@@ -79,10 +79,9 @@ public class ProtoBufRecordReader implements RecordReader {
 
   private Descriptors.Descriptor buildProtoBufDescriptor(ProtoBufRecordReaderConfig protoBufRecordReaderConfig)
       throws IOException {
-    try {
-      InputStream fin = ProtoBufUtils.getDescriptorFileInputStream(
-          protoBufRecordReaderConfig.getDescriptorFile().toString());
-      DescriptorProtos.FileDescriptorSet set = DescriptorProtos.FileDescriptorSet.parseFrom(fin);
+    try (InputStream in = ProtoBufUtils.openDescriptorFile(
+        protoBufRecordReaderConfig.getDescriptorFile().toString())) {
+      DescriptorProtos.FileDescriptorSet set = DescriptorProtos.FileDescriptorSet.parseFrom(in);
       Descriptors.FileDescriptor fileDescriptor =
           Descriptors.FileDescriptor.buildFrom(set.getFile(0), new Descriptors.FileDescriptor[]{});
       return fileDescriptor.getMessageTypes().get(0);

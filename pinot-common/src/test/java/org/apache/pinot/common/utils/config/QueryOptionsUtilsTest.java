@@ -140,6 +140,20 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
+  public void testPlannerRulesParsing() {
+    // Rule names are trimmed, and empty names are dropped
+    Map<String, String> queryOptions = Map.of(USE_PLANNER_RULES, "SortJoinTranspose, AggregateJoinTransposeExtended, ",
+        SKIP_PLANNER_RULES, " FilterIntoJoin ,,FilterAggregateTranspose");
+    assertEquals(QueryOptionsUtils.getUsePlannerRules(queryOptions),
+        Set.of("SortJoinTranspose", "AggregateJoinTransposeExtended"));
+    assertEquals(QueryOptionsUtils.getSkipPlannerRules(queryOptions),
+        Set.of("FilterIntoJoin", "FilterAggregateTranspose"));
+
+    assertEquals(QueryOptionsUtils.getUsePlannerRules(Map.of()), Set.of());
+    assertEquals(QueryOptionsUtils.getSkipPlannerRules(Map.of()), Set.of());
+  }
+
+  @Test
   public void testIntegerSettingParseSuccess() {
     HashMap<String, String> map = new HashMap<>();
 

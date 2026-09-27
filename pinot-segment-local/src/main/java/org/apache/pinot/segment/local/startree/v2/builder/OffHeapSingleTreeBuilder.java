@@ -32,13 +32,18 @@ import java.util.Arrays;
 import java.util.Iterator;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.roaringbitmap.RoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// The `OffHeapSingleTreeBuilder` class is the single star-tree builder that uses off-heap memory.
 public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OffHeapSingleTreeBuilder.class);
   private static final String SEGMENT_RECORD_FILE_NAME = "segment.record";
   private static final String STAR_TREE_RECORD_FILE_NAME = "star-tree.record";
   // If the temporary buffer needed is larger than 500M, use MMAP, otherwise use DIRECT
@@ -49,6 +54,16 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   private final BufferedOutputStream _starTreeRecordOutputStream;
   private final RecordOffsets _starTreeRecordOffsets;
 
+  /// One bitmap per metric holding the doc ids whose group aggregated over no non-null input, or `null` when null
+  /// handling is disabled. A record is stored the way a regular column is: the metric keeps a placeholder in the
+  /// serialized record and its nullness lives beside it, so the record layout is unchanged and the arithmetic in
+  /// [FixedSizeRecordOffsets] still holds.
+  ///
+  /// Keying on the doc id is safe because records are never moved: sorting permutes an array of doc ids and compares
+  /// through it, leaving each record where it was written.
+  private final RoaringBitmap[] _metricNullBitmaps;
+
+  private PinotDataBuffer _segmentRecordBuffer;
   private PinotDataBuffer _starTreeRecordBuffer;
   private int _numReadableStarTreeRecords;
 
@@ -64,6 +79,7 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
         _starTreeRecordFile);
     _starTreeRecordOutputStream = new BufferedOutputStream(new FileOutputStream(_starTreeRecordFile));
     _starTreeRecordOffsets = createRecordOffsets();
+    _metricNullBitmaps = _nullHandlingEnabled ? new RoaringBitmap[_numMetrics] : null;
   }
 
   /// Returns [FixedSizeRecordOffsets] when all metrics are serialized with a fixed size (see
@@ -86,6 +102,11 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
     return new FixedSizeRecordOffsets(recordSize);
   }
 
+  /// Serializes a record into the temporary star-tree record store.
+  ///
+  /// A metric that aggregated over no non-null input has no value to write, so the aggregated type's zero is written
+  /// in its place and [#appendRecord] records the nullness in [#_metricNullBitmaps]. The placeholder is never read
+  /// back: [#deserializeStarTreeRecord] consults the bitmap first.
   @SuppressWarnings("unchecked")
   private byte[] serializeStarTreeRecord(Record starTreeRecord) {
     int numBytes = _numDimensions * Integer.BYTES;
@@ -99,7 +120,9 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
           numBytes += Double.BYTES;
           break;
         case BYTES:
-          metricBytes[i] = _valueAggregators[i].serializeAggregatedValue(starTreeRecord._metrics[i]);
+          Object bytesValue = starTreeRecord._metrics[i];
+          metricBytes[i] = bytesValue != null ? _valueAggregators[i].serializeAggregatedValue(bytesValue)
+              : ArrayUtils.EMPTY_BYTE_ARRAY;
           numBytes += Integer.BYTES + metricBytes[i].length;
           break;
         default:
@@ -112,12 +135,13 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
       byteBuffer.putInt(dimension);
     }
     for (int i = 0; i < _numMetrics; i++) {
+      Object value = starTreeRecord._metrics[i];
       switch (_valueAggregators[i].getAggregatedValueType()) {
         case LONG:
-          byteBuffer.putLong((Long) starTreeRecord._metrics[i]);
+          byteBuffer.putLong(value != null ? (long) value : 0L);
           break;
         case DOUBLE:
-          byteBuffer.putDouble((Double) starTreeRecord._metrics[i]);
+          byteBuffer.putDouble(value != null ? (double) value : 0d);
           break;
         case BYTES:
           byteBuffer.putInt(metricBytes[i].length);
@@ -130,7 +154,11 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
     return bytes;
   }
 
-  private Record deserializeStarTreeRecord(PinotDataBuffer buffer, long offset) {
+  /// Deserializes the record at `docId`, whose metrics start at `offset`.
+  ///
+  /// A metric marked null in [#_metricNullBitmaps] comes back as `null` without its placeholder being deserialized,
+  /// which matters for `BYTES`: the placeholder is an empty array that no aggregator can decode.
+  private Record deserializeStarTreeRecord(PinotDataBuffer buffer, long offset, int docId) {
     int[] dimensions = new int[_numDimensions];
     for (int i = 0; i < _numDimensions; i++) {
       dimensions[i] = buffer.getInt(offset);
@@ -140,20 +168,22 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
     for (int i = 0; i < _numMetrics; i++) {
       switch (_valueAggregators[i].getAggregatedValueType()) {
         case LONG:
-          metrics[i] = buffer.getLong(offset);
+          metrics[i] = hasMetricValue(docId, i) ? buffer.getLong(offset) : null;
           offset += Long.BYTES;
           break;
         case DOUBLE:
-          metrics[i] = buffer.getDouble(offset);
+          metrics[i] = hasMetricValue(docId, i) ? buffer.getDouble(offset) : null;
           offset += Double.BYTES;
           break;
         case BYTES:
           int numBytes = buffer.getInt(offset);
           offset += Integer.BYTES;
-          byte[] bytes = new byte[numBytes];
-          buffer.copyTo(offset, bytes);
+          if (hasMetricValue(docId, i)) {
+            byte[] bytes = new byte[numBytes];
+            buffer.copyTo(offset, bytes);
+            metrics[i] = _valueAggregators[i].deserializeAggregatedValue(bytes);
+          }
           offset += numBytes;
-          metrics[i] = _valueAggregators[i].deserializeAggregatedValue(bytes);
           break;
         default:
           throw new IllegalStateException();
@@ -168,13 +198,40 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
     byte[] bytes = serializeStarTreeRecord(record);
     _starTreeRecordOutputStream.write(bytes);
     _starTreeRecordOffsets.addRecord(bytes.length);
+    if (_metricNullBitmaps != null) {
+      // The caller assigns this record _numDocs and increments it afterwards, so it is this record's doc id
+      markNullMetrics(record, _numDocs);
+    }
+  }
+
+  /// Records which of the record's metrics aggregated over no non-null input.
+  private void markNullMetrics(Record record, int docId) {
+    for (int i = 0; i < _numMetrics; i++) {
+      if (record._metrics[i] == null) {
+        RoaringBitmap nullBitmap = _metricNullBitmaps[i];
+        if (nullBitmap == null) {
+          nullBitmap = new RoaringBitmap();
+          _metricNullBitmaps[i] = nullBitmap;
+        }
+        nullBitmap.add(docId);
+      }
+    }
+  }
+
+  /// Returns whether the record holds a value for the metric, as opposed to having aggregated over no non-null input.
+  private boolean hasMetricValue(int docId, int metricId) {
+    if (_metricNullBitmaps == null) {
+      return true;
+    }
+    RoaringBitmap nullBitmap = _metricNullBitmaps[metricId];
+    return nullBitmap == null || !nullBitmap.contains(docId);
   }
 
   @Override
   Record getStarTreeRecord(int docId)
       throws IOException {
     ensureBufferReadable(docId);
-    return deserializeStarTreeRecord(_starTreeRecordBuffer, _starTreeRecordOffsets.getStartOffset(docId));
+    return deserializeStarTreeRecord(_starTreeRecordBuffer, _starTreeRecordOffsets.getStartOffset(docId), docId);
   }
 
   @Override
@@ -203,13 +260,12 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   Iterator<Record> sortAndAggregateSegmentRecords(int numDocs)
       throws IOException {
     // Write all dimensions for segment records into the buffer, and sort all records using an int array
-    PinotDataBuffer dataBuffer;
     long bufferSize = (long) numDocs * _numDimensions * Integer.BYTES;
     if (bufferSize > MMAP_SIZE_THRESHOLD) {
-      dataBuffer = PinotDataBuffer.mapFile(_segmentRecordFile, false, 0, bufferSize, PinotDataBuffer.NATIVE_ORDER,
-          "OffHeapSingleTreeBuilder: segment record buffer");
+      _segmentRecordBuffer = PinotDataBuffer.mapFile(_segmentRecordFile, false, 0, bufferSize,
+          PinotDataBuffer.NATIVE_ORDER, "OffHeapSingleTreeBuilder: segment record buffer");
     } else {
-      dataBuffer = PinotDataBuffer.allocateDirect(bufferSize, PinotDataBuffer.NATIVE_ORDER,
+      _segmentRecordBuffer = PinotDataBuffer.allocateDirect(bufferSize, PinotDataBuffer.NATIVE_ORDER,
           "OffHeapSingleTreeBuilder: segment record buffer");
     }
     int[] sortedDocIds = new int[numDocs];
@@ -221,7 +277,7 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
       for (int i = 0; i < numDocs; i++) {
         int[] dimensions = getSegmentRecordDimensions(i);
         for (int j = 0; j < _numDimensions; j++) {
-          dataBuffer.putInt(offset, dimensions[j]);
+          _segmentRecordBuffer.putInt(offset, dimensions[j]);
           offset += Integer.BYTES;
         }
       }
@@ -229,8 +285,8 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
         long offset1 = (long) sortedDocIds[i1] * _numDimensions * Integer.BYTES;
         long offset2 = (long) sortedDocIds[i2] * _numDimensions * Integer.BYTES;
         for (int i = 0; i < _numDimensions; i++) {
-          int dimension1 = dataBuffer.getInt(offset1 + (long) i * Integer.BYTES);
-          int dimension2 = dataBuffer.getInt(offset2 + (long) i * Integer.BYTES);
+          int dimension1 = _segmentRecordBuffer.getInt(offset1 + (long) i * Integer.BYTES);
+          int dimension2 = _segmentRecordBuffer.getInt(offset2 + (long) i * Integer.BYTES);
           if (dimension1 != dimension2) {
             return dimension1 - dimension2;
           }
@@ -241,40 +297,67 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
         sortedDocIds[i1] = sortedDocIds[i2];
         sortedDocIds[i2] = temp;
       });
-    } finally {
-      dataBuffer.close();
-      if (_segmentRecordFile.exists()) {
+
+      // Iterator reads dims from `_segmentRecordBuffer` (populated sequentially above) instead of
+      // re-fetching them from the segment forward index in the sorted (random-with-respect-to-layout)
+      // order. The buffer is a field, guaranteed to be released by close() via the try-with-resources
+      // on the builder in MultipleTreesBuilder — the terminal next() below is an early-release
+      // optimization; releaseSegmentRecordBuffer() is idempotent, so double-release is safe.
+      return new Iterator<Record>() {
+        boolean _hasNext = true;
+        Record _currentRecord = getSegmentRecordWithBufferDims(sortedDocIds[0], _segmentRecordBuffer);
+        int _docId = 1;
+
+        @Override
+        public boolean hasNext() {
+          return _hasNext;
+        }
+
+        @Override
+        public Record next() {
+          Record next = mergeSegmentRecord(null, _currentRecord);
+          while (_docId < numDocs) {
+            Record record = getSegmentRecordWithBufferDims(sortedDocIds[_docId++], _segmentRecordBuffer);
+            if (!Arrays.equals(record._dimensions, next._dimensions)) {
+              _currentRecord = record;
+              return next;
+            } else {
+              next = mergeSegmentRecord(next, record);
+            }
+          }
+          _hasNext = false;
+          releaseSegmentRecordBuffer();
+          return next;
+        }
+      };
+    } catch (Throwable t) {
+      // Fill / sort / iterator construction failed: nobody will drain the iterator, so release
+      // the buffer here. close() will find `_segmentRecordBuffer == null` and skip re-releasing.
+      releaseSegmentRecordBuffer();
+      throw t;
+    }
+  }
+
+  // Idempotent: safe to call multiple times from any exit path (iterator drain, exception during
+  // sortAndAggregate, or close() via try-with-resources). Null-checks the field and sets it to null
+  // after release, so a second call is a no-op. Best-effort — close() failures are logged, not
+  // thrown, so a successful build isn't masked by a cleanup error on the return path.
+  private void releaseSegmentRecordBuffer() {
+    if (_segmentRecordBuffer != null) {
+      try {
+        _segmentRecordBuffer.close();
+      } catch (IOException e) {
+        LOGGER.warn("Failed to close segment record buffer", e);
+      }
+      _segmentRecordBuffer = null;
+    }
+    if (_segmentRecordFile.exists()) {
+      try {
         FileUtils.forceDelete(_segmentRecordFile);
+      } catch (IOException e) {
+        LOGGER.warn("Failed to delete segment record file: {}", _segmentRecordFile, e);
       }
     }
-
-    // Create an iterator for aggregated records
-    return new Iterator<Record>() {
-      boolean _hasNext = true;
-      Record _currentRecord = getSegmentRecord(sortedDocIds[0]);
-      int _docId = 1;
-
-      @Override
-      public boolean hasNext() {
-        return _hasNext;
-      }
-
-      @Override
-      public Record next() {
-        Record next = mergeSegmentRecord(null, _currentRecord);
-        while (_docId < numDocs) {
-          Record record = getSegmentRecord(sortedDocIds[_docId++]);
-          if (!Arrays.equals(record._dimensions, next._dimensions)) {
-            _currentRecord = record;
-            return next;
-          } else {
-            next = mergeSegmentRecord(next, record);
-          }
-        }
-        _hasNext = false;
-        return next;
-      }
-    };
   }
 
   @Override
@@ -352,7 +435,11 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   @Override
   public void close()
       throws IOException {
-    super.close();
+    try {
+      super.close();
+    } finally {
+      releaseSegmentRecordBuffer();
+    }
     if (_starTreeRecordBuffer != null) {
       _starTreeRecordBuffer.close();
     }

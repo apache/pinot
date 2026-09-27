@@ -206,15 +206,14 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
     validateAnyValueBehavior(result, true); // Should return non-null (multiple non-null values available)
   }
 
-  // Performance validation test - ensures ANY_VALUE doesn't require all values to be processed
   @Test
-  void testPerformanceWithLargeDataset() {
+  void testGroupByWithMultipleStringValues() {
     // ANY_VALUE can return any of the values in the dataset
     // This test has mixed values, so ANY_VALUE could return any of them
     DataTypeScenario scenario = new DataTypeScenario(DataType.STRING);
     FluentQueryTest.DeclaringTable table = scenario.getDeclaringTable(true);
 
-    // Create a large dataset where ANY_VALUE can return any value
+    // Each instance provides distinct string values that ANY_VALUE can return.
     FluentQueryTest.QueryExecuted result =
         table.onFirstInstance("myField", "first_value", "value_1", "value_2", "value_3", "value_4")
             .andOnSecondInstance("myField", "value_5", "value_6", "value_7", "value_8", "value_9")

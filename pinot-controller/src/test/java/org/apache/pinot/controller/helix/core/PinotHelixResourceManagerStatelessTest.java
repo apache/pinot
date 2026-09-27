@@ -77,8 +77,10 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
@@ -1124,6 +1126,36 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       resourceManager.updateTableConfig(updatedTableConfig);
 
       verify(resourceManager).sendTableConfigRefreshMessage(offlineTableName);
+      verify(resourceManager).sendTableConfigSchemaRefreshMessage(offlineTableName);
+    } finally {
+      _helixResourceManager.deleteOfflineTable(rawTableName);
+      deleteSchema(rawTableName);
+    }
+  }
+
+  @Test
+  public void testAddSchemaWithOverrideRefreshesServerCaches()
+      throws Exception {
+    String rawTableName = "schemaOverrideRefreshTest";
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    addDummySchema(rawTableName);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(rawTableName)
+        .setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME)
+        .build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    _helixResourceManager.addTable(tableConfig);
+
+    PinotHelixResourceManager resourceManager = spy(_helixResourceManager);
+    doNothing().when(resourceManager).sendTableConfigSchemaRefreshMessage(offlineTableName);
+
+    try {
+      Schema schema = createDummySchema(rawTableName);
+      schema.addField(new DimensionFieldSpec("dimC", FieldSpec.DataType.STRING, true));
+      resourceManager.addSchema(schema, true, false);
+
+      assertEquals(resourceManager.getSchema(rawTableName), schema);
       verify(resourceManager).sendTableConfigSchemaRefreshMessage(offlineTableName);
     } finally {
       _helixResourceManager.deleteOfflineTable(rawTableName);

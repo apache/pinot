@@ -73,7 +73,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
       for (String mailboxId : _mailboxIds) {
         ReceivingMailbox receivingMailbox = _mailboxService.getReceivingMailbox(mailboxId);
         receivingMailbox.registerReceiveOperatorThreadContext(QueryThreadContext.getIfAvailable());
-        ReadMailboxAsyncStream asyncStream = new ReadMailboxAsyncStream(receivingMailbox, this);
+        ReadMailboxAsyncStream asyncStream = new ReadMailboxAsyncStream(receivingMailbox, _mailboxService);
         asyncStreams.add(asyncStream);
         _receivingStats.add(asyncStream._mailbox.getStatMap());
       }
@@ -164,13 +164,20 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     _statMap.merge(StatKey.UPSTREAM_WAIT_MS, from.getLong(ReceivingMailbox.StatKey.WAIT_CPU_TIME_MS));
   }
 
+  /// Adapts a [ReceivingMailbox] to the [AsyncStream] the [BlockingMultiStreamConsumer] reads from.
+  ///
+  /// Deliberately holds the [MailboxService] and not the operator. The mailbox keeps this stream reachable through
+  /// the reader callback registered on it, and after a failed query the mailbox itself stays in the service's cache
+  /// until it expires (see [#poll()] for why it is not released earlier). A reference back to the operator from here
+  /// would keep the operator, its [OpChainExecutionContext] and everything reachable from them alive for that whole
+  /// time.
   private static class ReadMailboxAsyncStream implements AsyncStream<ReceivingMailbox.MseBlockWithStats> {
     final ReceivingMailbox _mailbox;
-    final BaseMailboxReceiveOperator _operator;
+    final MailboxService _mailboxService;
 
-    ReadMailboxAsyncStream(ReceivingMailbox mailbox, BaseMailboxReceiveOperator operator) {
+    ReadMailboxAsyncStream(ReceivingMailbox mailbox, MailboxService mailboxService) {
       _mailbox = mailbox;
-      _operator = operator;
+      _mailboxService = mailboxService;
     }
 
     @Override
@@ -186,9 +193,11 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
       if (blockWithStats != null) {
         MseBlock block = blockWithStats.getBlock();
 
-        // TODO: Check if we should also release mailbox on not successful EOS.
+        // Only a successful EOS releases the mailbox from the service's cache. After an error the senders may still
+        // be running, and they have to find the cancelled mailbox rather than recreate a fresh one that nobody reads.
+        // The cache expiry takes care of it, and this stream holds nothing that makes that wait expensive.
         if (block.isSuccess()) {
-          _operator._mailboxService.releaseReceivingMailbox(_mailbox);
+          _mailboxService.releaseReceivingMailbox(_mailbox);
         }
       }
       return blockWithStats;

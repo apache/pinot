@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.document.Document;
@@ -71,7 +73,6 @@ import org.slf4j.LoggerFactory;
 /// Every added document stores the supplied Pinot doc id as a [NumericDocValuesField]. The same doc values
 /// drive both filtered traversal and the translation of search hits, so no assumption is made that
 /// `ScoreDoc.doc == Pinot docId` (Lucene may renumber on merges).
-
 ///
 /// Filtered search ([#getDocIds(float[], int, ImmutableRoaringBitmap)]) restricts HNSW candidate generation
 /// to the given Pinot doc ids (used to enforce the upsert doc-ids snapshot). It searches a near-real-time
@@ -80,16 +81,16 @@ import org.slf4j.LoggerFactory;
 /// unfiltered path keeps searching the last committed generation (cheaper; commit cadence is controlled by
 /// `commitIntervalMs` / `commitDocs`).
 ///
-/// **Cost of that freshness.** A refresh flushes the writer's RAM buffer, which for a vector field writes out
-/// the HNSW graph for the pending rows as a new Lucene segment. While a segment is actively consuming, nearly
-/// every filtered query finds new rows and therefore triggers one, so segment creation is driven by query rate
-/// rather than ingestion rate, and the resulting merges rebuild graphs. Concurrent callers coalesce onto a
-/// single refresh rather than each forcing their own. Bounding this properly means reopening on a background
-/// thread and having queries wait on a sequence number instead of driving the flush themselves -- see
-/// `RealtimeLuceneIndexRefreshManager`, which does that for the text indexes, and Lucene's
-/// `ControlledRealTimeReopenThread`. Until then, correctness is preserved at the cost of that flush.
+/// **Cost of that freshness.** A reopen flushes the writer's RAM buffer, which writes a new Lucene segment and
+/// builds an HNSW graph over the rows it contains. Query threads never pay that cost directly: a filtered query
+/// publishes the writer generation it needs and waits, and a single background thread performs the reopen, so
+/// concurrent queries needing the same generation share one flush rather than forcing one each. Reopens happen
+/// only while a query is waiting -- never on a timer -- and are spaced at least `refreshMinIntervalMs` apart, so
+/// segment creation stays bounded by ingestion rather than by query rate. A query waits at most
+/// `refreshWaitTimeoutMs`, then fails rather than answering from a searcher that may not hold its rows.
 ///
-/// This class is thread-safe for single writer multiple readers.
+/// This class is thread-safe for a single writer and multiple readers, plus one background reopen thread that
+/// this instance owns and [#close()] stops.
 public class MutableVectorIndex
     implements FilterAwareVectorIndexReader, MutableIndex, VectorIndexConfigProvider, EfSearchAware {
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableVectorIndex.class);
@@ -99,6 +100,21 @@ public class MutableVectorIndex
   public static final String VECTOR_INDEX_DOC_ID_COLUMN_NAME = "DocID";
   public static final long DEFAULT_COMMIT_INTERVAL_MS = 10_000L;
   public static final long DEFAULT_COMMIT_DOCS = 1000L;
+  public static final String REFRESH_MIN_INTERVAL_MS = "refreshMinIntervalMs";
+  public static final String REFRESH_WAIT_TIMEOUT_MS = "refreshWaitTimeoutMs";
+  /// Minimum spacing between reopens, and equally the freshness delay a filtered query can pay. Raising it trades
+  /// query latency for fewer writer flushes; 0 disables the spacing.
+  ///
+  /// The default is deliberately small because most of the reduction comes from sharing rather than from spacing:
+  /// one reopen serves every query waiting on it, so reopens fall roughly by the number of concurrent readers
+  /// whatever this is set to. Measured at 2000 docs/s with 8 reader threads, raising it from 1ms to 10ms cut
+  /// reopens a further 4x but cost 4x the throughput and 4.5x the p50, landing well below the per-query-refresh
+  /// behaviour it replaces. At 1ms it measured better than that behaviour on throughput, p50, p95 and p99 while
+  /// still performing about a quarter of its reopens.
+  public static final long DEFAULT_REFRESH_MIN_INTERVAL_MS = 1L;
+  /// How long a filtered query waits for a reopen before failing. Bounded on purpose: an unbounded wait would let
+  /// a stalled reopen pin query threads of the shared searcher pool indefinitely.
+  public static final long DEFAULT_REFRESH_WAIT_TIMEOUT_MS = 5_000L;
   private final int _vectorDimension;
   private final VectorIndexConfig _vectorIndexConfig;
   private final VectorSimilarityFunction _vectorSimilarityFunction;
@@ -110,24 +126,47 @@ public class MutableVectorIndex
   private final FSDirectory _indexDirectory;
   private final IndexWriter _indexWriter;
   // Near-real-time searcher over the writer, used by the filtered search path (upsert doc-ids snapshot
-  // enforcement) so uncommitted rows are visible; refreshed on demand, reused across queries
+  // enforcement) so uncommitted rows are visible; reopened by _reopenThread, reused across queries
   private final SearcherManager _searcherManager;
-  // Coordinates callers that need the same near-real-time generation. One caller refreshes while the others wait
-  // for its published watermark instead of serializing on maybeRefreshBlocking or reopening the same generation.
-  private final Object _searcherRefreshMonitor = new Object();
-  // Guarded by _searcherRefreshMonitor.
-  private boolean _searcherRefreshInProgress;
-  private volatile long _searcherRefreshCount;
+  /// Performs every near-real-time reopen on one background thread. Query threads never flush the writer
+  /// themselves: they publish the generation they need and block until this thread has reopened past it, so N
+  /// concurrent queries share one reopen instead of forcing N.
+  ///
+  /// Deliberately hand-rolled rather than delegating to Lucene's `ControlledRealTimeReopenThread`, for two reasons
+  /// that both bear on correctness here. That class publishes its searching generation from a
+  /// `ReferenceManager.RefreshListener`, which `ReferenceManager#doMaybeRefresh` invokes from a finally block --
+  /// so a reopen that *threw* still advertises the generation it merely attempted, and a filtered query would then
+  /// search a stale searcher and silently drop rows its filter names. And its reopen loop refreshes on a fixed
+  /// cadence whether or not anyone is waiting, which on a consuming segment is never a no-op: rows are always
+  /// buffered, so every tick flushes and builds a graph even for a table that runs no filtered query at all.
+  /// The loop below publishes only after a reopen returns normally, and runs only when a query is waiting.
+  private final Thread _reopenThread;
+  private final long _refreshMinIntervalMs;
+  private final long _refreshWaitTimeoutMs;
+  /// Guards the reopen handshake: the requested and reached generations, the failure record, and the closed flag.
+  private final Object _refreshMonitor = new Object();
+  /// Highest generation any waiting query has asked for. Guarded by [#_refreshMonitor].
+  private long _requestedSequenceNumber = -1;
+  /// Highest generation the shared searcher is known to cover. Published only after a reopen returns normally, so
+  /// a failed reopen can never make a query believe it is looking at rows the searcher does not have.
+  private volatile long _refreshedThroughSequenceNumber = -1;
+  /// Last reopen failure and a count of them, so a query blocked across a failure fails instead of waiting out its
+  /// timeout. Guarded by [#_refreshMonitor].
+  private Throwable _reopenFailure;
+  private long _reopenFailureCount;
+  private boolean _closed;
+  private final AtomicLong _searcherRefreshCount = new AtomicLong();
+  private final AtomicLong _searcherRefreshWaitCount = new AtomicLong();
   // Number of documents added so far; used only for the commit cadence, never as a doc id. Written by the indexing
   // thread only; read cross-thread for debug output, where staleness is acceptable.
   private volatile int _numDocsAdded;
-  /// Sequence number of the newest row handed to the writer, and the sequence number the shared searcher was
-  /// last refreshed through. Together they let a filtered search skip the refresh when nothing has been added
-  /// since. Doc ids cannot be used for this: [MutableIndex#add] allows rows in arbitrary doc-id order, so a
-  /// doc-id watermark would skip the refresh a lower-numbered but newer row needs. Writer sequence numbers are
-  /// monotonic by construction. Written by the single indexing thread, read by query threads.
+  /// Sequence number of the newest row handed to the writer. A filtered search waits for the reopen thread to
+  /// pass this value, and skips waiting entirely when the searcher is already past it. Doc ids cannot be used
+  /// for this: [MutableIndex#add] allows rows in arbitrary doc-id order, so a doc-id watermark would skip the
+  /// wait a lower-numbered but newer row needs. Writer sequence numbers are monotonic by construction, and share
+  /// the space that `IndexWriter#getMaxCompletedSequenceNumber` reports, which is what the reopen thread
+  /// publishes as its searching generation. Written by the single indexing thread, read by query threads.
   private volatile long _lastAddedSequenceNumber = -1;
-  private volatile long _searcherRefreshedThroughSequenceNumber = -1;
 
   private long _lastCommitTime;
   private final ThreadLocal<Integer> _efSearchOverride = new ThreadLocal<>();
@@ -143,6 +182,14 @@ public class MutableVectorIndex
         vectorIndexConfig.getProperties().getOrDefault("commitIntervalMs", String.valueOf(DEFAULT_COMMIT_INTERVAL_MS)));
     _commitDocs = Long.parseLong(
         vectorIndexConfig.getProperties().getOrDefault("commitDocs", String.valueOf(DEFAULT_COMMIT_DOCS)));
+    _refreshMinIntervalMs = Long.parseLong(vectorIndexConfig.getProperties()
+        .getOrDefault(REFRESH_MIN_INTERVAL_MS, String.valueOf(DEFAULT_REFRESH_MIN_INTERVAL_MS)));
+    _refreshWaitTimeoutMs = Long.parseLong(vectorIndexConfig.getProperties()
+        .getOrDefault(REFRESH_WAIT_TIMEOUT_MS, String.valueOf(DEFAULT_REFRESH_WAIT_TIMEOUT_MS)));
+    Preconditions.checkArgument(_refreshMinIntervalMs >= 0, "Require %s >= 0, got %s for column: %s",
+        REFRESH_MIN_INTERVAL_MS, _refreshMinIntervalMs, vectorColumn);
+    Preconditions.checkArgument(_refreshWaitTimeoutMs > 0, "Require %s > 0, got %s for column: %s",
+        REFRESH_WAIT_TIMEOUT_MS, _refreshWaitTimeoutMs, vectorColumn);
     _vectorSimilarityFunction = VectorIndexUtils.toSimilarityFunction(vectorIndexConfig.getVectorDistanceFunction());
     // Each column of a segment gets its own directory, so that cleaning up one column does not remove the index of
     // another column of the same segment.
@@ -152,6 +199,7 @@ public class MutableVectorIndex
     FSDirectory indexDirectory = null;
     IndexWriter indexWriter = null;
     SearcherManager searcherManager = null;
+    Thread reopenThread = null;
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
@@ -165,6 +213,8 @@ public class MutableVectorIndex
           VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig).setOpenMode(IndexWriterConfig.OpenMode.CREATE));
       indexWriter.commit();
       searcherManager = new SearcherManager(indexWriter, false, false, null);
+      reopenThread = new Thread(this::reopenLoop, "vector-nrt-reopen-" + segmentName + "-" + vectorColumn);
+      reopenThread.setDaemon(true);
       _lastCommitTime = System.currentTimeMillis();
     } catch (Exception e) {
       // IndexWriter does not close the Directory passed to it, so both need to be closed.
@@ -180,6 +230,18 @@ public class MutableVectorIndex
     _indexDirectory = indexDirectory;
     _indexWriter = indexWriter;
     _searcherManager = searcherManager;
+    _reopenThread = reopenThread;
+    // Started last: the loop reads final fields assigned above, so publishing `this` to another thread any
+    // earlier would race construction. Guarded because this is where OutOfMemoryError: unable to create native
+    // thread lands, and by now nothing else holds a reference that could close the writer -- which would keep
+    // write.lock on a directory whose name is deterministic, so every retry of this segment would then fail.
+    try {
+      _reopenThread.start();
+    } catch (Throwable t) {
+      IOUtils.closeWhileHandlingException(_searcherManager, _indexWriter, _indexDirectory);
+      deleteIndexDir();
+      throw t;
+    }
   }
 
   @Override
@@ -314,6 +376,11 @@ public class MutableVectorIndex
     info.put("effectiveHnswUseRelativeDistance", getEffectiveUseRelativeDistance());
     info.put("effectiveHnswUseBoundedQueue", getEffectiveUseBoundedQueue());
     info.put("supportsPreFilter", supportsPreFilter());
+    info.put(REFRESH_MIN_INTERVAL_MS, _refreshMinIntervalMs);
+    info.put(REFRESH_WAIT_TIMEOUT_MS, _refreshWaitTimeoutMs);
+    // Reopens vs. the queries that had to wait for one: the gap between them is the sharing this path relies on.
+    info.put("searcherRefreshCount", _searcherRefreshCount.get());
+    info.put("searcherRefreshWaitCount", _searcherRefreshWaitCount.get());
     try (DirectoryReader directoryReader = DirectoryReader.open(_indexDirectory)) {
       info.put("numDocs", directoryReader.numDocs());
       info.put("numDeletedDocs", directoryReader.numDeletedDocs());
@@ -333,14 +400,9 @@ public class MutableVectorIndex
       throws IOException {
     if (preFilterBitmap != null) {
       // Filtered search enforces the query's visible-document set, so it must see every row that set names --
-      // including rows still in the writer's RAM buffer. Refreshing flushes the writer, so only refresh when this
-      // query can actually see past the last refresh, and coalesce callers waiting for the same generation. The
-      // added-doc watermark is read BEFORE refreshing so rows arriving during the refresh are not wrongly claimed
-      // as visible.
-      long lastAdded = _lastAddedSequenceNumber;
-      if (lastAdded > _searcherRefreshedThroughSequenceNumber) {
-        refreshSearcherThrough(lastAdded);
-      }
+      // including rows still in the writer's RAM buffer. The watermark is read BEFORE waiting, so rows arriving
+      // during the reopen are not wrongly claimed as visible.
+      awaitSearcherGeneration(_lastAddedSequenceNumber);
       IndexSearcher indexSearcher = _searcherManager.acquire();
       try {
         return search(indexSearcher, vector, topK, efSearch, useRelativeDistance, useBoundedQueue,
@@ -356,64 +418,166 @@ public class MutableVectorIndex
     }
   }
 
-  /// Refreshes the shared near-real-time searcher through `targetSequenceNumber`, coalescing concurrent callers.
+  /// Blocks until the shared searcher is known to cover `targetSequenceNumber`.
   ///
-  /// The winning caller publishes the exact generation it captured before refreshing and wakes the waiters. A
-  /// waiter whose target is newer then performs the next refresh. This is necessary because rows added during a
-  /// refresh are not guaranteed to be visible in the reopened reader.
-  private void refreshSearcherThrough(long targetSequenceNumber)
+  /// The reopen itself runs on [#_reopenThread]; this only publishes the generation needed and waits. That is the
+  /// point of the indirection -- every concurrent caller needing the same or an older generation is satisfied by
+  /// one reopen, and no query thread ever flushes the writer.
+  ///
+  /// Fails rather than waits when the reopen cannot deliver: a reopen that threw, a closed index, or a wait past
+  /// [#_refreshWaitTimeoutMs]. Returning normally without the generation would mean searching a stale searcher and
+  /// silently dropping rows the query's filter names, which is the failure this whole path exists to prevent.
+  @VisibleForTesting
+  void awaitSearcherGeneration(long targetSequenceNumber)
       throws IOException {
-    synchronized (_searcherRefreshMonitor) {
-      while (_searcherRefreshInProgress
-          && _searcherRefreshedThroughSequenceNumber < targetSequenceNumber) {
-        onSearcherRefreshWait();
+    // Plain volatile read, so a query that is already covered adds no synchronization at all.
+    if (targetSequenceNumber <= _refreshedThroughSequenceNumber) {
+      return;
+    }
+    _searcherRefreshWaitCount.incrementAndGet();
+    long deadlineMs = System.currentTimeMillis() + _refreshWaitTimeoutMs;
+    synchronized (_refreshMonitor) {
+      long failuresBefore = _reopenFailureCount;
+      if (targetSequenceNumber > _requestedSequenceNumber) {
+        _requestedSequenceNumber = targetSequenceNumber;
+      }
+      _refreshMonitor.notifyAll();
+      while (targetSequenceNumber > _refreshedThroughSequenceNumber) {
+        if (_closed) {
+          throw new IOException(describe("Vector index closed while waiting for the searcher to reopen"));
+        }
+        if (_reopenFailureCount != failuresBefore) {
+          throw new IOException(describe("Vector searcher reopen failed"), _reopenFailure);
+        }
+        long remainingMs = deadlineMs - System.currentTimeMillis();
+        if (remainingMs <= 0) {
+          throw new IOException(describe(
+              "Timed out after " + _refreshWaitTimeoutMs + "ms waiting for the vector searcher to reopen through "
+                  + "generation " + targetSequenceNumber));
+        }
         try {
-          _searcherRefreshMonitor.wait();
+          _refreshMonitor.wait(remainingMs);
         } catch (InterruptedException e) {
-          throw new IOException("Interrupted while waiting to refresh vector searcher for segment " + _segmentName
-              + " column " + _vectorColumn, e);
+          // Not re-arming the interrupt flag: the cause is preserved on the IOException, and this runs on a pooled
+          // Lucene searcher thread the pool deliberately keeps un-interrupted (see submitSearch).
+          throw new IOException(describe("Interrupted while waiting for the vector searcher to reopen"), e);
         }
       }
-      if (_searcherRefreshedThroughSequenceNumber >= targetSequenceNumber) {
-        return;
-      }
-      _searcherRefreshInProgress = true;
     }
+  }
 
-    try {
-      beforeSearcherRefresh();
-      // A false return means another caller already owns SearcherManager's refresh lock. This is benign: use the
-      // blocking form so this call still returns a searcher covering the requested writer generation.
-      if (!_searcherManager.maybeRefresh()) {
-        _searcherManager.maybeRefreshBlocking();
+  /// Reopens the shared searcher whenever a query is waiting for a generation it does not yet cover.
+  ///
+  /// Runs only on demand. An idle cadence would be pure cost here: a consuming segment always has buffered rows,
+  /// so a timed reopen is never the cheap no-op it is for a settled index -- it flushes the writer and builds an
+  /// HNSW graph for the flushed rows, even for a table that issues no filtered query at all.
+  private void reopenLoop() {
+    long lastReopenMs = 0L;
+    long failedRequest = Long.MIN_VALUE;
+    int consecutiveFailures = 0;
+    while (true) {
+      long request;
+      synchronized (_refreshMonitor) {
+        // Park unless someone needs a generation we have not reached AND have not already failed on. Without the
+        // failedRequest half, a request whose waiters have all given up would drive an unbounded retry-and-log
+        // loop, because a failed reopen never advances _refreshedThroughSequenceNumber.
+        while (!_closed && (_requestedSequenceNumber <= _refreshedThroughSequenceNumber
+            || _requestedSequenceNumber <= failedRequest)) {
+          try {
+            _refreshMonitor.wait();
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+          }
+        }
+        if (_closed) {
+          return;
+        }
+        // Spacing waits on the monitor rather than sleeping, so close() can wake it immediately. It has to loop:
+        // every arriving query calls notifyAll, and a single timed wait would return on that notification and
+        // reopen early, leaving the interval unenforced exactly when load makes it matter.
+        long reopenNotBeforeMs = lastReopenMs + Math.max(_refreshMinIntervalMs,
+            consecutiveFailures == 0 ? 0L : Math.min(1000L << Math.min(consecutiveFailures - 1, 5), 30_000L));
+        while (!_closed) {
+          long waitMs = reopenNotBeforeMs - System.currentTimeMillis();
+          if (waitMs <= 0) {
+            break;
+          }
+          try {
+            _refreshMonitor.wait(waitMs);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+          }
+        }
+        if (_closed) {
+          return;
+        }
+        // Read after the wait, so this reopen serves the newest request rather than the one that woke us.
+        request = _requestedSequenceNumber;
       }
-      synchronized (_searcherRefreshMonitor) {
-        _searcherRefreshedThroughSequenceNumber =
-            Math.max(_searcherRefreshedThroughSequenceNumber, targetSequenceNumber);
-        _searcherRefreshCount++;
+      // Read the writer's generation BEFORE reopening, so rows arriving during the reopen are not claimed as
+      // visible by a reader that may not contain them.
+      long generation;
+      try {
+        generation = _indexWriter.getMaxCompletedSequenceNumber();
+        doReopen();
+      } catch (Throwable t) {
+        consecutiveFailures++;
+        // Log the first failure of a run in full; after that only periodically, so a persistently failing writer
+        // cannot turn an already-degraded server into a log flood.
+        if (consecutiveFailures == 1 || consecutiveFailures % 100 == 0) {
+          LOGGER.error("Failed to reopen the vector searcher ({} consecutive) for segment: {}, column: {}",
+              consecutiveFailures, _segmentName, _vectorColumn, t);
+        }
+        lastReopenMs = System.currentTimeMillis();
+        synchronized (_refreshMonitor) {
+          _reopenFailure = t;
+          _reopenFailureCount++;
+          // Remember what failed so an abandoned request cannot drive a retry loop. A newer request still gets a
+          // fresh attempt, so a transient failure (disk pressure, a slow flush) recovers on the next query.
+          failedRequest = request;
+          _refreshMonitor.notifyAll();
+        }
+        continue;
       }
-    } finally {
-      synchronized (_searcherRefreshMonitor) {
-        _searcherRefreshInProgress = false;
-        _searcherRefreshMonitor.notifyAll();
+      lastReopenMs = System.currentTimeMillis();
+      consecutiveFailures = 0;
+      _searcherRefreshCount.incrementAndGet();
+      synchronized (_refreshMonitor) {
+        // Published only here, after a reopen that returned normally.
+        _refreshedThroughSequenceNumber = Math.max(_refreshedThroughSequenceNumber, generation);
+        _refreshMonitor.notifyAll();
       }
     }
   }
 
-  /// Test hook invoked by the winning refresher after it publishes the in-progress state.
+  /// Seam for tests that need a reopen to fail; the failure handling around it is the part worth covering.
   @VisibleForTesting
-  void beforeSearcherRefresh()
+  void doReopen()
       throws IOException {
+    _searcherManager.maybeRefreshBlocking();
   }
 
-  /// Test hook invoked when another caller is about to wait for the winning refresher.
+  private String describe(String message) {
+    return message + " for segment: " + _segmentName + ", column: " + _vectorColumn;
+  }
+
   @VisibleForTesting
-  void onSearcherRefreshWait() {
+  long getLastAddedSequenceNumber() {
+    return _lastAddedSequenceNumber;
   }
 
   @VisibleForTesting
   long getSearcherRefreshCount() {
-    return _searcherRefreshCount;
+    return _searcherRefreshCount.get();
+  }
+
+  /// Cumulative number of queries that had to wait for a reopen. Compared against the reopen count, this is what
+  /// shows sharing: many waits against one reopen.
+  @VisibleForTesting
+  long getSearcherRefreshWaitCount() {
+    return _searcherRefreshWaitCount.get();
   }
 
   private MutableRoaringBitmap search(IndexSearcher indexSearcher, float[] vector, int topK, int efSearch,
@@ -527,6 +691,17 @@ public class MutableVectorIndex
 
   @Override
   public void close() {
+    // Stop the reopen loop and release every waiting query before the searcher manager goes away: the loop
+    // refreshes through it, and a query blocked on a generation that will now never arrive must not hang.
+    synchronized (_refreshMonitor) {
+      _closed = true;
+      _refreshMonitor.notifyAll();
+    }
+    try {
+      _reopenThread.join(TimeUnit.SECONDS.toMillis(30));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
     try {
       _indexWriter.commit();
       // IndexWriter does not close the Directory passed to it, so both need to be closed.

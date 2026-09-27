@@ -240,7 +240,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$1], dir0=[DESC], offset=[0], fetch=[10])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(sort0=[$1], dir0=[DESC], fetch=[10])",
           "\n      PinotLogicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL], leafReturnFinalResult=[true])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
@@ -256,7 +256,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$1], dir0=[DESC], offset=[0], fetch=[10])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(sort0=[$1], dir0=[DESC], fetch=[10])",
           "\n      PinotLogicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL], leafReturnFinalResult=[true], collations=[[1 DESC]], limit=[10])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
@@ -272,7 +272,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[DESC], offset=[0], fetch=[10])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(sort0=[$0], dir0=[DESC], fetch=[10])",
           "\n      LogicalProject(cnt=[$1])",
           "\n        PinotLogicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL], collations=[[1 DESC]], limit=[10])",
@@ -336,7 +336,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0], fetch=[10])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(sort0=[$0], dir0=[ASC], fetch=[10])",
           "\n      PinotLogicalAggregate(group=[{0}], aggType=[FINAL], collations=[[0]], limit=[10])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",

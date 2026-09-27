@@ -55,6 +55,9 @@ import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils.SqlOptionsMode;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -97,21 +100,34 @@ public class RequestUtils {
     return sqlNodeAndOptions;
   }
 
-  /// Sets extra options for the given query.
+  /// Merges the request payload options (`queryOptions` and `trace`) into the options parsed from the SQL. The SQL
+  /// options take precedence, unless the request sets [Request.QueryOptionKey#SQL_OPTIONS_MODE] to `IGNORE` (the SQL
+  /// options are dropped) or `REJECT` (the query fails when it carries any).
   @VisibleForTesting
   public static void setOptions(SqlNodeAndOptions sqlNodeAndOptions, JsonNode jsonRequest) {
-    Map<String, String> queryOptions = new HashMap<>();
+    Map<String, String> requestOptions = new HashMap<>();
     if (jsonRequest.has(Request.QUERY_OPTIONS)) {
-      queryOptions.putAll(getOptionsFromString(jsonRequest.get(Request.QUERY_OPTIONS).asText()));
+      requestOptions.putAll(getOptionsFromString(jsonRequest.get(Request.QUERY_OPTIONS).asText()));
     }
     if (jsonRequest.has(Request.TRACE) && jsonRequest.get(Request.TRACE).asBoolean()) {
-      queryOptions.put(Request.TRACE, "true");
+      requestOptions.put(Request.TRACE, "true");
     }
-    if (!queryOptions.isEmpty()) {
-      LOGGER.debug("Query options are set to: {}", queryOptions);
+    if (requestOptions.isEmpty()) {
+      return;
     }
-    // Setting all query options back into SqlNodeAndOptions. The above ordering matters due to priority overwrite rule
-    sqlNodeAndOptions.setExtraOptions(queryOptions);
+    LOGGER.debug("Query options are set to: {}", requestOptions);
+    requestOptions = QueryOptionsUtils.resolveCaseInsensitiveOptions(requestOptions);
+    SqlOptionsMode sqlOptionsMode = QueryOptionsUtils.getSqlOptionsMode(requestOptions);
+    Map<String, String> sqlOptions = sqlNodeAndOptions.getOptions();
+    if (sqlOptionsMode != SqlOptionsMode.ALLOW && !sqlOptions.isEmpty()) {
+      if (sqlOptionsMode == SqlOptionsMode.REJECT) {
+        throw QueryErrorCode.QUERY_VALIDATION.asException(
+            "Query options are not allowed in the SQL for this request, found: " + sqlOptions.keySet());
+      }
+      sqlOptions.clear();
+    }
+    // SQL options take precedence over request options
+    requestOptions.forEach(sqlOptions::putIfAbsent);
   }
 
   public static Expression getIdentifierExpression(String identifier) {

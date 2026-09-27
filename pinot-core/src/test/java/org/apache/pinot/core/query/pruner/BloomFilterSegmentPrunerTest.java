@@ -30,8 +30,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -39,6 +44,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.OnHeapGuavaBloomFilterReader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -54,18 +60,27 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.mockito.ArgumentCaptor;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class BloomFilterSegmentPrunerTest {
@@ -240,6 +255,127 @@ public class BloomFilterSegmentPrunerTest {
     List<IndexSegment> selected =
         runPruner(segments, "SELECT COUNT(*) FROM testTable WHERE column = 21.0 AND column = 30.0", 5000);
     assertEquals(selected.size(), 1);
+  }
+
+  @DataProvider
+  public Object[][] prefetchExecutionModes() {
+    return new Object[][]{
+        {1, false, true},
+        {1, true, true},
+        {12, false, true},
+        {12, true, true},
+        {12, true, false}
+    };
+  }
+
+  @Test(dataProvider = "prefetchExecutionModes", timeOut = 10_000)
+  public void testPruningPreservesPrefetchLifecycle(int numSegments, boolean useExecutor, boolean enablePrefetch)
+      throws Exception {
+    List<IndexSegment> segments = new ArrayList<>();
+    List<IndexSegment> expected = new ArrayList<>();
+    for (int i = 0; i < numSegments; i++) {
+      IndexSegment segment = mockIndexSegment(new String[]{i % 2 == 0 ? "1.0" : "2.0"});
+      segments.add(segment);
+      if (i % 2 == 0) {
+        expected.add(segment);
+      }
+      AtomicBoolean acquired = new AtomicBoolean();
+      doAnswer(invocation -> {
+        assertFalse(acquired.getAndSet(true));
+        return null;
+      }).when(segment).acquire(any(FetchContext.class));
+      doAnswer(invocation -> {
+        acquired.set(false);
+        return null;
+      }).when(segment).release(any(FetchContext.class));
+      DataSource dataSource = segment.getDataSourceNullable("column");
+      DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
+      when(dataSource.getDataSourceMetadata()).thenAnswer(invocation -> {
+        assertEquals(acquired.get(), enablePrefetch, "Prefetched data must be acquired before pruning");
+        return metadata;
+      });
+    }
+    QueryContext query = prefetchQuery();
+    query.setEnablePrefetch(enablePrefetch);
+    query.setMaxExecutionThreads(4);
+    ExecutorService executor = Executors.newFixedThreadPool(4);
+    try {
+      List<IndexSegment> selected = useExecutor ? PRUNER.prune(segments, query, executor)
+          : PRUNER.prune(segments, query);
+      assertEquals(selected.size(), expected.size());
+      assertEquals(Set.copyOf(selected), Set.copyOf(expected));
+      for (IndexSegment segment : segments) {
+        if (enablePrefetch) {
+          assertReleasedPrefetch(segment, 1);
+        } else {
+          verify(segment, never()).prefetch(any(FetchContext.class));
+          verify(segment, never()).acquire(any(FetchContext.class));
+          verify(segment, never()).release(any(FetchContext.class));
+        }
+      }
+    } finally {
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+    }
+  }
+
+  @DataProvider
+  public Object[][] pruningFailures() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "pruningFailures", timeOut = 10_000)
+  public void testPrefetchReleasedAfterWorkerFailure(boolean interruptWorker)
+      throws Exception {
+    List<IndexSegment> segments = new ArrayList<>();
+    for (int i = 0; i < 12; i++) {
+      segments.add(mockIndexSegment(new String[]{"1.0"}));
+    }
+    DataSource dataSource = segments.getFirst().getDataSourceNullable("column");
+    DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
+    IllegalStateException workerFailure = new IllegalStateException("Cannot read bloom filter metadata");
+    when(dataSource.getDataSourceMetadata()).thenAnswer(invocation -> {
+      if (interruptWorker) {
+        Thread.currentThread().interrupt();
+        return metadata;
+      }
+      throw workerFailure;
+    });
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      RuntimeException failure = expectThrows(RuntimeException.class,
+          () -> PRUNER.prune(segments, prefetchQuery(), executor));
+      if (interruptWorker) {
+        assertTrue(ExceptionUtils.indexOfType(failure, QueryCancelledException.class) >= 0);
+      } else {
+        assertTrue(ExceptionUtils.getThrowableList(failure).contains(workerFailure));
+      }
+      assertReleasedPrefetch(segments.getFirst(), 1);
+      for (int i = 1; i < segments.size(); i++) {
+        assertReleasedPrefetch(segments.get(i), 0);
+      }
+    } finally {
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+    }
+  }
+
+  private QueryContext prefetchQuery() {
+    QueryContext query = QueryContextConverterUtils.getQueryContext(
+        "SELECT COUNT(*) FROM testTable WHERE column = 1.0");
+    query.setEnablePrefetch(true);
+    query.setMaxExecutionThreads(1);
+    query.setEndTimeMs(System.currentTimeMillis() + 30_000);
+    return query;
+  }
+
+  private void assertReleasedPrefetch(IndexSegment segment, int numAcquisitions) {
+    ArgumentCaptor<FetchContext> captor = ArgumentCaptor.forClass(FetchContext.class);
+    verify(segment).prefetch(captor.capture());
+    FetchContext fetchContext = captor.getValue();
+    assertFalse(fetchContext.isEmpty());
+    verify(segment, times(numAcquisitions)).acquire(same(fetchContext));
+    verify(segment, times(numAcquisitions + 1)).release(same(fetchContext));
   }
 
   @Test

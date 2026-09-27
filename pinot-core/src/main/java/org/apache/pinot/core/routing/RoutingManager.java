@@ -127,6 +127,17 @@ public interface RoutingManager {
   /// @return true if the route table exists.
   boolean routingExists(String tableNameWithType);
 
+  /// Returns the tables this instance currently has routing for.
+  ///
+  /// Used by broker startup pre-connect to derive the (server, table type) channels this broker actually
+  /// routes to, so it opens exactly those rather than the cross product of every enabled server with every
+  /// table type. The default returns an empty set for implementations that do not track routing per table.
+  ///
+  /// @return table names with type; empty when unknown.
+  default Set<String> getRoutableTables() {
+    return Set.of();
+  }
+
   /// Acquire the time boundary info. Useful for hybrid logical table queries that needs to split between
   /// realtime and offline.
   /// @param offlineTableName offline table name

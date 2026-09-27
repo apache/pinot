@@ -88,6 +88,11 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   @CommandLine.Option(names = {"-numThreads"}, description = "Parallelism while generating segments, default is 1.")
   private int _numThreads = 1;
 
+  @CommandLine.Option(names = {"-searchRecursively"}, arity = "1",
+      description = "Whether to search for data files recursively under 'dataDir', default is true. "
+          + "Pass '-searchRecursively false' to only look at the top level of 'dataDir'.")
+  private boolean _searchRecursively = true;
+
   public CreateSegmentCommand setDataDir(String dataDir) {
     _dataDir = dataDir;
     return this;
@@ -143,13 +148,19 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     return this;
   }
 
+  public CreateSegmentCommand setSearchRecursively(boolean searchRecursively) {
+    _searchRecursively = searchRecursively;
+    return this;
+  }
+
   @Override
   public String toString() {
     return String.format(
         "CreateSegment -dataDir %s -format %s -outDir %s -overwrite %s -tableConfigFile %s -schemaFile %s "
-            + "-readerConfigFile %s -retry %d -failOnEmptySegment %s -postCreationVerification %s -numThreads %d",
+            + "-readerConfigFile %s -retry %d -failOnEmptySegment %s -postCreationVerification %s -numThreads %d "
+            + "-searchRecursively %s",
         _dataDir, _format, _outDir, _overwrite, _tableConfigFile, _schemaFile, _readerConfigFile, _retry,
-        _failOnEmptySegment, _postCreationVerification, _numThreads);
+        _failOnEmptySegment, _postCreationVerification, _numThreads, _searchRecursively);
   }
 
   @Override
@@ -272,7 +283,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     return true;
   }
 
-  private List<String> getDataFiles(File dataDir) {
+  List<String> getDataFiles(File dataDir) {
     List<String> dataFiles = new ArrayList<>();
     //noinspection ConstantConditions
     getDataFilesHelper(dataDir.listFiles(), dataFiles);
@@ -282,8 +293,10 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   private void getDataFilesHelper(File[] files, List<String> dataFiles) {
     for (File file : files) {
       if (file.isDirectory()) {
-        //noinspection ConstantConditions
-        getDataFilesHelper(file.listFiles(), dataFiles);
+        if (_searchRecursively) {
+          //noinspection ConstantConditions
+          getDataFilesHelper(file.listFiles(), dataFiles);
+        }
       } else {
         if (isDataFile(file.getName())) {
           dataFiles.add(file.getPath());

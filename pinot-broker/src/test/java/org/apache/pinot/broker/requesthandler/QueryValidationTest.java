@@ -111,9 +111,10 @@ public class QueryValidationTest {
     testValidateGroovyQuery(
         "SELECT COUNT(colA) FROM bar GROUP BY GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
             + "'arg0 + arg1', colA, colB)", true);
+    // HAVING imposes grouping semantics, so both the predicate and the SELECT list have to be aggregated.
     testValidateGroovyQuery(
-        "SELECT foo FROM bar HAVING GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', 'arg0 + arg1', colA,"
-            + " colB) = 'foobarval'", true);
+        "SELECT COUNT(*) FROM bar HAVING GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
+            + "'arg0 + arg1', MAX(colA), MIN(colB)) = 'foobarval'", true);
 
     testValidateGroovyQuery("SELECT foo FROM bar", false);
   }
@@ -167,9 +168,8 @@ public class QueryValidationTest {
   }
 
   private void testValidateGroovyQuery(String query, boolean queryContainsGroovy) {
-    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-
     try {
+      PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
       BaseSingleStageBrokerRequestHandler.validateGroovyScript(pinotQuery, queryContainsGroovy);
       if (queryContainsGroovy) {
         fail("Query should have failed since groovy was found in query: " + pinotQuery);

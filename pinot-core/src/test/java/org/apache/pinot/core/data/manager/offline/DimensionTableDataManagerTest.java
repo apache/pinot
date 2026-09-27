@@ -122,7 +122,7 @@ public class DimensionTableDataManagerTest {
     _indexDir = new File(tableDataDir, segmentName);
     SegmentMetadata segmentMetadata = new SegmentMetadataImpl(_indexDir);
     _segmentZKMetadata = new SegmentZKMetadata(segmentName);
-    _segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
+    _segmentZKMetadata.setCrc(segmentMetadata.getCrc());
   }
 
   @AfterMethod(alwaysRun = true)

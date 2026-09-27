@@ -249,7 +249,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     filterPlanNode.run();
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
         StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, queryContext.getFilter(),
-            filterPlanNode.getPredicateEvaluators());
+            filterPlanNode.getPredicateEvaluators(), queryContext.isNullHandlingEnabled());
     assertNull(predicateEvaluatorsMap);
   }
 
@@ -281,7 +281,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     filterPlanNode.run();
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
         StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, queryContext.getFilter(),
-            filterPlanNode.getPredicateEvaluators());
+            filterPlanNode.getPredicateEvaluators(), queryContext.isNullHandlingEnabled());
     assertNotNull(predicateEvaluatorsMap);
 
     // Extract values with star-tree

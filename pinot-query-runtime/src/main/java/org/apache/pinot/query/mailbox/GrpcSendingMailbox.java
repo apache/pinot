@@ -116,9 +116,12 @@ public class GrpcSendingMailbox implements SendingMailbox {
     return false;
   }
 
-  /// NOTE: [org.apache.pinot.query.runtime.operator.exchange.BlockExchange] implementations rely on this method
-  /// serializing the block synchronously on the calling thread: once it returns, the block's contents may be handed
-  /// by reference to a local receiver that mutates them.
+  @Override
+  public boolean deliversByReference() {
+    // Blocks are serialized within send(MseBlock.Data), so the receiver never reads this instance
+    return false;
+  }
+
   @Override
   public void send(MseBlock.Data data) {
     QueryThreadContext.checkTerminationAndSampleUsage(SEND_SCOPE);

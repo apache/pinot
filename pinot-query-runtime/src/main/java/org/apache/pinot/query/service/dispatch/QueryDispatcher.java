@@ -87,6 +87,7 @@ import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.StageStatsTreeNode;
 import org.apache.pinot.query.service.dispatch.streaming.StreamingQuerySession;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
@@ -102,7 +103,9 @@ import org.slf4j.LoggerFactory;
 
 
 /// `QueryDispatcher` dispatch a query to different workers.
-public class QueryDispatcher {
+public class QueryDispatcher implements PinotClusterConfigChangeListener {
+  private static final String ENABLE_PROTO_SEGMENT_LIST_KEY =
+      CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST;
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
   private static final String PINOT_BROKER_QUERY_DISPATCHER_FORMAT = "multistage-query-dispatch-%d";
   /// Maximum time (ms) to wait for outstanding `OpChainComplete` stats messages on both the success and error
@@ -133,26 +136,43 @@ public class QueryDispatcher {
   /// Cluster-level default for stream-stats mode. Used as the fallback in [#submitAndReduce] when the query
   /// does not carry an explicit [QueryOptionKey#STREAM_STATS] override.
   private final boolean _streamStatsDefault;
+  /// Whether leaf-stage segment lists are shipped as native protobuf fields of the worker metadata instead of the
+  /// legacy JSON custom property. Seeded from the static broker config and then followed live from cluster config on
+  /// [#ENABLE_PROTO_SEGMENT_LIST_KEY], so an operator can turn it on once every server of the cluster has been
+  /// upgraded, and off again, without restarting the brokers. `volatile` because the cluster-config callback and the
+  /// request path race; read once per query so that all servers of one query agree.
+  private volatile boolean _enableProtoSegmentList;
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
-        GrpcKeepAliveConfig.DISABLED, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS);
+        GrpcKeepAliveConfig.DISABLED, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS,
+        CommonConstants.Broker.DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST);
   }
 
   /// Overload that accepts gRPC keep-alive settings for broker dispatch channels. A non-positive `keepAliveTimeMs`
-  /// disables keep-alive.
+  /// disables keep-alive. Kept for callers that predate the proto segment list encoding, which they leave disabled.
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
       boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout, keepAliveTimeMs,
+        keepAliveTimeoutMs, keepAliveWithoutCalls, streamStatsDefault, statsDrainMs,
+        CommonConstants.Broker.DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST);
+  }
+
+  /// Overload that also takes the static broker config seed for the proto segment list encoding.
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
+      boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs,
+      boolean enableProtoSegmentList) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
         new GrpcKeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls),
-        streamStatsDefault, statsDrainMs);
+        streamStatsDefault, statsDrainMs, enableProtoSegmentList);
   }
 
   private QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout, GrpcKeepAliveConfig keepAliveConfig,
-      boolean streamStatsDefault, long statsDrainMs) {
+      boolean streamStatsDefault, long statsDrainMs, boolean enableProtoSegmentList) {
     _cancelTimeout = cancelTimeout;
     _statsDrainMs = statsDrainMs;
     _mailboxService = mailboxService;
@@ -163,6 +183,7 @@ public class QueryDispatcher {
     _keepAliveConfig = keepAliveConfig;
     _failureDetector = failureDetector;
     _streamStatsDefault = streamStatsDefault;
+    _enableProtoSegmentList = enableProtoSegmentList;
 
     if (enableCancellation) {
       _serversByQuery = new ConcurrentHashMap<>();
@@ -359,8 +380,9 @@ public class QueryDispatcher {
     // that stage). The streaming observer uses this to drain the session latch correctly when its stream errors
     // before all opchains have responded.
     BlockingQueue<AsyncResponse<Worker.QueryResponse>> ackQueue = new ArrayBlockingQueue<>(serversOut.size());
+    boolean enableProtoSegmentList = _enableProtoSegmentList;
     for (QueryServerInstance server : serversOut) {
-      Worker.QueryRequest request = createRequest(server, stageInfos, protoRequestMetadata);
+      Worker.QueryRequest request = createRequest(server, stageInfos, protoRequestMetadata, enableProtoSegmentList);
       int expectedForServer = 0;
       for (DispatchablePlanFragment stagePlan : plansWithoutRoot) {
         List<Integer> workerIds = stagePlan.getServerInstanceToWorkerIdMap().get(server);
@@ -633,8 +655,9 @@ public class QueryDispatcher {
     ByteString protoRequestMetadata = QueryPlanSerDeUtils.toProtoProperties(requestMetadata);
 
     // Submit the query plan to all servers in parallel
+    boolean enableProtoSegmentList = _enableProtoSegmentList;
     BlockingQueue<AsyncResponse<E>> dispatchCallbacks = dispatch(sendRequest, serverInstancesOut, deadline,
-        serverInstance -> createRequest(serverInstance, stageInfos, protoRequestMetadata));
+        serverInstance -> createRequest(serverInstance, stageInfos, protoRequestMetadata, enableProtoSegmentList));
 
     processResults(requestId, serverInstancesOut.size(), resultConsumer, deadline, dispatchCallbacks);
   }
@@ -698,8 +721,39 @@ public class QueryDispatcher {
     }
   }
 
+  /// Applies the proto segment list encoding set in cluster config, which takes effect on the next query. Anything
+  /// other than `true` — the key cleared, or a value that is not a boolean — reads as disabled, which is the legacy
+  /// encoding every server understands.
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (!changedConfigs.contains(ENABLE_PROTO_SEGMENT_LIST_KEY)) {
+      return;
+    }
+    String value = clusterConfigs.get(ENABLE_PROTO_SEGMENT_LIST_KEY);
+    boolean enableProtoSegmentList = value != null && Boolean.parseBoolean(value.trim());
+    if (enableProtoSegmentList == _enableProtoSegmentList) {
+      return;
+    }
+    _enableProtoSegmentList = enableProtoSegmentList;
+    LOGGER.info("Updated {} from: {} to: {}", ENABLE_PROTO_SEGMENT_LIST_KEY, !enableProtoSegmentList,
+        enableProtoSegmentList);
+    if (enableProtoSegmentList) {
+      LOGGER.warn("The proto segment list encoding is now enabled. Every server this broker dispatches to, including "
+          + "the servers of remote clusters when multi-cluster routing is used, must already run a version that "
+          + "understands it; leaf stages routed to an older server will fail. Set it back to false to revert.");
+    }
+  }
+
+  @VisibleForTesting
+  public boolean isEnableProtoSegmentList() {
+    return _enableProtoSegmentList;
+  }
+
+  /// Builds the request for one server: the plans of the stages it takes part in, with only its own workers'
+  /// metadata. The leaf-stage segment lists are encoded here, once per worker, rather than at plan time.
   private static Worker.QueryRequest createRequest(QueryServerInstance serverInstance,
-      Map<DispatchablePlanFragment, StageInfo> stageInfos, ByteString protoRequestMetadata) {
+      Map<DispatchablePlanFragment, StageInfo> stageInfos, ByteString protoRequestMetadata,
+      boolean enableProtoSegmentList) {
     Worker.QueryRequest.Builder requestBuilder = Worker.QueryRequest.newBuilder();
     requestBuilder.setVersion(PlanVersions.V1);
 
@@ -713,7 +767,7 @@ public class QueryDispatcher {
           workerMetadataList.add(stageWorkerMetadataList.get(workerId));
         }
         List<Worker.WorkerMetadata> protoWorkerMetadataList =
-            QueryPlanSerDeUtils.toProtoWorkerMetadataList(workerMetadataList);
+            QueryPlanSerDeUtils.toProtoWorkerMetadataList(workerMetadataList, enableProtoSegmentList);
         StageInfo stageInfo = entry.getValue();
 
         Worker.StagePlan requestStagePlan = Worker.StagePlan.newBuilder()

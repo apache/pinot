@@ -29,6 +29,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -323,6 +324,116 @@ public class AndFilterOperatorTest {
         new AndFilterOperator(List.of(childAnd, bitmapOp(numDocs, false, 3, 6, 30)), null, numDocs, false);
     assertTrue(andOperator.canProduceBitmaps());
     assertEquals(andOperator.getBitmaps().reduce().toArray(), new int[]{3, 6});
+  }
+
+  @Test
+  public void testGetBitmapsWithNullChild() {
+    int numDocs = 10;
+    // The second child is UNKNOWN on {4, 5, 6}. The AND is UNKNOWN only where no child is false: on 4, where the other
+    // children are true, while 5 and 6 are false through the first child
+    AndFilterOperator andOperator = new AndFilterOperator(List.of(bitmapOp(numDocs, false, 2, 3, 4, 7),
+        new BitmapBasedFilterOperator(MutableRoaringBitmap.bitmapOf(0, 1, 2, 3), false, numDocs,
+            MutableRoaringBitmap.bitmapOf(4, 5, 6)), bitmapOp(numDocs, false, 2, 4, 8)), null, numDocs, true);
+
+    assertTrue(andOperator.canProduceBitmaps());
+    assertTrue(andOperator.mayHaveNulls());
+    BitmapCollection bitmaps = andOperator.getBitmaps();
+    assertEquals(bitmaps.reduce().toArray(), new int[]{2});
+    assertEquals(bitmaps.getNullBitmap().toArray(), new int[]{4});
+    assertEquals(andOperator.getNumMatchingDocs(), 1);
+
+    NotFilterOperator notOperator = new NotFilterOperator(andOperator, numDocs, true);
+    assertTrue(notOperator.canOptimizeCount());
+    assertEquals(notOperator.getNumMatchingDocs(), 8);
+    assertEquals(notOperator.getBitmaps().reduce().toArray(), new int[]{0, 1, 3, 5, 6, 7, 8, 9});
+    assertEquals(TestUtils.getDocIds(notOperator.getTrues()), List.of(0, 1, 3, 5, 6, 7, 8, 9));
+  }
+
+  @Test
+  public void testGetBitmapsWithoutNullChild() {
+    int numDocs = 10;
+    AndFilterOperator andOperator = new AndFilterOperator(
+        List.of(bitmapOp(numDocs, false, 2, 3, 4, 7), bitmapOp(numDocs, false, 2, 4, 8)), null, numDocs, true);
+
+    assertFalse(andOperator.mayHaveNulls());
+    assertNull(andOperator.getBitmaps().getNullBitmap());
+    assertEquals(andOperator.getNumMatchingDocs(), 2);
+  }
+
+  @Test
+  public void testGetNulls() {
+    int numDocs = 10;
+    // The first child is UNKNOWN on {4, 5, 6}; the AND is UNKNOWN only on 4, where the second child is true, since 5
+    // and 6 are false through it
+    AndFilterOperator andFilterOperator = new AndFilterOperator(
+        List.of(new TestFilterOperator(new int[]{0, 1, 2, 3}, new int[]{4, 5, 6}, numDocs),
+            new TestFilterOperator(new int[]{2, 3, 4, 7}, numDocs)), null, numDocs, true);
+
+    assertTrue(andFilterOperator.mayHaveNulls());
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), List.of(2, 3));
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getNulls()), List.of(4));
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), List.of(0, 1, 5, 6, 7, 8, 9));
+  }
+
+  @Test
+  public void testChildTrueNowhereButUnknownSomewhere() {
+    int numDocs = 5;
+    // The first child is true nowhere and UNKNOWN on {1, 2}; the AND is UNKNOWN on 1, where the second child is
+    // true, and false everywhere else
+    AndFilterOperator andFilterOperator = new AndFilterOperator(
+        List.of(new TestFilterOperator(new int[0], new int[]{1, 2}, numDocs),
+            new TestFilterOperator(new int[]{1, 3}, numDocs)), null, numDocs, true);
+
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), List.of());
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getNulls()), List.of(1));
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), List.of(0, 2, 3, 4));
+  }
+
+  @Test
+  public void testGetNullsWhenNeverFalse() {
+    int numDocs = 3;
+    // The negated child is true nowhere and UNKNOWN on 1, so its negation is true on {0, 2}, UNKNOWN on 1 and false
+    // nowhere. The conjunction with a match-all is then never false either, yet still UNKNOWN on 1
+    NotFilterOperator notFilterOperator =
+        new NotFilterOperator(new TestFilterOperator(new int[0], new int[]{1}, numDocs), numDocs, true);
+    AndFilterOperator andFilterOperator = new AndFilterOperator(
+        List.of(notFilterOperator, new MatchAllFilterOperator(numDocs)), null, numDocs, true);
+
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), List.of(0, 2));
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getNulls()), List.of(1));
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), List.of());
+  }
+
+  @Test
+  public void testGetNullsPropagateThroughNestedOr() {
+    int numDocs = 8;
+    // The OR is UNKNOWN on {1, 2}, where its first child is UNKNOWN and its second false; the AND above it inherits
+    // that where its own other child is true, and the outer negation has to leave those documents out
+    OrFilterOperator orFilterOperator = new OrFilterOperator(
+        List.of(new TestFilterOperator(new int[]{0}, new int[]{1, 2}, numDocs),
+            new TestFilterOperator(new int[]{3}, numDocs)), null, numDocs, true);
+    AndFilterOperator andFilterOperator = new AndFilterOperator(
+        List.of(new TestFilterOperator(new int[]{0, 1, 2, 3, 4}, numDocs), orFilterOperator), null, numDocs, true);
+
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getNulls()), List.of(1, 2));
+    NotFilterOperator notFilterOperator = new NotFilterOperator(andFilterOperator, numDocs, true);
+    assertEquals(TestUtils.getDocIds(notFilterOperator.getTrues()), List.of(4, 5, 6, 7));
+  }
+
+  @Test
+  public void testGetNumMatchingDocsWithNullChild() {
+    int numDocs = 10;
+    // The second child is exclusive, so true on all but {0, 1, 4}; the AND is true on {2, 3} and UNKNOWN on {5, 6},
+    // where the first child is UNKNOWN and the second true
+    AndFilterOperator andOperator = new AndFilterOperator(List.of(
+        new BitmapBasedFilterOperator(MutableRoaringBitmap.bitmapOf(0, 1, 2, 3), false, numDocs,
+            MutableRoaringBitmap.bitmapOf(4, 5, 6)), bitmapOp(numDocs, true, 0, 1, 4)), null, numDocs, true);
+
+    assertTrue(andOperator.canOptimizeCount());
+    assertEquals(andOperator.getNumMatchingDocs(), 2);
+    BitmapCollection bitmaps = andOperator.getBitmaps();
+    assertEquals(bitmaps.reduce().toArray(), new int[]{2, 3});
+    assertEquals(bitmaps.getNullBitmap().toArray(), new int[]{5, 6});
   }
 
   private static BitmapBasedFilterOperator bitmapOp(int numDocs, boolean exclusive, int... docIds) {

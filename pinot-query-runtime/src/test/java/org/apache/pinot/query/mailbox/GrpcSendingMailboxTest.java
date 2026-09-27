@@ -80,6 +80,18 @@ public class GrpcSendingMailboxTest {
     }
   }
 
+  @Test
+  public void doesNotDeliverBlocksByReference() {
+    GrpcSendingMailbox mailbox =
+        new GrpcSendingMailbox("test-mailbox", Mockito.mock(ChannelManager.class), "localhost", 0, Long.MAX_VALUE,
+            new StatMap<>(MailboxSendOperator.StatKey.class), 4 * 1024 * 1024, true);
+
+    // Blocks are serialized within send(MseBlock.Data), so senders that share one block between mailboxes do not
+    // need to give this one a copy. See BroadcastExchange.
+    Assert.assertFalse(mailbox.deliversByReference());
+    Assert.assertFalse(mailbox.isLocal());
+  }
+
   /// Regression test for the lazy-initialization data race on `_contentObserver`. Before the fix, both `sendInternal`
   /// and `cancel` had an unsynchronized `if (_contentObserver == null) { _contentObserver = getContentObserver(); }`
   /// pattern. `_contentObserver` is `volatile` so individual reads/writes are atomic, but two threads racing through

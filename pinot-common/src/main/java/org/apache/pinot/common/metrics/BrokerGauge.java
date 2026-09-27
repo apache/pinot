@@ -28,6 +28,17 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   MAX_BURST_QPS("tables", false),
   QUERY_RATE_LIMIT_DISABLED("queryQuota", true),
   NETTY_CONNECTION_CONNECT_TIME_MS("nettyConnection", true),
+  // 1 once startup warmup has completed and readiness may be granted, 0 while still warming. Always 1
+  // when warmup is disabled, so dashboards read identically on untouched deployments.
+  STARTUP_WARMUP_COMPLETE("status", true),
+  // Number of routable servers (the servers this broker's routable tables route to) that startup warmup did
+  // NOT reach before it exited -- no probe hit them. Set once at warmup exit. 0 on a normal floor exit (the
+  // round-robin probed every table). Non-zero means warmup stopped short of its intended per-server
+  // coverage: the budget expired, or servers were too slow to respond, before every server was probed. It
+  // is a completeness signal, not "these servers are cold" -- serve-path JIT is warmed per-JVM and channels
+  // are opened by pre-connect, so an unreached server is only marginally colder. Not recorded when warmup
+  // is disabled.
+  STARTUP_WARMUP_UNCOVERED_SERVERS("servers", true),
   REQUEST_SIZE("requestSize", false),
   RESIZE_TIME_MS("milliseconds", false),
   UNHEALTHY_SERVERS("servers", true),

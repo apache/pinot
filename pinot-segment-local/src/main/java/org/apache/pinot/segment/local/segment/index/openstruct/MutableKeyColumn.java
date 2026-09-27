@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.openstruct;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Set;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.MutableDictionaryFactory;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeInvertedIndex;
@@ -31,6 +32,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
 /// A single key's mutable column for an OPEN_STRUCT column: forward index (dictionary-encoded)
@@ -45,6 +47,8 @@ public class MutableKeyColumn implements Closeable {
 
   private final String _key;
   private final DataType _storedType;
+  private final PinotDataType _destType;
+  private final boolean _needsInferenceCheck;
   private final MutableForwardIndex _forwardIndex;
   private final ThreadSafeMutableRoaringBitmap _presenceBitmap;
   private final MutableDictionary _dictionary;
@@ -62,13 +66,16 @@ public class MutableKeyColumn implements Closeable {
 
   public MutableKeyColumn(String key, DataType storedType, Object defaultNullValue,
       PinotDataBufferMemoryManager memoryManager, int capacity) {
-    this(key, storedType, defaultNullValue, memoryManager, capacity, key);
+    this(key, storedType, defaultNullValue, memoryManager, capacity, key, false);
   }
 
   public MutableKeyColumn(String key, DataType storedType, Object defaultNullValue,
-      PinotDataBufferMemoryManager memoryManager, int capacity, String allocationContext) {
+      PinotDataBufferMemoryManager memoryManager, int capacity, String allocationContext,
+      boolean needsInferenceCheck) {
     _key = key;
     _storedType = storedType;
+    _needsInferenceCheck = needsInferenceCheck;
+    _destType = ColumnDataType.fromDataTypeSV(storedType).toPinotDataType();
     _presenceBitmap = new ThreadSafeMutableRoaringBitmap();
     _invertedIndex = new RealtimeInvertedIndex();
 
@@ -97,6 +104,18 @@ public class MutableKeyColumn implements Closeable {
 
   public DataType getStoredType() {
     return _storedType;
+  }
+
+  public PinotDataType getDestType() {
+    return _destType;
+  }
+
+  /// Whether a value on this key can ever produce a type-inference failure. True only for a key
+  /// with no declared child spec whose stored type fell back to STRING; fixed at allocation, since
+  /// neither the child spec nor the stored type changes afterwards. Lets the per-row path skip the
+  /// inference call entirely for every other key.
+  public boolean needsInferenceCheck() {
+    return _needsInferenceCheck;
   }
 
   public MutableForwardIndex getForwardIndex() {

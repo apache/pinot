@@ -654,11 +654,13 @@ data: {
     # Binary operators tokens.
     # Example: "< INFIX_CAST: \"::\" >".
     binaryOperatorsTokens: [
+      "< INFIX_CAST: \"::\" >"
     ]
 
     # Binary operators initialization.
     # Example: "InfixCast".
     extraBinaryExpressions: [
+      "InfixCast"
       "SqlAtTimeZone"
     ]
 

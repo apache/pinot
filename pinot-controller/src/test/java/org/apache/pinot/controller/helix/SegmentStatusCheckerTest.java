@@ -48,7 +48,9 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.resources.SegmentStatusInfo;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
@@ -317,6 +319,90 @@ public class SegmentStatusCheckerTest {
     verifyControllerMetrics(REALTIME_TABLE_NAME, 3, 3, 3, 2, 66, 0, 100, 0, 0);
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
         ControllerGauge.MISSING_CONSUMING_SEGMENT_TOTAL_COUNT), 2);
+  }
+
+  /// When a table is paused via the pause/resume ingestion API, PinotLLCRealtimeSegmentManager deliberately does not
+  /// create a new CONSUMING segment after the current one commits. Without the pause gate,
+  /// MissingConsumingSegmentFinder would see the completed segments with no CONSUMING replacement and flag them as
+  /// missing for as long as the pause lasts.
+  ///
+  /// The fixture matches [#realtimeBasicTest], which reports a
+  /// [ControllerGauge#MISSING_CONSUMING_SEGMENT_TOTAL_COUNT] of 2. The checker is run twice against the same metrics
+  /// instance — once unpaused to establish that non-zero reading, then again after pausing — so this covers the
+  /// actual production scenario: these gauges are last-write-wins, so pausing must actively reset a previously
+  /// reported value rather than merely stop updating it.
+  @Test
+  public void realtimePausedTableHasNoMissingConsumingSegmentAlert() {
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName("timeColumn")
+            .setNumReplicas(3).setStreamConfigs(getStreamConfigMap()).build();
+
+    String seg1 = new LLCSegmentName(RAW_TABLE_NAME, 1, 0, System.currentTimeMillis()).getSegmentName();
+    String seg2 = new LLCSegmentName(RAW_TABLE_NAME, 1, 1, System.currentTimeMillis()).getSegmentName();
+    String seg3 = new LLCSegmentName(RAW_TABLE_NAME, 2, 1, System.currentTimeMillis()).getSegmentName();
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    idealState.setPartitionState(seg1, "pinot1", "ONLINE");
+    idealState.setPartitionState(seg1, "pinot2", "ONLINE");
+    idealState.setPartitionState(seg1, "pinot3", "ONLINE");
+
+    idealState.setPartitionState(seg2, "pinot1", "ONLINE");
+    idealState.setPartitionState(seg2, "pinot2", "ONLINE");
+    idealState.setPartitionState(seg2, "pinot3", "ONLINE");
+
+    idealState.setPartitionState(seg3, "pinot1", "CONSUMING");
+    idealState.setPartitionState(seg3, "pinot2", "CONSUMING");
+    idealState.setPartitionState(seg3, "pinot3", "OFFLINE");
+    idealState.setReplicas("3");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    externalView.setState(seg1, "pinot1", "ONLINE");
+    externalView.setState(seg1, "pinot2", "ONLINE");
+    externalView.setState(seg1, "pinot3", "ONLINE");
+
+    externalView.setState(seg2, "pinot1", "CONSUMING");
+    externalView.setState(seg2, "pinot2", "ONLINE");
+    externalView.setState(seg2, "pinot3", "CONSUMING");
+
+    externalView.setState(seg3, "pinot1", "CONSUMING");
+    externalView.setState(seg3, "pinot2", "CONSUMING");
+    externalView.setState(seg3, "pinot3", "OFFLINE");
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getHelixInstanceConfig(any())).thenReturn(newQuerableInstanceConfig("any"));
+    when(resourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
+    when(resourceManager.getAllTables()).thenReturn(List.of(REALTIME_TABLE_NAME));
+    when(resourceManager.getTableIdealState(REALTIME_TABLE_NAME)).thenReturn(idealState);
+    when(resourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+    SegmentZKMetadata committedSegmentZKMetadata = mockCommittedSegmentZKMetadata();
+    SegmentZKMetadata consumingSegmentZKMetadata = mockConsumingSegmentZKMetadata(11111L);
+    mockSegmentsZKMetadata(resourceManager, REALTIME_TABLE_NAME,
+        Map.of(seg1, committedSegmentZKMetadata, seg2, committedSegmentZKMetadata, seg3, consumingSegmentZKMetadata));
+
+    // Stubbed exactly as in realtimeBasicTest so that MissingConsumingSegmentFinder computes a non-zero count.
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    ZNRecord znRecord = new ZNRecord("0");
+    znRecord.setSimpleField(CommonConstants.Segment.Realtime.END_OFFSET, "10000");
+    when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(znRecord);
+
+    // Not yet paused: the finder runs and reports the missing consuming segments.
+    runSegmentStatusChecker(resourceManager, 0);
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
+        ControllerGauge.MISSING_CONSUMING_SEGMENT_TOTAL_COUNT), 2);
+
+    // Mirrors how PinotLLCRealtimeSegmentManager#updatePauseStateInIdealState records an administrative pause, and how
+    // #isTablePaused reads it back off the ideal state record.
+    idealState.getRecord().setSimpleField(PinotLLCRealtimeSegmentManager.PAUSE_STATE,
+        new PauseState(true, PauseState.ReasonCode.ADMINISTRATIVE, "paused for test", "0", null).toJsonString());
+
+    runSegmentStatusChecker(resourceManager, 0);
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
+        ControllerGauge.MISSING_CONSUMING_SEGMENT_TOTAL_COUNT), 0);
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
+        ControllerGauge.MISSING_CONSUMING_SEGMENT_NEW_PARTITION_COUNT), 0);
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
+        ControllerGauge.MISSING_CONSUMING_SEGMENT_MAX_DURATION_MINUTES), 0);
   }
 
   @Test

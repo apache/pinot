@@ -168,6 +168,18 @@ public class MultiClusterRoutingManager implements RoutingManager {
   }
 
   @Override
+  public Set<String> getRoutableTables() {
+    // Union across clusters so startup pre-connect derives channels for every cluster this broker routes
+    // to; without this override the RoutingManager default returns empty and pre-connect would silently do
+    // nothing on a multi-cluster broker.
+    Set<String> combined = new HashSet<>(_localClusterRoutingManager.getRoutableTables());
+    for (BaseBrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
+      combined.addAll(remoteCluster.getRoutableTables());
+    }
+    return combined;
+  }
+
+  @Override
   public TablePartitionInfo getTablePartitionInfo(String tableNameWithType) {
     return findFirst(mgr -> mgr.getTablePartitionInfo(tableNameWithType), tableNameWithType);
   }
