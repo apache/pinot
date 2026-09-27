@@ -71,6 +71,16 @@ public interface InstanceSelector {
   /// Returns the enabled server instances currently serving the table.
   Set<String> getServingInstances();
 
+  /// Returns whether the server is assigned to at least one segment that this selector can route. Unlike
+  /// [#getServingInstances()], this also returns `true` while the server is disabled, which lets the routing manager
+  /// wait only for the table updates that are relevant before acknowledging a newly enabled server.
+  ///
+  /// Custom implementations inherit a conservative default because they cannot derive assignment membership from
+  /// serving state alone. Built-in selectors override this with their exact ideal-state assignment snapshot.
+  default boolean isServerAssigned(String instanceId) {
+    return true;
+  }
+
   /// Returns how well the table's segments are replicated across the instances this selector can route to,
   /// or `null` if this selector does not measure it. The routing manager reads this after each assignment
   /// and instance change and publishes it as the table's replica health gauges.

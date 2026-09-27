@@ -207,6 +207,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     _newSegmentStateMap = new HashMap<>(newSegmentMapCapacity);
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
+    Set<String> assignedInstances = new HashSet<>();
 
     // Get the online instances for the segments
     Map<String, Set<String>> oldSegmentToOnlineInstancesMap =
@@ -215,6 +216,11 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     for (String segment : onlineSegments) {
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
       assert idealStateInstanceStateMap != null;
+      for (Map.Entry<String, String> instanceState : idealStateInstanceStateMap.entrySet()) {
+        if (isOnlineForRouting(instanceState.getValue())) {
+          assignedInstances.add(instanceState.getKey());
+        }
+      }
       Map<String, String> externalViewInstanceStateMap = externalViewAssignment.get(segment);
       Set<String> onlineInstances;
       if (externalViewInstanceStateMap == null) {
@@ -289,6 +295,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       }
       _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMap.get(segment), candidates));
     }
+    _assignedInstances = Set.copyOf(assignedInstances);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Got _newSegmentStateMap: {}, _oldSegmentCandidatesMap: {}", _newSegmentStateMap.keySet(),
           _oldSegmentCandidatesMap.keySet());

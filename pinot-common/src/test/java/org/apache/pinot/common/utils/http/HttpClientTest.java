@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils.http;
 
 import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.List;
@@ -28,11 +29,21 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
+import org.apache.hc.core5.http.protocol.HttpContext;
+import org.apache.hc.core5.io.CloseMode;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -129,6 +140,29 @@ public class HttpClientTest {
       assertEquals(head.getStatusCode(), 503);
     } finally {
       server.stop(0);
+    }
+  }
+
+  // Stubs the raw-response overload used above so the test can assert the immediate-close behavior directly.
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testErrorStatusIsPreservedWhenReadingErrorBodyFails()
+      throws Exception {
+    CloseableHttpClient apacheClient = mock(CloseableHttpClient.class);
+    CloseableHttpResponse apacheResponse = mock(CloseableHttpResponse.class);
+    HttpEntity entity = mock(HttpEntity.class);
+    when(apacheClient.execute(any(ClassicHttpRequest.class), any(HttpContext.class))).thenReturn(apacheResponse);
+    when(apacheResponse.getCode()).thenReturn(503);
+    when(apacheResponse.getReasonPhrase()).thenReturn("Service Unavailable");
+    when(apacheResponse.getEntity()).thenReturn(entity);
+    when(entity.getContent()).thenThrow(new IOException("simulated broken error body"));
+
+    try (HttpClient client = new HttpClient(apacheClient)) {
+      SimpleHttpResponse response = client.sendGetRequest(URI.create("http://localhost/truncated-error"));
+      assertEquals(response.getStatusCode(), 503);
+      assertTrue(response.getResponse().contains("Failed to get a reason"));
+      assertTrue(response.getResponse().contains("simulated broken error body"));
+      verify(apacheResponse).close(CloseMode.IMMEDIATE);
     }
   }
 

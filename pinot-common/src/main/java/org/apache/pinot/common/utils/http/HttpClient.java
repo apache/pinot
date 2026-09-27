@@ -116,6 +116,10 @@ public class HttpClient implements AutoCloseable {
     _httpClient = buildCloseableHttpClient(httpClientConfig, csf);
   }
 
+  HttpClient(CloseableHttpClient httpClient) {
+    _httpClient = httpClient;
+  }
+
   public static HttpClient getInstance() {
     return HttpClientHolder.HTTP_CLIENT;
   }
@@ -319,6 +323,9 @@ public class HttpClient implements AutoCloseable {
     return sendRequest(request, socketTimeoutMs, connectionRequestTimeoutMs, Integer.MAX_VALUE);
   }
 
+  // The response-handler overloads consume the complete entity before returning. This raw-response overload is
+  // required so bounded reads can close a truncated response immediately without draining the remaining body.
+  @SuppressWarnings("deprecation")
   public SimpleHttpResponse sendRequest(ClassicHttpRequest request, long socketTimeoutMs,
       long connectionRequestTimeoutMs, int maxResponseLength)
       throws IOException {
@@ -346,11 +353,22 @@ public class HttpClient implements AutoCloseable {
             controllerVersion);
       }
       int statusCode = response.getCode();
+      if (statusCode >= 300) {
+        String errorContent;
+        try {
+          BoundedResponseContent responseContent = readResponseContent(response.getEntity(), maxResponseLength);
+          closeImmediately = responseContent._truncated;
+          errorContent = responseContent._content;
+        } catch (Exception e) {
+          // Preserve the historical error contract: once an HTTP status is available, a broken error entity must not
+          // replace it with a transport exception. Close immediately because the entity was not consumed reliably.
+          closeImmediately = true;
+          errorContent = String.format("Failed to get a reason, exception: %s", e);
+        }
+        return new SimpleHttpResponse(statusCode, getErrorMessage(request, response, errorContent));
+      }
       BoundedResponseContent responseContent = readResponseContent(response.getEntity(), maxResponseLength);
       closeImmediately = responseContent._truncated;
-      if (statusCode >= 300) {
-        return new SimpleHttpResponse(statusCode, getErrorMessage(request, response, responseContent._content));
-      }
       return new SimpleHttpResponse(statusCode, responseContent._content);
     } finally {
       if (closeImmediately) {
@@ -398,13 +416,8 @@ public class HttpClient implements AutoCloseable {
 
   private static String httpEntityToString(HttpEntity httpEntity)
       throws IOException {
-    return httpEntityToString(httpEntity, Integer.MAX_VALUE);
-  }
-
-  private static String httpEntityToString(HttpEntity httpEntity, int maxResponseLength)
-      throws IOException {
     try {
-      return EntityUtils.toString(httpEntity, maxResponseLength);
+      return EntityUtils.toString(httpEntity);
     } catch (ParseException exception) {
       throw new RuntimeException(exception);
     }
@@ -662,14 +675,9 @@ public class HttpClient implements AutoCloseable {
   }
 
   private static String getErrorMessage(ClassicHttpRequest request, CloseableHttpResponse response) {
-    return getErrorMessage(request, response, Integer.MAX_VALUE);
-  }
-
-  private static String getErrorMessage(ClassicHttpRequest request, CloseableHttpResponse response,
-      int maxResponseLength) {
     String entityStr;
     try {
-      entityStr = EntityUtils.toString(response.getEntity(), maxResponseLength);
+      entityStr = EntityUtils.toString(response.getEntity());
     } catch (Exception e) {
       entityStr = String.format("Failed to get a reason, exception: %s", e);
     }
