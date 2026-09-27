@@ -27,6 +27,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.spi.ingest.InsertRequest;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -228,6 +229,29 @@ public class InsertStatementStore {
     }
   }
 
+  /// Deletes a table's entire `/INSERT_STATEMENTS/{table}` and `/INSERT_REQUEST_IDS/{table}`
+  /// subtrees. Called by the cleanup sweep when the table itself no longer exists — stale
+  /// reservations must not survive a table drop, or a recreated table with the same name would
+  /// serve the old table's idempotency results.
+  ///
+  /// @return true if both subtree removals succeeded (removing a nonexistent path is a success)
+  public boolean deleteTableSubtrees(String tableNameWithType) {
+    boolean ok = true;
+    for (String path : new String[]{buildTablePath(tableNameWithType),
+        REQUEST_IDS_PREFIX + "/" + tableNameWithType}) {
+      try {
+        if (!_propertyStore.remove(path, AccessOption.PERSISTENT)) {
+          LOGGER.warn("Failed to remove insert subtree {} for dropped table {}", path, tableNameWithType);
+          ok = false;
+        }
+      } catch (Exception e) {
+        LOGGER.error("Failed to remove insert subtree {} for dropped table {}", path, tableNameWithType, e);
+        ok = false;
+      }
+    }
+    return ok;
+  }
+
   /// Atomically reserves a requestId for a given table. If the requestId is already reserved,
   /// returns the existing statementId. Otherwise, creates a ZK node to reserve the mapping.
   ///
@@ -244,7 +268,7 @@ public class InsertStatementStore {
   /// @throws RuntimeException if the reservation state cannot be determined due to ZK failure
   @Nullable
   public String reserveRequestId(String tableNameWithType, String requestId, String statementId) {
-    String path = REQUEST_IDS_PREFIX + "/" + tableNameWithType + "/" + requestId;
+    String path = buildRequestIdPath(tableNameWithType, requestId);
     try {
       ZNRecord record = new ZNRecord(requestId);
       record.setSimpleField(STATEMENT_ID_FIELD, statementId);
@@ -291,7 +315,7 @@ public class InsertStatementStore {
     if (requestId == null) {
       return;
     }
-    String path = REQUEST_IDS_PREFIX + "/" + tableNameWithType + "/" + requestId;
+    String path = buildRequestIdPath(tableNameWithType, requestId);
     try {
       _propertyStore.remove(path, AccessOption.PERSISTENT);
     } catch (Exception e) {
@@ -312,7 +336,7 @@ public class InsertStatementStore {
     if (requestId == null || expectedStatementId == null) {
       return true;
     }
-    String path = REQUEST_IDS_PREFIX + "/" + tableNameWithType + "/" + requestId;
+    String path = buildRequestIdPath(tableNameWithType, requestId);
     try {
       /// Single-step soft-delete via version-checked overwrite to a tombstone marker. We do NOT
       /// call remove() afterwards: the unconditional remove from ZkHelixPropertyStore has no
@@ -384,7 +408,7 @@ public class InsertStatementStore {
     if (requestId == null || expectedStatementId == null) {
       return false;
     }
-    String path = REQUEST_IDS_PREFIX + "/" + tableNameWithType + "/" + requestId;
+    String path = buildRequestIdPath(tableNameWithType, requestId);
     try {
       Stat stat = new Stat();
       ZNRecord existing = _propertyStore.get(path, stat, AccessOption.PERSISTENT);
@@ -444,7 +468,7 @@ public class InsertStatementStore {
     if (requestId == null) {
       return null;
     }
-    String path = REQUEST_IDS_PREFIX + "/" + tableNameWithType + "/" + requestId;
+    String path = buildRequestIdPath(tableNameWithType, requestId);
     try {
       ZNRecord existing = _propertyStore.get(path, null, AccessOption.PERSISTENT);
       if (existing == null) {
@@ -583,7 +607,7 @@ public class InsertStatementStore {
   @Nullable
   public InsertStatementManifest findByRequestId(String tableNameWithType, String requestId) {
     /// First check the atomic reservation index
-    String path = REQUEST_IDS_PREFIX + "/" + tableNameWithType + "/" + requestId;
+    String path = buildRequestIdPath(tableNameWithType, requestId);
     try {
       ZNRecord record = _propertyStore.get(path, null, AccessOption.PERSISTENT);
       if (record != null) {
@@ -657,7 +681,24 @@ public class InsertStatementStore {
   }
 
   private static String buildPath(String tableNameWithType, String statementId) {
-    return INSERT_STATEMENTS_PREFIX + "/" + tableNameWithType + "/" + statementId;
+    return INSERT_STATEMENTS_PREFIX + "/" + tableNameWithType + "/" + validateIdForPath("statementId", statementId);
+  }
+
+  private static String buildRequestIdPath(String tableNameWithType, String requestId) {
+    return REQUEST_IDS_PREFIX + "/" + tableNameWithType + "/" + validateIdForPath("requestId", requestId);
+  }
+
+  /// Defense-in-depth for ids that become znode names. [InsertRequest] already rejects ids that
+  /// don't match [InsertRequest#ID_PATTERN] at construction, but this store is also called by
+  /// internal paths (sweep, tests, future executors); a stray '/' here would create nested znodes
+  /// that break getChildren-based listing and pruning, and could collide with another caller's
+  /// subtree.
+  private static String validateIdForPath(String name, String id) {
+    if (id == null || !InsertRequest.ID_PATTERN.matcher(id).matches()) {
+      throw new IllegalArgumentException(
+          name + " must match " + InsertRequest.ID_PATTERN.pattern() + "; got: " + id);
+    }
+    return id;
   }
 
   private static ZNRecord toZNRecord(InsertStatementManifest manifest)

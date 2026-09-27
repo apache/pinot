@@ -401,4 +401,56 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
       }
     }, 30_000, "INSERT INTO VALUES rows did not become queryable within 30s");
   }
+
+  /// ---- Test: value-type fidelity for negative numbers, BYTES, and BIG_DECIMAL through the
+  ///      broker's JSON wire path ----
+
+  @Test
+  public void testInsertNegativeBytesAndBigDecimalThroughBroker()
+      throws Exception {
+    String tableName = "insertTypedValues";
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName(tableName)
+        .addSingleValueDimension("id", FieldSpec.DataType.INT)
+        .addSingleValueDimension("data", FieldSpec.DataType.BYTES)
+        .addMetric("amount", FieldSpec.DataType.BIG_DECIMAL)
+        .addMetric("delta", FieldSpec.DataType.DOUBLE)
+        .build();
+    addSchema(schema);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(tableName)
+        .build();
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toString(),
+        BasicAuthTestUtils.AUTH_HEADER);
+
+    /// The broker serializes rows to JSON for the controller. Without canonical wire encoding,
+    /// byte[] becomes Base64 (the controller's STRING→BYTES coercion expects HEX) and BigDecimal
+    /// loses precision through Jackson's default double parsing. Negative numbers additionally
+    /// exercise the parser's MINUS_PREFIX unwrapping. This test pins all three end to end.
+    String sql = "INSERT INTO " + tableName
+        + " (id, data, amount, delta) VALUES (-7, X'0BCD', 123456789.123456789, -1.5)";
+    JsonNode response = queryBrokerHttpEndpoint(sql);
+    LOGGER.info("Typed-values INSERT response: {}", response);
+    JsonNode resultRows = response.path("resultTable").path("rows");
+    assertEquals(resultRows.size(), 1, "Expected exactly one result row; got: " + response);
+    assertEquals(resultRows.get(0).get(1).asText(), "VISIBLE",
+        "Typed-values INSERT must return VISIBLE; got: " + response);
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode resp = postQuery("SELECT id, data, amount, delta FROM " + tableName + " WHERE id = -7");
+        JsonNode rows = resp.path("resultTable").path("rows");
+        if (rows.size() != 1) {
+          return false;
+        }
+        JsonNode row = rows.get(0);
+        return row.get(0).asInt() == -7
+            && "0bcd".equalsIgnoreCase(row.get(1).asText())
+            && "123456789.123456789".equals(row.get(2).asText())
+            && row.get(3).asDouble() == -1.5;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 30_000, "Typed INSERT values (negative INT, BYTES, BIG_DECIMAL, negative DOUBLE) did not round-trip");
+  }
 }

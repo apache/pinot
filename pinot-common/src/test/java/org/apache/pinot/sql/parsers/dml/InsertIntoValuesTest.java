@@ -229,10 +229,33 @@ public class InsertIntoValuesTest {
     Assert.assertEquals(stmt.getExecutionType(), DataManipulationStatement.ExecutionType.MINION);
   }
 
-  @Test(expectedExceptions = IllegalArgumentException.class,
+  @Test(expectedExceptions = SqlCompilationException.class,
       expectedExceptionsMessageRegExp = ".*Only literal values are supported.*")
   public void testInsertValuesRejectsNonLiteralExpression() {
     String sql = "INSERT INTO myTable (id, value) VALUES (1, 1 + 1)";
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
+    InsertIntoValues.parse(sqlNodeAndOptions);
+  }
+
+  /// Calcite parses signed numbers as MINUS_PREFIX/PLUS_PREFIX calls around the unsigned literal, so
+  /// the parser must unwrap the sign instead of rejecting them as non-literal expressions.
+  @Test
+  public void testNegativeAndSignedNumericLiterals() {
+    String sql = "INSERT INTO myTable (a, b, c, d) VALUES (-1, -2.5, +3, -0)";
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
+
+    InsertIntoValues stmt = InsertIntoValues.parse(sqlNodeAndOptions);
+    java.util.List<Object> row = stmt.getRows().get(0);
+    Assert.assertEquals(((BigDecimal) row.get(0)).intValue(), -1);
+    Assert.assertEquals(((BigDecimal) row.get(1)).doubleValue(), -2.5);
+    Assert.assertEquals(((BigDecimal) row.get(2)).intValue(), 3);
+    Assert.assertEquals(((BigDecimal) row.get(3)).intValue(), 0);
+  }
+
+  @Test(expectedExceptions = SqlCompilationException.class,
+      expectedExceptionsMessageRegExp = ".*Unary minus is only supported on numeric literals.*")
+  public void testUnaryMinusOnNonNumericLiteralIsRejected() {
+    String sql = "INSERT INTO myTable (a) VALUES (-'abc')";
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
     InsertIntoValues.parse(sqlNodeAndOptions);
   }
@@ -290,8 +313,8 @@ public class InsertIntoValuesTest {
       try {
         SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
         InsertIntoValues.parse(sqlNodeAndOptions);
-        Assert.fail("Expected IllegalArgumentException for date/time literal in: " + sql);
-      } catch (IllegalArgumentException e) {
+        Assert.fail("Expected SqlCompilationException for date/time literal in: " + sql);
+      } catch (SqlCompilationException e) {
         Assert.assertTrue(e.getMessage().contains("Date/time literals are not supported"),
             "Expected date/time rejection message, got: " + e.getMessage());
       }

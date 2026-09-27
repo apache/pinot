@@ -21,12 +21,9 @@ package org.apache.pinot.core.query.executor.sql;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -295,7 +292,7 @@ public class SqlQueryExecutor {
           genericRow.putValue(columns.get(i), null);
           genericRow.addNullValueField(columns.get(i));
         } else {
-          genericRow.putValue(columns.get(i), value);
+          genericRow.putValue(columns.get(i), canonicalizeForWire(value));
         }
       }
       genericRows.add(genericRow);
@@ -307,149 +304,37 @@ public class SqlQueryExecutor {
       tableType = TableType.valueOf(tableTypeStr.toUpperCase(Locale.ROOT));
     }
 
-    // Compute a stable payload hash for idempotency when requestId is set.
-    // Exclude control options (requestId, tableType) from the hash so the payload hash
-    // only covers table + columns + values + non-control options.
-    Map<String, String> payloadOptions = null;
-    if (insertStmt.getOptions() != null) {
-      payloadOptions = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-      payloadOptions.putAll(insertStmt.getOptions());
-      payloadOptions.remove("requestId");
-      payloadOptions.remove("tableType");
-    }
-    // Hash is only used for idempotency conflict detection paired with requestId. When the client
-    // didn't supply a requestId the coordinator's idempotency path never reads it, so skip the
-    // O(rows × columns) SHA-256 computation entirely.
-    String payloadHash = insertStmt.getRequestId() != null
-        ? computePayloadHash(insertStmt.getTableName(), columns, insertStmt.getRows(), payloadOptions)
-        : null;
-
+    // No payloadHash is set here: the coordinator computes it from the request it receives
+    // (a client-supplied hash cannot be trusted for idempotency conflict detection).
     return new InsertRequest.Builder()
         .setTableName(insertStmt.getTableName())
         .setTableType(tableType)
         .setInsertType(InsertType.ROW)
         .setRows(genericRows)
         .setRequestId(insertStmt.getRequestId())
-        .setPayloadHash(payloadHash)
         .setOptions(insertStmt.getOptions())
         .build();
   }
 
-  /// Computes a stable SHA-256 hash from the table name, column list, row values, and non-control options.
-  /// Control options like requestId and tableType are excluded so the hash only covers the data payload.
-  /// This ensures that identical INSERT statements produce the same hash for idempotency.
-  private static String computePayloadHash(String tableName, List<String> columns,
-      List<List<Object>> rows, Map<String, String> options) {
-    try {
-      MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      digest.update(tableName.getBytes(StandardCharsets.UTF_8));
-      digest.update((byte) 0);
-
-      for (String col : columns) {
-        digest.update(col.getBytes(StandardCharsets.UTF_8));
-        digest.update((byte) 0);
-      }
-      digest.update((byte) 1);
-
-      for (List<Object> row : rows) {
-        for (Object val : row) {
-          // Coerce to a canonical encoding so the same logical value hashes identically across
-          // SDKs that box numerics differently. Type-dispatch keeps the hot path light:
-          // integral types take the longValue path (no BigDecimal allocation), only true
-          // BigDecimal inputs pay the canonical-form cost. Without canonicalization, two clients
-          // sending the same INSERT through different bindings get different hashes and lose
-          // idempotency.
-          if (val == null) {
-            digest.update((byte) 'N');  // null sentinel
-          } else if (val instanceof Long || val instanceof Integer || val instanceof Short || val instanceof Byte) {
-            // Canonicalize integral types through BigDecimal so SQL-path retries (parser produces
-            // BigDecimal) and programmatic callers (raw Long) hash identically. BigDecimal.valueOf
-            // is the cheapest path that avoids the toString round-trip.
-            digest.update((byte) 'D');
-            digest.update(canonicalizeBigDecimal(BigDecimal.valueOf(((Number) val).longValue()))
-                .getBytes(StandardCharsets.UTF_8));
-          } else if (val instanceof BigDecimal) {
-            digest.update((byte) 'D');
-            digest.update(canonicalizeBigDecimal((BigDecimal) val).getBytes(StandardCharsets.UTF_8));
-          } else if (val instanceof BigInteger) {
-            // Canonicalize through BigDecimal so a BigInteger and an equivalent Long produce the
-            // same idempotency hash. Without this, two clients that send the same logical value
-            // via different SDK numeric bindings would observe IDEMPOTENCY_CONFLICT on retry.
-            digest.update((byte) 'D');
-            digest.update(canonicalizeBigDecimal(new BigDecimal((BigInteger) val))
-                .getBytes(StandardCharsets.UTF_8));
-          } else if (val instanceof Double || val instanceof Float) {
-            // NaN/Infinity are valid SQL VALUES but cannot pass through BigDecimal (throws
-            // NumberFormatException on "NaN"/"Infinity"). Hash a stable sentinel byte instead so
-            // the entire INSERT doesn't crash. Differentiates positive/negative infinity and NaN.
-            double d = ((Number) val).doubleValue();
-            if (!Double.isFinite(d)) {
-              digest.update((byte) 'D');
-              if (Double.isNaN(d)) {
-                digest.update((byte) 'X');  // X = NaN sentinel
-              } else if (d > 0) {
-                digest.update((byte) 'P');  // P = +Infinity sentinel
-              } else {
-                digest.update((byte) 'M');  // M = -Infinity sentinel
-              }
-            } else {
-              // Canonicalize through BigDecimal via the type's own toString so Float and Double of
-              // the same user-typed numeric literal hash identically. Float.doubleValue() bakes in
-              // the widening artifact (Float 0.1f → 0.10000000149...) and would diverge from
-              // Double 0.1 — using the type's canonical string representation avoids that.
-              digest.update((byte) 'D');
-              String canonical = (val instanceof Float)
-                  ? Float.toString((Float) val)
-                  : Double.toString((Double) val);
-              digest.update(canonicalizeBigDecimal(new BigDecimal(canonical))
-                  .getBytes(StandardCharsets.UTF_8));
-            }
-          } else if (val instanceof Boolean) {
-            digest.update((byte) 'B');
-            digest.update(((Boolean) val) ? (byte) 1 : (byte) 0);
-          } else if (val instanceof byte[]) {
-            digest.update((byte) 'X');  // raw bytes
-            digest.update((byte[]) val);
-          } else {
-            digest.update((byte) 'S');  // string-coerced
-            digest.update(val.toString().getBytes(StandardCharsets.UTF_8));
-          }
-          digest.update((byte) 0);
-        }
-        digest.update((byte) 2);
-      }
-
-      if (options != null && !options.isEmpty()) {
-        // Sort keys for deterministic ordering using a case-insensitive comparator so callers that
-        // pass mixed-case option keys (defensive against upstream parser variation) hash to the
-        // same value as a canonical-cased version. Matches the case-insensitive option lookup the
-        // upstream parser does in InsertIntoValues.findOptionCaseInsensitive.
-        TreeMap<String, String> canonical = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-        canonical.putAll(options);
-        for (Map.Entry<String, String> entry : canonical.entrySet()) {
-          digest.update(entry.getKey().getBytes(StandardCharsets.UTF_8));
-          digest.update((byte) 0);
-          digest.update(entry.getValue().getBytes(StandardCharsets.UTF_8));
-          digest.update((byte) 0);
-        }
-      }
-
-      return BytesUtils.toHexString(digest.digest());
-    } catch (NoSuchAlgorithmException e) {
-      throw new RuntimeException("SHA-256 not available", e);
+  /// Canonicalizes a parsed literal into a representation that survives the broker → controller
+  /// JSON round trip with full fidelity. Jackson turns `byte[]` into Base64 and reads numbers back
+  /// as `Double` (losing BigDecimal precision), while the controller-side type coercion
+  /// (DataTypeTransformer) expects BYTES-as-STRING to be HEX. Encoding bytes as hex and
+  /// BigDecimal as a plain string keeps both entry points (broker HTTP and in-process controller
+  /// SQL) byte-identical, so schema-driven coercion and the server-computed idempotency hash
+  /// behave the same on either path.
+  private static Object canonicalizeForWire(Object value) {
+    if (value instanceof byte[]) {
+      return BytesUtils.toHexString((byte[]) value);
     }
-  }
-
-  /// Canonicalize a [BigDecimal] for hashing so equivalent values produce identical strings.
-  /// Handles the zero edge case explicitly: `BigDecimal.ZERO.stripTrailingZeros()` returns
-  /// `0E-1` (a denormalized form) on JDK 8+ which would diverge from `"0"` produced by
-  /// `new BigDecimal("0").toPlainString()`. Special-casing zero forces the canonical form
-  /// "0" regardless of input scale.
-  private static String canonicalizeBigDecimal(BigDecimal bd) {
-    if (bd.signum() == 0) {
-      return "0";
+    if (value instanceof BigDecimal) {
+      // Strip trailing zeros so integral literals written with a decimal point ("3.0") coerce into
+      // INT/LONG columns — STRING→LONG conversion uses Long.parseLong, which rejects "3.0". The
+      // zero guard avoids the denormalized "0E-1"-style forms stripTrailingZeros can produce.
+      BigDecimal bd = (BigDecimal) value;
+      return bd.signum() == 0 ? "0" : bd.stripTrailingZeros().toPlainString();
     }
-    return bd.stripTrailingZeros().toPlainString();
+    return value;
   }
 
   private String getControllerUrl() {

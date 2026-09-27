@@ -41,8 +41,11 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingest.InsertConsistencyMode;
 import org.apache.pinot.spi.ingest.InsertErrorCode;
 import org.apache.pinot.spi.ingest.InsertExecutor;
@@ -121,6 +124,18 @@ public class InsertStatementCoordinator {
   private volatile Map<InsertType, InsertExecutor> _executorSnapshot;
   private final long _statementTimeoutMs;
   private final long _visibleRetentionMs;
+  /// Scopes the cleanup sweep to tables this controller leads. Every controller with the feature
+  /// flag runs a coordinator + sweep; without this gate N controllers would all scan every table's
+  /// manifests, race on the same CAS transitions, and each poll Minion task state. Nullable so
+  /// unit tests (and embedded single-controller setups) can run without Helix lead-controller
+  /// wiring — null means "act as leader for every table".
+  @Nullable
+  private final LeadControllerManager _leadControllerManager;
+  /// Pre-acceptance bounds for ROW inserts, enforced before a manifest is created. Segments for
+  /// ROW inserts are built on the controller inside the request thread, so unbounded row counts or
+  /// payload bytes translate directly into controller heap/CPU pressure.
+  private final int _maxRowsPerRowInsert;
+  private final long _maxBytesPerRowInsert;
 
   /// Tables that are known to have insert statements. Populated as statements are submitted
   /// and during cleanup sweeps. This set is an optimization to avoid scanning all tables; the
@@ -176,12 +191,25 @@ public class InsertStatementCoordinator {
   public InsertStatementCoordinator(PinotHelixResourceManager helixResourceManager,
       InsertStatementStore statementStore, ControllerMetrics controllerMetrics,
       long statementTimeoutMs, long visibleRetentionMs) {
+    this(helixResourceManager, statementStore, controllerMetrics, statementTimeoutMs, visibleRetentionMs,
+        null, ControllerConf.DEFAULT_INSERT_ROW_MAX_ROWS_PER_STATEMENT,
+        ControllerConf.DEFAULT_INSERT_ROW_MAX_BYTES_PER_STATEMENT);
+  }
+
+  public InsertStatementCoordinator(PinotHelixResourceManager helixResourceManager,
+      InsertStatementStore statementStore, ControllerMetrics controllerMetrics,
+      long statementTimeoutMs, long visibleRetentionMs,
+      @Nullable LeadControllerManager leadControllerManager,
+      int maxRowsPerRowInsert, long maxBytesPerRowInsert) {
     _helixResourceManager = helixResourceManager;
     _statementStore = statementStore;
     _controllerMetrics = controllerMetrics;
     _executors = new EnumMap<>(InsertType.class);
     _statementTimeoutMs = statementTimeoutMs;
     _visibleRetentionMs = visibleRetentionMs;
+    _leadControllerManager = leadControllerManager;
+    _maxRowsPerRowInsert = maxRowsPerRowInsert;
+    _maxBytesPerRowInsert = maxBytesPerRowInsert;
     /// Do NOT create the scheduler thread here — when the feature flag is disabled we never call
     /// start() and the thread would be leaked. Deferred to start().
   }
@@ -385,6 +413,11 @@ public class InsertStatementCoordinator {
     /// 2. Idempotency check — atomic reservation via ZK to prevent concurrent retries from
     ///    both creating statements for the same requestId. Fails closed on ZK errors.
     ///
+    /// The payload hash is computed HERE from the request the coordinator actually received, never
+    /// trusted from the client. A client-supplied (or omitted) hash would let a caller reuse a
+    /// requestId with different rows and silently receive the old statement's result.
+    String payloadHash = request.getRequestId() != null ? request.computePayloadHash() : null;
+
     /// ownReservation=true means THIS request created the ZK reservation node and is responsible
     /// for releasing it on failure. When ownReservation=false, a prior request created the node
     /// and we must never delete it (doing so would break idempotency for the original client).
@@ -414,7 +447,7 @@ public class InsertStatementCoordinator {
         /// A prior request created this reservation — we do not own it and must not delete it.
         InsertStatementManifest existing = _statementStore.getStatement(tableNameWithType, existingStatementId);
         if (existing != null) {
-          return handleIdempotency(request, existing);
+          return handleIdempotency(request, payloadHash, existing);
         }
         /// Reservation exists but manifest was GC'd. Defer rebind until after the new manifest
         /// is persisted (step 5) so that concurrent retries reading the rebound reservation
@@ -465,6 +498,32 @@ public class InsertStatementCoordinator {
           "INSERT INTO ... VALUES requires at least one row");
     }
 
+    /// 4c. Bound ROW insert size before creating a manifest. ROW segments are built on the
+    /// controller inside the request thread, so an unbounded row count or payload translates
+    /// directly into controller heap/CPU pressure alongside its other duties (periodic tasks,
+    /// segment completion).
+    if (request.getInsertType() == InsertType.ROW) {
+      int numRows = request.getRows().size();
+      if (numRows > _maxRowsPerRowInsert) {
+        if (ownReservation) {
+          releaseRequestIdOnFailure(tableNameWithType, request.getRequestId(), request.getStatementId());
+        }
+        return rejectResult(request.getStatementId(), InsertErrorCode.ROW_LIMIT_EXCEEDED,
+            "INSERT contains " + numRows + " rows, exceeding the per-statement limit of " + _maxRowsPerRowInsert
+                + " (" + ControllerConf.INSERT_ROW_MAX_ROWS_PER_STATEMENT + ")");
+      }
+      long estimatedBytes = estimateRowPayloadBytes(request.getRows(), _maxBytesPerRowInsert);
+      if (estimatedBytes > _maxBytesPerRowInsert) {
+        if (ownReservation) {
+          releaseRequestIdOnFailure(tableNameWithType, request.getRequestId(), request.getStatementId());
+        }
+        return rejectResult(request.getStatementId(), InsertErrorCode.PAYLOAD_TOO_LARGE,
+            "INSERT payload is estimated at more than " + _maxBytesPerRowInsert
+                + " bytes, exceeding the per-statement limit ("
+                + ControllerConf.INSERT_ROW_MAX_BYTES_PER_STATEMENT + ")");
+      }
+    }
+
     /// 5. If we observed a stale reservation, win the rebind FIRST — before publishing any orphan
     /// manifest in ZK. rebindRequestIdIfEquals uses a content-and-version-checked CAS: a concurrent
     /// retry that also observed the same stale reservation will lose here, and must yield to the
@@ -485,7 +544,7 @@ public class InsertStatementCoordinator {
         InsertStatementManifest winner = waitForWinnerManifest(tableNameWithType, request.getRequestId(),
             request.getStatementId());
         if (winner != null && !winner.getStatementId().equals(request.getStatementId())) {
-          return handleIdempotency(request, winner);
+          return handleIdempotency(request, payloadHash, winner);
         }
         /// Winner manifest still not visible after polling — fail closed. Caller can retry; the
         /// retry will see the now-rebound reservation in handleIdempotency on the first read.
@@ -503,7 +562,7 @@ public class InsertStatementCoordinator {
     long now = System.currentTimeMillis();
     InsertStatementManifest manifest =
         new InsertStatementManifest(request.getStatementId(), request.getRequestId(),
-            request.getPayloadHash(), tableNameWithType, request.getInsertType(),
+            payloadHash, tableNameWithType, request.getInsertType(),
             InsertStatementState.ACCEPTED, now, now, List.of(), null, null, null);
 
     if (!_statementStore.createStatement(manifest)) {
@@ -682,9 +741,9 @@ public class InsertStatementCoordinator {
       }
 
       if (resultState != null && resultState != InsertStatementState.ACCEPTED) {
-        /// Apply terminal state transition (ACCEPTED -> VISIBLE/ABORTED/COMMITTED) with a CAS
-        /// retry loop. Precondition guard: only upgrade from ACCEPTED — a concurrent abort writer
-        /// already writing ABORTED must win, and we must not resurrect it with VISIBLE/COMMITTED.
+        /// Apply terminal state transition (ACCEPTED -> VISIBLE/ABORTED) with a CAS retry loop.
+        /// Precondition guard: only upgrade from ACCEPTED — a concurrent abort writer already
+        /// writing ABORTED must win, and we must not resurrect it with VISIBLE.
         CasResult result = persistWithCasRetry(tableNameWithType, request.getStatementId(),
             m -> m.getState() == InsertStatementState.ACCEPTED,
             fresh -> {
@@ -801,7 +860,7 @@ public class InsertStatementCoordinator {
       String errorMessage = "Executor error: " + e.getMessage();
       /// Use a precondition predicate so we only ABORT when the manifest is still ACCEPTED. If the
       /// executor's success path partially landed (e.g., segments uploaded and ZK manifest was
-      /// already flipped to VISIBLE/COMMITTED before an exception bubbled up from a metric or
+      /// already flipped to VISIBLE before an exception bubbled up from a metric or
       /// gauge call), do NOT overwrite that state with ABORTED — and do NOT release the requestId,
       /// because the data may already be queryable. Releasing would let a retry produce duplicate
       /// inserts.
@@ -1142,10 +1201,8 @@ public class InsertStatementCoordinator {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.INSERT_STATEMENTS_VISIBLE, 1);
       _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.INSERT_STATEMENTS_ACTIVE, getActiveStatementCount());
     } else if (result.getState() == InsertStatementState.ABORTED) {
-      /// Tighten precondition to match the user-abort path: only flip from non-terminal states.
-      /// A broader precondition (e.g., "anything not VISIBLE") would let a task-failure abort
-      /// overwrite COMMITTED — currently unreachable but keeping the invariant tight prevents
-      /// future drift as the state machine evolves.
+      /// Tighten precondition to match the user-abort path: only flip from non-terminal states,
+      /// keeping the invariant tight as the state machine evolves.
       CasResult cas = persistWithCasRetry(tableNameWithType, statementId,
           m -> m.getState() != InsertStatementState.VISIBLE
               && m.getState() != InsertStatementState.ABORTED,
@@ -1259,10 +1316,15 @@ public class InsertStatementCoordinator {
   }
 
   /// Handles idempotency when a request with the same requestId is submitted again.
-  private InsertResult handleIdempotency(InsertRequest request, InsertStatementManifest existing) {
-    /// Same requestId + matching payloadHash (including both-null) = return existing result.
-    /// Both-null is a legitimate idempotency case for callers that don't compute a payload hash.
-    if (Objects.equals(request.getPayloadHash(), existing.getPayloadHash())) {
+  ///
+  /// @param payloadHash the hash the coordinator computed from THIS request's payload (never the
+  ///        client-supplied value); non-null whenever requestId is set, which is the only path that
+  ///        reaches here. Manifests written by older builds may carry a null hash — those compare
+  ///        as a conflict, which fails closed (reject rather than return a possibly-wrong result).
+  private InsertResult handleIdempotency(InsertRequest request, String payloadHash,
+      InsertStatementManifest existing) {
+    /// Same requestId + matching payloadHash = same payload retried; return existing result.
+    if (Objects.equals(payloadHash, existing.getPayloadHash())) {
       LOGGER.info("Idempotent request detected for requestId={}, returning existing statementId={}",
           request.getRequestId(), existing.getStatementId());
       return new InsertResult.Builder().setStatementId(existing.getStatementId()).setState(existing.getState())
@@ -1275,7 +1337,7 @@ public class InsertStatementCoordinator {
     /// state=REJECTED so clients can distinguish "your request was never accepted" from "your
     /// accepted request was aborted." Matches the InsertErrorCode pre-acceptance contract.
     LOGGER.warn("Duplicate requestId={} with different payloadHash. Existing={}, new={}", request.getRequestId(),
-        existing.getPayloadHash(), request.getPayloadHash());
+        existing.getPayloadHash(), payloadHash);
     return rejectResult(request.getStatementId(), InsertErrorCode.IDEMPOTENCY_CONFLICT,
         "Request id '" + request.getRequestId() + "' already used with a different payload");
   }
@@ -1318,7 +1380,26 @@ public class InsertStatementCoordinator {
             LOGGER.info("Cleanup sweep aborting mid-iteration: coordinator stop() requested");
             break;
           }
+          /// Only the table's lead controller sweeps it. Every flag-enabled controller runs this
+          /// scheduler, so without the gate N controllers would scan the same manifests, race on
+          /// the same CAS transitions, and each poll Minion task state. Tables this controller
+          /// does not lead stay in _tablesWithStatements so a later leadership change picks them up.
+          if (_leadControllerManager != null && !_leadControllerManager.isLeaderForTable(table)) {
+            continue;
+          }
           try {
+            /// A dropped table leaves its /INSERT_STATEMENTS and /INSERT_REQUEST_IDS subtrees
+            /// behind (deleteTable does not know about them). Reap them here; otherwise a
+            /// recreated table with the same name would serve stale idempotency results (a reused
+            /// requestId would return the OLD table's VISIBLE result and silently skip the insert),
+            /// and the sweep would keep listing manifests of nonexistent tables forever.
+            if (!_helixResourceManager.hasTable(table)) {
+              LOGGER.info("Cleanup sweep: table {} no longer exists; deleting its insert-statement "
+                  + "and request-id subtrees", table);
+              _statementStore.deleteTableSubtrees(table);
+              _tablesWithStatements.remove(table);
+              continue;
+            }
             cleanupStatementsForTable(table);
           } catch (Throwable t) {
             /// Catch Throwable, not just Exception: a ScheduledExecutorService cancels future
@@ -1370,8 +1451,7 @@ public class InsertStatementCoordinator {
   /// Cleans up stuck and completed statements for a specific table.
   ///
   /// Handles:
-  /// - ACCEPTED/PREPARED stuck beyond timeout -> ABORTED
-  /// - COMMITTED stuck beyond committed timeout -> ABORTED (partial commit safety)
+  /// - ACCEPTED stuck beyond timeout -> ABORTED (FILE; ROW is GC'd after a longer retention)
   /// - VISIBLE beyond retention period -> GC (manifest deleted from ZK)
   /// - ABORTED beyond retention period -> GC (manifest deleted from ZK)
   ///
@@ -1523,7 +1603,7 @@ public class InsertStatementCoordinator {
                 abortedManifest = manifest;
               }
               delegateAbortToExecutor(abortedManifest);
-              bumpActiveStatementCount(-1);  /// ACCEPTED/PREPARED → ABORTED via timeout sweep
+              bumpActiveStatementCount(-1);  /// ACCEPTED → ABORTED via timeout sweep
               _controllerMetrics.addMeteredGlobalValue(ControllerMeter.INSERT_STATEMENTS_ABORTED, 1);
               changedCount++;
             } else if (cas == CasResult.PRECHECK_FAILED) {
@@ -1885,6 +1965,31 @@ public class InsertStatementCoordinator {
 
   /// Pre-acceptance rejection — no manifest exists in ZK. Use for validation failures and rejections
   /// before the manifest is persisted. Callers cannot `getStatus` a REJECTED statementId.
+  /// Cheap estimate of a ROW payload's size for the pre-acceptance byte limit: field-name and
+  /// string-value character counts (2 bytes/char), raw byte[] lengths, and a flat 16 bytes for
+  /// boxed numerics/booleans. Returns early once the limit is exceeded so a pathological payload
+  /// doesn't cost a full scan just to be rejected.
+  private static long estimateRowPayloadBytes(List<GenericRow> rows, long limit) {
+    long total = 0;
+    for (GenericRow row : rows) {
+      for (Map.Entry<String, Object> entry : row.getFieldToValueMap().entrySet()) {
+        total += 2L * entry.getKey().length();
+        Object value = entry.getValue();
+        if (value instanceof String) {
+          total += 2L * ((String) value).length();
+        } else if (value instanceof byte[]) {
+          total += ((byte[]) value).length;
+        } else {
+          total += 16;
+        }
+        if (total > limit) {
+          return total;
+        }
+      }
+    }
+    return total;
+  }
+
   private static InsertResult rejectResult(String statementId, String errorCode, String message) {
     return new InsertResult.Builder().setStatementId(statementId).setState(InsertStatementState.REJECTED)
         .setErrorCode(errorCode).setMessage(message).build();

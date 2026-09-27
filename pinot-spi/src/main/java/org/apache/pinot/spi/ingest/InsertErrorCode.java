@@ -62,6 +62,13 @@ public final class InsertErrorCode {
   public static final String INVALID_SEGMENT_NAME = "INVALID_SEGMENT_NAME";
   /// ROW insert request had null/empty rows; coordinator rejects pre-acceptance.
   public static final String EMPTY_ROWS = "EMPTY_ROWS";
+  /// ROW insert exceeded the configured per-statement row-count limit; rejected pre-acceptance.
+  public static final String ROW_LIMIT_EXCEEDED = "ROW_LIMIT_EXCEEDED";
+  /// ROW insert exceeded the configured per-statement payload-byte limit; rejected pre-acceptance.
+  public static final String PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE";
+  /// ROW insert rejected because the controller is already executing the configured maximum number
+  /// of concurrent ROW inserts. Retryable.
+  public static final String TOO_MANY_CONCURRENT_INSERTS = "TOO_MANY_CONCURRENT_INSERTS";
 
   /// ---- Post-acceptance (state=ABORTED, manifest exists) -------------------------------------
 
