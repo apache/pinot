@@ -27,6 +27,11 @@ import org.apache.pinot.spi.utils.Pairs.IntPair;
 public final class SortedDocIdSet implements BlockDocIdSet {
   private final List<IntPair> _docIdRanges;
 
+  /// Returns a doc id set over the given document id ranges, or [EmptyDocIdSet] when there is none.
+  public static BlockDocIdSet create(List<IntPair> docIdRanges) {
+    return docIdRanges.isEmpty() ? EmptyDocIdSet.unscanned() : new SortedDocIdSet(docIdRanges);
+  }
+
   // NOTE: No need to track numDocs because sorted index can only apply to ImmutableSegment, so the document ids are
   //       always smaller than numDocs.
   public SortedDocIdSet(List<IntPair> docIdRanges) {
@@ -41,13 +46,5 @@ public final class SortedDocIdSet implements BlockDocIdSet {
   @Override
   public long getNumEntriesScannedInFilter() {
     return 0L;
-  }
-
-  @Override
-  public BlockDocIdSet getOptimizedDocIdSet() {
-    if (_docIdRanges.isEmpty()) {
-      return EmptyDocIdSet.getInstance();
-    }
-    return this;
   }
 }

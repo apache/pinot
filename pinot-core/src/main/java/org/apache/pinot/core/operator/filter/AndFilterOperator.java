@@ -28,7 +28,6 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
-import org.apache.pinot.core.operator.docidsets.ShortCircuitingDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.BufferFastAggregation;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -55,15 +54,14 @@ public class AndFilterOperator extends BaseFilterOperator {
     long totalEntriesScanned = 0L;
     for (BaseFilterOperator filterOperator : _filterOperators) {
       BlockDocIdSet blockDocIdSet = filterOperator.getTrues();
-      BlockDocIdSet optimizedDocIdSet = blockDocIdSet.getOptimizedDocIdSet();
       totalEntriesScanned += blockDocIdSet.getNumEntriesScannedInFilter();
-      if (optimizedDocIdSet instanceof EmptyDocIdSet) {
-        return new ShortCircuitingDocIdSet(totalEntriesScanned);
+      if (blockDocIdSet instanceof EmptyDocIdSet) {
+        return new EmptyDocIdSet(totalEntriesScanned);
       }
-      if (optimizedDocIdSet instanceof MatchAllDocIdSet) {
+      if (blockDocIdSet instanceof MatchAllDocIdSet) {
         continue;
       }
-      blockDocIdSets.add(optimizedDocIdSet);
+      blockDocIdSets.add(blockDocIdSet);
     }
     if (blockDocIdSets.isEmpty()) {
       return new MatchAllDocIdSet(_numDocs);
@@ -78,7 +76,7 @@ public class AndFilterOperator extends BaseFilterOperator {
     for (BaseFilterOperator filterOperator : _filterOperators) {
       BlockDocIdSet childNotFalses = filterOperator.getNotFalses();
       if (childNotFalses instanceof EmptyDocIdSet) {
-        return EmptyDocIdSet.getInstance();
+        return EmptyDocIdSet.unscanned();
       }
       if (childNotFalses instanceof MatchAllDocIdSet) {
         continue;
@@ -93,7 +91,7 @@ public class AndFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getNulls() {
-    return mayHaveNulls() ? deriveNulls(_queryOptions) : EmptyDocIdSet.getInstance();
+    return mayHaveNulls() ? deriveNulls(_queryOptions) : EmptyDocIdSet.unscanned();
   }
 
   @Override

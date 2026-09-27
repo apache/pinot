@@ -22,15 +22,22 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
 
 
-/// Singleton class which extends [BlockDocIdSet] that is empty, i.e. does not contain any document.
+/// A [BlockDocIdSet] that does not contain any document.
+///
+/// It keeps the number of entries scanned in the filter before the result was found to be empty, so that the execution
+/// stats still account for that work. A result found without scanning uses the shared instance from [#unscanned].
 public final class EmptyDocIdSet implements BlockDocIdSet {
-  private EmptyDocIdSet() {
+  private static final EmptyDocIdSet UNSCANNED = new EmptyDocIdSet(0L);
+
+  /// Returns the shared instance for an empty result found without scanning.
+  public static EmptyDocIdSet unscanned() {
+    return UNSCANNED;
   }
 
-  private static final EmptyDocIdSet INSTANCE = new EmptyDocIdSet();
+  private final long _numEntriesScannedInFilter;
 
-  public static EmptyDocIdSet getInstance() {
-    return INSTANCE;
+  public EmptyDocIdSet(long numEntriesScannedInFilter) {
+    _numEntriesScannedInFilter = numEntriesScannedInFilter;
   }
 
   @Override
@@ -40,6 +47,6 @@ public final class EmptyDocIdSet implements BlockDocIdSet {
 
   @Override
   public long getNumEntriesScannedInFilter() {
-    return 0L;
+    return _numEntriesScannedInFilter;
   }
 }
