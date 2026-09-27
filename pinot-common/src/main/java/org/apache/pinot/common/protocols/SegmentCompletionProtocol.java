@@ -190,18 +190,6 @@ public class SegmentCompletionProtocol {
     }
 
     @Nullable
-    public static ReasonCode fromReasonCodeParam(@Nullable String reasonCode) {
-      if (reasonCode == null) {
-        return null;
-      }
-      try {
-        return fromCode(Integer.parseInt(reasonCode));
-      } catch (NumberFormatException ignored) {
-        return null;
-      }
-    }
-
-    @Nullable
     public static ReasonCode fromCode(int reasonCode) {
       return BY_ID.get(reasonCode);
     }
@@ -363,16 +351,8 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
-      /// Parses the raw `reasonCode` query parameter. Missing, malformed, or unknown values are ignored so the
-      /// retained legacy `reason` can continue to be used as fallback.
-      public Params withReasonCodeParam(@Nullable String reasonCode) {
-        ReasonCode parsedReasonCode = ReasonCode.fromReasonCodeParam(reasonCode);
-        if (parsedReasonCode != null) {
-          return withReasonCode(parsedReasonCode);
-        }
-        return this;
-      }
-
+      /// Resolves the `reasonCode` query parameter. Missing or unknown values are ignored so the retained legacy
+      /// `reason` can continue to be used as fallback.
       public Params withReasonCodeParam(@Nullable Integer reasonCode) {
         ReasonCode parsedReasonCode = reasonCode != null ? ReasonCode.fromCode(reasonCode) : null;
         if (parsedReasonCode != null) {

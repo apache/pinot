@@ -155,20 +155,16 @@ public class SegmentCompletionProtocolTest {
     Assert.assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
 
     params = new SegmentCompletionProtocol.Request.Params()
-        .withReasonCodeParam("110");
+        .withReasonCodeParam(110);
     Assert.assertEquals(params.getReason(), SegmentCompletionProtocol.REASON_TIME_LIMIT);
     Assert.assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.TIME_LIMIT);
 
     params = new SegmentCompletionProtocol.Request.Params().withReason(SegmentCompletionProtocol.REASON_ROW_LIMIT)
-        .withReasonCodeParam("999");
+        .withReasonCodeParam(999);
     Assert.assertEquals(params.getReason(), SegmentCompletionProtocol.REASON_ROW_LIMIT);
     Assert.assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
 
-    params = new SegmentCompletionProtocol.Request.Params().withReasonCodeParam("999");
-    Assert.assertNull(params.getReason());
-    Assert.assertNull(params.getReasonCode());
-
-    params = new SegmentCompletionProtocol.Request.Params().withReasonCodeParam("FUTURE_REASON_CODE");
+    params = new SegmentCompletionProtocol.Request.Params().withReasonCodeParam(999);
     Assert.assertNull(params.getReason());
     Assert.assertNull(params.getReasonCode());
   }
