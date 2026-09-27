@@ -631,10 +631,6 @@ public class CommonConstants {
         "pinot.broker.mse.streaming.distinct.flush.threshold";
     public static final int DEFAULT_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD = -1;
 
-    /// Default output block size (rows) for the streaming selection ORDER BY combine
-    /// ({@link Request.QueryOptionKey#SORTED_SELECTION_MERGE_BLOCK_SIZE}).
-    public static final int DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE = 10_000;
-
     // Whether to infer partition hint by default or not.
     // This value can always be overridden by INFER_PARTITION_HINT query option
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
@@ -1674,6 +1670,21 @@ public class CommonConstants {
     /// among many sorted ones. This default is chosen to tolerate that while still rejecting a mostly-unsorted table.
     /// It is a starting point rather than a measured optimum.
     public static final double DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO = 0.8;
+    /// Server-wide override of [#DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO], applied to queries that do not
+    /// set the query option.
+    public static final String SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO =
+        "sorted.selection.merge.auto.min.sorted.ratio";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO;
+
+    /// Default output block size (rows) for the streaming selection ORDER BY combine
+    /// ([Broker.Request.QueryOptionKey#SORTED_SELECTION_MERGE_BLOCK_SIZE]).
+    public static final int DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE = 10_000;
+    /// Server-wide override of [#DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE], applied to queries that do not set the
+    /// query option.
+    public static final String SORTED_SELECTION_MERGE_BLOCK_SIZE = "sorted.selection.merge.block.size";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_SORTED_SELECTION_MERGE_BLOCK_SIZE =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + SORTED_SELECTION_MERGE_BLOCK_SIZE;
     public static final String CONFIG_OF_MSE_MIN_GROUP_TRIM_SIZE = MSE_CONFIG_PREFIX + ".min.group.trim.size";
     // Match the value of GroupByUtils.DEFAULT_MIN_NUM_GROUPS
     public static final int DEFAULT_MSE_MIN_GROUP_TRIM_SIZE = 5000;

@@ -32,6 +32,7 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
@@ -49,17 +50,17 @@ import org.slf4j.LoggerFactory;
 
 /// Streaming, lazy combine operator for selection ORDER BY queries whose first order-by expression is an identifier.
 ///
-/// It performs an incremental k-way heap merge across the per-segment operators in {@code _operators}, returning
-/// globally sorted rows in bounded blocks. Each segment is exposed through a {@link SegmentCursor} that yields that
+/// It performs an incremental k-way heap merge across the per-segment operators in `_operators`, returning
+/// globally sorted rows in bounded blocks. Each segment is exposed through a [SegmentCursor] that yields that
 /// segment's locally-sorted rows in order:
 ///
 /// - Segments physically sorted on the first order-by column are backed by
-///   {@link StreamingSelectionOrderByOperator}, which is pulled lazily one run/block at a time.
+///   [StreamingSelectionOrderByOperator], which is pulled lazily one run/block at a time.
 /// - Other (e.g. consuming/unsorted) segments are backed by a single materialized top-K block (any
-///   {@link SelectionResultsBlock}-producing operator such as {@code SelectionOrderByOperator}); the cursor reads that
+///   [SelectionResultsBlock]-producing operator such as `SelectionOrderByOperator`); the cursor reads that
 ///   one block and iterates its rows.
 ///
-/// A {@link PriorityQueue} of {@link SegmentCursor} ordered by the {@link OrderByComparatorFactory} comparator on
+/// A [PriorityQueue] of [SegmentCursor] ordered by the [OrderByComparatorFactory] comparator on
 /// each
 /// cursor's current head row drives the merge with an at-most-one-head-per-active-segment invariant (the heap holds the
 /// cursors themselves, never all rows, which would degenerate into a full heap-sort that materializes everything). Each
@@ -67,39 +68,43 @@ import org.slf4j.LoggerFactory;
 /// row, and re-offers it if it still has a head.
 ///
 /// **Min/max lazy segment activation (pruning).** Cursors are sorted by the first order-by column's min value
-/// (ASC) / max value (DESC) reusing the {@code MinMaxValueContext} idea from
-/// {@link MinMaxValueBasedSelectionOrderByCombineOperator}. A cursor is only activated (its segment acquired and first
-/// block read) when the merge frontier reaches its min/max, so once {@code limit + offset} rows are emitted the
-/// remaining segments are never acquired or read. See {@link #activateEligibleCursors(SegmentCursor)} for the
+/// (ASC) / max value (DESC) reusing the `MinMaxValueContext` idea from
+/// [MinMaxValueBasedSelectionOrderByCombineOperator]. A cursor is only activated (its segment acquired and first
+/// block read) when the merge frontier reaches its min/max, so once `limit + offset` rows are emitted the
+/// remaining segments are never acquired or read. See [#activateEligibleCursors(SegmentCursor)] for the
 /// correctness argument.
 /// Pruning is disabled when null handling is enabled (an unsorted segment's first order-by column may then contain
 /// nulls whose ordering position the raw min/max cannot capture), in which case every segment is activated.
+/// Its effect shows in the stats: a never-activated segment scans no docs, so `numSegmentsMatched` excludes it while
+/// `numSegmentsProcessed` counts every segment. Their difference also counts activated segments that matched no rows.
+/// TODO: report the activated count separately; that needs a new `DataTable.MetadataKey`.
+///       See https://github.com/apache/pinot/pull/19120#discussion_r3871714063
 ///
 /// **Segment acquire/release lifecycle.** A cursor acquires its
-/// {@link AcquireReleaseColumnsSegmentOperator} on activation and releases it only when its child operator is fully
+/// [AcquireReleaseColumnsSegmentOperator] on activation and releases it only when its child operator is fully
 /// drained (acquire-on-activate / release-on-exhaust), rather than per run. This is intentional: the backing
-/// {@link StreamingSelectionOrderByOperator} retains a buffer-backed {@code ValueBlock} across {@code nextBlock()}
+/// [StreamingSelectionOrderByOperator] retains a buffer-backed `ValueBlock` across `nextBlock()`
 /// calls in its tail-to-sort mode, so releasing between interleaved runs could read segment buffers after a release
 /// under prefetch. Holding the acquire for the cursor's lifetime guarantees no release happens between a cursor's
 /// own reads; min/max pruning bounds the number of simultaneously-active (acquired) segments to the merge frontier.
-/// The rows handed out by the child operators are already deep-copied to heap {@code Object[]} (via
-/// {@code RowBasedBlockValueFetcher}), so they remain valid after the segment is released. Any cursors still
-/// acquired when the merge ends early (LIMIT reached) or errors out are released via {@link #releaseAllCursors()}.
+/// The rows handed out by the child operators are already deep-copied to heap `Object[]` (via
+/// `RowBasedBlockValueFetcher`), so they remain valid after the segment is released. Any cursors still
+/// acquired when the merge ends early (LIMIT reached) or errors out are released via [#releaseAllCursors()].
 ///
 /// **Streaming paths only.** This operator is installed only where a
-/// {@link org.apache.pinot.core.query.executor.ResultsBlockStreamer} is present (the
-/// MSE leaf, driven by {@link org.apache.pinot.core.operator.streaming.StreamingInstanceResponseOperator}, and the
-/// gRPC streaming endpoint). The merge emits many bounded {@link SelectionResultsBlock}s from successive
-/// {@link #getNextBlock()} calls followed by a final {@link MetadataResultsBlock}. On the blocking single-stage
-/// path the caller expects one complete block from a single {@link #getNextBlock()} call, so nothing here could
-/// stream: the merge would accumulate the whole {@code limit + offset} result while holding every activated cursor's
-/// materialized block alive. That path keeps {@link MinMaxValueBasedSelectionOrderByCombineOperator}.
+/// [org.apache.pinot.core.query.executor.ResultsBlockStreamer] is present (the
+/// MSE leaf, driven by [org.apache.pinot.core.operator.streaming.StreamingInstanceResponseOperator], and the
+/// gRPC streaming endpoint). The merge emits many bounded [SelectionResultsBlock]s from successive
+/// [#getNextBlock()] calls followed by a final [MetadataResultsBlock]. On the blocking single-stage
+/// path the caller expects one complete block from a single [#getNextBlock()] call, so nothing here could
+/// stream: the merge would accumulate the whole `limit + offset` result while holding every activated cursor's
+/// materialized block alive. That path keeps [MinMaxValueBasedSelectionOrderByCombineOperator].
 ///
-/// **Threading.** This operator overrides {@link #start()}/{@link #stop()} to no-ops (other than releasing
-/// segments) and runs the merge single-threaded and lazily in {@link #getNextBlock()} on the consumer thread; it does
-/// not use the base worker-queue model. The base entry points that it replaces - {@link #processSegments()} and
-/// {@link #isQuerySatisfied(SelectionResultsBlock, Object)} - are overridden to fail loud. The base
-/// {@code Phaser} (which exists only to fence worker threads against segment release) is intentionally bypassed because
+/// **Threading.** This operator overrides [#start()]/[#stop()] to no-ops (other than releasing
+/// segments) and runs the merge single-threaded and lazily in [#getNextBlock()] on the consumer thread; it does
+/// not use the base worker-queue model. The base entry points that it replaces - [#processSegments()] and
+/// [#isQuerySatisfied(SelectionResultsBlock, Object)] - are overridden to fail loud. The base
+/// `Phaser` (which exists only to fence worker threads against segment release) is intentionally bypassed because
 /// all child/segment access is synchronous on the single consumer thread that holds the segment references; no async
 /// work may be introduced here without restoring that fence. The instance is single-use (driven once to completion) and
 /// is not thread-safe.
@@ -111,10 +116,12 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
   private final boolean _asc;
   private final boolean _pruningEnabled;
   /// Whether a cursor whose bound *ties* the merge frontier may be deferred, not only one sorting strictly
-  /// beyond it. Only correct under a single order-by expression: see {@link #sortsBeyond}.
+  /// beyond it. Only correct under a single order-by expression: see [#sortsBeyond].
   private final boolean _deferTiedCursors;
   private final int _numRowsToKeep;
   private final int _blockSize;
+  /// Segments whose metadata marks the leading order-by column sorted; -1 when that expression is not a column
+  private final int _numSortedSegments;
   private final Comparator<Object[]> _comparator;
   private final SegmentCursor[] _sortedCursors;
   private final PriorityQueue<SegmentCursor> _priorityQueue;
@@ -168,6 +175,7 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
     // Reading DataSourceMetadata does not touch column buffers, so no segment acquire is needed here (mirrors
     // MinMaxValueBasedSelectionOrderByCombineOperator).
     _sortedCursors = new SegmentCursor[_numOperators];
+    int numSortedSegments = firstOrderByColumn != null ? 0 : -1;
     for (int i = 0; i < _numOperators; i++) {
       Operator<BaseResultsBlock> operator = _operators.get(i);
       if (firstOrderByColumn == null) {
@@ -178,7 +186,11 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
           operator.getIndexSegment().getDataSource(firstOrderByColumn, queryContext.getSchema())
               .getDataSourceMetadata();
       _sortedCursors[i] = new SegmentCursor(operator, metadata.getMinValue(), metadata.getMaxValue());
+      if (metadata.isSorted()) {
+        numSortedSegments++;
+      }
     }
+    _numSortedSegments = numSortedSegments;
     if (firstOrderByColumn != null) {
       sortCursorsByMinMax();
     }
@@ -190,7 +202,7 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
 
   /// Sorts the cursors so the merge can activate them lazily in frontier order: ascending by the column min value for
   /// ASC, descending by the column max value for DESC. Cursors without a min/max are placed first because they must
-  /// always be processed (mirrors {@link MinMaxValueBasedSelectionOrderByCombineOperator}).
+  /// always be processed (mirrors [MinMaxValueBasedSelectionOrderByCombineOperator]).
   private void sortCursorsByMinMax() {
     if (_asc) {
       Arrays.sort(_sortedCursors, (o1, o2) -> {
@@ -220,7 +232,23 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
     return EXPLAIN_NAME;
   }
 
-  /// Override to a no-op: the merge is single-threaded and lazy in {@link #getNextBlock()}, so we do not spin up the
+  /// Settings fixed at construction. Explain never drives the merge, so how many segments activate is not shown here.
+  /// Query-wide values are idempotent so the broker merges the node across workers only when they agree; the segment
+  /// counts are summed. `numSortedSegments` is metadata sortedness, not whether a child streams: a DESC scan without
+  /// `allowReverseOrder`, or a leading column holding nulls, still falls back to a materialized child.
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    attributeBuilder.putLongIdempotent("blockSize", _blockSize);
+    attributeBuilder.putBool("frontierPruning", _pruningEnabled);
+    attributeBuilder.putBool("deferTiedCursors", _deferTiedCursors);
+    attributeBuilder.putLong("numSegments", _numOperators);
+    if (_numSortedSegments >= 0) {
+      attributeBuilder.putLong("numSortedSegments", _numSortedSegments);
+    }
+  }
+
+  /// Override to a no-op: the merge is single-threaded and lazy in [#getNextBlock()], so we do not spin up the
   /// base worker threads / blocking-queue model.
   @Override
   public void start() {
@@ -234,7 +262,7 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
     releaseAllCursors();
   }
 
-  /// The base worker-thread entry point must never run here ({@link #start()} is a no-op). Fail loud if it ever does.
+  /// The base worker-thread entry point must never run here ([#start()] is a no-op). Fail loud if it ever does.
   @Override
   protected void processSegments() {
     throw new IllegalStateException(
@@ -329,12 +357,12 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
 
   /// Activates not-yet-active cursors whose min/max bound can still reach the merge frontier.
   ///
-  /// Cursors are visited in min/max order and {@code _nextToActivate} advances only on a real activation, so a
-  /// {@code break} defers the current cursor to a later call with a risen frontier rather than skipping it. Deferring
+  /// Cursors are visited in min/max order and `_nextToActivate` advances only on a real activation, so a
+  /// `break` defers the current cursor to a later call with a risen frontier rather than skipping it. Deferring
   /// is safe because the first order-by column is the primary sort key: a cursor whose range starts past the frontier
   /// holds no row sorting before it. With no frontier known yet, activation is forced. Under a single order-by
   /// expression a cursor whose bound merely *ties* the frontier is deferred too, which is what keeps a long run of
-  /// equal segment minima from activating every segment at once; see {@link #sortsBeyond}.
+  /// equal segment minima from activating every segment at once; see [#sortsBeyond].
   ///
   /// The frontier is the row about to be emitted. Understating it defers a cursor that could have supplied that row
   /// and the merge emits out of order, where overstating it only activates a segment early. The leader is retained
@@ -366,11 +394,11 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
   /// be compared, so this reports `false` and the caller activates. Tests column 0 only, as the pruning bound always
   /// has, rather than the full-row comparator -- which would put every order-by column on the per-row path.
   ///
-  /// Under a single order-by expression ({@code _deferTiedCursors}) a *tie* also defers, which only postpones a
-  /// cursor: {@code _nextToActivate} does not advance, and the caller force-activates once heap and leader drain.
-  /// Since {@code bound} bounds every row in the segment, a deferred cursor holds no row sorting strictly before an
+  /// Under a single order-by expression (`_deferTiedCursors`) a *tie* also defers, which only postpones a
+  /// cursor: `_nextToActivate` does not advance, and the caller force-activates once heap and leader drain.
+  /// Since `bound` bounds every row in the segment, a deferred cursor holds no row sorting strictly before an
   /// emitted one -- only ties, interchangeable when column 0 is the whole sort key. Note this is *not*
-  /// {@link MinMaxValueBasedSelectionOrderByCombineOperator}'s justification: its bound is a complete top-K's k-th
+  /// [MinMaxValueBasedSelectionOrderByCombineOperator]'s justification: its bound is a complete top-K's k-th
   /// row, this one is the live frontier. It changes which tied rows are returned, already documented as arbitrary.
   private boolean sortsBeyond(Comparable bound, @Nullable SegmentCursor leader, @Nullable SegmentCursor top) {
     Object leaderHead = leader != null ? leader.currentHead()[0] : null;
@@ -404,7 +432,7 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
     }
   }
 
-  /// Returns the accumulated output rows as a sorted {@link SelectionResultsBlock} and resets the output buffer. The
+  /// Returns the accumulated output rows as a sorted [SelectionResultsBlock] and resets the output buffer. The
   /// block carries the comparator so the broker-side n-way reduce stays correct. Execution stats are not attached
   /// here: they go on the terminal metadata block.
   private BaseResultsBlock flushDataBlock() {
@@ -453,9 +481,9 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
   }
 
   /// Iterates a single segment's locally-sorted rows, pulling blocks lazily from its operator. Streaming-backed cursors
-  /// loop until the operator returns {@code null}; single-block-backed cursors read exactly one block. The segment is
+  /// loop until the operator returns `null`; single-block-backed cursors read exactly one block. The segment is
   /// acquired on activation and released once exhausted or when the combine finishes (see
-  /// {@link StreamingSelectionOrderByCombineOperator}).
+  /// [StreamingSelectionOrderByCombineOperator]).
   private class SegmentCursor {
     private final Operator<BaseResultsBlock> _operator;
     @Nullable
@@ -478,14 +506,14 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
       _maxValue = maxValue;
     }
 
-    /// Returns the current head row to be merged next, or {@code null} if not activated or exhausted.
+    /// Returns the current head row to be merged next, or `null` if not activated or exhausted.
     @Nullable
     Object[] currentHead() {
       return _head;
     }
 
     /// Acquires the segment, resolves whether the child is the lazy streaming operator, and reads the first block.
-    /// After this call {@link #currentHead()} returns the first row, or {@code null} if the segment contributes
+    /// After this call [#currentHead()] returns the first row, or `null` if the segment contributes
     /// nothing.
     void activate() {
       acquireSegment();
@@ -495,7 +523,7 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
     }
 
     /// Advances past the current head, pulling the next block lazily for streaming cursors. Releases the segment
-    /// when the cursor is exhausted; afterwards {@link #currentHead()} returns {@code null}.
+    /// when the cursor is exhausted; afterwards [#currentHead()] returns `null`.
     void advance() {
       _pos++;
       if (_pos < _rows.size()) {
@@ -510,14 +538,15 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
     }
 
     /// Loads the next non-empty block of rows from the operator, capturing the combine-level data schema on first
-    /// sight. Returns {@code false} when the operator is exhausted (no more rows). Streaming-backed operators emit
-    /// one run/block per call and {@code null} when done; single-block operators emit a single block and must not be
+    /// sight. Returns `false` when the operator is exhausted (no more rows). Streaming-backed operators emit
+    /// one run/block per call and `null` when done; single-block operators emit a single block and must not be
     /// called again afterwards, so an empty/null block from a single-block child is treated as exhausted.
     ///
     /// A block whose schema differs from the one already captured is dropped and reported, mirroring
-    /// {@link org.apache.pinot.core.operator.combine.merger.SelectionOrderByResultsBlockMerger}. Segments on a server
+    /// [org.apache.pinot.core.operator.combine.merger.SelectionOrderByResultsBlockMerger]. Segments on a server
     /// can disagree on schema mid-reload (a newly added column exists only in reloaded segments), and merging rows of
-    /// differing width under one schema would corrupt the result rather than fail.
+    /// differing width under one schema would corrupt the result rather than fail. The cursor is exhausted rather than
+    /// skipping the one block, which drops the same unit the merger does: there, a block is a segment's whole result.
     private boolean pullBlock() {
       while (true) {
         SelectionResultsBlock block = nextBlock();
@@ -562,8 +591,8 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
       }
     }
 
-    /// Returns whether the underlying child operator is the lazy {@link StreamingSelectionOrderByOperator}. Must be
-    /// called after the first {@link Operator#nextBlock()}, which is what materializes a wrapped child.
+    /// Returns whether the underlying child operator is the lazy [StreamingSelectionOrderByOperator]. Must be
+    /// called after the first [Operator#nextBlock()], which is what materializes a wrapped child.
     private boolean isStreamingChild() {
       Operator underlying = _operator;
       if (_operator instanceof AcquireReleaseColumnsSegmentOperator) {
@@ -583,7 +612,7 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
       _acquired = true;
     }
 
-    /// Releases the segment if still held. Idempotent: safe to call from {@link #exhaust()} and combine cleanup.
+    /// Releases the segment if still held. Idempotent: safe to call from [#exhaust()] and combine cleanup.
     private void release() {
       if (_acquired) {
         if (_operator instanceof AcquireReleaseColumnsSegmentOperator) {
