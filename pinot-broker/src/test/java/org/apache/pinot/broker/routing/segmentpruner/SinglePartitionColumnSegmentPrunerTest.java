@@ -152,6 +152,26 @@ public class SinglePartitionColumnSegmentPrunerTest {
   }
 
   @Test
+  public void testMoreThanEightDistinctPartitionFunctions() throws Exception {
+    Map<String, ZNRecord> records = new LinkedHashMap<>();
+    Set<String> expected = new HashSet<>();
+    for (int offset = 0; offset < 9; offset++) {
+      String segment = "matching_" + offset;
+      records.put(segment, metadata(segment, "PrunerCounting", 16, Set.of(offset),
+          Map.of("offset", Integer.toString(offset))));
+      expected.add(segment);
+    }
+    for (int offset = 0; offset < 9; offset++) {
+      String segment = "nonmatching_" + offset;
+      records.put(segment, metadata(segment, "PrunerCounting", 16, Set.of(offset + 1),
+          Map.of("offset", Integer.toString(offset))));
+    }
+    CountingPartitionFunction.CALLS.set(0);
+    assertEquals(pruner(records, 1).prune(request(predicate("EQUALS", "0")), records.keySet()), expected);
+    assertEquals(CountingPartitionFunction.CALLS.get(), 9);
+  }
+
+  @Test
   public void testEqualConfigurationsReusePartitionIds() throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
     for (int i = 0; i < Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD; i++) {
