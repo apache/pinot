@@ -36,11 +36,19 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.AccessOption;
+import org.apache.helix.HelixManager;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
@@ -54,8 +62,16 @@ import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
+import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.config.table.DimensionTableConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -63,16 +79,19 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.assertj.core.api.Assertions;
 import org.mockito.ArgumentMatchers;
-import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
@@ -86,6 +105,13 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private final Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
   private boolean _isRunIgnored;
   private TimeZone _currentSystemTimeZone;
+
+  // For real dimension table uses
+  private static final SegmentOperationsThrottlerSet SEGMENT_OPERATIONS_THROTTLER =
+      new SegmentOperationsThrottlerSet(new SegmentOperationsThrottler(1, 2, true),
+          new SegmentOperationsThrottler(1, 2, true), new SegmentOperationsThrottler(1, 2, true),
+          new SegmentOperationsThrottler(1, 2, true));
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), ResourceBasedQueriesTest.class.getName());
 
   @BeforeClass
   public void setUp()
@@ -136,7 +162,11 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         if (table._replicated) {
           ImmutableSegment segment = addSegmentReplicated(factory1, factory2, offlineTableName, genericRows);
           if (table._isDimTable) {
-            registerMockDimensionTable(offlineTableName, schema, table, segment);
+            if (table._isActualDimTableNeeded) {
+              registerRealDimensionTable(offlineTableName, schema, table, segment);
+            } else {
+              registerMockDimensionTable(offlineTableName, schema, table, segment);
+            }
           }
           continue;
         }
@@ -300,20 +330,20 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         for (int i = 0; i < columns.size(); i++) {
           row.put(columns.get(i), values[i]);
         }
-        lookupMap.put(new PrimaryKey(recordReader.getRecordValues(docId, primaryKeyIndexes)), row);
+        Object[] o = recordReader.getRecordValues(docId, primaryKeyIndexes);
+        lookupMap.put(new PrimaryKey(o), row);
       }
     } catch (Exception e) {
       throw new RuntimeException("Failed to build the mock dimension table for: " + offlineTableName, e);
     }
     // Create and register a mock DimensionTableDataManager
-    DimensionTableDataManager mockDimManager = Mockito.mock(DimensionTableDataManager.class);
-    Mockito.when(mockDimManager.getPrimaryKeyColumns()).thenReturn(primaryKeyColumns);
-    Mockito.when(mockDimManager.containsKey(ArgumentMatchers.any(PrimaryKey.class)))
-        .thenAnswer(invocation -> {
-          PrimaryKey pk = invocation.getArgument(0);
-          return lookupMap.containsKey(pk);
-        });
-    Mockito.when(mockDimManager.lookupValues(ArgumentMatchers.any(PrimaryKey.class),
+    DimensionTableDataManager mockDimManager = mock(DimensionTableDataManager.class);
+    when(mockDimManager.getPrimaryKeyColumns()).thenReturn(primaryKeyColumns);
+    when(mockDimManager.containsKey(ArgumentMatchers.any(PrimaryKey.class))).thenAnswer(invocation -> {
+      PrimaryKey pk = invocation.getArgument(0);
+      return lookupMap.containsKey(pk);
+    });
+    when(mockDimManager.lookupValues(ArgumentMatchers.any(PrimaryKey.class),
         ArgumentMatchers.any(String[].class))).thenAnswer(invocation -> {
           PrimaryKey pk = invocation.getArgument(0);
           String[] lookupColumns = invocation.getArgument(1);
@@ -330,6 +360,34 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     DimensionTableDataManager.registerDimensionTable(offlineTableName, mockDimManager);
   }
 
+  private void registerRealDimensionTable(String offlineTableName, Schema schema, QueryTestCase.Table table,
+      ImmutableSegment segment)
+      throws Exception {
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TableNameBuilder.extractRawTableName(offlineTableName))
+            .setDimensionTableConfig(new DimensionTableConfig(false /* disablePreload */, false))
+            .build();
+
+    ZkHelixPropertyStore<ZNRecord> propertyStoreMock = mock(ZkHelixPropertyStore.class);
+    HelixManager helixManager = mock(HelixManager.class);
+    when(propertyStoreMock.get("/CONFIGS/TABLE/" + offlineTableName, null, AccessOption.PERSISTENT)).thenReturn(
+        TableConfigSerDeUtils.toZNRecord(tableConfig));
+    when(propertyStoreMock.get("/SCHEMAS/" + schema.getSchemaName(), null, AccessOption.PERSISTENT)).thenReturn(
+        SchemaSerDeUtils.toZNRecord(schema));
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStoreMock);
+
+    InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
+    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
+
+    DimensionTableDataManager tableDataManager = DimensionTableDataManager.createInstanceByTableName(offlineTableName);
+    tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, schema,
+        new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, SEGMENT_OPERATIONS_THROTTLER,
+        false, mock(ServerReloadJobStatusCache.class));
+    tableDataManager.start();
+    tableDataManager.addSegment(segment, null);   // <-- triggers the real createFastLookupDimensionTable()
+    DimensionTableDataManager.registerDimensionTable(offlineTableName, tableDataManager);
+  }
+
   @AfterClass
   public void tearDown() {
     // Restore the original default timezone
@@ -338,6 +396,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       server.shutDown();
     }
     _mailboxService.shutdown();
+    FileUtils.deleteQuietly(TEMP_DIR);
   }
 
   // TODO: name the test using testCaseName for testng reports
@@ -400,8 +459,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
-  public void testQueryTestCasesWithLiteModeWithOutput(String testCaseName, boolean isIgnored, String sql,
-      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer,
+  public void testQueryTestCasesWithLiteModeWithOutput(String testCaseName, boolean isIgnored, String sql, String h2Sql,
+      List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer,
       boolean ignoreLiteMode)
       throws Exception {
     if (ignoreV2Optimizer || ignoreLiteMode) {
@@ -487,8 +546,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         Assertions.assertThat(queryResult.getProcessingException().getMessage()).matches(pattern);
         return Optional.empty();
       }
-      Assert.assertNull(expectedErrorMsg, "Expected error with message '" + expectedErrorMsg
-          + "'. But instead rows were returned: " + JsonUtils.objectToPrettyString(queryResult.getResultTable()));
+      Assert.assertNull(expectedErrorMsg,
+          "Expected error with message '" + expectedErrorMsg + "'. But instead rows were returned: "
+              + JsonUtils.objectToPrettyString(queryResult.getResultTable()));
       Assert.assertNotNull(queryResult.getResultTable(),
           "Result table is null: " + JsonUtils.objectToPrettyString(queryResult));
       return Optional.of(queryResult);
@@ -611,8 +671,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
               : replaceTableName(testCaseName, queryCase._sql);
           Object[] testEntry = new Object[]{
-              testCaseName, queryCase._ignored, sql, h2Sql, queryCase._expectedException, queryCase._keepOutputRowOrder,
-              queryCase._ignoreV2Optimizer, queryCase._ignoreLiteMode
+              testCaseName, queryCase._ignored, sql, h2Sql, queryCase._expectedException,
+              queryCase._keepOutputRowOrder, queryCase._ignoreV2Optimizer, queryCase._ignoreLiteMode
           };
           providerContent.add(testEntry);
         }
