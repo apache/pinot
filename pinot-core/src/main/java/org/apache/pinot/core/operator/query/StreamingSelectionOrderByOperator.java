@@ -61,32 +61,32 @@ import org.roaringbitmap.RoaringBitmap;
 
 /// Lazy, incremental selection ORDER BY operator for segments that are physically sorted on the first order-by column.
 ///
-/// Unlike {@link SelectionOrderByOperator} (which materializes the segment's whole top-K in a single block) this
-/// operator emits one globally-sorted {@link SelectionResultsBlock} per {@link #getNextBlock()} call and returns
-/// {@code null} when the segment is exhausted, so that a downstream k-way-merge combine operator can pull from many
+/// Unlike [SelectionOrderByOperator] (which materializes the segment's whole top-K in a single block) this
+/// operator emits one globally-sorted [SelectionResultsBlock] per [#getNextBlock()] call and returns
+/// `null` when the segment is exhausted, so that a downstream k-way-merge combine operator can pull from many
 /// segments lazily and stop early. It relies on the underlying project operator iterating the first order-by column in
-/// the query order (the caller must guarantee {@code projectOperator.isCompatibleWith(DocIdOrder.fromAsc(asc))}).
+/// the query order (the caller must guarantee `projectOperator.isCompatibleWith(DocIdOrder.fromAsc(asc))`).
 ///
-/// Every instance emits at least one block before {@code null}: a segment matching no rows emits a single empty block
-/// carrying the {@link DataSchema}, so consumers never have to reconstruct a schema the segment already knows.
+/// Every instance emits at least one block before `null`: a segment matching no rows emits a single empty block
+/// carrying the [DataSchema], so consumers never have to reconstruct a schema the segment already knows.
 ///
 /// It runs in one of two emission modes:
 ///
-/// - **No tail to sort** ({@code numSortedExpressions == numOrderByExpressions}, e.g. {@code ORDER BY sorted}):
+/// - **No tail to sort** (`numSortedExpressions == numOrderByExpressions`, e.g. `ORDER BY sorted`):
 ///   rows already arrive from the project operator in final order, so each call emits the next project block
-///   (trimmed to the remaining {@code limit + offset} budget).
-/// - **Tail to sort** ({@code numSortedExpressions < numOrderByExpressions}, e.g.
-///   {@code ORDER BY sorted, other}):
+///   (trimmed to the remaining `limit + offset` budget).
+/// - **Tail to sort** (`numSortedExpressions < numOrderByExpressions`, e.g.
+///   `ORDER BY sorted, other`):
 ///   each call reads forward until the first order-by value changes (a primary-value "run"), retains the run's top
-///   {@code limit + offset} rows by the full comparator, and emits them sorted. This bounds the in-memory run buffer to
-///   {@code limit + offset} rows even when the first order-by column is near-constant (very low cardinality).
+///   `limit + offset` rows by the full comparator, and emits them sorted. This bounds the in-memory run buffer to
+///   `limit + offset` rows even when the first order-by column is near-constant (very low cardinality).
 ///
-/// Like {@link SelectionOrderByOperator} it preserves the two-phase projection optimization: when there are output
+/// Like [SelectionOrderByOperator] it preserves the two-phase projection optimization: when there are output
 /// expressions that are not order-by expressions, the forward scan only fetches the order-by expressions plus the
 /// document id, and the non-order-by expressions are fetched in a second pass over the retained document ids of each
 /// emitted block.
 ///
-/// This operator is stateful across {@link #getNextBlock()} calls and is **not** thread-safe; a single consumer
+/// This operator is stateful across [#getNextBlock()] calls and is **not** thread-safe; a single consumer
 /// must drive it.
 public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionResultsBlock> {
   private static final String EXPLAIN_NAME = "SELECT_ORDERBY_STREAMING";
@@ -231,7 +231,7 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
   }
 
   /// No-tail-to-sort mode: the project operator already returns rows in final order, so emit the next project block,
-  /// trimmed to the remaining {@code limit + offset} budget. Returns {@code null} when exhausted, and otherwise a
+  /// trimmed to the remaining `limit + offset` budget. Returns `null` when exhausted, and otherwise a
   /// non-empty list -- empty project blocks are skipped and the row budget is checked up front, so "no rows" always
   /// means "no more rows".
   @Nullable
@@ -273,7 +273,7 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
   }
 
   /// Tail-to-sort mode: read forward until the first order-by value changes, retain the run's top
-  /// {@code limit + offset} rows by the full comparator, and return them sorted. Returns {@code null} when
+  /// `limit + offset` rows by the full comparator, and return them sorted. Returns `null` when
   /// exhausted.
   @Nullable
   private List<Object[]> nextRun() {
@@ -314,8 +314,8 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
   }
 
   /// Pulls the next row of the forward scan (across project blocks), materialized as an
-  /// {@code Object[_numExpressions]}. For two-phase the document id is stashed at index
-  /// {@code _numOrderByExpressions} (overwritten in the second pass). Returns {@code null} when the project operator
+  /// `Object[_numExpressions]`. For two-phase the document id is stashed at index
+  /// `_numOrderByExpressions` (overwritten in the second pass). Returns `null` when the project operator
   /// is exhausted.
   @Nullable
   private Object[] nextRow() {
@@ -350,7 +350,7 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
     return materializeRow(_currentFetcher, _currentDocIds, _currentNullBitmaps, rowId);
   }
 
-  /// Pulls the next project block carrying documents, skipping any that carry none. Returns {@code null} only when
+  /// Pulls the next project block carrying documents, skipping any that carry none. Returns `null` only when
   /// the project operator is exhausted; an empty block means "nothing in this batch", not "end of segment", and
   /// treating one as exhaustion would truncate the scan.
   ///
@@ -410,7 +410,7 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
   /// Second pass of the two-phase fetch: fills the non-order-by expression values for the rows of a single emitted
   /// block.
   /// The rows keep their final (comparator) order; the fill iterates a document-id-sorted view that shares the same row
-  /// instances, mirroring {@link SelectionOrderByOperator#computePartiallyOrdered()}.
+  /// instances, mirroring [SelectionOrderByOperator#computePartiallyOrdered()].
   private void fetchNonOrderByColumns(List<Object[]> rows) {
     int numRows = rows.size();
     RoaringBitmap docIds = new RoaringBitmap();
@@ -478,9 +478,9 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
   }
 
   /// Resolves a non-order-by expression's result type without building the phase-2 pipeline, for the zero-match case
-  /// where there is nothing to fetch. This reproduces {@link TransformOperator#getResultColumnContext} exactly -- that
+  /// where there is nothing to fetch. This reproduces [TransformOperator#getResultColumnContext] exactly -- that
   /// method resolves against its project operator's source column contexts, which for phase 2 are
-  /// {@link #_phase2DataSourceMap} -- so the schema is identical to the one the fetch path builds, at metadata cost
+  /// [#_phase2DataSourceMap] -- so the schema is identical to the one the fetch path builds, at metadata cost
   /// only. Worth the indirection because a selective filter can leave many segments of a table matching nothing, and
   /// each would otherwise stand up a full projection and transform operator to read types it already knows.
   private ColumnContext resolveResultColumnContext(ExpressionContext expression) {
@@ -558,8 +558,8 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
         numTotalDocs);
   }
 
-  /// Reports scan cost to the shared {@link QueryScanCostContext} so scan-based query killing
-  /// ({@link org.apache.pinot.core.common.Operator#nextBlock()} -> {@code checkScanBasedKilling}) can see this
+  /// Reports scan cost to the shared [QueryScanCostContext] so scan-based query killing
+  /// ([org.apache.pinot.core.common.Operator#nextBlock()] -> `checkScanBasedKilling`) can see this
   /// operator's work. Without this the killer is blind on the streaming path, unlike every other selection operator.
   private void reportScanCost(int numDocsScanned, long numEntriesScannedPostFilter) {
     QueryScanCostContext scanCost = getScanCostContext();
