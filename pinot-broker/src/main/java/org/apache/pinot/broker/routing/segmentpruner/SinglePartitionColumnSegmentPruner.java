@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.segmentpruner;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -48,6 +49,7 @@ import org.apache.pinot.sql.FilterKind;
 /// The `SinglePartitionColumnSegmentPruner` prunes segments based on their partition metadata stored in ZK. The
 /// pruner supports queries with filter (or nested filter) of EQUALITY and IN predicates.
 public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
+  private static final int MAX_LINEAR_FUNCTIONS = 8;
   private final String _tableNameWithType;
   private final String _partitionColumn;
   private final IntSupplier _preparationThreshold;
@@ -133,7 +135,8 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
 
   private Set<String> pruneWithPreparedPredicate(Expression filterExpression, Set<String> segments) {
     Set<String> selectedSegments = new HashSet<>();
-    Map<PartitionFunction, PreparedPredicate> predicates = new HashMap<>();
+    List<PreparedPredicate> predicates = new ArrayList<>(2);
+    Map<PartitionFunction, PreparedPredicate> predicateMap = null;
     for (String segment : segments) {
       SegmentPartitionInfo partitionInfo = _partitionInfoMap.get(segment);
       if (partitionInfo == null || partitionInfo == SegmentPartitionUtils.INVALID_PARTITION_INFO) {
@@ -141,10 +144,30 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
         continue;
       }
       PartitionFunction function = partitionInfo.getPartitionFunction();
-      PreparedPredicate predicate = predicates.get(function);
+      PreparedPredicate predicate = null;
+      if (predicateMap == null) {
+        for (PreparedPredicate candidate : predicates) {
+          if (function.equals(candidate._partitionFunction)) {
+            predicate = candidate;
+            break;
+          }
+        }
+      } else {
+        predicate = predicateMap.get(function);
+      }
       if (predicate == null) {
         predicate = new PreparedPredicate(filterExpression, function);
-        predicates.put(function, predicate);
+        if (predicateMap == null && predicates.size() < MAX_LINEAR_FUNCTIONS) {
+          predicates.add(predicate);
+        } else {
+          if (predicateMap == null) {
+            predicateMap = new HashMap<>();
+            for (PreparedPredicate candidate : predicates) {
+              predicateMap.put(candidate._partitionFunction, candidate);
+            }
+          }
+          predicateMap.put(function, predicate);
+        }
       }
       if (predicate.matches(partitionInfo.getPartitions())) {
         selectedSegments.add(segment);
