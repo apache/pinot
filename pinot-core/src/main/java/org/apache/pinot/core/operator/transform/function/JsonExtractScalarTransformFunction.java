@@ -79,7 +79,7 @@ import org.roaringbitmap.RoaringBitmap;
 /// `STRING` input for scalar result types other than `STRING`, `JSON`, and `BIG_DECIMAL`. `BYTES` input, complex
 /// paths, containers / array result types, precision-sensitive results, documents beyond Jackson's configured
 /// limits, and Fory failures use Jayway. Its name, supported envelope, and implementation can change while the
-/// integration is evaluated. Fory is an optional runtime dependency; add `org.apache.fory:fory-json:1.6.0` (and its
+/// integration is evaluated. Fory is an optional runtime dependency; add `org.apache.fory:fory-json:1.7.5` (and its
 /// transitive `fory-core` dependency) to the application classpath to activate this experimental path.
 ///
 /// **Arguments:**
@@ -262,7 +262,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     _resultMetadata = new TransformResultMetadata(_dataType, isSingleValue, false);
     DataType inputDataType = firstArgument.getResultMetadata().getDataType();
     // STRING/JSON use the BigDecimal-preserving parser because non-string JSON values are serialized to the output.
-    // Fory 1.6 materializes fractional numbers as Double, so enabling it here would lose numeric precision.
+    // Fory materializes fractional numbers as Double, so enabling it here would lose numeric precision.
     _foryEligible = _extractionMode == ExtractionMode.FORY && _simpleJsonPath != null
         && inputDataType == DataType.STRING && isSingleValue && _dataType != DataType.STRING
         && _dataType != DataType.JSON && _dataType != DataType.BIG_DECIMAL;
