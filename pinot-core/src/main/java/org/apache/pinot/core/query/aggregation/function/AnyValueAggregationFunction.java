@@ -224,7 +224,7 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
       case BIG_DECIMAL:
         return dict.getBigDecimalValue(dictId);
       case BYTES:
-        return dict.getBytesValue(dictId);
+        return dict.getByteArrayValue(dictId);
       default:
         throw new IllegalStateException("Unsupported dictionary type: " + storedType);
     }
@@ -246,7 +246,7 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
       case BIG_DECIMAL:
         return bvs.getBigDecimalValuesSV()[index];
       case BYTES:
-        return bvs.getBytesValuesSV()[index];
+        return new ByteArray(bvs.getBytesValuesSV()[index]);
       default:
         throw new IllegalStateException("Unsupported direct access type: " + bvs.getValueType().getStoredType());
     }
@@ -267,8 +267,6 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
       return serializeVariableValue(DataType.STRING, ((String) value).getBytes(StandardCharsets.UTF_8));
     } else if (value instanceof BigDecimal) {
       return serializeVariableValue(DataType.BIG_DECIMAL, value.toString().getBytes(StandardCharsets.UTF_8));
-    } else if (value instanceof byte[]) {
-      return serializeVariableValue(DataType.BYTES, (byte[]) value);
     } else if (value instanceof ByteArray) {
       return serializeVariableValue(DataType.BYTES, ((ByteArray) value).getBytes());
     } else {
