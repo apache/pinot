@@ -21,6 +21,7 @@ package org.apache.pinot.tools.admin.command;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -48,6 +49,10 @@ public class PostQueryCommandTest {
   private static final String JSON_RESPONSE_WITH_RESULT_TABLE_AND_EXCEPTIONS =
       "{\"resultTable\":{\"dataSchema\":{\"columnNames\":[\"col1\"],\"columnDataTypes\":[\"STRING\"]},"
           + "\"rows\":[[\"a\"]]},\"exceptions\":[{\"errorCode\":200,\"message\":\"partial failure\"}]}";
+
+  private static final String JSON_RESPONSE_WITH_PARTIAL_RESULT =
+      "{\"resultTable\":{\"dataSchema\":{\"columnNames\":[\"col1\"],\"columnDataTypes\":[\"STRING\"]},"
+          + "\"rows\":[[\"a\"]]},\"exceptions\":[],\"partialResult\":true}";
 
   private static final String NOT_JSON_RESPONSE = "<html><body>502 Bad Gateway</body></html>";
 
@@ -140,6 +145,14 @@ public class PostQueryCommandTest {
   }
 
   @Test
+  public void testFormatResponseCsvWithPartialResultStillRendersCsv() {
+    PostQueryCommand command = new PostQueryCommand();
+    command.setOutputFormat(PostQueryCommand.OutputFormat.CSV);
+    String csv = command.formatResponse(JSON_RESPONSE_WITH_PARTIAL_RESULT);
+    assertEquals(csv, "col1\r\na\r\n");
+  }
+
+  @Test
   public void testCliParsingDefaultOutputFormatIsJson() {
     PostQueryCommand command = new PostQueryCommand();
     new CommandLine(command).parseArgs("-query", "select 1");
@@ -184,7 +197,7 @@ public class PostQueryCommandTest {
       @Override
       public String run() {
         // formatResponse() is invoked for real here (not overridden), so the CSV-fallback path
-        // and _lastResponseRenderedAsRequested bookkeeping are exercised end-to-end.
+        // and _lastResponseSafeForOutputFile bookkeeping are exercised end-to-end.
         return formatResponse(JSON_RESPONSE_WITHOUT_RESULT_TABLE);
       }
     };
@@ -193,6 +206,44 @@ public class PostQueryCommandTest {
     boolean result = command.execute();
     assertFalse(result);
     assertFalse(_tempOutputFile.exists());
+  }
+
+  @Test
+  public void testExecuteDoesNotWriteCsvFileForRowsWithExceptions()
+      throws Exception {
+    assertTrue(_tempOutputFile.delete());
+    PostQueryCommand command = commandReturning(JSON_RESPONSE_WITH_RESULT_TABLE_AND_EXCEPTIONS);
+    command.setOutputFormat(PostQueryCommand.OutputFormat.CSV);
+    command.setOutputFile(_tempOutputFile.getAbsolutePath());
+
+    assertFalse(command.execute());
+    assertFalse(_tempOutputFile.exists());
+  }
+
+  @Test
+  public void testExecuteDoesNotWriteCsvFileForPartialResult()
+      throws Exception {
+    assertTrue(_tempOutputFile.delete());
+    PostQueryCommand command = commandReturning(JSON_RESPONSE_WITH_PARTIAL_RESULT);
+    command.setOutputFormat(PostQueryCommand.OutputFormat.CSV);
+    command.setOutputFile(_tempOutputFile.getAbsolutePath());
+
+    assertFalse(command.execute());
+    assertFalse(_tempOutputFile.exists());
+  }
+
+  @Test
+  public void testExecuteRejectedCsvLeavesExistingOutputFileUntouched()
+      throws Exception {
+    String sentinel = "previous successful export";
+    Files.write(_tempOutputFile.toPath(), sentinel.getBytes(StandardCharsets.UTF_8));
+    PostQueryCommand command = commandReturning(JSON_RESPONSE_WITH_PARTIAL_RESULT);
+    command.setOutputFormat(PostQueryCommand.OutputFormat.CSV);
+    command.setOutputFile(_tempOutputFile.getAbsolutePath());
+
+    assertFalse(command.execute());
+    String contents = new String(Files.readAllBytes(_tempOutputFile.toPath()), StandardCharsets.UTF_8);
+    assertEquals(contents, sentinel);
   }
 
   @Test
@@ -206,7 +257,7 @@ public class PostQueryCommandTest {
       @Override
       public String run() {
         // formatResponse() is invoked for real here, so the CSV success path and
-        // _lastResponseRenderedAsRequested bookkeeping are exercised end-to-end, matching the
+        // _lastResponseSafeForOutputFile bookkeeping are exercised end-to-end, matching the
         // fallback-failure test's style above.
         return formatResponse(JSON_RESPONSE_WITH_RESULT_TABLE);
       }
@@ -236,5 +287,44 @@ public class PostQueryCommandTest {
     command.execute();
     String[] filesAfter = _tempDir.list();
     assertEquals(filesAfter, filesBefore);
+  }
+
+  @Test
+  public void testExecuteRecomputesCsvFileSafetyForEachResponseOnSameInstance()
+      throws Exception {
+    assertTrue(_tempOutputFile.delete());
+    String[] responses = {
+        JSON_RESPONSE_WITH_PARTIAL_RESULT,
+        JSON_RESPONSE_WITH_RESULT_TABLE,
+        JSON_RESPONSE_WITH_RESULT_TABLE_AND_EXCEPTIONS
+    };
+    AtomicInteger responseIndex = new AtomicInteger();
+    PostQueryCommand command = new PostQueryCommand() {
+      @Override
+      public String run() {
+        return formatResponse(responses[responseIndex.getAndIncrement()]);
+      }
+    };
+    command.setOutputFormat(PostQueryCommand.OutputFormat.CSV);
+    command.setOutputFile(_tempOutputFile.getAbsolutePath());
+
+    assertFalse(command.execute());
+    assertFalse(_tempOutputFile.exists());
+
+    assertTrue(command.execute());
+    String successfulCsv = "col1,col2\r\na,1\r\n\"b,c\",2\r\n";
+    assertEquals(Files.readString(_tempOutputFile.toPath(), StandardCharsets.UTF_8), successfulCsv);
+
+    assertFalse(command.execute());
+    assertEquals(Files.readString(_tempOutputFile.toPath(), StandardCharsets.UTF_8), successfulCsv);
+  }
+
+  private static PostQueryCommand commandReturning(String rawResponse) {
+    return new PostQueryCommand() {
+      @Override
+      public String run() {
+        return formatResponse(rawResponse);
+      }
+    };
   }
 }

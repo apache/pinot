@@ -89,11 +89,10 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
 
   private AuthProvider _authProvider;
 
-  /// Whether the most recent `formatResponse()` call rendered the response in the requested
-  /// `_outputFormat`, as opposed to falling back to the raw response because the response could
-  /// not be rendered as CSV. `execute()` reads this to decide whether writing `-outputFile` is
-  /// safe; it stays `true` for the default JSON format, which never falls back.
-  private boolean _lastResponseRenderedAsRequested = true;
+  /// Whether the most recent `formatResponse()` result is safe to write to `_outputFile` in the
+  /// requested format. This is `false` when CSV formatting falls back to the raw response or when
+  /// the CSV would omit response-level failure metadata such as exceptions or `partialResult`.
+  private boolean _lastResponseSafeForOutputFile = true;
 
   @Override
   public String getName() {
@@ -186,12 +185,13 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
   /// Renders the raw broker response according to `_outputFormat`. Never throws for a
   /// CSV-incompatible response: falls back to the raw response whenever the response isn't valid
   /// JSON, or has no `resultTable` (e.g. the query errored out), so no error detail is ever lost
-  /// from the logged/returned string. Sets `_lastResponseRenderedAsRequested` to `false` whenever
-  /// this fallback happens, so `execute()` can refuse to write a non-CSV body to `-outputFile`
-  /// when CSV was requested.
+  /// from the logged/returned string. Marks the response unsafe for file output whenever this
+  /// fallback happens, so `execute()` can refuse to write a non-CSV body to `-outputFile`
+  /// when CSV was requested. A partial response is still rendered for logging, but is marked
+  /// unsafe for file output because CSV cannot preserve its response-level diagnostics.
   String formatResponse(String rawResponse) {
+    _lastResponseSafeForOutputFile = true;
     if (_outputFormat != OutputFormat.CSV) {
-      _lastResponseRenderedAsRequested = true;
       return rawResponse;
     }
     JsonNode root;
@@ -200,14 +200,14 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     } catch (IOException e) {
       LOGGER.warn("Response is not valid JSON (e.g. a broker/proxy error page); "
           + "falling back to the raw response instead of CSV.", e);
-      _lastResponseRenderedAsRequested = false;
+      _lastResponseSafeForOutputFile = false;
       return rawResponse;
     }
     JsonNode resultTable = root.get("resultTable");
     if (resultTable == null || resultTable.isNull()) {
       LOGGER.warn("Response has no 'resultTable' (e.g. the query may have errored out); "
           + "falling back to JSON output instead of CSV.");
-      _lastResponseRenderedAsRequested = false;
+      _lastResponseSafeForOutputFile = false;
       return rawResponse;
     }
     JsonNode exceptions = root.path("exceptions");
@@ -215,6 +215,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
       LOGGER.warn("Response has a 'resultTable' but also reports exceptions and/or a partial "
           + "result; CSV output only renders resultTable rows, so this detail is not reflected "
           + "in the CSV. Use -outputFormat JSON to inspect the full response.");
+      _lastResponseSafeForOutputFile = false;
     }
     JsonNode columnNames = resultTable.path("dataSchema").path("columnNames");
     JsonNode rows = resultTable.path("rows");
@@ -252,10 +253,9 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
       // CSVPrinter only throws IOException for the underlying Appendable; a StringWriter never
       // throws, so this is unreachable in practice. Fall back to JSON rather than propagate.
       LOGGER.warn("Unexpected error rendering CSV; falling back to JSON output.", e);
-      _lastResponseRenderedAsRequested = false;
+      _lastResponseSafeForOutputFile = false;
       return rawResponse;
     }
-    _lastResponseRenderedAsRequested = true;
     return stringWriter.toString();
   }
 
@@ -265,12 +265,11 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     String result = run();
     LOGGER.info("Result: {}", result);
     if (_outputFile != null) {
-      if (_outputFormat == OutputFormat.CSV && !_lastResponseRenderedAsRequested) {
-        // The response could not be rendered as CSV (e.g. a broker error or non-JSON body), so
-        // `result` is the raw fallback, not CSV. Do not let a file consumer mistake this
-        // non-CSV body for a successful CSV export; refuse the write and report failure instead.
-        // The raw response is still visible above via LOGGER.info("Result: {}", ...).
-        LOGGER.warn("Not writing '{}': response could not be rendered as CSV. Use "
+      if (_outputFormat == OutputFormat.CSV && !_lastResponseSafeForOutputFile) {
+        // The response either could not be rendered as CSV or the CSV would omit failure metadata.
+        // Refuse the write so a file consumer cannot mistake fallback JSON or incomplete rows for
+        // a successful CSV export. The diagnostic response remains visible in the log above.
+        LOGGER.warn("Not writing '{}': response is not safe for CSV file output. Use "
             + "-outputFormat JSON to inspect the full response.", _outputFile);
         return false;
       }
