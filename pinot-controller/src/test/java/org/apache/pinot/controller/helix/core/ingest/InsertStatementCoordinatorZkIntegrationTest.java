@@ -117,14 +117,25 @@ public class InsertStatementCoordinatorZkIntegrationTest {
   }
 
   @Test
-  public void testDifferentPayloadHashWithSameRequestIdRejected() {
+  public void testDifferentPayloadWithSameRequestIdRejected() {
     when(_mockExecutor.execute(any())).thenReturn(makeAcceptedResult("stmt-first"));
 
     InsertRequest first = makeRequest("stmt-first", "req-collide", "hash-1");
     _coordinator.submitInsert(first);
 
-    /// Different payloadHash → collision detected
-    InsertRequest other = makeRequest("stmt-second", "req-collide", "hash-2");
+    /// Reusing the requestId with DIFFERENT row contents → collision detected. The coordinator
+    /// hashes the payload it receives (a client-supplied hash cannot force or evade a match), so
+    /// the conflict must be triggered by actually changing the rows.
+    org.apache.pinot.spi.data.readers.GenericRow differentRow =
+        new org.apache.pinot.spi.data.readers.GenericRow();
+    differentRow.putValue("id", 42);
+    InsertRequest other = new InsertRequest.Builder()
+        .setStatementId("stmt-second")
+        .setRequestId("req-collide")
+        .setTableName("testTable")
+        .setInsertType(InsertType.ROW)
+        .setRows(Collections.singletonList(differentRow))
+        .build();
     InsertResult r = _coordinator.submitInsert(other);
     assertEquals(r.getState(), InsertStatementState.REJECTED);
     assertEquals(r.getErrorCode(), "IDEMPOTENCY_CONFLICT");
@@ -176,6 +187,18 @@ public class InsertStatementCoordinatorZkIntegrationTest {
   @Test
   public void testConcurrentSubmissionsWithStaleReservationExactlyOneWins()
       throws Exception {
+    /// Warm the manifest serialization path (Jackson class-loading) before the timed concurrent
+    /// phase. On a cold JVM the rebind winner's first createStatement can take longer than the
+    /// loser's bounded waitForWinnerManifest poll window (20 × 10–20ms), making the loser surface
+    /// the retryable REBIND_RACE_LOST instead of converging — a timing artifact of slow test
+    /// machines, not a coordination bug. Warming removes the one-time cost so the assertion below
+    /// exercises the actual race semantics.
+    InsertStatementManifest warmup = new InsertStatementManifest("stmt-warmup", null, null, TABLE,
+        InsertType.ROW, InsertStatementState.ACCEPTED, 1L, 1L, java.util.List.of(), null, null, null);
+    _statementStore.createStatement(warmup);
+    _statementStore.getStatement(TABLE, "stmt-warmup");
+    _statementStore.deleteStatement(TABLE, "stmt-warmup");
+
     /// Pre-seed a reservation pointing to a GC'd statementId.
     _statementStore.reserveRequestId(TABLE, "req-stale", "stmt-gc");
     /// Note: we intentionally do NOT create a manifest for stmt-gc — simulating GC.

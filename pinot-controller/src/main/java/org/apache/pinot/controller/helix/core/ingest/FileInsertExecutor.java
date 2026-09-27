@@ -311,12 +311,43 @@ public class FileInsertExecutor implements InsertExecutor {
     return _resourceManager.getTableConfig(tableNameWithType);
   }
 
-  /// Builds the task configuration map for the Minion SegmentGenerationAndPushTask.
+  /// Option keys (case-insensitive) that may be forwarded from the caller's request options into
+  /// the Minion task config. Task configs also accept framework-level keys — `input.fs.className`,
+  /// `recordReader.className`, `outputDirURI`, `push.*`, `authToken` — that would let an
+  /// EXECUTE_INSERT principal redirect reads/writes or load arbitrary classes, bypassing the
+  /// file-URI scheme allowlist (e.g. LocalPinotFS for an s3:// URI). That power belongs to the
+  /// ad-hoc Minion task API, which requires a stronger privilege, so everything not listed here
+  /// (or under {@link #FORWARDED_OPTION_PREFIX}) is dropped with a log line.
+  private static final Set<String> FORWARDED_OPTION_KEYS = Set.of(
+      "inputformat", "includefilenamepattern", "excludefilenamepattern");
+
+  /// Record-reader data-shape properties (CSV delimiter, header, etc.). The prefix is safe to
+  /// forward because it configures how records are parsed, not which classes are loaded or where
+  /// data is read from/written to; `recordReader.className` does NOT match this prefix.
+  private static final String FORWARDED_OPTION_PREFIX = "recordreader.prop.";
+
+  /// Control options consumed by the coordinator itself; never task config, dropped silently.
+  private static final Set<String> CONTROL_OPTION_KEYS = Set.of("requestid", "tabletype");
+
+  /// Builds the task configuration map for the Minion SegmentGenerationAndPushTask, forwarding
+  /// only allowlisted caller options.
   private Map<String, String> buildTaskConfigs(String fileUri, String statementId,
       Map<String, String> requestOptions) {
     Map<String, String> taskConfigs = new HashMap<>();
     if (requestOptions != null) {
-      taskConfigs.putAll(requestOptions);
+      for (Map.Entry<String, String> entry : requestOptions.entrySet()) {
+        String key = entry.getKey();
+        String lowerKey = key.toLowerCase(Locale.ROOT);
+        if (CONTROL_OPTION_KEYS.contains(lowerKey)) {
+          continue;
+        }
+        if (FORWARDED_OPTION_KEYS.contains(lowerKey) || lowerKey.startsWith(FORWARDED_OPTION_PREFIX)) {
+          taskConfigs.put(key, entry.getValue());
+        } else {
+          LOGGER.warn("Dropping non-allowlisted option '{}' from file-insert task config for statement {}",
+              key, statementId);
+        }
+      }
     }
     taskConfigs.put(INPUT_DIR_URI, fileUri);
     taskConfigs.put(STATEMENT_ID_KEY, statementId);

@@ -20,9 +20,13 @@ package org.apache.pinot.spi.ingest;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
+import java.util.Map;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -149,5 +153,66 @@ public class InsertRequestTest {
         "Builder message must contain '" + canonicalPhrase + "'; got: " + builderEx.getMessage());
     assertTrue(jsonEx.getMessage().contains(canonicalPhrase),
         "JsonCreator message must contain '" + canonicalPhrase + "'; got: " + jsonEx.getMessage());
+  }
+
+  /// statementId and requestId become ZK znode names and segment-name components; both must be
+  /// rejected on any construction path when they contain characters outside the strict ID pattern.
+  @Test
+  public void testIdsOutsidePatternRejectedOnBothPaths() {
+    InsertRequest.Builder badStatementId = new InsertRequest.Builder()
+        .setTableName("t").setInsertType(InsertType.ROW).setStatementId("a/b");
+    IllegalArgumentException ex1 = expectThrows(IllegalArgumentException.class, badStatementId::build);
+    assertTrue(ex1.getMessage().contains("statementId must match"), ex1.getMessage());
+
+    InsertRequest.Builder badRequestId = new InsertRequest.Builder()
+        .setTableName("t").setInsertType(InsertType.ROW).setRequestId("../etc");
+    IllegalArgumentException ex2 = expectThrows(IllegalArgumentException.class, badRequestId::build);
+    assertTrue(ex2.getMessage().contains("requestId must match"), ex2.getMessage());
+
+    JsonMappingException ex3 = expectThrows(JsonMappingException.class,
+        () -> OBJECT_MAPPER.readValue(
+            "{\"tableName\":\"t\",\"insertType\":\"ROW\",\"statementId\":\"a/b\"}",
+            InsertRequest.class));
+    assertTrue(ex3.getMessage().contains("statementId must match"), ex3.getMessage());
+  }
+
+  /// The controller REST endpoint never trusts a client-supplied statementId; this helper is what
+  /// it uses to replace it while keeping everything else intact.
+  @Test
+  public void testWithServerGeneratedStatementIdReplacesClientValue() {
+    InsertRequest request = new InsertRequest.Builder()
+        .setTableName("t").setInsertType(InsertType.ROW).setStatementId("client-chosen")
+        .setRequestId("req-1").build();
+    InsertRequest regenerated = request.withServerGeneratedStatementId();
+    assertNotEquals(regenerated.getStatementId(), "client-chosen");
+    assertTrue(InsertRequest.ID_PATTERN.matcher(regenerated.getStatementId()).matches());
+    assertEquals(regenerated.getRequestId(), "req-1");
+    assertEquals(regenerated.getTableName(), "t");
+  }
+
+  /// The payload hash is computed server-side for idempotency conflict detection: identical
+  /// payloads must hash identically, a changed row value must change the hash, and control options
+  /// (requestId, tableType) must not affect it.
+  @Test
+  public void testComputePayloadHashStableAndSensitive() {
+    GenericRow row = new GenericRow();
+    row.putValue("id", 1);
+    row.putValue("name", "x");
+    InsertRequest a = new InsertRequest.Builder()
+        .setTableName("t").setInsertType(InsertType.ROW).setRows(List.of(row))
+        .setOptions(Map.of("requestId", "r1")).build();
+    InsertRequest b = new InsertRequest.Builder()
+        .setTableName("t").setInsertType(InsertType.ROW).setRows(List.of(row))
+        .setOptions(Map.of("requestId", "r2")).build();
+    assertEquals(a.computePayloadHash(), b.computePayloadHash(),
+        "control options must not affect the payload hash");
+
+    GenericRow differentRow = new GenericRow();
+    differentRow.putValue("id", 2);
+    differentRow.putValue("name", "x");
+    InsertRequest c = new InsertRequest.Builder()
+        .setTableName("t").setInsertType(InsertType.ROW).setRows(List.of(differentRow)).build();
+    assertNotEquals(a.computePayloadHash(), c.computePayloadHash(),
+        "a changed row value must change the payload hash");
   }
 }

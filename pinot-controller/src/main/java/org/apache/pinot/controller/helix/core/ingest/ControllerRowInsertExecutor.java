@@ -28,13 +28,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Semaphore;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
+import org.apache.pinot.controller.api.upload.SegmentValidationUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -100,11 +104,24 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
 
   private final PinotHelixResourceManager _resourceManager;
   private final boolean _allowDestructiveRollback;
+  /// Runs the same storage-quota check as the segment-upload REST path. Nullable so unit tests
+  /// (and embedded setups) can run without the TableSizeReader wiring — null skips the check.
+  @Nullable
+  private final StorageQuotaChecker _storageQuotaChecker;
+  /// Bounds concurrent segment builds on this controller. Acquired non-blocking: when saturated,
+  /// the request fails fast with TOO_MANY_CONCURRENT_INSERTS rather than queueing request threads
+  /// behind heap-hungry builds.
+  private final Semaphore _concurrentInsertPermits;
 
   /// Creates a new executor with destructive rollback DISABLED. Partial-batch upload failures
   /// leave already-registered segments in IdealState; operators reconcile manually.
   public ControllerRowInsertExecutor(PinotHelixResourceManager resourceManager) {
     this(resourceManager, false);
+  }
+
+  public ControllerRowInsertExecutor(PinotHelixResourceManager resourceManager, boolean allowDestructiveRollback) {
+    this(resourceManager, allowDestructiveRollback, null,
+        ControllerConf.DEFAULT_INSERT_ROW_MAX_CONCURRENT_STATEMENTS);
   }
 
   /// Creates a new executor.
@@ -115,9 +132,15 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
   ///     segments out from under live queries and is OFF by default. Set via
   ///     `controller.insert.row.allow.destructive.rollback` on interactive/quickstart-tier
   ///     controllers only.
-  public ControllerRowInsertExecutor(PinotHelixResourceManager resourceManager, boolean allowDestructiveRollback) {
+  /// @param storageQuotaChecker       quota checker shared with the segment-upload REST path;
+  ///     null skips the quota check (tests / embedded setups)
+  /// @param maxConcurrentInserts      maximum ROW inserts building segments concurrently
+  public ControllerRowInsertExecutor(PinotHelixResourceManager resourceManager, boolean allowDestructiveRollback,
+      @Nullable StorageQuotaChecker storageQuotaChecker, int maxConcurrentInserts) {
     _resourceManager = resourceManager;
     _allowDestructiveRollback = allowDestructiveRollback;
+    _storageQuotaChecker = storageQuotaChecker;
+    _concurrentInsertPermits = new Semaphore(maxConcurrentInserts);
   }
 
   @Override
@@ -184,6 +207,14 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
     /// 5. Build all segments first (staging phase), then upload all atomically.
     /// If any build fails, no segments have been uploaded yet so nothing to roll back.
     /// If upload fails partway through, we roll back already-uploaded segments.
+    ///
+    /// Segment build is heap/CPU-heavy and runs inside the request thread, so gate it behind the
+    /// concurrency permit. Fail fast (retryable error) rather than queueing request threads.
+    if (!_concurrentInsertPermits.tryAcquire()) {
+      return buildErrorResult(statementId,
+          "Controller is already executing the maximum number of concurrent ROW inserts; retry later",
+          InsertErrorCode.TOO_MANY_CONCURRENT_INSERTS);
+    }
     File workingDir = null;
     try {
       workingDir = createWorkingDir(tableNameWithType);
@@ -223,6 +254,20 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
         File segmentOutputDir = driver.getOutputDirectory();
         File segmentTarFile = new File(segmentTarDir, segmentName + ".tar.gz");
         TarCompressionUtils.createCompressedTarFile(segmentOutputDir, segmentTarFile);
+
+        /// Run the same pre-upload checks as the segment-upload REST path: time-interval sanity
+        /// against the table's time column, the one-partition-per-segment rule for offline upsert
+        /// tables, and the storage quota. Checking at staging time means a violation rejects the
+        /// whole statement before anything reaches the deep store or IdealState — the direct
+        /// addNewSegment call below bypasses PinotSegmentUploadDownloadRestletResource, so without
+        /// these calls an over-quota table could keep growing through INSERT.
+        SegmentMetadataImpl builtSegmentMetadata = new SegmentMetadataImpl(segmentOutputDir);
+        SegmentValidationUtils.validateTimeInterval(builtSegmentMetadata, tableConfig);
+        SegmentValidationUtils.validateUpsertSegmentPartitionMetadata(builtSegmentMetadata, tableConfig);
+        if (_storageQuotaChecker != null) {
+          SegmentValidationUtils.checkStorageQuota(segmentName, segmentTarFile.length(),
+              FileUtils.sizeOfDirectory(segmentOutputDir), tableConfig, _storageQuotaChecker);
+        }
 
         stagedSegments.add(new StagedSegment(segmentName, segmentOutputDir, segmentTarFile, partitionRows.size(),
             partitionId));
@@ -291,6 +336,7 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
           InsertErrorCode.SEGMENT_BUILD_FAILED);
     } finally {
       FileUtils.deleteQuietly(workingDir);
+      _concurrentInsertPermits.release();
     }
   }
 
@@ -343,12 +389,17 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
     for (GenericRow row : rows) {
       Object value = row.getValue(partitionColumn);
       if (value == null) {
-        /// Match server-side stream behavior: hash "" through the partition function rather than
-        /// defaulting to partition 0. Primary-key null rejection is handled separately in
-        /// validatePrimaryKeyValues, before this method is called, so we don't repeat it here.
-        int partition = partitionFunction.getPartition("");
-        partitioned.computeIfAbsent(partition, k -> new ArrayList<>()).add(row);
-        continue;
+        /// The segment creator stores the column's default null value for null cells and computes
+        /// the segment's partition metadata from that STORED value — so route the row by the same
+        /// default. Hashing anything else (e.g. "") can put the row in a segment whose metadata
+        /// claims a different partition, breaking the one-partition-per-segment rule that upsert
+        /// assignment and partition pruning rely on. Primary-key null rejection is handled
+        /// separately in validatePrimaryKeyValues, before this method is called.
+        if (fieldSpec == null) {
+          throw new IllegalArgumentException(
+              "Null value in partition column '" + partitionColumn + "' which is missing from the schema");
+        }
+        value = fieldSpec.getDefaultNullValue();
       }
       String partitionValue = normalizeForPartition(value, storedType);
       int partition = partitionFunction.getPartition(partitionValue);
@@ -409,6 +460,10 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
     String stringForm;
     if (value instanceof BigDecimal) {
       stringForm = ((BigDecimal) value).stripTrailingZeros().toPlainString();
+    } else if (value instanceof byte[]) {
+      /// byte[] (e.g. a BYTES column's default null value) has no usable toString — use the hex
+      /// form, which is what BYTES.convert expects.
+      stringForm = BytesUtils.toHexString((byte[]) value);
     } else {
       stringForm = String.valueOf(value);
     }
@@ -468,8 +523,22 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
     /// Read segment metadata from the built segment directory
     SegmentMetadata segmentMetadata = new SegmentMetadataImpl(segmentDir);
 
-    /// Register segment in ZooKeeper and assign to instances
-    _resourceManager.addNewSegment(tableNameWithType, segmentMetadata, segmentDownloadURI);
+    /// Register segment in ZooKeeper and assign to instances. If registration fails, remove the
+    /// tar we just copied — otherwise every failed insert leaks an orphan tar in the deep store
+    /// that no cleanup path knows about.
+    try {
+      _resourceManager.addNewSegment(tableNameWithType, segmentMetadata, segmentDownloadURI);
+    } catch (Exception e) {
+      try {
+        pinotFS.delete(finalSegmentLocationURI, false);
+        LOGGER.info("Removed orphan segment tar {} from deep store after failed registration",
+            finalSegmentLocationURI);
+      } catch (Exception cleanupEx) {
+        LOGGER.warn("Failed to remove orphan segment tar {} from deep store after failed registration; "
+            + "operator cleanup may be required", finalSegmentLocationURI, cleanupEx);
+      }
+      throw e;
+    }
     LOGGER.info("Registered segment {} in ZooKeeper for table {}", segmentName, tableNameWithType);
   }
 

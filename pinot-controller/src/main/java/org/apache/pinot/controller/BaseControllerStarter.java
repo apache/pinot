@@ -685,16 +685,18 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // errorCode=COORDINATOR_NOT_READY (fail-closed, never a partial execution).
     InsertStatementStore insertStatementStore =
         new InsertStatementStore(_helixResourceManager.getPropertyStore());
-    _insertStatementCoordinator =
-        new InsertStatementCoordinator(_helixResourceManager, insertStatementStore, _controllerMetrics);
+    // Pass the LeadControllerManager so the coordinator's cleanup sweep only touches tables this
+    // controller leads — with N flag-enabled controllers, ungated sweeps would race on the same
+    // CAS transitions and each poll Minion task state.
+    _insertStatementCoordinator = new InsertStatementCoordinator(_helixResourceManager, insertStatementStore,
+        _controllerMetrics, InsertStatementCoordinator.DEFAULT_STATEMENT_TIMEOUT_MS,
+        InsertStatementCoordinator.DEFAULT_VISIBLE_RETENTION_MS, _leadControllerManager,
+        _config.getInsertRowMaxRowsPerStatement(), _config.getInsertRowMaxBytesPerStatement());
 
     if (_config.isInsertEnabled()) {
-      // Register the ROW executor so broker-issued INSERTs are routed correctly.
-      // FILE executor is registered later (once _taskManager is available); start() is deferred
-      // until ALL executors are registered so isStarted()=true means "ready for any insert type".
-      ControllerRowInsertExecutor rowInsertExecutor =
-          new ControllerRowInsertExecutor(_helixResourceManager, _config.isInsertRowAllowDestructiveRollback());
-      _insertStatementCoordinator.registerExecutor(InsertType.ROW.name(), rowInsertExecutor);
+      // The ROW executor is registered later, together with the FILE executor, because it needs
+      // _storageQuotaChecker which is constructed below; start() is deferred until ALL executors
+      // are registered so isStarted()=true means "ready for any insert type".
 
       // Wire the coordinator (not the raw executor) so that controller-local INSERTs go through
       // the same idempotency, hybrid-table validation, and manifest tracking as HTTP-submitted ones.
@@ -762,6 +764,13 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // unlocked. Until this line a ROW or FILE INSERT request would have hit checkEnabled()'s 503
     // because isStarted()=false, avoiding the "ROW works but FILE returns NO_EXECUTOR" window.
     if (_config.isInsertEnabled()) {
+      // Register the ROW executor here (not at coordinator construction) so it can reuse the
+      // upload-path validators: _storageQuotaChecker is only constructed above, after the
+      // coordinator wiring.
+      ControllerRowInsertExecutor rowInsertExecutor =
+          new ControllerRowInsertExecutor(_helixResourceManager, _config.isInsertRowAllowDestructiveRollback(),
+              _storageQuotaChecker, _config.getInsertRowMaxConcurrentStatements());
+      _insertStatementCoordinator.registerExecutor(InsertType.ROW.name(), rowInsertExecutor);
       if (_taskManager == null) {
         // No Minion task manager configured — register only the ROW executor and start the
         // coordinator. ROW inserts (INSERT INTO VALUES) are designed for interactive / quickstart

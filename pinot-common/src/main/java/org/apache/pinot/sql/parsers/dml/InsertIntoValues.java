@@ -25,6 +25,8 @@ import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.ByteString;
+import org.apache.calcite.sql.SqlBasicCall;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
@@ -213,6 +215,20 @@ public class InsertIntoValues implements DataManipulationStatement {
   /// converts them to epoch millis does not exist yet on the INSERT INTO VALUES path.
   /// Use epoch-millis integers (e.g. `1704067200000`) or ISO-8601 strings instead.
   private static Object extractLiteralValue(SqlNode node) {
+    /// Calcite parses signed numbers in expression context as a MINUS_PREFIX/PLUS_PREFIX call around the
+    /// unsigned literal (e.g. VALUES (-1) is (- 1)), not as a signed SqlLiteral. Unwrap the sign here so
+    /// negative numeric values are accepted; CalciteSqlParser handles these kinds the same way for queries.
+    if (node instanceof SqlBasicCall
+        && (node.getKind() == SqlKind.MINUS_PREFIX || node.getKind() == SqlKind.PLUS_PREFIX)) {
+      SqlNode operand = ((SqlBasicCall) node).getOperandList().get(0);
+      Object operandValue = extractLiteralValue(operand);
+      if (operandValue instanceof BigDecimal) {
+        return node.getKind() == SqlKind.MINUS_PREFIX ? ((BigDecimal) operandValue).negate() : operandValue;
+      }
+      throw new SqlCompilationException(
+          "Unary " + (node.getKind() == SqlKind.MINUS_PREFIX ? "minus" : "plus")
+              + " is only supported on numeric literals in INSERT INTO ... VALUES. Got: " + node);
+    }
     if (node instanceof SqlLiteral) {
       SqlLiteral literal = (SqlLiteral) node;
       Object value = literal.getValue();
@@ -228,7 +244,7 @@ public class InsertIntoValues implements DataManipulationStatement {
         if (tag != null) {
           String upperTag = tag.toUpperCase(Locale.ROOT);
           if ("DATE".equals(upperTag) || "TIME".equals(upperTag) || "TIMESTAMP".equals(upperTag)) {
-            throw new IllegalArgumentException(
+            throw new SqlCompilationException(
                 "Date/time literals are not supported in INSERT INTO ... VALUES (no schema-aware coercion). "
                     + "Use epoch-millis integers or ISO-8601 strings instead. Got: " + node);
           }
@@ -249,12 +265,12 @@ public class InsertIntoValues implements DataManipulationStatement {
           || value instanceof byte[]) {
         return value;
       }
-      throw new IllegalArgumentException(
+      throw new SqlCompilationException(
           "Unsupported literal type in INSERT INTO ... VALUES: " + value.getClass().getSimpleName()
               + " (value: " + value + "). Supported types: numeric, boolean, character/varchar, bytes.");
     }
     /// Non-literal expressions (e.g. 1+1, CURRENT_TIMESTAMP) are not supported in VALUES
-    throw new IllegalArgumentException(
+    throw new SqlCompilationException(
         "Only literal values are supported in INSERT INTO ... VALUES. "
             + "Expression not supported: " + node.toString());
   }

@@ -123,23 +123,25 @@ public class InsertStatementCoordinatorTest {
     when(_helixResourceManager.hasOfflineTable("testTable")).thenReturn(true);
     when(_helixResourceManager.hasRealtimeTable("testTable")).thenReturn(false);
 
-    /// Existing manifest with same requestId and payloadHash
+    /// The coordinator computes the payload hash from the request itself (client-supplied hashes
+    /// are ignored), so the "existing" manifest must carry the hash the coordinator would compute
+    /// for an identical retry.
+    InsertRequest request = new InsertRequest.Builder()
+        .setStatementId("stmt-2")
+        .setRequestId("req-1")
+        .setTableName("testTable")
+        .setInsertType(InsertType.ROW)
+        .setRows(Collections.singletonList(new GenericRow()))
+        .build();
+
     InsertStatementManifest existing = new InsertStatementManifest(
-        "stmt-existing", "req-1", "hash-abc", "testTable_OFFLINE",
+        "stmt-existing", "req-1", request.computePayloadHash(), "testTable_OFFLINE",
         InsertType.ROW, InsertStatementState.ACCEPTED, System.currentTimeMillis(),
         System.currentTimeMillis(), List.of(), null, null, null);
     /// Atomic reservation returns existing statementId (someone already reserved this requestId)
     when(_statementStore.reserveRequestId("testTable_OFFLINE", "req-1", "stmt-2"))
         .thenReturn("stmt-existing");
     when(_statementStore.getStatement("testTable_OFFLINE", "stmt-existing")).thenReturn(existing);
-
-    InsertRequest request = new InsertRequest.Builder()
-        .setStatementId("stmt-2")
-        .setRequestId("req-1")
-        .setPayloadHash("hash-abc")
-        .setTableName("testTable")
-        .setInsertType(InsertType.ROW)
-        .build();
 
     InsertResult result = _coordinator.submitInsert(request);
 
@@ -154,8 +156,11 @@ public class InsertStatementCoordinatorTest {
     when(_helixResourceManager.hasOfflineTable("testTable")).thenReturn(true);
     when(_helixResourceManager.hasRealtimeTable("testTable")).thenReturn(false);
 
+    /// Existing manifest carries the hash of a DIFFERENT payload than the incoming request; the
+    /// coordinator's server-computed hash for this request will not match. A client cannot force a
+    /// match by supplying a hash — setPayloadHash on the request is deliberately not used here.
     InsertStatementManifest existing = new InsertStatementManifest(
-        "stmt-existing", "req-1", "hash-abc", "testTable_OFFLINE",
+        "stmt-existing", "req-1", "hash-of-a-different-payload", "testTable_OFFLINE",
         InsertType.ROW, InsertStatementState.ACCEPTED, System.currentTimeMillis(),
         System.currentTimeMillis(), List.of(), null, null, null);
     /// Atomic reservation returns existing statementId
@@ -166,9 +171,9 @@ public class InsertStatementCoordinatorTest {
     InsertRequest request = new InsertRequest.Builder()
         .setStatementId("stmt-2")
         .setRequestId("req-1")
-        .setPayloadHash("hash-DIFFERENT")
         .setTableName("testTable")
         .setInsertType(InsertType.ROW)
+        .setRows(Collections.singletonList(new GenericRow()))
         .build();
 
     InsertResult result = _coordinator.submitInsert(request);
@@ -557,9 +562,17 @@ public class InsertStatementCoordinatorTest {
     /// Track how many times the executor is actually called
     AtomicInteger executorCallCount = new AtomicInteger(0);
 
-    /// The existing manifest that the idempotent path returns
+    /// The existing manifest that the idempotent path returns. Its payloadHash must be the hash
+    /// the coordinator computes for the concurrent requests' (identical) payload — client-supplied
+    /// hashes are ignored by the coordinator.
+    String serverPayloadHash = new InsertRequest.Builder()
+        .setTableName("testTable")
+        .setInsertType(InsertType.ROW)
+        .setRows(Collections.singletonList(new GenericRow()))
+        .build()
+        .computePayloadHash();
     InsertStatementManifest existingManifest = new InsertStatementManifest(
-        "stmt-winner", "req-concurrent", "hash-1", "testTable_OFFLINE",
+        "stmt-winner", "req-concurrent", serverPayloadHash, "testTable_OFFLINE",
         InsertType.ROW, InsertStatementState.ACCEPTED, System.currentTimeMillis(),
         System.currentTimeMillis(), List.of(), null, null, null);
 
@@ -691,20 +704,20 @@ public class InsertStatementCoordinatorTest {
     /// Our rebind loses the race
     when(_statementStore.rebindRequestIdIfEquals(eq("testTable_OFFLINE"), eq("req-race"), eq("stmt-gc"),
         anyString())).thenReturn(false);
-    /// The winner's manifest under a different statementId
-    InsertStatementManifest winner = new InsertStatementManifest("stmt-winner", "req-race", "payload-hash",
-        "testTable_OFFLINE", InsertType.ROW, InsertStatementState.ACCEPTED, 1L, 1L, List.of(),
-        null, null, null);
-    when(_statementStore.findByRequestId("testTable_OFFLINE", "req-race")).thenReturn(winner);
-
     InsertRequest request = new InsertRequest.Builder()
         .setStatementId("stmt-loser")
         .setRequestId("req-race")
-        .setPayloadHash("payload-hash")
         .setTableName("testTable")
         .setInsertType(InsertType.ROW)
         .setRows(Collections.singletonList(new GenericRow()))
         .build();
+
+    /// The winner's manifest under a different statementId. The winner submitted the same payload,
+    /// so its manifest carries the same server-computed hash.
+    InsertStatementManifest winner = new InsertStatementManifest("stmt-winner", "req-race",
+        request.computePayloadHash(), "testTable_OFFLINE", InsertType.ROW, InsertStatementState.ACCEPTED,
+        1L, 1L, List.of(), null, null, null);
+    when(_statementStore.findByRequestId("testTable_OFFLINE", "req-race")).thenReturn(winner);
 
     InsertResult result = _coordinator.submitInsert(request);
 

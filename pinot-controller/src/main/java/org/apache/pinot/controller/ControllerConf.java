@@ -458,6 +458,22 @@ public class ControllerConf extends PinotConfiguration {
   public static final String INSERT_ROW_ALLOW_DESTRUCTIVE_ROLLBACK =
       "controller.insert.row.allow.destructive.rollback";
   public static final boolean DEFAULT_INSERT_ROW_ALLOW_DESTRUCTIVE_ROLLBACK = false;
+  /// Maximum number of rows a single push-based INSERT (SQL VALUES or REST body) may carry.
+  /// Segments for ROW inserts are built on the controller inside the request thread, so this bounds
+  /// controller heap/CPU per statement. Requests over the limit are rejected before a manifest is
+  /// created.
+  public static final String INSERT_ROW_MAX_ROWS_PER_STATEMENT = "controller.insert.row.max.rows.per.statement";
+  public static final int DEFAULT_INSERT_ROW_MAX_ROWS_PER_STATEMENT = 10_000;
+  /// Maximum estimated payload size in bytes for a single ROW insert (sum of the sizes of all row
+  /// values). Bounds controller heap for wide-row inserts that stay under the row-count limit.
+  public static final String INSERT_ROW_MAX_BYTES_PER_STATEMENT = "controller.insert.row.max.bytes.per.statement";
+  public static final long DEFAULT_INSERT_ROW_MAX_BYTES_PER_STATEMENT = 10 * 1024 * 1024;
+  /// Maximum number of ROW inserts building segments concurrently on this controller. Additional
+  /// requests are rejected immediately (fail fast) rather than queued, so a burst of large inserts
+  /// cannot starve the controller's other duties (periodic tasks, segment completion).
+  public static final String INSERT_ROW_MAX_CONCURRENT_STATEMENTS =
+      "controller.insert.row.max.concurrent.statements";
+  public static final int DEFAULT_INSERT_ROW_MAX_CONCURRENT_STATEMENTS = 4;
 
   public static final String ENFORCE_POOL_BASED_ASSIGNMENT_KEY = "enforce.pool.based.assignment";
   public static final boolean DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT = false;
@@ -1573,6 +1589,23 @@ public class ControllerConf extends PinotConfiguration {
   /// [#INSERT_ROW_ALLOW_DESTRUCTIVE_ROLLBACK] for the operator trade-off.
   public boolean isInsertRowAllowDestructiveRollback() {
     return getProperty(INSERT_ROW_ALLOW_DESTRUCTIVE_ROLLBACK, DEFAULT_INSERT_ROW_ALLOW_DESTRUCTIVE_ROLLBACK);
+  }
+
+  /// @return maximum rows a single ROW insert may carry; see [#INSERT_ROW_MAX_ROWS_PER_STATEMENT].
+  public int getInsertRowMaxRowsPerStatement() {
+    return getProperty(INSERT_ROW_MAX_ROWS_PER_STATEMENT, DEFAULT_INSERT_ROW_MAX_ROWS_PER_STATEMENT);
+  }
+
+  /// @return maximum estimated payload bytes for a single ROW insert; see
+  ///   [#INSERT_ROW_MAX_BYTES_PER_STATEMENT].
+  public long getInsertRowMaxBytesPerStatement() {
+    return getProperty(INSERT_ROW_MAX_BYTES_PER_STATEMENT, DEFAULT_INSERT_ROW_MAX_BYTES_PER_STATEMENT);
+  }
+
+  /// @return maximum concurrent ROW inserts on this controller; see
+  ///   [#INSERT_ROW_MAX_CONCURRENT_STATEMENTS].
+  public int getInsertRowMaxConcurrentStatements() {
+    return getProperty(INSERT_ROW_MAX_CONCURRENT_STATEMENTS, DEFAULT_INSERT_ROW_MAX_CONCURRENT_STATEMENTS);
   }
 
   private long convertPeriodToUnit(String period, TimeUnit timeUnitToConvertTo) {
