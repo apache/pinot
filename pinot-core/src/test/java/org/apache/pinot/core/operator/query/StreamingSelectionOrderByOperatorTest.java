@@ -73,20 +73,20 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/// Segment-level tests for {@link StreamingSelectionOrderByOperator}.
+/// Segment-level tests for [StreamingSelectionOrderByOperator].
 ///
-/// <p>The operator emits the same globally-sorted rows as the existing materialized selection ORDER BY operators, only
-/// spread across many lazily-produced blocks. Each test therefore asserts <b>stream-vs-materialized parity</b>: it
-/// drives the streaming operator through {@link SelectionPlanNode} with {@code sortedSelectionMergeMode=ON},
+/// The operator emits the same globally-sorted rows as the existing materialized selection ORDER BY operators, only
+/// spread across many lazily-produced blocks. Each test therefore asserts **stream-vs-materialized parity**: it
+/// drives the streaming operator through [SelectionPlanNode] with `sortedSelectionMergeMode=ON`,
 /// concatenates
-/// every {@link Operator#nextBlock()} output until {@code null}, and asserts the concatenation equals the single block
-/// the materialized operator ({@link SelectionPartiallyOrderedByLinearOperator} / {@link SelectionOrderByOperator})
+/// every [Operator#nextBlock()] output until `null`, and asserts the concatenation equals the single block
+/// the materialized operator ([SelectionPartiallyOrderedByLinearOperator] / [SelectionOrderByOperator])
 /// produces for the identical query with the hint off.
 ///
-/// <p>To keep element-wise comparison deterministic (priority-queue draining is not stable for rows that tie on every
-/// order-by column) each fixture makes the order-by column tuple unique per row: the {@code _segment} fixture has a
-/// unique sorted column, while the {@code _dupSegment} / {@code _largeSegment} fixtures repeat the sorted column but
-/// pair it with a unique {@code TAIL_COL} order-by tail. The all-order-by-columns-tie case (where stream and
+/// To keep element-wise comparison deterministic (priority-queue draining is not stable for rows that tie on every
+/// order-by column) each fixture makes the order-by column tuple unique per row: the `_segment` fixture has a
+/// unique sorted column, while the `_dupSegment` / `_largeSegment` fixtures repeat the sorted column but
+/// pair it with a unique `TAIL_COL` order-by tail. The all-order-by-columns-tie case (where stream and
 /// materialized output may legitimately differ in row order) is intentionally out of scope here and is covered by the
 /// combine-level test via multiset comparison.
 public class StreamingSelectionOrderByOperatorTest {
@@ -202,7 +202,7 @@ public class StreamingSelectionOrderByOperatorTest {
     return records;
   }
 
-  /// Appends one run of {@code runSize} rows all sharing {@code sortedValue}, with a tail that descends within the run
+  /// Appends one run of `runSize` rows all sharing `sortedValue`, with a tail that descends within the run
   /// (so the tail column is not globally sorted) and is unique per (sortedCol, tailCol) tuple.
   private static void appendRun(List<GenericRow> records, int sortedValue, int runSize) {
     for (int j = 0; j < runSize; j++) {
@@ -349,7 +349,7 @@ public class StreamingSelectionOrderByOperatorTest {
         "Expected no nulls in the output when null handling is disabled");
   }
 
-  /// No-tail mode, single phase: {@link StreamingSelectionOrderByOperator} must skip a zero-document project block
+  /// No-tail mode, single phase: [StreamingSelectionOrderByOperator] must skip a zero-document project block
   /// rather than read it as end-of-segment.
   @Test
   public void testEmptyProjectBlockDoesNotTruncateSortedScan() {
@@ -357,14 +357,14 @@ public class StreamingSelectionOrderByOperatorTest {
         1, 0);
   }
 
-  /// Same, two phase: this is also the only path that asks the injected block for {@code getDocIds()}.
+  /// Same, two phase: this is also the only path that asks the injected block for `getDocIds()`.
   @Test
   public void testEmptyProjectBlockDoesNotTruncateTwoPhaseSortedScan() {
     assertEmptyProjectBlocksAreSkipped(_segment, "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol LIMIT 25",
         1, 2, 1, 0);
   }
 
-  /// Tail mode: the run scan reaches the project operator through {@code nextRow()}, which already tolerated empty
+  /// Tail mode: the run scan reaches the project operator through `nextRow()`, which already tolerated empty
   /// blocks. Pins that the two scan paths agree.
   @Test
   public void testEmptyProjectBlockDoesNotTruncateRunScan() {
@@ -380,7 +380,7 @@ public class StreamingSelectionOrderByOperatorTest {
   }
 
   /// Empty blocks arriving immediately before exhaustion exercise the loop's other exit: the skip must fall through
-  /// to the project operator's {@code null} rather than spin or emit a phantom row. The limit exceeds the fixture so
+  /// to the project operator's `null` rather than spin or emit a phantom row. The limit exceeds the fixture so
   /// the scan actually reaches the end instead of stopping on the row budget.
   @Test
   public void testEmptyProjectBlocksBeforeExhaustionEndTheScan() {
@@ -388,14 +388,14 @@ public class StreamingSelectionOrderByOperatorTest {
         0, 2);
   }
 
-  /// The skip loop sits directly on top of the {@code limit + offset} budget bookkeeping, so cover a non-zero offset.
+  /// The skip loop sits directly on top of the `limit + offset` budget bookkeeping, so cover a non-zero offset.
   @Test
   public void testEmptyProjectBlockIsSkippedWithOffset() {
     assertEmptyProjectBlocksAreSkipped(_segment,
         "SELECT sortedCol FROM testTable ORDER BY sortedCol LIMIT 15 OFFSET 10", 1, 2, 1, 0);
   }
 
-  /// {@code nextRow()} rebuilds the phase-1 null bitmaps in the same branch that pulls the next non-empty block, so
+  /// `nextRow()` rebuilds the phase-1 null bitmaps in the same branch that pulls the next non-empty block, so
   /// the skip must not desynchronise a bitmap from the block it was built against. Uses the fixture that carries a
   /// null in the order-by tail column, with null handling on.
   @Test
@@ -489,7 +489,7 @@ public class StreamingSelectionOrderByOperatorTest {
     }
   }
 
-  /// Each {@link ProjectPlanNode} build looks up one data source per projected column, so a plan that builds the
+  /// Each [ProjectPlanNode] build looks up one data source per projected column, so a plan that builds the
   /// project twice looks up more than the materialized plan, which builds it once.
   @Test
   public void testDescIncompatibleFallbackBuildsTheProjectOnce() {
@@ -504,7 +504,7 @@ public class StreamingSelectionOrderByOperatorTest {
         "The DESC-incompatible fall-through built the project twice");
   }
 
-  /// Plans {@code query} in {@code mode} against a segment counting data source lookups into {@code numLookups},
+  /// Plans `query` in `mode` against a segment counting data source lookups into `numLookups`,
   /// asserting it lands on the materialized DESC operator.
   private Operator<SelectionResultsBlock> planWithCountedDataSourceLookups(@Language("sql") String query,
       SortedSelectionMergeMode mode, AtomicInteger numLookups) {
@@ -525,9 +525,9 @@ public class StreamingSelectionOrderByOperatorTest {
   }
 
   /// Every block the tail-to-sort path emits carries a structurally mutable row list. Defensive rather than a fix for
-  /// a reachable failure: no consumer of this operator adds to the list today, but {@link SelectionResultsBlock} is a
-  /// shared type and {@code SelectionOperatorUtils.mergeWithoutOrdering()} adds to the row list of the block it merges
-  /// into, which a fixed-size {@code Arrays.asList} view would reject.
+  /// a reachable failure: no consumer of this operator adds to the list today, but [SelectionResultsBlock] is a
+  /// shared type and `SelectionOperatorUtils.mergeWithoutOrdering()` adds to the row list of the block it merges
+  /// into, which a fixed-size `Arrays.asList` view would reject.
   @Test
   public void testRunPathEmitsGrowableRowLists() {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
@@ -570,7 +570,7 @@ public class StreamingSelectionOrderByOperatorTest {
   }
 
   /// A segment matching no rows must still emit exactly one block before signalling exhaustion: empty, but carrying
-  /// the same {@link DataSchema} the identical query produces when it does match rows. Consumers therefore never have
+  /// the same [DataSchema] the identical query produces when it does match rows. Consumers therefore never have
   /// to reconstruct a schema the segment already knows.
   private void assertZeroMatchEmitsOneSchemaBlock(IndexSegment segment, @Language("sql") String zeroMatchQuery,
       @Language("sql") String matchingQuery, int numSortedExpressions, boolean nullHandling) {
@@ -592,11 +592,11 @@ public class StreamingSelectionOrderByOperatorTest {
     assertNull(operator.nextBlock(), "Exactly one block may precede exhaustion");
   }
 
-  /// Drives the operator twice over {@code segment}: once against the real project operator, once against one that
+  /// Drives the operator twice over `segment`: once against the real project operator, once against one that
   /// splices zero-document blocks into its output, and asserts the emitted rows are identical.
   ///
-  /// <p>No doc-id-set operator produces an empty block today, so the case has to be injected. The project operator is
-  /// built with a deliberately small {@code maxDocsPerCall} so the scan spans several blocks.
+  /// No doc-id-set operator produces an empty block today, so the case has to be injected. The project operator is
+  /// built with a deliberately small `maxDocsPerCall` so the scan spans several blocks.
   ///
   /// @param injectBeforeRealBlock 1-based index of the real block to splice empties in front of; 0 for none
   /// @param numEmptyBlocks how many consecutive empty blocks to splice in at that point
@@ -625,7 +625,7 @@ public class StreamingSelectionOrderByOperatorTest {
     }
   }
 
-  /// Builds a {@link StreamingSelectionOrderByOperator} directly (rather than through {@link SelectionPlanNode}) so
+  /// Builds a [StreamingSelectionOrderByOperator] directly (rather than through [SelectionPlanNode]) so
   /// the project operator can be wrapped. Passing 0 for every injection parameter yields the undecorated operator.
   private StreamingSelectionOrderByOperator buildOperatorWithInjectableProject(IndexSegment segment,
       @Language("sql") String query, int numSortedExpressions, boolean nullHandling, int injectBeforeRealBlock,
@@ -665,10 +665,10 @@ public class StreamingSelectionOrderByOperatorTest {
   }
 
   /// Forwards everything to a real project operator, but splices zero-document blocks into its output:
-  /// {@code numEmptyBlocks} of them just before the {@code injectBeforeRealBlock}-th real block, and
-  /// {@code numTrailingEmptyBlocks} after the last real block but before exhaustion.
+  /// `numEmptyBlocks` of them just before the `injectBeforeRealBlock`-th real block, and
+  /// `numTrailingEmptyBlocks` after the last real block but before exhaustion.
   ///
-  /// <p>Every real block is still delivered, merely deferred, so the decorator provably drops nothing of its own -
+  /// Every real block is still delivered, merely deferred, so the decorator provably drops nothing of its own -
   /// any row loss observed by a test is the operator under test truncating its scan.
   private static class EmptyBlockInjectingProjectOperator extends BaseProjectOperator<ValueBlock> {
     private final BaseProjectOperator<?> _delegate;
@@ -791,13 +791,13 @@ public class StreamingSelectionOrderByOperatorTest {
     }
   }
 
-  /// Runs {@code query} twice over {@code segment} - once with the streaming hint on, once off - and asserts the
+  /// Runs `query` twice over `segment` - once with the streaming hint on, once off - and asserts the
   /// concatenated streaming blocks equal the materialized operator's single block, cell by cell. Returns the (now
   /// exhausted) streaming operator so callers can make extra assertions on its execution statistics.
   ///
   /// @param expectedMinBlocks the minimum number of non-null blocks the streaming operator must emit. Tail-mode
-  ///     cases that span multiple runs pass {@code >= 2} to prove the output is genuinely streamed; cases whose
-  ///     result fits in a single trimmed block pass {@code 1}.
+  ///     cases that span multiple runs pass `>= 2` to prove the output is genuinely streamed; cases whose
+  ///     result fits in a single trimmed block pass `1`.
   private StreamingSelectionOrderByOperator assertParity(IndexSegment segment, @Language("sql") String query,
       boolean nullHandling, int expectedMinBlocks) {
     // Streaming path.
@@ -842,7 +842,7 @@ public class StreamingSelectionOrderByOperatorTest {
     return (StreamingSelectionOrderByOperator) streamingOperator;
   }
 
-  /// Drains the streaming operator for {@code query} and returns all rows concatenated in emission order.
+  /// Drains the streaming operator for `query` and returns all rows concatenated in emission order.
   private List<Object[]> collectStreamingRows(IndexSegment segment, @Language("sql") String query,
       boolean nullHandling) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);

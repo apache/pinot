@@ -43,7 +43,6 @@ import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.CommonConstants.Server.SortedSelectionMergeMode;
 import org.slf4j.Logger;
@@ -149,7 +148,7 @@ public class QueryContext {
   private double _sortedSelectionMergeAutoMinSortedRatio =
       Server.DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO;
   /// Output block size (rows) for the streaming selection ORDER BY combine
-  private int _sortedSelectionMergeBlockSize = Broker.DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE;
+  private int _sortedSelectionMergeBlockSize = Server.DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE;
   // Guards the one-time warning in isSortedSelectionMergeEnabled() so that an unresolved AUTO does not log once per
   // segment/combine call for the same query.
   private volatile boolean _unresolvedSortedSelectionMergeModeWarned;

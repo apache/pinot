@@ -179,9 +179,10 @@ public class CombineSlowOperatorsTest {
 
   /// The merge loop drains its heap on the caller thread and, for single-block cursors, may never re-enter a child
   /// operator, so it must check the query deadline itself. With an already-expired deadline the operator must surface a
-  /// timeout <b>before</b> activating any child - asserted via {@code _operationInProgress}, which also keeps the test
-  /// from passing vacuously if the timeout came from somewhere else.
-  @Test
+  /// timeout **before** activating any child - asserted via `_operationInProgress`, which also keeps the test
+  /// from passing vacuously if the timeout came from somewhere else. A regression would drive a [SlowOperator], which
+  /// sleeps for an hour, so the test timeout turns that hang into a failure.
+  @Test(timeOut = 30_000)
   public void testStreamingSelectionOrderByCombineOperatorHonorsDeadline() {
     // A real latch, never awaited: this test asserts that no child is driven at all, so there is nothing to wait
     // for. It is passed only so every getOperators() call site in this class looks alike; SlowOperator null-guards
@@ -221,7 +222,7 @@ public class CombineSlowOperatorsTest {
   }
 
   /// Submits the combine operator on a separate thread, waits for a child operator to start, cancels the future, and
-  /// asserts the operator surfaces an {@link ExceptionResultsBlock}. When {@code operatorsToVerify} is non-empty
+  /// asserts the operator surfaces an [ExceptionResultsBlock]. When `operatorsToVerify` is non-empty
   /// (the single-threaded streaming combine, whose merge runs the children on the caller thread), it additionally
   /// asserts the cancellation was genuine - a child actually started and none completed normally - so the test
   /// cannot pass vacuously on an unrelated failure or by never exercising the cancel path.
