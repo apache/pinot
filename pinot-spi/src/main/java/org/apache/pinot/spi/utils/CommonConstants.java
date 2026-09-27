@@ -384,8 +384,8 @@ public class CommonConstants {
     public static final String DEFAULT_BROKER_QUERY_LOG_SQL_REDACTION = "none";
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
     /// How query option keys supplied through SQL `SET` / `OPTION(...)` on DQL queries are validated.
-    /// Cluster config key: `pinot.broker.query.option.validationMode`, applied live and not read from the broker
-    /// instance config. One of `QueryOptionsUtils.SqlQueryOptionValidationMode`: `NONE` (default, unknown keys are
+    /// Config key: `pinot.broker.query.option.validationMode`, applied live with broker instance config precedence.
+    /// One of `QueryOptionsUtils.SqlQueryOptionValidationMode`: `NONE` (default, unknown keys are
     /// preserved silently, as they always have been), `WARN` (preserved, logged once per distinct unknown key) or
     /// `REJECT` (query fails). Plugins can allowlist their own keys for `REJECT` via
     /// `QueryOptionsUtils.registerSqlQueryOptionKey`.
@@ -393,8 +393,8 @@ public class CommonConstants {
         "pinot.broker.query.option.validationMode";
     public static final String DEFAULT_BROKER_QUERY_OPTION_VALIDATION_MODE = "NONE";
     /// How the legacy PQL-style `OPTION(key=value)` query option suffix is handled.
-    /// Cluster config key: `pinot.broker.query.option.legacySyntaxMode`, applied live and not read from the broker
-    /// instance config. One of `QueryOptionsUtils.SqlOptionsMode`: `ALLOW` (default) applies the options as always,
+    /// Config key: `pinot.broker.query.option.legacySyntaxMode`, applied live with broker instance config precedence.
+    /// One of `QueryOptionsUtils.SqlOptionsMode`: `ALLOW` (default) applies the options as always,
     /// `IGNORE` strips the suffix and drops its options, `REJECT` fails the statement with an error pointing at
     /// `SET`. Applies to every statement type, since `SET` covers them all.
     public static final String CONFIG_OF_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE =

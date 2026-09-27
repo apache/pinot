@@ -169,8 +169,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   private volatile boolean _isStarting = false;
   private volatile boolean _isShuttingDown = false;
   // Dedicated handler for listening to cluster config changes
-  protected final DefaultClusterConfigChangeHandler _clusterConfigChangeHandler =
-      new DefaultClusterConfigChangeHandler();
+  protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
 
   // TODO To be removed in favor of _clusterConfigChangeHandler to manage config related changes.
   //      Please use this only if you are reliant specifically on the ClusterChangeMediator infra.
@@ -228,6 +227,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   public void init(PinotConfiguration brokerConf)
       throws Exception {
     _brokerConf = brokerConf;
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler(_brokerConf);
     // Remove all white-spaces from the list of zkServers (if any).
     _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER).replaceAll("\\s+", "");
     _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
