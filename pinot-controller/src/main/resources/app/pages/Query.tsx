@@ -188,6 +188,7 @@ const queryErrorCodeMap = {
   425: "BrokerRequestSend",
   427: "ServerNotResponding",
   429: "TooManyRequests",
+  430: "WorkloadBudgetExceededError",
   450: "InternalError",
   500: "MergeResponseError",
   503: "QueryCancellationError",
