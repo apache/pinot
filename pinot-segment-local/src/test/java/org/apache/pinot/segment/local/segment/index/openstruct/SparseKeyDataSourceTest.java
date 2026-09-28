@@ -36,7 +36,8 @@ public class SparseKeyDataSourceTest {
   // Doc 0 has every key; doc 1 is an empty blob; doc 2 misses these keys but has another.
   private static final String[] BLOBS = {
       "{\"i\":7,\"l\":123456789012,\"f\":1.5,\"d\":2.25,\"s\":\"hello\",\"bd\":3.14,\"n\":42,"
-          + "\"b\":\"aGVsbG8=\",\"jn\":null}",
+          + "\"b\":\"aGVsbG8=\",\"jn\":null,\"obj\":{\"os\":\"android\",\"sdk\":33},"
+          + "\"arr\":[1,2,3]}",
       null,
       "{\"other\":1}",
   };
@@ -44,7 +45,7 @@ public class SparseKeyDataSourceTest {
   private static SparseKeyDataSource source(String key, DataType declaredType) {
     OpenStructSparseBlobReader blob = new OpenStructSparseBlobReader(
         new FakeStringForwardIndex(BLOBS), FakeStringForwardIndex.nullVector(BLOBS), BLOBS.length);
-    return new SparseKeyDataSource(new DimensionFieldSpec(key, declaredType, true), blob);
+    return new SparseKeyDataSource(new DimensionFieldSpec(key, declaredType, true), blob, 0);
   }
 
   @Test
@@ -84,6 +85,42 @@ public class SparseKeyDataSourceTest {
     assertEquals(fwd.getBigDecimal(0, null), new BigDecimal("3.14"));
     assertEquals(fwd.getBigDecimal(1, null), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL);
     assertEquals(fwd.getBigDecimal(2, null), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL);
+  }
+
+  @Test
+  public void testContainerValuesSerializeAsJsonRatherThanEmptyString() {
+    // asText() is the empty string for an object or array node, which made a nested value indistinguishable from a
+    // missing key. A blob key holding a document must read back as that document.
+    assertEquals(source("obj", DataType.STRING).getForwardIndex().getString(0, null),
+        "{\"os\":\"android\",\"sdk\":33}");
+    assertEquals(source("arr", DataType.STRING).getForwardIndex().getString(0, null), "[1,2,3]");
+
+    // Scalars and absent keys are untouched.
+    assertEquals(source("s", DataType.STRING).getForwardIndex().getString(0, null), "hello");
+    assertEquals(source("obj", DataType.STRING).getForwardIndex().getString(2, null),
+        FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+  }
+
+  @Test
+  public void testAbsentKeyReadsAsTheDeclaredDefaultNotTheTypeDefault() {
+    // A key absent from the segment entirely already reads as the declared default, through
+    // OpenStructDataSource.getValueFieldSpec. A key absent from one document should not read as something else --
+    // and MapFilterOperator refuses the JSON-index fast path for exactly the declared default, so the two
+    // disagreeing let a NOT_IN over that value take the fast path and miss the documents that lack the key.
+    DimensionFieldSpec spec = new DimensionFieldSpec("i", DataType.INT, true, -7);
+    OpenStructSparseBlobReader blob = new OpenStructSparseBlobReader(
+        new FakeStringForwardIndex(BLOBS), FakeStringForwardIndex.nullVector(BLOBS), BLOBS.length);
+    ForwardIndexReader<?> fwd = new SparseKeyDataSource(spec, blob, 0).getForwardIndex();
+
+    assertEquals(fwd.getInt(0, null), 7);
+    // Doc 2 has other keys but not this one.
+    assertEquals(fwd.getInt(2, null), -7);
+  }
+
+  @Test
+  public void testAbsentKeyStillFallsBackToTheTypeDefaultWhenNoneIsDeclared() {
+    assertEquals(source("i", DataType.INT).getForwardIndex().getInt(2, null),
+        FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
   }
 
   @Test

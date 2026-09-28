@@ -164,6 +164,11 @@ public class MapFilterOperatorOpenStructTest {
 
   private static OpenStructDataSource mockSparseSegmentSource(@Nullable List<String> manifest,
       Map<String, FieldSpec> children, String[] blobs) {
+    return mockSparseSegmentSource(manifest, children, blobs, 0);
+  }
+
+  private static OpenStructDataSource mockSparseSegmentSource(@Nullable List<String> manifest,
+      Map<String, FieldSpec> children, String[] blobs, int maxNumValuesPerMVEntry) {
     OpenStructSparseBlobReader blob = new OpenStructSparseBlobReader(
         new FakeStringForwardIndex(blobs), FakeStringForwardIndex.nullVector(blobs), NUM_DOCS);
     OpenStructDataSource osDs = mockOpenStructSource(children);
@@ -178,7 +183,7 @@ public class MapFilterOperatorOpenStructTest {
       if (manifest != null && !manifest.contains(key)) {
         return new NullDataSource(childSpec, NUM_DOCS);
       }
-      return new SparseKeyDataSource(childSpec, blob);
+      return new SparseKeyDataSource(childSpec, blob, maxNumValuesPerMVEntry);
     });
     return osDs;
   }
@@ -673,6 +678,29 @@ public class MapFilterOperatorOpenStructTest {
     assertTrue(opD.toExplainString().contains("delegateTo:per_key_index"));
     assertEquals(countMatches(opD), NUM_DOCS);
 
+    verify(jsonIndex, never()).getMatchingDocIds(any(FilterContext.class));
+  }
+
+  /// A multi-value key's values live in the blob as a JSON array, so `key = 'a'` has to compare against each
+  /// element. The scan does; the JSON index, which flattens an array element-wise, answers a different
+  /// question -- so the fast path is refused and the two cannot disagree.
+  @Test
+  public void testSparseMultiValueKeyScansInsteadOfUsingTheJsonIndex() {
+    JsonIndexReader jsonIndex = mock(JsonIndexReader.class);
+    String[] blobs = new String[NUM_DOCS];
+    for (int i = 0; i < NUM_DOCS; i++) {
+      // Every fourth doc holds "a" among its values, the rest of the even docs do not, odd docs lack the key.
+      blobs[i] = i % 2 != 0 ? null : i % 4 == 0 ? "{\"tags\":[\"a\",\"b\"]}" : "{\"tags\":[\"c\"]}";
+    }
+    Map<String, FieldSpec> children = Map.of("tags", new DimensionFieldSpec("tags", DataType.STRING, false));
+    OpenStructDataSource osDs = withSparseJsonIndex(
+        mockSparseSegmentSource(List.of("tags"), children, blobs, 2), jsonIndex);
+
+    MapFilterOperator op = new MapFilterOperator(mockSegment(osDs),
+        makeEqPredicate(COLUMN, "tags", "a"), mockQueryContext(), NUM_DOCS);
+
+    assertTrue(op.toExplainString().contains("delegateTo:per_key_index"));
+    assertEquals(countMatches(op), NUM_DOCS / 4);
     verify(jsonIndex, never()).getMatchingDocIds(any(FilterContext.class));
   }
 }

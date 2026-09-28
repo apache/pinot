@@ -38,6 +38,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -52,18 +53,25 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   private final DataSource _sparseDataSource;
   @Nullable
   private final Set<String> _sparseKeys;
+  /// Sparse keys whose values are collections, mapped to the longest value each one holds. Read from the parent
+  /// column's metadata, where the segment build records it for exactly the keys whose shape is not visible in a
+  /// column of their own.
+  @Nullable
+  private final Map<String, Integer> _sparseMultiValueKeys;
   @Nullable
   private final OpenStructSparseBlobReader _sparseBlobReader;
   private final ConcurrentHashMap<String, DataSource> _sparseKeyDataSourceCache;
 
   public ImmutableOpenStructDataSource(ComplexFieldSpec fieldSpec, Map<String, DataSource> perKeyDataSources,
       @Nullable DataSource sparseDataSource, DataSourceMetadata dataSourceMetadata,
-      ColumnIndexContainer indexContainer, @Nullable List<String> sparseKeys) {
+      ColumnIndexContainer indexContainer, @Nullable List<String> sparseKeys,
+      @Nullable Map<String, Integer> sparseMultiValueKeys) {
     super(dataSourceMetadata, indexContainer);
     _fieldSpec = fieldSpec;
     _perKeyDataSources = perKeyDataSources;
     _sparseDataSource = sparseDataSource;
     _sparseKeys = sparseKeys != null ? Set.copyOf(sparseKeys) : null;
+    _sparseMultiValueKeys = sparseMultiValueKeys != null ? Map.copyOf(sparseMultiValueKeys) : null;
     if (sparseDataSource != null) {
       ForwardIndexReader<?> blobFwd = sparseDataSource.getForwardIndex();
       _sparseBlobReader = blobFwd != null
@@ -84,10 +92,11 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   /// Callers must use [#getDataSource(String)] for per-key access; whole-struct projection
   /// (`SELECT open_struct_col`) is handled by the query layer, not the storage layer.
   public ImmutableOpenStructDataSource(ComplexFieldSpec fieldSpec, Map<String, DataSource> perKeyDataSources,
-      @Nullable DataSource sparseDataSource, int numDocs, @Nullable List<String> sparseKeys) {
+      @Nullable DataSource sparseDataSource, int numDocs, @Nullable List<String> sparseKeys,
+      @Nullable Map<String, Integer> sparseMultiValueKeys) {
     this(fieldSpec, perKeyDataSources, sparseDataSource,
         new ImmutableOpenStructDataSourceMetadata(fieldSpec, numDocs),
-        new ColumnIndexContainer.FromMap.Builder().build(), sparseKeys);
+        new ColumnIndexContainer.FromMap.Builder().build(), sparseKeys, sparseMultiValueKeys);
   }
 
   @Override
@@ -106,7 +115,33 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
       return new NullDataSource(getValueFieldSpec(key), getDataSourceMetadata().getNumDocs());
     }
     return _sparseKeyDataSourceCache.computeIfAbsent(key,
-        k -> new SparseKeyDataSource(getValueFieldSpec(k), _sparseBlobReader));
+        k -> new SparseKeyDataSource(getValueFieldSpec(k), _sparseBlobReader, maxNumValues(k)));
+  }
+
+  /// Field spec for a key's values, with an undeclared sparse key's shape taken from the segment's sparse
+  /// multi-value manifest. Which tier a key lands on is a tuning decision, so it must not decide the key's
+  /// shape: without this, the same rows would report `STRING[]` on a segment that materialized the key and a
+  /// scalar `STRING` holding `["a","b"]` on one that put it in the blob, and a query fanning out over both
+  /// would see two shapes for one column.
+  @Override
+  public FieldSpec getValueFieldSpec(String key) {
+    FieldSpec childFieldSpec = _fieldSpec.getChildFieldSpec(key);
+    if (childFieldSpec != null) {
+      return childFieldSpec;
+    }
+    boolean singleValue = _sparseMultiValueKeys == null || !_sparseMultiValueKeys.containsKey(key);
+    return new DimensionFieldSpec(key, FieldSpec.DataType.STRING, singleValue);
+  }
+
+  /// Longest value a multi-value sparse key holds, which is what the readers over it size their buffers from.
+  /// Zero for a single-value key, as [DataSourceMetadata#getMaxNumValuesPerMVEntry()] reports for one.
+  private int maxNumValues(String key) {
+    FieldSpec valueFieldSpec = getValueFieldSpec(key);
+    if (valueFieldSpec.isSingleValueField()) {
+      return 0;
+    }
+    // A declared multi-value key has no manifest entry when every one of its values was a scalar.
+    return _sparseMultiValueKeys != null ? _sparseMultiValueKeys.getOrDefault(key, 1) : 1;
   }
 
   @Override
