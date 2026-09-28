@@ -1738,7 +1738,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // controller drops the ended partition from the stream partition list), so the gauge set to 0 above
     // would otherwise linger at 0 forever and raise a false ingestion-stopped alert. Remove it. On a failed
     // transition we never reach here, so the gauge stays at 0 and a genuine stall remains visible.
-    if (_endOfPartitionGroup) {
+    // The committed end offset must also match where this replica saw the end. If another replica won the commit
+    // at an earlier offset, a successor segment consumes the rest, so the gauge stays at 0 until it starts.
+    if (_endOfPartitionGroup
+        && _currentOffset.compareTo(_streamPartitionMsgOffsetFactory.create(segmentZKMetadata.getEndOffset())) == 0) {
       _serverMetrics.removeTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING);
     }
   }

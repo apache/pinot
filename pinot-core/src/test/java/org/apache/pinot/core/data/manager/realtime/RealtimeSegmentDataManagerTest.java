@@ -681,11 +681,37 @@ public class RealtimeSegmentDataManagerTest {
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.COMMITTED);
       segmentDataManager.setEndOfPartitionGroup(true);
+      segmentDataManager.setCurrentOffset(START_OFFSET_VALUE + 600);
 
       segmentDataManager.goOnlineFromConsuming(metadata);
 
       // On a successful ONLINE transition the gauge is set to 0 in the finally and then removed.
       verify(serverMetrics, atLeast(1)).removeTableGauge(anyString(), eq(ServerGauge.LLC_PARTITION_CONSUMING));
+    }
+  }
+
+  @Test
+  public void testEndOfPartitionGroupKeepsGaugeWhenCommittedAtEarlierOffset()
+      throws Exception {
+    // This replica read to the end of the partition group, but another replica won the commit at an earlier
+    // offset. A successor segment consumes the rest, so the gauge must stay at 0 and not be removed.
+    ServerMetrics serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+    metadata.setEndOffset(new LongMsgOffset(START_OFFSET_VALUE + 600).toString());
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, serverMetrics)) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.DISCARDED);
+      segmentDataManager.setEndOfPartitionGroup(true);
+      segmentDataManager.setCurrentOffset(START_OFFSET_VALUE + 650);
+
+      segmentDataManager.goOnlineFromConsuming(metadata);
+
+      Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      verify(serverMetrics, atLeast(1)).setValueOfTableGauge(anyString(),
+          eq(ServerGauge.LLC_PARTITION_CONSUMING), eq(0L));
+      verify(serverMetrics, never()).removeTableGauge(anyString(), eq(ServerGauge.LLC_PARTITION_CONSUMING));
     }
   }
 
