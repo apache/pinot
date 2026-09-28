@@ -253,6 +253,26 @@ public class StarTreeBuilderUtilsTest {
   }
 
   @Test
+  public void testUsesAnyColumn() {
+    Configuration metadataProperties = new PropertiesConfiguration();
+    TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = new TreeMap<>();
+    aggregationSpecs.put(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "derived"),
+        AggregationSpec.DEFAULT);
+    aggregationSpecs.put(AggregationFunctionColumnPair.COUNT_STAR, AggregationSpec.DEFAULT);
+    StarTreeV2Metadata.writeMetadata(metadataProperties, 1, List.of("dim"), aggregationSpecs, 100, Set.of());
+    StarTreeV2Metadata metadata = new StarTreeV2Metadata(metadataProperties);
+    List<StarTreeV2Metadata> metadataList = List.of(metadata);
+
+    assertFalse(StarTreeBuilderUtils.usesAnyColumn(null, Set.of("derived")));
+    assertFalse(StarTreeBuilderUtils.usesAnyColumn(metadataList, Set.of()));
+    assertFalse(StarTreeBuilderUtils.usesAnyColumn(metadataList, Set.of("other")));
+    assertTrue(StarTreeBuilderUtils.usesAnyColumn(metadataList, Set.of("dim")));
+    assertTrue(StarTreeBuilderUtils.usesAnyColumn(metadataList, Set.of("derived")));
+    // COUNT(*) must not match a column named "*".
+    assertFalse(StarTreeBuilderUtils.usesAnyColumn(metadataList, Set.of(AggregationFunctionColumnPair.STAR)));
+  }
+
+  @Test
   public void testExpressionContextFromFunctionParameters() {
     // DISTINCTCOUNTHLL
     DistinctCountHLLValueAggregator hllValueAggregator =

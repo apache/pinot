@@ -27,6 +27,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,6 +44,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
+import org.apache.pinot.segment.local.recordtransformer.TransformProvenanceUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
@@ -90,6 +92,7 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.FieldSpec.MaxLengthExceedStrategy;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
@@ -110,6 +113,12 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   protected SegmentGeneratorConfig _config;
   protected Schema _schema;
   @Nullable
+  private Map<String, String> _transformFunctionByColumn;
+  @Nullable
+  private Map<String, String> _transformFingerprintByColumn;
+  private Set<String> _columnsWithOnlyTransformedValues = Set.of();
+  private Set<String> _columnsWithDependencyClosedTransformValues = Set.of();
+  @Nullable
   protected InstanceType _instanceType;
   protected int _totalDocs;
   protected TreeMap<String, ColumnStatistics> _columnStatisticsMap;
@@ -127,6 +136,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
 
     _config = config;
     _schema = config.getSchema();
+    _transformFunctionByColumn = null;
+    _transformFingerprintByColumn = null;
+    _columnsWithOnlyTransformedValues = Set.of();
+    _columnsWithDependencyClosedTransformValues = Set.of();
     _instanceType = config.getInstanceType();
     _totalDocs = totalDocs;
     _columnStatisticsMap = columnStatisticsMap;
@@ -540,8 +553,27 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       // built on disk (the dictionary optimizer may have flipped DICTIONARY to RAW at segment-creation time).
       ForwardIndexConfig fwdConfig =
           columnIndexCreators.getIndexConfigs().getConfig(StandardIndexes.forward());
-      addColumnMetadataInfo(properties, column, columnStatistics, _totalDocs, _schema.getFieldSpecFor(column),
-          hasDictionary, dictionaryElementSize, fwdConfig.getEncodingType(), false);
+      if (_columnsWithOnlyTransformedValues.contains(column)) {
+        String transformFunction = getTransformFunctionForColumn(column);
+        if (transformFunction != null) {
+          addColumnMetadataInfo(properties, column, columnStatistics, _totalDocs, _schema.getFieldSpecFor(column),
+              hasDictionary, dictionaryElementSize, fwdConfig.getEncodingType(), false, transformFunction,
+              _columnsWithDependencyClosedTransformValues.contains(column)
+                  ? getTransformFingerprintForColumn(column) : null);
+        } else {
+          // Field-spec-derived evaluators such as legacy time conversion and map __KEYS/__VALUES extraction have no
+          // explicit expression that can be persisted and replayed. Keep their provenance unknown instead of writing
+          // a version-2 known-no-transform marker for values that were in fact transformed.
+          addColumnMetadataInfo(properties, column, columnStatistics, _totalDocs, _schema.getFieldSpecFor(column),
+              hasDictionary, dictionaryElementSize, fwdConfig.getEncodingType(), false);
+        }
+      } else {
+        // A configured expression does not prove it generated the stored values: normal ingestion preserves an
+        // existing non-null output. Leave source/mixed columns untracked so a later config change cannot overwrite
+        // authoritative input values.
+        addColumnMetadataInfo(properties, column, columnStatistics, _totalDocs, _schema.getFieldSpecFor(column),
+            hasDictionary, dictionaryElementSize, fwdConfig.getEncodingType(), false);
+      }
       // When null handling is enabled for a column but it has no null values, NullValueVectorCreator.seal() writes no
       // bitmap file. Record a metadata flag for that case so such a column is distinguishable from one that never had
       // null handling (both lack a bitmap file), which is what the reload-time backfill relies on. Columns that do
@@ -619,6 +651,30 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,
       ColumnStatistics columnStatistics, int totalDocs, FieldSpec fieldSpec, boolean hasDictionary,
       int dictionaryElementSize, FieldConfig.EncodingType forwardIndexEncoding, boolean autoGenerated) {
+    addColumnMetadataInfo(properties, column, columnStatistics, totalDocs, fieldSpec, hasDictionary,
+        dictionaryElementSize, forwardIndexEncoding, autoGenerated, null);
+    // Preserve the legacy overload's semantics: callers that do not provide provenance must remain unknown rather
+    // than being recorded as a known no-transform column.
+    properties.clearProperty(getKeyFor(column, TRANSFORM_FUNCTION));
+    properties.clearProperty(getKeyFor(column, TRANSFORM_FUNCTION_BASE64));
+    properties.clearProperty(getKeyFor(column, TRANSFORM_FUNCTION_PROVENANCE_VERSION));
+    properties.clearProperty(getKeyFor(column, TRANSFORM_FUNCTION_FINGERPRINT));
+  }
+
+  /// Adds column metadata information to the properties configuration, including transform provenance.
+  public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,
+      ColumnStatistics columnStatistics, int totalDocs, FieldSpec fieldSpec, boolean hasDictionary,
+      int dictionaryElementSize, FieldConfig.EncodingType forwardIndexEncoding, boolean autoGenerated,
+      @Nullable String transformFunction) {
+    addColumnMetadataInfo(properties, column, columnStatistics, totalDocs, fieldSpec, hasDictionary,
+        dictionaryElementSize, forwardIndexEncoding, autoGenerated, transformFunction, null);
+  }
+
+  /// Adds column metadata information with dependency-aware transform provenance.
+  public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,
+      ColumnStatistics columnStatistics, int totalDocs, FieldSpec fieldSpec, boolean hasDictionary,
+      int dictionaryElementSize, FieldConfig.EncodingType forwardIndexEncoding, boolean autoGenerated,
+      @Nullable String transformFunction, @Nullable String transformFingerprint) {
     addFieldSpec(properties, column, fieldSpec);
     properties.setProperty(getKeyFor(column, TOTAL_DOCS), String.valueOf(totalDocs));
     int cardinality = columnStatistics.getCardinality();
@@ -661,6 +717,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     if (autoGenerated) {
       properties.setProperty(getKeyFor(column, IS_AUTO_GENERATED), "true");
     }
+    addTransformFunction(properties, column, transformFunction, transformFingerprint);
 
     // Min/max value
     if (fieldSpec.getFieldType() != FieldType.COMPLEX) {
@@ -692,6 +749,64 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         }
       }
     }
+  }
+
+  /// Records the transform function used to generate the given column in the segment metadata properties.
+  public static void addTransformFunction(PropertiesConfiguration properties, String column,
+      @Nullable String transformFunction) {
+    addTransformFunction(properties, column, transformFunction, null);
+  }
+
+  /// Records the transform expression and its dependency-aware fingerprint.
+  public static void addTransformFunction(PropertiesConfiguration properties, String column,
+      @Nullable String transformFunction, @Nullable String transformFingerprint) {
+    String rawKey = getKeyFor(column, TRANSFORM_FUNCTION);
+    String encodedKey = getKeyFor(column, TRANSFORM_FUNCTION_BASE64);
+    String provenanceKey = getKeyFor(column, TRANSFORM_FUNCTION_PROVENANCE_VERSION);
+    String fingerprintKey = getKeyFor(column, TRANSFORM_FUNCTION_FINGERPRINT);
+    properties.clearProperty(rawKey);
+    properties.clearProperty(encodedKey);
+    properties.clearProperty(fingerprintKey);
+    if (transformFunction != null) {
+      properties.setProperty(encodedKey,
+          Base64.getEncoder().encodeToString(transformFunction.getBytes(StandardCharsets.UTF_8)));
+      if (transformFingerprint != null) {
+        properties.setProperty(fingerprintKey, transformFingerprint);
+      }
+    }
+    // Keep the marker even when the expression is absent. This distinguishes a known no-transform state from a
+    // legacy segment whose generating expression is unknown and lets A -> none -> A trigger both regenerations.
+    properties.setProperty(provenanceKey,
+        transformFunction == null || transformFingerprint != null ? TransformProvenanceUtils.CURRENT_VERSION : 1);
+  }
+
+  @Nullable
+  private String getTransformFunctionForColumn(String column) {
+    return getTransformFunctionByColumn().get(column);
+  }
+
+  @Nullable
+  private String getTransformFingerprintForColumn(String column) {
+    if (_transformFingerprintByColumn == null) {
+      _transformFingerprintByColumn = TransformProvenanceUtils.getTransformFingerprints(_config.getTableConfig(),
+          _schema);
+    }
+    return _transformFingerprintByColumn.get(column);
+  }
+
+  /// Sets the directly generated transform outputs and the subset with dependency-closed provenance.
+  public void setTransformProvenanceColumns(Set<String> columnsWithOnlyTransformedValues,
+      Set<String> columnsWithDependencyClosedTransformValues) {
+    _columnsWithOnlyTransformedValues = Set.copyOf(columnsWithOnlyTransformedValues);
+    _columnsWithDependencyClosedTransformValues = Set.copyOf(columnsWithDependencyClosedTransformValues);
+  }
+
+  private Map<String, String> getTransformFunctionByColumn() {
+    if (_transformFunctionByColumn == null) {
+      TableConfig tableConfig = _config != null ? _config.getTableConfig() : null;
+      _transformFunctionByColumn = IngestionConfigUtils.getTransformFunctionByColumn(tableConfig, _schema);
+    }
+    return _transformFunctionByColumn;
   }
 
   /// In order to persist complex field metadata, we need to recursively add child field specs

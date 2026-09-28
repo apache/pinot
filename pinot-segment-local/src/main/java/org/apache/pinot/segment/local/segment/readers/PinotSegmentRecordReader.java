@@ -140,7 +140,8 @@ public class PinotSegmentRecordReader implements RecordReader {
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while loading the segment from: " + indexDir, e);
     }
-    init(indexSegment, true, fieldsToRead, null, sortOrder, skipDefaultNullValues);
+    init(indexSegment, true, CollectionUtils.isEmpty(fieldsToRead) ? null : fieldsToRead, null, sortOrder,
+        skipDefaultNullValues);
   }
 
   /// Initializes the record reader from a segment.
@@ -148,6 +149,12 @@ public class PinotSegmentRecordReader implements RecordReader {
   /// @param indexSegment Index segment to read from
   public void init(IndexSegment indexSegment) {
     init(indexSegment, false, null, null, null, false);
+  }
+
+  /// Initializes the reader from an already loaded segment while restricting record replay to the requested fields.
+  /// This is used by RefreshSegment to omit changed derived outputs so the ingestion pipeline recomputes them.
+  public void initWithFieldsToRead(IndexSegment indexSegment, Set<String> fieldsToRead) {
+    init(indexSegment, false, fieldsToRead, null, null, false);
   }
 
   /// Initializes the record reader from a mutable segment with optional sorted document ids.
@@ -179,7 +186,7 @@ public class PinotSegmentRecordReader implements RecordReader {
       _openStructDataSources = new HashMap<>();
       _openStructMapValueReaders = new HashMap<>();
       Set<String> columnsInSegment = _indexSegment.getPhysicalColumnNames();
-      if (CollectionUtils.isEmpty(fieldsToRead)) {
+      if (fieldsToRead == null) {
         for (String column : columnsInSegment) {
           addColumnReader(column);
         }

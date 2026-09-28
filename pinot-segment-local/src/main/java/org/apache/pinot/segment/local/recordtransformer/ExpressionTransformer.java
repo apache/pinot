@@ -58,6 +58,10 @@ public class ExpressionTransformer implements RecordTransformer {
 
   @VisibleForTesting
   final LinkedHashMap<String, FunctionEvaluator> _expressionEvaluators = new LinkedHashMap<>();
+  /// Tracks evaluator outputs synthesized from a field spec without an explicit transform expression. Their runtime
+  /// behavior has no expression that can be persisted and replayed, so neither they nor their dependents can claim
+  /// dependency-closed transform provenance.
+  private final Set<String> _implicitTransformColumns = new HashSet<>();
   /// Tracks columns whose transform functions were implicitly derived from MAP field specs (e.g. `mapField__KEYS`,
   /// `mapField__VALUES`). When the source MAP is absent from the record, the transform for these columns is skipped
   /// to preserve backward-compatible behavior and avoid overwriting existing values with null.
@@ -66,10 +70,29 @@ public class ExpressionTransformer implements RecordTransformer {
   /// for post-upsert transforms where derived columns should be recomputed on the merged row; otherwise transforms only
   /// populate missing or null-valued columns.
   private final boolean _overwriteExistingValues;
+  /// Existing values for these columns are authoritative, including values marked null. This is used when replaying a
+  /// segment whose legacy derived-column provenance is unknown, so a null marker does not accidentally trigger the
+  /// current transform expression.
+  private final Set<String> _columnsToPreserve;
+  /// Preserved transform outputs whose stored dependency-closed provenance matches the active transform graph.
+  /// Downstream outputs can safely include these columns in their own dependency provenance.
+  private final Set<String> _trustedTransformOutputs;
+  /// Columns for which at least one row supplied an authoritative output value. Segment-level provenance is safe only
+  /// when every stored value came from the transform pipeline, so one source value makes the whole column mixed.
+  private final Set<String> _columnsWithSourceValues = new HashSet<>();
   private final boolean _continueOnError;
   private final ThrottledLogger _throttledLogger;
 
   public ExpressionTransformer(TableConfig tableConfig, Schema schema) {
+    this(tableConfig, schema, Set.of(), Set.of());
+  }
+
+  public ExpressionTransformer(TableConfig tableConfig, Schema schema, Set<String> columnsToPreserve) {
+    this(tableConfig, schema, columnsToPreserve, Set.of());
+  }
+
+  public ExpressionTransformer(TableConfig tableConfig, Schema schema, Set<String> columnsToPreserve,
+      Set<String> trustedTransformOutputs) {
     Map<String, FunctionEvaluator> expressionEvaluators = new HashMap<>();
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     List<TransformConfig> transformConfigs =
@@ -88,6 +111,9 @@ public class ExpressionTransformer implements RecordTransformer {
         FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
         if (functionEvaluator != null) {
           expressionEvaluators.put(fieldName, functionEvaluator);
+          if (!hasExplicitTransform(fieldSpec)) {
+            _implicitTransformColumns.add(fieldName);
+          }
           if (isImplicitMapTransform(fieldSpec)) {
             _implicitMapTransformColumns.add(fieldName);
           }
@@ -97,6 +123,10 @@ public class ExpressionTransformer implements RecordTransformer {
     topologicalSortEvaluators(expressionEvaluators);
 
     _overwriteExistingValues = false;
+    _columnsToPreserve = Set.copyOf(columnsToPreserve);
+    Preconditions.checkArgument(columnsToPreserve.containsAll(trustedTransformOutputs),
+        "Trusted transform outputs must also be preserved");
+    _trustedTransformOutputs = Set.copyOf(trustedTransformOutputs);
     _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
     _throttledLogger = new ThrottledLogger(LOGGER, ingestionConfig);
   }
@@ -115,6 +145,8 @@ public class ExpressionTransformer implements RecordTransformer {
     topologicalSortEvaluators(expressionEvaluators);
 
     _overwriteExistingValues = overwriteExistingValues;
+    _columnsToPreserve = Set.of();
+    _trustedTransformOutputs = Set.of();
     _continueOnError = continueOnError;
     _throttledLogger = new ThrottledLogger(LOGGER, null);
   }
@@ -175,11 +207,55 @@ public class ExpressionTransformer implements RecordTransformer {
     return inputColumns;
   }
 
+  /// Returns transform outputs for which no processed row supplied an authoritative value.
+  public Set<String> getColumnsWithOnlyTransformedValues() {
+    Set<String> columns = new HashSet<>(_expressionEvaluators.keySet());
+    columns.removeAll(_columnsWithSourceValues);
+    return columns;
+  }
+
+  /// Returns transform outputs whose values have dependency-closed provenance. Besides outputs generated during this
+  /// run, the closure may use preserved outputs whose persisted fingerprint matches the active transform graph.
+  public Set<String> getColumnsWithDependencyClosedTransformValues() {
+    Set<String> directlyTransformedColumns = getColumnsWithOnlyTransformedValues();
+    Set<String> columns = new HashSet<>(_trustedTransformOutputs);
+    columns.removeAll(_implicitTransformColumns);
+    for (Map.Entry<String, FunctionEvaluator> entry : _expressionEvaluators.entrySet()) {
+      String column = entry.getKey();
+      if (columns.contains(column) || !directlyTransformedColumns.contains(column)
+          || _implicitTransformColumns.contains(column)) {
+        continue;
+      }
+      boolean allTransformDependenciesGenerated = true;
+      for (String argument : entry.getValue().getArguments()) {
+        if (_expressionEvaluators.containsKey(argument) && !columns.contains(argument)) {
+          allTransformDependenciesGenerated = false;
+          break;
+        }
+      }
+      if (allTransformDependenciesGenerated) {
+        columns.add(column);
+      }
+    }
+    return columns;
+  }
+
   @Override
   public void transform(GenericRow record) {
     for (Map.Entry<String, FunctionEvaluator> entry : _expressionEvaluators.entrySet()) {
       String column = entry.getKey();
       FunctionEvaluator transformFunctionEvaluator = entry.getValue();
+      if (_columnsToPreserve.contains(column)
+          && (record.getFieldToValueMap().containsKey(column) || record.isNullValue(column))) {
+        _columnsWithSourceValues.add(column);
+        if (_trustedTransformOutputs.contains(column) && record.isNullValue(column)) {
+          // Segment replay materializes a column's stored default alongside its null marker. A trusted transform output
+          // represents the logical transform result, so expose null to downstream evaluators just as fresh ingestion
+          // does instead of leaking the storage default into a dependent expression.
+          record.removeValue(column);
+        }
+        continue;
+      }
       Object existingValue = record.getValue(column);
       boolean shouldApplyTransform = _overwriteExistingValues || existingValue == null || record.isNullValue(column);
       if (shouldApplyTransform) {
@@ -195,10 +271,16 @@ public class ExpressionTransformer implements RecordTransformer {
             throw new RuntimeException("Caught exception while evaluation transform function for column: " + column, e);
           }
           _throttledLogger.warn("Caught exception while evaluation transform function for column: " + column, e);
+          // The incomplete row will eventually receive a schema default. That fallback is not an expression result and
+          // must not be certified as replay-safe transform provenance for this column or its dependents.
+          _columnsWithSourceValues.add(column);
           record.markIncomplete();
         }
-      } else if ((existingValue.getClass().isArray() && !(existingValue instanceof byte[]))
-          || existingValue instanceof Collection || existingValue instanceof Map) {
+      } else {
+        _columnsWithSourceValues.add(column);
+      }
+      if (!shouldApplyTransform && ((existingValue.getClass().isArray() && !(existingValue instanceof byte[]))
+          || existingValue instanceof Collection || existingValue instanceof Map)) {
         // BYTES single-value columns are intentionally excluded from this branch. `byte[]` is logically a scalar
         // and is preserved like other scalar types; without the exclusion, a transform yielding null (e.g. when
         // the source field is absent) would clobber the existing `byte[]` value. Multi-value BYTES (`byte[][]`)
@@ -221,12 +303,19 @@ public class ExpressionTransformer implements RecordTransformer {
   }
 
   private static boolean isImplicitMapTransform(FieldSpec fieldSpec) {
-    if (fieldSpec.getTransformFunction() != null) {
+    if (hasExplicitTransform(fieldSpec)) {
       return false;
     }
     String fieldName = fieldSpec.getName();
     return fieldName.endsWith(SchemaUtils.MAP_KEY_COLUMN_SUFFIX)
         || fieldName.endsWith(SchemaUtils.MAP_VALUE_COLUMN_SUFFIX);
+  }
+
+  // Schema-level transforms are deprecated but still honored for backward compatibility.
+  @SuppressWarnings("deprecation")
+  private static boolean hasExplicitTransform(FieldSpec fieldSpec) {
+    String transformFunction = fieldSpec.getTransformFunction();
+    return transformFunction != null && !transformFunction.isEmpty();
   }
 
   private void applyTransformedValue(GenericRow record, String column, @Nullable Object transformedValue) {
