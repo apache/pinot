@@ -21,12 +21,16 @@ package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -74,6 +78,46 @@ public class RealtimeNgramFilteringIndexTest {
     ngramQuery = "r";
     testSelectionResults(_ngram2To3Index, ngramQuery, null);
     testSelectionResults(_ngram2To2Index, ngramQuery, null);
+  }
+
+  @Test
+  public void testQueryWithNgramThatWasNeverIndexed() {
+    // "zq" never appears in the indexed documents, so nothing can match. This used to throw
+    // IndexOutOfBoundsException because the unknown n-gram resolved to dictionary id -1.
+    MutableRoaringBitmap docIds = _ngram2To3Index.getDocIds("zq");
+    assertNotNull(docIds);
+    assertTrue(docIds.isEmpty());
+
+    // A query mixing a known and an unknown n-gram must also match nothing.
+    docIds = _ngram2To3Index.getDocIds("drezq");
+    assertNotNull(docIds);
+    assertTrue(docIds.isEmpty());
+  }
+
+  @Test(timeOut = 30_000L)
+  public void testReadLockReleasedWhenNoNgramIsGenerated()
+      throws Exception {
+    RealtimeNgramFilteringIndex index = new RealtimeNgramFilteringIndex("col", 2, 3);
+    try {
+      index.add("andrew");
+
+      // The search query is shorter than the minimum n-gram length, so no n-gram is generated. This used to return
+      // while still holding the read lock, which blocked every later write forever.
+      assertNull(index.getDocIds("r"));
+
+      CountDownLatch indexed = new CountDownLatch(1);
+      Thread writer = new Thread(() -> {
+        index.add("drew");
+        indexed.countDown();
+      });
+      writer.start();
+      assertTrue(indexed.await(10L, TimeUnit.SECONDS), "Writer thread is blocked by a leaked read lock");
+      writer.join();
+
+      assertEquals(index.getDocIds("drew").getCardinality(), 2);
+    } finally {
+      index.close();
+    }
   }
 
   private List<String> getTextData() {
