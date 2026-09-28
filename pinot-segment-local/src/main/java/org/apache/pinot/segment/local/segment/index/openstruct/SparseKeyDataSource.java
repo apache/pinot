@@ -177,14 +177,15 @@ public class SparseKeyDataSource extends BaseDataSource {
     public byte[] getBytes(int docId, ForwardIndexReaderContext context) {
       // Non-binary nodes yield null, and TextNode base64-decoding throws on malformed input; both fold to the
       // type default, matching the other getters.
+      byte[] absent = declaredOr(byte[].class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES);
       return orDefault(docId, context, node -> {
         try {
           byte[] bytes = node.binaryValue();
-          return bytes == null ? FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES : bytes;
+          return bytes == null ? absent : bytes;
         } catch (IOException e) {
-          return FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
+          return absent;
         }
-      }, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES);
+      }, absent);
     }
 
 
@@ -341,7 +342,7 @@ public class SparseKeyDataSource extends BaseDataSource {
     public byte[][] getBytesMV(int docId, ForwardIndexReaderContext context) {
       JsonNode[] nodes = valueNodes(docId, context);
       if (nodes == null) {
-        return new byte[][]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES};
+        return new byte[][]{declaredOr(byte[].class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES)};
       }
       byte[][] values = new byte[nodes.length][];
       for (int i = 0; i < nodes.length; i++) {

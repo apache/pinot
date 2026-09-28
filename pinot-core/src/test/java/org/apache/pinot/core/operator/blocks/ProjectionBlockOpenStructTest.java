@@ -146,13 +146,69 @@ public class ProjectionBlockOpenStructTest {
   @Test
   public void testNestedObjectReadsBackNested() {
     Map<String, Object> document = new LinkedHashMap<>();
+    Map<String, Object> configApi = new LinkedHashMap<>();
+    configApi.put("message", "success_v2");
+    configApi.put("timeTaken", 106.0);
     document.put("configApi.timeTaken", 106.0);
     document.put("configApi.message", "success_v2");
-    document.put("configApi", new LinkedHashMap<>(Map.of("message", "success_v2")));
+    document.put("configApi", configApi);
     document.put("device_os", "android");
 
     assertEquals(project(document).getStringValuesSV()[0],
-        "{\"configApi\":{\"message\":\"success_v2\"},\"device_os\":\"android\"}");
+        "{\"configApi\":{\"message\":\"success_v2\",\"timeTaken\":106.0},\"device_os\":\"android\"}");
+  }
+
+  /// A dotted leaf whose container does not actually hold it is not a duplicate of anything, so dropping it would
+  /// lose the value outright.
+  @Test
+  public void testLeafMissingFromItsContainerIsKept() {
+    Map<String, Object> document = new LinkedHashMap<>();
+    document.put("a", new LinkedHashMap<>(Map.of("b", 1)));
+    document.put("a.c", 2);
+
+    assertEquals(project(document).getStringValuesSV()[0], "{\"a\":{\"b\":1},\"a.c\":2}");
+  }
+
+  /// The shape reconstruction actually produces: the flattener stores a container as JSON **text**, not as a map,
+  /// so the container arrives as a String alongside the dotted leaves split out of it. A shape-only check misses
+  /// every native document and leaves the object escaped in the output.
+  @Test
+  public void testNestedObjectStoredAsJsonTextReadsBackNested() {
+    Map<String, Object> document = new LinkedHashMap<>();
+    document.put("configApi.timeTaken", 106.0);
+    document.put("configApi.message", "success_v2");
+    document.put("configApi", "{\"message\":\"success_v2\",\"timeTaken\":106.0}");
+    document.put("device_os", "android");
+
+    assertEquals(project(document).getStringValuesSV()[0],
+        "{\"configApi\":{\"message\":\"success_v2\",\"timeTaken\":106.0},\"device_os\":\"android\"}");
+  }
+
+  /// A container nested two deep, again as text, so the unwrapping has to recurse rather than stop at the top.
+  @Test
+  public void testJsonTextContainerIsUnwrappedRecursively() {
+    Map<String, Object> document = new LinkedHashMap<>();
+    document.put("a", "{\"b\":{\"c\":1}}");
+    document.put("a.b", "{\"c\":1}");
+
+    assertEquals(project(document).getStringValuesSV()[0], "{\"a\":{\"b\":{\"c\":1}}}");
+  }
+
+  /// A string that merely looks like an object must not swallow a key genuinely spelled with a dot: the container
+  /// has to actually hold the rest of the path.
+  @Test
+  public void testJsonLookingStringDoesNotSwallowALiteralDottedKey() {
+    Map<String, Object> document = new LinkedHashMap<>();
+    document.put("a", "{\"other\":1}");
+    document.put("a.b", 2);
+
+    assertEquals(project(document).getStringValuesSV()[0], "{\"a\":{\"other\":1},\"a.b\":2}");
+  }
+
+  /// Text that is not JSON stays text rather than becoming a parse failure or a null.
+  @Test
+  public void testNonJsonTextStaysText() {
+    assertEquals(project(Map.of("note", "{not json")).getStringValuesSV()[0], "{\"note\":\"{not json\"}");
   }
 
   /// `.` is an ordinary key character with no escape, so a dotted key whose prefix is not itself an object of this

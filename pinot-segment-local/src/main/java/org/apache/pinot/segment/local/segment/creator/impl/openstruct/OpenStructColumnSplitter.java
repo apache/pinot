@@ -236,6 +236,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     // represent -- stringified on a STRING key, a coercion failure on a typed one -- rather than reshaping a
     // column other documents already wrote to.
     boolean multiValueKey;
+    boolean firstSighting = false;
     if (_presenceBitmaps.containsKey(key)) {
       multiValueKey = _multiValueKeys.contains(key);
     } else {
@@ -245,16 +246,21 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       multiValueKey = keySpec != null
           ? !keySpec.isSingleValueField()
           : OpenStructTypeInference.asMultiValue(rawValue) != null;
-      if (multiValueKey) {
-        _multiValueKeys.add(key);
-      }
+      firstSighting = true;
     }
     Object[] elements = multiValueKey ? OpenStructTypeInference.asMultiValue(rawValue) : null;
     if (elements != null && elements.length == 0) {
       // No elements, so no value and nothing to infer a type from. A materialized multi-value column has no
       // empty state, so treating this as present would mean inventing one; the key is simply not in this
       // document, the same as a null value above.
+      //
+      // Returning before the shape is recorded is what keeps the two tiers in step: the mutable index also
+      // returns here without allocating a column, so letting an empty list decide the shape would make this
+      // side multi-value and that side whatever the next row happens to be.
       return;
+    }
+    if (firstSighting && multiValueKey) {
+      _multiValueKeys.add(key);
     }
     DataType valueType;
     if (keySpec != null) {

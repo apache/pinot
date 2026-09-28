@@ -180,6 +180,15 @@ public class ItemTransformFunction extends BaseTransformFunction {
     return valueBlock.getBlockValueSet(_keyPath).getDoubleValuesMV();
   }
 
+  /// The multi-value twin of [#transformToBigDecimalValuesSV]: the base class widens INT, LONG, FLOAT, DOUBLE,
+  /// STRING and BYTES into a BIG_DECIMAL, but a key already declared BIG_DECIMAL matches no case and throws
+  /// `Cannot read MV BIG_DECIMAL as BIG_DECIMAL`. A sparse key is never dictionary-encoded, so it reaches exactly
+  /// that switch.
+  @Override
+  public BigDecimal[][] transformToBigDecimalValuesMV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_keyPath).getBigDecimalValuesMV();
+  }
+
   @Override
   public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
     return valueBlock.getBlockValueSet(_keyPath).getStringValuesMV();

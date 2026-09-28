@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -42,6 +43,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// ProjectionBlock holds a column name to Block Map.
 /// It provides DocIdSetBlock for a given column.
 public class ProjectionBlock implements ValueBlock {
+  private static final TypeReference<Map<String, Object>> MAP_TYPE_REFERENCE = new TypeReference<>() { };
+  private static final TypeReference<Object> OBJECT_TYPE_REFERENCE = new TypeReference<>() { };
+
   private final Map<String, DataSource> _dataSourceMap;
   private final DataBlockCache _dataBlockCache;
 
@@ -118,16 +122,71 @@ public class ProjectionBlock implements ValueBlock {
   }
 
   /// Whether `key` is a path into an object that the document also carries whole. `configApi.timeTaken` is, when
-  /// `configApi` is a key; a key the document literally spells with a dot is not, because no prefix of it is a key.
+  /// `configApi` is an object of the document holding `timeTaken`; a key the document literally spells with a dot
+  /// is not.
+  ///
+  /// The container is usually JSON **text** rather than a map: that is how the flattener emits it
+  /// ([OpenStructKeyFlattener]) and how the read path keeps it, so a shape check alone would miss every native
+  /// document. Requiring the container to actually hold the rest of the path is what keeps a string that merely
+  /// looks like JSON from swallowing a key that is genuinely spelled with a dot.
   private static boolean isPathIntoPresentObject(String key, Map<String, Object> document) {
     int dot = key.indexOf(OpenStructKeyFlattener.PATH_SEPARATOR);
     while (dot >= 0) {
-      if (document.get(key.substring(0, dot)) instanceof Map) {
+      Map<String, Object> container = asContainer(document.get(key.substring(0, dot)));
+      if (container != null && container.containsKey(nextSegment(key, dot + 1))) {
         return true;
       }
       dot = key.indexOf(OpenStructKeyFlattener.PATH_SEPARATOR, dot + 1);
     }
     return false;
+  }
+
+  /// The path segment starting at `from`, i.e. the first key the enclosing container would have to hold.
+  private static String nextSegment(String key, int from) {
+    int dot = key.indexOf(OpenStructKeyFlattener.PATH_SEPARATOR, from);
+    return dot < 0 ? key.substring(from) : key.substring(from, dot);
+  }
+
+  /// `value` as an object, whether it arrives as a map or as the JSON text the flattener stores a container as.
+  /// Null for anything that is not an object, text that does not parse, and text that parses to an array or a
+  /// scalar -- none of those can be the thing a dotted path descends into.
+  @Nullable
+  private static Map<String, Object> asContainer(@Nullable Object value) {
+    if (value instanceof Map<?, ?> map) {
+      return asStringKeyedMap(map);
+    }
+    if (value instanceof String text && !text.isEmpty() && text.charAt(0) == '{') {
+      try {
+        return JsonUtils.stringToObject(text, MAP_TYPE_REFERENCE);
+      } catch (IOException e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /// JSON text unwrapped into the object or array it holds, or the text unchanged when it is neither.
+  private static Object unwrapJsonText(String text) {
+    if (text.isEmpty()) {
+      return text;
+    }
+    char first = text.charAt(0);
+    if (first != '{' && first != '[') {
+      return text;
+    }
+    try {
+      return renderValue(JsonUtils.stringToObject(text, OBJECT_TYPE_REFERENCE));
+    } catch (IOException e) {
+      return text;
+    }
+  }
+
+  private static Map<String, Object> asStringKeyedMap(Map<?, ?> map) {
+    Map<String, Object> keyed = new LinkedHashMap<>(map.size());
+    for (Map.Entry<?, ?> entry : map.entrySet()) {
+      keyed.put(String.valueOf(entry.getKey()), entry.getValue());
+    }
+    return keyed;
   }
 
   /// Values as JSON renders them, recursing so a nested object is cleaned up the same way the top level is.
@@ -140,11 +199,14 @@ public class ProjectionBlock implements ValueBlock {
     }
     if (value instanceof Map<?, ?> map) {
       // Keys re-typed, values left raw: renderDocument renders each one as it walks them.
-      Map<String, Object> nested = new LinkedHashMap<>(map.size());
-      for (Map.Entry<?, ?> entry : map.entrySet()) {
-        nested.put(String.valueOf(entry.getKey()), entry.getValue());
-      }
-      return renderDocument(nested);
+      return renderDocument(asStringKeyedMap(map));
+    }
+    if (value instanceof String text) {
+      // A container reaches here as the JSON text the flattener stored, so inserting it as a string would nest a
+      // quoted document inside the document. Only text that parses as an object or an array is unwrapped, and text
+      // that fails to parse stays text, so the cost of the ambiguity falls on a string that both looks like JSON
+      // and is valid JSON.
+      return unwrapJsonText(text);
     }
     if (value instanceof List<?> list) {
       List<Object> rendered = new ArrayList<>(list.size());

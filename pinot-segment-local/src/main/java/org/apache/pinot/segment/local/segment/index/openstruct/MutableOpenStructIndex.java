@@ -377,7 +377,11 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
       // forward index, and metadata that disagreed with it would tell the query planner the wrong thing.
       spec = new DimensionFieldSpec(key, col.getStoredType(), col.isSingleValue());
     }
-    return new SimpleColumnMetadata(spec, _capacity);
+    // A multi-value key must carry a real max length: the scan iterators allocate their matcher buffers from it,
+    // so UNAVAILABLE (-1) throws NegativeArraySizeException before a RANGE predicate is ever evaluated. A
+    // consuming key has no range index, so RANGE always reaches the scan.
+    return spec.isSingleValueField() ? new SimpleColumnMetadata(spec, _capacity)
+        : new SimpleColumnMetadata(spec, _capacity, MutableKeyColumn.MAX_NUM_MULTI_VALUES);
   }
 
   @Override

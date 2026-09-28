@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
+import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Set;
@@ -195,6 +196,12 @@ public class MutableKeyColumn implements Closeable {
   /// [IllegalArgumentException] when the list is longer than [#MAX_NUM_MULTI_VALUES]; the caller drops and meters
   /// it, the same as a value that cannot be coerced.
   public void setValues(int docId, Object[] values) {
+    // Checked before the dictionary is touched. The length check inside the forward index throws too, but by then
+    // the values are already interned, leaving dictionary entries no document references -- they never mis-map a
+    // row, but they do inflate distinct-value counts for a row that was rejected.
+    Preconditions.checkArgument(values.length <= MAX_NUM_MULTI_VALUES,
+        "Row %s has %s multi-values for key: %s, exceeding the maximum of %s", docId, values.length, _key,
+        MAX_NUM_MULTI_VALUES);
     int[] dictIds = new int[values.length];
     for (int i = 0; i < values.length; i++) {
       dictIds[i] = _dictionary.index(values[i]);
@@ -223,6 +230,20 @@ public class MutableKeyColumn implements Closeable {
     // an absent doc would deserialize as if it held the first dictionary entry (dictId 0).
     if (!_presenceBitmap.contains(docId)) {
       return null;
+    }
+    if (!_singleValue) {
+      // The multi-value forward index implements only the MV getters: asking it for a single dictId throws
+      // UnsupportedOperationException, which reaches every caller of getMapValue (SELECT of the column, and the
+      // realtime seal path).
+      int[] dictIds = _forwardIndex.getDictIdMV(docId);
+      Object[] values = new Object[dictIds.length];
+      for (int i = 0; i < dictIds.length; i++) {
+        if (dictIds[i] < 0 || dictIds[i] >= _dictionary.length()) {
+          return null;
+        }
+        values[i] = _dictionary.get(dictIds[i]);
+      }
+      return values;
     }
     int dictId = _forwardIndex.getDictId(docId, null);
     if (dictId < 0 || dictId >= _dictionary.length()) {
@@ -288,9 +309,11 @@ public class MutableKeyColumn implements Closeable {
 
     @Override
     public int getDictIdMV(int docId, int[] dictIdBuffer, ForwardIndexReaderContext context) {
-      if (docId > _lastIndexedDocId) {
-        // Past the watermark the key has no row yet, which reads as the reserved default -- the same one value a
-        // sealed segment folds in for an absent multi-value doc.
+      if (!_presenceBitmap.contains(docId)) {
+        // The reserved default, the one value a sealed segment folds in for an absent multi-value doc. The
+        // single-value twin can lean on zero-initialized chunks reading as dictId 0; a multi-value index stores a
+        // length header, so an in-range hole reads as zero values instead -- an empty list, which is a value the
+        // document never held and which no sealed segment produces.
         dictIdBuffer[0] = 0;
         return 1;
       }
@@ -299,7 +322,7 @@ public class MutableKeyColumn implements Closeable {
 
     @Override
     public int[] getDictIdMV(int docId, ForwardIndexReaderContext context) {
-      if (docId > _lastIndexedDocId) {
+      if (!_presenceBitmap.contains(docId)) {
         return new int[]{0};
       }
       return _forwardIndex.getDictIdMV(docId);
