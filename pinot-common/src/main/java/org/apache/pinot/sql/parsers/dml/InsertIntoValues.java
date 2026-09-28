@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.ByteString;
+import org.apache.calcite.util.BitString;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
@@ -254,8 +255,13 @@ public class InsertIntoValues implements DataManipulationStatement {
       if (value instanceof NlsString) {
         return ((NlsString) value).getValue();
       }
-      /// Unwrap Calcite's ByteString to byte[] for X'AB12' BYTES literals so Pinot BYTES columns
-      /// can be inserted via INSERT INTO VALUES.
+      /// Unwrap Calcite's binary-string representations to byte[] so Pinot BYTES columns can be
+      /// inserted via INSERT INTO VALUES. Calcite's parser produces a SqlBinaryStringLiteral whose
+      /// getValue() is a BitString for X'AB12' hex literals; ByteString is kept as well for callers
+      /// that construct literals programmatically.
+      if (value instanceof BitString) {
+        return ((BitString) value).getAsByteArray();
+      }
       if (value instanceof ByteString) {
         return ((ByteString) value).getBytes();
       }
