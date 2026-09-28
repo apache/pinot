@@ -59,6 +59,10 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
   private Comparable<?> _computedMinValue;
   @Nullable
   private Comparable<?> _computedMaxValue;
+  // Sortedness observed by that same scan, since it walks the same docs in the same order computeSorted() would.
+  // Null when no scan ran (min/max were tracked, or the type is not recovered), in which case computeSorted() scans.
+  @Nullable
+  private Boolean _scanSorted;
 
   public MutableNoDictColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn) {
     _dataSourceMetadata = dataSource.getDataSourceMetadata();
@@ -105,8 +109,11 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
   /// Computes min/max by scanning the sealed forward index once, caching the result. Only invoked when the mutable
   /// segment reports null min/max, which happens for ingestion-aggregated metric columns: their values mutate in
   /// place during consumption, so `MutableSegmentImpl` deliberately skips min/max tracking for them. Without a value
-  /// domain the BitSliced range index creator cannot subtract the min for INT/LONG columns, so we recover it here
-  /// (the scan mirrors the one {@link #isSorted()} already performs at seal time).
+  /// domain the BitSliced range index creator cannot subtract the min for INT/LONG columns, so we recover it here.
+  ///
+  /// This is the same pass {@link #isSorted()} already performs at seal time for these columns, not an extra one: it
+  /// walks the docs in that method's order and records sortedness alongside min/max, and {@link #computeSorted()}
+  /// reuses the result. So a segment commit still reads such a column exactly once.
   ///
   /// Scoped to single-value INT/LONG columns because those are the only types whose BitSliced range index reads
   /// min/max: FLOAT/DOUBLE use the full floating-point ordinal domain, and other stored types do not support the
@@ -122,27 +129,37 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
     if (isSingleValue() && numDocs > 0) {
       switch (getStoredType()) {
         case INT: {
-          int min = _forwardIndex.getInt(0);
+          int min = _forwardIndex.getInt(docId(0));
           int max = min;
+          int prev = min;
+          boolean sorted = true;
           for (int i = 1; i < numDocs; i++) {
-            int curr = _forwardIndex.getInt(i);
+            int curr = _forwardIndex.getInt(docId(i));
             min = Math.min(min, curr);
             max = Math.max(max, curr);
+            sorted &= curr >= prev;
+            prev = curr;
           }
           _computedMinValue = min;
           _computedMaxValue = max;
+          _scanSorted = sorted;
           break;
         }
         case LONG: {
-          long min = _forwardIndex.getLong(0);
+          long min = _forwardIndex.getLong(docId(0));
           long max = min;
+          long prev = min;
+          boolean sorted = true;
           for (int i = 1; i < numDocs; i++) {
-            long curr = _forwardIndex.getLong(i);
+            long curr = _forwardIndex.getLong(docId(i));
             min = Math.min(min, curr);
             max = Math.max(max, curr);
+            sorted &= curr >= prev;
+            prev = curr;
           }
           _computedMinValue = min;
           _computedMaxValue = max;
+          _scanSorted = sorted;
           break;
         }
         default:
@@ -153,6 +170,12 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
     }
     // Set last so a re-entrant call cannot observe the flag as computed while the values are still being populated.
     _minMaxComputed = true;
+  }
+
+  /// Maps an iteration position to the docId to read, mirroring the order {@link #computeSorted()} walks so that a
+  /// single pass can answer both the value domain and sortedness.
+  private int docId(int index) {
+    return _sortedDocIds != null ? _sortedDocIds[index] : index;
   }
 
   @Nullable
@@ -201,8 +224,14 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
     }
 
     // A single distinct value is always sorted — no scan needed. Min and max are tracked per raw value during
-    // ingestion, but are left null when aggregated metrics are enabled, so fall back to the scan when unavailable.
+    // ingestion, but are left null when aggregated metrics are enabled; for those this call recovers them by
+    // scanning, which also settles sortedness.
     Comparable<?> minValue = getMinValue();
+    if (_scanSorted != null) {
+      // Min/max were untracked and recovered by computeMinMaxIfNeeded() above. That scan walked the same docs in the
+      // same order this method would, so it already answered sortedness: reuse it rather than scanning twice.
+      return _scanSorted;
+    }
     if (minValue != null && minValue.equals(getMaxValue())) {
       return true;
     }

@@ -235,13 +235,13 @@ public interface IndexCreationContext extends ColumnShape {
     /// Overrides the min value that would otherwise be sourced from the [ColumnShape]. Used when the source reports a
     /// null min/max (e.g. ingestion-aggregated no-dictionary columns on the index-handler path) and the caller has
     /// recomputed it. A null argument leaves delegation to the source unchanged.
-    public Builder withMinValue(Comparable<?> minValue) {
+    public Builder withMinValue(@Nullable Comparable<?> minValue) {
       _minValue = minValue;
       return this;
     }
 
     /// Overrides the max value derived from the source [ColumnShape]. See [#withMinValue].
-    public Builder withMaxValue(Comparable<?> maxValue) {
+    public Builder withMaxValue(@Nullable Comparable<?> maxValue) {
       _maxValue = maxValue;
       return this;
     }
