@@ -1612,11 +1612,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   public void goOnlineFromConsuming(SegmentZKMetadata segmentZKMetadata)
       throws InterruptedException {
     _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+    StreamPartitionMsgOffset endOffset = null;
     try {
       // Remove the segment file before we do anything else.
       removeSegmentFile();
       _leaseExtender.removeSegment(_segmentNameStr);
-      StreamPartitionMsgOffset endOffset = _streamPartitionMsgOffsetFactory.create(segmentZKMetadata.getEndOffset());
+      endOffset = _streamPartitionMsgOffsetFactory.create(segmentZKMetadata.getEndOffset());
       _segmentLogger.info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {})", _state,
           _startOffset, endOffset);
       stop();
@@ -1735,13 +1736,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // Reached only on a successful CONSUMING -> ONLINE transition (any failure above is rethrown and skips
     // this). If the segment stopped because the stream partition group ended -- e.g. a Kinesis shard was
     // split/merged and fully consumed -- no successor consuming segment is created for this partition (the
-    // controller drops the ended partition from the stream partition list), so the gauge set to 0 above
-    // would otherwise linger at 0 forever and raise a false ingestion-stopped alert. Remove it. On a failed
-    // transition we never reach here, so the gauge stays at 0 and a genuine stall remains visible.
+    // Kinesis metadata provider drops a shard once it confirms the shard is fully consumed), so the gauge set
+    // to 0 above would otherwise linger at 0 forever and raise a false ingestion-stopped alert. Remove it. On a
+    // failed transition we never reach here, so the gauge stays at 0 and a genuine stall remains visible.
     // The committed end offset must also match where this replica saw the end. If another replica won the commit
     // at an earlier offset, a successor segment consumes the rest, so the gauge stays at 0 until it starts.
-    if (_endOfPartitionGroup
-        && _currentOffset.compareTo(_streamPartitionMsgOffsetFactory.create(segmentZKMetadata.getEndOffset())) == 0) {
+    if (_endOfPartitionGroup && _currentOffset.compareTo(endOffset) == 0) {
       _serverMetrics.removeTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING);
     }
   }

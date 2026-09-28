@@ -76,6 +76,7 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.mockito.InOrder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -89,6 +90,7 @@ import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -686,7 +688,12 @@ public class RealtimeSegmentDataManagerTest {
       segmentDataManager.goOnlineFromConsuming(metadata);
 
       // On a successful ONLINE transition the gauge is set to 0 in the finally and then removed.
-      verify(serverMetrics, atLeast(1)).removeTableGauge(anyString(), eq(ServerGauge.LLC_PARTITION_CONSUMING));
+      InOrder inOrder = inOrder(serverMetrics);
+      inOrder.verify(serverMetrics, atLeast(1)).setValueOfTableGauge(anyString(),
+          eq(ServerGauge.LLC_PARTITION_CONSUMING), eq(0L));
+      inOrder.verify(serverMetrics).removeTableGauge(anyString(), eq(ServerGauge.LLC_PARTITION_CONSUMING));
+      inOrder.verify(serverMetrics, never()).setValueOfTableGauge(anyString(),
+          eq(ServerGauge.LLC_PARTITION_CONSUMING), eq(0L));
     }
   }
 
@@ -730,6 +737,8 @@ public class RealtimeSegmentDataManagerTest {
       // ERROR state makes goOnlineFromConsuming download-and-replace, which we force to fail.
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.ERROR);
       segmentDataManager.setEndOfPartitionGroup(true);
+      // Match the committed end offset so only the failed transition blocks the removal.
+      segmentDataManager.setCurrentOffset(START_OFFSET_VALUE + 600);
       segmentDataManager._throwOnReplace = true;
 
       Assert.assertThrows(RuntimeException.class, () -> segmentDataManager.goOnlineFromConsuming(metadata));
@@ -754,7 +763,9 @@ public class RealtimeSegmentDataManagerTest {
       segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.COMMITTED);
-      // _endOfPartitionGroup defaults to false -> normal commit.
+      // _endOfPartitionGroup defaults to false -> normal commit. Match the committed end offset so only the
+      // missing end of partition group blocks the removal.
+      segmentDataManager.setCurrentOffset(START_OFFSET_VALUE + 600);
 
       segmentDataManager.goOnlineFromConsuming(metadata);
 
