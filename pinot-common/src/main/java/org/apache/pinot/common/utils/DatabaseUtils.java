@@ -170,15 +170,25 @@ public class DatabaseUtils {
   /// If queryOptions and headers have conflicting database context an [DatabaseConflictException] is thrown.
   public static String extractDatabaseFromQueryRequest(
       @Nullable Map<String, String> queryOptions, @Nullable HttpHeaders headers) {
-    String databaseFromOptions = queryOptions == null ? null : queryOptions.get(CommonConstants.DATABASE);
-    String databaseFromHeaders = headers == null ? null : headers.getHeaderString(CommonConstants.DATABASE);
+    String database = extractDatabaseFromQueryRequest(
+        queryOptions == null ? null : queryOptions.get(CommonConstants.DATABASE),
+        headers == null ? null : headers.getHeaderString(CommonConstants.DATABASE));
+    return Objects.requireNonNullElse(database, CommonConstants.DEFAULT_DATABASE);
+  }
+
+  /// Returns the database context of a request: the `database` header, else the `database` query option, or `null`
+  /// when neither is set.
+  ///
+  /// @throws DatabaseConflictException if both are set and differ
+  @Nullable
+  public static String extractDatabaseFromQueryRequest(@Nullable String databaseFromOptions,
+      @Nullable String databaseFromHeaders) {
     if (databaseFromHeaders != null && databaseFromOptions != null
         && !databaseFromOptions.equals(databaseFromHeaders)) {
       throw new DatabaseConflictException("Database context mismatch : from headers '" + databaseFromHeaders
           + "', from query options '" + databaseFromOptions + "'");
     }
-    String database = databaseFromHeaders != null ? databaseFromHeaders : databaseFromOptions;
-    return Objects.requireNonNullElse(database, CommonConstants.DEFAULT_DATABASE);
+    return databaseFromHeaders != null ? databaseFromHeaders : databaseFromOptions;
   }
 
   /// Extract the database name from the prefix of fully qualified table name.
