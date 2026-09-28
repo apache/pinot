@@ -173,12 +173,17 @@ public final class OrDocIdSet implements BlockDocIdSet {
     _scanBasedDocIdSets.set(docIdSets);
     _docIdSets = null;
     MutableRoaringBitmap docIdsToReturn = new MutableRoaringBitmap();
-    if (docIds.isEmpty()) {
+    // NOTE: Bound the candidates like NotDocIdSet does. A bitmap branch is intersected through its raw bitmap, which
+    //       on a realtime segment can carry document ids beyond numDocs that the iterator() path would have dropped.
+    ImmutableRoaringBitmap boundedDocIds = NotDocIdSet.bound(docIds, _numDocs);
+    if (boundedDocIds.isEmpty()) {
+      // No branch is evaluated, so none of them will close its own iterator
+      releaseFrom(docIdSets, 0);
       return docIdsToReturn;
     }
-    int numCandidates = docIds.getCardinality();
+    int numCandidates = boundedDocIds.getCardinality();
     int numDocIdSets = docIdSets.size();
-    ImmutableRoaringBitmap remainingDocIds = docIds;
+    ImmutableRoaringBitmap remainingDocIds = boundedDocIds;
     for (int i = 0; i < numDocIdSets; i++) {
       ImmutableRoaringBitmap matchingDocIds = docIdSets.get(i).applyAnd(remainingDocIds);
       if (matchingDocIds.isEmpty()) {

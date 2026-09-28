@@ -357,7 +357,8 @@ public class QueryOptionsUtils {
       return AndRestrictionPushdownMode.valueOf(value.toUpperCase(Locale.ROOT));
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
-          String.format("Invalid value for %s: '%s'. Expected one of: ALWAYS, NEVER, AUTO", key, value));
+          String.format("Invalid value for %s: '%s'. Expected one of: %s (this option is a mode, not a boolean toggle)",
+              key, value, Arrays.toString(AndRestrictionPushdownMode.values())));
     }
   }
 

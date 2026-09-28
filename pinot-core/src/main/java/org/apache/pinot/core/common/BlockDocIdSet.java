@@ -92,6 +92,8 @@ public interface BlockDocIdSet {
   /// together with [#iterator]. [#getNumEntriesScannedInFilter] stays valid afterwards.
   default ImmutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
     if (docIds.isEmpty()) {
+      // Nothing is evaluated, so the iterator will not close itself
+      release();
       return new MutableRoaringBitmap();
     }
     BlockDocIdIterator docIdIterator = iterator();
@@ -144,13 +146,7 @@ public interface BlockDocIdSet {
     // TODO: This scan is not counted in the execution stats
     if (docIdIterator instanceof ScanBasedDocIdIterator || docIdIterator instanceof AndDocIdIterator
         || docIdIterator instanceof OrDocIdIterator) {
-      RoaringBitmapWriter<MutableRoaringBitmap> bitmapWriter =
-          RoaringBitmapWriter.bufferWriter().runCompress(false).get();
-      int docId;
-      while ((docId = docIdIterator.next()) != Constants.EOF) {
-        bitmapWriter.add(docId);
-      }
-      return new RangelessBitmapDocIdSet(bitmapWriter.get());
+      return new RangelessBitmapDocIdSet(collect(docIdIterator));
     }
 
     // NOTE: AND and OR DocIdSet might return BitmapBasedDocIdIterator after processing the iterators. Create a new

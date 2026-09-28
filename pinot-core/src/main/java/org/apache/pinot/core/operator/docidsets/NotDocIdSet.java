@@ -62,6 +62,8 @@ public class NotDocIdSet implements BlockDocIdSet {
   @Override
   public ImmutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
     if (docIds.isEmpty()) {
+      // The child is not evaluated, so it will not close its own iterator
+      _childDocIdSet.release();
       return new MutableRoaringBitmap();
     }
     // NOTE: The candidate set can carry document ids beyond numDocs, because BitmapDocIdIterator#getDocIds() hands out
@@ -69,6 +71,7 @@ public class NotDocIdSet implements BlockDocIdSet {
     //       complement can, so the bound NotDocIdIterator applies has to be applied here too.
     ImmutableRoaringBitmap boundedDocIds = bound(docIds, _numDocs);
     if (boundedDocIds.isEmpty()) {
+      _childDocIdSet.release();
       return new MutableRoaringBitmap();
     }
     // Within the candidate set, NOT(child) is the candidates the child does not match, so the child only has to be

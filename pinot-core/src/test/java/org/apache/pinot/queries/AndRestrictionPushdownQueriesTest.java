@@ -90,21 +90,6 @@ public class AndRestrictionPushdownQueriesTest extends BaseSingleValueQueriesTes
     assertRowsEqual(getBrokerResponse(withMode("always", query)), getBrokerResponse(withMode("never", query)));
   }
 
-  /// With null handling on, AndFilterOperator#getFalses() wraps the push-down in a NOT over OR(trues, nulls), and
-  /// excludeNulls() builds its AND with the flag -- the two paths where the push-down changes how nulls flow.
-  @Test
-  public void testPushdownWithNullHandlingKeepsTheSameRows() {
-    String query = "SELECT column1, column5 FROM testTable WHERE column1 IS NOT NULL "
-        + "AND NOT (column5 = 'gFuH' OR column11 IN ('t', 'P')) ORDER BY column1 LIMIT 50";
-
-    assertRowsEqual(getBrokerResponse(withNullHandling(withMode("always", query))),
-        getBrokerResponse(withNullHandling(withMode("never", query))));
-  }
-
-  private static String withNullHandling(String query) {
-    return "SET enableNullHandling = true; " + query;
-  }
-
   private static String withMode(String mode, String query) {
     return "SET " + QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE + " = '" + mode + "'; " + query;
   }

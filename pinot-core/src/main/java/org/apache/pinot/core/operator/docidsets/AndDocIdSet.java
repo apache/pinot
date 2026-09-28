@@ -78,6 +78,12 @@ public final class AndDocIdSet implements BlockDocIdSet {
   public BlockDocIdIterator iterator() {
     List<BlockDocIdSet> docIdSets = _docIdSets;
     Preconditions.checkState(docIdSets != null, "iterator() called on an already consumed AndDocIdSet");
+    return buildIterator(docIdSets);
+  }
+
+  /// Builds the iterator over the given children and consumes this DocIdSet. [#applyAnd] passes the children with
+  /// the candidate set prepended, which is why they are not read from `_docIdSets` here.
+  private BlockDocIdIterator buildIterator(List<BlockDocIdSet> docIdSets) {
     int numDocIdSets = docIdSets.size();
     // NOTE: Keep the order of BlockDocIdSets to preserve the order decided within FilterOperatorUtils.
     // TODO: Consider deciding the order based on the stats of BlockDocIdIterators
@@ -249,10 +255,11 @@ public final class AndDocIdSet implements BlockDocIdSet {
     return isScanBased();
   }
 
-  /// Intersects this AND with the candidate set by handing the candidates to [#iterator] as one more index-based
-  /// child. Everything [#iterator] does -- merging the index children first, sorting bitmaps by cardinality,
-  /// [org.apache.pinot.common.utils.config.QueryOptionsUtils#isAndScanReorderingEnabled], running every scan against
-  /// the merged document ids -- then applies to the restricted evaluation too, with one implementation of AND.
+  /// Intersects this AND with the candidate set by handing the candidates to [#buildIterator] as one more
+  /// index-based child. Everything [#iterator] does -- merging the index children first, sorting bitmaps by
+  /// cardinality, [org.apache.pinot.common.utils.config.QueryOptionsUtils#isAndScanReorderingEnabled], running every
+  /// scan against the merged document ids -- then applies to the restricted evaluation too, with one implementation of
+  /// AND.
   @Override
   public ImmutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
     List<BlockDocIdSet> docIdSets = _docIdSets;
@@ -269,10 +276,9 @@ public final class AndDocIdSet implements BlockDocIdSet {
     List<BlockDocIdSet> docIdSetsWithCandidates = new ArrayList<>(docIdSets.size() + 1);
     docIdSetsWithCandidates.add(new RangelessBitmapDocIdSet(docIds));
     docIdSetsWithCandidates.addAll(docIdSets);
-    _docIdSets = docIdSetsWithCandidates;
-    BlockDocIdIterator docIdIterator = iterator();
-    // iterator() returns the merged document ids directly whenever it has no lazy child left, which is the usual case
-    // once the candidate set has forced the merge branch
+    BlockDocIdIterator docIdIterator = buildIterator(docIdSetsWithCandidates);
+    // buildIterator() returns the merged document ids directly whenever it has no lazy child left, which is the usual
+    // case once the candidate set has forced the merge branch
     return docIdIterator instanceof BitmapBasedDocIdIterator ? ((BitmapBasedDocIdIterator) docIdIterator).getDocIds()
         : BlockDocIdSet.collect(docIdIterator);
   }

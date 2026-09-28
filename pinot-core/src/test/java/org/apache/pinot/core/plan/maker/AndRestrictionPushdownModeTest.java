@@ -117,7 +117,7 @@ public class AndRestrictionPushdownModeTest {
   }
 
   /// Resolves the flag for the given query, optionally setting the `andRestrictionPushdown` query option. With no
-  /// option the server default (AUTO) applies.
+  /// option the server default (NEVER) applies.
   private static boolean resolve(@Nullable String mode, String query) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     if (mode != null) {

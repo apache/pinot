@@ -115,8 +115,10 @@ public class AndDocIdSetPushdownTest {
     expected.or(secondBranch);
     expected.and(scanMatches);
 
+    // One scan-based branch keeps the OR deferrable, and without an index-based child the outer AND has no seed
     BlockDocIdSet or = new OrDocIdSet(
-        List.of(new BitmapDocIdSet(firstBranch, NUM_DOCS), new BitmapDocIdSet(secondBranch, NUM_DOCS)), NUM_DOCS);
+        List.of(new BitmapDocIdSet(firstBranch, NUM_DOCS), new CountingScanDocIdSet(secondBranch)), NUM_DOCS);
+    assertTrue(or.isApplyAndDeferrable());
     BlockDocIdSet docIdSet = new AndDocIdSet(List.of(new CountingScanDocIdSet(scanMatches), or), null, true);
 
     assertEquals(collectDocIds(docIdSet), expected.toArray());
@@ -180,6 +182,48 @@ public class AndDocIdSetPushdownTest {
     or.applyAnd(candidates);
 
     assertTrue(skipped.isReleased(), "A branch skipped by the short-circuit must still be released");
+  }
+
+  /// A bitmap branch under an OR is intersected through its raw bitmap, which can reach past numDocs just like the
+  /// candidate set can. The iterator path drops those ids, so the push-down has to drop them too.
+  @Test
+  public void testOrDoesNotEmitDocumentIdsBeyondNumDocs() {
+    int numDocs = 100;
+    MutableRoaringBitmap candidates = new MutableRoaringBitmap();
+    candidates.add(0L, 150L);
+
+    ImmutableRoaringBitmap docIds = new OrDocIdSet(
+        List.of(new BitmapDocIdSet(range(90, 150), numDocs), new CountingScanDocIdSet(range(0, 10))), numDocs)
+        .applyAnd(candidates);
+
+    assertTrue(docIds.last() < numDocs, "OR must not emit document ids at or beyond numDocs, but emitted "
+        + docIds.last());
+    // The iterator path is the reference implementation: both must agree
+    assertEquals(docIds.toArray(), collectDocIds(new AndDocIdSet(List.of(new BitmapDocIdSet(candidates, numDocs),
+        new OrDocIdSet(List.of(new BitmapDocIdSet(range(90, 150), numDocs), new CountingScanDocIdSet(range(0, 10))),
+            numDocs)), null, false)));
+  }
+
+  /// A DocIdSet handed no candidate is never evaluated, so it has to be released instead.
+  @Test
+  public void testDocIdSetsWithoutCandidatesAreReleased() {
+    MutableRoaringBitmap noCandidates = new MutableRoaringBitmap();
+
+    ReleaseTrackingDocIdSet leaf = new ReleaseTrackingDocIdSet(range(0, 10));
+    leaf.applyAnd(noCandidates);
+    assertTrue(leaf.isReleased(), "A leaf handed no candidate must be released");
+
+    ReleaseTrackingDocIdSet orBranch = new ReleaseTrackingDocIdSet(range(0, 10));
+    new OrDocIdSet(List.of(orBranch), NUM_DOCS).applyAnd(noCandidates);
+    assertTrue(orBranch.isReleased(), "An OR branch must be released when the OR is handed no candidate");
+
+    // Every candidate is at or beyond numDocs, so the NOT drops them all before reaching its child
+    int numDocs = 100;
+    MutableRoaringBitmap candidatesBeyondNumDocs = new MutableRoaringBitmap();
+    candidatesBeyondNumDocs.add(100L, 150L);
+    ReleaseTrackingDocIdSet notChild = new ReleaseTrackingDocIdSet(range(0, 10));
+    new NotDocIdSet(notChild, numDocs).applyAnd(candidatesBeyondNumDocs);
+    assertTrue(notChild.isReleased(), "A NOT child must be released when no candidate is below numDocs");
   }
 
   private static final class ReleaseTrackingDocIdSet implements BlockDocIdSet {

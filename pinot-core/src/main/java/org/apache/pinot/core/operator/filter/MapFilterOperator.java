@@ -265,9 +265,10 @@ public class MapFilterOperator extends BaseFilterOperator {
   }
 
   /// Forwarded so three-valued logic survives the delegation. `NotFilterOperator.getTrues()` reads
-  /// `getFalses()`, and `And`/`OrFilterOperator.getFalses()` read `getNulls()`; leaving these on the
-  /// base implementation would report an absent key's UNKNOWN docs as FALSE, so
-  /// `NOT (col['key'] = v)` would match every doc missing the key.
+  /// `getFalses()`, and `And`/`OrFilterOperator.getNotFalses()` read their children's `getNotFalses()`;
+  /// leaving these on the base implementation would report an absent key's UNKNOWN docs as FALSE, so
+  /// `NOT (col['key'] = v)` would match every doc missing the key. `getNulls()` is forwarded too, so
+  /// that it stays consistent with the other three.
   @Override
   protected BlockDocIdSet getNulls() {
     return _delegate.getNulls();
