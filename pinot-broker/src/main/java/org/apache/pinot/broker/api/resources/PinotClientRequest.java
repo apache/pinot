@@ -767,10 +767,10 @@ public class PinotClientRequest {
   /// The caller must pass the checks of a query on the table, since the WHERE clause reads it: access to the table and
   /// the [Actions.Table#QUERY] action. Then the fine-grained [Actions.Table#DELETE_ROWS] action is checked on the table
   /// name, like the query action, and on its raw name, which the controller checks, so that a type suffix cannot
-  /// bypass a rule on the raw name. No row-level security filter may apply to the table, since it would not restrict
-  /// the rows the statement deletes. Last, the access control must allow deleting rows, see
+  /// bypass a rule on the raw name. The access control must allow deleting rows, see
   /// [AccessControl#authorizeDeleteRows], which denies by default: the fine-grained checks allow every action by
-  /// default, so they cannot tell an access control written before `DELETE` existed from one that allows it.
+  /// default, so they cannot tell an access control written before `DELETE` existed from one that allows it. No
+  /// row-level security filter may apply to the table, since it would not restrict the rows the statement deletes.
   ///
   /// @throws WebApplicationException with status 403 if the caller is not authorized
   private void authorizeDelete(AccessControl accessControl, String tableName, HttpRequesterIdentity requesterIdentity,
@@ -788,12 +788,12 @@ public class PinotClientRequest {
       authorizationResult =
           accessControl.authorize(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.DELETE_ROWS);
     }
+    if (authorizationResult.hasAccess()) {
+      authorizationResult = accessControl.authorizeDeleteRows(requesterIdentity, httpHeaders, tableName);
+    }
     if (authorizationResult.hasAccess() && hasRowFilters(accessControl, requesterIdentity, tableName)) {
       authorizationResult = new BasicAuthorizationResultImpl(false,
           "Row-level security applies to the table, and would not restrict the rows the statement deletes");
-    }
-    if (authorizationResult.hasAccess()) {
-      authorizationResult = accessControl.authorizeDeleteRows(requesterIdentity, httpHeaders, tableName);
     }
     if (!authorizationResult.hasAccess()) {
       throw deleteAccessDenied(tableName, authorizationResult);
@@ -826,8 +826,15 @@ public class PinotClientRequest {
         CommonConstants.Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH)) {
       return false;
     }
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     List<String> rowFilters =
-        accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters().orElse(null);
+        accessControl.getRowColFilters(requesterIdentity, rawTableName).getRLSFilters().orElse(null);
+    if (rowFilters != null && !rowFilters.isEmpty()) {
+      return true;
+    }
+    if (!rawTableName.equals(tableName)) {
+      rowFilters = accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters().orElse(null);
+    }
     return rowFilters != null && !rowFilters.isEmpty();
   }
 

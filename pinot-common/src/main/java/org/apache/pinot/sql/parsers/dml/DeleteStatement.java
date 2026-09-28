@@ -236,7 +236,7 @@ public class DeleteStatement implements DataManipulationStatement {
   ///                        not support
   public DeleteStatement resolveTableName(@Nullable String databaseHeader, TableCache tableCache)
       throws QueryException {
-    String database = DatabaseUtils.extractDatabaseFromQueryRequest(_database, databaseHeader);
+    String database = DatabaseUtils.extractDatabaseFromOptionAndHeader(_database, databaseHeader);
     String tableName;
     try {
       tableName = DatabaseUtils.translateTableName(_tableName, database, tableCache.isIgnoreCase());

@@ -562,7 +562,52 @@ public class PinotClientRequestTest {
 
     assertForbidden(postSql("DELETE FROM myTable WHERE region = 'EU'"), "myTable", "Row-level security");
     assertEquals(accessControl._checks, List.of("broker", "tables [myTable]",
-        Actions.Table.QUERY + " TABLE myTable", Actions.Table.DELETE_ROWS + " TABLE myTable", "rowFilters myTable"));
+        Actions.Table.QUERY + " TABLE myTable", Actions.Table.DELETE_ROWS + " TABLE myTable", "deleteRows myTable",
+        "rowFilters myTable"));
+  }
+
+  @DataProvider(name = "typedDeleteRlsTables")
+  public Object[][] typedDeleteRlsTables() {
+    return new Object[][]{
+        {"myTable", List.of("rowFilters myTable")},
+        {"myTable_OFFLINE", List.of("rowFilters myTable", "rowFilters myTable_OFFLINE")}
+    };
+  }
+
+  @Test(dataProvider = "typedDeleteRlsTables")
+  public void testDeleteFromTypedTableIsForbiddenWhenRowLevelSecurityApplies(String filteredTable,
+      List<String> expectedFilterLookups)
+      throws Exception {
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
+        CommonConstants.Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH)).thenReturn(true);
+    RecordingAccessControl accessControl = new RecordingAccessControl() {
+      @Override
+      public TableRowColAccessResult getRowColFilters(RequesterIdentity requesterIdentity, String table) {
+        super.getRowColFilters(requesterIdentity, table);
+        return table.equals(filteredTable)
+            ? new TableRowColAccessResultImpl(List.of("region = 'US'"))
+            : TableRowColAccessResultImpl.unrestricted();
+      }
+    };
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+
+    assertForbidden(postSql("DELETE FROM myTable_OFFLINE WHERE region = 'EU'"), "myTable_OFFLINE",
+        "Row-level security");
+    assertEquals(accessControl._checks.stream().filter(check -> check.startsWith("rowFilters ")).toList(),
+        expectedFilterLookups);
+  }
+
+  @Test
+  public void testDeleteDeniedBeforeRowFilterLookup()
+      throws Exception {
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
+        CommonConstants.Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH)).thenReturn(true);
+    RecordingAccessControl accessControl = new RecordingAccessControl(List.of("region = 'US'"), "deleteRows");
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+
+    assertForbidden(postSql("DELETE FROM myTable_OFFLINE WHERE region = 'EU'"), "myTable_OFFLINE",
+        "deleteRows denied");
+    assertFalse(accessControl._checks.stream().anyMatch(check -> check.startsWith("rowFilters ")));
   }
 
   @Test
@@ -576,8 +621,8 @@ public class PinotClientRequestTest {
 
     assertSucceeded(postSql("DELETE FROM myTable WHERE col1 = 'a'"));
     assertEquals(accessControl._checks, List.of("broker", "tables [myTable]",
-        Actions.Table.QUERY + " TABLE myTable", Actions.Table.DELETE_ROWS + " TABLE myTable", "rowFilters myTable",
-        "deleteRows myTable"));
+        Actions.Table.QUERY + " TABLE myTable", Actions.Table.DELETE_ROWS + " TABLE myTable", "deleteRows myTable",
+        "rowFilters myTable"));
   }
 
   @Test
