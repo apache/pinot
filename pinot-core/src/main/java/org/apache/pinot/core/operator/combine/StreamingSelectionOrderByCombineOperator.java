@@ -38,6 +38,7 @@ import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.StreamingSelectionOrderByOperator;
 import org.apache.pinot.core.operator.streaming.BaseStreamingCombineOperator;
+import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
@@ -73,8 +74,11 @@ import org.slf4j.LoggerFactory;
 /// block read) when the merge frontier reaches its min/max, so once `limit + offset` rows are emitted the
 /// remaining segments are never acquired or read. See [#activateEligibleCursors(SegmentCursor)] for the
 /// correctness argument.
-/// Pruning is disabled when null handling is enabled (an unsorted segment's first order-by column may then contain
-/// nulls whose ordering position the raw min/max cannot capture), in which case every segment is activated.
+/// With null handling on, a segment whose leading column is not flagged non-null by
+/// [SelectionPlanNode#isColumnFlaggedNonNull] (it has nulls, the segment predates the flag, or it is a consuming
+/// segment) is given no min/max and always activates. Flagged segments keep their min/max. With
+/// null handling off, min/max are used as stored. The flag is read from segment metadata, not the null value vector:
+/// that vector is a mapped buffer, and probing it here would acquire segments pruning is about to skip.
 /// Its effect shows in the stats: a never-activated segment scans no docs, so `numSegmentsMatched` excludes it while
 /// `numSegmentsProcessed` counts every segment. Their difference also counts activated segments that matched no rows.
 /// TODO: report the activated count separately; that needs a new `DataTable.MetadataKey`.
@@ -165,7 +169,7 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
     String firstOrderByColumn =
         firstOrderByExpressionContext.getType() == ExpressionContext.Type.IDENTIFIER
             ? firstOrderByExpressionContext.getIdentifier() : null;
-    _pruningEnabled = firstOrderByColumn != null && !queryContext.isNullHandlingEnabled();
+    _pruningEnabled = firstOrderByColumn != null;
     // A column-0 tie only proves the segment cannot supply an *earlier* row when column 0 is the whole sort key.
     // With two or more expressions a tie on column 0 can hide a row sorting earlier on column 1, so ties must
     // still activate (same gate as MinMaxValueBasedSelectionOrderByCombineOperator's numOrderByExpressions == 1).
@@ -185,7 +189,16 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
       DataSourceMetadata metadata =
           operator.getIndexSegment().getDataSource(firstOrderByColumn, queryContext.getSchema())
               .getDataSourceMetadata();
-      _sortedCursors[i] = new SegmentCursor(operator, metadata.getMinValue(), metadata.getMaxValue());
+      Comparable minValue = metadata.getMinValue();
+      Comparable maxValue = metadata.getMaxValue();
+      // isNonNull is loaded with the segment, the same class of access as min/max. False means nulls or unknown, so
+      // drop the bounds and let activateEligibleCursors force-activate this cursor. Do not read the null vector here.
+      if (queryContext.isNullHandlingEnabled()
+          && !SelectionPlanNode.isColumnFlaggedNonNull(operator.getIndexSegment(), firstOrderByColumn)) {
+        minValue = null;
+        maxValue = null;
+      }
+      _sortedCursors[i] = new SegmentCursor(operator, minValue, maxValue);
       if (metadata.isSorted()) {
         numSortedSegments++;
       }
