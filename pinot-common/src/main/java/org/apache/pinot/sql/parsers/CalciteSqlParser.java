@@ -122,19 +122,14 @@ public class CalciteSqlParser {
     sql = ParserUtils.sanitizeSql(sql);
 
     // extract and remove OPTIONS string
-    List<String> options = List.of();
     SqlOptionsMode legacyOptionSyntaxMode = QueryOptionsUtils.getLegacyOptionSyntaxMode();
-    if (legacyOptionSyntaxMode == SqlOptionsMode.IGNORE) {
-      sql = removeOptionsFromSql(sql);
-    } else {
-      options = extractOptionsFromSql(sql);
-      if (!options.isEmpty()) {
-        if (legacyOptionSyntaxMode == SqlOptionsMode.REJECT) {
-          throw new SqlCompilationException("Legacy OPTION(...) query options are not allowed on this cluster, use "
-              + "'SET <key> = <value>;' statements instead: " + options);
-        }
-        sql = removeOptionsFromSql(sql);
+    List<String> options = extractOptionsFromSql(sql);
+    if (!options.isEmpty()) {
+      if (legacyOptionSyntaxMode == SqlOptionsMode.REJECT) {
+        throw new SqlCompilationException("Legacy OPTION(...) query options are not allowed on this cluster, use "
+            + "'SET <key> = <value>;' statements instead: " + options);
       }
+      sql = removeOptionsFromSql(sql);
     }
 
     try (StringReader inStream = new StringReader(sql)) {
@@ -145,13 +140,21 @@ public class CalciteSqlParser {
       SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
       // add legacy OPTIONS keyword-based options
       if (!options.isEmpty()) {
-        Map<String, String> optionMap = extractOptionsMap(options);
-        if (sqlNodeAndOptions.getSqlType() == PinotSqlType.DQL) {
-          // No-op unless the broker enables query option validation. DML (e.g.
-          // INSERT INTO FILE OPTION(taskName=...)) carries free-form task/FS properties, like DML SET.
-          QueryOptionsUtils.validateSqlQueryOptions(optionMap);
+        if (legacyOptionSyntaxMode == SqlOptionsMode.IGNORE) {
+          // The options of a DML statement configure it (e.g. a dry run), so dropping them would change its effect
+          if (sqlNodeAndOptions.getSqlType() == PinotSqlType.DML) {
+            throw new SqlCompilationException("Legacy OPTION(...) options are ignored on this cluster, use "
+                + "'SET <key> = <value>;' statements to configure a DML statement: " + options);
+          }
+        } else {
+          Map<String, String> optionMap = extractOptionsMap(options);
+          if (sqlNodeAndOptions.getSqlType() == PinotSqlType.DQL) {
+            // No-op unless the broker enables query option validation. DML (e.g.
+            // INSERT INTO FILE OPTION(taskName=...)) carries free-form task/FS properties, like DML SET.
+            QueryOptionsUtils.validateSqlQueryOptions(optionMap);
+          }
+          sqlNodeAndOptions.setExtraOptions(optionMap);
         }
-        sqlNodeAndOptions.setExtraOptions(optionMap);
       }
       sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parseStartTimeNs);
       return sqlNodeAndOptions;
@@ -165,8 +168,10 @@ public class CalciteSqlParser {
     SqlNode statementNode = null;
     Map<String, String> options = new HashMap<>();
     for (SqlNode sqlNode : sqlNodeList) {
-      if (sqlNode instanceof SqlInsertFromFile) {
-        // extract insert statement (execution statement)
+      if (sqlNode instanceof SqlInsertFromFile || sqlNode.getKind().belongsTo(SqlKind.DML)) {
+        // extract DML statement (execution statement). The SQL executor runs INSERT INTO ... FROM FILE, lets a
+        // deployment plug in DELETE and rejects the other DML kinds the grammar parses (UPDATE, MERGE, CALL) with a
+        // clear error, instead of the query engines failing to compile them as queries.
         if (sqlType == null) {
           sqlType = PinotSqlType.DML;
           statementNode = sqlNode;
@@ -198,6 +203,12 @@ public class CalciteSqlParser {
         options.put(key.getSimple(), value.toValue());
       } else {
         // default extract query statement (execution statement)
+        if (sqlNode instanceof SqlExplain) {
+          SqlKind explainedKind = ((SqlExplain) sqlNode).getExplicandum().getKind();
+          if (explainedKind.belongsTo(SqlKind.DML)) {
+            throw new SqlCompilationException("EXPLAIN is not supported for DML statements: " + explainedKind);
+          }
+        }
         if (sqlType == null) {
           sqlType = PinotSqlType.DQL;
           statementNode = sqlNode;
@@ -675,6 +686,11 @@ public class CalciteSqlParser {
     }
     // Outside the try: the rewriter already throws SqlCompilationException, and wrapping it would drop its message.
     sqlNode = PostgreSqlCastRewriter.rewrite(sqlNode);
+    return toExpression(sqlNode);
+  }
+
+  /// Compiles an expression that is already parsed, e.g. the condition of a parsed statement, into [Expression].
+  public static Expression compileToExpression(SqlNode sqlNode) {
     return toExpression(sqlNode);
   }
 

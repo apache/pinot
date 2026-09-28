@@ -37,6 +37,7 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
+import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
@@ -123,6 +124,16 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
         requestContext.setErrorCode(errorCode);
         return new BrokerResponseNative(errorCode, e.getMessage());
       }
+    }
+
+    // The query engines only run queries. The REST endpoints dispatch DML statements to the SQL executor and reject
+    // the other statement types before reaching this handler; the gRPC endpoint and custom containers do not, and the
+    // engines would fail to compile such a statement as a query with a confusing error.
+    PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
+    if (sqlType != PinotSqlType.DQL) {
+      requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
+      return new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
+          "Unsupported SQL type - " + sqlType + ", this API only supports DQL.");
     }
 
     BaseBrokerRequestHandler requestHandler = _singleStageBrokerRequestHandler;
