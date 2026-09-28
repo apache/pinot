@@ -26,6 +26,7 @@ import java.io.UncheckedIOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -246,5 +247,30 @@ public class OpenStructIndexConfig extends IndexConfig {
       throw new UncheckedIOException(
           "Failed to parse inverted index config for OPEN_STRUCT key '" + key + "'", e);
     }
+  }
+
+  /// Value equality over every setting, so two columns whose OPEN_STRUCT settings differ are never taken for one
+  /// another by code that collapses equal configs (the lazy column materializer keeps one instance per distinct
+  /// config).
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    OpenStructIndexConfig that = (OpenStructIndexConfig) o;
+    return _maxDenseKeys == that._maxDenseKeys && Double.compare(_denseKeyMinFillRate, that._denseKeyMinFillRate) == 0
+        && _sparseJsonIndex == that._sparseJsonIndex && _perKeyMetricsEnabled == that._perKeyMetricsEnabled
+        && Objects.equals(_defaultValueFieldConfig, that._defaultValueFieldConfig)
+        && Objects.equals(_denseKeys, that._denseKeys) && Objects.equals(_valueFieldConfigs, that._valueFieldConfigs)
+        && Objects.equals(_ignoredKeys, that._ignoredKeys);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _defaultValueFieldConfig, _maxDenseKeys, _denseKeys, _denseKeyMinFillRate,
+        _valueFieldConfigs, _sparseJsonIndex, _perKeyMetricsEnabled, _ignoredKeys);
   }
 }

@@ -92,4 +92,11 @@ public interface InstanceDataManagerConfig {
   boolean shouldCheckCRCOnSegmentLoad();
 
   boolean isDimensionTablePreloadDisabled();
+
+  /// Whether immutable segments create the index container and data source of a physical column on its first access
+  /// instead of for every column at load. Off by default: it trades per-column heap on wide segments for reporting an
+  /// unreadable index on first access rather than at load (see the segment loader for the full trade-off).
+  default boolean isLazyColumnMaterialization() {
+    return false;
+  }
 }
