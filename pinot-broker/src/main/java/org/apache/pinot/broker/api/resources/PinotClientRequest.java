@@ -108,6 +108,7 @@ import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
 import org.apache.pinot.sql.parsers.dml.DeleteStatement;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.glassfish.jersey.server.ManagedAsync;
+import org.jvnet.hk2.annotations.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -149,6 +150,7 @@ public class PinotClientRequest {
   private AccessControlFactory _accessControlFactory;
 
   @Inject
+  @Optional
   private TableCache _tableCache;
 
   @Inject
@@ -748,6 +750,10 @@ public class PinotClientRequest {
     AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);
     if (!authorizationResult.hasAccess()) {
       throw deleteAccessDenied(null, authorizationResult);
+    }
+    if (_tableCache == null) {
+      return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION,
+          "DELETE is not supported by this broker: no table cache was configured");
     }
     DeleteStatement statement;
     try {

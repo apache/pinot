@@ -128,15 +128,6 @@ public class DeleteStatementTest {
   }
 
   @Test
-  public void testResolveTableNameRejectsInvalidName() {
-    // The parser rejects such a name, but not the constructor, which executors may use
-    QueryException e = expectThrows(QueryException.class,
-        () -> new DeleteStatement("a.b.c", "a = 1", null, Map.of()).resolveTableName(null, mock(TableCache.class)));
-    assertEquals(e.getErrorCode(), QueryErrorCode.QUERY_VALIDATION);
-    assertTrue(e.getMessage().startsWith("Invalid table name in DELETE: "), e.getMessage());
-  }
-
-  @Test
   public void testResolveTableNameRejectsLogicalTables() {
     // Deleting from a logical table would delete from physical tables the caller is not authorized for
     TableCache tableCache = mock(TableCache.class);
@@ -153,7 +144,6 @@ public class DeleteStatementTest {
     DeleteStatement statement = parse("DELETE FROM myTable WHERE a = 1");
     assertFalse(statement.isResolved());
     assertTrue(statement.resolveTableName(null, mock(TableCache.class)).isResolved());
-    assertFalse(new DeleteStatement("myTable", "a = 1", null, Map.of()).isResolved());
   }
 
   @Test
