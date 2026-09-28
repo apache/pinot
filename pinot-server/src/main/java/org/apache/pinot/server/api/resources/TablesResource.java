@@ -262,7 +262,7 @@ public class TablesResource {
 
             // Column stats are scoped to the caller's column filter.
             for (String column : columnSet) {
-              ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
+              ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
               int columnLength = columnMetadata.getLengthOfLongestElement();
               if (columnLength < 0) {
                 // For raw STRING/BYTES/BIG_DECIMAL column, set the columnLength as the length of the max value.
@@ -394,10 +394,10 @@ public class TablesResource {
       @Nullable Set<String> columnFilter) {
     int additionalCount = 0;
     if (columnFilter == null) {
-      additionalCount = segment.getSegmentMetadata().getColumnMetadataMap().size();
+      additionalCount = segment.getSegmentMetadata().getAllColumns().size();
     } else {
       for (String column : columnFilter) {
-        if (segment.getSegmentMetadata().getColumnMetadataMap().containsKey(column)) {
+        if (segment.getSegmentMetadata().getColumnMetadataFor(column) != null) {
           additionalCount++;
         }
       }

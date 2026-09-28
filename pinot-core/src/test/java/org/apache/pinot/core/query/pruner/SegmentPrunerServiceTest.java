@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.pruner;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -264,6 +265,9 @@ public class SegmentPrunerServiceTest {
       ThreadSafeMutableRoaringBitmap validDocIds, ThreadSafeMutableRoaringBitmap queryableDocIds) {
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getTotalDocs()).thenReturn(totalDocs);
+    // The segment reads its columns through these accessors; Mockito has no empty default for a NavigableSet
+    when(segmentMetadata.getAllColumns()).thenReturn(Collections.emptyNavigableSet());
+    when(segmentMetadata.getAllColumnMetadata()).thenReturn(List.of());
     ImmutableSegmentImpl segment = new ImmutableSegmentImpl(
         mock(SegmentDirectory.class), segmentMetadata, new HashMap<>(), null);
     PartitionUpsertMetadataManager manager = mock(PartitionUpsertMetadataManager.class);

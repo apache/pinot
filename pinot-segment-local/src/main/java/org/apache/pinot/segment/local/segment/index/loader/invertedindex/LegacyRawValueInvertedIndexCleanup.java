@@ -78,7 +78,7 @@ public final class LegacyRawValueInvertedIndexCleanup {
       throws IOException {
     SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segmentWriter.toSegmentDirectory().getSegmentMetadata();
     String segmentName = segmentMetadata.getName();
-    for (ColumnMetadata columnMetadata : segmentMetadata.getColumnMetadataMap().values()) {
+    for (ColumnMetadata columnMetadata : segmentMetadata.getAllColumnMetadata()) {
       String column = columnMetadata.getColumnName();
       if (!segmentWriter.hasIndexFor(column, StandardIndexes.inverted())) {
         continue;
