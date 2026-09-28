@@ -345,7 +345,7 @@ const QueryPage = () => {
     setQueryLoader(true);
     queryExecuted.current = true;
     let params;
-    let queryOptions = [];
+    let queryOptions = ['applicationName=pinot-controller-console'];
     if(queryTimeout){
       queryOptions.push(`timeoutMs=${queryTimeout}`);
     }
