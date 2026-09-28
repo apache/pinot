@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -43,6 +44,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
@@ -205,22 +207,144 @@ public class OpenStructIndexTypeTest {
   @Test(dataProvider = "codecSpecOpenStructConfigs")
   public void testTableValidationRejectsCodecSpecForMaterializedChildren(OpenStructIndexConfig openStructConfig,
       String expectedTarget) {
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> validateTableWithOpenStruct(openStructConfig));
+    assertEquals(exception.getMessage(), "OPEN_STRUCT column 'payload': codecSpec is not supported for "
+        + expectedTarget + "; materialized keys always use a dictionary-encoded or LZ4 raw forward index");
+  }
+
+  /// Per-key settings that a materialized key would silently ignore. JSON uses single quotes for readability.
+  @DataProvider(name = "ignoredPerKeySettings")
+  public Object[][] ignoredPerKeySettings() {
+    String unsupported = "OPEN_STRUCT column 'payload': %s is not supported for key 'clicks'; ";
+    return new Object[][]{
+        {"{'name': 'clicks', 'encodingType': 'RAW', 'compressionCodec': 'ZSTANDARD'}",
+            String.format(unsupported, "compressionCodec")},
+        {"{'name': 'clicks', 'indexTypes': ['INVERTED']}", String.format(unsupported, "indexTypes")},
+        {"{'name': 'clicks', 'timestampConfig': {'granularities': ['DAY']}}",
+            String.format(unsupported, "timestampConfig")},
+        {"{'name': 'clicks', 'properties': {'forwardIndexDisabled': 'true'}}",
+            String.format(unsupported, "properties")},
+        {"{'name': 'clicks', 'tierOverwrites': {'hotTier': {'encodingType': 'RAW'}}}",
+            String.format(unsupported, "tierOverwrites")},
+        {rawKeyWithForward("'compressionCodec': 'ZSTANDARD'"),
+            String.format(unsupported, "indexes.forward.compressionCodec")},
+        {rawKeyWithForward("'chunkCompressionType': 'ZSTANDARD'"),
+            String.format(unsupported, "indexes.forward.chunkCompressionType")},
+        {"{'name': 'clicks', 'indexes': {'forward': {'dictIdCompressionType': 'MV_ENTRY_DICT'}}}",
+            String.format(unsupported, "indexes.forward.dictIdCompressionType")},
+        {rawKeyWithForward("'targetDocsPerChunk': 2048"),
+            String.format(unsupported, "indexes.forward.targetDocsPerChunk")},
+        {rawKeyWithForward("'targetMaxChunkSize': '512K'"),
+            String.format(unsupported, "indexes.forward.targetMaxChunkSize")},
+        {rawKeyWithForward("'rawIndexWriterVersion': 4"),
+            String.format(unsupported, "indexes.forward.rawIndexWriterVersion")},
+        {rawKeyWithForward("'deriveNumDocsPerChunk': true"),
+            String.format(unsupported, "indexes.forward.deriveNumDocsPerChunk")},
+        {rawKeyWithForward("'configs': {'key': 'value'}"), String.format(unsupported, "indexes.forward.configs")},
+        {rawKeyWithForward("'disabled': true"), String.format(unsupported, "indexes.forward.disabled")},
+        {"{'name': 'clicks', 'indexes': {'dictionary': {'onHeap': true}}}",
+            String.format(unsupported, "indexes.dictionary.onHeap")},
+        {"{'name': 'clicks', 'indexes': {'dictionary': {'useVarLengthDictionary': true}}}",
+            String.format(unsupported, "indexes.dictionary.useVarLengthDictionary")},
+        // The dictionary vs raw choice comes from the FieldConfig encodingType; the per-key forward and dictionary
+        // configs may only restate it.
+        {"{'name': 'clicks', 'indexes': {'forward': {'encodingType': 'RAW'}}}",
+            "OPEN_STRUCT column 'payload': indexes.forward.encodingType RAW of key 'clicks' conflicts with its "
+                + "encodingType DICTIONARY; "},
+        {"{'name': 'clicks', 'indexes': {'dictionary': {'disabled': true}}}",
+            "OPEN_STRUCT column 'payload': indexes.dictionary of key 'clicks' disables the dictionary, which conflicts "
+                + "with its encodingType DICTIONARY; "},
+        {"{'name': 'clicks', 'encodingType': 'RAW', 'indexes': {'dictionary': {}}}",
+            "OPEN_STRUCT column 'payload': indexes.dictionary of key 'clicks' enables the dictionary, which conflicts "
+                + "with its encodingType RAW; "}
+    };
+  }
+
+  @Test(dataProvider = "ignoredPerKeySettings")
+  public void testValidateRejectsIgnoredPerKeySettings(String keyConfigJson, String expectedMessagePrefix)
+      throws Exception {
+    FieldConfig keyConfig = parseFieldConfig(keyConfigJson);
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> validatePerKeyConfigs(null, List.of(keyConfig)));
+    assertTrue(exception.getMessage().startsWith(expectedMessagePrefix), exception.getMessage());
+  }
+
+  @Test
+  public void testValidateNamesDefaultValueFieldConfigInPerKeyErrors()
+      throws Exception {
+    FieldConfig defaultConfig = parseFieldConfig("{'name': 'default', 'properties': {'forwardIndexDisabled': 'true'}}");
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> validatePerKeyConfigs(defaultConfig, null));
+    assertEquals(exception.getMessage(), "OPEN_STRUCT column 'payload': properties is not supported for "
+        + "defaultValueFieldConfig; configure the key through encodingType and 'indexes'");
+  }
+
+  /// Settings a materialized key honors, and forward/dictionary entries that only restate its encodingType, pass.
+  @Test
+  public void testValidateAllowsHonoredAndRestatedPerKeySettings()
+      throws Exception {
+    FieldConfig rawKey = parseFieldConfig("{'name': 'clicks', 'encodingType': 'RAW', 'indexes': {"
+        + "'forward': {'encodingType': 'RAW', 'disabled': false}, 'dictionary': {'disabled': true}, "
+        + "'range': {'version': 2}, 'bloom': {'fpp': 0.01}}}");
+    FieldConfig dictionaryKey = parseFieldConfig("{'name': 'views', 'properties': {}, 'tierOverwrites': {}, "
+        + "'indexes': {'forward': {}, 'dictionary': {'disabled': false}, 'inverted': {}}}");
+    FieldConfig defaultConfig = parseFieldConfig("{'name': 'default', 'encodingType': 'RAW', "
+        + "'indexes': {'forward': null, 'dictionary': null, 'bloom': {}}}");
+    validatePerKeyConfigs(defaultConfig, List.of(rawKey, dictionaryKey));
+  }
+
+  /// The table-config path deserializes per-key configs from JSON; a round trip must neither lose a rejected setting
+  /// nor turn an unset field into a rejected one.
+  @Test
+  public void testTableValidationChecksIgnoredPerKeySettings()
+      throws Exception {
+    FieldConfig honoredKey = parseFieldConfig("{'name': 'clicks', 'encodingType': 'RAW', "
+        + "'indexes': {'forward': {'encodingType': 'RAW'}, 'range': {}}}");
+    validateTableWithOpenStruct(
+        new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(honoredKey), null, null, null, null));
+
+    FieldConfig ignoredKey = parseFieldConfig("{'name': 'clicks', 'encodingType': 'RAW', "
+        + "'indexes': {'forward': {'targetDocsPerChunk': 2048}}}");
+    IllegalStateException exception = expectThrows(IllegalStateException.class, () -> validateTableWithOpenStruct(
+        new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(ignoredKey), null, null, null, null)));
+    assertEquals(exception.getMessage(), "OPEN_STRUCT column 'payload': indexes.forward.targetDocsPerChunk is not "
+        + "supported for key 'clicks'; materialized keys always use a dictionary-encoded or LZ4 raw forward index");
+  }
+
+  private static FieldConfig parseFieldConfig(String singleQuotedJson)
+      throws Exception {
+    return JsonUtils.stringToObject(singleQuotedJson.replace('\'', '"'), FieldConfig.class);
+  }
+
+  private static String rawKeyWithForward(String forwardFields) {
+    return "{'name': 'clicks', 'encodingType': 'RAW', 'indexes': {'forward': {" + forwardFields + "}}}";
+  }
+
+  /// Validates an OPEN_STRUCT column `payload` whose index config has the given per-key configs.
+  private static void validatePerKeyConfigs(@Nullable FieldConfig defaultValueFieldConfig,
+      @Nullable List<FieldConfig> valueFieldConfigs) {
+    OpenStructIndexConfig config = new OpenStructIndexConfig(false, defaultValueFieldConfig, -1, null, 0.5,
+        valueFieldConfigs, null, null, null, null);
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
+    StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSchema().getFieldSpecFor("payload"), null);
+  }
+
+  /// Runs full table-config validation, which reads the OPEN_STRUCT config back from JSON.
+  private static void validateTableWithOpenStruct(OpenStructIndexConfig openStructConfig) {
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set(StandardIndexes.openStruct().getPrettyName(), JsonUtils.objectToJsonNode(openStructConfig));
     FieldConfig parentFieldConfig = new FieldConfig.Builder("payload").withIndexes(indexes).build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName("openStructCodecSpecTest")
+        .setTableName("openStructPerKeyTest")
         .setFieldConfigList(List.of(parentFieldConfig))
         .build();
-    Schema schema = new Schema.SchemaBuilder()
-        .setSchemaName("openStructCodecSpecTest")
-        .addOpenStruct("payload", Map.of())
-        .build();
+    TableConfigUtils.validate(tableConfig, openStructSchema());
+  }
 
-    IllegalStateException exception = expectThrows(IllegalStateException.class,
-        () -> TableConfigUtils.validate(tableConfig, schema));
-    assertEquals(exception.getMessage(), "OPEN_STRUCT column 'payload': codecSpec is not supported for "
-        + expectedTarget + "; materialized keys always use a dictionary-encoded or LZ4 raw forward index");
+  private static Schema openStructSchema() {
+    return new Schema.SchemaBuilder().setSchemaName("openStructPerKeyTest").addOpenStruct("payload", Map.of()).build();
   }
 
   private static FieldConfig rawCodecSpecFieldConfig(String name) {
