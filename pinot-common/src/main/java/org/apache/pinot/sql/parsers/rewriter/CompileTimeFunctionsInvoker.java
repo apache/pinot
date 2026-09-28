@@ -87,6 +87,9 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
       return expression;
     }
     String canonicalName = FunctionRegistry.canonicalize(function.getOperator());
+    if (canonicalName.equals("arrayvalueconstructor") || canonicalName.equals("array")) {
+      return expression;
+    }
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
     if (functionInfo == null || !functionInfo.isDeterministic()) {
       return expression;

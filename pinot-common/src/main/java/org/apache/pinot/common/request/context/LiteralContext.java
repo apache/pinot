@@ -167,9 +167,6 @@ public class LiteralContext {
     }
     boolean singleValue = !value.getClass().isArray();
     switch (type) {
-      case BOOLEAN:
-        return singleValue ? PinotDataType.BOOLEAN
-            : (value instanceof boolean[] ? PinotDataType.PRIMITIVE_BOOLEAN_ARRAY : PinotDataType.BOOLEAN_ARRAY);
       case INT:
         return singleValue ? PinotDataType.INT : PinotDataType.PRIMITIVE_INT_ARRAY;
       case LONG:
@@ -180,6 +177,9 @@ public class LiteralContext {
         return singleValue ? PinotDataType.DOUBLE : PinotDataType.PRIMITIVE_DOUBLE_ARRAY;
       case BIG_DECIMAL:
         return singleValue ? PinotDataType.BIG_DECIMAL : PinotDataType.BIG_DECIMAL_ARRAY;
+      case BOOLEAN:
+        return singleValue ? PinotDataType.BOOLEAN
+            : (value instanceof boolean[] ? PinotDataType.PRIMITIVE_BOOLEAN_ARRAY : PinotDataType.BOOLEAN_ARRAY);
       case TIMESTAMP:
         return singleValue ? PinotDataType.TIMESTAMP : PinotDataType.TIMESTAMP_ARRAY;
       case STRING:

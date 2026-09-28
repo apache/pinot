@@ -333,6 +333,13 @@ public class ArrayFunctions {
       }
       return doubleArr;
     }
+    if (clazz == BigDecimal.class) {
+      BigDecimal[] bigDecimalArr = new BigDecimal[arr.length];
+      for (int i = 0; i < arr.length; i++) {
+        bigDecimalArr[i] = (BigDecimal) arr[i];
+      }
+      return bigDecimalArr;
+    }
     if (clazz == Boolean.class) {
       boolean[] boolArr = new boolean[arr.length];
       for (int i = 0; i < arr.length; i++) {
@@ -340,12 +347,12 @@ public class ArrayFunctions {
       }
       return boolArr;
     }
-    if (clazz == BigDecimal.class) {
-      BigDecimal[] bigDecimalArr = new BigDecimal[arr.length];
+    if (clazz == Timestamp.class) {
+      Timestamp[] timestampArr = new Timestamp[arr.length];
       for (int i = 0; i < arr.length; i++) {
-        bigDecimalArr[i] = (BigDecimal) arr[i];
+        timestampArr[i] = (Timestamp) arr[i];
       }
-      return bigDecimalArr;
+      return timestampArr;
     }
     if (clazz == String.class) {
       String[] strArr = new String[arr.length];
@@ -360,13 +367,6 @@ public class ArrayFunctions {
         bytesArr[i] = (byte[]) arr[i];
       }
       return bytesArr;
-    }
-    if (clazz == Timestamp.class) {
-      Timestamp[] timestampArr = new Timestamp[arr.length];
-      for (int i = 0; i < arr.length; i++) {
-        timestampArr[i] = (Timestamp) arr[i];
-      }
-      return timestampArr;
     }
     if (clazz == UUID.class) {
       UUID[] uuidArr = new UUID[arr.length];

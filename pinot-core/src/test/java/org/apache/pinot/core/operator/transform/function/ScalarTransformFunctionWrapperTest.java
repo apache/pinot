@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.text.Normalizer;
@@ -1663,6 +1664,21 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     return sum;
   }
 
+  @ScalarFunction
+  public static UUID[] duplicateUuid(UUID uuid) {
+    return new UUID[]{uuid, uuid};
+  }
+
+  @ScalarFunction
+  public static int countUuids(UUID[] uuids) {
+    return uuids.length;
+  }
+
+  @ScalarFunction
+  public static BigDecimal[] duplicateBigDecimal(BigDecimal value) {
+    return new BigDecimal[]{value, value};
+  }
+
   @Test
   public void testCountTrueBooleansTransformFunction() {
     // Exercises the PRIMITIVE_BOOLEAN_ARRAY dispatch in getNonLiteralValues: the int MV column is
@@ -1710,6 +1726,60 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
       expectedValues[i] = sum;
     }
     testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testDuplicateUuidTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("duplicateUuid(%s)", UUID_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "duplicateUuid");
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.UUID);
+    assertFalse(transformFunction.getResultMetadata().isSingleValue());
+    byte[][][] expectedValues = new byte[NUM_ROWS][][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = new byte[][]{_uuidSVValues[i], _uuidSVValues[i]};
+    }
+    byte[][][] actualValues = transformFunction.transformToBytesValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(actualValues[i], expectedValues[i]);
+    }
+  }
+
+  @Test
+  public void testCountUuidsTransformFunction() {
+    // Exercises UUID_ARRAY dispatch in getNonLiteralValues: duplicateUuid returns UUID[] (as BYTES MV),
+    // and countUuids receives UUID[].
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("countUuids(duplicateUuid(%s))", UUID_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "countUuids");
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
+    assertTrue(transformFunction.getResultMetadata().isSingleValue());
+    int[] expectedValues = new int[NUM_ROWS];
+    Arrays.fill(expectedValues, 2);
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testDuplicateBigDecimalTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("duplicateBigDecimal(%s)", BIG_DECIMAL_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "duplicateBigDecimal");
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.BIG_DECIMAL);
+    assertFalse(transformFunction.getResultMetadata().isSingleValue());
+    BigDecimal[][] expectedValues = new BigDecimal[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = new BigDecimal[]{_bigDecimalSVValues[i], _bigDecimalSVValues[i]};
+    }
+    BigDecimal[][] actualValues = transformFunction.transformToBigDecimalValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(actualValues[i], expectedValues[i]);
+    }
   }
 
   private static class StaticUuidTransformFunction extends BaseTransformFunction {

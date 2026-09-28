@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.UUID;
 import org.testng.Assert;
@@ -28,15 +29,29 @@ import org.testng.annotations.Test;
 public class ArrayFunctionsTest {
 
   @Test
-  public void testBytesArrayValueConstructor() {
-    byte[][] expected = {{0}, {1, 2}};
+  public void testBigDecimalArrayValueConstructor() {
+    BigDecimal[] expected = {new BigDecimal("123.45"), new BigDecimal("678.90")};
 
     Assert.assertEquals(ArrayFunctions.arrayValueConstructor(expected[0], expected[1]), expected);
   }
 
   @Test
+  public void testBooleanArrayValueConstructor() {
+    boolean[] expected = {true, false};
+
+    Assert.assertEquals(ArrayFunctions.arrayValueConstructor(true, false), expected);
+  }
+
+  @Test
   public void testTimestampArrayValueConstructor() {
     Timestamp[] expected = {new Timestamp(1000L), new Timestamp(2000L)};
+
+    Assert.assertEquals(ArrayFunctions.arrayValueConstructor(expected[0], expected[1]), expected);
+  }
+
+  @Test
+  public void testBytesArrayValueConstructor() {
+    byte[][] expected = {{0}, {1, 2}};
 
     Assert.assertEquals(ArrayFunctions.arrayValueConstructor(expected[0], expected[1]), expected);
   }

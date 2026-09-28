@@ -25,6 +25,11 @@ import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.rel.type.RelDataTypeSystem;
+import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.FunctionVolatility;
@@ -284,11 +289,23 @@ public class FunctionUtilsTest {
     assertEquals(FunctionUtils.getParameterType(Timestamp[].class), PinotDataType.TIMESTAMP_ARRAY);
     assertEquals(FunctionUtils.getParameterType(String[].class), PinotDataType.STRING_ARRAY);
     assertEquals(FunctionUtils.getParameterType(byte[][].class), PinotDataType.BYTES_ARRAY);
+    assertEquals(FunctionUtils.getParameterType(UUID[].class), PinotDataType.UUID_ARRAY);
     // Boxed array forms not allowed as scalar function parameters
     assertNull(FunctionUtils.getParameterType(Integer[].class));
     assertNull(FunctionUtils.getParameterType(Boolean[].class));
     // Unknown class
     assertNull(FunctionUtils.getParameterType(LocalDate.class));
+  }
+
+  @Test
+  public void testGetRelDataType() {
+    RelDataTypeFactory typeFactory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
+    assertEquals(FunctionUtils.getRelDataType(typeFactory, int.class).getSqlTypeName(), SqlTypeName.INTEGER);
+    assertEquals(FunctionUtils.getRelDataType(typeFactory, UUID.class).getSqlTypeName(), SqlTypeName.UUID);
+    RelDataType uuidArrayRelType = FunctionUtils.getRelDataType(typeFactory, UUID[].class);
+    assertEquals(uuidArrayRelType.getSqlTypeName(), SqlTypeName.ARRAY);
+    assertNotNull(uuidArrayRelType.getComponentType());
+    assertEquals(uuidArrayRelType.getComponentType().getSqlTypeName(), SqlTypeName.UUID);
   }
 
   @Test
