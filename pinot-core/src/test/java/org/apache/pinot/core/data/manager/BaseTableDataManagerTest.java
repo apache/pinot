@@ -297,7 +297,7 @@ public class BaseTableDataManagerTest {
     SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
     zkMetadata.setTier(TIER_NAME);
     SegmentMetadata localMetadata = mock(SegmentMetadata.class);
-    when(localMetadata.getCrc()).thenReturn(0L);
+    when(localMetadata.getCrc()).thenReturn("0");
 
     ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata);
     BaseTableDataManager tableDataManager = spy(createTableManager());
