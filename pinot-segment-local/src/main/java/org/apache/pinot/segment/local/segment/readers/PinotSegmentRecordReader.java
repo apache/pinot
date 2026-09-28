@@ -40,7 +40,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +69,7 @@ public class PinotSegmentRecordReader implements RecordReader {
 
   private int _nextDocId = 0;
   private List<String> _primaryKeyColumns;
+  private int[] _primaryKeyIndexes;
 
   public PinotSegmentRecordReader() {
   }
@@ -404,7 +404,7 @@ public class PinotSegmentRecordReader implements RecordReader {
   }
 
   public Object[] getPrimaryKeys(int docId) {
-    int[] primaryKeyIndexes = getIndexesForColumns(_primaryKeyColumns);
+    int[] primaryKeyIndexes = getPrimaryKeyIndexes();
     Object[] values = new Object[primaryKeyIndexes.length];
     for (int i = 0, n = primaryKeyIndexes.length; i < n; i++) {
       int columnIndex = primaryKeyIndexes[i];
@@ -419,5 +419,13 @@ public class PinotSegmentRecordReader implements RecordReader {
     }
 
     return values;
+  }
+
+  private int[] getPrimaryKeyIndexes() {
+    if (_primaryKeyIndexes != null) {
+      return _primaryKeyIndexes;
+    }
+    _primaryKeyIndexes = getIndexesForColumns(_primaryKeyColumns);
+    return _primaryKeyIndexes;
   }
 }
