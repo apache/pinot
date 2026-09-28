@@ -20,6 +20,7 @@ package org.apache.pinot.core.plan;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -35,6 +36,7 @@ import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByLinearOpe
 import org.apache.pinot.core.operator.query.StreamingSelectionOrderByOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -231,7 +233,9 @@ public class SelectionPlanNode implements PlanNode {
   /// This is [#isColumnPhysicallySorted] plus the null caveat: once null handling is on, the physical order is not
   /// the order the query asks for, so a column carrying nulls is not usable as sorted. Reading the null bitmap
   /// touches the segment's mapped buffer, so this must only be called once the segment has been acquired -- which is
-  /// why [AcquireReleaseColumnsSegmentPlanNode] defers the whole plan build until after `acquire()`.
+  /// why [AcquireReleaseColumnsSegmentPlanNode] defers the whole plan build until after `acquire()`. Callers that
+  /// run before acquire use [#isColumnFlaggedNonNull] instead. That flag is one-sided (`true` means no nulls; `false`
+  /// means nulls or unknown) and is stricter than the bitmap check below.
   public static boolean isColumnSorted(IndexSegment segment, QueryContext queryContext, String column) {
     DataSource dataSource = segment.getDataSource(column, queryContext.getSchema());
     // If there are null values, we cannot trust DataSourceMetadata.isSorted
@@ -252,5 +256,19 @@ public class SelectionPlanNode implements PlanNode {
   /// [org.apache.pinot.spi.utils.CommonConstants.Server.SortedSelectionMergeMode#AUTO] before any plan node is built.
   public static boolean isColumnPhysicallySorted(IndexSegment segment, QueryContext queryContext, String column) {
     return segment.getDataSource(column, queryContext.getSchema()).getDataSourceMetadata().isSorted();
+  }
+
+  /// Returns whether segment metadata flags `column` as holding no nulls ([ColumnMetadata#isNonNull]).
+  ///
+  /// Reads segment metadata only, so it needs no segment acquire. `false` means nulls or unknown. A consuming segment
+  /// has no column metadata map (it is `null`, so
+  /// [org.apache.pinot.segment.spi.SegmentMetadata#getColumnMetadataFor] would throw) and is never flagged.
+  public static boolean isColumnFlaggedNonNull(IndexSegment segment, String column) {
+    Map<String, ColumnMetadata> columnMetadataMap = segment.getSegmentMetadata().getColumnMetadataMap();
+    if (columnMetadataMap == null) {
+      return false;
+    }
+    ColumnMetadata columnMetadata = columnMetadataMap.get(column);
+    return columnMetadata != null && columnMetadata.isNonNull();
   }
 }

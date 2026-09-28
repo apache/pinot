@@ -505,28 +505,30 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       //
       // TODO: allowReverseOrder=true still does not guarantee streaming leaves. getSortedByProject() swallows the
       //       failure when a docId set cannot be reversed and returns the unreversed operator, so the leaf gate then
-      //       declines and AUTO has again resolved ON over materialized children. Same residual shape as the null
-      //       handling case below; a shared "can this segment actually stream in the query's direction" predicate
-      //       would close both. See https://github.com/apache/pinot/pull/19120#discussion_r3871713989
+      //       declines and AUTO has resolved ON over materialized children.
+      //       See https://github.com/apache/pinot/pull/19120#discussion_r3871713989
       LOGGER.debug("Not using {} for a DESC leading ORDER BY expression without {}: {}",
           QueryOptionKey.SORTED_SELECTION_MERGE_MODE, QueryOptionKey.ALLOW_REVERSE_ORDER, firstOrderByExpression);
       return false;
     }
     String column = firstOrderByExpression.getIdentifier();
+    boolean nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     int numSorted = 0;
     for (SegmentContext segmentContext : segmentContexts) {
-      // TODO: This deliberately uses the physical-sortedness predicate rather than the full
-      //       SelectionPlanNode.isColumnSorted(), which additionally rejects a column carrying nulls when null
-      //       handling is on. That null check reads the segment's mapped buffer via the null value vector, and this
-      //       runs before any segment is acquired -- AcquireReleaseColumnsSegmentPlanNode defers the whole plan build
-      //       precisely so that no planner touches a buffer pre-acquire. Consequence: with null handling on and a
-      //       null-bearing leading column, AUTO can resolve to ON while the leaf gate then refuses to stream, giving
-      //       a k-way merge over fully materialized children -- correct, but slower than the MinMax combine. Handle
-      //       properly (an acquire-free nullability signal, or resolving AUTO per segment at acquire time) as a
-      //       follow-up. See https://github.com/apache/pinot/pull/19120#discussion_r3871713975
-      if (SelectionPlanNode.isColumnPhysicallySorted(segmentContext.getIndexSegment(), queryContext, column)) {
-        numSorted++;
+      // Physical sortedness is metadata. SelectionPlanNode.isColumnSorted() also rejects a null-bearing column, but
+      // that reads the null value vector, a mapped buffer, and this runs before any segment is acquired. Use
+      // SelectionPlanNode.isColumnFlaggedNonNull() instead. It is one-sided (false means nulls or unknown) and
+      // stricter than the leaf, which can see an empty bitmap after acquire: an old segment with no flag resolves OFF
+      // rather than streaming over a materialized child.
+      // See https://github.com/apache/pinot/pull/19120#discussion_r3871713975
+      IndexSegment segment = segmentContext.getIndexSegment();
+      if (!SelectionPlanNode.isColumnPhysicallySorted(segment, queryContext, column)) {
+        continue;
       }
+      if (nullHandlingEnabled && !SelectionPlanNode.isColumnFlaggedNonNull(segment, column)) {
+        continue;
+      }
+      numSorted++;
     }
     double sortedRatio = (double) numSorted / numSegments;
     double minSortedRatio = queryContext.getSortedSelectionMergeAutoMinSortedRatio();
