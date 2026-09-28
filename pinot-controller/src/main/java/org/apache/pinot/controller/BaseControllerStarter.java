@@ -669,7 +669,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new SegmentCompletionManager(_helixParticipantManager, _pinotLLCRealtimeSegmentManager, _controllerMetrics,
             _leadControllerManager, _config.getSegmentCommitTimeoutSeconds(), segmentCompletionConfig);
 
-    _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
+    _sqlQueryExecutor = createSqlQueryExecutor();
 
     _connectionManager = PoolingHttpClientConnectionManagerHelper.createWithSocketFactory();
     _connectionManager.setDefaultSocketConfig(
@@ -824,6 +824,12 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   protected PinotLLCRealtimeSegmentManager createPinotLLCRealtimeSegmentManager() {
     return new PinotLLCRealtimeSegmentManager(_helixResourceManager, _config, _controllerMetrics);
+  }
+
+  /// Creates the executor of the DML statements sent to the controller `/sql` endpoint. Override it to execute the
+  /// statements that Pinot parses but does not execute itself, e.g. `DELETE` (see `SqlQueryExecutor#executeDelete`).
+  protected SqlQueryExecutor createSqlQueryExecutor() {
+    return new SqlQueryExecutor(_config.generateVipUrl());
   }
 
   /// Scan all table resources in the cluster and ensure table config and schema exist for each table.

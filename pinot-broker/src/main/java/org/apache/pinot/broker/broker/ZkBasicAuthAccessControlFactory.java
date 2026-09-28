@@ -49,6 +49,12 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 /// number of tables/password etc.) or add/delete user without restarting your Pinot clusters,
 /// and these changes happen immediately.
 /// Users Configuration store in Helix Zookeeper and encrypted user password via Bcrypt Encryption Algorithm.
+///
+/// Users query the tables they have access to, but never delete rows with a SQL `DELETE` through the broker (see
+/// [AccessControl#authorizeDeleteRows]). The controller UI stores every permission when it saves a user stored
+/// without any, so a stored `DELETE` permission may not have been granted on purpose. Run `DELETE` through the
+/// controller, whose access control requires the `DELETE` permission for every deletion, or use an access control
+/// that implements [AccessControl#authorizeDeleteRows].
 public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
 
   private AccessControl _accessControl;

@@ -114,6 +114,12 @@ public class Actions {
     public static final String CREATE_TABLE = "CreateTable";
     public static final String DELETE_INSTANCE_PARTITIONS = "DeleteInstancePartitions";
     public static final String DELETE_ROUTING = "DeleteRouting";
+    /// Delete rows from a table with a SQL `DELETE` statement, checked with the [#QUERY] action by the query endpoints
+    /// of the brokers and the controllers. The controller checks it on the raw table name and also requires the
+    /// `DELETE` access type, like its other deletions. The broker checks it on the table name and on its raw name, and
+    /// also requires `AccessControl#authorizeDeleteRows`, which denies by default, since the fine-grained checks allow
+    /// every action by default.
+    public static final String DELETE_ROWS = "DeleteRows";
     public static final String DELETE_SCHEMA = "DeleteSchema";
     public static final String DELETE_SEGMENT = "DeleteSegment";
     public static final String DELETE_TABLE = "DeleteTable";

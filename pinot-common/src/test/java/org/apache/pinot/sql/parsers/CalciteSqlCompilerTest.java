@@ -24,6 +24,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.calcite.sql.SqlDelete;
+import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -3377,6 +3379,36 @@ public class CalciteSqlCompilerTest {
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(customSql);
     Assert.assertTrue(sqlNodeAndOptions.getSqlNode() instanceof SqlInsertFromFile);
     Assert.assertEquals(sqlNodeAndOptions.getSqlType(), PinotSqlType.DML);
+  }
+
+  @Test
+  public void testDmlStatementsAreClassifiedAsDml() {
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(
+        "SET taskName = 'purge-1'; DELETE FROM db.tbl WHERE col1 = 'a' AND col2 > 10");
+    Assert.assertTrue(sqlNodeAndOptions.getSqlNode() instanceof SqlDelete);
+    Assert.assertEquals(sqlNodeAndOptions.getSqlType(), PinotSqlType.DML);
+    Assert.assertEquals(sqlNodeAndOptions.getOptions().get("taskName"), "purge-1");
+    SqlDelete sqlDelete = (SqlDelete) sqlNodeAndOptions.getSqlNode();
+    Assert.assertEquals(((SqlIdentifier) sqlDelete.getTargetTable()).names, List.of("db", "tbl"));
+    Assert.assertNotNull(sqlDelete.getCondition());
+
+    // The other DML kinds the grammar parses are DML too, so that the SQL executor rejects them with a clear error
+    // instead of the query engines failing to compile them as queries
+    for (String sql : List.of("UPDATE tbl SET col1 = 'a' WHERE col2 > 10",
+        "MERGE INTO tbl USING src ON tbl.col1 = src.col1 WHEN MATCHED THEN UPDATE SET col2 = src.col2",
+        "CALL myProcedure()")) {
+      Assert.assertEquals(CalciteSqlParser.compileToSqlNodeAndOptions(sql).getSqlType(), PinotSqlType.DML, sql);
+    }
+
+    // A DELETE is an executable DML statement, so it cannot be combined with a query
+    SqlCompilationException e = Assert.expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToSqlNodeAndOptions("DELETE FROM tbl WHERE col1 = 1; SELECT * FROM tbl"));
+    Assert.assertTrue(e.getMessage().contains("executable statement already exist with type: DML"), e.getMessage());
+
+    // EXPLAIN of a DML statement is rejected instead of being compiled as a query
+    e = Assert.expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToSqlNodeAndOptions("EXPLAIN PLAN FOR DELETE FROM tbl WHERE col1 = 1"));
+    Assert.assertTrue(e.getMessage().contains("EXPLAIN is not supported for DML statements: DELETE"), e.getMessage());
   }
 
   @Test

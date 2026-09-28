@@ -62,6 +62,21 @@ public class SqlOptionsModeTest {
   }
 
   @Test
+  public void testIgnoredLegacyOptionSyntaxFailsDmlStatements() {
+    QueryOptionsUtils.setLegacyOptionSyntaxMode(SqlOptionsMode.IGNORE);
+    // Dropping the options of a DML statement would change its effect, e.g. run a dry run DELETE for real
+    for (String sql : List.of("DELETE FROM vegetables WHERE name = 'kale' OPTION(dryRun=true)",
+        "INSERT INTO db.tbl FROM FILE 'file:///tmp/file1' OPTION(taskName=myTask-1)")) {
+      SqlCompilationException e = expectThrows(SqlCompilationException.class, () -> sqlOptionsOf(sql));
+      assertTrue(e.getMessage().contains("OPTION(...)"), e.getMessage());
+      assertTrue(e.getMessage().contains("SET"), e.getMessage());
+    }
+    // SET statements are unaffected
+    assertEquals(sqlOptionsOf("SET dryRun='true'; DELETE FROM vegetables WHERE name = 'kale'"),
+        Map.of("dryRun", "true"));
+  }
+
+  @Test
   public void testRejectedLegacyOptionSyntaxFailsEveryStatementType() {
     QueryOptionsUtils.setLegacyOptionSyntaxMode(SqlOptionsMode.REJECT);
     for (String sql : List.of("select * from vegetables OPTION(timeoutMs=1000)",
@@ -86,6 +101,22 @@ public class SqlOptionsModeTest {
   public void testIgnoredSqlOptionsAreDropped() {
     assertEquals(parse("SET timeoutMs='1000'; select * from vegetables OPTION(skipUpsert=true)",
         "timeoutMs=2000;sqlOptionsMode=ignore"), Map.of("timeoutMs", "2000", "sqlOptionsMode", "ignore"));
+  }
+
+  @Test
+  public void testIgnoredSqlOptionsFailDmlStatements() {
+    // Dropping the options of a DML statement would change its effect, e.g. run a dry run DELETE for real
+    for (String sql : List.of("SET dryRun='true'; DELETE FROM vegetables WHERE name = 'kale'",
+        "SET database='db1'; DELETE FROM vegetables WHERE name = 'kale'",
+        "DELETE FROM vegetables WHERE name = 'kale' OPTION(dryRun=true)",
+        "SET taskName='myTask-1'; INSERT INTO db.tbl FROM FILE 'file:///tmp/file1'")) {
+      QueryException e = expectThrows(QueryException.class, () -> parse(sql, "sqlOptionsMode=ignore"));
+      assertEquals(e.getErrorCode(), QueryErrorCode.QUERY_VALIDATION);
+      assertTrue(e.getMessage().contains("DML"), e.getMessage());
+    }
+    // A DML statement without SQL options is unaffected
+    assertEquals(parse("DELETE FROM vegetables WHERE name = 'kale'", "dryRun=true;sqlOptionsMode=ignore"),
+        Map.of("dryRun", "true", "sqlOptionsMode", "ignore"));
   }
 
   @Test
