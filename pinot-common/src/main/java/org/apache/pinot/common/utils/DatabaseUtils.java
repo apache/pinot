@@ -170,7 +170,7 @@ public class DatabaseUtils {
   /// If queryOptions and headers have conflicting database context an [DatabaseConflictException] is thrown.
   public static String extractDatabaseFromQueryRequest(
       @Nullable Map<String, String> queryOptions, @Nullable HttpHeaders headers) {
-    String database = extractDatabaseFromQueryRequest(
+    String database = extractDatabaseFromOptionAndHeader(
         queryOptions == null ? null : queryOptions.get(CommonConstants.DATABASE),
         headers == null ? null : headers.getHeaderString(CommonConstants.DATABASE));
     return Objects.requireNonNullElse(database, CommonConstants.DEFAULT_DATABASE);
@@ -181,7 +181,7 @@ public class DatabaseUtils {
   ///
   /// @throws DatabaseConflictException if both are set and differ
   @Nullable
-  public static String extractDatabaseFromQueryRequest(@Nullable String databaseFromOptions,
+  public static String extractDatabaseFromOptionAndHeader(@Nullable String databaseFromOptions,
       @Nullable String databaseFromHeaders) {
     if (databaseFromHeaders != null && databaseFromOptions != null
         && !databaseFromOptions.equals(databaseFromHeaders)) {
