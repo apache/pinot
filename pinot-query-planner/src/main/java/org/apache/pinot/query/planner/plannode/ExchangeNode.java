@@ -41,6 +41,7 @@ public class ExchangeNode extends BasePlanNode {
   private final List<RelFieldCollation> _collations;
   private final boolean _sortOnSender;
   private final boolean _sortOnReceiver;
+  private final boolean _autoWindowSort;
   // Table names should be set for SUB_PLAN exchange type.
   private final Set<String> _tableNames;
   @Nullable
@@ -51,6 +52,15 @@ public class ExchangeNode extends BasePlanNode {
       RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
       @Nullable List<RelFieldCollation> collations, boolean sortOnSender, boolean sortOnReceiver,
       @Nullable Set<String> tableNames, ExchangeStrategy exchangeStrategy, String hashFunction) {
+    this(stageId, dataSchema, inputs, exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender,
+        sortOnReceiver, false, tableNames, exchangeStrategy, hashFunction);
+  }
+
+  public ExchangeNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs, PinotRelExchangeType exchangeType,
+      RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
+      @Nullable List<RelFieldCollation> collations, boolean sortOnSender, boolean sortOnReceiver,
+      boolean autoWindowSort, @Nullable Set<String> tableNames, ExchangeStrategy exchangeStrategy,
+      String hashFunction) {
     super(stageId, dataSchema, null, inputs);
     _exchangeType = exchangeType;
     _distributionType = distributionType;
@@ -59,6 +69,7 @@ public class ExchangeNode extends BasePlanNode {
     _collations = collations;
     _sortOnSender = sortOnSender;
     _sortOnReceiver = sortOnReceiver;
+    _autoWindowSort = autoWindowSort;
     _tableNames = tableNames;
     _exchangeStrategy = exchangeStrategy;
     _hashFunction = hashFunction;
@@ -94,6 +105,10 @@ public class ExchangeNode extends BasePlanNode {
     return _sortOnReceiver;
   }
 
+  public boolean isAutoWindowSort() {
+    return _autoWindowSort;
+  }
+
   @Nullable
   public Set<String> getTableNames() {
     return _tableNames;
@@ -121,7 +136,7 @@ public class ExchangeNode extends BasePlanNode {
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
     return new ExchangeNode(_stageId, _dataSchema, inputs, _exchangeType, _distributionType, _keys, _prePartitioned,
-        _collations, _sortOnSender, _sortOnReceiver, _tableNames, null, _hashFunction);
+        _collations, _sortOnSender, _sortOnReceiver, _autoWindowSort, _tableNames, null, _hashFunction);
   }
 
   @Override
@@ -137,6 +152,7 @@ public class ExchangeNode extends BasePlanNode {
     }
     ExchangeNode that = (ExchangeNode) o;
     return _sortOnSender == that._sortOnSender && _sortOnReceiver == that._sortOnReceiver
+        && _autoWindowSort == that._autoWindowSort
         && _prePartitioned == that._prePartitioned && _exchangeType == that._exchangeType
         && _distributionType == that._distributionType && Objects.equals(_keys, that._keys)
         && Objects.equals(_collations, that._collations) && Objects.equals(_tableNames, that._tableNames)
@@ -146,6 +162,6 @@ public class ExchangeNode extends BasePlanNode {
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _exchangeType, _distributionType, _keys, _sortOnSender, _sortOnReceiver,
-        _prePartitioned, _collations, _tableNames, _hashFunction);
+        _autoWindowSort, _prePartitioned, _collations, _tableNames, _hashFunction);
   }
 }
