@@ -123,6 +123,20 @@ public abstract class IndexedTable extends BaseTable {
     _lookupMap.computeIfPresent(key, (k, v) -> updateRecord(v, newRecord));
   }
 
+  /// Same as [#updateExistingRecord], additionally reporting whether a record with the key existed (and was
+  /// therefore merged into).
+  protected boolean updateExistingRecordIfPresent(Key key, Record newRecord) {
+    return _lookupMap.computeIfPresent(key, (k, v) -> updateRecord(v, newRecord)) != null;
+  }
+
+  /// Merges `newRecord` into the record with the same key if one exists; a record with a new key is ignored.
+  /// Used by the grouping-sets base-aggregation combine to fold OVERFLOW base records (whose base key was
+  /// dropped when the base table hit its group limit) into the already-derived groups, keeping the grand total
+  /// and coarse subtotals exact like the expansion path.
+  public void upsertExisting(Key key, Record newRecord) {
+    updateExistingRecord(key, newRecord);
+  }
+
   private Record updateRecord(Record existingRecord, Record newRecord) {
     Object[] existingValues = existingRecord.getValues();
     Object[] newValues = newRecord.getValues();
