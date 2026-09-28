@@ -252,6 +252,21 @@ public class InsertIntoValuesTest {
     Assert.assertEquals(((BigDecimal) row.get(3)).intValue(), 0);
   }
 
+  /// Calcite parses X'..' hex literals into a SqlBinaryStringLiteral whose value is a BitString
+  /// (not ByteString); the parser must unwrap it to byte[] for Pinot BYTES columns. Regression
+  /// test for the BitString fall-through that surfaced "Unsupported literal type: BitString".
+  @Test
+  public void testHexBytesLiteral() {
+    String sql = "INSERT INTO myTable (data) VALUES (X'0BCD')";
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
+
+    InsertIntoValues stmt = InsertIntoValues.parse(sqlNodeAndOptions);
+    Object value = stmt.getRows().get(0).get(0);
+    Assert.assertTrue(value instanceof byte[], "X'..' literal must extract to byte[], got: "
+        + (value == null ? "null" : value.getClass().getName()));
+    Assert.assertEquals((byte[]) value, new byte[]{0x0B, (byte) 0xCD});
+  }
+
   @Test(expectedExceptions = SqlCompilationException.class,
       expectedExceptionsMessageRegExp = ".*Unary minus is only supported on numeric literals.*")
   public void testUnaryMinusOnNonNumericLiteralIsRejected() {
