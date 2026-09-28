@@ -184,6 +184,7 @@ public class PlanNodeSerializer {
           .addAllCollations(convertCollations(node.getCollations()))
           .setSort(node.isSort())
           .setSortedOnSender(node.isSortedOnSender())
+          .setAutoProfile(node.isAutoProfile())
           .build();
       builder.setMailboxReceiveNode(mailboxReceiveNode);
       return null;
