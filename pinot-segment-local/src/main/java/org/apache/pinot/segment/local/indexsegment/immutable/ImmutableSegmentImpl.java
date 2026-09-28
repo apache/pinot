@@ -56,6 +56,7 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -459,6 +460,35 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Override
   public SegmentMetadataImpl getSegmentMetadata() {
     return _segmentMetadata;
+  }
+
+  /// Answers from the column metadata, so a caller that needs only the column's statistics does not materialize the
+  /// column. That matters most under lazy column materialization: segment pruning asks this for every segment the
+  /// server holds, and building an index container per segment there would put a reader — and, for an external
+  /// table, a Parquet footer parse — on the query thread for segments that are about to be pruned away.
+  ///
+  /// A column whose data source already exists (every column in eager mode, a materialized one in lazy mode) answers
+  /// with that data source's own metadata, so the two calls can never disagree. A column that is still to be
+  /// materialized answers with the metadata its data source would carry: a MAP column's map metadata (unsorted, no
+  /// row length), an OPEN_STRUCT parent's synthesized metadata (no statistics), and every other column's view over
+  /// its [ColumnMetadata]. A column the segment does not expose (a materialized OPEN_STRUCT child, or one absent
+  /// from the segment) falls back to the data source, which is where the schema-driven default and virtual columns
+  /// are created and where the same error is raised as before.
+  @Override
+  public DataSourceMetadata getDataSourceMetadata(String column, Schema schema) {
+    DataSource dataSource = _dataSources.get(column);
+    if (dataSource != null) {
+      return dataSource.getDataSourceMetadata();
+    }
+    ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+    if (columnMetadata == null || isMaterializedChild(columnMetadata)) {
+      return getDataSource(column, schema).getDataSourceMetadata();
+    }
+    if (_openStructChildren != null && _openStructChildren.containsKey(column)) {
+      return ImmutableOpenStructDataSource.metadataOf(columnMetadata.getFieldSpec(), _segmentMetadata.getTotalDocs());
+    }
+    return columnMetadata.getFieldSpec().getDataType() == FieldSpec.DataType.MAP
+        ? ImmutableMapDataSource.metadataOf(columnMetadata) : ImmutableDataSource.metadataOf(columnMetadata);
   }
 
   @Override
