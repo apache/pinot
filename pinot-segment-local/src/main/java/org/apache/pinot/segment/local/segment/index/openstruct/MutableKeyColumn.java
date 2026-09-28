@@ -43,7 +43,35 @@ import org.apache.pinot.spi.utils.PinotDataType;
 /// index carry the same single-writer/multiple-readers contract.
 public class MutableKeyColumn implements Closeable {
   private static final int DEFAULT_AVG_STRING_LENGTH = 32;
-  private static final int DEFAULT_ROWS_PER_CHUNK = 1000;
+  /// Floor on the forward-index chunk size, used when a segment's capacity is small enough that
+  /// the derived size would be smaller.
+  private static final int MIN_ROWS_PER_CHUNK = 1000;
+  /// Chunk count this sizing aims for over a segment's life, used to derive the chunk size from
+  /// segment capacity. Chunks are allocated lazily but contiguously from docId 0, so total bytes
+  /// for a key are governed by its highest docId, not by this value — raising it only splits the
+  /// same footprint into more allocations. Each allocation costs a log line, an off-heap
+  /// allocation, and a copy of the copy-on-write reader list (so the copying is quadratic in the
+  /// chunk count). Deriving from capacity rather than using it outright (as schema columns do)
+  /// keeps the floor for a rarely-seen key small: the OPEN_STRUCT key space is user-controlled, and
+  /// mutable mode holds every observed key, since maxDenseKeys is applied at seal rather than
+  /// during consumption. Above a capacity of MAX_ROWS_PER_CHUNK * MAX_CHUNKS_PER_KEY the ceiling
+  /// takes over and the realised chunk count grows past this target.
+  private static final int MAX_CHUNKS_PER_KEY = 256;
+  /// Ceiling on the forward-index chunk size, and therefore on the off-heap a key reserves merely
+  /// by being observed: [FixedByteSVMutableForwardIndex] allocates its first chunk eagerly in its
+  /// constructor, so every key costs `numRowsPerChunk * Integer.BYTES` the moment it appears, even
+  /// if it is only ever written at docId 0. That floor multiplies across a key space that is
+  /// user-controlled and never pruned during consumption, so it must not scale with segment
+  /// capacity. At 4000 rows it is 16 KB per observed key; the uncapped `capacity / 256` derivation
+  /// reserved 78 KB per key at a 5M-row capacity, which a segment that met a few thousand rare keys
+  /// would turn into hundreds of MB it never writes into.
+  ///
+  /// 4000 keeps most of what the capacity-derived size buys for keys that do reach high docIds: at
+  /// a 5M-row capacity such a key allocates 1250 chunks, against 5000 under the flat 1000-row size
+  /// this sizing replaced (a 16x drop in reader-list copying) and 256 under the uncapped
+  /// derivation. Capacities at or below 1_024_000 are unaffected — their derived size is already
+  /// under the ceiling.
+  private static final int MAX_ROWS_PER_CHUNK = 4000;
 
   private final String _key;
   private final DataType _storedType;
@@ -94,8 +122,10 @@ public class MutableKeyColumn implements Closeable {
     // writes the default value, keeping dictIds and bitmap slots contiguous.
     _invertedIndex.reserveNextDictId();
 
+    int numRowsPerChunk =
+        Math.min(Math.max(MIN_ROWS_PER_CHUNK, capacity / MAX_CHUNKS_PER_KEY), MAX_ROWS_PER_CHUNK);
     _forwardIndex = new FixedByteSVMutableForwardIndex(true, DataType.INT,
-        DEFAULT_ROWS_PER_CHUNK, memoryManager, allocationContext + ".fwd");
+        numRowsPerChunk, memoryManager, allocationContext + ".fwd");
   }
 
   public String getKey() {

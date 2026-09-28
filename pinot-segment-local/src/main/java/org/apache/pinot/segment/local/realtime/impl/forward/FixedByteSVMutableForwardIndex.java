@@ -239,7 +239,16 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   }
 
   private void addBuffer() {
-    LOGGER.info("Allocating {} bytes for: {}", _chunkSizeInBytes, _allocationContext);
+    // Log the first chunk at INFO — that is the "this column started using off-heap memory" signal
+    // operators rely on. Subsequent chunks are growth of an already-reported allocation, and for a
+    // column that grows across many chunks the repetition is both noise and measurable cost on the
+    // consuming path.
+    if (_writers.isEmpty()) {
+      LOGGER.info("Allocating {} bytes for: {}", _chunkSizeInBytes, _allocationContext);
+    } else {
+      LOGGER.debug("Allocating {} bytes for: {} (chunk {})", _chunkSizeInBytes, _allocationContext,
+          _writers.size() + 1);
+    }
     // NOTE: PinotDataBuffer is tracked in the PinotDataBufferMemoryManager. No need to track it inside the class.
     PinotDataBuffer buffer = _memoryManager.allocate(_chunkSizeInBytes, _allocationContext);
     _writers.add(

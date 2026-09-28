@@ -42,6 +42,25 @@ public interface ColumnarOpenStructIndexCreator extends IndexCreator {
   void add(Map<String, Object> openStructValue, int docId)
       throws IOException;
 
+  /// Whether this creator can consume an [OpenStructColumnarSource] via [#addColumnar]. Callers
+  /// must check this before calling `addColumnar`, and fall back to per-document
+  /// [#add(Map, int)] when it returns `false`. Checking up front rather than letting `addColumnar`
+  /// refuse matters when several creators share one column: a creator that had already accepted
+  /// the source could not be rewound.
+  default boolean supportsColumnarAdd() {
+    return false;
+  }
+
+  /// Ingests an entire OPEN_STRUCT column in columnar form, replacing the per-document
+  /// [#add(Map, int)] calls for the whole column. Only valid when [#supportsColumnarAdd] returns
+  /// `true`, and only when the caller is writing documents in source order with none filtered out;
+  /// the source carries no mapping from its docIds to on-disk positions.
+  default void addColumnar(OpenStructColumnarSource source)
+      throws IOException {
+    throw new UnsupportedOperationException(
+        "Columnar OPEN_STRUCT ingestion is not supported by this implementation");
+  }
+
   /// Returns metadata properties for the materialized columns this creator produced during `seal()`.
   /// The framework merges the returned properties into the segment metadata.
   /// Returns an empty map for creators that produce no materialized columns. Call after `seal()`.
