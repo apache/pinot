@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.openstruct;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -86,7 +85,7 @@ public class OpenStructIndexType
       Preconditions.checkState(fieldSpec.isSingleValueField(),
           "OPEN_STRUCT index can only be created on single-value columns, but column '%s' is multi-value",
           fieldSpec.getName());
-      validatePerKeyIndexes(config);
+      validatePerKeyIndexes(config, fieldSpec.getName());
       validateIgnoredKeys(config, fieldSpec);
       if (fieldSpec instanceof ComplexFieldSpec) {
         validateChildFieldSpecTypes((ComplexFieldSpec) fieldSpec);
@@ -124,26 +123,36 @@ public class OpenStructIndexType
     }
   }
 
-  private void validatePerKeyIndexes(OpenStructIndexConfig config) {
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
+  private void validatePerKeyIndexes(OpenStructIndexConfig config, String column) {
     if (config.getValueFieldConfigs() != null) {
-      fieldConfigs.addAll(config.getValueFieldConfigs());
-    }
-    if (config.getDefaultValueFieldConfig() != null) {
-      fieldConfigs.add(config.getDefaultValueFieldConfig());
-    }
-    for (FieldConfig fieldConfig : fieldConfigs) {
-      JsonNode indexes = fieldConfig.getIndexes();
-      if (indexes == null) {
-        continue;
+      for (FieldConfig fieldConfig : config.getValueFieldConfigs()) {
+        validatePerKeyFieldConfig(fieldConfig, column, "key '" + fieldConfig.getName() + "'");
       }
-      Iterator<String> indexNames = indexes.fieldNames();
-      while (indexNames.hasNext()) {
-        String indexName = indexNames.next();
-        Preconditions.checkState(OpenStructSupportedIndexes.ALLOWED_PRETTY_NAMES.contains(indexName),
-            "OPEN_STRUCT key '%s' declares unsupported index '%s'; supported indexes are %s",
-            fieldConfig.getName(), indexName, OpenStructSupportedIndexes.ALLOWED_PRETTY_NAMES);
-      }
+    }
+    FieldConfig defaultValueFieldConfig = config.getDefaultValueFieldConfig();
+    if (defaultValueFieldConfig != null) {
+      validatePerKeyFieldConfig(defaultValueFieldConfig, column, "defaultValueFieldConfig");
+    }
+  }
+
+  /// Validates one per-key [FieldConfig] of OPEN_STRUCT `column`; `target` names it in error messages.
+  private static void validatePerKeyFieldConfig(FieldConfig fieldConfig, String column, String target) {
+    JsonNode indexes = fieldConfig.getIndexes();
+    if (indexes == null) {
+      return;
+    }
+    JsonNode forwardIndex = indexes.get(StandardIndexes.forward().getPrettyName());
+    // The OPEN_STRUCT splitter builds its own per-key forward-index configs (dict-vs-raw decision plus a
+    // fixed LZ4 raw compression), so a per-key codecSpec would be silently discarded. Reject it explicitly.
+    Preconditions.checkState(forwardIndex == null || !forwardIndex.hasNonNull("codecSpec"),
+        "OPEN_STRUCT column '%s': codecSpec is not supported for %s; materialized keys always use a "
+            + "dictionary-encoded or LZ4 raw forward index", column, target);
+    Iterator<String> indexNames = indexes.fieldNames();
+    while (indexNames.hasNext()) {
+      String indexName = indexNames.next();
+      Preconditions.checkState(OpenStructSupportedIndexes.ALLOWED_PRETTY_NAMES.contains(indexName),
+          "OPEN_STRUCT key '%s' declares unsupported index '%s'; supported indexes are %s",
+          fieldConfig.getName(), indexName, OpenStructSupportedIndexes.ALLOWED_PRETTY_NAMES);
     }
   }
 

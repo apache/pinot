@@ -27,15 +27,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReaderV7;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -57,8 +61,8 @@ import static org.testng.Assert.*;
 
 /// Tests compression metadata persistence across [ForwardIndexHandler] reload operations.
 ///
-/// Coverage includes chunk-compression changes, dictionary/raw conversions, forward-index disable/re-enable, and
-/// stale metadata cleanup.
+/// Coverage includes chunk-compression changes, codec-pipeline (V7) rewrites and rollback, dictionary/raw
+/// conversions, forward-index disable/re-enable, and stale metadata cleanup.
 public class ForwardIndexHandlerCompressionStatsTest {
   private static final String RAW_TABLE_NAME = "compressionStatsReloadTest";
   private static final String SEGMENT_NAME = "compressionStatsReloadSegment";
@@ -603,5 +607,142 @@ public class ForwardIndexHandlerCompressionStatsTest {
         "Uncompressed forward index size should be cleared after raw-to-dict conversion");
     assertTrue(dictMeta.getDictionaryEncodedUncompressedValueSizeInBytes() > 0,
         "Dictionary uncompressed value size should be collected during raw-to-dictionary conversion");
+  }
+
+  @Test
+  public void testLegacyToCodecSpecRewritePersistsRawSizeWithoutChunkType()
+      throws Exception {
+    ColumnMetadata legacyMeta = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(RAW_INT_COL);
+    assertEquals(legacyMeta.getRawForwardIndexChunkCompressionType(), ChunkCompressionType.SNAPPY);
+    assertEquals(legacyMeta.getRawForwardIndexUncompressedValueSizeInBytes(), (long) NUM_ROWS * Integer.BYTES);
+
+    _fieldConfigMap.put(RAW_INT_COL, codecSpecFieldConfig(RAW_INT_COL, "DELTA,ZSTD(3)", false));
+    updateForwardIndex(createIndexLoadingConfig());
+
+    // A V7 index has no single legacy chunk-compression type, but its uncompressed value size is still reported.
+    assertEquals(readCodecSpec(RAW_INT_COL), "DELTA,ZSTD(3)");
+    ColumnMetadata v7Meta = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(RAW_INT_COL);
+    assertNull(v7Meta.getRawForwardIndexChunkCompressionType());
+    assertEquals(v7Meta.getRawForwardIndexUncompressedValueSizeInBytes(), (long) NUM_ROWS * Integer.BYTES);
+  }
+
+  @Test
+  public void testCodecSpecChangeAndLegacyRollbackPersistRawStats()
+      throws Exception {
+    _fieldConfigMap.put(RAW_INT_COL, codecSpecFieldConfig(RAW_INT_COL, "DELTA,LZ4", false));
+    updateForwardIndex(createIndexLoadingConfig());
+    _fieldConfigMap.put(RAW_INT_COL, codecSpecFieldConfig(RAW_INT_COL, "T64,LZ4", false));
+    updateForwardIndex(createIndexLoadingConfig());
+
+    assertEquals(readCodecSpec(RAW_INT_COL), "T64,LZ4");
+    ColumnMetadata v7Meta = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(RAW_INT_COL);
+    assertNull(v7Meta.getRawForwardIndexChunkCompressionType());
+    assertEquals(v7Meta.getRawForwardIndexUncompressedValueSizeInBytes(), (long) NUM_ROWS * Integer.BYTES);
+
+    // Rolling back to a legacy codec restores the legacy chunk-compression type alongside the size.
+    _fieldConfigMap.put(RAW_INT_COL,
+        new FieldConfig(RAW_INT_COL, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.LZ4, null));
+    updateForwardIndex(createIndexLoadingConfig());
+
+    assertNull(readCodecSpec(RAW_INT_COL));
+    ColumnMetadata legacyMeta = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(RAW_INT_COL);
+    assertEquals(legacyMeta.getRawForwardIndexChunkCompressionType(), ChunkCompressionType.LZ4);
+    assertEquals(legacyMeta.getRawForwardIndexUncompressedValueSizeInBytes(), (long) NUM_ROWS * Integer.BYTES);
+  }
+
+  @Test
+  public void testDictToCodecSpecPersistsRawStats()
+      throws Exception {
+    _noDictionaryColumns.add(DICT_INT_COL);
+    _fieldConfigMap.put(DICT_INT_COL, codecSpecFieldConfig(DICT_INT_COL, "DELTA,LZ4", false));
+    updateForwardIndex(createIndexLoadingConfig());
+
+    assertEquals(readCodecSpec(DICT_INT_COL), "DELTA,LZ4");
+    ColumnMetadata colMeta = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(DICT_INT_COL);
+    assertFalse(colMeta.hasDictionary());
+    assertNull(colMeta.getRawForwardIndexChunkCompressionType());
+    assertEquals(colMeta.getRawForwardIndexUncompressedValueSizeInBytes(), (long) NUM_ROWS * Integer.BYTES);
+    assertEquals(colMeta.getDictionaryEncodedUncompressedValueSizeInBytes(), ColumnMetadata.UNAVAILABLE);
+  }
+
+  @Test
+  public void testEnableDictionaryOnCodecSpecColumnKeepsRawStats()
+      throws Exception {
+    _fieldConfigMap.put(RAW_INT_COL, codecSpecFieldConfig(RAW_INT_COL, "DELTA,LZ4", false));
+    updateForwardIndex(createIndexLoadingConfig());
+
+    // Adding a dictionary keeps the V7 raw forward index, so its raw stats are carried over unchanged.
+    _noDictionaryColumns.remove(RAW_INT_COL);
+    _fieldConfigMap.put(RAW_INT_COL, codecSpecFieldConfig(RAW_INT_COL, "DELTA,LZ4", true));
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      ForwardIndexHandler handler = new ForwardIndexHandler(segmentDirectory, createIndexLoadingConfig());
+      assertEquals(handler.computeOperations(writer),
+          Map.of(RAW_INT_COL, List.of(ForwardIndexHandler.Operation.ENABLE_DICTIONARY)));
+      handler.updateIndices(writer);
+      handler.postUpdateIndicesCleanup(writer);
+    }
+
+    assertEquals(readCodecSpec(RAW_INT_COL), "DELTA,LZ4");
+    ColumnMetadata colMeta = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(RAW_INT_COL);
+    assertTrue(colMeta.hasDictionary());
+    assertEquals(colMeta.getForwardIndexEncoding(), FieldConfig.EncodingType.RAW);
+    assertNull(colMeta.getRawForwardIndexChunkCompressionType());
+    assertEquals(colMeta.getRawForwardIndexUncompressedValueSizeInBytes(), (long) NUM_ROWS * Integer.BYTES);
+  }
+
+  @Test
+  public void testCodecSpecRewriteClearsStatsWhenDisabled()
+      throws Exception {
+    _fieldConfigMap.put(RAW_INT_COL, codecSpecFieldConfig(RAW_INT_COL, "DELTA,LZ4", false));
+    TableConfig configWithStatsDisabled = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(new ArrayList<>(_noDictionaryColumns))
+        .setFieldConfigList(new ArrayList<>(_fieldConfigMap.values()))
+        .build();
+    updateForwardIndex(new IndexLoadingConfig(configWithStatsDisabled, SCHEMA));
+
+    assertEquals(readCodecSpec(RAW_INT_COL), "DELTA,LZ4");
+    ColumnMetadata colMeta = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(RAW_INT_COL);
+    assertNull(colMeta.getRawForwardIndexChunkCompressionType());
+    assertEquals(colMeta.getRawForwardIndexUncompressedValueSizeInBytes(), ColumnMetadata.UNAVAILABLE);
+  }
+
+  /// Builds a RAW [FieldConfig] whose forward index uses `codecSpec`, optionally keeping a dictionary.
+  private static FieldConfig codecSpecFieldConfig(String column, String codecSpec, boolean withDictionary) {
+    ObjectNode forward = JsonUtils.newObjectNode();
+    forward.put("codecSpec", codecSpec);
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("forward", forward);
+    if (withDictionary) {
+      indexes.set("dictionary", JsonUtils.newObjectNode());
+    }
+    return new FieldConfig.Builder(column)
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
+  }
+
+  private static void updateForwardIndex(IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      ForwardIndexHandler handler = new ForwardIndexHandler(segmentDirectory, indexLoadingConfig);
+      assertTrue(handler.needUpdateIndices(writer), "Handler should detect the forward-index change");
+      handler.updateIndices(writer);
+      handler.postUpdateIndicesCleanup(writer);
+    }
+  }
+
+  /// Returns the canonical codec spec from the column's V7 forward-index header, or null for a legacy raw index.
+  @Nullable
+  private static String readCodecSpec(String column)
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      PinotDataBuffer buffer = reader.getIndexFor(column, StandardIndexes.forward());
+      return FixedByteChunkSVForwardIndexReaderV7.hasCodecPipelineHeader(buffer)
+          ? FixedByteChunkSVForwardIndexReaderV7.readCodecSpec(buffer) : null;
+    }
   }
 }
