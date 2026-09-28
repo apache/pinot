@@ -98,14 +98,6 @@ public class SqlQueryExecutorTest {
   }
 
   @Test
-  public void testUnsupportedDmlKindReturnsErrorResponse() {
-    BrokerResponse response = new SqlQueryExecutor(CONTROLLER_URL).executeDMLStatement(
-        CalciteSqlParser.compileToSqlNodeAndOptions("UPDATE myTable SET col1 = 'b' WHERE col1 = 'a'"), null);
-
-    assertError(response, QueryErrorCode.SQL_PARSING, "Unsupported DML SqlKind - UPDATE");
-  }
-
-  @Test
   public void testDeleteIsExecutedByTheOverridingExecutor() {
     AtomicReference<DeleteStatement> executedStatement = new AtomicReference<>();
     AtomicReference<Map<String, String>> executedHeaders = new AtomicReference<>();

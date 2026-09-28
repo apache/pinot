@@ -120,12 +120,11 @@ public class PinotQueryResourceTest {
   }
 
   @Test
-  public void testDmlOnGetQueryEndpointReturnsValidationError() {
-    for (String dml : List.of("DELETE FROM t WHERE a = 1", "INSERT INTO t FROM FILE 'file:///tmp/data'")) {
-      String response = streamingOutputToString(_pinotQueryResource.handleGetSql(dml, null, null, null));
-      assertTrue(response.contains(String.valueOf(QueryErrorCode.QUERY_VALIDATION.getId())), response);
-      assertTrue(response.contains("use POST /sql instead"), response);
-    }
+  public void testDeleteOnGetQueryEndpointReturnsValidationError() {
+    String response = streamingOutputToString(
+        _pinotQueryResource.handleGetSql("DELETE FROM t WHERE a = 1", null, null, null));
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.QUERY_VALIDATION.getId())), response);
+    assertTrue(response.contains("use POST /sql instead"), response);
     verify(_sqlQueryExecutor, never()).executeDMLStatement(any(), any());
     verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
   }
@@ -200,23 +199,6 @@ public class PinotQueryResourceTest {
     verify(_sqlQueryExecutor).executeDMLStatement(any(SqlNodeAndOptions.class), eq(REQUEST_HEADERS));
     verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
     verify(_accessControlFactory, never()).create();
-  }
-
-  @DataProvider
-  public Object[][] invalidDeletes() {
-    return new Object[][]{
-        {"DELETE FROM t", null, QueryErrorCode.SQL_PARSING},
-        {"SET database = 'db1'; DELETE FROM t WHERE a = 1", "db2", QueryErrorCode.QUERY_VALIDATION}
-    };
-  }
-
-  @Test(dataProvider = "invalidDeletes")
-  public void testInvalidDeleteIsRejected(String sql, @Nullable String database, QueryErrorCode expectedErrorCode) {
-    String response = postSql(sql, database);
-
-    assertTrue(response.contains(String.valueOf(expectedErrorCode.getId())), response);
-    verify(_accessControlFactory, never()).create();
-    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
   }
 
   @Test

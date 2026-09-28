@@ -114,12 +114,7 @@ public class DeleteStatement implements DataManipulationStatement {
   private final Map<String, String> _options;
   private final boolean _resolved;
 
-  /// @param tableName table name, see [#getTableName()]
-  /// @param predicate WHERE clause, see [#getPredicate()]
-  /// @param database `database` option of the statement, which qualifies an unqualified table name when the table is
-  ///                 resolved, see [#resolveTableName]
-  /// @param options other options of the statement, see [#getOptions()]
-  public DeleteStatement(String tableName, String predicate, @Nullable String database, Map<String, String> options) {
+  private DeleteStatement(String tableName, String predicate, @Nullable String database, Map<String, String> options) {
     this(tableName, predicate, database, options, false);
   }
 

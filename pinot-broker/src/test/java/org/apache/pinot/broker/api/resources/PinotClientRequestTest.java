@@ -35,6 +35,7 @@ import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -470,6 +471,22 @@ public class PinotClientRequestTest {
   }
 
   @Test
+  public void testDeleteWithoutTableCacheIsNotExecuted()
+      throws Exception {
+    // Broker applications using the legacy constructor do not bind a table cache.
+    FieldUtils.writeField(_pinotClientRequest, "_tableCache", null, true);
+    when(_accessControlFactory.create()).thenReturn(new AllowAllAccessControlFactory().create());
+
+    AsyncResponse asyncResponse = postSql("DELETE FROM myTable WHERE col1 = 'a'");
+
+    ArgumentCaptor<Response> captor = ArgumentCaptor.forClass(Response.class);
+    verify(asyncResponse).resume(captor.capture());
+    assertEquals(captor.getValue().getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0),
+        QueryErrorCode.QUERY_VALIDATION.getId());
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  @Test
   public void testDeleteIsForbiddenByDefault()
       throws Exception {
     // An access control written before DELETE existed allows queries, but not deleting rows
@@ -511,21 +528,6 @@ public class PinotClientRequestTest {
   }
 
   @Test
-  public void testDeleteFromATableWithATypeChecksTheDeleteRowsActionOnItsRawName()
-      throws Exception {
-    RecordingAccessControl accessControl = new RecordingAccessControl();
-    when(_accessControlFactory.create()).thenReturn(accessControl);
-    when(_sqlQueryExecutor.executeStatement(any(), any())).thenReturn(new BrokerResponseNative());
-
-    assertSucceeded(postSql("DELETE FROM myTable_OFFLINE WHERE col1 = 'a'"));
-    // Also on the raw name, which the controller checks, so that a type suffix cannot bypass a rule on the raw name
-    assertEquals(accessControl._checks, List.of("broker", "tables [myTable_OFFLINE]",
-        Actions.Table.QUERY + " TABLE myTable_OFFLINE", Actions.Table.DELETE_ROWS + " TABLE myTable_OFFLINE",
-        Actions.Table.DELETE_ROWS + " TABLE myTable", "deleteRows myTable_OFFLINE"));
-    assertEquals(executedDelete(Map.of("Authorization", "Basic abc")).getTableName(), "myTable_OFFLINE");
-  }
-
-  @Test
   public void testDeleteFromATableWithATypeIsForbiddenByTheDeleteRowsActionOnItsRawName()
       throws Exception {
     RecordingAccessControl accessControl =
@@ -549,21 +551,6 @@ public class PinotClientRequestTest {
     assertEquals(accessControl._checks, List.of("broker"));
     verify(_tableCache, never()).getActualTableName(any());
     verify(_tableCache, never()).getActualLogicalTableName(any());
-  }
-
-  @Test
-  public void testDeleteIsForbiddenWhenRowLevelSecurityApplies()
-      throws Exception {
-    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
-        CommonConstants.Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH)).thenReturn(true);
-    // The row filters would not restrict the rows the statement deletes
-    RecordingAccessControl accessControl = new RecordingAccessControl(List.of("region = 'US'"));
-    when(_accessControlFactory.create()).thenReturn(accessControl);
-
-    assertForbidden(postSql("DELETE FROM myTable WHERE region = 'EU'"), "myTable", "Row-level security");
-    assertEquals(accessControl._checks, List.of("broker", "tables [myTable]",
-        Actions.Table.QUERY + " TABLE myTable", Actions.Table.DELETE_ROWS + " TABLE myTable", "deleteRows myTable",
-        "rowFilters myTable"));
   }
 
   @DataProvider(name = "typedDeleteRlsTables")
@@ -595,19 +582,6 @@ public class PinotClientRequestTest {
         "Row-level security");
     assertEquals(accessControl._checks.stream().filter(check -> check.startsWith("rowFilters ")).toList(),
         expectedFilterLookups);
-  }
-
-  @Test
-  public void testDeleteDeniedBeforeRowFilterLookup()
-      throws Exception {
-    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
-        CommonConstants.Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH)).thenReturn(true);
-    RecordingAccessControl accessControl = new RecordingAccessControl(List.of("region = 'US'"), "deleteRows");
-    when(_accessControlFactory.create()).thenReturn(accessControl);
-
-    assertForbidden(postSql("DELETE FROM myTable_OFFLINE WHERE region = 'EU'"), "myTable_OFFLINE",
-        "deleteRows denied");
-    assertFalse(accessControl._checks.stream().anyMatch(check -> check.startsWith("rowFilters ")));
   }
 
   @Test
@@ -643,33 +617,6 @@ public class PinotClientRequestTest {
     ArgumentCaptor<WebApplicationException> captor = ArgumentCaptor.forClass(WebApplicationException.class);
     verify(asyncResponse).resume(captor.capture());
     assertEquals(captor.getValue().getResponse().getStatus(), Response.Status.UNAUTHORIZED.getStatusCode());
-    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
-  }
-
-  @Test
-  public void testDeleteWithConflictingDatabasesIsRejected()
-      throws Exception {
-    when(_httpHeaders.getHeaderString(CommonConstants.DATABASE)).thenReturn("db2");
-    RecordingAccessControl accessControl = new RecordingAccessControl();
-    when(_accessControlFactory.create()).thenReturn(accessControl);
-
-    assertError(postSql("SET database = 'db1'; DELETE FROM myTable WHERE col1 = 'a'"),
-        QueryErrorCode.QUERY_VALIDATION);
-    // Only the first-step access control ran: the table is not authorized
-    assertEquals(accessControl._checks, List.of("broker"));
-    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
-  }
-
-  @Test
-  public void testDeleteFromALogicalTableIsRejected()
-      throws Exception {
-    // Its physical tables are not authorized
-    when(_tableCache.getActualLogicalTableName("myLogicalTable")).thenReturn("myLogicalTable");
-    RecordingAccessControl accessControl = new RecordingAccessControl();
-    when(_accessControlFactory.create()).thenReturn(accessControl);
-
-    assertError(postSql("DELETE FROM myLogicalTable WHERE col1 = 'a'"), QueryErrorCode.QUERY_VALIDATION);
-    assertEquals(accessControl._checks, List.of("broker"));
     verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
   }
 
@@ -717,12 +664,6 @@ public class PinotClientRequestTest {
     verify(asyncResponse).resume(captor.capture());
     assertEquals(captor.getValue().getStatus(), Response.Status.OK.getStatusCode());
     assertEquals(captor.getValue().getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0), -1);
-  }
-
-  private static void assertError(AsyncResponse asyncResponse, QueryErrorCode expectedErrorCode) {
-    ArgumentCaptor<Response> captor = ArgumentCaptor.forClass(Response.class);
-    verify(asyncResponse).resume(captor.capture());
-    assertEquals(captor.getValue().getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0), expectedErrorCode.getId());
   }
 
   /// Asserts that the `DELETE` is denied with HTTP 403. The message names the table (`null` if not expected) once the

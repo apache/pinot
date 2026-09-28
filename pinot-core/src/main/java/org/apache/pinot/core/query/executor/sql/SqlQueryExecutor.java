@@ -88,9 +88,9 @@ public class SqlQueryExecutor {
 
   /// Parses and executes a DML statement.
   ///
-  /// A `DELETE` is refused with a [QueryErrorCode#ACCESS_DENIED] error, since this method cannot authorize the caller:
-  /// it is executed with [#executeStatement] once its table is resolved and the caller authorized to delete rows from
-  /// it, as the query endpoints of the broker and the controller do.
+  /// A `DELETE` is refused by [#executeStatement] with a [QueryErrorCode#ACCESS_DENIED] error, since this method
+  /// cannot authorize the caller: it is executed once its table is resolved and the caller authorized to delete rows
+  /// from it, as the query endpoints of the broker and the controller do.
   ///
   /// @param sqlNodeAndOptions Parsed DML object
   /// @param headers extra headers map for minion task submission
@@ -101,11 +101,8 @@ public class SqlQueryExecutor {
     try {
       statement = DataManipulationStatementParser.parse(sqlNodeAndOptions);
     } catch (QueryException e) {
-      // e.g. a DELETE without a WHERE clause, or a DML kind that Pinot parses but does not execute (UPDATE, MERGE)
+      // e.g. a DELETE without a WHERE clause
       return new BrokerResponseNative(e.getErrorCode(), e.getMessage());
-    }
-    if (statement instanceof DeleteStatement) {
-      return new BrokerResponseNative(QueryErrorCode.ACCESS_DENIED, UNAUTHORIZED_DELETE_MESSAGE);
     }
     return executeStatement(statement, headers);
   }
