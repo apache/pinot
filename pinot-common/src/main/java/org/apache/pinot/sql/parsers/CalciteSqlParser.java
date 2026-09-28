@@ -37,6 +37,7 @@ import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlJoin;
@@ -141,10 +142,10 @@ public class CalciteSqlParser {
       // add legacy OPTIONS keyword-based options
       if (!options.isEmpty()) {
         if (legacyOptionSyntaxMode == SqlOptionsMode.IGNORE) {
-          // The options of a DML statement configure it (e.g. a dry run), so dropping them would change its effect
-          if (sqlNodeAndOptions.getSqlType() == PinotSqlType.DML) {
+          // Dropping a DELETE option (e.g. dryRun) would change its effect.
+          if (sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
             throw new SqlCompilationException("Legacy OPTION(...) options are ignored on this cluster, use "
-                + "'SET <key> = <value>;' statements to configure a DML statement: " + options);
+                + "'SET <key> = <value>;' statements to configure DELETE: " + options);
           }
         } else {
           Map<String, String> optionMap = extractOptionsMap(options);
@@ -168,10 +169,8 @@ public class CalciteSqlParser {
     SqlNode statementNode = null;
     Map<String, String> options = new HashMap<>();
     for (SqlNode sqlNode : sqlNodeList) {
-      if (sqlNode instanceof SqlInsertFromFile || sqlNode.getKind().belongsTo(SqlKind.DML)) {
-        // extract DML statement (execution statement). The SQL executor runs INSERT INTO ... FROM FILE, lets a
-        // deployment plug in DELETE and rejects the other DML kinds the grammar parses (UPDATE, MERGE, CALL) with a
-        // clear error, instead of the query engines failing to compile them as queries.
+      if (sqlNode instanceof SqlInsertFromFile || sqlNode instanceof SqlDelete) {
+        // extract DML statement (execution statement)
         if (sqlType == null) {
           sqlType = PinotSqlType.DML;
           statementNode = sqlNode;
@@ -203,12 +202,6 @@ public class CalciteSqlParser {
         options.put(key.getSimple(), value.toValue());
       } else {
         // default extract query statement (execution statement)
-        if (sqlNode instanceof SqlExplain) {
-          SqlKind explainedKind = ((SqlExplain) sqlNode).getExplicandum().getKind();
-          if (explainedKind.belongsTo(SqlKind.DML)) {
-            throw new SqlCompilationException("EXPLAIN is not supported for DML statements: " + explainedKind);
-          }
-        }
         if (sqlType == null) {
           sqlType = PinotSqlType.DQL;
           statementNode = sqlNode;

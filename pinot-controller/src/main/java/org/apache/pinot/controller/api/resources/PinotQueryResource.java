@@ -157,7 +157,7 @@ public class PinotQueryResource {
   @ManualAuthorization
   public StreamingOutput handleGetSql(@QueryParam("sql") String sqlQuery, @QueryParam("trace") String traceEnabled,
       @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
-    // A GET must not modify data, e.g. when a browser holding credentials follows a link, so it only runs queries
+    // Do not allow a browser holding credentials to follow a link that deletes rows
     return executeSqlQueryCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions, true);
   }
 
@@ -373,9 +373,9 @@ public class PinotQueryResource {
   }
 
   private StreamingOutput executeSqlQueryCatching(HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
-      String queryOptions, boolean onlyDql) {
+      String queryOptions, boolean isGet) {
     try {
-      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, onlyDql);
+      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, isGet);
     } catch (ProcessingException pe) {
       LOGGER.error("Caught exception while processing get request {}", pe.getMessage());
       return constructQueryExceptionResponse(QueryErrorCode.fromErrorCode(pe.getErrorCode()), pe.getMessage());
@@ -392,7 +392,7 @@ public class PinotQueryResource {
   }
 
   private StreamingOutput executeSqlQuery(@Context HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
-      @Nullable String queryOptions, boolean onlyDql)
+      @Nullable String queryOptions, boolean isGet)
       throws Exception {
     LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
     // Parse with the exact payload forwarded to the broker, so that the options used to route the query (engine,
@@ -405,9 +405,9 @@ public class PinotQueryResource {
       throw QueryErrorCode.QUERY_VALIDATION.asException(
           "DDL statements are not supported on /sql; use POST /sql/ddl instead.");
     }
-    if (onlyDql && sqlType == PinotSqlType.DML) {
+    if (isGet && sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
       throw QueryErrorCode.QUERY_VALIDATION.asException(
-          "DML statements are not supported on GET /sql; use POST /sql instead.");
+          "DELETE is not supported on GET /sql; use POST /sql instead.");
     }
 
     // Determine which engine to used based on query options.

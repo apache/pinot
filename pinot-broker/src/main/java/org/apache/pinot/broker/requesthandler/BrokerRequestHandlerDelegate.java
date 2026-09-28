@@ -25,6 +25,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -37,7 +38,6 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
-import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
@@ -126,14 +126,11 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       }
     }
 
-    // The query engines only run queries. The REST endpoints dispatch DML statements to the SQL executor and reject
-    // the other statement types before reaching this handler; the gRPC endpoint and custom containers do not, and the
-    // engines would fail to compile such a statement as a query with a confusing error.
-    PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
-    if (sqlType != PinotSqlType.DQL) {
+    // gRPC and custom containers can call this handler directly, bypassing the REST DELETE authorization path.
+    if (sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
       requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
       return new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
-          "Unsupported SQL type - " + sqlType + ", this API only supports DQL.");
+          "DELETE is only supported by the broker SQL endpoint.");
     }
 
     BaseBrokerRequestHandler requestHandler = _singleStageBrokerRequestHandler;

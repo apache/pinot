@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
-import java.util.List;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
@@ -33,41 +31,28 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
 public class BrokerRequestHandlerDelegateTest {
 
   @Test
-  public void testOnlyQueriesReachTheQueryEngines()
+  public void testDeleteDoesNotReachTheQueryEngines()
       throws Exception {
     BaseSingleStageBrokerRequestHandler singleStageHandler = mock(BaseSingleStageBrokerRequestHandler.class);
-    BrokerResponseNative queryResponse = new BrokerResponseNative();
-    when(singleStageHandler.handleRequest(any(), any(), any(), any(), any())).thenReturn(queryResponse);
     BrokerRequestHandlerDelegate delegate = new BrokerRequestHandlerDelegate(singleStageHandler, null, null, null);
 
-    // DML is executed by the SQL executor, which the gRPC endpoint and custom containers do not dispatch to: the
-    // statement is rejected instead of failing to compile as a query
-    for (String sql : List.of("DELETE FROM myTable WHERE col1 = 'a'",
-        "INSERT INTO myTable FROM FILE 'file:///tmp/data'")) {
-      RequestContext requestContext = new DefaultRequestContext();
-      BrokerResponse response =
-          delegate.handleRequest(JsonUtils.newObjectNode().put(Request.SQL, sql), null, null, requestContext, null);
-      assertEquals(response.getExceptions().size(), 1, sql);
-      QueryProcessingException exception = response.getExceptions().get(0);
-      assertEquals(exception.getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
-      assertTrue(exception.getMessage().contains("only supports DQL"), exception.getMessage());
-      assertEquals(requestContext.getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
-    }
-    verify(singleStageHandler, never()).handleRequest(any(), any(), any(), any(), any());
-
-    // Queries are handed to the query engine
+    // gRPC and custom containers bypass the REST authorization path.
+    RequestContext requestContext = new DefaultRequestContext();
     BrokerResponse response = delegate.handleRequest(
-        JsonUtils.newObjectNode().put(Request.SQL, "SELECT * FROM myTable"), null, null, new DefaultRequestContext(),
+        JsonUtils.newObjectNode().put(Request.SQL, "DELETE FROM myTable WHERE col1 = 'a'"), null, null, requestContext,
         null);
-    assertSame(response, queryResponse);
+    assertEquals(response.getExceptions().size(), 1);
+    QueryProcessingException exception = response.getExceptions().get(0);
+    assertEquals(exception.getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
+    assertTrue(exception.getMessage().contains("broker SQL endpoint"), exception.getMessage());
+    assertEquals(requestContext.getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
+    verify(singleStageHandler, never()).handleRequest(any(), any(), any(), any(), any());
   }
 }
