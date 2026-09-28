@@ -21,13 +21,18 @@ package org.apache.pinot.query.runtime.operator;
 import java.io.IOException;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.RelFieldCollation.Direction;
+import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
@@ -39,6 +44,7 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator.Type;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -231,6 +237,82 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
+  public void shouldProfileEachSenderAcrossBlocksWithBoundedSerializedExtraction()
+      throws IOException {
+    Object[][] tieHeavyRows = new Object[70][];
+    Object[][] disorderedRows = new Object[70][];
+    for (int i = 0; i < 70; i++) {
+      tieHeavyRows[i] = new Object[]{i >= 64 ? null : (i % 3 == 0 ? 1 : 0), 1};
+      disorderedRows[i] = new Object[]{i, 2};
+    }
+    for (int i = 0; i < 16; i++) {
+      int index = i * 4;
+      Object[] row = disorderedRows[index];
+      disorderedRows[index] = disorderedRows[index + 1];
+      disorderedRows[index + 1] = row;
+    }
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(
+        new ReceivingMailbox.MseBlockWithStats(new SerializedDataBlock(
+            DataBlockBuilder.buildFromRows(Arrays.asList(tieHeavyRows).subList(0, 32), DATA_SCHEMA)), List.of()),
+        new ReceivingMailbox.MseBlockWithStats(new SerializedDataBlock(
+            DataBlockBuilder.buildFromRows(Arrays.asList(tieHeavyRows).subList(32, 70), DATA_SCHEMA)), List.of()),
+        OperatorTestUtil.eosWithEmptyStats());
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
+    when(_mailbox2.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, Arrays.copyOfRange(disorderedRows, 0, 20)),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, Arrays.copyOfRange(disorderedRows, 20, 70)),
+        OperatorTestUtil.eosWithEmptyStats());
+
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth,
+        RelDistribution.Type.HASH_DISTRIBUTED, Long.MAX_VALUE, true)) {
+      drain(operator);
+      StatMap<BaseMailboxReceiveOperator.StatKey> stats = operator.copyStatMaps();
+      assertEquals(stats.getLong(BaseMailboxReceiveOperator.StatKey.AUTO_SAMPLED_ROWS), 130L);
+      assertEquals(stats.getInt(BaseMailboxReceiveOperator.StatKey.AUTO_SAMPLE_STREAMS), 2);
+      assertEquals(stats.getInt(BaseMailboxReceiveOperator.StatKey.AUTO_CANDIDATE_STREAMS), 1);
+    }
+  }
+
+  @Test
+  public void shouldNotTreatReverseSortedStreamAsDisordered() {
+    Object[][] reverseSortedRows = new Object[65][];
+    for (int i = 0; i < reverseSortedRows.length; i++) {
+      reverseSortedRows[i] = new Object[]{65 - i, 1};
+    }
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, reverseSortedRows),
+        OperatorTestUtil.eosWithEmptyStats());
+
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadata1,
+        RelDistribution.Type.SINGLETON, Long.MAX_VALUE, true)) {
+      drain(operator);
+      StatMap<BaseMailboxReceiveOperator.StatKey> stats = operator.copyStatMaps();
+      assertEquals(stats.getInt(BaseMailboxReceiveOperator.StatKey.AUTO_SAMPLE_STREAMS), 1);
+      assertEquals(stats.getInt(BaseMailboxReceiveOperator.StatKey.AUTO_CANDIDATE_STREAMS), 0);
+    }
+  }
+
+  @Test
+  public void shouldPreserveBlocksWhenAutoProfilingCannotCompareRows() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA,
+        new Object[]{1, 1}, new Object[]{2, 2}), OperatorTestUtil.eosWithEmptyStats());
+    OpChainExecutionContext context = OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE,
+        _stageMetadata1);
+    MailboxReceiveNode node = mock(MailboxReceiveNode.class);
+    when(node.getDistributionType()).thenReturn(RelDistribution.Type.SINGLETON);
+    when(node.getSenderStageId()).thenReturn(1);
+    when(node.isAutoProfile()).thenReturn(true);
+    when(node.getCollations()).thenReturn(List.of(new RelFieldCollation(5)));
+    try (MailboxReceiveOperator operator = new MailboxReceiveOperator(context, node)) {
+      assertEquals(((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows().size(), 2);
+      assertTrue(operator.nextBlock().isSuccess());
+      assertEquals(operator.copyStatMaps().getInt(BaseMailboxReceiveOperator.StatKey.AUTO_CANDIDATE_STREAMS), 0);
+    }
+  }
+
+  @Test
   public void shouldGetReceptionReceiveErrorMailbox() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     String errorMessage = "TEST ERROR";
@@ -342,10 +424,20 @@ public class MailboxReceiveOperatorTest {
 
   private MailboxReceiveOperator getOperator(StageMetadata stageMetadata, RelDistribution.Type distributionType,
       long deadlineMs) {
+    return getOperator(stageMetadata, distributionType, deadlineMs, false);
+  }
+
+  private MailboxReceiveOperator getOperator(StageMetadata stageMetadata, RelDistribution.Type distributionType,
+      long deadlineMs, boolean autoProfile) {
     OpChainExecutionContext context = OperatorTestUtil.getOpChainContext(_mailboxService, deadlineMs, stageMetadata);
     MailboxReceiveNode node = mock(MailboxReceiveNode.class);
     when(node.getDistributionType()).thenReturn(distributionType);
     when(node.getSenderStageId()).thenReturn(1);
+    if (autoProfile) {
+      when(node.isAutoProfile()).thenReturn(true);
+      when(node.getCollations()).thenReturn(
+          List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST)));
+    }
     return new MailboxReceiveOperator(context, node);
   }
 
