@@ -215,10 +215,14 @@ public class OpenStructIndexType
     return EXTENSIONS;
   }
 
+  /// The OPEN_STRUCT column itself has no index to build -- its data lives in materialized children -- but those
+  /// children are not schema columns, so nothing else ever derives index configs for them. This handler does, and
+  /// then delegates to the ordinary per-index handlers. Without it a key's `valueFieldConfigs` take effect only at
+  /// segment creation and can never be changed by a reload.
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory,
       Map<String, FieldIndexConfigs> configsByCol, Schema schema, TableConfig tableConfig) {
-    return IndexHandler.NoOp.INSTANCE;
+    return new OpenStructPerKeyIndexHandler(segmentDirectory, configsByCol, schema, tableConfig);
   }
 
   @Nullable
