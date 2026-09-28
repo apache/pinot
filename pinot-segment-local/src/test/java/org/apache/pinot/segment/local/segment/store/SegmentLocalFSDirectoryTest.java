@@ -128,9 +128,8 @@ public class SegmentLocalFSDirectoryTest implements PinotBuffersAfterClassCheckR
         .build();
   }
 
-  /// Prefetching is bounded by a JVM-wide page counter that tests cannot reset, so rather than asserting on how many
-  /// pages got faulted in, these cases pin down the config contract: the byte limit is accepted, zero disables
-  /// prefetching, and reads stay correct either way.
+  /// The prefetched-page counter is JVM-wide, so each case resets it via [SegmentLocalFSDirectory#resetPrefetchedPages]
+  /// to get a deterministic baseline before asserting on how many pages actually got faulted in.
   @Test
   public void testPrefetchLimitDisabledStillReadsData()
       throws Exception {
@@ -138,6 +137,7 @@ public class SegmentLocalFSDirectoryTest implements PinotBuffersAfterClassCheckR
     FileUtils.deleteQuietly(prefetchDir);
     try {
       FileUtils.copyDirectory(_segmentDirectory.getPath().toFile(), prefetchDir);
+      SegmentLocalFSDirectory.resetPrefetchedPages();
       // 0 bytes disables prefetching entirely
       try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(prefetchDir, _metadata,
           ReadMode.mmap, prefetchLoaderContext(0))) {
@@ -149,6 +149,8 @@ public class SegmentLocalFSDirectoryTest implements PinotBuffersAfterClassCheckR
         try (SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
           verifyData(reader.getIndexFor("noPrefetchColumn", StandardIndexes.forward()));
         }
+        Assert.assertEquals(SegmentLocalFSDirectory.getPrefetchedPages(), 0,
+            "No pages should be faulted in when the prefetch limit is 0");
       }
     } finally {
       FileUtils.deleteQuietly(prefetchDir);
@@ -162,6 +164,7 @@ public class SegmentLocalFSDirectoryTest implements PinotBuffersAfterClassCheckR
     FileUtils.deleteQuietly(prefetchDir);
     try {
       FileUtils.copyDirectory(_segmentDirectory.getPath().toFile(), prefetchDir);
+      SegmentLocalFSDirectory.resetPrefetchedPages();
       // 8KB, i.e. a 2 page budget: exercises the slowdown branch that only faults in header pages
       try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(prefetchDir, _metadata,
           ReadMode.mmap, prefetchLoaderContext(8 * 1024))) {
@@ -173,6 +176,9 @@ public class SegmentLocalFSDirectoryTest implements PinotBuffersAfterClassCheckR
         try (SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
           verifyData(reader.getIndexFor("smallPrefetchColumn", StandardIndexes.forward()));
         }
+        // Slowdown threshold is floor(0.67 * 2) = 1 page, so exactly 1 page gets faulted in from a zero baseline
+        Assert.assertEquals(SegmentLocalFSDirectory.getPrefetchedPages(), 1,
+            "Exactly one page should be faulted in before the slowdown threshold kicks in");
       }
     } finally {
       FileUtils.deleteQuietly(prefetchDir);

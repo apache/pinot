@@ -311,6 +311,18 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
         : segmentDirectoryLoaderContext.getMaxMmapPrefetchBytes();
   }
 
+  /// The prefetched-page counter is JVM-wide and never reset in production, but tests need to observe it from a
+  /// known baseline to assert on prefetch behavior deterministically.
+  @VisibleForTesting
+  static long getPrefetchedPages() {
+    return PREFETCHED_PAGES.get();
+  }
+
+  @VisibleForTesting
+  static void resetPrefetchedPages() {
+    PREFETCHED_PAGES.set(0);
+  }
+
   private PinotDataBuffer getIndexForColumn(String column, IndexType<?, ?, ?> type)
       throws IOException {
     PinotDataBuffer buffer;

@@ -20,6 +20,7 @@ package org.apache.pinot.spi.config.instance;
 
 import java.util.Map;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 
 
@@ -61,7 +62,9 @@ public interface InstanceDataManagerConfig {
 
   /// Max amount of mmap'ed segment data to proactively fault into memory on segment load, in bytes.
   /// Zero disables prefetching. Only applies when [#getReadMode()] is [ReadMode#mmap].
-  long getMaxMmapPrefetchBytes();
+  default long getMaxMmapPrefetchBytes() {
+    return CommonConstants.Server.DEFAULT_MMAP_PREFETCH_MAX_SIZE_BYTES;
+  }
 
   int getMaxParallelSegmentBuilds();
 
