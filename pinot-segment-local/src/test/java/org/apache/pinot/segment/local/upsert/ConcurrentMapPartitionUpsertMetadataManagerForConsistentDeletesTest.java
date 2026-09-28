@@ -54,6 +54,7 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -69,8 +70,13 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -94,6 +100,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
       ThreadSafeMutableRoaringBitmap validDocIds, @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds,
       @Nullable List<PrimaryKey> primaryKeys) {
     ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
+    when(segment.tryAcquireReadLock()).thenReturn(true);
     when(segment.getSegmentName()).thenReturn(getSegmentName(sequenceNumber));
     when(segment.getValidDocIds()).thenReturn(validDocIds);
     when(segment.getQueryableDocIds()).thenReturn(queryableDocIds);
@@ -127,6 +134,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
       creationTimeMs = System.currentTimeMillis();
     }
     ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
+    when(segment.tryAcquireReadLock()).thenReturn(true);
     when(segment.getSegmentName()).thenReturn(getUploadedRealtimeSegmentName(creationTimeMs, suffix));
     when(segment.getValidDocIds()).thenReturn(validDocIds);
     when(segment.getQueryableDocIds()).thenReturn(queryableDocIds);
@@ -261,6 +269,75 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
   public void tearDown()
       throws IOException {
     FileUtils.forceDelete(INDEX_DIR);
+  }
+
+  @Test
+  public void testRevertDropsKeyWhenPreviousSegmentIsDestroyed()
+      throws IOException {
+    // dropOutOfOrderRecord turns on _previousKeyToRecordLocationMap tracking
+    UpsertContext upsertContext = _contextBuilder.setDropOutOfOrderRecord(true).build();
+    ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(REALTIME_TABLE_NAME, 0, upsertContext);
+
+    int[] primaryKeys = new int[]{10, 20};
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment1 =
+        mockImmutableSegment(1, validDocIds1, null, List.of(makePrimaryKey(10), makePrimaryKey(20)));
+    upsertMetadataManager.addSegment(segment1, validDocIds1, null,
+        List.of(new RecordInfo(makePrimaryKey(10), 0, 100, false), new RecordInfo(makePrimaryKey(20), 1, 200, false))
+            .iterator());
+
+    ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment mutableSegment = mockMutableSegmentWithDataSource(2, validDocIds2, null, primaryKeys);
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(10), 0, 150, false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(20), 1, 250, false));
+    assertEquals(upsertMetadataManager._previousKeyToRecordLocationMap.size(), 2);
+    // segment1 has no valid docs left, so removing it skips metadata cleanup and leaves the previous locations dangling
+    assertTrue(validDocIds1.getMutableRoaringBitmap().isEmpty());
+
+    // Previous segment destroyed: nothing to revert to, the keys are dropped without reading the segment
+    doReturn(false).when(segment1).tryAcquireReadLock();
+    upsertMetadataManager.revertAndRemoveSegment(mutableSegment,
+        List.of(Map.entry(0, makePrimaryKey(10)), Map.entry(1, makePrimaryKey(20))).iterator());
+    assertTrue(upsertMetadataManager._primaryKeyToRecordLocationMap.isEmpty());
+    assertTrue(upsertMetadataManager._previousKeyToRecordLocationMap.isEmpty());
+    verify(segment1, never()).getDataSource(anyString());
+
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
+  }
+
+  @Test
+  public void testPartialUpsertSkipsMergeWhenCurrentSegmentIsDestroyed()
+      throws IOException {
+    PartialUpsertHandler partialUpsertHandler = mock(PartialUpsertHandler.class);
+    UpsertContext upsertContext =
+        _contextBuilder.setPartialUpsertHandlerSupplier(() -> partialUpsertHandler).build();
+    ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(REALTIME_TABLE_NAME, 0, upsertContext);
+
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment1 =
+        mockImmutableSegment(1, validDocIds1, null, List.of(makePrimaryKey(1), makePrimaryKey(2)));
+    upsertMetadataManager.addSegment(segment1, validDocIds1, null,
+        List.of(new RecordInfo(makePrimaryKey(1), 0, 100, false), new RecordInfo(makePrimaryKey(2), 1, 200, false))
+            .iterator());
+
+    // Current segment alive: the previous row is read from it and merged
+    GenericRow record1 = new GenericRow();
+    upsertMetadataManager.updateRecord(record1, new RecordInfo(makePrimaryKey(1), 0, 150, false));
+    verify(partialUpsertHandler).merge(any(), same(record1), any());
+
+    // Current segment destroyed: the previous row must not be read, the record is returned as is
+    doReturn(false).when(segment1).tryAcquireReadLock();
+    GenericRow record2 = new GenericRow();
+    assertSame(upsertMetadataManager.updateRecord(record2, new RecordInfo(makePrimaryKey(2), 1, 250, false)),
+        record2);
+    // Still exactly one merge in total: none happened for the destroyed segment
+    verify(partialUpsertHandler, times(1)).merge(any(), any(), any());
+
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
   }
 
   @Test
