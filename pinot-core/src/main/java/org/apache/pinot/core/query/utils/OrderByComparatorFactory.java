@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.utils;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -101,11 +100,8 @@ public class OrderByComparatorFactory {
     Map<ExpressionContext, Integer> groupByExpressionIndexMap = getGroupByExpressionIndexMap(groupByExpressions);
     List<OrderByExpressionWithIndex> result = new ArrayList<>();
     // get index wrt group key for each order by expression
-    rowOrderByExpressions.forEach(expr -> {
-      Integer index = groupByExpressionIndexMap.get(expr.getExpression());
-      Preconditions.checkState(index != null, "ORDER BY expression: %s is not a GROUP BY key", expr.getExpression());
-      result.add(new OrderByExpressionWithIndex(expr, index));
-    });
+    rowOrderByExpressions.forEach(
+        expr -> result.add(new OrderByExpressionWithIndex(expr, groupByExpressionIndexMap.get(expr.getExpression()))));
     return result;
   }
 
