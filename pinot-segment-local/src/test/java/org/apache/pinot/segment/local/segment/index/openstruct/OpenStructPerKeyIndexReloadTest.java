@@ -43,6 +43,7 @@ import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
@@ -149,6 +150,36 @@ public class OpenStructPerKeyIndexReloadTest {
         "an ordinary column's inverted index must survive the reload");
   }
 
+  /// The per-key index matrix the end-to-end ingestion test uses: one key inverted, one dictionary-only, one raw.
+  /// A reload must leave all three as configured -- a raw key in particular must not be dragged into a dictionary.
+  @Test
+  public void testReloadOfAMixedPerKeyIndexMatrix()
+      throws Exception {
+    File segmentDir = buildSegment("mixedMatrix", withMixedMatrix());
+    reload(segmentDir, withMixedMatrix());
+
+    String views = OpenStructNaming.materializedColumnName(COLUMN, "views");
+    String cpu = OpenStructNaming.materializedColumnName(COLUMN, "cpu");
+    String host = OpenStructNaming.materializedColumnName(COLUMN, "host");
+    assertTrue(hasIndex(segmentDir, views, StandardIndexes.inverted()), "the inverted key keeps its index");
+    assertTrue(hasIndex(segmentDir, cpu, StandardIndexes.dictionary()), "the dictionary key keeps its dictionary");
+    assertFalse(hasIndex(segmentDir, host, StandardIndexes.dictionary()), "the raw key must stay raw");
+  }
+
+  private static OpenStructIndexConfig withMixedMatrix() {
+    FieldConfig views = new FieldConfig.Builder("views")
+        .withIndexes(JsonUtils.objectToJsonNode(Map.of("inverted", Map.of())))
+        .build();
+    FieldConfig cpu = new FieldConfig.Builder("cpu")
+        .withEncodingType(FieldConfig.EncodingType.DICTIONARY)
+        .build();
+    FieldConfig host = new FieldConfig.Builder("host")
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .build();
+    return new OpenStructIndexConfig(false, null, 3, Set.of("views", "cpu", "host"), 0.5,
+        List.of(views, cpu, host));
+  }
+
   // ---------------------------------------------------------------- fixtures
 
   private static OpenStructIndexConfig withoutPerKeyIndex() {
@@ -171,7 +202,10 @@ public class OpenStructPerKeyIndexReloadTest {
 
   private static Schema schema() {
     return new Schema.SchemaBuilder().setSchemaName(TABLE)
-        .addField(new ComplexFieldSpec(COLUMN, FieldSpec.DataType.OPEN_STRUCT, true, Map.of()))
+        .addField(new ComplexFieldSpec(COLUMN, FieldSpec.DataType.OPEN_STRUCT, true, Map.of(
+            "views", new DimensionFieldSpec("views", FieldSpec.DataType.LONG, true),
+            "cpu", new DimensionFieldSpec("cpu", FieldSpec.DataType.DOUBLE, true),
+            "host", new DimensionFieldSpec("host", FieldSpec.DataType.STRING, true))))
         .addSingleValueDimension(ORDINARY_COLUMN, FieldSpec.DataType.STRING)
         .build();
   }
@@ -192,6 +226,9 @@ public class OpenStructPerKeyIndexReloadTest {
     for (int docId = 0; docId < NUM_DOCS; docId++) {
       Map<String, Object> props = new HashMap<>();
       props.put(KEY, docId % 2 == 0 ? "us" : "eu");
+      props.put("views", (long) docId);
+      props.put("cpu", docId * 0.5);
+      props.put("host", "host-" + (docId % 5));
       GenericRow row = new GenericRow();
       row.putValue(COLUMN, props);
       row.putValue(ORDINARY_COLUMN, "id-" + (docId % 8));
