@@ -1281,7 +1281,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
   @DataProvider
   public Object[][] revertFailureCases() {
     return new Object[][]{
-        {"reader"}, {"bitmap"}, {"none"}
+        {"reader"}, {"bitmap"}, {"concurrent"}, {"none"}
     };
   }
 
@@ -1306,7 +1306,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
       ThreadSafeMutableRoaringBitmap previousValidDocIds = new ThreadSafeMutableRoaringBitmap();
       when(previousSegment.getValidDocIds()).thenReturn(failure.equals("bitmap") ? null : previousValidDocIds);
       PrimaryKey key = makePrimaryKey(10);
-      manager._primaryKeyToRecordLocationMap.put(key, new RecordLocation(segment, 0, 200, 2));
+      // "concurrent": the next consuming segment took the key while this segment was being replaced
+      MutableSegment nextSegment = mock(MutableSegment.class);
+      when(nextSegment.getSegmentName()).thenReturn(getSegmentName(2));
+      boolean concurrent = failure.equals("concurrent");
+      manager._primaryKeyToRecordLocationMap.put(key, new RecordLocation(concurrent ? nextSegment : segment, 0,
+          concurrent ? 300 : 200, 2));
       manager._previousKeyToRecordLocationMap.put(key, new RecordLocation(previousSegment, 0, 100, 2));
       manager._trackedSegments.add(segment);
       try (MockedConstruction<UpsertUtils.RecordInfoReader> readers =
@@ -1319,18 +1324,21 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
           })) {
         manager.removeSegment(segment);
         assertFalse(manager._trackedSegments.contains(segment));
-        assertEquals(readers.constructed().size(), failure.equals("bitmap") ? 0 : 1);
+        assertEquals(readers.constructed().size(), failure.equals("bitmap") || concurrent ? 0 : 1);
       }
       boolean successfulRevert = failure.equals("none");
       if (successfulRevert) {
         checkRecordLocation(manager._primaryKeyToRecordLocationMap, 10, previousSegment, 0, 100, 1, HashFunction.NONE);
         assertTrue(previousValidDocIds.contains(0));
         assertFalse(validDocIds.contains(0));
+      } else if (concurrent) {
+        checkRecordLocation(manager._primaryKeyToRecordLocationMap, 10, nextSegment, 0, 300, 1, HashFunction.NONE);
       } else {
         assertFalse(manager._primaryKeyToRecordLocationMap.containsKey(key),
             "Preserve the existing key-removal fallback");
       }
-      assertTrue(manager._previousKeyToRecordLocationMap.isEmpty());
+      // Removal reverts keys directly, so a key owned by the next consuming segment keeps its previous location
+      assertEquals(manager._previousKeyToRecordLocationMap.containsKey(key), concurrent);
       verify(metrics, times(successfulRevert ? 0 : 1))
           .addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
       verify(context.getTableDataManager(), never()).addSegmentError(anyString(), any());

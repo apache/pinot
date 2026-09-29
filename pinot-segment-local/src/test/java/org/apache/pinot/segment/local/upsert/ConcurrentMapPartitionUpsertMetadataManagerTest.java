@@ -2479,7 +2479,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   @DataProvider
   public Object[][] handledRevertFailureCases() {
     return new Object[][]{
-        {"reader"}, {"bitmap"}
+        {"reader"}, {"bitmap"}, {"concurrent"}
     };
   }
 
@@ -2504,7 +2504,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       when(previousSegment.getValidDocIds()).thenReturn(
           failure.equals("bitmap") ? null : new ThreadSafeMutableRoaringBitmap());
       PrimaryKey key = makePrimaryKey(10);
-      manager._primaryKeyToRecordLocationMap.put(key, new RecordLocation(segment, 0, 200));
+      // "concurrent": the next consuming segment took the key while this segment was being replaced
+      MutableSegment nextSegment = mock(MutableSegment.class);
+      when(nextSegment.getSegmentName()).thenReturn(getSegmentName(2));
+      boolean concurrent = failure.equals("concurrent");
+      manager._primaryKeyToRecordLocationMap.put(key,
+          concurrent ? new RecordLocation(nextSegment, 0, 300) : new RecordLocation(segment, 0, 200));
       manager._previousKeyToRecordLocationMap.put(key, new RecordLocation(previousSegment, 0, 100));
       manager._trackedSegments.add(segment);
       try (MockedConstruction<UpsertUtils.RecordInfoReader> readers =
@@ -2518,10 +2523,15 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
         // Use the actual backend removal. Existing reader/bitmap fallbacks must finish without throwing.
         manager.removeSegment(segment);
         assertFalse(manager._trackedSegments.contains(segment));
-        assertEquals(readers.constructed().size(), failure.equals("bitmap") ? 0 : 1);
+        assertEquals(readers.constructed().size(), failure.equals("bitmap") || concurrent ? 0 : 1);
       }
-      assertFalse(manager._primaryKeyToRecordLocationMap.containsKey(key),
-          "Preserve the existing key-removal fallback");
+      if (concurrent) {
+        assertSame(manager._primaryKeyToRecordLocationMap.get(key).getSegment(), nextSegment,
+            "Keep the key in the next consuming segment");
+      } else {
+        assertFalse(manager._primaryKeyToRecordLocationMap.containsKey(key),
+            "Preserve the existing key-removal fallback");
+      }
       assertTrue(manager._previousKeyToRecordLocationMap.isEmpty());
       verify(metrics).addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
       verify(context.getTableDataManager(), never()).addSegmentError(anyString(), any());

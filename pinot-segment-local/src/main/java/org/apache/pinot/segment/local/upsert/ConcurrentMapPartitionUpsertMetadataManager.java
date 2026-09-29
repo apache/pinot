@@ -267,12 +267,12 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               // The consuming segment's key is in a different immutable segment
               _previousKeyToRecordLocationMap.remove(pk);
             } else {
-              _logger.warn(
-                  "Consuming segment: {} has added the primary key for docId: {} from the segment: {}, suggesting"
-                      + " that consumption is occurring concurrently with segment replacement, which is undesirable "
-                      + "for consistency between replicas for the table: {}.",
-                  recordLocation.getSegment().getSegmentName(), primaryKeyEntry.getKey(), segment.getSegmentName(),
+              _logger.warn("UPSERT_METADATA_REVERT_FAILED: segment={}. Consuming segment: {} has added the primary "
+                      + "key for docId: {}, suggesting that consumption is occurring concurrently with segment "
+                      + "replacement, which is undesirable for consistency between replicas for the table: {}.",
+                  segment.getSegmentName(), recordLocation.getSegment().getSegmentName(), primaryKeyEntry.getKey(),
                   _tableNameWithType);
+              _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
             }
             return recordLocation;
           });
