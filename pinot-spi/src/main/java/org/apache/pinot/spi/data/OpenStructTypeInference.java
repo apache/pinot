@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.data;
 
+import java.util.Collection;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.PinotDataType;
 
@@ -64,5 +65,43 @@ public final class OpenStructTypeInference {
       default:
         return null;
     }
+  }
+
+  /// The elements of a multi-value raw value, or null when the value is not a collection.
+  ///
+  /// Covers what actually reaches an OPEN_STRUCT map value: a `List` from a JSON decoder, a `GenericData.Array`
+  /// or any other `Collection` from Avro, and an `Object[]` from a GenericRow that was already normalized.
+  @Nullable
+  public static Object[] asMultiValue(Object rawValue) {
+    if (rawValue instanceof Object[]) {
+      return (Object[]) rawValue;
+    }
+    if (rawValue instanceof Collection) {
+      return ((Collection<?>) rawValue).toArray();
+    }
+    return null;
+  }
+
+  /// One element type for a multi-value value, or null when the elements say nothing -- an empty collection, or
+  /// one holding only nulls. Elements that disagree resolve to STRING, the same answer a key whose values drift
+  /// across rows gets, so a mixed array stays readable rather than losing its odd elements.
+  @Nullable
+  public static FieldSpec.DataType inferElementDataType(Object[] elements) {
+    FieldSpec.DataType resolved = null;
+    for (Object element : elements) {
+      if (element == null) {
+        continue;
+      }
+      FieldSpec.DataType elementType = inferDataType(element);
+      if (elementType == null) {
+        return FieldSpec.DataType.STRING;
+      }
+      if (resolved == null) {
+        resolved = elementType;
+      } else if (resolved != elementType) {
+        return FieldSpec.DataType.STRING;
+      }
+    }
+    return resolved;
   }
 }

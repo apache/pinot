@@ -28,6 +28,9 @@ package org.apache.pinot.segment.spi.index;
 /// In order to mark a class as a [java.util.ServiceLoader] service, some metadata has to be added. Java modules
 /// define a typesafe way to define services, but given that Pinot does not use them right now, the easier way to create
 /// these services is by using Google AutoService. BloomIndexPlugin can be used as example.
+///
+/// All plugins together can register at most [IndexService#MAX_INDEX_TYPES] distinct index types: an [IndexService]
+/// built from a larger set fails at construction. See that constant for where the limit comes from.
 public interface IndexPlugin<T extends IndexType<?, ?, ?>> {
   int DEFAULT_PRIORITY = 0;
   T getIndexType();

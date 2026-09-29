@@ -100,6 +100,7 @@
       <classifier>test</classifier>
       <scope>test</scope>
     </dependency>
+    <!-- Runtime dependency of Kafka's KafkaClusterTestKit, which EmbeddedKafkaCluster starts; not a test framework -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>

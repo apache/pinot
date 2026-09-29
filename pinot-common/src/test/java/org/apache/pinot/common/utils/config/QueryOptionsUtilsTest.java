@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.*;
@@ -130,6 +131,24 @@ public class QueryOptionsUtilsTest {
     Map<String, Set<FieldConfig.IndexType>> skipIndexes = QueryOptionsUtils.getSkipIndexes(queryOptions);
     assertEquals(skipIndexes.get("col1"), Set.of(FieldConfig.IndexType.RANGE, FieldConfig.IndexType.INVERTED));
     assertEquals(skipIndexes.get("col2"), Set.of(FieldConfig.IndexType.SORTED));
+  }
+
+  /// Asserts that spaces around column names and index types are ignored.
+  @Test(dataProvider = "skipIndexesWithSpaces")
+  public void testSkipIndexesParsingWithSpaces(String skipIndexesStr) {
+    Map<String, Set<FieldConfig.IndexType>> skipIndexes =
+        QueryOptionsUtils.getSkipIndexes(Map.of(SKIP_INDEXES, skipIndexesStr));
+    assertEquals(skipIndexes, Map.of("col1", Set.of(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE),
+        "col2", Set.of(FieldConfig.IndexType.SORTED)));
+  }
+
+  @DataProvider
+  public Object[][] skipIndexesWithSpaces() {
+    return new Object[][]{
+        {"col1=inverted, range&col2=sorted"},
+        {"col1=inverted,range& col2=sorted"},
+        {" col1 = inverted , range & col2 = sorted "}
+    };
   }
 
   @Test(expectedExceptions = RuntimeException.class)

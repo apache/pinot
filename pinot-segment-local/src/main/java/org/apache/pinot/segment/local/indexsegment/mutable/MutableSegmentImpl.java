@@ -382,7 +382,8 @@ public class MutableSegmentImpl implements MutableSegment {
           // See isNoDictionaryColumn to have more context.
           dictionaryIndexConfig = DictionaryIndexConfig.DEFAULT;
         }
-        dictionary = DictionaryIndexType.createMutableDictionary(context, dictionaryIndexConfig);
+        dictionary = ((DictionaryIndexType) StandardIndexes.dictionary()).createMutableDictionary(context,
+            dictionaryIndexConfig);
       } else {
         dictionary = null;
         if (!fieldSpec.isSingleValueField()) {

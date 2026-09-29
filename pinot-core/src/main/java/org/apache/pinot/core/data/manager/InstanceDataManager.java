@@ -66,7 +66,9 @@ public interface InstanceDataManager {
   /// Should be called only once. After calling shut down, no other method should be called.
   void shutDown();
 
-  /// Delete a table.
+  /// Deletes a table: records `deletionTimeMs` as the table's newest deletion time, even when this instance never
+  /// created a data manager for it, then shuts down and removes the data manager if one exists. Until that record
+  /// expires, a same-name recreation is accepted only from a table config created after the recorded time.
   void deleteTable(String tableNameWithType, long deletionTimeMs)
       throws Exception;
 

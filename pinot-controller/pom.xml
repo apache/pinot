@@ -108,6 +108,7 @@
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- @Suite classes under suites/ that split the controller tests into the stateful and stateless runs -->
     <dependency>
       <groupId>org.junit.platform</groupId>
       <artifactId>junit-platform-suite</artifactId>

@@ -252,7 +252,9 @@ public class TablesResource {
 
             Set<String> allSegmentColumns = segmentMetadata.getAllColumns();
             if (columnSet == null) {
-              columnSet = allSegmentColumns;
+              // Copy: getAllColumns() is a view of the segment's own columns, and retainAll below would otherwise
+              // narrow the first segment's metadata rather than the running intersection.
+              columnSet = new HashSet<>(allSegmentColumns);
             } else {
               columnSet.retainAll(allSegmentColumns);
             }
