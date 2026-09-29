@@ -69,6 +69,12 @@ import org.slf4j.LoggerFactory;
 /// - Use [InvertedIndexHandler] to create inverted indices
 /// - Use [DefaultColumnHandler] to update auto-generated default columns
 /// - Use [ColumnMinMaxValueGenerator] to add min/max value to column metadata
+///
+/// Subclasses (plugged in through [SegmentPreProcessorProvider]) can narrow what a run does by overriding
+/// [#createHandler], [#getColumnMinMaxValueGeneratorMode], [#shouldProcessStarTrees] and
+/// [#shouldProcessMultiColumnTextIndex]. [#needProcess] and [#process] consult the same hooks, so a step a subclass
+/// defers is neither reported as pending nor executed. Default column handling is not overridable because skipping it
+/// would leave schema columns missing from the segment.
 public class SegmentPreProcessor implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreProcessor.class);
 
@@ -202,8 +208,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       segmentMetadata = _segmentDirectory.getSegmentMetadata();
 
       // Add min/max value to column metadata according to the prune mode.
-      ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode =
-          _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
+      ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode = getColumnMinMaxValueGeneratorMode();
       if (columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE) {
         ColumnMinMaxValueGenerator columnMinMaxValueGenerator =
             new ColumnMinMaxValueGenerator(segmentMetadata, segmentWriter, columnMinMaxValueGeneratorMode);
@@ -217,12 +222,13 @@ public class SegmentPreProcessor implements AutoCloseable {
     // Startree creation will load the segment again, so we need to close and re-open the segment writer to make sure
     // that the other required indices (e.g. forward index) are up-to-date.
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
-      if (processStarTrees(indexDir, segmentOperationsThrottlerSet)) {
+      if (shouldProcessStarTrees() && processStarTrees(indexDir, segmentOperationsThrottlerSet)) {
         _segmentDirectory.reloadMetadata();
         segmentWriter.save();
       }
       // Create/modify/remove multi-col text index if required.
-      if (processMultiColTextIndex(indexDir, segmentWriter, segmentOperationsThrottlerSet)) {
+      if (shouldProcessMultiColumnTextIndex()
+          && processMultiColTextIndex(indexDir, segmentWriter, segmentOperationsThrottlerSet)) {
         // NOTE: When adding new steps after this, un-comment the next line.
         //_segmentDirectory.reloadMetadata();
         segmentWriter.save();
@@ -230,9 +236,31 @@ public class SegmentPreProcessor implements AutoCloseable {
     }
   }
 
-  private IndexHandler createHandler(IndexType<?, ?, ?> type) {
+  /// Creates the handler that brings the segment's indexes of the given type in line with the index loading config.
+  /// Used by both [#needProcess] and [#process]. Subclasses may return [IndexHandler.NoOp#INSTANCE] to leave the
+  /// segment's indexes of that type untouched for this run: nothing is built and nothing is removed. The forward index
+  /// handler is created through this method too; deferring it also defers the dictionary changes it performs, which
+  /// dictionary-based indexes such as inverted and FST depend on.
+  protected IndexHandler createHandler(IndexType<?, ?, ?> type) {
     return type.createIndexHandler(_segmentDirectory, _indexLoadingConfig.getFieldIndexConfigByColName(), _schema,
         _tableConfig);
+  }
+
+  /// Returns the mode used to add missing column min/max values. Defaults to the index loading config's mode.
+  protected ColumnMinMaxValueGeneratorMode getColumnMinMaxValueGeneratorMode() {
+    return _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
+  }
+
+  /// Returns whether star-trees are created, modified or removed in this run. When `false`, existing star-trees are
+  /// left as they are, including ones that no longer match the config.
+  protected boolean shouldProcessStarTrees() {
+    return true;
+  }
+
+  /// Returns whether the multi-column text index is created, modified or removed in this run. When `false`, an
+  /// existing multi-column text index is left as it is.
+  protected boolean shouldProcessMultiColumnTextIndex() {
+    return true;
   }
 
   /// This method checks if there is any discrepancy between the segment and current table config and schema.
@@ -261,13 +289,13 @@ public class SegmentPreProcessor implements AutoCloseable {
         }
       }
       // Check if there is need to create/modify/remove star-trees.
-      if (needProcessStarTrees()) {
+      if (shouldProcessStarTrees() && needProcessStarTrees()) {
         LOGGER.info("Found startree index needs updates in segment: {}", segmentName);
         return true;
       }
 
       // Check if there is need to create/modify/remove multi-col text index
-      if (needProcessMultiColumnTextIndex()) {
+      if (shouldProcessMultiColumnTextIndex() && needProcessMultiColumnTextIndex()) {
         LOGGER.info("Found multi-column text index needs updates in segment: {}", segmentName);
         return true;
       }
@@ -284,8 +312,7 @@ public class SegmentPreProcessor implements AutoCloseable {
   }
 
   private List<String> columnMinMaxValueUpdates() {
-    ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode =
-        _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
+    ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode = getColumnMinMaxValueGeneratorMode();
     if (columnMinMaxValueGeneratorMode == ColumnMinMaxValueGeneratorMode.NONE) {
       return List.of();
     }

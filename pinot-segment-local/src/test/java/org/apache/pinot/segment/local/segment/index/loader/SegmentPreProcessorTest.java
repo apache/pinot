@@ -58,6 +58,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -1863,6 +1864,72 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     // Remove new indexes
     resetIndexConfigs();
     runPreProcessor(_newColumnsSchemaWithH3Json);
+  }
+
+  @Test
+  public void testSubclassDefersPreprocessSteps()
+      throws Exception {
+    buildV3Segment();
+    removeMinMaxValuesFromMetadataFile();
+    // Pending work of every overridable kind: add an inverted index (column1), remove one (column7), add a star-tree
+    // and fill in min/max values.
+    _invertedIndexColumns.remove(COLUMN7_NAME);
+    _invertedIndexColumns.add(COLUMN1_NAME);
+    _enableDefaultStarTree = true;
+    _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.ALL;
+
+    // A subclass deferring those steps reports nothing pending and changes nothing.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new DeferringSegmentPreProcessor(segmentDirectory,
+            createIndexLoadingConfig(_schema))) {
+      assertFalse(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      assertFalse(reader.hasIndexFor(COLUMN1_NAME, StandardIndexes.inverted()));
+      assertTrue(reader.hasIndexFor(COLUMN7_NAME, StandardIndexes.inverted()));
+    }
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    assertNull(segmentMetadata.getStarTreeV2MetadataList());
+    assertNull(segmentMetadata.getColumnMetadataFor(COLUMN1_NAME).getMinValue());
+
+    // The default pre-processor then performs the deferred work.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, createIndexLoadingConfig(_schema))) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      assertTrue(reader.hasIndexFor(COLUMN1_NAME, StandardIndexes.inverted()));
+      assertFalse(reader.hasIndexFor(COLUMN7_NAME, StandardIndexes.inverted()));
+    }
+    segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    assertNotNull(segmentMetadata.getStarTreeV2MetadataList());
+    assertNotNull(segmentMetadata.getColumnMetadataFor(COLUMN1_NAME).getMinValue());
+  }
+
+  /// Defers inverted index changes, star-tree changes and min/max generation.
+  private static class DeferringSegmentPreProcessor extends SegmentPreProcessor {
+    DeferringSegmentPreProcessor(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
+      super(segmentDirectory, indexLoadingConfig);
+    }
+
+    @Override
+    protected IndexHandler createHandler(IndexType<?, ?, ?> type) {
+      return type == StandardIndexes.inverted() ? IndexHandler.NoOp.INSTANCE : super.createHandler(type);
+    }
+
+    @Override
+    protected ColumnMinMaxValueGeneratorMode getColumnMinMaxValueGeneratorMode() {
+      return ColumnMinMaxValueGeneratorMode.NONE;
+    }
+
+    @Override
+    protected boolean shouldProcessStarTrees() {
+      return false;
+    }
   }
 
   private void verifyProcessNeeded()
