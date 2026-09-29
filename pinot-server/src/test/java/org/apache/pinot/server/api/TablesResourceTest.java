@@ -502,9 +502,9 @@ public class TablesResourceTest extends BaseResourceTest {
     assertEquals(diagnostics.get("snapshotCapturedAtMs").asLong(), capturedAt);
     assertTrue(diagnostics.get("snapshotAgeMs").asLong() >= beforeRequest - capturedAt);
     assertTrue(diagnostics.get("snapshotAgeMs").asLong() <= afterRequest - capturedAt);
-    assertEquals(diagnostics.get("snapshotTriggerSegmentName").asText(), trigger.segmentName());
-    assertEquals(diagnostics.get("snapshotTriggerStartOffset").asText(), trigger.startOffset());
-    assertEquals(diagnostics.get("validDocIdsCrc32").asLong(),
+    assertEquals(diagnostics.get("snapshotConsumingSegmentName").asText(), trigger.consumingSegmentName());
+    assertEquals(diagnostics.get("snapshotConsumedUpToOffset").asText(), trigger.consumedUpToOffset());
+    assertEquals(diagnostics.get("docIdsCrc32").asLong(),
         expectedType.equals("SNAPSHOT") ? 4200314552L : 569535174L);
   }
 

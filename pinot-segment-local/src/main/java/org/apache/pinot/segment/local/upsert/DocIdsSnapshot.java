@@ -42,23 +42,24 @@ public record DocIdsSnapshot(MutableRoaringBitmap docIds, @Nullable Metadata met
   private static final int MAGIC = 0x5044534D; // PDSM: Pinot doc ids snapshot metadata
   private static final int VERSION = 1;
 
-  /// This identifies the consumer startup that triggered a snapshot, not a partition consistency watermark.
-  public record Trigger(String segmentName, String startOffset) {
+  /// The consumer startup that triggered a snapshot. consumedUpToOffset is exclusive, the first offset that consumer
+  /// reads, and is not a partition consistency watermark.
+  public record Trigger(String consumingSegmentName, String consumedUpToOffset) {
   }
 
-  public record Metadata(long validDocIdsCrc32, long snapshotCapturedAtMs,
-                         @Nullable String snapshotTriggerSegmentName, @Nullable String snapshotTriggerStartOffset) {
+  public record Metadata(long docIdsCrc32, long snapshotCapturedAtMs,
+                         @Nullable String snapshotConsumingSegmentName, @Nullable String snapshotConsumedUpToOffset) {
     public Map<String, Object> toResponse(long nowMs) {
       Map<String, Object> response = new HashMap<>();
-      response.put("validDocIdsCrc32", validDocIdsCrc32);
+      response.put("docIdsCrc32", docIdsCrc32);
       response.put("snapshotCapturedAtMs", snapshotCapturedAtMs);
       // Do not turn clock skew into an apparently fresh snapshot.
       if (nowMs >= snapshotCapturedAtMs) {
         response.put("snapshotAgeMs", nowMs - snapshotCapturedAtMs);
       }
-      if (snapshotTriggerSegmentName != null && snapshotTriggerStartOffset != null) {
-        response.put("snapshotTriggerSegmentName", snapshotTriggerSegmentName);
-        response.put("snapshotTriggerStartOffset", snapshotTriggerStartOffset);
+      if (snapshotConsumingSegmentName != null && snapshotConsumedUpToOffset != null) {
+        response.put("snapshotConsumingSegmentName", snapshotConsumingSegmentName);
+        response.put("snapshotConsumedUpToOffset", snapshotConsumedUpToOffset);
       }
       return response;
     }
@@ -85,8 +86,8 @@ public record DocIdsSnapshot(MutableRoaringBitmap docIds, @Nullable Metadata met
       crc.update(docId >>> 8);
       crc.update(docId);
     }
-    Metadata metadata = new Metadata(crc.getValue(), capturedAtMs, trigger != null ? trigger.segmentName() : null,
-        trigger != null ? trigger.startOffset() : null);
+    Metadata metadata = new Metadata(crc.getValue(), capturedAtMs,
+        trigger != null ? trigger.consumingSegmentName() : null, trigger != null ? trigger.consumedUpToOffset() : null);
     byte[] json = JsonUtils.objectToString(metadata).getBytes(StandardCharsets.UTF_8);
     byte[] bytes = ByteBuffer.allocate(snapshot.getBytes().length + 2 * Integer.BYTES + json.length)
         .put(snapshot.getBytes()).putInt(MAGIC).putInt(VERSION).put(json).array();
@@ -103,8 +104,8 @@ public record DocIdsSnapshot(MutableRoaringBitmap docIds, @Nullable Metadata met
         try {
           Metadata parsed = JsonUtils.stringToObject(
               new String(bytes, trailer.position(), trailer.remaining(), StandardCharsets.UTF_8), Metadata.class);
-          if (parsed.snapshotCapturedAtMs() > 0 && parsed.validDocIdsCrc32() >= 0
-              && parsed.validDocIdsCrc32() <= 0xFFFFFFFFL) {
+          if (parsed.snapshotCapturedAtMs() > 0 && parsed.docIdsCrc32() >= 0
+              && parsed.docIdsCrc32() <= 0xFFFFFFFFL) {
             metadata = parsed;
           }
         } catch (Exception e) {

@@ -893,9 +893,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   @Override
-  public void takeSnapshot(String consumingSegmentName, String startOffset) {
+  public void takeSnapshot(String consumingSegmentName, String consumedUpToOffset) {
     DocIdsSnapshot.Trigger previous = _snapshotTrigger.get();
-    _snapshotTrigger.set(new DocIdsSnapshot.Trigger(consumingSegmentName, startOffset));
+    _snapshotTrigger.set(new DocIdsSnapshot.Trigger(consumingSegmentName, consumedUpToOffset));
     try {
       takeSnapshot();
     } finally {
