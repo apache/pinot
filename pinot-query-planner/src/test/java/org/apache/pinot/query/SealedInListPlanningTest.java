@@ -125,6 +125,9 @@ public class SealedInListPlanningTest extends QueryEnvironmentTestBase {
         "SELECT col1 FROM a WHERE col3 IN (" + STRINGS.replace("'v", "'") + ")",
         "SELECT col1 FROM a WHERE NOT (col3 IN (" + INTS + ") AND col1 = 'x')",
         "SELECT col1 FROM a WHERE " + OR_CHAIN,
+        // All fields stay, so field trimming does not fold the chain before sealing.
+        "SELECT * FROM a WHERE " + OR_CHAIN,
+        "SELECT * FROM a WHERE " + OR_CHAIN.replaceAll("col3 = (\\d+)", "$1 = col3"),
         "SELECT SUM(CASE WHEN col3 IN (" + INTS + ") THEN 1 ELSE 0 END) FROM a",
         "SELECT SUM(CASE WHEN col3 NOT IN (" + INTS + ") THEN 1 ELSE 0 END) FROM a",
         "SELECT COUNT(*) FILTER (WHERE col3 IN (" + INTS + ")), COUNT(*) FROM a",
