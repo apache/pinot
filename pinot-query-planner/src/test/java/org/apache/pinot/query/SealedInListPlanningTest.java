@@ -89,6 +89,9 @@ public class SealedInListPlanningTest extends QueryEnvironmentTestBase {
 
   /// The same tables with column-based null handling, so that their columns are nullable.
   private QueryEnvironment _nullableQueryEnvironment;
+  /// The nullable tables, planned as the broker plans queries without null handling.
+  private QueryEnvironment _withoutNullHandling;
+  private QueryEnvironment _guardedWithoutNullHandling;
 
   @BeforeClass
   public void setUpNullableTables() {
@@ -99,6 +102,10 @@ public class SealedInListPlanningTest extends QueryEnvironmentTestBase {
     }
     _nullableQueryEnvironment =
         getQueryEnvironment(3, 1, 2, schemas, SERVER1_SEGMENTS, SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP);
+    Map<String, Schema> allSchemas = new HashMap<>(TABLE_SCHEMAS);
+    allSchemas.putAll(schemas);
+    _withoutNullHandling = newQueryEnvironment(allSchemas, false);
+    _guardedWithoutNullHandling = newQueryEnvironment(allSchemas, true);
   }
 
   @DataProvider(name = "samePlanQueries")
@@ -209,14 +216,14 @@ public class SealedInListPlanningTest extends QueryEnvironmentTestBase {
     assertEquals(serializedStages(query), serializedStages(unsealed));
   }
 
-  /// Null checks on the column of a large list must give the same plan as without sealing. Calcite folds
-  /// `x IS NOT NULL` into the Sarg of `x NOT IN (...)` as `NULL AS FALSE`. If the list were sealed first, Calcite would
-  /// instead drop the `IS NOT NULL` as redundant, and servers that run without null handling would return the rows
-  /// where `x` is null.
+  /// Null checks on the column of a large list must give the same plan as without sealing. This planner uses Calcite's
+  /// `IS NULL` and `IS NOT NULL`, as the broker does with null handling. Calcite folds `x IS NOT NULL` into the Sarg of
+  /// `x NOT IN (...)` as `NULL AS FALSE`, and the lists are sealed after this, so the plans stay the same.
   ///
   /// Not in this list: a null check in another clause than the list (for example the list in `JOIN ... ON` and
   /// `x IS NOT NULL` in `WHERE`) only meets the sealed list during optimization. Calcite then drops the null check as
-  /// redundant, which is correct in SQL, as it does on master for `x < 5 AND x IS NOT NULL`.
+  /// redundant, as it does next to `x < 5`. This is correct, because with null handling the servers apply SQL null
+  /// semantics. [#testNullChecksWithoutNullHandling] covers these queries without null handling.
   @DataProvider(name = "nullableColumnQueries")
   public Object[][] nullableColumnQueries() {
     List<String> queries = List.of(
@@ -239,6 +246,52 @@ public class SealedInListPlanningTest extends QueryEnvironmentTestBase {
       }
     }
     return cases.toArray(new Object[0][]);
+  }
+
+  /// Null checks with the planner set up as the broker does it for queries without null handling. The planner then uses
+  /// Pinot's `IS NULL` and `IS NOT NULL` operators, which Calcite cannot see into. So a null check stays in the plan,
+  /// wherever it is, and the plan is the same as without sealing.
+  @DataProvider(name = "nullChecksWithoutNullHandling")
+  public Object[][] nullChecksWithoutNullHandling() {
+    List<String> queries = List.of(
+        // The null check is in another clause than the list.
+        "SELECT a.col1 FROM a JOIN b ON a.col1 = b.col1 AND b.col3 NOT IN (" + INTS + ") WHERE b.col3 IS NOT NULL",
+        "SELECT a.col1 FROM a LEFT JOIN b ON a.col1 = b.col1 AND b.col3 NOT IN (" + INTS + ") "
+            + "WHERE b.col3 IS NOT NULL",
+        "SELECT col1 FROM (SELECT col1, col3 FROM a WHERE col3 NOT IN (" + INTS + ")) t WHERE t.col3 IS NOT NULL",
+        "SELECT col1 FROM (SELECT col1, col3 FROM a WHERE col3 IN (" + INTS + ")) t WHERE t.col3 IS NOT NULL",
+        "WITH t AS (SELECT col1, col3 FROM a WHERE col3 NOT IN (" + INTS + ")) SELECT col1 FROM t "
+            + "WHERE col3 IS NOT NULL",
+        // The null check is on a column that the column of the list is joined on.
+        "SELECT a.col1 FROM a JOIN b ON a.col3 = b.col6 WHERE a.col3 NOT IN (" + INTS + ") AND b.col6 IS NOT NULL",
+        // The null check is in the same condition as the list.
+        "SELECT col1 FROM a WHERE col3 NOT IN (" + INTS + ") AND col3 IS NOT NULL",
+        "SELECT col1 FROM a WHERE col3 IN (" + INTS + ") OR col3 IS NULL",
+        // NOT IN over a sub-query adds null checks of its own.
+        "SELECT col1 FROM (SELECT col1, col3 FROM a WHERE col3 NOT IN (" + INTS + ")) t "
+            + "WHERE t.col3 NOT IN (SELECT col6 FROM b)"
+    );
+    List<Object[]> cases = new ArrayList<>();
+    for (String query : queries) {
+      cases.add(new Object[]{query});
+      cases.add(new Object[]{"SET usePhysicalOptimizer=true; " + query});
+    }
+    return cases.toArray(new Object[0][]);
+  }
+
+  @Test(dataProvider = "nullChecksWithoutNullHandling")
+  public void testNullChecksWithoutNullHandling(String query) {
+    String unsealed = "SET sealedInListThreshold=0; " + query;
+    String explained = explain(_withoutNullHandling, query);
+    if (query.contains(" IS NOT NULL") || query.contains(" IS NULL")) {
+      assertTrue(explained.contains(" NULL($"), explained);
+    }
+    assertEquals(explained, explain(_withoutNullHandling, unsealed));
+    assertEquals(serializedStages(_withoutNullHandling, query), serializedStages(_withoutNullHandling, unsealed));
+    // The list is sealed: no planner rule sees it.
+    try (QueryEnvironment.CompiledQuery compiledQuery = _guardedWithoutNullHandling.compile(query)) {
+      compiledQuery.planQuery(1);
+    }
   }
 
   @Test(dataProvider = "nullableColumnQueries")
@@ -392,8 +445,14 @@ public class SealedInListPlanningTest extends QueryEnvironmentTestBase {
   }
 
   private static QueryEnvironment getGuardedQueryEnvironment() {
+    return newQueryEnvironment(TABLE_SCHEMAS, true);
+  }
+
+  /// Returns a planner that is set up like the broker for queries without null handling. With `guarded`, a
+  /// [LargeSargGuardRule] runs before the first rule and after each rule of every phase.
+  private static QueryEnvironment newQueryEnvironment(Map<String, Schema> schemas, boolean guarded) {
     MockRoutingManagerFactory factory = new MockRoutingManagerFactory(1, 2);
-    for (Map.Entry<String, Schema> entry : TABLE_SCHEMAS.entrySet()) {
+    for (Map.Entry<String, Schema> entry : schemas.entrySet()) {
       factory.registerTable(entry.getValue(), entry.getKey());
     }
     for (Map.Entry<String, List<String>> entry : SERVER1_SEGMENTS.entrySet()) {
@@ -421,14 +480,17 @@ public class SealedInListPlanningTest extends QueryEnvironmentTestBase {
         rules.addAll(guarded);
       }
     };
-    return new QueryEnvironment(QueryEnvironment.configBuilder()
+    ImmutableQueryEnvironment.Config.Builder config = QueryEnvironment.configBuilder()
         .requestId(1L)
         .database(CommonConstants.DEFAULT_DATABASE)
         .tableCache(tableCache)
         .workerManager(new WorkerManager("Broker_localhost", "localhost", 3, routingManager))
-        .ruleSet(new PinotRuleSet(List.of(new DefaultRuleSetCustomizer(), guard)))
-        .defaultSealedInListThreshold(GUARD_THRESHOLD)
-        .build());
+        .isNullHandlingEnabled(false)
+        .defaultSealedInListThreshold(GUARD_THRESHOLD);
+    if (guarded) {
+      config.ruleSet(new PinotRuleSet(List.of(new DefaultRuleSetCustomizer(), guard)));
+    }
+    return new QueryEnvironment(config.build());
   }
 
   /// Never fires; fails when it is offered a node with an unsealed large Sarg, or with an AND/OR of many comparisons of

@@ -74,6 +74,11 @@ import org.apache.pinot.calcite.sql.fun.PinotInListOperator;
 /// push-down, transitive predicates across joins, outer join simplification and all rules that treat the predicate
 /// as a whole work as before.
 ///
+/// Null checks keep their meaning. Without null handling, the planner uses Pinot's own `IS NULL` and `IS NOT NULL`
+/// operators (see `PinotOperatorTable`), which Calcite never merges into a Sarg or drops. With null handling, Calcite
+/// can drop an `x IS NOT NULL` next to a sealed list on `x` as redundant, as it does next to `x < 5`. This is correct,
+/// because the servers then apply SQL null semantics.
+///
 /// Not thread safe: a query is planned by a single thread.
 public final class SearchSealer {
   private final int _threshold;

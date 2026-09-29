@@ -807,9 +807,8 @@ public class CommonConstants {
     ///
     /// Predicates in the same filter or join condition still fold into the list first, as without sealing. Sealed lists
     /// lose Calcite's value-level reasoning across plan nodes: a predicate that a rule moves next to a sealed list on
-    /// the same column is not merged into it. For example, an `x IS NOT NULL` in another clause than a sealed list on
-    /// `x` is dropped as redundant when the two meet, which is correct in SQL. With null handling disabled, the servers
-    /// then do not filter the rows where `x` is null, as today for `x < 5 AND x IS NOT NULL`.
+    /// the same column is not merged into it. Null checks keep their meaning: without null handling, Calcite cannot see
+    /// into Pinot's `IS NULL` and `IS NOT NULL` operators, and with null handling the servers apply SQL null semantics.
     ///
     /// A value of 0 or less disables sealing. Planning outside the broker's multi-stage request handler (for example
     /// for the controller `/sql` endpoint) does not read this broker config and uses the default. The query option
