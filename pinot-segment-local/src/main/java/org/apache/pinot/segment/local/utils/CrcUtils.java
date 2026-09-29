@@ -42,7 +42,9 @@ public class CrcUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(CrcUtils.class);
   private static final int BUFFER_SIZE = 65536;
   private static final String CRC_FILE_EXTENSTION = ".crc";
-  private static final List<String> DATA_FILE_EXTENSIONS = Arrays.asList(".fwd", ".dict");
+  // Null vectors count as data, because a null is stored as the default value in the forward index
+  private static final List<String> DATA_FILE_EXTENSIONS =
+      Arrays.asList(".fwd", ".dict", V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
 
 
   public static long computeCrc(File indexDir) throws IOException {
@@ -64,7 +66,8 @@ public class CrcUtils {
   /// NOTE: do not include the segment creation meta file.
   /// @param dir the directory to collect files from
   /// @param files the list to add collected files to
-  /// @param dataFilesOnly if true, only collect data files (.fwd, .dict); if false, collect all normal files
+  /// @param dataFilesOnly if true, only collect data files (.fwd, .dict, .bitmap.nullvalue); if false, collect all
+  ///                      normal files
   private static void collectFiles(File dir, List<File> files, boolean dataFilesOnly) {
     File[] dirFiles = dir.listFiles();
     Preconditions.checkNotNull(dirFiles);
@@ -90,7 +93,7 @@ public class CrcUtils {
     }
   }
 
-  /// Determines if a file is considered a "Data File" (one of ".fwd", ".dict" file types).
+  /// Determines if a file is considered a "Data File" (one of ".fwd", ".dict", ".bitmap.nullvalue" file types).
   private static boolean isDataFile(String fileName) {
     for (String ext : DATA_FILE_EXTENSIONS) {
       if (fileName.endsWith(ext)) {
