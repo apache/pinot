@@ -66,6 +66,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -157,14 +158,16 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         ColumnMetadata parentMetadata = segmentMetadata.getColumnMetadataMap().get(parent);
         List<String> sparseKeys = null;
         Map<String, Integer> sparseMultiValueKeys = null;
+        Map<String, DataType> sparseKeyTypes = null;
         if (parentMetadata instanceof ColumnMetadataImpl impl) {
           sparseKeys = impl.getSparseKeys();
           sparseMultiValueKeys = impl.getSparseMultiValueKeys();
+          sparseKeyTypes = impl.getSparseKeyTypes();
         }
         _dataSources.put(parent, new ImmutableOpenStructDataSource((ComplexFieldSpec) fieldSpec,
             openStructDenseChildren.getOrDefault(parent, Map.of()),
             openStructSparseChildren.get(parent), segmentMetadata.getTotalDocs(), sparseKeys,
-            sparseMultiValueKeys));
+            sparseMultiValueKeys, sparseKeyTypes));
       }
     }
 

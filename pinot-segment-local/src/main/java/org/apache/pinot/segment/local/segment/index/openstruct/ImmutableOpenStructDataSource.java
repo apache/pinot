@@ -58,6 +58,10 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   /// column of their own.
   @Nullable
   private final Map<String, Integer> _sparseMultiValueKeys;
+  /// Sparse keys mapped to the type the segment build resolved for them, read from the parent column's metadata
+  /// for the same reason as the shape above: the blob is JSON and carries no type of its own.
+  @Nullable
+  private final Map<String, FieldSpec.DataType> _sparseKeyTypes;
   @Nullable
   private final OpenStructSparseBlobReader _sparseBlobReader;
   private final ConcurrentHashMap<String, DataSource> _sparseKeyDataSourceCache;
@@ -65,13 +69,15 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   public ImmutableOpenStructDataSource(ComplexFieldSpec fieldSpec, Map<String, DataSource> perKeyDataSources,
       @Nullable DataSource sparseDataSource, DataSourceMetadata dataSourceMetadata,
       ColumnIndexContainer indexContainer, @Nullable List<String> sparseKeys,
-      @Nullable Map<String, Integer> sparseMultiValueKeys) {
+      @Nullable Map<String, Integer> sparseMultiValueKeys,
+      @Nullable Map<String, FieldSpec.DataType> sparseKeyTypes) {
     super(dataSourceMetadata, indexContainer);
     _fieldSpec = fieldSpec;
     _perKeyDataSources = perKeyDataSources;
     _sparseDataSource = sparseDataSource;
     _sparseKeys = sparseKeys != null ? Set.copyOf(sparseKeys) : null;
     _sparseMultiValueKeys = sparseMultiValueKeys != null ? Map.copyOf(sparseMultiValueKeys) : null;
+    _sparseKeyTypes = sparseKeyTypes != null ? Map.copyOf(sparseKeyTypes) : null;
     if (sparseDataSource != null) {
       ForwardIndexReader<?> blobFwd = sparseDataSource.getForwardIndex();
       _sparseBlobReader = blobFwd != null
@@ -93,10 +99,11 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   /// (`SELECT open_struct_col`) is handled by the query layer, not the storage layer.
   public ImmutableOpenStructDataSource(ComplexFieldSpec fieldSpec, Map<String, DataSource> perKeyDataSources,
       @Nullable DataSource sparseDataSource, int numDocs, @Nullable List<String> sparseKeys,
-      @Nullable Map<String, Integer> sparseMultiValueKeys) {
+      @Nullable Map<String, Integer> sparseMultiValueKeys,
+      @Nullable Map<String, FieldSpec.DataType> sparseKeyTypes) {
     this(fieldSpec, perKeyDataSources, sparseDataSource,
         new ImmutableOpenStructDataSourceMetadata(fieldSpec, numDocs),
-        new ColumnIndexContainer.FromMap.Builder().build(), sparseKeys, sparseMultiValueKeys);
+        new ColumnIndexContainer.FromMap.Builder().build(), sparseKeys, sparseMultiValueKeys, sparseKeyTypes);
   }
 
   @Override
@@ -118,11 +125,14 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
         k -> new SparseKeyDataSource(getValueFieldSpec(k), _sparseBlobReader, maxNumValues(k)));
   }
 
-  /// Field spec for a key's values, with an undeclared sparse key's shape taken from the segment's sparse
-  /// multi-value manifest. Which tier a key lands on is a tuning decision, so it must not decide the key's
-  /// shape: without this, the same rows would report `STRING[]` on a segment that materialized the key and a
-  /// scalar `STRING` holding `["a","b"]` on one that put it in the blob, and a query fanning out over both
-  /// would see two shapes for one column.
+  /// Field spec for a key's values, with an undeclared sparse key's shape and type taken from the segment's
+  /// sparse manifests. Which tier a key lands on is a tuning decision, so it must not decide either: without
+  /// this, the same rows would report `INT` on a segment that materialized the key and `STRING` on one that put
+  /// it in the blob -- and `STRING[]` versus a scalar `STRING` holding `["a","b"]` for shape -- so a query
+  /// fanning out over both would see two types for one column.
+  ///
+  /// A segment built before the manifests existed lists nothing, and an unlisted key falls back to the
+  /// single-value STRING every sparse key used to read as.
   @Override
   public FieldSpec getValueFieldSpec(String key) {
     FieldSpec childFieldSpec = _fieldSpec.getChildFieldSpec(key);
@@ -130,7 +140,10 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
       return childFieldSpec;
     }
     boolean singleValue = _sparseMultiValueKeys == null || !_sparseMultiValueKeys.containsKey(key);
-    return new DimensionFieldSpec(key, FieldSpec.DataType.STRING, singleValue);
+    FieldSpec.DataType dataType = _sparseKeyTypes != null
+        ? _sparseKeyTypes.getOrDefault(key, FieldSpec.DataType.STRING)
+        : FieldSpec.DataType.STRING;
+    return new DimensionFieldSpec(key, dataType, singleValue);
   }
 
   /// Longest value a multi-value sparse key holds, which is what the readers over it size their buffers from.
