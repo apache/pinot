@@ -378,7 +378,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       }
     } catch (IOException e) {
       LOGGER.warn("Unable to fetch segments from deep store that are beyond retention period for table: {}",
-          tableNameWithType);
+          tableNameWithType, e);
     }
 
     return segmentsToDelete;
@@ -405,6 +405,15 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     URI tableDataUri = URIUtils.getUri(_pinotHelixResourceManager.getDataDir(), rawTableName);
     PinotFS pinotFS = PinotFSFactory.create(tableDataUri.getScheme());
+
+    // The data dir is created when the first segment is pushed, so it is legitimately absent for a table that has
+    // never had a segment in deep store. Such a table has no untracked segments to delete, and listing a
+    // non-existent directory fails on most file systems.
+    if (!pinotFS.exists(tableDataUri)) {
+      LOGGER.info("Skipping deep store scan for untracked segments for table: {} as data dir: {} does not exist",
+          tableNameWithType, tableDataUri);
+      return segmentsToDelete;
+    }
 
     long startTimeMs = System.currentTimeMillis();
 

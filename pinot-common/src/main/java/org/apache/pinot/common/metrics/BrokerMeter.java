@@ -42,6 +42,11 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   ///
   /// At this moment this counter does not include queries executed in multi-stage mode.
   public static final BrokerMeter QUERIES = create("QUERIES", "queries", false);
+
+  /// Queries in which the broker rewrote at least one exact aggregation into its approximate counterpart, because
+  /// `pinot.broker.use.approximate.function` was on. The results of those queries are approximate.
+  public static final BrokerMeter APPROXIMATE_FUNCTION_OVERRIDES =
+      create("APPROXIMATE_FUNCTION_OVERRIDES", "queries", false);
   /// Number of single-stage queries that have been started.
   ///
   /// Unlike [#QUERIES], this metric is global and not attached to a particular table.
@@ -139,6 +144,15 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED = create(
       "SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED", "badResponses", false);
 
+  // This metric tracks the number of times an in-flight server was skipped (its channel went inactive or a request
+  // send to it failed) because the query was submitted with skipUnavailableServers=true.
+  public static final BrokerMeter SERVER_MARKED_DOWN_SKIPPED =
+      create("SERVER_MARKED_DOWN_SKIPPED", "count", true);
+
+  // This metric tracks the number of broker responses carrying a BROKER_REQUEST_SEND (425) error
+  public static final BrokerMeter BROKER_RESPONSES_WITH_SEND_EXCEPTIONS = create(
+      "BROKER_RESPONSES_WITH_SEND_EXCEPTIONS", "badResponses", false);
+
   public static final BrokerMeter BROKER_RESPONSES_WITH_TIMEOUTS = create(
       "BROKER_RESPONSES_WITH_TIMEOUTS", "badResponses", false);
 
@@ -196,6 +210,12 @@ public class BrokerMeter implements AbstractMetrics.Meter {
       "NETTY_CONNECTION_BYTES_RECEIVED", "nettyConnection", true);
   public static final BrokerMeter NETTY_CONNECTION_SEND_REQUEST_FAILURES = create(
       "NETTY_CONNECTION_SEND_REQUEST_FAILURES", "nettyConnection", true);
+  // These track server channels transitioning to active/inactive on the broker (Netty channelActive/channelInactive).
+  // Non-global: emitted per server and tagged with the server short name (see DataTableHandler).
+  public static final BrokerMeter NETTY_CONNECTION_CHANNEL_ACTIVE = create(
+      "NETTY_CONNECTION_CHANNEL_ACTIVE", "nettyConnection", false);
+  public static final BrokerMeter NETTY_CONNECTION_CHANNEL_INACTIVE = create(
+      "NETTY_CONNECTION_CHANNEL_INACTIVE", "nettyConnection", false);
 
   public static final BrokerMeter PROACTIVE_CLUSTER_CHANGE_CHECK = create(
       "PROACTIVE_CLUSTER_CHANGE_CHECK", "proactiveClusterChangeCheck", true);

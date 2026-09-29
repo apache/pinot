@@ -144,7 +144,7 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
 
     SegmentMetadata mockMetadata = mock(SegmentMetadata.class);
     when(mockSegment.getSegmentMetadata()).thenReturn(mockMetadata);
-    when(mockMetadata.getCrc()).thenReturn("12345");
+    when(mockMetadata.getCrc()).thenReturn(12345L);
 
     SegmentZKMetadata mockZkMetadata = mock(SegmentZKMetadata.class);
     when(mockZkMetadata.getSegmentName()).thenReturn(SEGMENT_NAME);

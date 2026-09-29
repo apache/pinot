@@ -25,6 +25,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
@@ -146,16 +147,8 @@ public class MultistageAggregationExecutor {
       AggregationFunction aggFunction = _aggFunctions[i];
       Object[] intermediateResults = AggregateOperator.getIntermediateResults(aggFunction, block);
       for (Object intermediateResult : intermediateResults) {
-        // Not all V1 aggregation functions have null-handling logic. Handle null values before calling merge.
-        // TODO: Fix it
-        if (intermediateResult == null) {
-          continue;
-        }
-        if (_mergeResultHolder[i] == null) {
-          _mergeResultHolder[i] = intermediateResult;
-        } else {
-          _mergeResultHolder[i] = aggFunction.merge(_mergeResultHolder[i], intermediateResult);
-        }
+        _mergeResultHolder[i] =
+            AggregationFunctionUtils.merge(aggFunction, _mergeResultHolder[i], intermediateResult);
       }
     }
   }

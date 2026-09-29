@@ -18,27 +18,25 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAggregationFunction {
 
-  public PercentileTDigestMVAggregationFunction(ExpressionContext expression, int percentile) {
-    super(expression, percentile, false);
-  }
-
-  public PercentileTDigestMVAggregationFunction(ExpressionContext expression, double percentile) {
-    super(expression, percentile, false);
+  public PercentileTDigestMVAggregationFunction(ExpressionContext expression, int percentile,
+      boolean nullHandlingEnabled) {
+    super(expression, percentile, nullHandlingEnabled);
   }
 
   public PercentileTDigestMVAggregationFunction(ExpressionContext expression, double percentile,
-      int compressionFactor) {
-    super(expression, percentile, compressionFactor, false);
+      boolean nullHandlingEnabled) {
+    super(expression, percentile, nullHandlingEnabled);
+  }
+
+  public PercentileTDigestMVAggregationFunction(ExpressionContext expression, double percentile,
+      int compressionFactor, boolean nullHandlingEnabled) {
+    super(expression, percentile, compressionFactor, nullHandlingEnabled);
   }
 
   @Override
@@ -55,23 +53,5 @@ public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAgg
                 + _percentile + ")")
             : (AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + "mv(" + _expression + ", "
                 + _percentile + ", " + _compressionFactor + ")"));
-  }
-
-  @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    aggregateMV(length, aggregationResultHolder, blockValSetMap.get(_expression));
-  }
-
-  @Override
-  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap.get(_expression));
-  }
-
-  @Override
-  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap.get(_expression));
   }
 }

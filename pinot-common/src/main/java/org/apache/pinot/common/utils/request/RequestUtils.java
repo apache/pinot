@@ -29,6 +29,7 @@ import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -54,6 +55,9 @@ import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils.SqlOptionsMode;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -96,21 +100,34 @@ public class RequestUtils {
     return sqlNodeAndOptions;
   }
 
-  /// Sets extra options for the given query.
+  /// Merges the request payload options (`queryOptions` and `trace`) into the options parsed from the SQL. The SQL
+  /// options take precedence, unless the request sets [Request.QueryOptionKey#SQL_OPTIONS_MODE] to `IGNORE` (the SQL
+  /// options are dropped) or `REJECT` (the query fails when it carries any).
   @VisibleForTesting
   public static void setOptions(SqlNodeAndOptions sqlNodeAndOptions, JsonNode jsonRequest) {
-    Map<String, String> queryOptions = new HashMap<>();
+    Map<String, String> requestOptions = new HashMap<>();
     if (jsonRequest.has(Request.QUERY_OPTIONS)) {
-      queryOptions.putAll(getOptionsFromString(jsonRequest.get(Request.QUERY_OPTIONS).asText()));
+      requestOptions.putAll(getOptionsFromString(jsonRequest.get(Request.QUERY_OPTIONS).asText()));
     }
     if (jsonRequest.has(Request.TRACE) && jsonRequest.get(Request.TRACE).asBoolean()) {
-      queryOptions.put(Request.TRACE, "true");
+      requestOptions.put(Request.TRACE, "true");
     }
-    if (!queryOptions.isEmpty()) {
-      LOGGER.debug("Query options are set to: {}", queryOptions);
+    if (requestOptions.isEmpty()) {
+      return;
     }
-    // Setting all query options back into SqlNodeAndOptions. The above ordering matters due to priority overwrite rule
-    sqlNodeAndOptions.setExtraOptions(queryOptions);
+    LOGGER.debug("Query options are set to: {}", requestOptions);
+    requestOptions = QueryOptionsUtils.resolveCaseInsensitiveOptions(requestOptions);
+    SqlOptionsMode sqlOptionsMode = QueryOptionsUtils.getSqlOptionsMode(requestOptions);
+    Map<String, String> sqlOptions = sqlNodeAndOptions.getOptions();
+    if (sqlOptionsMode != SqlOptionsMode.ALLOW && !sqlOptions.isEmpty()) {
+      if (sqlOptionsMode == SqlOptionsMode.REJECT) {
+        throw QueryErrorCode.QUERY_VALIDATION.asException(
+            "Query options are not allowed in the SQL for this request, found: " + sqlOptions.keySet());
+      }
+      sqlOptions.clear();
+    }
+    // SQL options take precedence over request options
+    requestOptions.forEach(sqlOptions::putIfAbsent);
   }
 
   public static Expression getIdentifierExpression(String identifier) {
@@ -179,6 +196,14 @@ public class RequestUtils {
     return Literal.stringArrayValue(Arrays.asList(value));
   }
 
+  public static Literal getLiteral(byte[][] value) {
+    List<ByteBuffer> bytesArray = new ArrayList<>(value.length);
+    for (byte[] bytes : value) {
+      bytesArray.add(ByteBuffer.wrap(bytes.clone()));
+    }
+    return Literal.bytesArrayValue(bytesArray);
+  }
+
   public static Literal getLiteral(@Nullable Object object) {
     if (object == null) {
       return getNullLiteral();
@@ -228,6 +253,9 @@ public class RequestUtils {
     if (object instanceof String[]) {
       return getLiteral((String[]) object);
     }
+    if (object instanceof byte[][]) {
+      return getLiteral((byte[][]) object);
+    }
     return getLiteral(object.toString());
   }
 
@@ -254,6 +282,9 @@ public class RequestUtils {
       switch (node.getTypeName()) {
         case BOOLEAN:
           literal.setBoolValue(node.booleanValue());
+          break;
+        case BINARY:
+          literal.setBinaryValue(node.getValueAs(byte[].class));
           break;
         case NULL:
           literal.setNullValue(true);
@@ -329,6 +360,10 @@ public class RequestUtils {
     return getLiteralExpression(getLiteral(value));
   }
 
+  public static Expression getLiteralExpression(byte[][] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
   public static Expression getLiteralExpression(SqlLiteral node) {
     return getLiteralExpression(getLiteral(node));
   }
@@ -370,6 +405,8 @@ public class RequestUtils {
         return getDoubleArrayValue(literal);
       case STRING_ARRAY_VALUE:
         return getStringArrayValue(literal);
+      case BYTES_ARRAY_VALUE:
+        return getBytesArrayValue(literal);
       default:
         throw new IllegalStateException("Unsupported field type: " + type);
     }
@@ -419,6 +456,19 @@ public class RequestUtils {
     return literal.getStringArrayValue().toArray(new String[0]);
   }
 
+  public static byte[][] getBytesArrayValue(Literal literal) {
+    List<ByteBuffer> list = literal.getBytesArrayValue();
+    int size = list.size();
+    byte[][] array = new byte[size][];
+    for (int i = 0; i < size; i++) {
+      ByteBuffer buffer = list.get(i).duplicate();
+      byte[] bytes = new byte[buffer.remaining()];
+      buffer.get(bytes);
+      array[i] = bytes;
+    }
+    return array;
+  }
+
   public static Pair<ColumnDataType, Object> getLiteralTypeAndValue(Literal literal) {
     Literal._Fields type = literal.getSetField();
     switch (type) {
@@ -450,6 +500,8 @@ public class RequestUtils {
         return Pair.of(ColumnDataType.DOUBLE_ARRAY, getDoubleArrayValue(literal));
       case STRING_ARRAY_VALUE:
         return Pair.of(ColumnDataType.STRING_ARRAY, getStringArrayValue(literal));
+      case BYTES_ARRAY_VALUE:
+        return Pair.of(ColumnDataType.BYTES_ARRAY, getBytesArrayValue(literal));
       default:
         throw new IllegalStateException("Unsupported field type: " + type);
     }
@@ -659,6 +711,9 @@ public class RequestUtils {
       case STRING_ARRAY_VALUE:
         return literal.getStringArrayValue().stream().map(value -> "'" + value + "'").collect(Collectors.toList())
             .toString();
+      case BYTES_ARRAY_VALUE:
+        return Arrays.stream(getBytesArrayValue(literal)).map(value -> "X'" + BytesUtils.toHexString(value) + "'")
+            .collect(Collectors.toList()).toString();
       default:
         throw new IllegalStateException("Unsupported field type: " + type);
     }

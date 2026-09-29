@@ -43,6 +43,11 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
   public static final String NUM_RECORDS_MODIFIED_KEY = "numRecordsModified";
 
   @Override
+  protected boolean shouldUpdateZKMetadataWithoutUpload() {
+    return true;
+  }
+
+  @Override
   protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
       throws Exception {
     Map<String, String> configs = pinotTaskConfig.getConfigs();

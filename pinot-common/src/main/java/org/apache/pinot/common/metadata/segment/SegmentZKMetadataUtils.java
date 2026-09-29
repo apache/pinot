@@ -89,7 +89,7 @@ public class SegmentZKMetadataUtils {
       segmentZKMetadata.setEndOffset(endOffset);
       segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
       // for committing segments, we use data CRC to replace but only if the data CRC is present for the segment
-      if (Long.parseLong(segmentMetadata.getDataCrc()) >= 0) {
+      if (segmentMetadata.getDataCrc() >= 0) {
         segmentZKMetadata.setUseDataCrc(true);
       }
 
@@ -159,8 +159,8 @@ public class SegmentZKMetadataUtils {
     SegmentVersion segmentVersion = segmentMetadata.getVersion();
     segmentZKMetadata.setIndexVersion(segmentVersion != null ? segmentVersion.toString() : null);
     segmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
-    segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
-    segmentZKMetadata.setDataCrc(Long.parseLong(segmentMetadata.getDataCrc()));
+    segmentZKMetadata.setCrc(segmentMetadata.getCrc());
+    segmentZKMetadata.setDataCrc(segmentMetadata.getDataCrc());
     segmentZKMetadata.setDownloadUrl(downloadUrl);
     segmentZKMetadata.setCrypterName(crypterName);
     segmentZKMetadata.setSizeInBytes(segmentSizeInBytes);

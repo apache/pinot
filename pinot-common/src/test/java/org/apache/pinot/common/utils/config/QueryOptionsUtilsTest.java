@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.*;
@@ -39,7 +40,8 @@ public class QueryOptionsUtilsTest {
   private static final List<String> POSITIVE_INT_KEYS =
       List.of(NUM_REPLICA_GROUPS_TO_QUERY, MAX_EXECUTION_THREADS, NUM_GROUPS_LIMIT, MAX_INITIAL_RESULT_HOLDER_CAPACITY,
           MAX_STREAMING_PENDING_BLOCKS, MAX_ROWS_IN_JOIN, MAX_ROWS_IN_WINDOW);
-  private static final List<String> NON_NEGATIVE_INT_KEYS = List.of(MULTI_STAGE_LEAF_LIMIT);
+  private static final List<String> NON_NEGATIVE_INT_KEYS =
+      List.of(MULTI_STAGE_LEAF_LIMIT, STREAMING_GROUP_BY_FLUSH_THRESHOLD, STREAMING_DISTINCT_FLUSH_THRESHOLD);
   private static final List<String> UNBOUNDED_INT_KEYS =
       List.of(MIN_SEGMENT_GROUP_TRIM_SIZE, MIN_SERVER_GROUP_TRIM_SIZE, MIN_BROKER_GROUP_TRIM_SIZE,
           GROUP_TRIM_THRESHOLD);
@@ -110,6 +112,19 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
+  public void shouldReadInPredicatePruningThresholdOption() {
+    // Any integer is accepted; a negative value means always attempt IN-predicate pruning
+    assertEquals(QueryOptionsUtils.getInPredicatePruningThreshold(Map.of(IN_PREDICATE_PRUNING_THRESHOLD, "20")), 20);
+    assertEquals(QueryOptionsUtils.getInPredicatePruningThreshold(Map.of(IN_PREDICATE_PRUNING_THRESHOLD, "-1")), -1);
+    assertNull(QueryOptionsUtils.getInPredicatePruningThreshold(Map.of()));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void shouldRejectInvalidInPredicatePruningThreshold() {
+    QueryOptionsUtils.getInPredicatePruningThreshold(Map.of(IN_PREDICATE_PRUNING_THRESHOLD, "invalid"));
+  }
+
+  @Test
   public void testSkipIndexesParsing() {
     String skipIndexesStr = "col1=inverted,range&col2=sorted";
     Map<String, String> queryOptions = Map.of(SKIP_INDEXES, skipIndexesStr);
@@ -118,11 +133,43 @@ public class QueryOptionsUtilsTest {
     assertEquals(skipIndexes.get("col2"), Set.of(FieldConfig.IndexType.SORTED));
   }
 
+  /// Asserts that spaces around column names and index types are ignored.
+  @Test(dataProvider = "skipIndexesWithSpaces")
+  public void testSkipIndexesParsingWithSpaces(String skipIndexesStr) {
+    Map<String, Set<FieldConfig.IndexType>> skipIndexes =
+        QueryOptionsUtils.getSkipIndexes(Map.of(SKIP_INDEXES, skipIndexesStr));
+    assertEquals(skipIndexes, Map.of("col1", Set.of(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE),
+        "col2", Set.of(FieldConfig.IndexType.SORTED)));
+  }
+
+  @DataProvider
+  public Object[][] skipIndexesWithSpaces() {
+    return new Object[][]{
+        {"col1=inverted, range&col2=sorted"},
+        {"col1=inverted,range& col2=sorted"},
+        {" col1 = inverted , range & col2 = sorted "}
+    };
+  }
+
   @Test(expectedExceptions = RuntimeException.class)
   public void testSkipIndexesParsingInvalid() {
     String skipIndexesStr = "col1=inverted,range&col2";
     Map<String, String> queryOptions = Map.of(SKIP_INDEXES, skipIndexesStr);
     QueryOptionsUtils.getSkipIndexes(queryOptions);
+  }
+
+  @Test
+  public void testPlannerRulesParsing() {
+    // Rule names are trimmed, and empty names are dropped
+    Map<String, String> queryOptions = Map.of(USE_PLANNER_RULES, "SortJoinTranspose, AggregateJoinTransposeExtended, ",
+        SKIP_PLANNER_RULES, " FilterIntoJoin ,,FilterAggregateTranspose");
+    assertEquals(QueryOptionsUtils.getUsePlannerRules(queryOptions),
+        Set.of("SortJoinTranspose", "AggregateJoinTransposeExtended"));
+    assertEquals(QueryOptionsUtils.getSkipPlannerRules(queryOptions),
+        Set.of("FilterIntoJoin", "FilterAggregateTranspose"));
+
+    assertEquals(QueryOptionsUtils.getUsePlannerRules(Map.of()), Set.of());
+    assertEquals(QueryOptionsUtils.getSkipPlannerRules(Map.of()), Set.of());
   }
 
   @Test
@@ -323,6 +370,10 @@ public class QueryOptionsUtilsTest {
       // Non-negative ints
       case MULTI_STAGE_LEAF_LIMIT:
         return QueryOptionsUtils.getMultiStageLeafLimit(map);
+      case STREAMING_GROUP_BY_FLUSH_THRESHOLD:
+        return QueryOptionsUtils.getStreamingGroupByFlushThreshold(map);
+      case STREAMING_DISTINCT_FLUSH_THRESHOLD:
+        return QueryOptionsUtils.getStreamingDistinctFlushThreshold(map);
       // Unbounded ints
       case MIN_SEGMENT_GROUP_TRIM_SIZE:
         return QueryOptionsUtils.getMinSegmentGroupTrimSize(map);

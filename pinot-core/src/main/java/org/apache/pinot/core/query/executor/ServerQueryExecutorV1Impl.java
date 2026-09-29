@@ -64,6 +64,7 @@ import org.apache.pinot.core.query.killing.QueryKillingStrategy;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
 import org.apache.pinot.core.query.pruner.SegmentPrunerStatistics;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.request.context.ExplainMode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -204,8 +205,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     long querySchedulingTimeMs = System.currentTimeMillis() - queryArrivalTimeMs;
     if (querySchedulingTimeMs >= queryTimeoutMs) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
-      String errorMessage = "Query scheduling took " + querySchedulingTimeMs + "ms (longer than query timeout of "
-          + queryTimeoutMs + "ms) on server: " + _instanceDataManager.getInstanceId();
+      String errorMessage =
+          "Query scheduling took " + querySchedulingTimeMs + "ms (longer than query timeout of " + queryTimeoutMs
+              + "ms) on server: " + _instanceDataManager.getInstanceId();
       InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
       instanceResponse.addException(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT, errorMessage);
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
@@ -233,7 +235,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Processing requestId: {} with segmentsToQuery: {}, optionalSegments: {} and acquiredSegments: {}",
           requestId, executionInfo.getSegmentsToQuery(), executionInfo.getOptionalSegments(),
-          executionInfo.getSegmentDataManagers().stream().map(SegmentDataManager::getSegmentName)
+          executionInfo.getSegmentDataManagers()
+              .stream()
+              .map(SegmentDataManager::getSegmentName)
               .collect(Collectors.toList()));
     }
 
@@ -494,8 +498,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   ///
   /// Currently only supports ID_SET subquery within the IN_PARTITIONED_SUBQUERY transform function, which will be
   /// rewritten to an IN_ID_SET transform function.
-  private void handleSubquery(ExpressionContext expression, TableExecutionInfo executionInfo,
-      TimerContext timerContext, ExecutorService executorService, long endTimeMs)
+  private void handleSubquery(ExpressionContext expression, TableExecutionInfo executionInfo, TimerContext timerContext,
+      ExecutorService executorService, long endTimeMs)
       throws Exception {
     FunctionContext function = expression.getFunction();
     if (function == null) {
@@ -599,8 +603,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     PlanMaker planMaker = planMakerOverride != null ? planMakerOverride : _planMaker;
     Plan queryPlan;
     if (streamer != null) {
-      queryPlan =
-          planMaker.makeStreamingInstancePlan(selectedSegmentContexts, queryContext, executorService, streamer);
+      queryPlan = planMaker.makeStreamingInstancePlan(selectedSegmentContexts, queryContext, executorService, streamer);
     } else {
       queryPlan = planMaker.makeInstancePlan(selectedSegmentContexts, queryContext, executorService);
     }
@@ -610,27 +613,29 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   private InstanceResponseBlock execute(List<IndexSegment> indexSegments, QueryContext queryContext,
       TimerContext timerContext, ExecutorService executorService, ResultsBlockStreamer streamer,
-      boolean enableStreaming, List<SegmentContext> selectedSegmentContexts,
-      @Nullable PlanMaker planMakerOverride)
+      boolean enableStreaming, List<SegmentContext> selectedSegmentContexts, @Nullable PlanMaker planMakerOverride)
       throws TimeoutException {
     InstanceResponseBlock instanceResponse;
     @Nullable
     ResultsBlockStreamer actualStreamer = enableStreaming ? streamer : null;
-    switch (queryContext.getExplain()) {
+    ExplainMode explainMode = queryContext.getExplain();
+    switch (explainMode) {
       case DESCRIPTION:
-        instanceResponse = executeDescribeExplain(indexSegments, queryContext, timerContext, executorService,
-            actualStreamer, selectedSegmentContexts);
+        instanceResponse =
+            executeDescribeExplain(indexSegments, queryContext, timerContext, executorService, actualStreamer,
+                selectedSegmentContexts);
         break;
       case NODE:
-        instanceResponse = executeNodeExplain(queryContext, timerContext, executorService, actualStreamer,
-            selectedSegmentContexts);
+        instanceResponse =
+            executeNodeExplain(queryContext, timerContext, executorService, actualStreamer, selectedSegmentContexts);
         break;
       case NONE:
-        instanceResponse = executeQuery(queryContext, timerContext, executorService, actualStreamer,
-            selectedSegmentContexts, planMakerOverride);
+        instanceResponse =
+            executeQuery(queryContext, timerContext, executorService, actualStreamer, selectedSegmentContexts,
+                planMakerOverride);
         break;
       default:
-        throw new IllegalStateException("Unsupported explain mode: " + queryContext.getExplain());
+        throw new IllegalStateException("Unsupported explain mode: " + explainMode);
     }
     return instanceResponse;
   }
@@ -665,8 +670,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return new InstanceResponseBlock(explainResults);
     }
 
-    Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer,
-        selectedSegmentContexts, null);
+    Plan queryPlan =
+        planCombineQuery(queryContext, timerContext, executorService, streamer, selectedSegmentContexts, null);
 
     TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
 
@@ -698,8 +703,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return new InstanceResponseBlock(explainResults);
     }
 
-    Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer, selectedSegmentContexts,
-        null);
+    Plan queryPlan =
+        planCombineQuery(queryContext, timerContext, executorService, streamer, selectedSegmentContexts, null);
 
     TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
     InstanceResponseBlock result = executeDescribeExplain(queryPlan, queryContext);

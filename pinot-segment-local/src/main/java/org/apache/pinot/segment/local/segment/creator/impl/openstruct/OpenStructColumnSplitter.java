@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.openstruct;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Utf8;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -31,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -40,6 +43,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByt
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.NoDictColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StatsCollectorUtil;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.openstruct.OpenStructSupportedIndexes;
@@ -65,6 +69,7 @@ import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.OpenStructKeyFlattener;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.OpenStructTypeInference;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -87,28 +92,39 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
 
   private final File _indexDir;
   private final String _columnName;
+  private final String _tableNameWithType;
   private final Map<String, FieldSpec> _childFieldSpecs;
   private final OpenStructIndexConfig _config;
   private final int _maxDenseKeys;
+  private final int _maxNestedKeyDepth;
 
   // Per-key accumulation
   private final Map<String, RoaringBitmap> _presenceBitmaps = new HashMap<>();
   private final Map<String, List<Object>> _values = new HashMap<>();
   private final Map<String, DataType> _inferredTypes = new HashMap<>();
+  private final Map<String, Long> _coercionFailuresPerKey = new HashMap<>();
+  private final Map<String, Long> _inferenceFailuresPerKey = new HashMap<>();
+  /// Keys whose values are collections. A key is multi-value for the whole segment as soon as one document
+  /// presents it as one, the same all-or-nothing rule the key's type follows.
+  private final Set<String> _multiValueKeys = new HashSet<>();
+  /// Keys whose value is a nested object rendered as JSON text by [OpenStructKeyFlattener].
+  private final Set<String> _containerKeys = new HashSet<>();
   private int _numDocs;
-  private int _coercionFailures;
+  private int _ignoredKeyDropCount;
 
   // Resolved at seal time
   @Nullable
   private Set<String> _resolvedDenseKeys;
   private final Map<String, PropertiesConfiguration> _materializedColumnMetadata = new LinkedHashMap<>();
 
-  public OpenStructColumnSplitter(File indexDir, String columnName, FieldSpec fieldSpec,
+  public OpenStructColumnSplitter(File indexDir, String columnName, String tableNameWithType, FieldSpec fieldSpec,
       OpenStructIndexConfig config) {
     _indexDir = indexDir;
     _columnName = columnName;
+    _tableNameWithType = tableNameWithType;
     _config = config;
     _maxDenseKeys = config.getMaxDenseKeys();
+    _maxNestedKeyDepth = config.getMaxNestedKeyDepth();
 
     Map<String, FieldSpec> childFieldSpecs = null;
     if (fieldSpec instanceof ComplexFieldSpec) {
@@ -180,6 +196,13 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       if (_resolvedDenseKeys.contains(key)) {
         continue;
       }
+      if (_containerKeys.contains(key)) {
+        // A flattened container holds the JSON text of a whole subtree, and its leaves are already
+        // separate keys competing for the same dense budget. Materializing the blob as well spends a
+        // column on data no predicate can use without decoding it, so a container is dense only when
+        // the table config asks for it by name (handled in the configured-keys pass above).
+        continue;
+      }
       double fillRate = (double) _presenceBitmaps.get(key).getCardinality() / _numDocs;
       if ((_maxDenseKeys < 0 || _resolvedDenseKeys.size() < _maxDenseKeys) && fillRate >= minFillRate) {
         _resolvedDenseKeys.add(key);
@@ -190,38 +213,139 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
 
   private void addMap(@Nullable Map<String, Object> map) {
     if (map != null && !map.isEmpty()) {
-      for (Map.Entry<String, Object> entry : map.entrySet()) {
-        String key = entry.getKey();
-        Object rawValue = entry.getValue();
-        if (rawValue == null) {
-          continue;
-        }
-        FieldSpec keySpec = _childFieldSpecs.get(key);
-        DataType valueType = keySpec != null
-            ? keySpec.getDataType()
-            : _inferredTypes.computeIfAbsent(key, k -> {
-              DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
-              return inferred != null ? inferred : DataType.STRING;
-            });
-        if (!_presenceBitmaps.containsKey(key)) {
-          _presenceBitmaps.put(key, new RoaringBitmap());
-          _values.put(key, new ArrayList<>());
-        }
-        _presenceBitmaps.get(key).add(_numDocs);
-        Object coerced;
-        try {
-          PinotDataType sourceType = PinotDataType.getSingleValueType(rawValue);
-          PinotDataType destType = ColumnDataType.fromDataTypeSV(valueType.getStoredType()).toPinotDataType();
-          coerced = destType.convert(rawValue, sourceType);
-        } catch (Exception e) {
-          _coercionFailures++;
-          _presenceBitmaps.get(key).remove(_numDocs);
-          continue;
-        }
-        _values.get(key).add(coerced);
-      }
+      OpenStructKeyFlattener.flatten(map, _maxNestedKeyDepth, this::addEntry);
     }
     _numDocs++;
+  }
+
+  /// Accumulates one flat key of the current document. `container` marks a key whose value is a nested object
+  /// rendered as JSON text; see [#classify()] for why those are held out of automatic dense selection.
+  private void addEntry(String key, @Nullable Object rawValue, boolean container) {
+    if (rawValue == null) {
+      return;
+    }
+    if (_config.isIgnoredKey(key)) {
+      _ignoredKeyDropCount++;
+      return;
+    }
+    if (container) {
+      _containerKeys.add(key);
+    }
+    FieldSpec keySpec = _childFieldSpecs.get(key);
+    // Shape is decided by the first value the key presents and then sticks, exactly as its type does. A
+    // collection arriving on a key whose shape is already scalar is handled as any other value it cannot
+    // represent -- stringified on a STRING key, a coercion failure on a typed one -- rather than reshaping a
+    // column other documents already wrote to.
+    boolean multiValueKey;
+    boolean firstSighting = false;
+    if (_presenceBitmaps.containsKey(key)) {
+      multiValueKey = _multiValueKeys.contains(key);
+    } else {
+      // A declaration decides the shape in both directions -- a key declared single-value stays single-value
+      // even when its values are collections, because the declaration is what the user asked for. Only an
+      // undeclared key takes its shape from the data.
+      multiValueKey = keySpec != null
+          ? !keySpec.isSingleValueField()
+          : OpenStructTypeInference.asMultiValue(rawValue) != null;
+      firstSighting = true;
+    }
+    Object[] elements = multiValueKey ? OpenStructTypeInference.asMultiValue(rawValue) : null;
+    if (elements != null && elements.length == 0) {
+      // No elements, so no value and nothing to infer a type from. A materialized multi-value column has no
+      // empty state, so treating this as present would mean inventing one; the key is simply not in this
+      // document, the same as a null value above.
+      //
+      // Returning before the shape is recorded is what keeps the two tiers in step: the mutable index also
+      // returns here without allocating a column, so letting an empty list decide the shape would make this
+      // side multi-value and that side whatever the next row happens to be.
+      return;
+    }
+    if (firstSighting && multiValueKey) {
+      _multiValueKeys.add(key);
+    }
+    DataType valueType;
+    if (keySpec != null) {
+      valueType = keySpec.getDataType();
+    } else if (elements != null) {
+      // A collection resolves to its element type. Established types stay sticky exactly as for a scalar key:
+      // once a key is STRING it stays STRING, and an element type that disagrees with the established one
+      // resolves to STRING rather than dropping the row.
+      DataType established = _inferredTypes.get(key);
+      if (established != null && established != DataType.STRING) {
+        valueType = established;
+      } else {
+        DataType inferred = OpenStructTypeInference.inferElementDataType(elements);
+        if (inferred == null) {
+          // Empty, or all nulls: nothing to learn from, and STRING holds whatever arrives later.
+          valueType = established != null ? established : DataType.STRING;
+        } else {
+          valueType = established != null && established != inferred ? DataType.STRING : inferred;
+        }
+        _inferredTypes.putIfAbsent(key, valueType);
+      }
+    } else {
+      DataType established = _inferredTypes.get(key);
+      if (established != null && established != DataType.STRING) {
+        // Sticky: a key already resolved to a non-STRING type can't flip later, so skip
+        // inference entirely -- matches MutableOpenStructIndex's fast path. An unmappable
+        // value here is a coercion failure below, not a fresh inference decision; overriding
+        // valueType to STRING per-row would desync it from _inferredTypes and corrupt _values
+        // with a mix of types for one key.
+        valueType = established;
+      } else {
+        // Resolve per value rather than only on first sighting: the key's inferred type is
+        // cached, so folding the counter into a computeIfAbsent would record one failure per
+        // key no matter how many values actually took the STRING fallback.
+        DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
+        if (inferred == null) {
+          valueType = DataType.STRING;
+          _inferenceFailuresPerKey.merge(key, 1L, Long::sum);
+        } else {
+          // established is STRING here (or null): once a key falls back to STRING it stays
+          // STRING even if a later value would infer cleanly on its own.
+          valueType = established != null ? established : inferred;
+        }
+        _inferredTypes.putIfAbsent(key, valueType);
+      }
+    }
+    RoaringBitmap bitmap = _presenceBitmaps.computeIfAbsent(key, k -> new RoaringBitmap());
+    List<Object> values = _values.computeIfAbsent(key, k -> new ArrayList<>());
+    if (!bitmap.checkedAdd(_numDocs)) {
+      // The key already has a value for this document. Values pair with the bitmap positionally when the
+      // column is written, so appending a second one would shift every document after it instead of failing
+      // -- keep the first value and drop this one. [OpenStructKeyFlattener] already emits a key once per
+      // document, which leaves this an invariant of the class rather than a contract held elsewhere.
+      return;
+    }
+    Object coerced;
+    try {
+      PinotDataType destType = ColumnDataType.fromDataTypeSV(valueType.getStoredType()).toPinotDataType();
+      coerced = elements != null ? coerceElements(elements, destType) : coerceScalar(rawValue, destType);
+    } catch (Exception e) {
+      _coercionFailuresPerKey.merge(key, 1L, Long::sum);
+      bitmap.remove(_numDocs);
+      return;
+    }
+    values.add(coerced);
+  }
+
+  private static Object coerceScalar(Object rawValue, PinotDataType destType) {
+    return destType.convert(rawValue, PinotDataType.getSingleValueType(rawValue));
+  }
+
+  /// Coerces every element to the key's resolved type. A null element takes the whole value down rather than
+  /// being silently dropped, because an array's length is part of its value -- losing one element would shift
+  /// every index after it.
+  private static Object[] coerceElements(Object[] elements, PinotDataType destType) {
+    Object[] coerced = new Object[elements.length];
+    for (int i = 0; i < elements.length; i++) {
+      Object element = elements[i];
+      if (element == null) {
+        throw new IllegalArgumentException("null element in a multi-value OPEN_STRUCT value");
+      }
+      coerced[i] = destType.convert(element, PinotDataType.getSingleValueType(element));
+    }
+    return coerced;
   }
 
   @Override
@@ -246,15 +370,93 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       writeSparseJsonColumn(sparseKeys);
     }
 
-    if (_coercionFailures > 0) {
-      LOGGER.info("OPEN_STRUCT '{}': dropped {} values due to type coercion failures", _columnName, _coercionFailures);
+    long totalCoercionFailures = sumValues(_coercionFailuresPerKey);
+    if (totalCoercionFailures > 0) {
+      LOGGER.info("OPEN_STRUCT '{}': dropped {} values due to type coercion failures across {} keys",
+          _columnName, totalCoercionFailures, _coercionFailuresPerKey.size());
+      // The key space is user-controlled, so the per-key breakdown is DEBUG-only.
+      LOGGER.debug("OPEN_STRUCT '{}': full coercion failure counts: {}", _columnName, _coercionFailuresPerKey);
+    }
+    long totalInferenceFailures = sumValues(_inferenceFailuresPerKey);
+    if (totalInferenceFailures > 0) {
+      LOGGER.info("OPEN_STRUCT '{}': {} values across {} keys fell back to STRING after type inference failed",
+          _columnName, totalInferenceFailures, _inferenceFailuresPerKey.size());
+      LOGGER.debug("OPEN_STRUCT '{}': full inference failure counts: {}", _columnName, _inferenceFailuresPerKey);
+    }
+    emitMetrics(sparseKeys.size(), totalCoercionFailures, totalInferenceFailures);
+
+    if (_ignoredKeyDropCount > 0) {
+      LOGGER.info("OPEN_STRUCT '{}': dropped {} entries for ignored keys", _columnName, _ignoredKeyDropCount);
       ServerMetrics serverMetrics = ServerMetrics.get();
       if (serverMetrics != null) {
-        serverMetrics.addMeteredGlobalValue(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, _coercionFailures);
+        serverMetrics.addMeteredTableValue(_tableNameWithType, _columnName,
+            ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, _ignoredKeyDropCount);
       }
     }
 
     emitParentColumnMetadata(sparseKeys);
+  }
+
+  /// Longest value stored for a multi-value key. A scalar stored on the key before it became multi-value counts
+  /// as the one-element value it reads back as.
+  private int maxNumValues(String key) {
+    int maxNumValues = 1;
+    for (Object value : _values.getOrDefault(key, List.of())) {
+      if (value instanceof Object[] elements) {
+        maxNumValues = Math.max(maxNumValues, elements.length);
+      }
+    }
+    return maxNumValues;
+  }
+
+  private static long sumValues(Map<String, Long> counts) {
+    return counts.values().stream().mapToLong(Long::longValue).sum();
+  }
+
+  private void emitMetrics(int sparseKeyCount, long totalCoercionFailures, long totalInferenceFailures) {
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    if (serverMetrics == null || _numDocs == 0) {
+      return;
+    }
+
+    if (totalCoercionFailures > 0) {
+      serverMetrics.addMeteredTableValue(_tableNameWithType, _columnName,
+          ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, totalCoercionFailures);
+    }
+    if (totalInferenceFailures > 0) {
+      serverMetrics.addMeteredTableValue(_tableNameWithType, _columnName,
+          ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, totalInferenceFailures);
+    }
+
+    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
+        ServerGauge.OPEN_STRUCT_LAST_SEGMENT_DENSE_KEY_COUNT, _resolvedDenseKeys.size());
+    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
+        ServerGauge.OPEN_STRUCT_LAST_SEGMENT_SPARSE_KEY_COUNT, sparseKeyCount);
+    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
+        ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_COUNT, _presenceBitmaps.size());
+    // Denominator for the per-key fill rate. Emitted as a raw count rather than folding the ratio into a
+    // single percentage gauge: integer division truncates a key present in a handful of docs to 0, which
+    // is indistinguishable from no data and is exactly the case worth alerting on.
+    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
+        ServerGauge.OPEN_STRUCT_LAST_SEGMENT_DOC_COUNT, _numDocs);
+
+    if (_config.isPerKeyMetricsEnabled()) {
+      // Emit for every key in the segment. Registry entries follow the ingested key space;
+      // table deletion can only sweep keys recoverable from denseKeys.
+      _presenceBitmaps.forEach((key, presence) -> serverMetrics.setOrUpdateTableGauge(_tableNameWithType,
+          OpenStructNaming.metricKey(_columnName, key),
+          ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, presence.getCardinality()));
+    } else {
+      // Emit only for configured dense keys — bounded by the table config.
+      for (String key : _config.getDenseKeys()) {
+        RoaringBitmap presence = _presenceBitmaps.get(key);
+        if (presence != null) {
+          serverMetrics.setOrUpdateTableGauge(_tableNameWithType,
+              OpenStructNaming.metricKey(_columnName, key),
+              ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, presence.getCardinality());
+        }
+      }
+    }
   }
 
   @Override
@@ -268,6 +470,29 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     return _materializedColumnMetadata;
   }
 
+  /// Field spec for a materialized child column.
+  ///
+  /// When the parent declares a child spec for the key, the child mirrors it: the declared data type rather than
+  /// the type it is stored as, and the declared default null value. That is what
+  /// [OpenStructDataSource#getValueFieldSpec] resolves for the key, so a document without the key reads the same
+  /// value whether the key is missing from this document or from the segment entirely. It also keeps the logical
+  /// type: a key declared TIMESTAMP, BOOLEAN, JSON or UUID used to land as the LONG, INT, STRING or BYTES it is
+  /// stored as, losing every operator that depends on knowing which it was.
+  ///
+  /// Without a declaration the child is a single-value dimension of the inferred stored type, whose natural Pinot
+  /// null value is what absent docs store.
+  ///
+  /// Single- or multi-value follows the data: a key whose values are collections is materialized as a multi-value
+  /// column. A declaration cannot override that, because the values are what the creators have to write.
+  private static DimensionFieldSpec materializedFieldSpec(String materializedCol, @Nullable FieldSpec keySpec,
+      DataType valueType, boolean singleValue) {
+    if (keySpec == null) {
+      return new DimensionFieldSpec(materializedCol, valueType.getStoredType(), singleValue);
+    }
+    return new DimensionFieldSpec(materializedCol, keySpec.getDataType(), singleValue, keySpec.getMaxLength(),
+        keySpec.getDefaultNullValue());
+  }
+
   private void writeDenseKeyColumn(String key)
       throws IOException {
     String materializedCol = OpenStructNaming.materializedColumnName(_columnName, key);
@@ -279,10 +504,21 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     RoaringBitmap presence = _presenceBitmaps.get(key);
     List<Object> values = _values.get(key);
 
-    // Synthetic field spec for the materialized child. Its natural Pinot dimension null value is the value
-    // stored for absent docs, so column metadata stays consistent with on-disk content.
-    DimensionFieldSpec childFieldSpec = new DimensionFieldSpec(materializedCol, storedType, true);
-    Object defaultValue = childFieldSpec.getDefaultNullValue();
+    boolean singleValue = !_multiValueKeys.contains(key);
+    if (!singleValue) {
+      // A key becomes multi-value the moment one document presents a collection, which can happen after other
+      // documents already stored a scalar. The column has one shape, so those scalars become one-element values --
+      // the same thing ingestion does for a scalar written to a declared multi-value field. The sparse blob is not
+      // rewritten this way: it is JSON and keeps the shape the row actually had, and the reader over it normalizes
+      // on the way out from the shape recorded in the sparse multi-value manifest.
+      values.replaceAll(value -> value instanceof Object[] ? value : new Object[]{value});
+    }
+    DimensionFieldSpec childFieldSpec = materializedFieldSpec(materializedCol, keySpec, valueType, singleValue);
+    // A multi-value column has no empty state on disk, so an absent doc stores a one-element array of the default,
+    // which is what the standard segment creator writes for an absent multi-value field.
+    Object defaultValue = singleValue
+        ? childFieldSpec.getDefaultNullValue()
+        : new Object[]{childFieldSpec.getDefaultNullValue()};
 
     // Collect statistics the standard way: present docs contribute their value, absent docs the default
     // (absent docs are also marked in the null vector below).
@@ -307,6 +543,13 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         .build();
 
     boolean useDictionary = resolveUseDictionary(childFieldSpec, configsForDecision, statsCollector);
+
+    // Defense-in-depth mirror of OpenStructIndexType.validatePerKeyIndexes: the child forward config built
+    // below discards any per-key codecSpec, so refuse to silently drop one that slipped past validation.
+    ForwardIndexConfig configuredForwardIndex = configsForDecision.getConfig(StandardIndexes.forward());
+    Preconditions.checkState(configuredForwardIndex.getCodecSpec() == null,
+        "OPEN_STRUCT column '%s': codecSpec is not supported for key '%s'; materialized keys always use a "
+            + "dictionary-encoded or LZ4 raw forward index", _columnName, key);
 
     // Reconcile dictionary + forward encoding with the final decision (mirrors BaseSegmentCreator.adaptConfig);
     // ForwardIndexCreatorFactory selects dict-vs-raw from the forward config's EncodingType. A compression codec
@@ -408,12 +651,21 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
           }
         }
 
+        boolean singleValue = childFieldSpec.isSingleValueField();
         int ordinal = 0;
         for (int docId = 0; docId < _numDocs; docId++) {
           Object value = presence.contains(docId) ? values.get(ordinal++) : defaultValue;
-          int dictId = useDictionary ? dictCreator.indexOfSV(value) : -1;
-          for (IndexCreator creator : creators) {
-            creator.add(value, dictId);
+          if (singleValue) {
+            int dictId = useDictionary ? dictCreator.indexOfSV(value) : -1;
+            for (IndexCreator creator : creators) {
+              creator.add(value, dictId);
+            }
+          } else {
+            Object[] multiValue = (Object[]) value;
+            int[] dictIds = useDictionary ? dictCreator.indexOfMV(multiValue) : null;
+            for (IndexCreator creator : creators) {
+              creator.add(multiValue, dictIds);
+            }
           }
         }
         for (IndexCreator creator : creators) {
@@ -464,7 +716,6 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     String sparseCol = OpenStructNaming.sparseColumnName(_columnName);
     int maxLen = 1;
     String[] jsonPerDoc = new String[_numDocs];
-    int nonNullCount = 0;
     for (int docId = 0; docId < _numDocs; docId++) {
       Map<String, Object> sparseEntries = new LinkedHashMap<>();
       for (String key : sparseKeys) {
@@ -478,13 +729,25 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         try {
           String json = JsonUtils.objectToString(sparseEntries);
           jsonPerDoc[docId] = json;
-          maxLen = Math.max(maxLen, json.getBytes(StandardCharsets.UTF_8).length);
-          nonNullCount++;
+          maxLen = Math.max(maxLen, Utf8.encodedLength(json));
         } catch (IOException e) {
           throw new RuntimeException("Failed to serialize sparse entries for docId " + docId, e);
         }
       }
     }
+
+    // Absent docs store "" in the raw forward index (see loop below) and are flagged in the null vector, so feed
+    // the same placeholder through the stats collector and record it as the default null value. Collected inside
+    // the write loop rather than in a pass of its own: it needs the exact same per-doc branch.
+    DimensionFieldSpec sparseFieldSpec = new DimensionFieldSpec(sparseCol, DataType.STRING, true);
+    String defaultValue = "";
+    sparseFieldSpec.setDefaultNullValue(defaultValue);
+    // This column is always raw (no dictionary), so it never needs the sorted unique-values array
+    // StringColumnPreIndexStatsCollector builds for dictionary creation -- the O(n log n) sort at
+    // seal() would be pure overhead here, close to one entry per doc. NoDictColumnStatisticsCollector
+    // gives the same cardinality/min/max/length stats without it (exact cardinality up to its
+    // tracking threshold, HyperLogLog beyond that).
+    AbstractColumnStatisticsCollector statsCollector = new NoDictColumnStatisticsCollector(sparseFieldSpec, null, null);
 
     SingleValueVarByteRawIndexCreator fwdCreator = new SingleValueVarByteRawIndexCreator(
         _indexDir, ChunkCompressionType.LZ4, sparseCol, _numDocs, DataType.STRING, maxLen);
@@ -495,11 +758,13 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     try {
       for (int docId = 0; docId < _numDocs; docId++) {
         if (jsonPerDoc[docId] != null) {
+          statsCollector.collect(jsonPerDoc[docId]);
           fwdCreator.putString(jsonPerDoc[docId]);
           if (jsonCreator != null) {
             jsonCreator.add(jsonPerDoc[docId]);
           }
         } else {
+          statsCollector.collect(defaultValue);
           fwdCreator.putString("");
           nullCreator.setNull(docId);
           if (jsonCreator != null) {
@@ -520,22 +785,15 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       }
     }
 
+    statsCollector.seal();
+
     PropertiesConfiguration props = new PropertiesConfiguration();
-    props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, V1Constants.MetadataKeys.Column.DATA_TYPE),
-        DataType.STRING.name());
-    props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, V1Constants.MetadataKeys.Column.COLUMN_TYPE),
-        FieldSpec.FieldType.DIMENSION.name());
-    props.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED), true);
-    props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, V1Constants.MetadataKeys.Column.TOTAL_DOCS),
-        _numDocs);
-    props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, V1Constants.MetadataKeys.Column.CARDINALITY),
-        nonNullCount);
-    props.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, V1Constants.MetadataKeys.Column.TOTAL_NUMBER_OF_ENTRIES),
-        _numDocs);
-    props.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, V1Constants.MetadataKeys.Column.HAS_DICTIONARY), false);
+    // Route through the same metadata writer as dense child columns (BaseSegmentCreator.addColumnMetadataInfo) so
+    // this raw, no-dictionary column carries every property ColumnMetadataImpl.fromPropertiesConfiguration()
+    // expects, instead of a hand-rolled subset that can silently drift from what the reader requires.
+    BaseSegmentCreator.addColumnMetadataInfo(props, sparseCol, statsCollector, _numDocs, sparseFieldSpec,
+        false /* hasDictionary */, 0 /* dictionaryElementSize */, FieldConfig.EncodingType.RAW,
+        false /* autoGenerated */);
     props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, "hasNullValue"), true);
     props.setProperty(
         V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, V1Constants.MetadataKeys.Column.PARENT_COLUMN),
@@ -571,6 +829,25 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
             JsonUtils.objectToString(sparseKeys));
       } catch (IOException e) {
         throw new RuntimeException("Failed to serialize sparse-key manifest", e);
+      }
+      // Which tier a key lands on is a tuning decision, so it must not change the key's shape: a dense child
+      // declares multi-value in its own column metadata, and a sparse key -- stored in a JSON blob that holds
+      // either shape -- declares it here, together with the longest value it holds so readers can size their
+      // buffers the way they do from a materialized column's maxNumberOfMultiValues.
+      Map<String, Integer> sparseMultiValueKeys = new LinkedHashMap<>();
+      for (String key : sparseKeys) {
+        if (_multiValueKeys.contains(key)) {
+          sparseMultiValueKeys.put(key, maxNumValues(key));
+        }
+      }
+      if (!sparseMultiValueKeys.isEmpty()) {
+        try {
+          props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(_columnName,
+              V1Constants.MetadataKeys.Column.SPARSE_MULTI_VALUE_KEYS),
+              JsonUtils.objectToString(sparseMultiValueKeys));
+        } catch (IOException e) {
+          throw new RuntimeException("Failed to serialize sparse multi-value key manifest", e);
+        }
       }
     }
     _materializedColumnMetadata.put(_columnName, props);

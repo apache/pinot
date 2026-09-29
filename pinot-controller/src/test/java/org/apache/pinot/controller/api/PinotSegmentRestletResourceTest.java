@@ -32,6 +32,7 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -186,7 +187,7 @@ public class PinotSegmentRestletResourceTest {
       throws Exception {
     String rawTableName = "metadataUpdateTestTable";
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
-    String segmentName = "metadataUpdateSegment";
+    String segmentName = "metadata+UpdateSegment";
     TEST_INSTANCE.addDummySchema(rawTableName);
     TEST_INSTANCE.getHelixResourceManager().addTable(
         new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setNumReplicas(1).build());
@@ -198,29 +199,35 @@ public class PinotSegmentRestletResourceTest {
     assertNotNull(originalMetadata);
     long originalCrc = originalMetadata.getCrc();
     long originalRefreshTime = originalMetadata.getRefreshTime();
-    String endpoint = TEST_INSTANCE.getControllerBaseApiUrl() + "/segments/" + offlineTableName + "/" + segmentName
-        + "/metadata";
+    URI endpoint = FileUploadDownloadClient.getUpdateSegmentZKMetadataURI(
+        URI.create(TEST_INSTANCE.getControllerBaseApiUrl()), offlineTableName, segmentName);
     String modifier = new SegmentZKMetadataCustomMapModifier(
         SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Map.of("task.lastProcessedTime", "1234"))
         .toJsonString();
 
-    SimpleHttpResponse response = ControllerTest.getHttpClient().sendJsonPutRequest(URI.create(endpoint), modifier,
+    SimpleHttpResponse response = ControllerTest.getHttpClient().sendJsonPutRequest(endpoint, modifier,
         Map.of(HttpHeaders.IF_MATCH, Long.toString(originalCrc)));
     assertEquals(response.getStatusCode(), 200);
     SegmentZKMetadata updatedMetadata =
         TEST_INSTANCE.getHelixResourceManager().getSegmentZKMetadata(offlineTableName, segmentName);
     assertNotNull(updatedMetadata);
-    assertTrue(updatedMetadata.getRefreshTime() > originalRefreshTime);
+    // Updating custom metadata does not replace the segment, so its refresh time must keep its documented meaning.
+    // Callers that need the metadata mutation time can use the ZK node mtime.
+    assertEquals(updatedMetadata.getRefreshTime(), originalRefreshTime);
     assertEquals(updatedMetadata.getCustomMap(), Map.of("task.lastProcessedTime", "1234"));
     assertEquals(updatedMetadata.getCrc(), originalCrc);
     assertEquals(updatedMetadata.getDownloadUrl(), "downloadUrl");
 
-    response = ControllerTest.getHttpClient().sendJsonPutRequest(URI.create(endpoint), modifier, Map.of());
+    response = ControllerTest.getHttpClient().sendJsonPutRequest(endpoint, modifier, Map.of());
     assertEquals(response.getStatusCode(), 400);
 
-    response = ControllerTest.getHttpClient().sendJsonPutRequest(URI.create(endpoint), "not-json",
+    response = ControllerTest.getHttpClient().sendJsonPutRequest(endpoint, "not-json",
         Map.of(HttpHeaders.IF_MATCH, Long.toString(originalCrc)));
     assertEquals(response.getStatusCode(), 400);
+
+    response = ControllerTest.getHttpClient().sendJsonPutRequest(endpoint, "x".repeat(64 * 1024 + 1),
+        Map.of(HttpHeaders.IF_MATCH, Long.toString(originalCrc)));
+    assertEquals(response.getStatusCode(), 413);
 
     for (String malformedModifier : List.of(
         "[]",
@@ -230,12 +237,12 @@ public class PinotSegmentRestletResourceTest {
         "{\"mapModifyMode\":\"UPDATE\",\"map\":[]}",
         "{\"mapModifyMode\":\"UPDATE\",\"map\":{\"key\":1}}",
         "{\"mapModifyMode\":\"UPDATE\",\"map\":{\"key\":{\"nested\":\"value\"}}}")) {
-      response = ControllerTest.getHttpClient().sendJsonPutRequest(URI.create(endpoint), malformedModifier,
+      response = ControllerTest.getHttpClient().sendJsonPutRequest(endpoint, malformedModifier,
           Map.of(HttpHeaders.IF_MATCH, Long.toString(originalCrc)));
       assertEquals(response.getStatusCode(), 400);
     }
 
-    response = ControllerTest.getHttpClient().sendJsonPutRequest(URI.create(endpoint), modifier,
+    response = ControllerTest.getHttpClient().sendJsonPutRequest(endpoint, modifier,
         Map.of(HttpHeaders.IF_MATCH, Long.toString(originalCrc + 1)));
     assertEquals(response.getStatusCode(), 412);
 
@@ -313,12 +320,12 @@ public class PinotSegmentRestletResourceTest {
       throws Exception {
     Map<String, String> crcMap = adminClient.getSegmentClient().getSegmentToCrcMap(tableName);
     if (crcMap == null) {
-      crcMap = java.util.Map.of();
+      crcMap = Map.of();
     }
     for (String segmentName : crcMap.keySet()) {
       SegmentMetadata metadata = metadataTable.get(segmentName);
       assertNotNull(metadata);
-      assertEquals(crcMap.get(segmentName), metadata.getCrc());
+      assertEquals(crcMap.get(segmentName), Long.toString(metadata.getCrc()));
     }
     assertEquals(crcMap.size(), expectedSize);
   }

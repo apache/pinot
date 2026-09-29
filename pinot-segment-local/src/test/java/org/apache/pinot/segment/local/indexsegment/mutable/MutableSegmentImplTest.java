@@ -38,6 +38,7 @@ import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -62,6 +63,14 @@ import static org.testng.Assert.assertEquals;
 public class MutableSegmentImplTest {
   private static final String AVRO_FILE = "data/test_data-mv.avro";
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "MutableSegmentImplTest");
+  /// Virtual columns describing the segment itself, which are expected to differ between a mutable segment and an
+  /// immutable segment built from the same records.
+  private static final Set<String> SEGMENT_LEVEL_VIRTUAL_COLUMNS =
+      Set.of(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME,
+          CommonConstants.Segment.BuiltInVirtualColumn.CREATIONTIME,
+          CommonConstants.Segment.BuiltInVirtualColumn.STARTTIME,
+          CommonConstants.Segment.BuiltInVirtualColumn.ENDTIME,
+          CommonConstants.Segment.BuiltInVirtualColumn.CRC);
 
   private Schema _schema;
   private MutableSegmentImpl _mutableSegmentImpl;
@@ -132,6 +141,29 @@ public class MutableSegmentImplTest {
     }
   }
 
+  /// The segment metadata virtual columns are skipped in the mutable-vs-immutable comparisons above because they
+  /// legitimately differ, so their values on a real mutable segment are pinned here instead. This mutable segment is
+  /// built from ZK metadata without a creation time and never gets a time range or a CRC, which is exactly the shape
+  /// of a CONSUMING segment.
+  @Test
+  public void testSegmentMetadataVirtualColumnsOnMutableSegment() {
+    for (String column : Set.of(CommonConstants.Segment.BuiltInVirtualColumn.CREATIONTIME,
+        CommonConstants.Segment.BuiltInVirtualColumn.STARTTIME,
+        CommonConstants.Segment.BuiltInVirtualColumn.ENDTIME,
+        CommonConstants.Segment.BuiltInVirtualColumn.CRC)) {
+      DataSource dataSource = _mutableSegmentImpl.getDataSource(column);
+      NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
+      Assert.assertNotNull(nullValueVector, "Expecting a null value vector for virtual column: " + column);
+      assertEquals(nullValueVector.getNullBitmap().getCardinality(), _mutableSegmentImpl.getNumDocsIndexed());
+    }
+
+    // $totalDocs tracks the documents indexed so far, and is never null
+    DataSource totalDocsDataSource =
+        _mutableSegmentImpl.getDataSource(CommonConstants.Segment.BuiltInVirtualColumn.TOTALDOCS);
+    assertEquals(totalDocsDataSource.getDictionary().getIntValue(0), _mutableSegmentImpl.getNumDocsIndexed());
+    Assert.assertNull(totalDocsDataSource.getNullValueVector());
+  }
+
   @Test
   public void testDataSourceForSVColumns() {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
@@ -148,8 +180,9 @@ public class MutableSegmentImplTest {
         Dictionary expectedDictionary = expectedDataSource.getDictionary();
         assertEquals(actualDictionary.length(), expectedDictionary.length());
 
-        // Allow the segment name to be different
-        if (column.equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME)) {
+        // Allow the segment level metadata to be different between the mutable segment and the immutable segment
+        // built from the same records
+        if (SEGMENT_LEVEL_VIRTUAL_COLUMNS.contains(column)) {
           continue;
         }
 

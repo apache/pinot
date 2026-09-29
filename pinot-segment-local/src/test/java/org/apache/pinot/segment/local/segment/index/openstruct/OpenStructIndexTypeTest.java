@@ -19,24 +19,43 @@
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.expectThrows;
 
 
 public class OpenStructIndexTypeTest {
+
+  @DataProvider(name = "codecSpecOpenStructConfigs")
+  public Object[][] codecSpecOpenStructConfigs() {
+    OpenStructIndexConfig valueConfig = new OpenStructIndexConfig(false, null, -1, null, 0.5,
+        List.of(rawCodecSpecFieldConfig("clicks")), null, null, null);
+    OpenStructIndexConfig defaultConfig = new OpenStructIndexConfig(false, rawCodecSpecFieldConfig("default"), -1,
+        null, 0.5, null, null, null, null);
+    return new Object[][]{{valueConfig, "key 'clicks'"}, {defaultConfig, "defaultValueFieldConfig"}};
+  }
 
   @Test
   public void testServiceLoaderResolves() {
@@ -82,5 +101,137 @@ public class OpenStructIndexTypeTest {
 
     // Must not throw.
     StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null);
+  }
+
+  @Test
+  public void testValidateRejectsIgnoredKeyAlsoDense()
+      throws Exception {
+    OpenStructIndexConfig config = JsonUtils.stringToObject(
+        "{\"denseKeys\": [\"clicks\"], \"ignoredKeys\": [\"clicks\"]}", OpenStructIndexConfig.class);
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
+    FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true, Map.of());
+
+    assertThrows(IllegalStateException.class,
+        () -> StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null));
+  }
+
+  @Test
+  public void testValidateRejectsIgnoredKeyAlsoHasValueFieldConfig()
+      throws Exception {
+    FieldConfig keyConfig = new FieldConfig.Builder("clicks").build();
+    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(keyConfig), null,
+        null, Set.of("clicks"));
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
+    FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true, Map.of());
+
+    assertThrows(IllegalStateException.class,
+        () -> StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null));
+  }
+
+  @Test
+  public void testValidateRejectsIgnoredKeyAlsoDeclaredInSchema()
+      throws Exception {
+    OpenStructIndexConfig config = JsonUtils.stringToObject(
+        "{\"ignoredKeys\": [\"clicks\"]}", OpenStructIndexConfig.class);
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
+    FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true,
+        Map.of("clicks", new DimensionFieldSpec("clicks", FieldSpec.DataType.LONG, true)));
+
+    assertThrows(IllegalStateException.class,
+        () -> StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null));
+  }
+
+  @Test
+  public void testValidateAllowsNonConflictingIgnoredKeys()
+      throws Exception {
+    OpenStructIndexConfig config = JsonUtils.stringToObject(
+        "{\"denseKeys\": [\"clicks\"], \"ignoredKeys\": [\"debug\"]}", OpenStructIndexConfig.class);
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
+    FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true,
+        Map.of("clicks", new DimensionFieldSpec("clicks", FieldSpec.DataType.LONG, true)));
+
+    // Must not throw.
+    StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null);
+  }
+
+  /// A declared MAP child key passes ColumnDataType conversion (used to be the only check) but has no DIMENSION
+  /// case in FieldSpec#getDefaultNullValue, the call allocateKeyColumn() actually makes — must be rejected here
+  /// instead of throwing uncaught on the first row ingested for the key.
+  @Test
+  public void testValidateRejectsMapChildKeyType()
+      throws Exception {
+    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, -1, null, 0.5, null, null);
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
+    FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true,
+        Map.of("nested", new ComplexFieldSpec("nested", FieldSpec.DataType.MAP, true, Map.of())));
+
+    assertThrows(IllegalStateException.class,
+        () -> StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null));
+  }
+
+  /// Same gap as MAP, for a nested OPEN_STRUCT child key.
+  @Test
+  public void testValidateRejectsOpenStructChildKeyType()
+      throws Exception {
+    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, -1, null, 0.5, null, null);
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
+    FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true,
+        Map.of("nested", new ComplexFieldSpec("nested", FieldSpec.DataType.OPEN_STRUCT, true, Map.of())));
+
+    assertThrows(IllegalStateException.class,
+        () -> StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null));
+  }
+
+  @Test
+  public void testValidateSkipsIgnoredKeyChecksWhenIndexDisabled()
+      throws Exception {
+    OpenStructIndexConfig config = JsonUtils.stringToObject(
+        "{\"disabled\": true, \"denseKeys\": [\"clicks\"], \"ignoredKeys\": [\"clicks\"]}",
+        OpenStructIndexConfig.class);
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
+    FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true, Map.of());
+
+    // Must not throw - validation is skipped entirely when the index is disabled.
+    StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null);
+  }
+
+  @Test(dataProvider = "codecSpecOpenStructConfigs")
+  public void testTableValidationRejectsCodecSpecForMaterializedChildren(OpenStructIndexConfig openStructConfig,
+      String expectedTarget) {
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set(StandardIndexes.openStruct().getPrettyName(), JsonUtils.objectToJsonNode(openStructConfig));
+    FieldConfig parentFieldConfig = new FieldConfig.Builder("payload").withIndexes(indexes).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("openStructCodecSpecTest")
+        .setFieldConfigList(List.of(parentFieldConfig))
+        .build();
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("openStructCodecSpecTest")
+        .addOpenStruct("payload", Map.of())
+        .build();
+
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validate(tableConfig, schema));
+    assertEquals(exception.getMessage(), "OPEN_STRUCT column 'payload': codecSpec is not supported for "
+        + expectedTarget + "; materialized keys always use a dictionary-encoded or LZ4 raw forward index");
+  }
+
+  private static FieldConfig rawCodecSpecFieldConfig(String name) {
+    ObjectNode forward = JsonUtils.newObjectNode();
+    forward.put("encodingType", FieldConfig.EncodingType.RAW.name());
+    forward.put("codecSpec", "LZ4");
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set(StandardIndexes.forward().getPrettyName(), forward);
+    return new FieldConfig.Builder(name)
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
   }
 }

@@ -589,6 +589,17 @@ public class DataSchema {
           if (value instanceof Timestamp[]) {
             return fromTimestampArray((Timestamp[]) value);
           }
+          if (value instanceof byte[][]) {
+            byte[][] bytesArray = (byte[][]) value;
+            ByteArray[] internalBytesArray = new ByteArray[bytesArray.length];
+            for (int i = 0; i < bytesArray.length; i++) {
+              internalBytesArray[i] = new ByteArray(bytesArray[i]);
+            }
+            return internalBytesArray;
+          }
+          if (value instanceof UUID[]) {
+            return fromUuidArray(value);
+          }
           return value;
         default:
           return value;
@@ -1065,7 +1076,10 @@ public class DataSchema {
         case MAP:
           return MAP;
         case OPEN_STRUCT:
-          return OBJECT;
+          // Selecting the column itself reads the whole struct back as its JSON document, so JSON is both what the
+          // value is and a type the wire format can carry. OBJECT has no serializer, which made `SELECT *` on any
+          // table with an OPEN_STRUCT column fail with "Error serializing response".
+          return JSON;
         case UNKNOWN:
           return UNKNOWN;
         default:

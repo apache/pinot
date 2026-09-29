@@ -95,6 +95,29 @@ public class IvfFlatFilterAwareTest {
     }
   }
 
+  /// Every filter-aware reader rejects a null bitmap with the same contract failure, so a caller that loses its
+  /// filter never silently receives documents outside it. See FilterAwareVectorIndexReader#getDocIds.
+  @Test
+  public void testPreFilterRejectsNullBitmap()
+      throws Exception {
+    int numVectors = 50;
+    int dimension = 4;
+    int nlist = 4;
+    float[][] vectors = generateVectors(numVectors, dimension, new Random(TEST_SEED));
+    createIndex(vectors, dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
+
+    VectorIndexConfig config = createConfig(dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
+    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
+      NullPointerException thrown = Assert.expectThrows(NullPointerException.class,
+          () -> reader.getDocIds(vectors[0], 5, (ImmutableRoaringBitmap) null));
+      Assert.assertNotNull(thrown.getMessage(), "The rejection must carry the pre-filter contract message");
+      Assert.assertTrue(thrown.getMessage().contains("must not be null"),
+          "Expected the pre-filter contract message, got: " + thrown.getMessage());
+    }
+  }
+
+
   @Test
   public void testPreFilterWithEmptyBitmapReturnsEmpty()
       throws Exception {

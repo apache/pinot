@@ -34,7 +34,7 @@ public class IntegerTupleSketchAggregationFunctionTest {
   public void testCanUseStarTreeDefaultK() {
     IntegerTupleSketchAggregationFunction function =
         new IntegerTupleSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col")),
-            IntegerSummary.Mode.Sum);
+            IntegerSummary.Mode.Sum, false);
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, "16384")));
@@ -46,7 +46,7 @@ public class IntegerTupleSketchAggregationFunctionTest {
   public void testCanUseCustomK() {
     IntegerTupleSketchAggregationFunction function = new IntegerTupleSketchAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"), ExpressionContext.forLiteral(Literal.intValue(32768))),
-        IntegerSummary.Mode.Sum);
+        IntegerSummary.Mode.Sum, false);
 
     // Default StarTree lgK = 14 / K=16384
     Assert.assertFalse(function.canUseStarTree(Map.of()));

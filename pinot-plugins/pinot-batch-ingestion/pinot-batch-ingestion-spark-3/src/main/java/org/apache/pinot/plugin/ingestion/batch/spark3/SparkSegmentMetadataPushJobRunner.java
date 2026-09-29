@@ -151,7 +151,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
       if (_spec.getPushJobSpec().isBatchSegmentUpload()) {
         // Process segments in batch mode using foreachPartition
         pathRDD.foreachPartition(segmentIterator -> {
-          setupFileSystems();
+          setupFileSystemsIfNeeded();
           List<String> segmentsInPartition = new ArrayList<>();
           segmentIterator.forEachRemaining(segmentsInPartition::add);
 
@@ -164,7 +164,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
       } else {
         // Process segments one by one using foreach
         pathRDD.foreach(segmentTarPath -> {
-          setupFileSystems();
+          setupFileSystemsIfNeeded();
           Map<String, String> segmentUriToTarPathMap =
               SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
                   new String[]{segmentTarPath});
@@ -198,7 +198,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
           @Override
           public void call(Iterator<String> segmentIterator) throws Exception {
             PluginManager.get().init();
-            setupFileSystems();
+            setupFileSystemsIfNeeded();
 
             List<String> segmentsInPartition = new ArrayList<>();
             segmentIterator.forEachRemaining(segmentsInPartition::add);
@@ -220,7 +220,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
           @Override
           public void call(String segmentTarPath) throws Exception {
             PluginManager.get().init();
-            setupFileSystems();
+            setupFileSystemsIfNeeded();
             try {
               Map<String, String> segmentUriToTarPathMap =
                   SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
@@ -246,6 +246,14 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
     List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
     for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
       PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
+    }
+  }
+
+  private void setupFileSystemsIfNeeded() {
+    List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
+    for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
+      PinotFSFactory.registerIfNeeded(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
+          new PinotConfiguration(pinotFSSpec));
     }
   }
 

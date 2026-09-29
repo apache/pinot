@@ -54,6 +54,7 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -250,6 +251,39 @@ public class SortedMailboxReceiveOperatorTest {
       assertEquals(((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows(), List.of(row1, row2, row3, row5, row4));
       assertTrue(operator.nextBlock().isSuccess());
     }
+  }
+
+  /// The block this operator emits wraps the very list it buffered the rows into, and a block handed to a local
+  /// mailbox can still be read after this op chain has been closed. Releasing the buffer must therefore drop the
+  /// reference, never empty the list.
+  @Test
+  public void shouldNotEmptyTheEmittedBlockOnClose() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    Object[] row = new Object[]{1, 1};
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row),
+        OperatorTestUtil.eosWithEmptyStats());
+    SortedMailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON);
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(resultRows.size(), 1);
+
+    operator.close();
+
+    assertEquals(resultRows.size(), 1, "the emitted block must survive the operator being closed");
+    assertEquals(resultRows.get(0), row);
+  }
+
+  /// The buffered rows must be gone on the error path too, not only once the sorted block has been produced.
+  @Test
+  public void shouldReleaseBufferedRowsOnError() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{1, 1}),
+        OperatorTestUtil.errorWithEmptyStats(new RuntimeException("TEST ERROR")));
+    SortedMailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON);
+    assertTrue(operator.nextBlock().isError());
+
+    operator.cancel(new RuntimeException("TEST ERROR"));
+
+    assertFalse(operator.hasBufferedState());
   }
 
   private SortedMailboxReceiveOperator getOperator(StageMetadata stageMetadata, RelDistribution.Type distributionType,

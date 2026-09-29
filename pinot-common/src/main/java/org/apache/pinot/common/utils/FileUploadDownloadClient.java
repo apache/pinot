@@ -25,6 +25,8 @@ import java.io.InputStream;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -244,9 +246,13 @@ public class FileUploadDownloadClient implements AutoCloseable {
   /// Returns the URI for updating the ZK metadata custom map of a segment.
   public static URI getUpdateSegmentZKMetadataURI(URI controllerURI, String tableNameWithType, String segmentName)
       throws URISyntaxException {
-    return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(),
-        OLD_SEGMENT_PATH + "/" + URIUtils.encode(tableNameWithType) + "/" + URIUtils.encode(segmentName)
-            + "/metadata");
+    String rawPath = OLD_SEGMENT_PATH + "/" + encodePathSegment(tableNameWithType) + "/"
+        + encodePathSegment(segmentName) + "/metadata";
+    return new URI(controllerURI.getScheme() + "://" + controllerURI.getRawAuthority() + rawPath);
+  }
+
+  private static String encodePathSegment(String pathSegment) {
+    return URLEncoder.encode(pathSegment, StandardCharsets.UTF_8).replace("+", "%20");
   }
 
   public static URI getReingestedSegmentUploadURI(URI controllerURI)
@@ -802,7 +808,14 @@ public class FileUploadDownloadClient implements AutoCloseable {
   /// TODO: migrate this method to another class
   public String uploadToSegmentStore(String uri)
       throws URISyntaxException, IOException, HttpErrorStatusException {
+    return uploadToSegmentStore(uri, null);
+  }
+
+  /// Authenticated variant of [#uploadToSegmentStore(String)].
+  public String uploadToSegmentStore(String uri, @Nullable AuthProvider authProvider)
+      throws URISyntaxException, IOException, HttpErrorStatusException {
     ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
+    AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::setHeader);
     // sendRequest checks the response status code
     SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
         _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
@@ -824,7 +837,14 @@ public class FileUploadDownloadClient implements AutoCloseable {
   /// @throws HttpErrorStatusException
   public TableLLCSegmentUploadResponse uploadLLCToSegmentStore(String uri)
       throws URISyntaxException, IOException, HttpErrorStatusException {
+    return uploadLLCToSegmentStore(uri, null);
+  }
+
+  /// Authenticated variant of [#uploadLLCToSegmentStore(String)].
+  public TableLLCSegmentUploadResponse uploadLLCToSegmentStore(String uri, @Nullable AuthProvider authProvider)
+      throws URISyntaxException, IOException, HttpErrorStatusException {
     ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
+    AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::setHeader);
     // sendRequest checks the response status code
     SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
         _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
@@ -848,7 +868,14 @@ public class FileUploadDownloadClient implements AutoCloseable {
   /// @throws HttpErrorStatusException
   public SegmentZKMetadata uploadLLCToSegmentStoreWithZKMetadata(String uri)
       throws URISyntaxException, IOException, HttpErrorStatusException {
+    return uploadLLCToSegmentStoreWithZKMetadata(uri, null);
+  }
+
+  /// Authenticated variant of [#uploadLLCToSegmentStoreWithZKMetadata(String)].
+  public SegmentZKMetadata uploadLLCToSegmentStoreWithZKMetadata(String uri, @Nullable AuthProvider authProvider)
+      throws URISyntaxException, IOException, HttpErrorStatusException {
     ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
+    AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::setHeader);
     // sendRequest checks the response status code
     SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
         _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));

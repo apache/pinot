@@ -25,7 +25,9 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.integration.tests.SharedHybridClusterIntegrationTestSuite.HybridScenarioLease;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -33,6 +35,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -40,12 +44,60 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.fail;
 
 
-public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTest {
+public class HybridClusterIntegrationTest extends SharedHybridClusterIntegrationTestSuite {
+  private HybridScenarioLease _canonicalScenario;
+
+  @BeforeClass(alwaysRun = true)
+  public void setUp()
+      throws Throwable {
+    _canonicalScenario = newScenario(getTableName(), getClass().getSimpleName());
+    Throwable primaryFailure = null;
+    try {
+      Schema schema = setUpStandardScenario(_canonicalScenario, null, DEFAULT_HYBRID_COUNT);
+      initializeCanonicalQueryState(getSharedAvroFiles(), schema);
+    } catch (Throwable t) {
+      primaryFailure = t;
+      throw t;
+    } finally {
+      if (primaryFailure != null) {
+        Throwable cleanupFailure = releaseCanonicalQueryState(null);
+        try {
+          closeScenario(_canonicalScenario, null);
+        } catch (Throwable t) {
+          cleanupFailure = appendCleanupFailure(cleanupFailure, t);
+        } finally {
+          _canonicalScenario = null;
+        }
+        if (cleanupFailure != null) {
+          primaryFailure.addSuppressed(cleanupFailure);
+        }
+      }
+    }
+  }
+
+  @AfterClass(alwaysRun = true)
+  public void tearDown()
+      throws Throwable {
+    Throwable cleanupFailure = releaseCanonicalQueryState(null);
+    if (_canonicalScenario != null) {
+      try {
+        closeScenario(_canonicalScenario, null);
+      } catch (Throwable t) {
+        cleanupFailure = appendCleanupFailure(cleanupFailure, t);
+      } finally {
+        _canonicalScenario = null;
+      }
+    }
+    if (cleanupFailure != null) {
+      throw cleanupFailure;
+    }
+  }
+
   @Test
   public void testUpdateBrokerResource()
       throws Exception {
     // Add a new broker to the cluster
-    BaseBrokerStarter brokerStarter = startOneBroker(1);
+    BaseBrokerStarter brokerStarter = startTrackedBroker(1);
 
     // Check if broker is added to all the tables in broker resource
     String clusterName = getHelixClusterName();
@@ -67,8 +119,7 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
     }, 60_000L, "Failed to find broker in broker resource ExternalView");
 
     // Stop the broker
-    brokerStarter.stop();
-    _brokerPorts.remove(_brokerPorts.size() - 1);
+    stopTrackedBrokerProcess();
 
     // Dropping the broker should fail because it is still in the broker resource
     try {
@@ -98,8 +149,8 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
       return true;
     }, 60_000L, "Failed to remove broker from broker resource ExternalView");
 
-    // Dropping the broker should success now
-    getOrCreateAdminClient().getInstanceClient().dropInstance(brokerId);
+    // Dropping the broker should succeed now
+    removeTrackedBrokerFromCluster();
 
     // Check if broker is dropped from the cluster
     assertFalse(_helixAdmin.getInstancesInCluster(clusterName).contains(brokerId));
@@ -188,7 +239,9 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
   @Test(dependsOnMethods = "testSegmentListApi")
   public void testReload()
       throws Exception {
+    markCanonicalSchemaMutation();
     super.testReload(true);
+    clearCanonicalSchemaMutation();
   }
 
   @Test
@@ -203,10 +256,9 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
     Assert.assertNotNull(getDebugInfo("debug/routingTable/" + TableNameBuilder.REALTIME.tableNameWithType(tableName)));
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testBrokerDebugRoutingTableSQL(boolean useMultiStageQueryEngine)
+  @Test
+  public void testBrokerDebugRoutingTableSQL()
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String tableName = getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
@@ -217,12 +269,9 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
     Assert.assertNotNull(getDebugInfo("debug/routingTable/sql?query=" + encodedSQL));
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testQueryTracing(boolean useMultiStageQueryEngine)
+  @Test
+  public void testQueryTracing()
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    // Tracing is a v1 only concept and the v2 query engine has separate multi-stage stats that are enabled by default
-    notSupportedInV2();
     JsonNode jsonNode = postQuery("SET trace = true; SELECT COUNT(*) FROM " + getTableName());
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
     Assert.assertTrue(jsonNode.get("exceptions").isEmpty());
@@ -232,12 +281,9 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
     Assert.assertTrue(traceInfo.has("localhost_R"));
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testQueryTracingWithLiteral(boolean useMultiStageQueryEngine)
+  @Test
+  public void testQueryTracingWithLiteral()
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    // Tracing is a v1 only concept and the v2 query engine has separate multi-stage stats that are enabled by default
-    notSupportedInV2();
     JsonNode jsonNode =
         postQuery("SET trace = true; SELECT 1, \'test\', ArrDelay FROM " + getTableName() + " LIMIT 10");
     long countStarResult = 10;
@@ -307,13 +353,9 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
     super.testHardcodedQueries();
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testQueriesFromQueryFile(boolean useMultiStageQueryEngine)
+  @Test
+  public void testQueriesFromQueryFile()
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    // Some of the hardcoded queries in the query file need to be adapted for v2 (for instance, using the arrayToMV
-    // with multi-value columns in filters / aggregations)
-    notSupportedInV2();
     super.testQueriesFromQueryFile();
   }
 
@@ -328,6 +370,7 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
   @Override
   public void testInstanceShutdown()
       throws Exception {
+    markCanonicalRoutingMutation();
     super.testInstanceShutdown();
   }
 
@@ -338,9 +381,8 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
     super.testBrokerResponseMetadata();
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testVirtualColumnQueries(boolean useMultiStageQueryEngine)
-      throws Exception {
+  @Test
+  public void testVirtualColumnQueries() {
     super.testVirtualColumnQueries();
   }
 
@@ -380,6 +422,7 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
   @Override
   public void testQueriesDisabled()
       throws Exception {
+    markCanonicalRoutingMutation();
     super.testQueriesDisabled();
   }
 

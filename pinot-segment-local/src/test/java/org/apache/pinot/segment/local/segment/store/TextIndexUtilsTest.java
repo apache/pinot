@@ -20,6 +20,8 @@ package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -48,5 +50,17 @@ public class TextIndexUtilsTest {
         new File(TEMP_DIR, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE),
         JsonUtils.stringToObject("{}", TextIndexConfig.class));
     assertEquals(readConfig, config);
+  }
+
+  /// A directory that cannot be listed, including one that does not exist or is not there at all, holds no index.
+  @Test
+  public void testUnlistableDirectoryHasNoColumnsWithIndex() {
+    List<String> columns = List.of("colA", "colB");
+    File missingDir = new File(TEMP_DIR, "doesNotExist");
+
+    assertEquals(TextIndexUtils.getColumnsWithTextIndex(missingDir, columns), Set.of());
+    assertEquals(TextIndexUtils.getColumnsWithLegacyNativeTextIndex(missingDir, columns), Set.of());
+    assertEquals(TextIndexUtils.getColumnsWithTextIndex(null, columns), Set.of());
+    assertEquals(TextIndexUtils.getColumnsWithLegacyNativeTextIndex(null, columns), Set.of());
   }
 }

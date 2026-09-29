@@ -20,15 +20,19 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.collect.Sets;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -221,6 +225,41 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
       }
       assertEquals(intValues[i], inValues.contains(new ByteArray(_bytesSVValues[i])) ? 1 : 0);
     }
+  }
+
+  @Test(dataProvider = "uuidInExpressions")
+  public void testUuidInTransformFunction(String expressionStr) {
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof InTransformFunction);
+    assertEquals(transformFunction.getName(), TransformFunctionType.IN.getName());
+
+    Set<ByteArray> inValues = Sets.newHashSet(new ByteArray(_uuidSVValues[2]), new ByteArray(_uuidSVValues[5]));
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (i == 2 || i == 5) {
+        assertEquals(intValues[i], 1);
+      }
+      assertEquals(intValues[i], inValues.contains(new ByteArray(_uuidSVValues[i])) ? 1 : 0);
+    }
+  }
+
+  @DataProvider(name = "uuidInExpressions")
+  public Object[][] uuidInExpressions() {
+    return new Object[][]{
+        {String.format("%s IN ('%s','%s')", UUID_SV_COLUMN,
+            BytesUtils.toHexString(_uuidSVValues[5]).toUpperCase(Locale.ROOT),
+            BytesUtils.toHexString(_uuidSVValues[2]))},
+        {String.format("%s IN (CAST('%s' AS UUID),CAST('%s' AS UUID))", UUID_SV_COLUMN,
+            UuidUtils.toString(_uuidSVValues[5]).toUpperCase(Locale.ROOT), UuidUtils.toString(_uuidSVValues[2]))}
+    };
+  }
+
+  @Test(expectedExceptions = BadQueryRequestException.class)
+  public void testUuidInTransformFunctionRejectsBareCanonicalLiteral() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("%s IN ('%s')", UUID_SV_COLUMN, UuidUtils.toString(_uuidSVValues[5])));
+    TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 
   @Test

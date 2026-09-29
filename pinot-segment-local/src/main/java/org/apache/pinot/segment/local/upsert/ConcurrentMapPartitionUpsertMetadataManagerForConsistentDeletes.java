@@ -490,12 +490,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     int newDocId = recordInfo.getDocId();
     Comparable newComparisonValue = recordInfo.getComparisonValue();
 
-    // When TTL is enabled, update largestSeenComparisonValue when adding new record
-    if (_deletedKeysTTL > 0) {
-      double comparisonValue = ((Number) newComparisonValue).doubleValue();
-      _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, comparisonValue));
-    }
-
     _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
         (primaryKey, currentRecordLocation) -> {
           if (currentRecordLocation != null) {
@@ -540,6 +534,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
             return new RecordLocation(segment, newDocId, newComparisonValue, 1);
           }
         });
+    // Bump after the record is installed; see ConcurrentMapPartitionUpsertMetadataManager#doAddRecord.
+    if (_deletedKeysTTL > 0) {
+      updateLargestSeenComparisonValue(((Number) newComparisonValue).doubleValue());
+    }
 
     updatePrimaryKeyGauge();
     return !isOutOfOrderRecord.get();

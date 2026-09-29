@@ -107,6 +107,8 @@ public enum TransformFunctionType {
       TransformFunctionType::jsonExtractScalarReturnTypeInference, jsonExtractScalarOperandTypeChecker()),
   JSON_EXTRACT_SCALAR_FIRST_MATCH("jsonExtractScalarFirstMatch",
       TransformFunctionType::jsonExtractScalarReturnTypeInference, jsonExtractScalarOperandTypeChecker()),
+  JSON_EXTRACT_SCALAR_FORY("jsonExtractScalarFory",
+      TransformFunctionType::jsonExtractScalarReturnTypeInference, jsonExtractScalarOperandTypeChecker()),
   JSON_EXTRACT_INDEX("jsonExtractIndex",
       opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2, SqlTypeName.VARCHAR),
       OperandTypes.family(

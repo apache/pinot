@@ -1,6 +1,6 @@
 ---
 name: review-architecture
-description: Review Apache Pinot diffs for architectural concerns — module boundaries, SPI vs. impl separation, circular deps, misplaced logic (broker code in server, server code in controller), abstraction choice (interface vs. abstract class), plugin layering, and layering violations between pinot-spi / pinot-common / pinot-core / pinot-segment-spi / pinot-segment-local. Trigger keywords — new interface, abstract class, package move, module, SPI, broker-server boundary, plugin, shaded.
+description: Review Apache Pinot architecture when module dependencies, SPI boundaries, abstractions, or class placement change.
 domain: kb/code-review-principles.md#3-code-architecture--module-design
 triggers:
   - diff adds/moves classes across module boundaries

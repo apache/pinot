@@ -143,15 +143,28 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       Schema schema = segmentMetadata.getSchema();
       for (String parent : openStructParents) {
         FieldSpec fieldSpec = schema != null ? schema.getFieldSpecFor(parent) : null;
+        if (schema == null) {
+          LOGGER.warn("Segment '{}': skipping OPEN_STRUCT parent column '{}': no schema available. "
+              + "Dense/sparse child data on disk will not be queryable.", segmentMetadata.getName(), parent);
+          continue;
+        }
         if (!(fieldSpec instanceof ComplexFieldSpec)) {
+          LOGGER.warn("Segment '{}': skipping OPEN_STRUCT parent column '{}': fieldSpec is {} "
+                  + "(expected ComplexFieldSpec). Dense/sparse child data on disk will not be queryable.",
+              segmentMetadata.getName(), parent, fieldSpec != null ? fieldSpec.getClass().getSimpleName() : "null");
           continue;
         }
         ColumnMetadata parentMetadata = segmentMetadata.getColumnMetadataMap().get(parent);
-        List<String> sparseKeys =
-            parentMetadata instanceof ColumnMetadataImpl impl ? impl.getSparseKeys() : null;
+        List<String> sparseKeys = null;
+        Map<String, Integer> sparseMultiValueKeys = null;
+        if (parentMetadata instanceof ColumnMetadataImpl impl) {
+          sparseKeys = impl.getSparseKeys();
+          sparseMultiValueKeys = impl.getSparseMultiValueKeys();
+        }
         _dataSources.put(parent, new ImmutableOpenStructDataSource((ComplexFieldSpec) fieldSpec,
             openStructDenseChildren.getOrDefault(parent, Map.of()),
-            openStructSparseChildren.get(parent), segmentMetadata.getTotalDocs(), sparseKeys));
+            openStructSparseChildren.get(parent), segmentMetadata.getTotalDocs(), sparseKeys,
+            sparseMultiValueKeys));
       }
     }
 

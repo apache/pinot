@@ -34,7 +34,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
 /// `_dictionaryVars`, `_encodedVars`. All other fields are extracted as plain JSON values.
 public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Object>> {
   // The maximum number of variables that can be stored in a cell (row of a single column).
-  private static final int MAX_VARIABLES_PER_CELL = ForwardIndexType.MAX_MULTI_VALUES_PER_ROW;
+  private static final int MAX_VARIABLES_PER_CELL = ForwardIndexConfig.DEFAULT_MAX_NUM_MULTI_VALUES;
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPLogRecordExtractor.class);
 
   private final ServerMetrics _serverMetrics = ServerMetrics.get();

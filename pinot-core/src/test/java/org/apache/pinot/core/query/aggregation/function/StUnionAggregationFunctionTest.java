@@ -26,7 +26,7 @@ import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.util.GeometryCombiner;
 import org.locationtech.jts.operation.union.UnaryUnionOp;
@@ -40,7 +40,7 @@ public class StUnionAggregationFunctionTest {
   public void testMergeHandlesGeometryCollectionInputs()
       throws Exception {
     ExpressionContext expression = ExpressionContext.forIdentifier("geometryColumn");
-    StUnionAggregationFunction aggregationFunction = new StUnionAggregationFunction(List.of(expression));
+    StUnionAggregationFunction aggregationFunction = new StUnionAggregationFunction(List.of(expression), false);
     Geometry polygon = GeometryUtils.GEOMETRY_WKT_READER.read("POLYGON((0 0, 0 5, 5 5, 5 0, 0 0))");
     Geometry line = GeometryUtils.GEOMETRY_WKT_READER.read("LINESTRING(20 20, 25 25)");
     Geometry geometryCollection =
@@ -57,7 +57,7 @@ public class StUnionAggregationFunctionTest {
   public void testAggregateHandlesMixedDimensionSequence()
       throws Exception {
     ExpressionContext expression = ExpressionContext.forIdentifier("geometryColumn");
-    StUnionAggregationFunction aggregationFunction = new StUnionAggregationFunction(List.of(expression));
+    StUnionAggregationFunction aggregationFunction = new StUnionAggregationFunction(List.of(expression), false);
 
     Geometry polygon = GeometryUtils.GEOMETRY_WKT_READER.read("POLYGON((0 0, 0 5, 5 5, 5 0, 0 0))");
     Geometry line = GeometryUtils.GEOMETRY_WKT_READER.read("LINESTRING(10 10, 15 15)");
@@ -71,8 +71,7 @@ public class StUnionAggregationFunctionTest {
     };
 
     AggregationResultHolder aggregationResultHolder = aggregationFunction.createAggregationResultHolder();
-    Map<ExpressionContext, BlockValSet> blockValSetMap =
-        Map.of(expression, new BytesBlockValSet(values));
+    Map<ExpressionContext, BlockValSet> blockValSetMap = Map.of(expression, new BytesBlockValSet(values));
 
     aggregationFunction.aggregate(values.length, aggregationResultHolder, blockValSetMap);
 
@@ -88,8 +87,8 @@ public class StUnionAggregationFunctionTest {
     }
 
     @Override
-    public FieldSpec.DataType getValueType() {
-      return FieldSpec.DataType.BYTES;
+    public DataType getValueType() {
+      return DataType.BYTES;
     }
 
     @Override

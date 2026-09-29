@@ -17,11 +17,13 @@
  * under the License.
  */
 package org.apache.pinot.controller.api.resources;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.io.ByteStreams;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -32,6 +34,8 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -66,7 +70,11 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
+import org.apache.helix.zookeeper.util.ZNRecordUtil;
+import org.apache.helix.zookeeper.zkclient.exception.ZkMarshallingError;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -150,6 +158,10 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotSegmentRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRestletResource.class);
+  private static final int MAX_CUSTOM_MAP_MODIFIER_SIZE_BYTES = 64 * 1024;
+  private static final int DEFAULT_ZK_JUTE_MAX_BUFFER_SIZE_BYTES = 0xfffff;
+  private static final int ZK_RECORD_SIZE_LIMIT_PERCENT = 90;
+  private static final ZNRecordSerializer ZN_RECORD_SERIALIZER = new ZNRecordSerializer();
 
   @Inject
   ControllerConf _controllerConf;
@@ -335,7 +347,8 @@ public class PinotSegmentRestletResource {
       @ApiResponse(code = 400, message = "Invalid table name, CRC, or custom map modifier"),
       @ApiResponse(code = 404, message = "Table or segment not found"),
       @ApiResponse(code = 409, message = "Segment metadata changed concurrently"),
-      @ApiResponse(code = 412, message = "Segment CRC does not match")
+      @ApiResponse(code = 412, message = "Segment CRC does not match"),
+      @ApiResponse(code = 413, message = "Custom map modifier or resulting ZK metadata is too large")
   })
   public SuccessResponse updateSegmentZKMetadataCustomMap(
       @ApiParam(value = "Table name with type", required = true, example = "myTable_OFFLINE")
@@ -343,14 +356,15 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "Expected segment CRC", required = true) @HeaderParam(HttpHeaders.IF_MATCH)
       String expectedCrcString,
-      @ApiParam(value = "Custom map modifier", required = true) String customMapModifierJson,
+      @ApiParam(value = "Custom map modifier", required = true) InputStream customMapModifierInputStream,
       @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
-    segmentName = URIUtils.decode(segmentName);
+    segmentName = decodePathSegment(segmentName);
     if (TableNameBuilder.getTableTypeFromTableName(tableNameWithType) == null) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Table type not provided with table name: %s", tableNameWithType), Status.BAD_REQUEST);
     }
+    String customMapModifierJson = readCustomMapModifier(customMapModifierInputStream);
 
     long expectedCrc;
     try {
@@ -380,9 +394,9 @@ public class PinotSegmentRestletResource {
           String.format("Segment CRC does not match for segment: %s in table: %s", segmentName, tableNameWithType),
           Status.PRECONDITION_FAILED);
     }
-    segmentZKMetadata.setRefreshTime(System.currentTimeMillis());
     segmentZKMetadata.setCustomMap(customMapModifier.modifyMap(segmentZKMetadata.getCustomMap()));
-    if (!_pinotHelixResourceManager.updateZkMetadata(tableNameWithType, segmentZKMetadata,
+    validateSegmentZKMetadataSize(segmentZKMetadata);
+    if (!_pinotHelixResourceManager.updateZkMetadataWithoutDataChange(tableNameWithType, segmentZKMetadata,
         segmentMetadataRecord.getVersion())) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Segment metadata changed concurrently for segment: %s in table: %s", segmentName,
@@ -391,6 +405,52 @@ public class PinotSegmentRestletResource {
     return new SuccessResponse(
         String.format("Successfully updated ZK metadata for segment: %s in table: %s", segmentName,
             tableNameWithType));
+  }
+
+  private static String readCustomMapModifier(@Nullable InputStream inputStream) {
+    if (inputStream == null) {
+      throw new ControllerApplicationException(LOGGER, "Missing segment ZK metadata custom map modifier",
+          Status.BAD_REQUEST);
+    }
+    try {
+      byte[] bytes = ByteStreams.toByteArray(ByteStreams.limit(inputStream, MAX_CUSTOM_MAP_MODIFIER_SIZE_BYTES + 1L));
+      if (bytes.length > MAX_CUSTOM_MAP_MODIFIER_SIZE_BYTES) {
+        throw new ControllerApplicationException(LOGGER, "Segment ZK metadata custom map modifier is too large",
+            Status.REQUEST_ENTITY_TOO_LARGE);
+      }
+      return new String(bytes, StandardCharsets.UTF_8);
+    } catch (IOException e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to read segment ZK metadata custom map modifier",
+          Status.BAD_REQUEST, e);
+    }
+  }
+
+  private static String decodePathSegment(String pathSegment) {
+    // URIUtils uses form decoding, where '+' represents a space. In a path, '+' is a literal character. Jersey can
+    // supply either the raw or decoded path parameter depending on the request URI, so protect literal plus signs
+    // before decoding percent escapes.
+    return URIUtils.decode(pathSegment.replace("+", "%2B"));
+  }
+
+  private static void validateSegmentZKMetadataSize(SegmentZKMetadata segmentZKMetadata) {
+    int zkJuteMaxBufferSizeBytes =
+        Integer.getInteger(ZkSystemPropertyKeys.JUTE_MAXBUFFER, DEFAULT_ZK_JUTE_MAX_BUFFER_SIZE_BYTES);
+    if (zkJuteMaxBufferSizeBytes <= 0) {
+      zkJuteMaxBufferSizeBytes = DEFAULT_ZK_JUTE_MAX_BUFFER_SIZE_BYTES;
+    }
+    int safeJuteRecordSizeBytes = (int) ((long) zkJuteMaxBufferSizeBytes * ZK_RECORD_SIZE_LIMIT_PERCENT / 100);
+    int safeRecordSizeBytes = Math.min(safeJuteRecordSizeBytes, ZNRecordUtil.getSerializerWriteSizeLimit());
+    byte[] serializedRecord;
+    try {
+      serializedRecord = ZN_RECORD_SERIALIZER.serialize(segmentZKMetadata.toZNRecord());
+    } catch (ZkMarshallingError e) {
+      throw new ControllerApplicationException(LOGGER, "Resulting segment ZK metadata is too large",
+          Status.REQUEST_ENTITY_TOO_LARGE, e);
+    }
+    if (serializedRecord.length > safeRecordSizeBytes) {
+      throw new ControllerApplicationException(LOGGER, "Resulting segment ZK metadata is too large",
+          Status.REQUEST_ENTITY_TOO_LARGE);
+    }
   }
 
   private JsonNode getExtraMetaData(String tableName, String segmentName, List<String> columns) {

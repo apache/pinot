@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,6 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
+import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriterV7;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
@@ -72,9 +75,6 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   private static final Logger LOGGER = LoggerFactory.getLogger(ForwardIndexType.class);
 
   public static final String INDEX_DISPLAY_NAME = "forward";
-  // For multi-valued column, forward-index.
-  // Maximum number of multi-values per row. We assert on this.
-  public static final int MAX_MULTI_VALUES_PER_ROW = 1000;
   private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT = 100;
   private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT = 100_000;
   //@formatter:off
@@ -116,6 +116,10 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     String column = fieldSpec.getName();
     CompressionCodec compressionCodec = forwardIndexConfig.getCompressionCodec();
     DictionaryIndexConfig dictionaryConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
+    String codecSpec = forwardIndexConfig.getCodecSpec();
+    if (codecSpec != null) {
+      validateCodecSpec(codecSpec, forwardIndexConfig, fieldSpec);
+    }
     // Dictionary-encoded forward index requires a dictionary to translate dict ids back to values.
     if (forwardIndexConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY) {
       Preconditions.checkState(dictionaryConfig.isEnabled(),
@@ -137,9 +141,49 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     }
   }
 
+  /// Validates a codec pipeline against the effective table config and schema before segment creation.
+  private static void validateCodecSpec(String codecSpec, ForwardIndexConfig forwardIndexConfig,
+      FieldSpec fieldSpec) {
+    String column = fieldSpec.getName();
+    Preconditions.checkState(forwardIndexConfig.getEncodingType() == FieldConfig.EncodingType.RAW,
+        "codecSpec requires RAW forward-index encoding for column: %s", column);
+    validateCodecPipelineShape(codecSpec, fieldSpec);
+    try {
+      FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
+      CodecPipelineExecutor executor = CodecPipelineExecutor.create(codecSpec, storedType);
+      int canonicalSpecBytes = executor.getCanonicalSpec().getBytes(StandardCharsets.UTF_8).length;
+      Preconditions.checkArgument(
+          canonicalSpecBytes <= FixedByteChunkForwardIndexWriterV7.MAX_CODEC_SPEC_LENGTH_BYTES,
+          "Canonical codec spec is %s bytes; the V7 header allows at most %s", canonicalSpecBytes,
+          FixedByteChunkForwardIndexWriterV7.MAX_CODEC_SPEC_LENGTH_BYTES);
+      FixedByteChunkForwardIndexWriterV7.validateAndNormalizeNumDocsPerChunk(executor, storedType.size(),
+          forwardIndexConfig.getTargetDocsPerChunk());
+    } catch (IllegalArgumentException e) {
+      throw new IllegalStateException(
+          "Codec pipeline validation failed for column '" + column + "' (codecSpec='" + codecSpec + "'): "
+              + e.getMessage(), e);
+    }
+  }
+
+  /// Enforces the shape supported by the V7 codec-pipeline writer. The factory calls this as
+  /// defense in depth for direct callers that bypass table-config validation.
+  static void validateCodecPipelineShape(String codecSpec, FieldSpec fieldSpec) {
+    String column = fieldSpec.getName();
+    Preconditions.checkArgument(fieldSpec.isSingleValueField(),
+        "codecSpec '%s' uses the V7 codec-pipeline writer, which only supports single-value columns. "
+            + "Column '%s' is multi-value.", codecSpec, column);
+    FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
+    Preconditions.checkArgument(storedType == FieldSpec.DataType.INT || storedType == FieldSpec.DataType.LONG,
+        "codecSpec '%s' uses the V7 codec-pipeline writer, which only supports INT and LONG columns. "
+            + "Column '%s' has type: %s.", codecSpec, column, storedType);
+  }
+
   private void validateForwardIndexDisabled(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec,
       TableConfig tableConfig) {
     String column = fieldSpec.getName();
+    ForwardIndexConfig forwardIndexConfig = indexConfigs.getConfig(StandardIndexes.forward());
+    Preconditions.checkState(forwardIndexConfig.getCodecSpec() == null,
+        "codecSpec cannot be configured when the forward index is disabled for column: %s", column);
 
     // TODO: Revisit this. We should allow dropping forward index after segment is sealed.
     Preconditions.checkState(tableConfig.getTableType() != TableType.REALTIME,
@@ -204,9 +248,14 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
           // Pop processed columns so the post-loop scan only emits defaults for columns with no FieldConfig at all.
           boolean inNoDictionaryList = noDictionaryColumns.remove(column);
 
+          JsonNode forwardIndexNode = fieldConfig.getIndexes().get(INDEX_DISPLAY_NAME);
+
           // `forwardIndexDisabled` short-circuits everything else.
           Map<String, String> properties = fieldConfig.getProperties();
           if (properties != null && isDisabled(properties)) {
+            JsonNode codecSpecNode = forwardIndexNode != null ? forwardIndexNode.get("codecSpec") : null;
+            Preconditions.checkState(codecSpecNode == null || codecSpecNode.isNull(),
+                "codecSpec cannot be configured when the forward index is disabled for column: %s", column);
             result.put(column, ForwardIndexConfig.getDisabled());
             continue;
           }
@@ -219,7 +268,6 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
           FieldConfig.EncodingType encodingType =
               inNoDictionaryList ? FieldConfig.EncodingType.RAW : fieldConfig.getEncodingType();
 
-          JsonNode forwardIndexNode = fieldConfig.getIndexes().get(INDEX_DISPLAY_NAME);
           if (forwardIndexNode != null) {
             Preconditions.checkState(forwardIndexNode.isObject(), "Invalid forward index config for column: %s",
                 column);
@@ -409,7 +457,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
             IndexUtil.buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
                 V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
         // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
-        return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),
+        return new FixedByteMVMutableForwardIndex(context.getMaxNumMultiValues(), context.getAvgNumMultiValues(),
             context.getCapacity(), dataType.size(), context.getMemoryManager(), allocationContext, false, storedType,
             dataType);
       }
@@ -423,7 +471,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
         String allocationContext = IndexUtil.buildAllocationContext(segmentName, column,
             V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
         // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
-        return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),
+        return new FixedByteMVMutableForwardIndex(context.getMaxNumMultiValues(), context.getAvgNumMultiValues(),
             context.getCapacity(), Integer.BYTES, context.getMemoryManager(), allocationContext, true,
             FieldSpec.DataType.INT);
       }

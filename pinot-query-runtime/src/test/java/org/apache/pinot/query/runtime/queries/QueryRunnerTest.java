@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.query.runtime.queries;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -25,11 +27,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -43,6 +48,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.assertj.core.api.Assertions;
 import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
@@ -163,6 +169,170 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     _mailboxService.shutdown();
   }
 
+  /// The self stats of a node are the node's own value minus its children's. A mailbox send reports its stats from
+  /// inside the getNextBlock() call whose time it is still spending, so unless that call is accounted first it
+  /// reports less than the input whose call it contains and the subtraction goes negative. A query whose filter
+  /// matches nothing makes the end-of-stream block the only block a stage handles, which is when the whole of the
+  /// send's time would be missing.
+  @Test
+  public void testSelfStatsAreNotNegative() {
+    @Language("sql")
+    String sql = "SELECT col1, COUNT(*) FROM a WHERE col1 = 'no-such-value' GROUP BY col1";
+    QueryDispatcher.QueryResult queryResult = queryRunner(sql, true);
+    Map<Integer, DispatchablePlanFragment> planNodes = planQuery(sql).getQueryPlan().getQueryStageMap();
+    ObjectNode statsTree =
+        new MultiStageStatsTreeBuilder(planNodes, queryResult.getQueryStats()).jsonStatsByStage(1);
+
+    int checked = assertSelfStatsAreNotNegative(statsTree);
+    Assert.assertTrue(checked > 0, "expected some self stats to check, got: " + statsTree);
+  }
+
+  /// Asserts that no self stat in the tree is negative, and returns how many were checked.
+  private static int assertSelfStatsAreNotNegative(JsonNode node) {
+    int checked = 0;
+    for (String statName : List.of("selfExecutionTimeMs", "selfClockTimeMs", "selfAllocatedMB", "selfGcTimeMs")) {
+      JsonNode stat = node.get(statName);
+      if (stat != null) {
+        Assert.assertTrue(stat.asLong() >= 0,
+            statName + " is " + stat.asLong() + ", which means this node reported less than its children, for node "
+                + node);
+        checked++;
+      }
+    }
+    for (JsonNode child : node.path("children")) {
+      checked += assertSelfStatsAreNotNegative(child);
+    }
+    return checked;
+  }
+
+  /// Runs a shuffling query over the two-server setup and checks the per-worker stats reported by every stage.
+  /// This is the only place these stats are exercised end to end, through real multi-worker stages and the
+  /// cross-server merge of their stat maps.
+  @Test
+  public void testPerWorkerStats() {
+    ObjectNode statsTree = statsTreeOf("SELECT col1, COUNT(*) FROM a GROUP BY col1");
+
+    // Idle workers are reported rather than active ones, so a query where every worker did something must not
+    // report any: their absence is the healthy signal.
+    Assert.assertNull(findFieldOwner(statsTree, "nonActiveWorkers"),
+        "expected no idle worker in a query where every worker contributes, got: " + statsTree);
+
+    // Assertions comparing a single worker's stats against the stage totals collapse to identities on a
+    // single-worker stage, so require a stage that actually ran on several workers, otherwise this test would keep
+    // passing if the cross-worker merge broke.
+    int multiWorkerSends = assertSendStats(statsTree);
+    Assert.assertTrue(multiWorkerSends > 0,
+        "expected a multi-worker send reporting maxEmittedRows and maxClockTimeMs, got: " + statsTree);
+  }
+
+  /// Each operator decides for itself which workers it was idle on, so a query whose filter matches nothing
+  /// separates them: the leaf operators were handed segments and are not idle, while everything above them sent
+  /// and received nothing and is idle on every worker.
+  @Test
+  public void testPerWorkerStatsWhenNothingMatches() {
+    ObjectNode statsTree = statsTreeOf("SELECT col1, COUNT(*) FROM a WHERE col1 = 'no-such-value' GROUP BY col1");
+
+    // StatMap drops zero-valued keys, so an absent field means zero throughout.
+    ObjectNode leaf = findNodeOfType(statsTree, "LEAF");
+    Assert.assertNotNull(leaf, "expected a LEAF node in " + statsTree);
+    Assert.assertNull(leaf.get("nonActiveWorkers"),
+        "expected workers with segments assigned not to be idle even though they emitted nothing: " + leaf);
+
+    ObjectNode leafStageSend = findSendAboveLeaf(statsTree);
+    Assert.assertNotNull(leafStageSend, "expected a leaf stage in " + statsTree);
+    Assert.assertEquals(leafStageSend.path("emittedRows").asLong(0), 0L, "expected the leaf stage to send nothing");
+    Assert.assertEquals(leafStageSend.path("nonActiveWorkers").asLong(0),
+        leafStageSend.path("parallelism").asLong(0),
+        "expected every worker of a send that sent nothing to be idle: " + leafStageSend);
+
+    ObjectNode receive = findNodeOfType(statsTree, "MAILBOX_RECEIVE");
+    Assert.assertNotNull(receive, "expected a MAILBOX_RECEIVE node in " + statsTree);
+    Assert.assertEquals(receive.path("nonActiveWorkers").asLong(0), receive.path("parallelism").asLong(0),
+        "expected every worker of a receive that got no row to be idle: " + receive);
+  }
+
+  private ObjectNode statsTreeOf(@Language("sql") String sql) {
+    QueryDispatcher.QueryResult queryResult = queryRunner(sql, true);
+    Map<Integer, DispatchablePlanFragment> planNodes = planQuery(sql).getQueryPlan().getQueryStageMap();
+    return new MultiStageStatsTreeBuilder(planNodes, queryResult.getQueryStats()).jsonStatsByStage(1);
+  }
+
+  @Nullable
+  private static ObjectNode findNodeOfType(JsonNode node, String type) {
+    if (type.equals(node.path("type").asText())) {
+      return (ObjectNode) node;
+    }
+    for (JsonNode child : node.path("children")) {
+      ObjectNode found = findNodeOfType(child, type);
+      if (found != null) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  /// Returns the first node in the tree carrying `field`, or null if none does.
+  @Nullable
+  private static ObjectNode findFieldOwner(JsonNode node, String field) {
+    if (node.get(field) != null) {
+      return (ObjectNode) node;
+    }
+    for (JsonNode child : node.path("children")) {
+      ObjectNode found = findFieldOwner(child, field);
+      if (found != null) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  /// Returns the MAILBOX_SEND node of the leaf stage, that is, the one holding the LEAF operator.
+  @Nullable
+  private static ObjectNode findSendAboveLeaf(JsonNode node) {
+    for (JsonNode child : node.path("children")) {
+      if ("MAILBOX_SEND".equals(node.path("type").asText()) && "LEAF".equals(child.path("type").asText())) {
+        return (ObjectNode) node;
+      }
+      ObjectNode found = findSendAboveLeaf(child);
+      if (found != null) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  /// Asserts the per-worker invariants on every send node reporting them, and returns how many of those ran on
+  /// more than one worker.
+  private static int assertSendStats(JsonNode node) {
+    int multiWorker = 0;
+    JsonNode maxEmittedRows = node.get("maxEmittedRows");
+    if (maxEmittedRows != null) {
+      long max = maxEmittedRows.asLong();
+      long emitted = node.path("emittedRows").asLong(0);
+      long parallelism = node.path("parallelism").asLong(0);
+      String ctx = " for node " + node;
+
+      // Both are counts over one worker while emittedRows is the sum over all of them, so neither can exceed it.
+      // This is what catches a merge function summing where it should take an extremum.
+      Assert.assertTrue(max <= emitted, "maxEmittedRows " + max + " exceeds emittedRows " + emitted + ctx);
+
+      long maxClockTimeMs = node.path("maxClockTimeMs").asLong(0);
+      long executionTimeMs = node.path("executionTimeMs").asLong(0);
+      Assert.assertTrue(maxClockTimeMs <= executionTimeMs,
+          "maxClockTimeMs " + maxClockTimeMs + " exceeds the summed executionTimeMs " + executionTimeMs + ctx);
+      Assert.assertTrue(maxClockTimeMs >= node.path("clockTimeMs").asLong(0),
+          "maxClockTimeMs " + maxClockTimeMs + " is below the average clockTimeMs" + ctx);
+
+      if (parallelism > 1) {
+        multiWorker++;
+      }
+    }
+    for (JsonNode child : node.path("children")) {
+      multiWorker += assertSendStats(child);
+    }
+    return multiWorker;
+  }
+
   /// Test compares with expected row count only.
   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows) {
@@ -201,6 +371,21 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
           .withFailMessage("Exception should contain: " + expectedError + ", but found: " + exceptionMessage)
           .contains(expectedError);
     }
+  }
+
+  /// RLS filters are stamped onto the leaf's query options, which is also the only place the planner records that the
+  /// leaf must finalize its aggregates (`is_partitioned_by_group_by_keys` makes the aggregate `AggType.DIRECT`, so no
+  /// stage above it can finalize anything). Stamping must merge, not replace: dropping the flag makes the leaf emit a
+  /// raw `IntOpenHashSet` into a column typed `INT`. Table b lives on a single server, so one row per group.
+  @Test
+  public void testDirectAggregateWithRowLevelSecurityFilter() {
+    String sql = "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ col1, DISTINCTCOUNT(col3) FROM b "
+        + "GROUP BY col1 ORDER BY col1";
+    Map<String, String> rlsFilters = Map.of(RlsUtils.buildRlsFilterKey("b"), "col3 > 1");
+    QueryDispatcher.QueryResult queryResult = queryRunner(sql, false, rlsFilters);
+    Assert.assertNull(queryResult.getProcessingException(), "Query failed: " + queryResult.getProcessingException());
+    // The RLS filter keeps only the two rows with col3 = 42.
+    compareRowEquals(queryResult.getResultTable(), List.of(new Object[]{"bar", 1}, new Object[]{"bob", 1}), true);
   }
 
   @DataProvider(name = "testDataWithSqlToFinalRowCount")
@@ -330,9 +515,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     testCases.add(new Object[]{
         "SELECT CAST(jsonExtractScalar(col1, CONCAT('pa', 'th'), 'INT') AS INT) FROM a", "Cannot resolve JSON path"});
     //    - the flip side: a jsonPath that cannot fold to a literal is still rejected, on the leaf stage rather than
-    //      during validation. Covers all three variants, which share the operand type checker.
+    //      during validation. Covers all four variants, which share the operand type checker.
     for (String jsonExtractScalar : new String[]{
-        "jsonExtractScalar", "jsonExtractScalarFast", "jsonExtractScalarFirstMatch"
+        "jsonExtractScalar", "jsonExtractScalarFast", "jsonExtractScalarFirstMatch", "jsonExtractScalarFory"
     }) {
       testCases.add(new Object[]{
           "SELECT " + jsonExtractScalar + "(col1, col2, 'INT') FROM a",

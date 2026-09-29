@@ -33,8 +33,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 /// [DistinctCountThetaSketchAggregationFunction], and returns the sketch as a base64 encoded string.
 public class DistinctCountRawThetaSketchAggregationFunction extends DistinctCountThetaSketchAggregationFunction {
 
-  public DistinctCountRawThetaSketchAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments);
+  public DistinctCountRawThetaSketchAggregationFunction(List<ExpressionContext> arguments,
+      boolean nullHandlingEnabled) {
+    super(arguments, nullHandlingEnabled);
   }
 
   @Override

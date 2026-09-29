@@ -93,7 +93,7 @@ public class ValidationManagerTest {
           TEST_INSTANCE.getHelixAdmin().getResourceExternalView(TEST_INSTANCE.getHelixClusterName(), offlineTableName);
       return externalView != null && externalView.getPartitionSet().contains(TEST_SEGMENT_NAME);
     }, 30_000L, "Failed to find the segment in the ExternalView");
-    Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
+    Mockito.when(segmentMetadata.getCrc()).thenReturn(System.nanoTime());
     TEST_INSTANCE.getHelixResourceManager()
         .refreshSegment(offlineTableName, segmentMetadata, segmentZKMetadata, EXPECTED_VERSION, "downloadUrl");
 

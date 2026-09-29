@@ -193,12 +193,13 @@
     <module name="IllegalImport">
       <property name="illegalClasses" value="com.google.common.io.Files"/>
     </module>
-    <!-- Use org.testng.Assert in tests -->
+    <!-- Tests are written with TestNG (org.testng.Assert). JUnit test APIs are banned; only the JUnit Platform
+         (org.junit.platform), which Surefire uses to run the TestNG suites, is allowed -->
     <module name="IllegalImport">
       <property name="regexp" value="true"/>
       <property name="illegalClasses"
                 value="org\.testng\.AssertJUnit.*,
-                org\.junit\.Assert.*,
+                org\.junit\.(?!platform\.).*,
                 org\.apache\.logging\.log4j\.core\.util\.Assert.*,
                 org\.locationtech\.jts\.util\.Assert.*"/>
     </module>
@@ -221,13 +222,6 @@
       <property name="illegalPattern" value="true"/>
       <property name="message"
                 value="Use /// markdown doc comments (JEP 467) instead of /** */ Javadoc."/>
-    </module>
-
-    <!-- If you have a Javadoc comment, make sure it is properly formed.
-         NOTE: this only inspects /** */ comments, so it no longer applies to the /// doc
-         comments that the codebase now uses. -->
-    <module name="JavadocStyle">
-      <property name="checkFirstSentence" value="false"/>
     </module>
 
     <!-- NAMING CONVENTIONS -->

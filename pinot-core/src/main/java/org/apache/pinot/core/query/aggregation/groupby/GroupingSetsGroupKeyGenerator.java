@@ -34,6 +34,7 @@ import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
+import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -86,6 +87,8 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
   /// Reusable single-element id list for a rolled-up (non-participating) column on the MV path. Per-instance
   /// (segment-confined, never shared across query threads) and treated as read-only: expandGroupIds copies its
   /// element into the composite key and never mutates it.
+  /// Stands for a NULL key component, whether because the grouping set excludes the column or because the row's
+  /// value is NULL. Shared by every row and set: the key expansion reads it and never writes to it.
   private final int[] _nullComponent = {ID_FOR_NULL};
 
   public GroupingSetsGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
@@ -281,6 +284,17 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
         throw new IllegalArgumentException(
             "Illegal multi-value data type for grouping-sets group key generator: " + _storedTypes[col]);
     }
+    if (_nullHandlingEnabled) {
+      // A null row's values were resolved above and are discarded here. Only the composed key decides a group, so the
+      // ids they took in the on-the-fly dictionary go unused rather than becoming groups of their own.
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+      if (nullBitmap != null && !nullBitmap.isEmpty()) {
+        PeekableIntIterator nullIterator = nullBitmap.getIntIterator();
+        while (nullIterator.hasNext()) {
+          ids[nullIterator.next()] = _nullComponent;
+        }
+      }
+    }
     return ids;
   }
 
@@ -291,6 +305,9 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
     BlockValSet blockValSet = valueBlock.getBlockValueSet(_groupByExpressions[col]);
     ValueToIdMap dictionary = _onTheFlyDictionaries[col];
     RoaringBitmap nullBitmap = _nullHandlingEnabled ? blockValSet.getNullBitmap() : null;
+    if (nullBitmap != null && nullBitmap.isEmpty()) {
+      nullBitmap = null;
+    }
     switch (_storedTypes[col]) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();

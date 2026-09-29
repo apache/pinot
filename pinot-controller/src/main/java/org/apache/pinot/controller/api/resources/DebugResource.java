@@ -277,7 +277,8 @@ public class DebugResource {
     }
 
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers,
+            _pinotHelixResourceManager.getServerAdminAuthProvider());
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, serverRequestTimeoutMs);
 
@@ -476,7 +477,8 @@ public class DebugResource {
     }
 
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers,
+            _pinotHelixResourceManager.getServerAdminAuthProvider());
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
 

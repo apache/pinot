@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
@@ -31,51 +32,33 @@ public class DistinctSumAggregationFunctionTest extends AbstractAggregationFunct
   public void distinctSumWithNulls() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(false)
-        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            "myField",
-            "1",
-            "2"
-        )
-        .andOnSecondInstance(
-            "myField",
-            "2",
-            "null"
-        )
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance("myField", "1", "2")
+        .andOnSecondInstance("myField", "2", "null")
         .whenQuery("select DISTINCT_SUM(myField) from testTable")
-        .thenResultIs("DOUBLE",
-            String.valueOf(3 + FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT)
-        ).whenQueryWithNullHandlingEnabled("select DISTINCT_SUM(myField) from testTable")
-        .thenResultIs("DOUBLE",
-            "3"
-        );
+        .thenResultIs("DOUBLE", String.valueOf(3 + FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT))
+        .whenQueryWithNullHandlingEnabled("select DISTINCT_SUM(myField) from testTable")
+        .thenResultIs("DOUBLE", "3");
   }
 
   @Test
   public void distinctSumWithGroupBy() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(false)
-        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            "myField",
-            "1",
-            "2",
-            "null"
-        )
-        .andOnSecondInstance(
-            "myField",
-            "2",
-            "null"
-        )
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance("myField", "1", "2", "null")
+        .andOnSecondInstance("myField", "2", "null")
         .whenQuery("select myField, DISTINCT_SUM(myField) from testTable group by myField order by myField")
-        .thenResultIs("INT | DOUBLE",
+        .thenResultIs(
+            "INT | DOUBLE",
             "-2147483648 | " + FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT,
             "1           | 1",
             "2           | 2"
         )
         .whenQueryWithNullHandlingEnabled(
             "select myField, DISTINCT_SUM(myField) from testTable  group by myField order by myField")
-        .thenResultIs("INT | DOUBLE",
+        .thenResultIs(
+            "INT | DOUBLE",
             "1    | 1",
             "2    | 2",
             "null | null"
@@ -84,22 +67,15 @@ public class DistinctSumAggregationFunctionTest extends AbstractAggregationFunct
 
   @Test
   public void distinctSumGroupByMV() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("tags", DataType.STRING)
+        .addMetricField("value", DataType.INT)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
-                .addMetricField("value", FieldSpec.DataType.INT)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"tag1;tag2", 1},
-            new Object[]{"tag2;tag3", null}
-        )
-        .andOnSecondInstance(
-            new Object[]{"tag1;tag2", 1},
-            new Object[]{"tag2;tag3", null}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"tag1;tag2", 1}, new Object[]{"tag2;tag3", null})
+        .andOnSecondInstance(new Object[]{"tag1;tag2", 1}, new Object[]{"tag2;tag3", null})
         .whenQuery("select tags, DISTINCT_SUM(value) from testTable group by tags order by tags")
         .thenResultIs(
             "STRING | DOUBLE",
@@ -107,8 +83,7 @@ public class DistinctSumAggregationFunctionTest extends AbstractAggregationFunct
             "tag2    | 1",
             "tag3    | 0"
         )
-        .whenQueryWithNullHandlingEnabled(
-            "select tags, DISTINCT_SUM(value) from testTable group by tags order by tags")
+        .whenQueryWithNullHandlingEnabled("select tags, DISTINCT_SUM(value) from testTable group by tags order by tags")
         .thenResultIs(
             "STRING | DOUBLE",
             "tag1    | 1",
@@ -119,42 +94,28 @@ public class DistinctSumAggregationFunctionTest extends AbstractAggregationFunct
 
   @Test
   public void distinctSumMV() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"1;2;3;4"},
-            new Object[]{"3;4;5;6"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"6;7;8;9"},
-            new Object[]{"9;10;11;12"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"1;2;3;4"}, new Object[]{"3;4;5;6"})
+        .andOnSecondInstance(new Object[]{"6;7;8;9"}, new Object[]{"9;10;11;12"})
         .whenQuery("select DISTINCT_SUM(mv) from testTable")
         .thenResultIs("DOUBLE", "78");
   }
 
   @Test
   public void distinctSumMVWithNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"null"},
-            new Object[]{"1;2"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null"},
-            new Object[]{"1;2"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null"}, new Object[]{"1;2"})
+        .andOnSecondInstance(new Object[]{"null"}, new Object[]{"1;2"})
         .whenQuery("select DISTINCT_SUM(mv) from testTable")
         .thenResultIs("DOUBLE", String.valueOf(3 + FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT))
         .whenQueryWithNullHandlingEnabled("select DISTINCT_SUM(mv) from testTable")
@@ -163,21 +124,15 @@ public class DistinctSumAggregationFunctionTest extends AbstractAggregationFunct
 
   @Test
   public void distinctSumMVGroupBySVWithNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .addSingleValueDimension("sv", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
-                .addSingleValueDimension("sv", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"null", "k1"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null", "k1"},
-            new Object[]{"1;2", "k1"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null", "k1"})
+        .andOnSecondInstance(new Object[]{"null", "k1"}, new Object[]{"1;2", "k1"})
         .whenQuery("select DISTINCT_SUM(mv) from testTable group by sv")
         .thenResultIs("DOUBLE", String.valueOf(3 + FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT))
         .whenQueryWithNullHandlingEnabled("select DISTINCT_SUM(mv) from testTable group by sv")
@@ -186,25 +141,21 @@ public class DistinctSumAggregationFunctionTest extends AbstractAggregationFunct
 
   @Test
   public void distinctSumMVGroupByMVWithNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv1", DataType.INT)
+        .addMultiValueDimension("mv2", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv1", FieldSpec.DataType.INT)
-                .addMultiValueDimension("mv2", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"null", "k1;k2"},
-            new Object[]{"1;2", "k1;k2"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null", "k1;k2"},
-            new Object[]{"1;2", "k1;k2"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null", "k1;k2"}, new Object[]{"1;2", "k1;k2"})
+        .andOnSecondInstance(new Object[]{"null", "k1;k2"}, new Object[]{"1;2", "k1;k2"})
         .whenQuery("select DISTINCT_SUM(mv1) from testTable group by mv2")
-        .thenResultIs("DOUBLE", String.valueOf(3 + FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT),
-            String.valueOf(3 + FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT))
+        .thenResultIs(
+            "DOUBLE",
+            String.valueOf(3 + FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT),
+            String.valueOf(3 + FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT)
+        )
         .whenQueryWithNullHandlingEnabled("select DISTINCT_SUM(mv1) from testTable group by mv2")
         .thenResultIs("DOUBLE", "3", "3");
   }

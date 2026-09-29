@@ -83,6 +83,8 @@ public class BloomFilterCreatorTest implements PinotBuffersAfterMethodCheckRule 
     String columnName = "uuidColumn";
     String uuid0 = "550e8400-e29b-41d4-a716-446655440000";
     String uuid1 = "550e8400-e29b-41d4-a716-446655440001";
+    String uuid0Hex = "550e8400e29b41d4a716446655440000";
+    String uuid1Hex = "550e8400e29b41d4a716446655440001";
     try (BloomFilterCreator bloomFilterCreator = new OnHeapGuavaBloomFilterCreator(TEMP_DIR, columnName, cardinality,
         new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP, 0, false), FieldSpec.DataType.UUID)) {
       bloomFilterCreator.add(UuidUtils.toBytes(uuid0), -1);
@@ -94,12 +96,12 @@ public class BloomFilterCreatorTest implements PinotBuffersAfterMethodCheckRule 
     try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(bloomFilterFile);
         BloomFilterReader onHeapBloomFilter = BloomFilterReaderFactory.getBloomFilterReader(dataBuffer, true);
         BloomFilterReader offHeapBloomFilter = BloomFilterReaderFactory.getBloomFilterReader(dataBuffer, false)) {
-      Assert.assertTrue(onHeapBloomFilter.mightContain(uuid0));
-      Assert.assertTrue(onHeapBloomFilter.mightContain(uuid1));
-      Assert.assertFalse(onHeapBloomFilter.mightContain("550e8400-e29b-41d4-a716-4466554400ff"));
-      Assert.assertTrue(offHeapBloomFilter.mightContain(uuid0));
-      Assert.assertTrue(offHeapBloomFilter.mightContain(uuid1));
-      Assert.assertFalse(offHeapBloomFilter.mightContain("550e8400-e29b-41d4-a716-4466554400ff"));
+      Assert.assertTrue(onHeapBloomFilter.mightContain(uuid0Hex));
+      Assert.assertTrue(onHeapBloomFilter.mightContain(uuid1Hex));
+      Assert.assertFalse(onHeapBloomFilter.mightContain("550e8400e29b41d4a7164466554400ff"));
+      Assert.assertTrue(offHeapBloomFilter.mightContain(uuid0Hex));
+      Assert.assertTrue(offHeapBloomFilter.mightContain(uuid1Hex));
+      Assert.assertFalse(offHeapBloomFilter.mightContain("550e8400e29b41d4a7164466554400ff"));
     }
   }
 

@@ -27,6 +27,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /// Factory for NEQ predicate evaluators.
@@ -72,6 +73,11 @@ public class NotEqualsPredicateEvaluatorFactory {
         return new StringRawValueBasedNeqPredicateEvaluator(notEqPredicate, value);
       case BYTES:
         return new BytesRawValueBasedNeqPredicateEvaluator(notEqPredicate, BytesUtils.toBytes(value));
+      // UUID is a logical type stored as 16 raw bytes, so -- like TIMESTAMP over LONG above -- convert the literal to
+      // its stored form and reuse the stored-type evaluator. getDataType() then correctly reports the type applySV
+      // consumes (BYTES), per the PredicateEvaluator contract.
+      case UUID:
+        return new BytesRawValueBasedNeqPredicateEvaluator(notEqPredicate, UuidUtils.toBytes(value));
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }

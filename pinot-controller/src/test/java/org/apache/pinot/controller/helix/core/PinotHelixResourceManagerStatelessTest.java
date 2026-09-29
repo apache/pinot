@@ -77,8 +77,10 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
@@ -91,6 +93,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.apache.zookeeper.data.Stat;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.DateTimeFormatterBuilder;
@@ -588,6 +591,51 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     }
   }
 
+  /// Pins the contract [org.apache.pinot.controller.helix.SegmentStatusChecker] depends on: the batched read returns
+  /// the metadata and the znode [Stat] index-aligned with the requested segment names, with `null` in both for a
+  /// segment that has no ZK metadata.
+  @Test
+  public void testRetrieveSegmentsZKMetadataBatched() {
+    long beforeMs = System.currentTimeMillis();
+    List<String> segmentNames = List.of("testSegment0", "testSegment1", "testSegment2");
+    // Write ZK metadata for the first and last segment only, leaving a gap in the middle
+    for (String segmentName : List.of("testSegment0", "testSegment2")) {
+      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+      segmentZKMetadata.setSizeInBytes(segmentName.hashCode());
+      ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentZKMetadata);
+    }
+
+    try {
+      List<Stat> stats = new ArrayList<>();
+      List<SegmentZKMetadata> segmentsZKMetadata =
+          _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME, segmentNames, stats);
+
+      // Both lists must line up with the requested names, so that the gap does not shift the entries after it
+      assertEquals(segmentsZKMetadata.size(), 3);
+      assertEquals(stats.size(), 3);
+      for (int i : new int[]{0, 2}) {
+        String segmentName = segmentNames.get(i);
+        assertNotNull(segmentsZKMetadata.get(i), segmentName);
+        assertEquals(segmentsZKMetadata.get(i).getSegmentName(), segmentName);
+        assertEquals(segmentsZKMetadata.get(i).getSizeInBytes(), segmentName.hashCode());
+        // A real znode mtime, not a default or the metadata's own creation time
+        assertNotNull(stats.get(i), segmentName);
+        assertTrue(stats.get(i).getMtime() >= beforeMs,
+            segmentName + " mtime: " + stats.get(i).getMtime() + " < " + beforeMs);
+      }
+      assertNull(segmentsZKMetadata.get(1));
+      assertNull(stats.get(1));
+
+      // The stats are optional
+      assertEquals(
+          _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME, segmentNames, null).size(), 3);
+    } finally {
+      for (String segmentName : List.of("testSegment0", "testSegment2")) {
+        ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentName);
+      }
+    }
+  }
+
   @Test
   public void testUpdateSchemaDateTime() {
     String segmentName = "testSegment";
@@ -1078,6 +1126,36 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       resourceManager.updateTableConfig(updatedTableConfig);
 
       verify(resourceManager).sendTableConfigRefreshMessage(offlineTableName);
+      verify(resourceManager).sendTableConfigSchemaRefreshMessage(offlineTableName);
+    } finally {
+      _helixResourceManager.deleteOfflineTable(rawTableName);
+      deleteSchema(rawTableName);
+    }
+  }
+
+  @Test
+  public void testAddSchemaWithOverrideRefreshesServerCaches()
+      throws Exception {
+    String rawTableName = "schemaOverrideRefreshTest";
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    addDummySchema(rawTableName);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(rawTableName)
+        .setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME)
+        .build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    _helixResourceManager.addTable(tableConfig);
+
+    PinotHelixResourceManager resourceManager = spy(_helixResourceManager);
+    doNothing().when(resourceManager).sendTableConfigSchemaRefreshMessage(offlineTableName);
+
+    try {
+      Schema schema = createDummySchema(rawTableName);
+      schema.addField(new DimensionFieldSpec("dimC", FieldSpec.DataType.STRING, true));
+      resourceManager.addSchema(schema, true, false);
+
+      assertEquals(resourceManager.getSchema(rawTableName), schema);
       verify(resourceManager).sendTableConfigSchemaRefreshMessage(offlineTableName);
     } finally {
       _helixResourceManager.deleteOfflineTable(rawTableName);

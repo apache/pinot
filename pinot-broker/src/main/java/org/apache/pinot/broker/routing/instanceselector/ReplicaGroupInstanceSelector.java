@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import it.unimi.dsi.fastutil.ints.Int2IntMap;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -27,7 +29,6 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
@@ -73,9 +74,13 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReplicaGroupInstanceSelector.class);
 
   @Override
-  public Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
+  public InstanceMapping select(List<String> segments, int requestId,
       SegmentStates segmentStates, Map<String, String> queryOptions) {
-    ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
+    return selectWithContext(segments, requestId, segmentStates, new ServerSelectionContext(queryOptions, _config));
+  }
+
+  protected InstanceMapping selectWithContext(List<String> segments, int requestId,
+      SegmentStates segmentStates, ServerSelectionContext ctx) {
     if (_adaptiveServerSelector != null) {
       // Adaptive Server Selection is enabled.
       List<SegmentInstanceCandidate> candidateServers = fetchCandidateServersForQuery(segments, segmentStates);
@@ -94,13 +99,13 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     }
   }
 
-  private Pair<Map<String, String>, Map<String, String>> selectServers(List<String> segments, int requestId,
+  protected InstanceMapping selectServers(List<String> segments, int requestId,
       SegmentStates segmentStates, @Nullable Map<String, Integer> serverRankMap, ServerSelectionContext ctx) {
 
-    Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    Map<String, String> segmentToSelectedInstanceMap = new Object2ObjectOpenHashMap<>(segments.size());
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
-    Map<Integer, Integer> poolToSegmentCount = new HashMap<>();
+    Int2IntOpenHashMap poolToSegmentCount = new Int2IntOpenHashMap(2);
     boolean useFixedReplica = ctx.isUseFixedReplica();
     Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(ctx.getQueryOptions());
     int numReplicaGroups = numReplicaGroupsToQuery != null ? numReplicaGroupsToQuery : 1;
@@ -115,7 +120,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
       // Round-robin selection (default behavior)
       int numCandidates = candidates.size();
-      int instanceIdx = (requestId + replicaOffset) % numCandidates;
+      int instanceIdx = Math.floorMod(requestId + replicaOffset, numCandidates);
       SegmentInstanceCandidate selectedInstance = candidates.get(instanceIdx);
       if (useFixedReplica) {
         // Adaptive Server Selection cannot be used with fixed replica routing.
@@ -124,16 +129,22 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       } else if (MapUtils.isNotEmpty(serverRankMap)) {
         // Adaptive Server Selection is enabled.
         // Use the instance with the best rank if all servers have stats populated, else use the round-robin selected
-        // instance
-        selectedInstance = candidates.stream()
-            .anyMatch(candidate -> !serverRankMap.containsKey(candidate.getInstance()))
-            ? selectedInstance
-            : candidates.stream()
-                .min(Comparator.comparingInt(candidate -> serverRankMap.get(candidate.getInstance())))
-                .orElse(selectedInstance);
+        // instance. As of 8 July 2026, this fallback is unreachable, but new implementations could require it.
+        int bestRank = Integer.MAX_VALUE;
+        for (SegmentInstanceCandidate candidate : candidates) {
+          Integer rank = serverRankMap.get(candidate.getInstance());
+          if (rank == null) {
+            selectedInstance = candidates.get(instanceIdx);
+            break;
+          }
+          if (rank < bestRank) {
+            bestRank = rank;
+            selectedInstance = candidate;
+          }
+        }
       }
 
-      poolToSegmentCount.merge(selectedInstance.getPool(), 1, Integer::sum);
+      poolToSegmentCount.addTo(selectedInstance.getPool(), 1);
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.
       if (selectedInstance.isOnline()) {
@@ -146,11 +157,11 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       }
       replicaOffset = (replicaOffset + 1) % numReplicaGroups;
     }
-    for (Map.Entry<Integer, Integer> entry : poolToSegmentCount.entrySet()) {
-      _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getValue(),
-          BrokerMetrics.getTagForPreferredPool(ctx.getQueryOptions()), String.valueOf(entry.getKey()));
+    for (Int2IntMap.Entry entry : poolToSegmentCount.int2IntEntrySet()) {
+      _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getIntValue(),
+          BrokerMetrics.getTagForPreferredPool(ctx.getQueryOptions()), String.valueOf(entry.getIntKey()));
     }
-    return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
+    return new InstanceMapping(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
 
   private List<SegmentInstanceCandidate> fetchCandidateServersForQuery(List<String> segments,
@@ -191,9 +202,9 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
   void updateSegmentMapsForUpsertTable(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
       Map<String, Long> newSegmentCreationTimeMap) {
     _oldSegmentCandidatesMap.clear();
+    _oldSegmentExpectedReplicasMap.clear();
     int newSegmentMapCapacity = HashUtil.getHashMapCapacity(newSegmentCreationTimeMap.size());
     _newSegmentStateMap = new HashMap<>(newSegmentMapCapacity);
-
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
 
@@ -246,7 +257,6 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       // NOTE: onlineInstances is either a TreeSet or an EmptySet (sorted)
       Set<String> onlineInstances = entry.getValue();
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
-
       Set<String> unavailableInstances = unavailableInstancesMap.get(idealStateInstanceStateMap.keySet());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
       int idealStateReplicaId = 0;
@@ -256,7 +266,9 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
         }
         idealStateReplicaId++;
       }
-      _oldSegmentCandidatesMap.put(segment, candidates);
+      // Instances taken out of service for the whole replica group are excluded above, so measuring against
+      // the ideal state count is what makes the replica health metrics reflect a group-wide knockout.
+      putOldSegment(segment, candidates, idealStateInstanceStateMap);
     }
 
     for (Map.Entry<String, Set<String>> entry : newSegmentToOnlineInstancesMap.entrySet()) {
@@ -264,7 +276,6 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       Set<String> onlineInstances = entry.getValue();
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
       Map<String, String> sortedIdealStateInstanceStateMap = convertToSortedMap(idealStateInstanceStateMap);
-
       Set<String> unavailableInstances =
           unavailableInstancesMap.getOrDefault(idealStateInstanceStateMap.keySet(), Set.of());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());

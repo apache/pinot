@@ -155,7 +155,7 @@ public class QueryServerAuthzTest {
     DispatchablePlanFragment stagePlan = queryPlan.getQueryStageMap().get(stageId);
     Plan.PlanNode rootNode = PlanNodeSerializer.process(stagePlan.getPlanFragment().getFragmentRoot());
     List<Worker.WorkerMetadata> workerMetadataList =
-        QueryPlanSerDeUtils.toProtoWorkerMetadataList(stagePlan.getWorkerMetadataList());
+        QueryPlanSerDeUtils.toProtoWorkerMetadataList(stagePlan.getWorkerMetadataList(), false);
     ByteString customProperty = QueryPlanSerDeUtils.toProtoProperties(stagePlan.getCustomProperties());
 
     // this particular test set requires the request to have a single QueryServerInstance to dispatch to

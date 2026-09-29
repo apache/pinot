@@ -32,7 +32,6 @@ import org.apache.calcite.rel.rules.FilterMergeRule;
 import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
 import org.apache.calcite.rel.rules.FilterSetOpTransposeRule;
 import org.apache.calcite.rel.rules.JoinPushExpressionsRule;
-import org.apache.calcite.rel.rules.ProjectAggregateMergeRule;
 import org.apache.calcite.rel.rules.ProjectFilterTransposeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectRemoveRule;
@@ -176,6 +175,10 @@ public class PinotQueryRuleSets {
       PinotAggregateFunctionRewriteRule
           .instanceWithDescription(PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE),
 
+      // Must stay ahead of PinotAggregateExchangeNodeInsertRule (POST_LOGICAL), which fixes the leaf-to-final
+      // intermediate result format from the function name.
+      PinotApproximateAggregateRewriteRule.INSTANCE,
+
       // convert CASE-style filtered aggregates into true filtered aggregates
       // put it after AGGREGATE_REDUCE_FUNCTIONS where SUM is converted to SUM0
       AggregateCaseToFilterRule.Config.DEFAULT
@@ -238,8 +241,10 @@ public class PinotQueryRuleSets {
       UnionMergeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.UNION_MERGE).toRule(),
       // Drop unused aggregate calls when a Project on top of the Aggregate doesn't reference them. Default-on.
-      ProjectAggregateMergeRule.Config.DEFAULT
-          .withDescription(PlannerRuleNames.PROJECT_AGGREGATE_MERGE).toRule(),
+      // Pinot fork of Calcite's ProjectAggregateMergeRule: the stock rule rebuilds the aggregate and silently
+      // drops its aggOptions hints, because Calcite only restores the hints of the node the rule matched on
+      // (the Project). See PinotProjectAggregateMergeRule.
+      PinotProjectAggregateMergeRule.instanceWithDescription(PlannerRuleNames.PROJECT_AGGREGATE_MERGE),
       PruneEmptyRules.CorrelateLeftEmptyRuleConfig.DEFAULT
           .withDescription(PlannerRuleNames.PRUNE_EMPTY_CORRELATE_LEFT).toRule(),
       PruneEmptyRules.CorrelateRightEmptyRuleConfig.DEFAULT

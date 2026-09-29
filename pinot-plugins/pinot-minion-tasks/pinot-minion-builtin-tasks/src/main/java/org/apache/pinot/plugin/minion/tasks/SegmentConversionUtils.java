@@ -49,6 +49,7 @@ import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
@@ -111,16 +112,41 @@ public class SegmentConversionUtils {
   public static void uploadSegment(Map<String, String> configs, List<Header> httpHeaders,
       List<NameValuePair> parameters, String tableNameWithType, String segmentName, String uploadURL, File fileToUpload)
       throws Exception {
-    // Create a RoundRobinURIProvider to round-robin IP addresses when retry uploading. Otherwise, it may always try to
-    // upload to a same broken host as: 1) DNS may not RR the IP addresses 2) OS cache the DNS resolution result.
+    sendWithRetry(configs, httpHeaders, tableNameWithType, segmentName, uploadURL, true, "uploading segment",
+        (client, uri, requestHeaders, socketTimeoutMs) ->
+            client.uploadSegment(uri, segmentName, fileToUpload, requestHeaders, parameters, socketTimeoutMs));
+  }
+
+  /// METADATA-mode registration with the same retry loop as [#uploadSegment]. Only the metadata tar is sent,
+  /// and `httpHeaders` must carry the segment tar location as DOWNLOAD_URI.
+  public static void uploadSegmentMetadata(Map<String, String> configs, List<Header> httpHeaders,
+      List<NameValuePair> parameters, String tableNameWithType, String segmentName, String uploadURL,
+      File segmentMetadataFile)
+      throws Exception {
+    sendWithRetry(configs, httpHeaders, tableNameWithType, segmentName, uploadURL, true, "uploading segment metadata",
+        (client, uri, requestHeaders, socketTimeoutMs) -> client.uploadSegmentMetadata(uri, segmentName,
+            segmentMetadataFile, requestHeaders, parameters, socketTimeoutMs));
+  }
+
+  @FunctionalInterface
+  private interface ControllerRequest {
+    SimpleHttpResponse send(FileUploadDownloadClient client, URI uri, List<Header> requestHeaders, int socketTimeoutMs)
+        throws Exception;
+  }
+
+  private static void sendWithRetry(Map<String, String> configs, List<Header> httpHeaders, String tableNameWithType,
+      String segmentName, String uploadURL, boolean retryNotFound, String operation, ControllerRequest request)
+      throws Exception {
+    // Round-robin IP addresses between attempts. Otherwise DNS and OS caching can repeatedly select the same broken
+    // controller behind a load-balanced host name.
     RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(List.of(new URI(uploadURL)), true);
     // Generate retry policy based on the config
     String maxNumAttemptsConfigStr = configs.get(MinionConstants.MAX_NUM_ATTEMPTS_KEY);
     int maxNumAttemptsFromConfig =
         maxNumAttemptsConfigStr != null ? Integer.parseInt(maxNumAttemptsConfigStr) : DEFAULT_MAX_NUM_ATTEMPTS;
     int maxNumAttempts = Math.max(maxNumAttemptsFromConfig, uriProvider.numAddresses());
-    LOGGER.info("Retry uploading for {} times. Max num attempts from pinot minion config: {}, number of IP addresses "
-        + "for upload URI: {}", maxNumAttempts, maxNumAttemptsFromConfig, uriProvider.numAddresses());
+    LOGGER.info("Retry {} for {} times. Max num attempts from pinot minion config: {}, number of IP addresses for "
+            + "controller URI: {}", operation, maxNumAttempts, maxNumAttemptsFromConfig, uriProvider.numAddresses());
     String initialRetryDelayMsConfig = configs.get(MinionConstants.INITIAL_RETRY_DELAY_MS_KEY);
     long initialRetryDelayMs =
         initialRetryDelayMsConfig != null ? Long.parseLong(initialRetryDelayMsConfig) : DEFAULT_INITIAL_RETRY_DELAY_MS;
@@ -129,65 +155,68 @@ public class SegmentConversionUtils {
         retryScaleFactorConfig != null ? Double.parseDouble(retryScaleFactorConfig) : DEFAULT_RETRY_SCALE_FACTOR;
     RetryPolicy retryPolicy =
         RetryPolicies.exponentialBackoffRetryPolicy(maxNumAttempts, initialRetryDelayMs, retryScaleFactor);
+    String socketTimeoutMsConfig = configs.get(MinionConstants.SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS_KEY);
+    int socketTimeoutMs =
+        socketTimeoutMsConfig != null ? Integer.parseInt(socketTimeoutMsConfig)
+            : HttpClient.DEFAULT_SOCKET_TIMEOUT_MS;
 
-    // Upload the segment with retry policy
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
-      retryPolicy.attempt(() -> {
-        URI uri = uriProvider.next();
-        String hostName = new URI(uploadURL).getHost();
-        int hostPort = new URI(uploadURL).getPort();
-        // If the original upload address is specified as host name, need add a "HOST" HTTP header to the HTTP
-        // request. Otherwise, if the upload address is a LB address, when the LB be configured as "disallow direct
-        // access by IP address", upload will fail.
-        if (!InetAddresses.isInetAddress(hostName)) {
-          httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + hostPort));
-        }
-        try {
-          SimpleHttpResponse response =
-              fileUploadDownloadClient.uploadSegment(uri, segmentName, fileToUpload, httpHeaders, parameters,
-                  HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
-          LOGGER.info("Got response {}: {} while uploading table: {}, segment: {} with uploadURL: {}",
-              response.getStatusCode(), response.getResponse(), tableNameWithType, segmentName, uploadURL);
-          return true;
-        } catch (HttpErrorStatusException e) {
-          int statusCode = e.getStatusCode();
-          if (statusCode == HttpStatus.SC_CONFLICT || statusCode == HttpStatus.SC_NOT_FOUND || statusCode >= 500) {
-            // Temporary exception
-            // 404 is treated as a temporary exception, as the uploadURL may be backed by multiple hosts,
-            // if singe host is down, can retry with another host.
-            LOGGER.warn("Caught temporary exception while uploading segment: {}, will retry", segmentName, e);
-            return false;
-          } else {
-            // Permanent exception
-            LOGGER.error("Caught permanent exception while uploading segment: {}, won't retry", segmentName, e);
-            throw e;
+      try {
+        retryPolicy.attempt(() -> {
+          URI uri = uriProvider.next();
+          String hostName = new URI(uploadURL).getHost();
+          int hostPort = new URI(uploadURL).getPort();
+          List<Header> requestHeaders = new ArrayList<>(httpHeaders);
+          // Preserve the original host when the request is sent to a resolved IP address behind a load balancer.
+          if (!InetAddresses.isInetAddress(hostName)) {
+            requestHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + hostPort));
           }
-        } catch (Exception e) {
-          LOGGER.warn("Caught temporary exception while uploading segment: {}, will retry", segmentName, e);
-          return false;
+          try {
+            SimpleHttpResponse response =
+                request.send(fileUploadDownloadClient, uri, requestHeaders, socketTimeoutMs);
+            LOGGER.info("Got response {}: {} while {} for table: {}, segment: {} with controller URL: {}",
+                response.getStatusCode(), response.getResponse(), operation, tableNameWithType, segmentName,
+                uploadURL);
+            return true;
+          } catch (HttpErrorStatusException e) {
+            int statusCode = e.getStatusCode();
+            if (statusCode == HttpStatus.SC_CONFLICT || statusCode >= 500
+                || retryNotFound && statusCode == HttpStatus.SC_NOT_FOUND) {
+              LOGGER.warn("Caught temporary exception while {}: {}, will retry", operation, segmentName, e);
+              return false;
+            }
+            LOGGER.error("Caught permanent exception while {}: {}, won't retry", operation, segmentName, e);
+            throw e;
+          } catch (Exception e) {
+            LOGGER.warn("Caught temporary exception while {}: {}, will retry", operation, segmentName, e);
+            return false;
+          }
+        });
+      } catch (RetriableOperationException e) {
+        if (e.getCause() instanceof HttpErrorStatusException) {
+          throw (HttpErrorStatusException) e.getCause();
         }
-      });
+        throw e;
+      }
     }
   }
 
   /// Updates the custom map in the segment ZK metadata without uploading the segment.
-  public static void updateSegmentZKMetadata(String tableNameWithType, String segmentName, String uploadURL,
-      String originalSegmentCrc,
+  public static void updateSegmentZKMetadata(Map<String, String> configs, String tableNameWithType, String segmentName,
+      String uploadURL, String originalSegmentCrc,
       SegmentZKMetadataCustomMapModifier customMapModifier, @Nullable AuthProvider authProvider)
       throws Exception {
-    URI controllerBaseUri = FileUploadDownloadClient.extractBaseURI(new URI(uploadURL));
-    URI updateUri = FileUploadDownloadClient.getUpdateSegmentZKMetadataURI(controllerBaseUri, tableNameWithType,
-        segmentName);
     List<Header> headers = new ArrayList<>(AuthProviderUtils.toRequestHeaders(authProvider));
     headers.add(new BasicHeader(HttpHeaders.IF_MATCH, originalSegmentCrc));
-    SSLContext sslContext = MinionContext.getInstance().getSSLContext();
-    try (FileUploadDownloadClient client = new FileUploadDownloadClient(sslContext)) {
-      SimpleHttpResponse response = client.updateSegmentZKMetadata(updateUri, customMapModifier.toJsonString(),
-          headers, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
-      LOGGER.info("Got response {}: {} while updating ZK metadata for table: {}, segment: {}",
-          response.getStatusCode(), response.getResponse(), tableNameWithType, segmentName);
-    }
+    String modifierJson = customMapModifier.toJsonString();
+    sendWithRetry(configs, headers, tableNameWithType, segmentName, uploadURL, false, "updating ZK metadata",
+        (client, uri, requestHeaders, socketTimeoutMs) -> {
+          URI controllerBaseUri = FileUploadDownloadClient.extractBaseURI(uri);
+          URI updateUri = FileUploadDownloadClient.getUpdateSegmentZKMetadataURI(controllerBaseUri,
+              tableNameWithType, segmentName);
+          return client.updateSegmentZKMetadata(updateUri, modifierJson, requestHeaders, socketTimeoutMs);
+        });
   }
 
   public static String startSegmentReplace(String tableNameWithType, String uploadURL,
@@ -200,6 +229,14 @@ public class SegmentConversionUtils {
       StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Nullable AuthProvider authProvider,
       boolean forceCleanup)
       throws Exception {
+    return startSegmentReplace(tableNameWithType, uploadURL, startReplaceSegmentsRequest, authProvider, forceCleanup,
+        HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  public static String startSegmentReplace(String tableNameWithType, String uploadURL,
+      StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Nullable AuthProvider authProvider,
+      boolean forceCleanup, int socketTimeoutMs)
+      throws Exception {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
@@ -207,7 +244,8 @@ public class SegmentConversionUtils {
       URI uri = FileUploadDownloadClient.getStartReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(),
           forceCleanup);
       SimpleHttpResponse response =
-          fileUploadDownloadClient.startReplaceSegments(uri, startReplaceSegmentsRequest, authProvider);
+          fileUploadDownloadClient.startReplaceSegments(uri, startReplaceSegmentsRequest, authProvider,
+              socketTimeoutMs);
       String responseString = response.getResponse();
       LOGGER.info(
           "Got response {}: {} while sending start replace segment request for table: {}, uploadURL: {}, request: {}",

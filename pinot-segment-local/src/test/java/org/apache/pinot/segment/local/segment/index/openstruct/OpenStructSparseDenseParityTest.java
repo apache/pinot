@@ -21,10 +21,12 @@ package org.apache.pinot.segment.local.segment.index.openstruct;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -294,6 +296,95 @@ public class OpenStructSparseDenseParityTest {
     } finally {
       sparse.destroy();
     }
+  }
+
+  /// A key holding lists reads as a multi-value column. Which tier it lands on is a `maxDenseKeys` decision,
+  /// not a property of the data, so it must not change the key's shape: a query fans out over every segment
+  /// of a table, and one segment answering `STRING[]` while another answers a scalar `STRING` holding
+  /// `["a","b"]` is two shapes for one column -- `col['labels'] = 'a'` would match only the first.
+  @Test
+  public void testMultiValueKeyHasTheSameShapeInBothTiers()
+      throws Exception {
+    // 'labels' is undeclared, so its shape comes from the data on both sides.
+    OpenStructIndexConfig denseConfig = new OpenStructIndexConfig(false, null, -1, null, 0.0, null, null);
+    OpenStructIndexConfig sparseConfig = new OpenStructIndexConfig(false, null, 0, null, null, null, null);
+    int numDocs = 6;
+
+    List<GenericRow> rows = new ArrayList<>(numDocs);
+    for (int docId = 0; docId < numDocs; docId++) {
+      GenericRow row = new GenericRow();
+      Map<String, Object> m = new HashMap<>();
+      Object value = labelsForDoc(docId);
+      if (value != null) {
+        m.put("labels", value);
+      }
+      row.putValue(METRICS, m);
+      rows.add(row);
+    }
+
+    ImmutableSegment dense = buildSegment(denseConfig, "dense-mv", rows);
+    ImmutableSegment sparse = buildSegment(sparseConfig, "sparse-mv", rows);
+    try {
+      DataSource denseKey = ((OpenStructDataSource) dense.getDataSource(METRICS)).getDataSource("labels");
+      DataSource sparseKey = ((OpenStructDataSource) sparse.getDataSource(METRICS)).getDataSource("labels");
+
+      assertFalse(denseKey.getDataSourceMetadata().getFieldSpec().isSingleValueField(), "dense shape");
+      assertFalse(sparseKey.getDataSourceMetadata().getFieldSpec().isSingleValueField(), "sparse shape");
+      // Longest value in the data, which is what callers size their multi-value buffers from.
+      assertEquals(denseKey.getDataSourceMetadata().getMaxNumValuesPerMVEntry(), 3);
+      assertEquals(sparseKey.getDataSourceMetadata().getMaxNumValuesPerMVEntry(), 3);
+
+      for (int docId = 0; docId < numDocs; docId++) {
+        String[] denseValues = readStringMV(denseKey, docId);
+        assertEquals(readStringMV(sparseKey, docId), denseValues, "labels docId=" + docId);
+      }
+      // Pin the values themselves too: cross-tier equality alone would survive a bug shared by both.
+      assertEquals(readStringMV(denseKey, 0), new String[]{"a", "b"});
+      // A scalar on a multi-value key is the one-element value it reads back as, in either tier.
+      assertEquals(readStringMV(sparseKey, 2), new String[]{"solo"});
+      // An absent document reads as one default element -- a multi-value column has no empty state.
+      assertEquals(readStringMV(sparseKey, 3),
+          new String[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING});
+    } finally {
+      dense.destroy();
+      sparse.destroy();
+    }
+  }
+
+  @Nullable
+  private static Object labelsForDoc(int docId) {
+    switch (docId) {
+      case 0:
+        return List.of("a", "b");
+      case 1:
+        return List.of("c");
+      case 2:
+        return "solo";
+      case 3:
+        return null;
+      default:
+        return List.of("d", "e", "f");
+    }
+  }
+
+  private static String[] readStringMV(DataSource ds, int docId) {
+    int maxNumValues = Math.max(1, ds.getDataSourceMetadata().getMaxNumValuesPerMVEntry());
+    @SuppressWarnings("rawtypes")
+    ForwardIndexReader fwd = ds.getForwardIndex();
+    assertFalse(fwd.isSingleValue(), "forward index must agree with the field spec");
+    ForwardIndexReaderContext ctx = fwd.createContext();
+    if (ds.getDictionary() != null) {
+      int[] dictIds = new int[maxNumValues];
+      int numValues = fwd.getDictIdMV(docId, dictIds, ctx);
+      String[] values = new String[numValues];
+      for (int i = 0; i < numValues; i++) {
+        values[i] = ds.getDictionary().getStringValue(dictIds[i]);
+      }
+      return values;
+    }
+    String[] buffer = new String[maxNumValues];
+    int numValues = fwd.getStringMV(docId, buffer, ctx);
+    return Arrays.copyOf(buffer, numValues);
   }
 
   private static void assertIndexMatchesAll(OpenStructDataSource ds, String key, String value, int numDocs) {

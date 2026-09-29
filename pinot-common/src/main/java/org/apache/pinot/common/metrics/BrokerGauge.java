@@ -28,6 +28,17 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   MAX_BURST_QPS("tables", false),
   QUERY_RATE_LIMIT_DISABLED("queryQuota", true),
   NETTY_CONNECTION_CONNECT_TIME_MS("nettyConnection", true),
+  // 1 once startup warmup has completed and readiness may be granted, 0 while still warming. Always 1
+  // when warmup is disabled, so dashboards read identically on untouched deployments.
+  STARTUP_WARMUP_COMPLETE("status", true),
+  // Number of routable servers (the servers this broker's routable tables route to) that startup warmup did
+  // NOT reach before it exited -- no probe hit them. Set once at warmup exit. 0 on a normal floor exit (the
+  // round-robin probed every table). Non-zero means warmup stopped short of its intended per-server
+  // coverage: the budget expired, or servers were too slow to respond, before every server was probed. It
+  // is a completeness signal, not "these servers are cold" -- serve-path JIT is warmed per-JVM and channels
+  // are opened by pre-connect, so an unreached server is only marginally colder. Not recorded when warmup
+  // is disabled.
+  STARTUP_WARMUP_UNCOVERED_SERVERS("servers", true),
   REQUEST_SIZE("requestSize", false),
   RESIZE_TIME_MS("milliseconds", false),
   UNHEALTHY_SERVERS("servers", true),
@@ -107,7 +118,30 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   /// signals a leak in the ZK listener / drop path.
   MATERIALIZED_VIEW_CACHE_ENTRY_COUNT("materializedViewCacheEntries", true),
   // Workload config fetch status: 1 = success, 0 = failure
-  WORKLOAD_CONFIG_FETCH_STATUS("status", true);
+  WORKLOAD_CONFIG_FETCH_STATUS("status", true),
+
+  /// Replica availability of a table as observed by this broker's routing: the smallest percentage of
+  /// assigned replicas that are actually routable, across all the table's measured segments. `100` means every
+  /// measured segment can be served from every replica the ideal state assigns to it; `0` means at least one measured
+  /// segment cannot be served at all.
+  ///
+  /// Two populations are left out of the measurement, so this gauge can read `100` while such a segment is
+  /// unavailable - watch [#UNAVAILABLE_SEGMENTS] for those:
+  /// - Segments assigned a single replica, which have no redundancy to report on and would otherwise pin a table of
+  ///   mixed replication (e.g. a tier assigned fewer replicas) to `0` for the length of any restart or rebalance.
+  /// - Segments still classified new (see
+  ///   [org.apache.pinot.spi.utils.CommonConstants.Broker#CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS]), which are
+  ///   commonly not yet loaded everywhere.
+  PERCENT_OF_REPLICAS("percent", false),
+
+  /// Number of the table's segments that this broker currently cannot route to any server. Segments assigned a
+  /// single replica are included
+  UNAVAILABLE_SEGMENTS("segments", false),
+
+  /// Number of the table's measured segments that are replicated as poorly as [#PERCENT_OF_REPLICAS] reports,
+  /// i.e. how many segments that percentage speaks for. The same populations are excluded, so this reads `0`
+  /// exactly when the table has nothing to measure.
+  SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS("segments", false);
 
   private final String _brokerGaugeName;
   private final String _unit;

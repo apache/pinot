@@ -18,14 +18,15 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import it.unimi.dsi.fastutil.ints.Int2IntMap;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.utils.HashUtil;
 
 /// Instance selector to balance the number of segments served by each selected server instance.
 ///
@@ -44,13 +45,13 @@ import org.apache.pinot.common.utils.HashUtil;
 public class BalancedInstanceSelector extends BaseInstanceSelector {
 
   @Override
-  public Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
+  public InstanceMapping select(List<String> segments, int requestId,
       SegmentStates segmentStates, Map<String, String> queryOptions) {
-    Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    Map<String, String> segmentToSelectedInstanceMap = new Object2ObjectOpenHashMap<>(segments.size());
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
     ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
-    Map<Integer, Integer> poolToSegmentCount = new HashMap<>();
+    Int2IntOpenHashMap poolToSegmentCount = new Int2IntOpenHashMap(2);
 
     for (String segment : segments) {
       List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
@@ -73,7 +74,7 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
       } else {
         selectedCandidate = candidates.get(requestId++ % candidates.size());
       }
-      poolToSegmentCount.merge(selectedCandidate.getPool(), 1, Integer::sum);
+      poolToSegmentCount.addTo(selectedCandidate.getPool(), 1);
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.
       if (selectedCandidate.isOnline()) {
@@ -83,10 +84,10 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
       }
     }
 
-    for (Map.Entry<Integer, Integer> entry : poolToSegmentCount.entrySet()) {
-      _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getValue(),
-          BrokerMetrics.getTagForPreferredPool(queryOptions), String.valueOf(entry.getKey()));
+    for (Int2IntMap.Entry entry : poolToSegmentCount.int2IntEntrySet()) {
+      _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getIntValue(),
+          BrokerMetrics.getTagForPreferredPool(queryOptions), String.valueOf(entry.getIntKey()));
     }
-    return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
+    return new InstanceMapping(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
 }

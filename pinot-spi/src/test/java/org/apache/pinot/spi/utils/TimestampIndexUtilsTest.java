@@ -127,4 +127,21 @@ public class TimestampIndexUtilsTest {
       assertEquals(new HashSet<>(rangeIndexColumns), transformColumns);
     }
   }
+
+  @Test
+  public void testApplyTimestampIndexEscapesQuotedColumn() {
+    String timestampColumn = "ts\"name";
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setFieldConfigList(
+        List.of(new FieldConfig.Builder(timestampColumn)
+            .withTimestampConfig(new TimestampConfig(List.of(TimestampIndexGranularity.DAY))).build())).build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addDateTime(timestampColumn, DataType.TIMESTAMP, "TIMESTAMP", "1:MILLISECONDS").build();
+
+    TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
+
+    List<TransformConfig> transformConfigs = tableConfig.getIngestionConfig().getTransformConfigs();
+    assertEquals(transformConfigs.size(), 1);
+    assertEquals(transformConfigs.get(0).getColumnName(), "$ts\"name$DAY");
+    assertEquals(transformConfigs.get(0).getTransformFunction(), "dateTrunc('DAY',\"ts\"\"name\")");
+  }
 }

@@ -25,6 +25,7 @@ import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
@@ -36,18 +37,23 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
+import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/// Implementation of [GroupKeyGenerator] interface using actual value based
-/// group keys, instead of dictionary ids. This implementation is used for group-by key
-/// generation when one or more of the group-by columns do not have dictionary.
+/// Implementation of [GroupKeyGenerator] interface using actual value based group keys, instead of dictionary ids.
+/// This implementation is used for group-by key generation when one or more of the group-by columns do not have
+/// dictionary.
 ///
-/// TODO:
-/// 1. Add support for multi-valued group-by columns.
-/// 2. Add support for trimming group-by results.
+/// With null handling enabled, a null row's column contributes a reserved id to the composed key instead of the id of
+/// its stored value, so nulls form groups of their own and are read back as SQL `NULL`. Both the single-value and the
+/// multi-value key paths recognize nulls. Nullness is read from the block's null bitmap rather than from the id, so a
+/// dictionary-encoded column beside a raw one still composes its own dictionary ids instead of paying for an
+/// on-the-fly dictionary.
 public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerator {
   private static final int ID_FOR_NULL = INVALID_ID - 1;
+  /// Shared by every null row and column: the key composition reads these arrays and never writes to them.
+  private static final int[] NULL_KEY_COMPONENT = {ID_FOR_NULL};
 
   private final ExpressionContext[] _groupByExpressions;
   private final int _numGroupByExpressions;
@@ -79,8 +85,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       // Take the dict-id path only when the forward index is dict-encoded. A column with EncodingType.RAW +
       // dictionaryIndex exposes a Dictionary but BlockValSet#getDictionaryIdsSV throws on its RAW forward
       // index — fall back to an on-the-fly dictionary on raw values for that case.
-      Dictionary dictionary = _nullHandlingEnabled || !columnContext.isDictionaryEncoded() ? null
-          : columnContext.getDictionary();
+      Dictionary dictionary = columnContext.isDictionaryEncoded() ? columnContext.getDictionary() : null;
       if (dictionary != null) {
         _dictionaries[i] = dictionary;
       } else {
@@ -148,125 +153,59 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
         }
       }
     }
+    // All null when null handling is disabled, so the per-column check below never matches. The check stays inside
+    // the row loop rather than forking the loop per mode: every iteration pays for a hash-map operation, which dwarfs
+    // a predicted branch.
+    RoaringBitmap[] nullBitmaps = new RoaringBitmap[_numGroupByExpressions];
+    if (_nullHandlingEnabled) {
+      for (int i = 0; i < _numGroupByExpressions; i++) {
+        RoaringBitmap nullBitmap = valueBlock.getBlockValueSet(_groupByExpressions[i]).getNullBitmap();
+        // Normalize an empty bitmap to null so the per-row check is a plain null comparison
+        nullBitmaps[i] = nullBitmap != null && !nullBitmap.isEmpty() ? nullBitmap : null;
+      }
+    }
     int[] keyValues = new int[_numGroupByExpressions];
     // note that we are mutating its backing array for memory efficiency
     FixedIntArray flyweightKey = new FixedIntArray(keyValues);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap[] nullBitmaps = new RoaringBitmap[_numGroupByExpressions];
-      for (int i = 0; i < _numGroupByExpressions; i++) {
-        nullBitmaps[i] = valueBlock.getBlockValueSet(_groupByExpressions[i]).getNullBitmap();
-      }
-      for (int row = 0; row < numDocs; row++) {
-        int numGroups = _groupKeyMap.size();
-        boolean hasInvalidKeyValue = false;
-        if (numGroups < _numGroupsLimit) {
-          for (int col = 0; col < _numGroupByExpressions; col++) {
-            if (nullBitmaps[col] != null && nullBitmaps[col].contains(row)) {
-              keyValues[col] = ID_FOR_NULL;
-            } else {
-              Object columnValues = values[col];
-              ValueToIdMap onTheFlyDictionary = _onTheFlyDictionaries[col];
-              int keyValue;
-              if (columnValues instanceof int[]) {
-                keyValue = onTheFlyDictionary.put(((int[]) columnValues)[row]);
-              } else if (columnValues instanceof long[]) {
-                keyValue = onTheFlyDictionary.put(((long[]) columnValues)[row]);
-              } else if (columnValues instanceof float[]) {
-                keyValue = onTheFlyDictionary.put(((float[]) columnValues)[row]);
-              } else if (columnValues instanceof double[]) {
-                keyValue = onTheFlyDictionary.put(((double[]) columnValues)[row]);
-              } else if (columnValues instanceof byte[][]) {
-                keyValue = onTheFlyDictionary.put(new ByteArray(((byte[][]) columnValues)[row]));
-              } else {
-                keyValue = onTheFlyDictionary.put(((Object[]) columnValues)[row]);
-              }
-              keyValues[col] = keyValue;
-            }
-          }
-        } else {
-          for (int col = 0; col < _numGroupByExpressions; col++) {
-            if (nullBitmaps[col] != null && nullBitmaps[col].contains(row)) {
-              keyValues[col] = ID_FOR_NULL;
-            } else {
-              Object columnValues = values[col];
-              ValueToIdMap onTheFlyDictionary = _onTheFlyDictionaries[col];
-              int keyValue;
-              if (columnValues instanceof int[]) {
-                keyValue = onTheFlyDictionary.getId(((int[]) columnValues)[row]);
-              } else if (columnValues instanceof long[]) {
-                keyValue = onTheFlyDictionary.getId(((long[]) columnValues)[row]);
-              } else if (columnValues instanceof float[]) {
-                keyValue = onTheFlyDictionary.getId(((float[]) columnValues)[row]);
-              } else if (columnValues instanceof double[]) {
-                keyValue = onTheFlyDictionary.getId(((double[]) columnValues)[row]);
-              } else if (columnValues instanceof byte[][]) {
-                keyValue = onTheFlyDictionary.getId(new ByteArray(((byte[][]) columnValues)[row]));
-              } else {
-                keyValue = onTheFlyDictionary.getId(((Object[]) columnValues)[row]);
-              }
-              if (keyValue == INVALID_ID) {
-                hasInvalidKeyValue = true;
-                break;
-              }
-            }
-          }
-        }
-        if (hasInvalidKeyValue) {
-          groupKeys[row] = INVALID_ID;
-        } else {
-          int groupId = getGroupIdForKey(flyweightKey);
-          if (groupId == numGroups) {
-            // When a new group is added, create a new FixedIntArray
-            keyValues = new int[_numGroupByExpressions];
-            flyweightKey = new FixedIntArray(keyValues);
-          }
-          groupKeys[row] = groupId;
-        }
-      }
-    } else {
-      for (int row = 0; row < numDocs; row++) {
-        int numGroups = _groupKeyMap.size();
-        boolean hasInvalidKeyValue = false;
-        if (numGroups < _numGroupsLimit) {
-          for (int col = 0; col < _numGroupByExpressions; col++) {
+    for (int row = 0; row < numDocs; row++) {
+      int numGroups = _groupKeyMap.size();
+      boolean hasInvalidKeyValue = false;
+      if (numGroups < _numGroupsLimit) {
+        for (int col = 0; col < _numGroupByExpressions; col++) {
+          if (isNull(nullBitmaps[col], row)) {
+            keyValues[col] = ID_FOR_NULL;
+          } else {
             Object columnValues = values[col];
             ValueToIdMap onTheFlyDictionary = _onTheFlyDictionaries[col];
-            int keyValue;
-            if (columnValues instanceof int[]) {
-              int columnValue = ((int[]) columnValues)[row];
-              keyValue = onTheFlyDictionary != null ? onTheFlyDictionary.put(columnValue) : columnValue;
-            } else if (columnValues instanceof long[]) {
-              keyValue = onTheFlyDictionary.put(((long[]) columnValues)[row]);
-            } else if (columnValues instanceof float[]) {
-              keyValue = onTheFlyDictionary.put(((float[]) columnValues)[row]);
-            } else if (columnValues instanceof double[]) {
-              keyValue = onTheFlyDictionary.put(((double[]) columnValues)[row]);
-            } else if (columnValues instanceof byte[][]) {
-              keyValue = onTheFlyDictionary.put(new ByteArray(((byte[][]) columnValues)[row]));
-            } else {
-              keyValue = onTheFlyDictionary.put(((Object[]) columnValues)[row]);
-            }
-            keyValues[col] = keyValue;
+            keyValues[col] = switch (columnValues) {
+              // A dictionary-encoded column has no on-the-fly dictionary: its values are dictionary ids already, used
+              // as key values directly
+              case int[] ints -> onTheFlyDictionary != null ? onTheFlyDictionary.put(ints[row]) : ints[row];
+              case long[] longs -> onTheFlyDictionary.put(longs[row]);
+              case float[] floats -> onTheFlyDictionary.put(floats[row]);
+              case double[] doubles -> onTheFlyDictionary.put(doubles[row]);
+              case byte[][] bytes -> onTheFlyDictionary.put(new ByteArray(bytes[row]));
+              default -> onTheFlyDictionary.put(((Object[]) columnValues)[row]);
+            };
           }
-        } else {
-          for (int col = 0; col < _numGroupByExpressions; col++) {
+        }
+      } else {
+        for (int col = 0; col < _numGroupByExpressions; col++) {
+          if (isNull(nullBitmaps[col], row)) {
+            keyValues[col] = ID_FOR_NULL;
+          } else {
             Object columnValues = values[col];
             ValueToIdMap onTheFlyDictionary = _onTheFlyDictionaries[col];
-            int keyValue;
-            if (columnValues instanceof int[]) {
-              int columnValue = ((int[]) columnValues)[row];
-              keyValue = onTheFlyDictionary != null ? onTheFlyDictionary.getId(columnValue) : columnValue;
-            } else if (columnValues instanceof long[]) {
-              keyValue = onTheFlyDictionary.getId(((long[]) columnValues)[row]);
-            } else if (columnValues instanceof float[]) {
-              keyValue = onTheFlyDictionary.getId(((float[]) columnValues)[row]);
-            } else if (columnValues instanceof double[]) {
-              keyValue = onTheFlyDictionary.getId(((double[]) columnValues)[row]);
-            } else if (columnValues instanceof byte[][]) {
-              keyValue = onTheFlyDictionary.getId(new ByteArray(((byte[][]) columnValues)[row]));
-            } else {
-              keyValue = onTheFlyDictionary.getId(((Object[]) columnValues)[row]);
-            }
+            int keyValue = switch (columnValues) {
+              // A dictionary-encoded column has no on-the-fly dictionary: its values are dictionary ids already, used
+              // as key values directly
+              case int[] ints -> onTheFlyDictionary != null ? onTheFlyDictionary.getId(ints[row]) : ints[row];
+              case long[] longs -> onTheFlyDictionary.getId(longs[row]);
+              case float[] floats -> onTheFlyDictionary.getId(floats[row]);
+              case double[] doubles -> onTheFlyDictionary.getId(doubles[row]);
+              case byte[][] bytes -> onTheFlyDictionary.getId(new ByteArray(bytes[row]));
+              default -> onTheFlyDictionary.getId(((Object[]) columnValues)[row]);
+            };
             if (keyValue == INVALID_ID) {
               hasInvalidKeyValue = true;
               break;
@@ -274,19 +213,23 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
             keyValues[col] = keyValue;
           }
         }
-        if (hasInvalidKeyValue) {
-          groupKeys[row] = INVALID_ID;
-        } else {
-          int groupId = getGroupIdForKey(flyweightKey);
-          if (groupId == numGroups) {
-            // When a new group is added, create a new FixedIntArray
-            keyValues = new int[_numGroupByExpressions];
-            flyweightKey = new FixedIntArray(keyValues);
-          }
-          groupKeys[row] = groupId;
+      }
+      if (hasInvalidKeyValue) {
+        groupKeys[row] = INVALID_ID;
+      } else {
+        int groupId = getGroupIdForKey(flyweightKey);
+        if (groupId == numGroups) {
+          // When a new group is added, create a new FixedIntArray
+          keyValues = new int[_numGroupByExpressions];
+          flyweightKey = new FixedIntArray(keyValues);
         }
+        groupKeys[row] = groupId;
       }
     }
+  }
+
+  private static boolean isNull(@Nullable RoaringBitmap nullBitmap, int row) {
+    return nullBitmap != null && nullBitmap.contains(row);
   }
 
   @Override
@@ -411,6 +354,17 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
             default:
               throw new IllegalArgumentException(
                   "Illegal data type for no-dictionary key generator: " + _storedTypes[i]);
+          }
+        }
+      }
+      if (_nullHandlingEnabled) {
+        // A null row's own value was resolved above and is discarded here. Only the composed key decides a group, so
+        // the id it took in the on-the-fly dictionary goes unused rather than becoming a group of its own.
+        RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+        if (nullBitmap != null && !nullBitmap.isEmpty()) {
+          PeekableIntIterator nullIterator = nullBitmap.getIntIterator();
+          while (nullIterator.hasNext()) {
+            keys[nullIterator.next()][i] = NULL_KEY_COMPONENT;
           }
         }
       }

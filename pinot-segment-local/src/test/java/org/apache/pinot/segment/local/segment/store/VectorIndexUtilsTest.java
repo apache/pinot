@@ -22,6 +22,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
@@ -284,6 +286,16 @@ public class VectorIndexUtilsTest {
     Assert.assertEquals(VectorIndexUtils.storageFormatOf(VectorBackendType.IVF_FLAT), VectorBackendType.IVF_FLAT);
     Assert.assertEquals(VectorIndexUtils.storageFormatOf(VectorBackendType.IVF_PQ), VectorBackendType.IVF_PQ);
     Assert.assertEquals(VectorIndexUtils.storageFormatOf(VectorBackendType.HNSW), VectorBackendType.HNSW);
+  }
+
+  /// A directory that cannot be listed, including one that does not exist or is not there at all, holds no index.
+  @Test
+  public void testUnlistableDirectoryHasNoColumnsWithIndex() {
+    List<String> columns = List.of("colA", "colB");
+    File missingDir = new File(_tempDir, "doesNotExist");
+
+    Assert.assertEquals(VectorIndexUtils.getColumnsWithVectorIndex(missingDir, columns), Set.of());
+    Assert.assertEquals(VectorIndexUtils.getColumnsWithVectorIndex(null, columns), Set.of());
   }
 
   private static VectorBackendType sniff(byte[] payload)

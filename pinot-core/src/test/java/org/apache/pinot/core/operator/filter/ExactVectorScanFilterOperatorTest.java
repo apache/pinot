@@ -27,10 +27,14 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.mockito.Mockito;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 
@@ -56,7 +60,7 @@ public class ExactVectorScanFilterOperatorTest {
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
 
     ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
-        "embedding", numDocs);
+        "embedding", numDocs, null, "vector_index_missing", VectorSearchParams.DEFAULT, null);
 
     // Should return doc 0 (distance=0) and doc 4 (distance=0.02)
     ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
@@ -81,13 +85,139 @@ public class ExactVectorScanFilterOperatorTest {
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 10);
 
     ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
-        "embedding", numDocs);
+        "embedding", numDocs, null, "vector_index_missing", VectorSearchParams.DEFAULT, null);
 
     ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
     Assert.assertEquals(result.getCardinality(), 3);
     Assert.assertTrue(result.contains(0));
     Assert.assertTrue(result.contains(1));
     Assert.assertTrue(result.contains(2));
+  }
+
+  @Test
+  public void testExactSearchOnlyScoresAllowedDocuments() {
+    float[][] vectors = {
+        {1.0f, 0.0f},
+        {1.0f, 0.0f},
+        {0.0f, 1.0f},
+        {0.0f, -1.0f}
+    };
+    ForwardIndexReader<?> mockReader = createMockForwardIndexReader(vectors);
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), new float[]{1.0f, 0.0f}, 2);
+    ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
+        "embedding", 4, createVectorIndexConfig("HNSW", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN),
+        "mutable_vector_index_not_filter_aware", VectorSearchParams.DEFAULT,
+        bitmapOf(2, 3));
+
+    Assert.assertEquals(operator.getBitmaps().reduce(), bitmapOf(2, 3));
+    ForwardIndexReader rawReader = mockReader;
+    verify(rawReader, never()).getFloatMV(Mockito.eq(0), Mockito.any());
+    verify(rawReader, never()).getFloatMV(Mockito.eq(1), Mockito.any());
+    verify(rawReader).getFloatMV(Mockito.eq(2), Mockito.any());
+    verify(rawReader).getFloatMV(Mockito.eq(3), Mockito.any());
+  }
+
+  @Test
+  public void testExactSearchWithEmptyAllowedDocumentsSkipsForwardIndex() {
+    ForwardIndexReader<?> mockReader = mock(ForwardIndexReader.class);
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), new float[]{1.0f, 0.0f}, 2);
+    ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
+        "embedding", 4, null, "vector_index_missing", VectorSearchParams.DEFAULT,
+        new MutableRoaringBitmap());
+
+    Assert.assertTrue(operator.getBitmaps().reduce().isEmpty());
+    verifyNoInteractions(mockReader);
+  }
+
+  @Test
+  public void testExactSearchIgnoresAllowedDocumentsBeyondNumDocs() {
+    ForwardIndexReader<?> mockReader = createMockForwardIndexReader(new float[][]{
+        {1.0f, 0.0f}, {0.5f, 0.5f}, {0.0f, 1.0f}
+    });
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), new float[]{1.0f, 0.0f}, 2);
+    ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
+        "embedding", 3, null, "mandatory_scope", VectorSearchParams.DEFAULT,
+        bitmapOf(2, 99));
+
+    Assert.assertEquals(operator.getBitmaps().reduce(), bitmapOf(2));
+    ForwardIndexReader rawReader = mockReader;
+    verify(rawReader).getFloatMV(Mockito.eq(2), Mockito.any());
+    verify(rawReader, never()).getFloatMV(Mockito.eq(99), Mockito.any());
+  }
+
+  /// topK comes straight from the query literal with no parse-time validation, so a segment falling back to this
+  /// operator must reject non-positive values exactly like the IVF readers do. Otherwise the same query errors on an
+  /// indexed segment and quietly returns nothing here.
+  @Test
+  public void testExactSearchRejectsNonPositiveTopK() {
+    ForwardIndexReader<?> mockReader = mock(ForwardIndexReader.class);
+
+    for (int topK : new int[]{0, -1}) {
+      VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+          ExpressionContext.forIdentifier("embedding"), new float[]{1.0f, 0.0f}, topK);
+      ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
+          "embedding", 4, null, "no_vector_index", VectorSearchParams.DEFAULT, null);
+      IllegalArgumentException exception =
+          Assert.expectThrows(IllegalArgumentException.class, operator::getBitmaps);
+      Assert.assertEquals(exception.getMessage(), "topK must be positive, got: " + topK);
+    }
+    verifyNoInteractions(mockReader);
+  }
+
+  /// Threshold search ignores topK entirely, so it must keep working when topK is not meaningful.
+  @Test
+  public void testExactThresholdSearchIgnoresNonPositiveTopK() {
+    ForwardIndexReader<?> mockReader = createMockForwardIndexReader(new float[][]{
+        {1.0f, 0.0f}, {0.0f, 1.0f}
+    });
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), new float[]{1.0f, 0.0f}, 0);
+    VectorSearchParams searchParams = new VectorSearchParams(null, null, null, 0.5f, null, null, null);
+    ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
+        "embedding", 2, null, "vector_index_missing", searchParams, null);
+
+    Assert.assertEquals(operator.getBitmaps().reduce(), bitmapOf(0));
+  }
+
+  @Test
+  public void testExactSearchTopKLargerThanAllowedCardinality() {
+    ForwardIndexReader<?> mockReader = createMockForwardIndexReader(new float[][]{
+        {1.0f, 0.0f},
+        {0.5f, 0.5f},
+        {0.0f, 1.0f},
+        {0.0f, -1.0f}
+    });
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), new float[]{1.0f, 0.0f}, 10);
+    ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
+        "embedding", 4, null, "vector_index_missing", VectorSearchParams.DEFAULT,
+        bitmapOf(2, 3));
+
+    Assert.assertEquals(operator.getBitmaps().reduce(), bitmapOf(2, 3));
+  }
+
+  @Test
+  public void testExactThresholdSearchOnlyScoresAllowedDocuments() {
+    ForwardIndexReader<?> mockReader = createMockForwardIndexReader(new float[][]{
+        {1.0f, 0.0f},
+        {0.9f, 0.1f},
+        {0.0f, 1.0f},
+        {-1.0f, 0.0f}
+    });
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), new float[]{1.0f, 0.0f}, 10);
+    VectorSearchParams searchParams = new VectorSearchParams(null, null, null, 2.0f, null, null, null);
+    ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
+        "embedding", 4, null, "vector_index_missing", searchParams,
+        bitmapOf(2, 3));
+
+    Assert.assertEquals(operator.getBitmaps().reduce(), bitmapOf(2));
+    ForwardIndexReader rawReader = mockReader;
+    verify(rawReader, never()).getFloatMV(Mockito.eq(0), Mockito.any());
+    verify(rawReader, never()).getFloatMV(Mockito.eq(1), Mockito.any());
   }
 
   @Test
@@ -122,7 +252,7 @@ public class ExactVectorScanFilterOperatorTest {
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
 
     ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
-        "embedding", numDocs);
+        "embedding", numDocs, null, "vector_index_missing", VectorSearchParams.DEFAULT, null);
 
     Assert.assertEquals(operator.getNumMatchingDocs(), 2);
   }
@@ -133,7 +263,7 @@ public class ExactVectorScanFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, new float[]{1.0f}, 1);
     ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
-        "embedding", 1);
+        "embedding", 1, null, "vector_index_missing", VectorSearchParams.DEFAULT, null);
     Assert.assertTrue(operator.canProduceBitmaps());
   }
 
@@ -144,7 +274,7 @@ public class ExactVectorScanFilterOperatorTest {
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, new float[]{1.0f, 2.0f}, 5);
     ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
         "embedding", 1, createVectorIndexConfig("IVF_PQ", VectorIndexConfig.VectorDistanceFunction.COSINE),
-        "ivf_pq_index_unavailable");
+        "ivf_pq_index_unavailable", VectorSearchParams.DEFAULT, null);
     String explain = operator.toExplainString();
     Assert.assertTrue(explain.contains("exact_scan"));
     Assert.assertTrue(explain.contains("embedding"));
@@ -167,7 +297,7 @@ public class ExactVectorScanFilterOperatorTest {
 
     ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
         "embedding", 2, createVectorIndexConfig("IVF_PQ", VectorIndexConfig.VectorDistanceFunction.COSINE),
-        "ivf_pq_index_unavailable");
+        "ivf_pq_index_unavailable", VectorSearchParams.DEFAULT, null);
 
     ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
     Assert.assertEquals(result.getCardinality(), 1);
@@ -188,7 +318,7 @@ public class ExactVectorScanFilterOperatorTest {
 
     ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
         "embedding", 2, createVectorIndexConfig("IVF_PQ", VectorIndexConfig.VectorDistanceFunction.INNER_PRODUCT),
-        "ivf_pq_index_unavailable");
+        "ivf_pq_index_unavailable", VectorSearchParams.DEFAULT, null);
 
     ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
     Assert.assertEquals(result.getCardinality(), 1);
@@ -208,7 +338,7 @@ public class ExactVectorScanFilterOperatorTest {
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 1);
 
     ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
-        "embedding", 2);
+        "embedding", 2, null, "vector_index_missing", VectorSearchParams.DEFAULT, null);
 
     ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
     Assert.assertEquals(result.getCardinality(), 1);
@@ -238,5 +368,11 @@ public class ExactVectorScanFilterOperatorTest {
       VectorIndexConfig.VectorDistanceFunction distanceFunction) {
     return new VectorIndexConfig(false, backendType, 2, 1, distanceFunction,
         Map.of("nlist", "4", "pqM", "2", "pqNbits", "8", "trainSampleSize", "16"));
+  }
+
+  private static MutableRoaringBitmap bitmapOf(int... docIds) {
+    MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+    bitmap.add(docIds);
+    return bitmap;
   }
 }

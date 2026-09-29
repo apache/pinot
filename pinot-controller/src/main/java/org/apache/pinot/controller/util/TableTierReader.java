@@ -80,7 +80,8 @@ public class TableTierReader {
       }
     }
     BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
-    ServerTableTierReader serverTableTierReader = new ServerTableTierReader(_executor, _connectionManager);
+    ServerTableTierReader serverTableTierReader = new ServerTableTierReader(_executor, _connectionManager,
+        _helixResourceManager.getServerAdminAuthProvider());
     Map<String, TableTierInfo> serverToTableTierInfoMap =
         serverTableTierReader.getTableTierInfoFromServers(endpoints, tableNameWithType, segmentName, timeoutMs);
 

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,6 +27,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.BaseDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
+import org.apache.pinot.segment.local.segment.index.datasource.NullDataSource;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
@@ -36,11 +40,12 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/// Per-key {@link DataSource} accessor for sealed OPEN_STRUCT segments. Dense keys get
-/// materialized DataSources; sparse keys get virtual [SparseKeyDataSource]s backed by the
-/// shared blob parser. Manifest-absent keys return null (definitively absent).
+/// Per-key [DataSource] accessor for sealed OPEN_STRUCT segments. Dense keys get materialized DataSources; sparse keys
+/// get virtual [SparseKeyDataSource]s backed by the shared blob parser; keys absent from the segment (no sparse blob,
+/// or not listed in the sparse manifest) resolve to an all-null [NullDataSource].
 public class ImmutableOpenStructDataSource extends BaseDataSource implements OpenStructDataSource {
   private final ComplexFieldSpec _fieldSpec;
   private final Map<String, DataSource> _perKeyDataSources;
@@ -48,18 +53,25 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   private final DataSource _sparseDataSource;
   @Nullable
   private final Set<String> _sparseKeys;
+  /// Sparse keys whose values are collections, mapped to the longest value each one holds. Read from the parent
+  /// column's metadata, where the segment build records it for exactly the keys whose shape is not visible in a
+  /// column of their own.
+  @Nullable
+  private final Map<String, Integer> _sparseMultiValueKeys;
   @Nullable
   private final OpenStructSparseBlobReader _sparseBlobReader;
   private final ConcurrentHashMap<String, DataSource> _sparseKeyDataSourceCache;
 
   public ImmutableOpenStructDataSource(ComplexFieldSpec fieldSpec, Map<String, DataSource> perKeyDataSources,
       @Nullable DataSource sparseDataSource, DataSourceMetadata dataSourceMetadata,
-      ColumnIndexContainer indexContainer, @Nullable List<String> sparseKeys) {
+      ColumnIndexContainer indexContainer, @Nullable List<String> sparseKeys,
+      @Nullable Map<String, Integer> sparseMultiValueKeys) {
     super(dataSourceMetadata, indexContainer);
     _fieldSpec = fieldSpec;
     _perKeyDataSources = perKeyDataSources;
     _sparseDataSource = sparseDataSource;
     _sparseKeys = sparseKeys != null ? Set.copyOf(sparseKeys) : null;
+    _sparseMultiValueKeys = sparseMultiValueKeys != null ? Map.copyOf(sparseMultiValueKeys) : null;
     if (sparseDataSource != null) {
       ForwardIndexReader<?> blobFwd = sparseDataSource.getForwardIndex();
       _sparseBlobReader = blobFwd != null
@@ -80,10 +92,11 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   /// Callers must use [#getDataSource(String)] for per-key access; whole-struct projection
   /// (`SELECT open_struct_col`) is handled by the query layer, not the storage layer.
   public ImmutableOpenStructDataSource(ComplexFieldSpec fieldSpec, Map<String, DataSource> perKeyDataSources,
-      @Nullable DataSource sparseDataSource, int numDocs, @Nullable List<String> sparseKeys) {
+      @Nullable DataSource sparseDataSource, int numDocs, @Nullable List<String> sparseKeys,
+      @Nullable Map<String, Integer> sparseMultiValueKeys) {
     this(fieldSpec, perKeyDataSources, sparseDataSource,
         new ImmutableOpenStructDataSourceMetadata(fieldSpec, numDocs),
-        new ColumnIndexContainer.FromMap.Builder().build(), sparseKeys);
+        new ColumnIndexContainer.FromMap.Builder().build(), sparseKeys, sparseMultiValueKeys);
   }
 
   @Override
@@ -92,27 +105,43 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   }
 
   @Override
-  @Nullable
   public DataSource getDataSource(String key) {
     DataSource ds = _perKeyDataSources.get(key);
     if (ds != null) {
       return ds;
     }
-    if (_sparseBlobReader == null) {
-      return null;
+    if (_sparseBlobReader == null || (_sparseKeys != null && !_sparseKeys.contains(key))) {
+      // Definitively absent: no sparse blob, or the sparse manifest does not list the key
+      return new NullDataSource(getValueFieldSpec(key), getDataSourceMetadata().getNumDocs());
     }
-    if (_sparseKeys != null && !_sparseKeys.contains(key)) {
-      return null;
-    }
-    return _sparseKeyDataSourceCache.computeIfAbsent(key, this::buildSparseKeyDataSource);
+    return _sparseKeyDataSourceCache.computeIfAbsent(key,
+        k -> new SparseKeyDataSource(getValueFieldSpec(k), _sparseBlobReader, maxNumValues(k)));
   }
 
-  private DataSource buildSparseKeyDataSource(String key) {
-    FieldSpec childSpec = _fieldSpec.getChildFieldSpec(key);
-    if (childSpec == null) {
-      childSpec = new DimensionFieldSpec(key, FieldSpec.DataType.STRING, true);
+  /// Field spec for a key's values, with an undeclared sparse key's shape taken from the segment's sparse
+  /// multi-value manifest. Which tier a key lands on is a tuning decision, so it must not decide the key's
+  /// shape: without this, the same rows would report `STRING[]` on a segment that materialized the key and a
+  /// scalar `STRING` holding `["a","b"]` on one that put it in the blob, and a query fanning out over both
+  /// would see two shapes for one column.
+  @Override
+  public FieldSpec getValueFieldSpec(String key) {
+    FieldSpec childFieldSpec = _fieldSpec.getChildFieldSpec(key);
+    if (childFieldSpec != null) {
+      return childFieldSpec;
     }
-    return new SparseKeyDataSource(childSpec, _sparseBlobReader);
+    boolean singleValue = _sparseMultiValueKeys == null || !_sparseMultiValueKeys.containsKey(key);
+    return new DimensionFieldSpec(key, FieldSpec.DataType.STRING, singleValue);
+  }
+
+  /// Longest value a multi-value sparse key holds, which is what the readers over it size their buffers from.
+  /// Zero for a single-value key, as [DataSourceMetadata#getMaxNumValuesPerMVEntry()] reports for one.
+  private int maxNumValues(String key) {
+    FieldSpec valueFieldSpec = getValueFieldSpec(key);
+    if (valueFieldSpec.isSingleValueField()) {
+      return 0;
+    }
+    // A declared multi-value key has no manifest entry when every one of its values was a scalar.
+    return _sparseMultiValueKeys != null ? _sparseMultiValueKeys.getOrDefault(key, 1) : 1;
   }
 
   @Override
@@ -133,10 +162,8 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   }
 
   @Override
-  @Nullable
   public DataSourceMetadata getDataSourceMetadata(String key) {
-    DataSource ds = getDataSource(key);
-    return ds != null ? ds.getDataSourceMetadata() : null;
+    return getDataSource(key).getDataSourceMetadata();
   }
 
   @Override
@@ -150,6 +177,125 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   @Nullable
   public JsonIndexReader getSparseJsonIndex() {
     return _sparseDataSource != null ? _sparseDataSource.getJsonIndex() : null;
+  }
+
+  @Nullable
+  @Override
+  public Map<String, Object> getMapValue(int docId) {
+    try (MapValueReader reader = openMapValueReader()) {
+      return reader.getMapValue(docId);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to close OPEN_STRUCT map value reader", e);
+    }
+  }
+
+  @Override
+  public MapValueReader openMapValueReader() {
+    return new CachingMapValueReader();
+  }
+
+  /// Caches one [PinotSegmentColumnReader] per key for the life of the reader, instead of
+  /// constructing one per call the way an unscoped [#getMapValue(int)] would. For a raw,
+  /// chunk-compressed column (e.g. the sparse blob), a fresh reader per doc means a fresh
+  /// decompression buffer and, depending on access order, redundant re-decompression of the same
+  /// chunk; reusing the reader across a sequential scan lets it carry its decoded-chunk state
+  /// forward. Not thread-safe — for one single-threaded scan only, per
+  /// [OpenStructDataSource#openMapValueReader()].
+  private final class CachingMapValueReader implements MapValueReader {
+    private final Map<String, PinotSegmentColumnReader> _readers = new HashMap<>();
+    // Kept out of _readers: a child key that happens to match the parent field name would otherwise share the
+    // same map entry as the sparse blob reader, silently shadowing it.
+    @Nullable
+    private final PinotSegmentColumnReader _sparseReader;
+
+    CachingMapValueReader() {
+      _sparseReader = _sparseDataSource != null ? createReader(_fieldSpec.getName(), _sparseDataSource) : null;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    @Override
+    public Map<String, Object> getMapValue(int docId) {
+      Map<String, Object> result = null;
+
+      for (Map.Entry<String, DataSource> entry : _perKeyDataSources.entrySet()) {
+        Object value = readValue(entry.getKey(), entry.getValue(), docId);
+        if (value != null) {
+          if (result == null) {
+            result = new HashMap<>();
+          }
+          result.put(entry.getKey(), value);
+        }
+      }
+
+      if (_sparseReader != null) {
+        Object sparseValue = readValue(_sparseReader, docId);
+        if (sparseValue instanceof String json && !json.isEmpty()) {
+          try {
+            Map<String, Object> sparseMap = JsonUtils.stringToObject(json, Map.class);
+            if (result == null) {
+              result = new HashMap<>();
+            }
+            result.putAll(sparseMap);
+          } catch (IOException e) {
+            throw new RuntimeException("Failed to parse sparse JSON at docId " + docId, e);
+          }
+        }
+      }
+
+      return result;
+    }
+
+    @Nullable
+    private Object readValue(String key, DataSource dataSource, int docId) {
+      return readValue(_readers.computeIfAbsent(key, k -> createReader(k, dataSource)), docId);
+    }
+
+    @Nullable
+    private Object readValue(@Nullable PinotSegmentColumnReader reader, int docId) {
+      return reader == null ? null : reader.isNull(docId) ? null : reader.getValue(docId);
+    }
+
+    @Nullable
+    private PinotSegmentColumnReader createReader(String key, DataSource dataSource) {
+      ForwardIndexReader<?> fwdReader = dataSource.getForwardIndex();
+      if (fwdReader == null) {
+        return null;
+      }
+      return new PinotSegmentColumnReader(key, fwdReader, dataSource.getDictionary(),
+          dataSource.getNullValueVector(), 0);
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      IOException firstException = null;
+      for (PinotSegmentColumnReader reader : _readers.values()) {
+        firstException = closeQuietly(reader, firstException);
+      }
+      if (_sparseReader != null) {
+        firstException = closeQuietly(_sparseReader, firstException);
+      }
+      if (firstException != null) {
+        throw firstException;
+      }
+    }
+
+    // Closes every reader even when an earlier one throws, instead of leaking the rest; extra failures are
+    // attached as suppressed on the first exception, mirroring try-with-resources semantics.
+    @Nullable
+    private static IOException closeQuietly(PinotSegmentColumnReader reader, @Nullable IOException firstException) {
+      try {
+        reader.close();
+        return firstException;
+      } catch (IOException e) {
+        if (firstException == null) {
+          return e;
+        }
+        firstException.addSuppressed(e);
+        return firstException;
+      }
+    }
   }
 
   private static class ImmutableOpenStructDataSourceMetadata implements DataSourceMetadata {

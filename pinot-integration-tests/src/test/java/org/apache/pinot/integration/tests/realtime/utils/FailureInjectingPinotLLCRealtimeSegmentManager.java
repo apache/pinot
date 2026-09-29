@@ -19,56 +19,58 @@
 package org.apache.pinot.integration.tests.realtime.utils;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.HashMap;
+import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.util.FailureInjectionUtils;
-import org.apache.zookeeper.data.Stat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class FailureInjectingPinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   private final Map<String, String> _failureConfig;
-  private long _maxSegmentCompletionTimeoutMs = 300000L;
-  private static final Logger LOGGER = LoggerFactory.getLogger(FailureInjectingPinotLLCRealtimeSegmentManager.class);
+  private final Set<String> _forceExpiredSegments = ConcurrentHashMap.newKeySet();
 
   public FailureInjectingPinotLLCRealtimeSegmentManager(PinotHelixResourceManager helixResourceManager,
       ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
     super(helixResourceManager, controllerConf, controllerMetrics);
-    _failureConfig = new HashMap<>();
+    _failureConfig = new ConcurrentHashMap<>();
   }
 
+  /// Treats force-expired segments as exceeding the max segment completion time regardless of how recently their
+  /// segment ZK metadata was updated. This makes them immediately eligible for repair while keeping their in-flight
+  /// commit attempts rejected, without shortening the completion time for any other segment.
   @Override
   protected boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName,
       long currentTimeMs) {
-    Stat stat = new Stat();
-    getSegmentZKMetadata(realtimeTableName, segmentName, stat);
-    if (currentTimeMs > stat.getMtime() + _maxSegmentCompletionTimeoutMs) {
-      LOGGER.info("Segment: {} exceeds the max completion time: {}ms, metadata update time: {}, current time: {}",
-          segmentName, _maxSegmentCompletionTimeoutMs, stat.getMtime(), currentTimeMs);
-      return true;
-    } else {
-      return false;
-    }
+    return _forceExpiredSegments.contains(segmentName)
+        || super.isExceededMaxSegmentCompletionTime(realtimeTableName, segmentName, currentTimeMs);
   }
 
-  public void setMaxSegmentCompletionTimeoutMs(long maxSegmentCompletionTimeoutMs) {
-    _maxSegmentCompletionTimeoutMs = maxSegmentCompletionTimeoutMs;
+  public void forceExpireSegments(Collection<String> segmentNames) {
+    _forceExpiredSegments.addAll(segmentNames);
+  }
+
+  public void clearForceExpiredSegments() {
+    _forceExpiredSegments.clear();
   }
 
   @VisibleForTesting
   public void enableTestFault(String faultType) {
-    _failureConfig.put(faultType, "true");
+    if (faultType != null) {
+      _failureConfig.put(faultType, "true");
+    }
   }
 
   @VisibleForTesting
   public void disableTestFault(String faultType) {
-    _failureConfig.remove(faultType);
+    if (faultType != null) {
+      _failureConfig.remove(faultType);
+    }
   }
 
   @Override

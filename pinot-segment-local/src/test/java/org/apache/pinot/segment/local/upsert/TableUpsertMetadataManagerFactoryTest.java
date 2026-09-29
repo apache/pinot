@@ -39,6 +39,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class TableUpsertMetadataManagerFactoryTest {
@@ -70,6 +71,24 @@ public class TableUpsertMetadataManagerFactoryTest {
     assertTrue(tableUpsertMetadataManager instanceof ConcurrentMapTableUpsertMetadataManager);
     assertTrue(tableUpsertMetadataManager.getOrCreatePartitionManager(0)
         instanceof ConcurrentMapPartitionUpsertMetadataManager);
+  }
+
+  @Test
+  public void testCreateFailsWithoutComparisonColumnOrTimeColumn() {
+    // An upsert table with neither a configured comparison column nor a time column has no way to resolve a comparison
+    // column, so init() must fail fast rather than fall back to an implicit value.
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(RAW_TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .build();
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(tableDataManager.getTableDataDir()).thenReturn(new File(RAW_TABLE_NAME));
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> TableUpsertMetadataManagerFactory.create(new PinotConfiguration(), tableConfig, SCHEMA, tableDataManager,
+            null));
+    assertTrue(e.getMessage().contains("must have a comparison column or a time column configured"),
+        "Unexpected message: " + e.getMessage());
   }
 
   @Test

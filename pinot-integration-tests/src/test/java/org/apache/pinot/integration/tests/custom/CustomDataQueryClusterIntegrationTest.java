@@ -140,7 +140,7 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
     if (isRealtimeTable()) {
       // In suite mode multiple realtime tests use different topics, so make sure
       // this class-specific topic exists before the controller validates stream metadata.
-      _sharedClusterTestSuite.createKafkaTopic(getKafkaTopic());
+      _sharedClusterTestSuite.createKafkaTopic(getKafkaTopic(), getNumKafkaPartitions());
       waitForKafkaTopicMetadataReadyForConsumer(getKafkaTopic(), getNumKafkaPartitions());
 
       // create realtime table

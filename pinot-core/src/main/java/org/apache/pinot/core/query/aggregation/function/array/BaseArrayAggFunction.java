@@ -18,23 +18,26 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
+import java.nio.ByteBuffer;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.function.NullableSingleInputAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public abstract class BaseArrayAggFunction<I, F extends Comparable>
-    extends NullableSingleInputAggregationFunction<I, F> {
+public abstract class BaseArrayAggFunction<I, F extends Comparable> extends BaseSingleInputAggregationFunction<I, F> {
 
   private final DataSchema.ColumnDataType _resultColumnType;
 
-  public BaseArrayAggFunction(ExpressionContext expression, FieldSpec.DataType dataType, boolean nullHandlingEnabled) {
+  public BaseArrayAggFunction(ExpressionContext expression, DataType dataType, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
     _resultColumnType = DataSchema.ColumnDataType.fromDataTypeMV(dataType);
   }
@@ -42,6 +45,28 @@ public abstract class BaseArrayAggFunction<I, F extends Comparable>
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.ARRAYAGG;
+  }
+
+  /// The star-tree index stores an arrayAgg cell as a serialized distinct set. Only the distinct variant is
+  /// associative under merge (set-union), so only distinct arrayAgg can be served from a star-tree. Non-distinct
+  /// variants keep the default `false` and fall back to the raw scan. See [ArrayAggDistinctValueAggregator].
+  @Override
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    return false;
+  }
+
+  /// Returns a [ByteBuffer] positioned at the payload of a star-tree pre-aggregated arrayAgg cell, after validating
+  /// the leading element-type tag matches `expectedElementType`. The payload that follows is byte-for-byte identical
+  /// to the corresponding `ObjectSerDeUtils.*_SET_SER_DE` format, so callers deserialize it with the matching set
+  /// SerDe's `deserialize(ByteBuffer)` overload. See [ArrayAggDistinctValueAggregator] for the writer.
+  protected static ByteBuffer starTreeSetPayload(byte[] cell, ElementType expectedElementType) {
+    ByteBuffer buffer = ByteBuffer.wrap(cell);
+    ElementType elementType = ElementType.fromTag(buffer.get());
+    if (elementType != expectedElementType) {
+      throw new IllegalStateException(
+          "Star-tree arrayAgg cell element type " + elementType + " does not match expected " + expectedElementType);
+    }
+    return buffer;
   }
 
   @Override
@@ -64,11 +89,13 @@ public abstract class BaseArrayAggFunction<I, F extends Comparable>
     return _resultColumnType;
   }
 
+  @Nullable
   @Override
   public I extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public I extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
