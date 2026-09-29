@@ -26,8 +26,15 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.calcite.avatica.util.ByteString;
+import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptPredicateList;
 import org.apache.calcite.plan.Strong;
+import org.apache.calcite.plan.hep.HepPlanner;
+import org.apache.calcite.plan.hep.HepProgram;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Filter;
+import org.apache.calcite.rel.logical.LogicalFilter;
+import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
@@ -189,6 +196,32 @@ public class SearchSealerTest {
       }
       assertEquals(RexExpressionUtils.fromRexNode(withLiteral), RexExpressionUtils.fromRexNode(searchWithLiteral));
     }
+  }
+
+  /// Many comparisons of one operand fold into a Sarg, which is then sealed. Comparisons of different operands cannot
+  /// fold into one Sarg, so a filter with many of them is left as it is.
+  @Test
+  public void testFoldsOnlyComparisonsOfOneOperand() {
+    RelOptCluster cluster = RelOptCluster.create(new HepPlanner(HepProgram.builder().build()), REX_BUILDER);
+    RelDataType intType = TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER);
+    RelNode values = LogicalValues.createEmpty(cluster, TYPE_FACTORY.builder().add("x", intType).build());
+    RexNode x = REX_BUILDER.makeInputRef(values, 0);
+    List<RexNode> sameOperand = new ArrayList<>();
+    List<RexNode> differentOperands = new ArrayList<>();
+    for (int i = 1; i <= 25; i++) {
+      RexNode literal = REX_BUILDER.makeExactLiteral(BigDecimal.valueOf(i), intType);
+      sameOperand.add(REX_BUILDER.makeCall(SqlStdOperatorTable.NOT_EQUALS, x, literal));
+      differentOperands.add(REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS,
+          REX_BUILDER.makeCall(SqlStdOperatorTable.PLUS, x, literal), literal));
+    }
+    RelNode list = LogicalFilter.create(values, REX_BUILDER.makeCall(SqlStdOperatorTable.AND, sameOperand));
+    String sealedCondition = ((Filter) new SearchSealer(20).seal(list)).getCondition().toString();
+    assertTrue(sealedCondition.startsWith(PinotSealedSearchOperator.NAME_PREFIX), sealedCondition);
+
+    // Simplification would remove the repeated term, so the filter only stays the same if it is not simplified.
+    differentOperands.add(differentOperands.get(0));
+    RelNode wide = LogicalFilter.create(values, REX_BUILDER.makeCall(SqlStdOperatorTable.AND, differentOperands));
+    assertSame(new SearchSealer(20).seal(wide), wide);
   }
 
   private static RexCall copy(RexCall search) {

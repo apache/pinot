@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
@@ -79,6 +80,11 @@ public class SealedInListPlanningTest extends QueryEnvironmentTestBase {
   private static final String BOOLEANS = IntStream.range(0, 24).mapToObj(i -> i % 2 == 0 ? "TRUE" : "FALSE")
       .collect(Collectors.joining(", "));
   private static final String OR_CHAIN = IntStream.range(0, NUM_VALUES).mapToObj(i -> "col3 = " + (i * 7 + 3))
+      .collect(Collectors.joining(" OR "));
+  /// Comparisons of many different operands, which cannot fold into one Sarg.
+  private static final String WIDE_AND = IntStream.range(1, 25).mapToObj(i -> "col3 + " + i + " = " + i * 7)
+      .collect(Collectors.joining(" AND "));
+  private static final String WIDE_OR = IntStream.range(1, 25).mapToObj(i -> "col6 + " + i + " = " + i * 7)
       .collect(Collectors.joining(" OR "));
 
   /// The same tables with column-based null handling, so that their columns are nullable.
@@ -177,7 +183,12 @@ public class SealedInListPlanningTest extends QueryEnvironmentTestBase {
         "SELECT a.col1, COUNT(*) FROM a JOIN b ON a.col1 = b.col1 WHERE b.col3 IN (" + INTS + ") GROUP BY a.col1",
         // Other types.
         "SELECT col1 FROM a WHERE ts_timestamp IN (" + TIMESTAMPS + ")",
-        "SELECT col1 FROM a WHERE col5 IN (" + BOOLEANS + ")"
+        "SELECT col1 FROM a WHERE col5 IN (" + BOOLEANS + ")",
+        // Many comparisons of different operands, without an IN list.
+        "SELECT col1 FROM a WHERE " + WIDE_AND,
+        "SELECT col1 FROM a WHERE " + WIDE_OR,
+        "SELECT a.col1 FROM a JOIN b ON a.col1 = b.col1 AND (" + WIDE_OR.replace("col6", "b.col6") + ")",
+        "SELECT col1 FROM a WHERE col3 IN (" + INTS + ") AND " + WIDE_AND
     );
     List<Object[]> cases = new ArrayList<>();
     for (String query : queries) {
@@ -420,7 +431,8 @@ public class SealedInListPlanningTest extends QueryEnvironmentTestBase {
         .build());
   }
 
-  /// Never fires; fails when it is offered a node with an unsealed large Sarg or a large AND/OR of comparisons.
+  /// Never fires; fails when it is offered a node with an unsealed large Sarg, or with an AND/OR of many comparisons of
+  /// one operand to literals.
   private static final class LargeSargGuardRule extends RelOptRule {
     LargeSargGuardRule(String description) {
       // Deprecated operand API, like the other Pinot rules that match any node: this rule never transforms.
@@ -437,10 +449,14 @@ public class SealedInListPlanningTest extends QueryEnvironmentTestBase {
           if (rexCall.getKind() == SqlKind.SEARCH) {
             size = ((RexLiteral) rexCall.getOperands().get(1)).getValueAs(Sarg.class).rangeSet.asRanges().size();
           } else if (rexCall.getKind() == SqlKind.AND || rexCall.getKind() == SqlKind.OR) {
-            size = (int) rexCall.getOperands().stream()
-                .filter(o -> o.isA(SqlKind.COMPARISON) && ((RexCall) o).getOperands().stream()
-                    .anyMatch(RexLiteral.class::isInstance))
-                .count();
+            // Only comparisons of one operand can fold into one Sarg.
+            Map<RexNode, Integer> comparisons = new HashMap<>();
+            for (RexNode operand : rexCall.getOperands()) {
+              RexNode compared = comparedToLiteral(operand);
+              if (compared != null) {
+                size = Math.max(size, comparisons.merge(compared, 1, Integer::sum));
+              }
+            }
           }
           if (size >= GUARD_THRESHOLD) {
             throw new AssertionError(description + " was offered " + rexCall.getKind() + " of size " + size + " in "
@@ -454,6 +470,21 @@ public class SealedInListPlanningTest extends QueryEnvironmentTestBase {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
+    }
+
+    @Nullable
+    private static RexNode comparedToLiteral(RexNode node) {
+      if (!node.isA(SqlKind.COMPARISON)) {
+        return null;
+      }
+      List<RexNode> operands = ((RexCall) node).getOperands();
+      if (operands.size() != 2) {
+        return null;
+      }
+      if (operands.get(1) instanceof RexLiteral) {
+        return operands.get(0);
+      }
+      return operands.get(0) instanceof RexLiteral ? operands.get(1) : null;
     }
   }
 }

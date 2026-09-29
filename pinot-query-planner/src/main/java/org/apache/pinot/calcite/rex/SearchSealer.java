@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptPredicateList;
 import org.apache.calcite.rel.RelHomogeneousShuttle;
 import org.apache.calcite.rel.RelNode;
@@ -266,8 +267,8 @@ public final class SearchSealer {
   }
 
   /// Returns whether a condition has a `SEARCH` that is large enough to seal, or an AND or OR with so many comparisons
-  /// to literals that Calcite could fold them into such a Sarg. An AND of `x <> v` comparisons folds into `n + 1`
-  /// ranges.
+  /// of one operand to literals that Calcite could fold them into such a Sarg. An AND of `x <> v` comparisons folds
+  /// into `n + 1` ranges. Comparisons of different operands cannot fold into one Sarg, so they are counted apart.
   private boolean hasLargeList(RexNode condition) {
     int minComparisons = Math.max(_threshold - 1, 2);
     return Boolean.TRUE.equals(condition.accept(new RexVisitorImpl<Boolean>(true) {
@@ -281,9 +282,10 @@ public final class SearchSealer {
           }
         }
         if ((kind == SqlKind.AND || kind == SqlKind.OR) && call.getOperands().size() >= minComparisons) {
-          int comparisons = 0;
+          Map<RexNode, Integer> comparisons = new HashMap<>();
           for (RexNode operand : call.getOperands()) {
-            if (isLiteralComparison(operand) && ++comparisons >= minComparisons) {
+            RexNode compared = comparedToLiteral(operand);
+            if (compared != null && comparisons.merge(compared, 1, Integer::sum) >= minComparisons) {
               return true;
             }
           }
@@ -298,12 +300,20 @@ public final class SearchSealer {
     }));
   }
 
-  private static boolean isLiteralComparison(RexNode node) {
+  /// Returns the operand that a comparison to a literal compares, or null if the node is not such a comparison.
+  @Nullable
+  private static RexNode comparedToLiteral(RexNode node) {
     if (!node.isA(SqlKind.COMPARISON) || !(node instanceof RexCall)) {
-      return false;
+      return null;
     }
     List<RexNode> operands = ((RexCall) node).getOperands();
-    return operands.size() == 2 && (operands.get(0) instanceof RexLiteral || operands.get(1) instanceof RexLiteral);
+    if (operands.size() != 2) {
+      return null;
+    }
+    if (operands.get(1) instanceof RexLiteral) {
+      return operands.get(0);
+    }
+    return operands.get(0) instanceof RexLiteral ? operands.get(1) : null;
   }
 
   /// Simplifies a filter or join condition like `RelBuilder#filter` does. Unlike `RexSimplify#simplifyUnknownAsFalse`,
