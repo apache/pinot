@@ -90,7 +90,7 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   void takeSnapshot();
 
   /// Takes a snapshot with the triggering consumer's startup context. Older implementations may ignore the context.
-  default void takeSnapshot(String consumingSegmentName, String startOffset) {
+  default void takeSnapshot(String consumingSegmentName, String consumedUpToOffset) {
     takeSnapshot();
   }
 
