@@ -127,18 +127,15 @@ public class DimensionTableDataManagerTest {
 
   @AfterMethod(alwaysRun = true)
   public void tearDownMethod() {
-    // DimensionTableDataManager is a process-wide singleton keyed by table name (see the static
-    // INSTANCES map in DimensionTableDataManager). Every test method loads the same
-    // dimBaseballTeams_OFFLINE table, so without an explicit teardown the singleton (and its
-    // property-store mock, loaded segments, and reload executor) leaks from one method into the
-    // next. A stale async reload from a prior method could then read a _propertyStore that a
-    // concurrent init() had swapped out, surfacing as an intermittent
-    // "Failed to find schema for table: dimBaseballTeams_OFFLINE". Shutting the singleton down
-    // removes it from INSTANCES so each method starts from a clean, freshly-initialized instance.
-    DimensionTableDataManager tableDataManager =
-        DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME);
-    if (tableDataManager != null) {
+    // Initialized managers stay in the process-wide registry (the static INSTANCES map in DimensionTableDataManager)
+    // until they shut down. Every test method loads the same dimBaseballTeams_OFFLINE table, so shut down all of them;
+    // otherwise a manager left over from a prior method (with its loaded segments and reload executor) would keep
+    // serving lookups for the table in the next one.
+    DimensionTableDataManager tableDataManager;
+    while ((tableDataManager = DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME)) != null) {
       tableDataManager.shutDown();
+      assertNotSame(DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME), tableDataManager,
+          "Manager should be deregistered once it shuts down");
     }
   }
 
@@ -181,6 +178,18 @@ public class DimensionTableDataManagerTest {
   private DimensionTableDataManager makeTableDataManager(TableConfig tableConfig, Schema schema,
       ZkHelixPropertyStore<ZNRecord> propertyStoreMock)
       throws JsonProcessingException {
+    return makeTableDataManager(tableConfig, schema, propertyStoreMock, TEMP_DIR);
+  }
+
+  /// Creates the manager a server with the given instance data directory would create for the table.
+  private DimensionTableDataManager makeTableDataManager(TableConfig tableConfig, Schema schema, File instanceDataDir)
+      throws JsonProcessingException {
+    return makeTableDataManager(tableConfig, schema, mock(ZkHelixPropertyStore.class), instanceDataDir);
+  }
+
+  private DimensionTableDataManager makeTableDataManager(TableConfig tableConfig, Schema schema,
+      ZkHelixPropertyStore<ZNRecord> propertyStoreMock, File instanceDataDir)
+      throws JsonProcessingException {
     HelixManager helixManager = mock(HelixManager.class);
     when(propertyStoreMock.get("/CONFIGS/TABLE/dimBaseballTeams_OFFLINE", null, AccessOption.PERSISTENT)).thenReturn(
         TableConfigSerDeUtils.toZNRecord(tableConfig));
@@ -188,7 +197,7 @@ public class DimensionTableDataManagerTest {
         SchemaSerDeUtils.toZNRecord(schema));
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStoreMock);
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
-    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
+    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(instanceDataDir.getAbsolutePath());
     DimensionTableDataManager tableDataManager =
         DimensionTableDataManager.createInstanceByTableName(OFFLINE_TABLE_NAME);
     tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, schema,
@@ -395,6 +404,84 @@ public class DimensionTableDataManagerTest {
     tableDataManager.shutDown();
 
     Assert.assertNull(DimensionTableDataManager.getInstanceByTableName(tableDataManager.getTableName()));
+  }
+
+  /// A manager becomes visible to lookups only once its initialization succeeds.
+  @Test
+  public void testFailedInitDoesNotRegisterManager() {
+    Schema schemaWithoutPrimaryKey = new Schema.SchemaBuilder()
+        .setSchemaName("dimBaseballTeams")
+        .addSingleValueDimension("teamID", DataType.STRING)
+        .addSingleValueDimension("teamName", DataType.STRING)
+        .build();
+    TableConfig tableConfig = getTableConfig(false, false);
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> makeTableDataManager(tableConfig, schemaWithoutPrimaryKey, new File(TEMP_DIR, "server0")));
+    assertTrue(exception.getMessage().contains("Primary key columns must be configured"), exception.getMessage());
+    assertNull(DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME));
+  }
+
+  /// Quickstarts run several servers in one JVM, and each server handles the ONLINE transition of the dimension table
+  /// segment on its own. A server that creates its manager after another server has loaded the segment must not
+  /// reset the lookup table the other server loaded.
+  @Test
+  public void testServerCreatingManagerAfterAnotherServerLoadedSegment()
+      throws Exception {
+    TableConfig tableConfig = getTableConfig(false, false);
+    Schema schema = getSchema();
+    PrimaryKey key = new PrimaryKey(new String[]{"SF"});
+
+    DimensionTableDataManager firstServerManager =
+        makeTableDataManager(tableConfig, schema, new File(TEMP_DIR, "server0"));
+    firstServerManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER));
+    assertTrue(firstServerManager.isPopulated());
+
+    DimensionTableDataManager secondServerManager =
+        makeTableDataManager(tableConfig, schema, new File(TEMP_DIR, "server1"));
+    DimensionTableDataManager lookupManager = DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME);
+    assertNotNull(lookupManager);
+    assertTrue(lookupManager.isPopulated(), "Lookups should still resolve to a populated manager");
+    assertEquals(lookupManager.lookupValue(key, "teamName"), "San Francisco Giants");
+
+    // The second server has its own manager, so it loads the segment itself instead of finding the first server's copy
+    assertNotSame(secondServerManager, firstServerManager);
+    assertFalse(secondServerManager.hasSegment(_segmentZKMetadata.getSegmentName()));
+    assertFalse(secondServerManager.isPopulated());
+    secondServerManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER));
+    assertTrue(secondServerManager.isPopulated());
+
+    // Shutting down one server's manager keeps the other one registered
+    firstServerManager.shutDown();
+    assertSame(DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME), secondServerManager);
+    assertEquals(secondServerManager.lookupValue(key, "teamName"), "San Francisco Giants");
+    secondServerManager.shutDown();
+    assertNull(DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME));
+  }
+
+  /// When several servers in one JVM host the table, lookups resolve to a manager that has loaded its lookup table,
+  /// regardless of which server registered its manager first.
+  @Test
+  public void testLookupPrefersPopulatedManager()
+      throws Exception {
+    TableConfig tableConfig = getTableConfig(false, false);
+    Schema schema = getSchema();
+    DimensionTableDataManager firstServerManager =
+        makeTableDataManager(tableConfig, schema, new File(TEMP_DIR, "server0"));
+    DimensionTableDataManager secondServerManager =
+        makeTableDataManager(tableConfig, schema, new File(TEMP_DIR, "server1"));
+    assertNotSame(secondServerManager, firstServerManager);
+    // Neither manager is populated, so the first registered one is returned
+    assertSame(DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME), firstServerManager);
+
+    secondServerManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER));
+    assertSame(DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME), secondServerManager);
+
+    firstServerManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER));
+    assertSame(DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME), firstServerManager);
   }
 
   @Test

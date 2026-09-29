@@ -54,13 +54,16 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 /// loads the contents into a HashMap for faster access thus the size should be small
 /// enough to easily fit in memory.
 ///
-/// DimensionTableDataManager uses Registry of Singletons pattern to store one instance per table
-/// which can be accessed via [#getInstanceByTableName] static method.
+/// Lookups find the manager through the static [#getInstanceByTableName] registry. A manager is registered once
+/// [#init] succeeds and deregistered when it shuts down. A production server runs in its own JVM, so the registry
+/// holds one manager per table. Quickstarts and multi-server tests run several servers in one JVM, and then it holds
+/// one manager per server hosting the table.
 @ThreadSafe
 public class DimensionTableDataManager extends OfflineTableDataManager {
 
-  // Storing singletons per table in a map
-  private static final Map<String, DimensionTableDataManager> INSTANCES = new ConcurrentHashMap<>();
+  /// Initialized managers per table, in registration order. Each list is immutable and replaced atomically, so lookups
+  /// read it without locking.
+  private static final Map<String, List<DimensionTableDataManager>> INSTANCES = new ConcurrentHashMap<>();
   public static final Hash.Strategy<Object[]> HASH_STRATEGY = new Hash.Strategy<>() {
     @Override
     public int hashCode(Object[] o) {
@@ -78,19 +81,65 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
   /// `createInstanceByTableName` should only be used by the
   /// [org.apache.pinot.core.data.manager.provider.TableDataManagerProvider] and the returned instance should
-  /// be properly initialized via [#init] method before using.
+  /// be properly initialized via [#init] method before using. The instance is registered for lookups under the table
+  /// name from the table config once [#init] succeeds, so `tableNameWithType` is unused and only kept for existing
+  /// callers.
+  ///
+  /// Always returns a new instance, even when this JVM already has one for the table. Servers sharing a JVM must not
+  /// share a manager, because [#init] binds it to one server's data directory and Helix manager and resets its lookup
+  /// table, and the shared segment map would make the other server skip the segment load that repopulates it.
   public static DimensionTableDataManager createInstanceByTableName(String tableNameWithType) {
-    return INSTANCES.computeIfAbsent(tableNameWithType, k -> new DimensionTableDataManager());
+    return new DimensionTableDataManager();
   }
 
+  /// Registers the instance only if the table has no registered manager yet, and returns the registered manager.
   @VisibleForTesting
   public static DimensionTableDataManager registerDimensionTable(String tableNameWithType,
       DimensionTableDataManager instance) {
-    return INSTANCES.computeIfAbsent(tableNameWithType, k -> instance);
+    return INSTANCES.computeIfAbsent(tableNameWithType, k -> List.of(instance)).get(0);
   }
 
+  /// Returns a manager of the given table, or `null` if none is initialized. When several servers in this JVM host
+  /// the table, each has its own manager for the same segments, and one that has loaded its lookup table is
+  /// preferred.
+  @Nullable
   public static DimensionTableDataManager getInstanceByTableName(String tableNameWithType) {
-    return INSTANCES.get(tableNameWithType);
+    List<DimensionTableDataManager> instances = INSTANCES.get(tableNameWithType);
+    if (instances == null) {
+      return null;
+    }
+    if (instances.size() > 1) {
+      for (DimensionTableDataManager instance : instances) {
+        if (instance.isPopulated()) {
+          return instance;
+        }
+      }
+    }
+    return instances.get(0);
+  }
+
+  private static void register(String tableNameWithType, DimensionTableDataManager instance) {
+    INSTANCES.compute(tableNameWithType, (k, instances) -> {
+      if (instances == null) {
+        return List.of(instance);
+      }
+      List<DimensionTableDataManager> newInstances = new ArrayList<>(instances.size() + 1);
+      newInstances.addAll(instances);
+      newInstances.add(instance);
+      return List.copyOf(newInstances);
+    });
+  }
+
+  private static void deregister(String tableNameWithType, DimensionTableDataManager instance) {
+    INSTANCES.computeIfPresent(tableNameWithType, (k, instances) -> {
+      List<DimensionTableDataManager> remainingInstances = new ArrayList<>(instances.size());
+      for (DimensionTableDataManager existingInstance : instances) {
+        if (existingInstance != instance) {
+          remainingInstances.add(existingInstance);
+        }
+      }
+      return remainingInstances.isEmpty() ? null : List.copyOf(remainingInstances);
+    });
   }
 
   private final AtomicReference<DimensionTable> _dimensionTable = new AtomicReference<>();
@@ -136,6 +185,9 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
       _dimensionTable.set(new FastLookupDimensionTable(schema, primaryKeyColumns, valueColumns, lookupTable));
     }
+
+    // Register last so that lookups never see a manager without a dimension table
+    register(_tableNameWithType, this);
   }
 
   @Override
@@ -169,9 +221,11 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
   @Override
   protected void doShutdown() {
+    // Deregister first so that lookups stop resolving to this manager while its segments are released. Remove only
+    // this instance, as the other managers of the table belong to other servers in this JVM.
+    deregister(_tableNameWithType, this);
     releaseAndRemoveAllSegments();
     closeDimensionTable(_dimensionTable.get());
-    INSTANCES.remove(_tableNameWithType);
   }
 
 
