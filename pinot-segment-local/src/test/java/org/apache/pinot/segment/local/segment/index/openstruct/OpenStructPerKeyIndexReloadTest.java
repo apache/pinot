@@ -34,6 +34,7 @@ import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -62,13 +63,14 @@ import static org.testng.Assert.assertTrue;
 /// Per-key indexes used to be built solely by `OpenStructColumnSplitter` while it wrote the child columns, so they
 /// were frozen at creation: adding a range index to a key and reloading did nothing, while the same change on an
 /// ordinary column has always worked.
-public class OpenStructPerKeyIndexHandlerTest {
+public class OpenStructPerKeyIndexReloadTest {
   private static final File TMP_DIR =
-      new File(FileUtils.getTempDirectory(), OpenStructPerKeyIndexHandlerTest.class.getSimpleName());
+      new File(FileUtils.getTempDirectory(), OpenStructPerKeyIndexReloadTest.class.getSimpleName());
   private static final String TABLE = "openStructPerKeyIndex";
   private static final String COLUMN = "props";
   private static final String KEY = "region";
   private static final String CHILD = OpenStructNaming.materializedColumnName(COLUMN, KEY);
+  private static final String ORDINARY_COLUMN = "id";
   private static final int NUM_DOCS = 64;
 
   @BeforeClass
@@ -98,8 +100,8 @@ public class OpenStructPerKeyIndexHandlerTest {
         "a reload must apply the key's index settings, the way it does for any other column");
   }
 
-  /// The handler must not touch a segment whose keys already carry what the config asks for, or every reload
-  /// would rewrite indexes that are already correct.
+  /// A segment whose keys already carry what the config asks for must need no reprocessing, and a reload of one
+  /// must leave the indexes alone -- otherwise every reload rewrites indexes that are already correct.
   @Test
   public void testReloadIsANoOpWhenTheKeyIndexIsAlreadyPresent()
       throws Exception {
@@ -107,16 +109,14 @@ public class OpenStructPerKeyIndexHandlerTest {
     assertTrue(hasIndex(segmentDir, CHILD, StandardIndexes.inverted()),
         "precondition: creation already built the index");
 
-    // Scoped to this handler rather than the whole preprocessor: other handlers legitimately want work on the
-    // OPEN_STRUCT parent itself, so SegmentPreProcessor.needProcess() is true for reasons unrelated to keys.
     try (SegmentDirectory directory = openDirectory(segmentDir);
-        SegmentDirectory.Reader reader = directory.createReader()) {
-      OpenStructPerKeyIndexHandler handler = new OpenStructPerKeyIndexHandler(directory,
-          indexLoadingConfig(withPerKeyInvertedIndex()).getFieldIndexConfigByColName(), schema(),
-          tableConfig(withPerKeyInvertedIndex()));
-      assertFalse(handler.needUpdateIndices(reader), "a key whose index already matches needs no rebuild");
-      assertTrue(reader.hasIndexFor(CHILD, StandardIndexes.inverted()), "and the index must survive");
+        SegmentPreProcessor preProcessor =
+            new SegmentPreProcessor(directory, indexLoadingConfig(withPerKeyInvertedIndex()))) {
+      assertFalse(preProcessor.needProcess(), "a key whose index already matches needs no reprocessing");
     }
+
+    reload(segmentDir, withPerKeyInvertedIndex());
+    assertTrue(hasIndex(segmentDir, CHILD, StandardIndexes.inverted()), "and the index must survive a reload");
   }
 
   /// The sparse blob holds every unmaterialized key in one column, so a per-key setting cannot mean anything for
@@ -133,6 +133,20 @@ public class OpenStructPerKeyIndexHandlerTest {
       assertFalse(hasIndex(segmentDir, sparse, StandardIndexes.inverted()),
           "the shared blob column must not get a per-key inverted index");
     }
+  }
+
+  /// An ordinary column's indexes must survive a reload of a table that also has OPEN_STRUCT keys.
+  @Test
+  public void testReloadKeepsIndexesOnOrdinaryColumns()
+      throws Exception {
+    File segmentDir = buildSegment("ordinaryUntouched", withPerKeyInvertedIndex());
+    assertTrue(hasIndex(segmentDir, ORDINARY_COLUMN, StandardIndexes.inverted()),
+        "precondition: creation built the ordinary column's inverted index");
+
+    reload(segmentDir, withPerKeyInvertedIndex());
+
+    assertTrue(hasIndex(segmentDir, ORDINARY_COLUMN, StandardIndexes.inverted()),
+        "an ordinary column's inverted index must survive the reload");
   }
 
   // ---------------------------------------------------------------- fixtures
@@ -158,6 +172,7 @@ public class OpenStructPerKeyIndexHandlerTest {
   private static Schema schema() {
     return new Schema.SchemaBuilder().setSchemaName(TABLE)
         .addField(new ComplexFieldSpec(COLUMN, FieldSpec.DataType.OPEN_STRUCT, true, Map.of()))
+        .addSingleValueDimension(ORDINARY_COLUMN, FieldSpec.DataType.STRING)
         .build();
   }
 
@@ -166,6 +181,7 @@ public class OpenStructPerKeyIndexHandlerTest {
     indexes.set("open_struct", JsonUtils.objectToJsonNode(osConfig));
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE)
         .setFieldConfigList(List.of(new FieldConfig.Builder(COLUMN).withIndexes(indexes).build()))
+        .setInvertedIndexColumns(List.of(ORDINARY_COLUMN))
         .setNullHandlingEnabled(true)
         .build();
   }
@@ -178,6 +194,7 @@ public class OpenStructPerKeyIndexHandlerTest {
       props.put(KEY, docId % 2 == 0 ? "us" : "eu");
       GenericRow row = new GenericRow();
       row.putValue(COLUMN, props);
+      row.putValue(ORDINARY_COLUMN, "id-" + (docId % 8));
       rows.add(row);
     }
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig(osConfig), schema());
@@ -206,8 +223,7 @@ public class OpenStructPerKeyIndexHandlerTest {
     }
   }
 
-  private static boolean hasIndex(File segmentDir, String column, org.apache.pinot.segment.spi.index.IndexType<?, ?, ?>
-      indexType)
+  private static boolean hasIndex(File segmentDir, String column, IndexType<?, ?, ?> indexType)
       throws Exception {
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
     ColumnMetadata columnMetadata = metadata.getColumnMetadataFor(column);
