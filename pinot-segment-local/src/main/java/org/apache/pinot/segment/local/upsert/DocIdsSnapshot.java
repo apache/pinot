@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -52,6 +53,8 @@ public record DocIdsSnapshot(MutableRoaringBitmap docIds, @Nullable Metadata met
     VALID_DOC_IDS, QUERYABLE_DOC_IDS
   }
 
+  // Ignore unknown fields so an older server still reads diagnostics written by a newer one.
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public record Metadata(long docIdsCrc, DocIdsType docIdsType, long snapshotCapturedAtMs,
                          @Nullable String snapshotConsumingSegmentName, @Nullable String snapshotConsumedUpToOffset) {
     public Map<String, Object> toResponse(long nowMs) {

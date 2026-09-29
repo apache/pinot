@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.upsert;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import org.apache.pinot.segment.local.upsert.DocIdsSnapshot.DocIdsType;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
@@ -31,6 +32,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -87,6 +89,18 @@ public class DocIdsSnapshotTest {
     ByteBuffer.wrap(bytes).putInt(legacy.length + Integer.BYTES, 99);
     assertNull(DocIdsSnapshot.fromBytes(bytes).metadata());
     assertEquals(DocIdsSnapshot.fromBytes(bytes).docIds(), bitmap.getMutableRoaringBitmap());
+  }
+
+  @Test
+  public void testUnknownDiagnosticsFieldsAreIgnored()
+      throws Exception {
+    byte[] bytes = DocIdsSnapshot.capture(bitmap(1, 2, 3), DocIdsType.VALID_DOC_IDS, null).getBytes();
+    // A newer server may add a field to the trailer. Insert one before the closing brace.
+    byte[] extra = ",\"futureField\":1}".getBytes(StandardCharsets.UTF_8);
+    byte[] newer = Arrays.copyOf(bytes, bytes.length - 1 + extra.length);
+    System.arraycopy(extra, 0, newer, bytes.length - 1, extra.length);
+    assertNotNull(DocIdsSnapshot.fromBytes(newer).metadata());
+    assertEquals(DocIdsSnapshot.fromBytes(newer).metadata(), DocIdsSnapshot.fromBytes(bytes).metadata());
   }
 
   @Test
