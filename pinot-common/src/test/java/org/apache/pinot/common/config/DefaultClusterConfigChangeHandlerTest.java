@@ -25,8 +25,11 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.ClusterConfig;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 
@@ -34,6 +37,36 @@ public class DefaultClusterConfigChangeHandlerTest {
   private static final String PINNED_KEY = "pinot.test.pinned";
   private static final String INSTANCE_ONLY_KEY = "pinot.test.instanceOnly";
   private static final String CLUSTER_ONLY_KEY = "pinot.test.clusterOnly";
+
+  @Test
+  public void testDefaultConstructorStartsWithEmptyConfigs() {
+    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    RecordingListener listener = new RecordingListener();
+
+    handler.registerClusterConfigChangeListener(listener);
+
+    assertEquals(listener.getLastChangedConfigs(), Set.of());
+    assertEquals(listener.getLastConfigs(), Map.of());
+  }
+
+  @Test
+  public void testNullInstanceValuesAreIgnored() {
+    PinotConfiguration instanceConfig = mock(PinotConfiguration.class);
+    when(instanceConfig.getKeys()).thenReturn(List.of(PINNED_KEY, INSTANCE_ONLY_KEY));
+    when(instanceConfig.getProperty(PINNED_KEY)).thenReturn("instance-value");
+    when(instanceConfig.getProperty(INSTANCE_ONLY_KEY)).thenReturn(null);
+
+    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler(instanceConfig);
+
+    assertConfigs(handler.getClusterConfigs(), Map.of(PINNED_KEY, "instance-value"));
+
+    Map<String, String> configsWithNull = new HashMap<>();
+    configsWithNull.put(PINNED_KEY, "instance-value");
+    configsWithNull.put(INSTANCE_ONLY_KEY, null);
+    handler = new DefaultClusterConfigChangeHandler(configsWithNull);
+
+    assertConfigs(handler.getClusterConfigs(), Map.of(PINNED_KEY, "instance-value"));
+  }
 
   @Test
   public void testInstanceConfigsTakePrecedenceOverClusterConfigs() {
