@@ -3823,6 +3823,47 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig6);
   }
 
+  @Test
+  public void testValidateConsumingNumInstancesPerPartition() {
+    // Unset (0) puts every partition on the same first instance, and 2 leaves every other instance idle
+    for (int numInstancesPerPartition : new int[]{0, 2}) {
+      for (String partitionSelector : new String[]{null, "FD_AWARE_INSTANCE_PARTITION_SELECTOR"}) {
+        TableConfig tableConfig = getPartitionedTableConfig(TableType.REALTIME, InstancePartitionsType.CONSUMING,
+            partitionSelector, true, 48, numInstancesPerPartition);
+        IllegalStateException e = expectThrows(IllegalStateException.class,
+            () -> TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig));
+        assertEquals(e.getMessage(),
+            "numInstancesPerPartition must be 1 for CONSUMING instance assignment with numPartitions: 48, got: "
+                + numInstancesPerPartition);
+      }
+    }
+
+    TableConfigUtils.validateInstanceAssignmentConfigs(
+        getPartitionedTableConfig(TableType.REALTIME, InstancePartitionsType.CONSUMING, null, true, 48, 1));
+    // Without explicit partitions, consuming segments are spread across all instances of the replica-group
+    TableConfigUtils.validateInstanceAssignmentConfigs(
+        getPartitionedTableConfig(TableType.REALTIME, InstancePartitionsType.CONSUMING, null, true, 1, 0));
+    TableConfigUtils.validateInstanceAssignmentConfigs(
+        getPartitionedTableConfig(TableType.REALTIME, InstancePartitionsType.CONSUMING, null, false, 48, 0));
+    // Completed segments are balanced across all instances of the partition
+    TableConfigUtils.validateInstanceAssignmentConfigs(
+        getPartitionedTableConfig(TableType.REALTIME, InstancePartitionsType.COMPLETED, null, true, 48, 2));
+    TableConfigUtils.validateInstanceAssignmentConfigs(
+        getPartitionedTableConfig(TableType.OFFLINE, InstancePartitionsType.OFFLINE, null, true, 48, 2));
+  }
+
+  private static TableConfig getPartitionedTableConfig(TableType tableType,
+      InstancePartitionsType instancePartitionsType, @Nullable String partitionSelector, boolean replicaGroupBased,
+      int numPartitions, int numInstancesPerPartition) {
+    InstanceAssignmentConfig instanceAssignmentConfig =
+        new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant", false, 0, null), null,
+            new InstanceReplicaGroupPartitionConfig(replicaGroupBased, 0, 2, 0, numPartitions,
+                numInstancesPerPartition, false, "memberId"), partitionSelector, false);
+    return new TableConfigBuilder(tableType).setTableName(TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Map.of(instancePartitionsType.name(), instanceAssignmentConfig))
+        .build();
+  }
+
   private Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");

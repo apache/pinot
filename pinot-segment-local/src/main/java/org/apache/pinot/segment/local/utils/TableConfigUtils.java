@@ -84,6 +84,7 @@ import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -1402,6 +1403,19 @@ public final class TableConfigUtils {
             instanceAssignmentConfig.getReplicaGroupPartitionConfig().getNumInstancesPerPartition() == 0
                 || instanceAssignmentConfig.getReplicaGroupPartitionConfig().getNumInstancesPerPartition() == 1,
             "numInstancesPerPartition must be 1 when using IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR");
+      }
+      // A consuming segment is assigned only to the first instance of its partition, so any other instance in the
+      // partition never consumes. When unset (0), every partition gets all instances and they all consume on the same
+      // first instance of the replica-group.
+      InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+          instanceAssignmentConfig.getReplicaGroupPartitionConfig();
+      if (tableConfig.getTableType() == TableType.REALTIME
+          && InstancePartitionsType.CONSUMING.name().equalsIgnoreCase(instancePartitionsType)
+          && replicaGroupPartitionConfig != null && replicaGroupPartitionConfig.isReplicaGroupBased()
+          && replicaGroupPartitionConfig.getNumPartitions() > 1) {
+        Preconditions.checkState(replicaGroupPartitionConfig.getNumInstancesPerPartition() == 1,
+            "numInstancesPerPartition must be 1 for CONSUMING instance assignment with numPartitions: %s, got: %s",
+            replicaGroupPartitionConfig.getNumPartitions(), replicaGroupPartitionConfig.getNumInstancesPerPartition());
       }
       // TODO: Add more validations for other partition selectors here
     }
