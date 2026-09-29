@@ -62,7 +62,8 @@ public class BenchmarkDistinctCountBitmapAggregation extends AbstractAggregation
   @Param({"200", "2000"})
   private int _valuesPerBitmap;
 
-  @Param({"2000000", "100000000"})
+  // The last universe spreads values over 32768 container keys, like hash codes of a non-numeric column do
+  @Param({"2000000", "100000000", "2147483647"})
   private int _maxValue;
 
   public static void main(String[] args) throws RunnerException {

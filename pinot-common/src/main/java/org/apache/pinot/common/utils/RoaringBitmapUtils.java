@@ -54,6 +54,14 @@ public class RoaringBitmapUtils {
     return bitmap;
   }
 
+  /// Deserializes a bitmap into a [RoaringBitmapUnion] that owns it, without copying it.
+  ///
+  /// Once RoaringBitmap ships its own `RoaringBitmapUnion`, this becomes
+  /// `RoaringBitmapUnion.takeOwnership(deserialize(bytes))`.
+  public static RoaringBitmapUnion deserializeToUnion(byte[] bytes) {
+    return RoaringBitmapUnion.deserialize(ByteBuffer.wrap(bytes));
+  }
+
   /// Iterates over the ranges of unset bits and calls the consumer for each range. This is more performant to
   /// alternatives like calling [RoaringBitmap#contains(int)] in a loop or cloning and flipping the bitmap before
   /// iterating, especially for sparse bitmaps.

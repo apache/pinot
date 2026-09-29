@@ -81,6 +81,11 @@ public interface ValueAggregator<R, A> {
   boolean isAggregatedValueFixedSize();
 
   /// Returns the maximum size in bytes of the aggregated values seen so far.
+  ///
+  /// For variable-size (`BYTES`) aggregated values this is only complete once every value has been serialized
+  /// through [#serializeAggregatedValue]: an aggregator may derive the size from the values it serialized rather than
+  /// measure every intermediate state. Builders must therefore serialize all values before consuming the size, as the
+  /// star-tree builders do.
   int getMaxAggregatedValueByteSize();
 
   /// Serializes an aggregated value into a byte array.

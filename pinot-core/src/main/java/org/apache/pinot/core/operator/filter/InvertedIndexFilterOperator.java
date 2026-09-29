@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.filter;
 import com.google.common.base.CaseFormat;
 import java.util.List;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.utils.MutableRoaringBitmapUnion;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
@@ -35,7 +36,6 @@ import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmapLazyUnion;
 
 
 public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
@@ -146,14 +146,13 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
               _invertedIndexReader.getDocIds(dictIds[1]));
           break;
         default:
-          // Union lazily and repair once at the end: the fold still materializes the union, but skips per-union
+          // Union lazily and finalize once at the end: the fold still materializes the union, but skips per-union
           // cardinality maintenance
-          MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+          MutableRoaringBitmapUnion union = new MutableRoaringBitmapUnion();
           for (int dictId : dictIds) {
-            MutableRoaringBitmapLazyUnion.lazyOr(bitmap, _invertedIndexReader.getDocIds(dictId));
+            union.add(_invertedIndexReader.getDocIds(dictId));
           }
-          MutableRoaringBitmapLazyUnion.repair(bitmap);
-          count = bitmap.getCardinality();
+          count = union.get().getCardinality();
           break;
       }
     }

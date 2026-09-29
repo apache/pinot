@@ -19,9 +19,9 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.nio.ByteBuffer;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Random;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
@@ -36,6 +36,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -70,26 +71,82 @@ public class DistinctCountBitmapLazyUnionTest {
   }
 
   private static Map<ExpressionContext, BlockValSet> mockBlockValSetMap(byte[][] serialized) {
+    return mockBlockValSetMap(serialized, null);
+  }
+
+  private static Map<ExpressionContext, BlockValSet> mockBlockValSetMap(byte[][] serialized,
+      @Nullable RoaringBitmap nullBitmap) {
     BlockValSet blockValSet = Mockito.mock(BlockValSet.class);
     Mockito.when(blockValSet.getValueType()).thenReturn(DataType.BYTES);
     Mockito.when(blockValSet.isSingleValue()).thenReturn(true);
     Mockito.when(blockValSet.getBytesValuesSV()).thenReturn(serialized);
-    return Collections.singletonMap(EXPRESSION, blockValSet);
+    Mockito.when(blockValSet.getNullBitmap()).thenReturn(nullBitmap);
+    return Map.of(EXPRESSION, blockValSet);
+  }
+
+  @Test
+  public void testAggregateSkipsNullRowsAcrossRanges() {
+    // With null handling enabled the block is consumed as several non-null ranges; the accumulator is re-read from
+    // the holder at the start of each range and written back at its end, and null rows never reach the union
+    byte[][] serialized = serializedBitmaps(120, 50, 100_000);
+    RoaringBitmap nullBitmap = RoaringBitmap.bitmapOf(0, 1, 17, 40, 41, 42, 99, 119);
+    DistinctCountBitmapAggregationFunction function =
+        new DistinctCountBitmapAggregationFunction(EXPRESSION, true);
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    int blockSize = 60;
+    for (int from = 0; from < serialized.length; from += blockSize) {
+      byte[][] block = new byte[blockSize][];
+      System.arraycopy(serialized, from, block, 0, blockSize);
+      RoaringBitmap blockNulls = new RoaringBitmap();
+      for (int i = 0; i < blockSize; i++) {
+        if (nullBitmap.contains(from + i)) {
+          blockNulls.add(i);
+        }
+      }
+      function.aggregate(blockSize, holder, mockBlockValSetMap(block, blockNulls));
+    }
+
+    RoaringBitmap expected = new RoaringBitmap();
+    for (int i = 0; i < serialized.length; i++) {
+      if (!nullBitmap.contains(i)) {
+        expected.or(RoaringBitmapUtils.deserialize(serialized[i]));
+      }
+    }
+    RoaringBitmap result = function.extractAggregationResult(holder);
+    assertEquals(result, expected);
+    assertEquals(result.getCardinality(), expected.getCardinality());
+    assertFalse(result.isEmpty());
   }
 
   @Test
   public void testAggregateAcrossBlocks() {
     // Enough overlap-heavy inputs to promote accumulator containers to (lazy) bitmap containers, split into
-    // multiple aggregate() calls to verify the accumulator stays valid across blocks until extraction
+    // multiple aggregate() calls to verify the accumulator stays valid across blocks until extraction. An early
+    // extraction after the first block guards the published-bitmap safety net: no operator extracts and then keeps
+    // aggregating today, but if one did, the published bitmap must stay immutable and later extraction must still
+    // be complete.
     byte[][] serialized = serializedBitmaps(200, 100, 200_000);
     DistinctCountBitmapAggregationFunction function =
         new DistinctCountBitmapAggregationFunction(EXPRESSION, false);
     AggregationResultHolder holder = function.createAggregationResultHolder();
     int blockSize = 50;
+    RoaringBitmap published = null;
+    RoaringBitmap publishedCopy = null;
     for (int from = 0; from < serialized.length; from += blockSize) {
       byte[][] block = new byte[blockSize][];
       System.arraycopy(serialized, from, block, 0, blockSize);
       function.aggregate(blockSize, holder, mockBlockValSetMap(block));
+      if (published != null) {
+        assertEquals(published, publishedCopy);
+        assertEquals(published.getCardinality(), publishedCopy.getCardinality());
+      }
+      if (from == 0) {
+        published = function.extractAggregationResult(holder);
+        assertEquals(published, eagerUnion(serialized, 0, blockSize));
+        // Repeated extraction returns the same published instance
+        assertSame(function.extractAggregationResult(holder), published);
+        publishedCopy = published.clone();
+      }
     }
 
     RoaringBitmap result = function.extractAggregationResult(holder);
@@ -186,7 +243,7 @@ public class DistinctCountBitmapLazyUnionTest {
       assertEquals(input, originalInput);
     }
 
-    // Match two keys, then encounter interleaved missing keys and an unsigned tail at the search threshold.
+    // Match two keys, then encounter interleaved missing keys and an unsigned tail.
     result = new RoaringBitmap();
     for (int key = 0; key < 64; key += 2) {
       result.add((key << 16) + 7);
@@ -203,7 +260,7 @@ public class DistinctCountBitmapLazyUnionTest {
   public void testMergeMixedContainersPreservesInputs() {
     DistinctCountBitmapAggregationFunction function =
         new DistinctCountBitmapAggregationFunction(EXPRESSION, false);
-    // Three matching keys plus unrelated keys keep the search path active for each four-container input.
+    // Three matching keys plus unrelated keys in the accumulator for each four-container input.
     RoaringBitmap result = RoaringBitmap.bitmapOf(0, 1 << 16, 2 << 16);
     for (int key = 8; key < 24; key++) {
       result.add(key << 16);

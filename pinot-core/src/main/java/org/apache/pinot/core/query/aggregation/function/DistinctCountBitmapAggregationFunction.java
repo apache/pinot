@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.RoaringBitmapUnion;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -37,8 +38,6 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
-import org.roaringbitmap.RoaringBitmapLazyUnion;
-import org.roaringbitmap.RoaringBitmapMerge;
 
 
 /// The `DistinctCountBitmapAggregationFunction` calculates the number of distinct values for a given single-value or
@@ -80,21 +79,14 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       // Logical BYTES is a serialized RoaringBitmap and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
-        int i = from;
-        RoaringBitmap valueBitmap = aggregationResultHolder.getResult();
-        if (valueBitmap == null) {
-          if (i == to) {
-            return;
-          }
-          // The first bitmap read becomes the accumulator instead of being merged into a fresh one
-          valueBitmap = RoaringBitmapUtils.deserialize(bytesValues[i++]);
-          aggregationResultHolder.setValue(valueBitmap);
+        Object result = aggregationResultHolder.getResult();
+        for (int i = from; i < to; i++) {
+          // The first bitmap read is deserialized straight into the accumulator instead of being merged into a fresh
+          // one; later ones are unioned lazily, and extractAggregationResult() finalizes the accumulator exactly once
+          result = result == null ? RoaringBitmapUtils.deserializeToUnion(bytesValues[i])
+              : addBitmap(result, RoaringBitmapUtils.deserialize(bytesValues[i]));
         }
-        for (; i < to; i++) {
-          // Lazy union defers cardinality maintenance; extract*Result() repairs the accumulator
-          // before it escapes this function
-          RoaringBitmapLazyUnion.lazyOr(valueBitmap, RoaringBitmapUtils.deserialize(bytesValues[i]));
-        }
+        aggregationResultHolder.setValue(result);
       });
       return;
     }
@@ -275,14 +267,11 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
-          RoaringBitmap value = RoaringBitmapUtils.deserialize(bytesValues[i]);
           int groupKey = groupKeyArray[i];
-          RoaringBitmap valueBitmap = groupByResultHolder.getResult(groupKey);
-          if (valueBitmap != null) {
-            RoaringBitmapLazyUnion.lazyOr(valueBitmap, value);
-          } else {
-            groupByResultHolder.setValueForKey(groupKey, value);
-          }
+          Object result = groupByResultHolder.getResult(groupKey);
+          groupByResultHolder.setValueForKey(groupKey,
+              result == null ? RoaringBitmapUtils.deserializeToUnion(bytesValues[i])
+                  : addBitmap(result, RoaringBitmapUtils.deserialize(bytesValues[i])));
         }
       });
       return;
@@ -465,12 +454,12 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
         for (int i = from; i < to; i++) {
           RoaringBitmap value = RoaringBitmapUtils.deserialize(bytesValues[i]);
           for (int groupKey : groupKeysArray[i]) {
-            RoaringBitmap bitmap = groupByResultHolder.getResult(groupKey);
-            if (bitmap != null) {
-              RoaringBitmapLazyUnion.lazyOr(bitmap, value);
+            Object result = groupByResultHolder.getResult(groupKey);
+            if (result != null) {
+              groupByResultHolder.setValueForKey(groupKey, addBitmap(result, value));
             } else {
-              // Clone a bitmap for the group
-              groupByResultHolder.setValueForKey(groupKey, value.clone());
+              // Each group owns an independent accumulator: the same input is added to every group of the row
+              groupByResultHolder.setValueForKey(groupKey, addBitmap(new RoaringBitmapUnion(), value));
             }
           }
         }
@@ -665,13 +654,16 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     if (result instanceof DictIdsWrapper) {
       // For dictionary-encoded expression, convert dictionary ids to hash code of the values
       return convertToValueBitmap((DictIdsWrapper) result);
-    } else {
-      // For serialized RoaringBitmap and non-dictionary-encoded expression, directly return the value bitmap.
-      // The serialized RoaringBitmap path unions lazily, so repair the accumulator before it escapes.
-      RoaringBitmap valueBitmap = (RoaringBitmap) result;
-      RoaringBitmapLazyUnion.repair(valueBitmap);
-      return valueBitmap;
     }
+    if (result instanceof RoaringBitmapUnion) {
+      // Serialized RoaringBitmap expression: finalize the lazy accumulator once and publish the plain bitmap, so
+      // repeated extraction returns the same instance and the union no longer references it
+      RoaringBitmap bitmap = ((RoaringBitmapUnion) result).take();
+      aggregationResultHolder.setValue(bitmap);
+      return bitmap;
+    }
+    // For non-dictionary-encoded expression (or an already published bitmap), directly return the value bitmap
+    return (RoaringBitmap) result;
   }
 
   @Override
@@ -684,18 +676,36 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     if (result instanceof DictIdsWrapper) {
       // For dictionary-encoded expression, convert dictionary ids to hash code of the values
       return convertToValueBitmap((DictIdsWrapper) result);
-    } else {
-      // For serialized RoaringBitmap and non-dictionary-encoded expression, directly return the value bitmap.
-      // The serialized RoaringBitmap path unions lazily, so repair the accumulator before it escapes.
-      RoaringBitmap valueBitmap = (RoaringBitmap) result;
-      RoaringBitmapLazyUnion.repair(valueBitmap);
-      return valueBitmap;
     }
+    if (result instanceof RoaringBitmapUnion) {
+      // See extractAggregationResult()
+      RoaringBitmap bitmap = ((RoaringBitmapUnion) result).take();
+      groupByResultHolder.setValueForKey(groupKey, bitmap);
+      return bitmap;
+    }
+    // For non-dictionary-encoded expression (or an already published bitmap), directly return the value bitmap
+    return (RoaringBitmap) result;
+  }
+
+  /// Unions a deserialized bitmap into the accumulator of a serialized-bitmap aggregation. The accumulator is a
+  /// [RoaringBitmapUnion] while aggregating; a plain [RoaringBitmap] means the result was already published by
+  /// extraction (no operator aggregates again after extracting today, so this path only keeps a published bitmap
+  /// immutable), in which case a fresh accumulator is started from a copy of it.
+  private static RoaringBitmapUnion addBitmap(Object result, RoaringBitmap input) {
+    RoaringBitmapUnion union;
+    if (result instanceof RoaringBitmapUnion) {
+      union = (RoaringBitmapUnion) result;
+    } else {
+      union = new RoaringBitmapUnion();
+      union.add((RoaringBitmap) result);
+    }
+    union.add(input);
+    return union;
   }
 
   @Override
   public RoaringBitmap merge(RoaringBitmap intermediateResult1, RoaringBitmap intermediateResult2) {
-    RoaringBitmapMerge.or(intermediateResult1, intermediateResult2);
+    intermediateResult1.or(intermediateResult2);
     return intermediateResult1;
   }
 

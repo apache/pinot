@@ -46,6 +46,7 @@ import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.utils.MutableRoaringBitmapUnion;
 import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonIndexCreator;
@@ -63,7 +64,6 @@ import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmapLazyUnion;
 
 
 /// Reader for json index.
@@ -177,34 +177,35 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     return ImmutableRoaringBitmap.and(target, other);
   }
 
-  /// Folds many posting lists into one result using lazy unions, repairing the accumulator once at [#get]. The
-  /// zero- and single-input cases return the borrowed posting list without copying, matching the ownership behavior
-  /// of [#or].
-  private static class LazyUnionAccumulator {
+  /// Folds many posting lists into one result through a [MutableRoaringBitmapUnion], which unions lazily and
+  /// finalizes the bitmap once at [#get]. The zero- and single-input cases return the borrowed posting list without
+  /// copying, matching the ownership behavior of [#or].
+  private static class UnionAccumulator {
     @Nullable
     private ImmutableRoaringBitmap _first;
     @Nullable
-    private MutableRoaringBitmap _accumulator;
+    private MutableRoaringBitmapUnion _union;
 
     void add(ImmutableRoaringBitmap docIds) {
       if (docIds.isEmpty()) {
         return;
       }
-      if (_accumulator != null) {
-        MutableRoaringBitmapLazyUnion.lazyOr(_accumulator, docIds);
+      if (_union != null) {
+        _union.add(docIds);
       } else if (_first == null) {
         _first = docIds;
       } else {
-        _accumulator = _first.toMutableRoaringBitmap();
-        MutableRoaringBitmapLazyUnion.lazyOr(_accumulator, docIds);
+        // The borrowed first posting list is copied into the union, never adopted
+        _union = new MutableRoaringBitmapUnion();
+        _union.add(_first);
+        _union.add(docIds);
         _first = null;
       }
     }
 
     ImmutableRoaringBitmap get() {
-      if (_accumulator != null) {
-        MutableRoaringBitmapLazyUnion.repair(_accumulator);
-        return _accumulator;
+      if (_union != null) {
+        return _union.take();
       }
       return _first != null ? _first : EMPTY_BITMAP;
     }
@@ -354,7 +355,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         StringBuilder buffer = new StringBuilder(key);
         buffer.append(JsonIndexCreator.KEY_VALUE_SEPARATOR);
         int pos = buffer.length();
-        LazyUnionAccumulator result = new LazyUnionAccumulator();
+        UnionAccumulator result = new UnionAccumulator();
         List<String> values = ((InPredicate) predicate).getValues();
         for (String value : values) {
           buffer.setLength(pos);
@@ -410,7 +411,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
               notInDictIds.add(dictId);
             }
           }
-          LazyUnionAccumulator result = new LazyUnionAccumulator();
+          UnionAccumulator result = new UnionAccumulator();
           for (int dictId = dictIdRange[0]; dictId < dictIdRange[1]; dictId++) {
             if (!notInDictIds.contains(dictId)) {
               result.add(_invertedIndex.getDocIds(dictId));
@@ -438,7 +439,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         }
         Pattern pattern = ((RegexpLikePredicate) predicate).getPattern();
         Matcher matcher = pattern.matcher("");
-        LazyUnionAccumulator result = new LazyUnionAccumulator();
+        UnionAccumulator result = new UnionAccumulator();
         byte[] dictBuffer = _dictionary.getBuffer();
         StringBuilder value = new StringBuilder();
         int valueStart = key.length() + 1;
@@ -473,7 +474,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
         Object lowerBound = lowerUnbounded ? null : rangeDataType.convert(rangePredicate.getLowerBound());
         Object upperBound = upperUnbounded ? null : rangeDataType.convert(rangePredicate.getUpperBound());
-        LazyUnionAccumulator result = new LazyUnionAccumulator();
+        UnionAccumulator result = new UnionAccumulator();
         byte[] dictBuffer = _dictionary.getBuffer();
         int valueStart = key.length() + 1;
         for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {

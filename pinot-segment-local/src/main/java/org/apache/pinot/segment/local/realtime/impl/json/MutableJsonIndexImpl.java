@@ -48,6 +48,7 @@ import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.utils.RoaringBitmapUnion;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.common.utils.regex.Pattern;
@@ -61,7 +62,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
-import org.roaringbitmap.RoaringBitmapLazyUnion;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -201,34 +201,35 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     return predicateType == Predicate.Type.IS_NULL;
   }
 
-  /// Folds many posting lists into one [LazyBitmap] using lazy unions, repairing the accumulator once at [#get].
-  /// The zero- and single-input cases return the borrowed posting list wrapped as an immutable [LazyBitmap],
-  /// matching the ownership behavior of [LazyBitmap#or].
+  /// Folds many posting lists into one [LazyBitmap] through a [RoaringBitmapUnion], which unions lazily and
+  /// finalizes the bitmap once at [#get]. A single input is borrowed: it is wrapped as an immutable [LazyBitmap],
+  /// never adopted or modified.
   private static class UnionAccumulator {
     @Nullable
     private RoaringBitmap _first;
     @Nullable
-    private RoaringBitmap _accumulator;
+    private RoaringBitmapUnion _union;
 
     void add(RoaringBitmap docIds) {
       if (docIds.isEmpty()) {
         return;
       }
-      if (_accumulator != null) {
-        RoaringBitmapLazyUnion.lazyOr(_accumulator, docIds);
+      if (_union != null) {
+        _union.add(docIds);
       } else if (_first == null) {
         _first = docIds;
       } else {
-        _accumulator = _first.clone();
-        RoaringBitmapLazyUnion.lazyOr(_accumulator, docIds);
+        // The borrowed first posting list is copied into the union, never adopted
+        _union = new RoaringBitmapUnion();
+        _union.add(_first);
+        _union.add(docIds);
         _first = null;
       }
     }
 
     LazyBitmap get() {
-      if (_accumulator != null) {
-        RoaringBitmapLazyUnion.repair(_accumulator);
-        return LazyBitmap.createMutable(_accumulator);
+      if (_union != null) {
+        return LazyBitmap.createMutable(_union.take());
       }
       return _first != null ? LazyBitmap.createImmutable(_first) : LazyBitmap.EMPTY_BITMAP;
     }
@@ -312,20 +313,6 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         return other;
       }
       return createMutable(RoaringBitmap.or(_value, other._value));
-    }
-
-    LazyBitmap or(RoaringBitmap bitmap) {
-      if (isEmpty()) {
-        return createImmutable(bitmap);
-      }
-      if (bitmap.isEmpty()) {
-        return this;
-      }
-      if (isMutable()) {
-        _value.or(bitmap);
-        return this;
-      }
-      return createMutable(RoaringBitmap.or(_value, bitmap));
     }
 
     LazyBitmap andNot(LazyBitmap other) {
