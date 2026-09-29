@@ -429,7 +429,7 @@ public class AggregateOperatorTest {
     assertEquals(merged, expected);
     assertEquals(merged.getCardinality(), expected.getCardinality());
 
-    // Pass the raw intermediate directly to another stage, without relying on serialization to repair it.
+    // Pass the raw intermediate directly to another stage, as a transfer that skips serialization does.
     when(_input.nextBlock()).thenReturn(mergedBlock).thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema = groupBy
         ? new DataSchema(new String[]{"group", "count"}, new ColumnDataType[]{INT, INT})

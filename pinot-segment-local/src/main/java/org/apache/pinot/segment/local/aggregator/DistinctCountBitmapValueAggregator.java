@@ -18,19 +18,21 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import org.apache.pinot.common.utils.RoaringBitmapUnion;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.roaringbitmap.RoaringBitmap;
-import org.roaringbitmap.RoaringBitmapLazyUnion;
 
 
-/// For serialized-bitmap (`byte[]`) raw values, the aggregated value is unioned lazily and repaired in
-/// [#serializeAggregatedValue]. A given metric column always provides either serialized bitmaps or plain raw values,
-/// never both, so the [#addToValue] path never observes a lazy accumulator. The `_maxByteSize` tracking stays valid
-/// on a lazy accumulator: serialized container sizes do not depend on the deferred cardinality values, and a lazy
-/// bitmap container measures at its full fixed size, which upper-bounds the size after repair.
-public class DistinctCountBitmapValueAggregator implements ValueAggregator<Object, RoaringBitmap> {
+/// Pre-aggregates distinct values into a [RoaringBitmapUnion], which unions serialized-bitmap (`byte[]`) inputs
+/// lazily and finalizes the bitmap only when it is read or serialized. A given metric column always provides either
+/// serialized bitmaps or plain raw values, never both.
+///
+/// [#getMaxAggregatedValueByteSize] reports the largest value produced by [#serializeAggregatedValue] so far. This
+/// aggregator is only used by the star-tree builders (it has no fixed size, so ingestion-time aggregation rejects
+/// it), and both builders serialize every record before that size is consumed: the off-heap builder when it appends
+/// a record, the on-heap builder in its pre-serialization pass before the forward indexes are sized.
+public class DistinctCountBitmapValueAggregator implements ValueAggregator<Object, RoaringBitmapUnion> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
 
   private int _maxByteSize;
@@ -46,60 +48,53 @@ public class DistinctCountBitmapValueAggregator implements ValueAggregator<Objec
   }
 
   @Override
-  public RoaringBitmap getInitialAggregatedValue(Object rawValue) {
+  public RoaringBitmapUnion getInitialAggregatedValue(Object rawValue) {
     // NOTE: rawValue cannot be null because this aggregator can only be used for star-tree index, and the builder
     //   never passes a null raw value: a null-aware star-tree leaves the aggregated value null until the group sees
     //   its first non-null input.
     assert rawValue != null;
-    RoaringBitmap initialValue;
     if (rawValue instanceof byte[]) {
-      byte[] bytes = (byte[]) rawValue;
-      initialValue = deserializeAggregatedValue(bytes);
-      _maxByteSize = Math.max(_maxByteSize, bytes.length);
-    } else {
-      initialValue = new RoaringBitmap();
-      addToValue(initialValue, rawValue);
-      _maxByteSize = Math.max(_maxByteSize, initialValue.serializedSizeInBytes());
+      return deserializeAggregatedValue((byte[]) rawValue);
     }
+    RoaringBitmapUnion initialValue = new RoaringBitmapUnion();
+    addToValue(initialValue, rawValue);
     return initialValue;
   }
 
   @Override
-  public RoaringBitmap applyRawValue(RoaringBitmap value, Object rawValue) {
+  public RoaringBitmapUnion applyRawValue(RoaringBitmapUnion value, Object rawValue) {
     if (rawValue instanceof byte[]) {
-      RoaringBitmapLazyUnion.lazyOr(value, deserializeAggregatedValue((byte[]) rawValue));
+      value.add(RoaringBitmapUtils.deserialize((byte[]) rawValue));
     } else {
       addToValue(value, rawValue);
     }
-    _maxByteSize = Math.max(_maxByteSize, value.serializedSizeInBytes());
     return value;
   }
 
-  /// Adds a raw value (single value or multi-value array) to the RoaringBitmap.
-  protected void addToValue(RoaringBitmap bitmap, Object rawValue) {
+  /// Adds a raw value (single value or multi-value array) to the union.
+  protected void addToValue(RoaringBitmapUnion union, Object rawValue) {
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;
       for (Object value : values) {
-        bitmap.add(value.hashCode());
+        union.add(value.hashCode());
       }
     } else {
-      bitmap.add(rawValue.hashCode());
+      union.add(rawValue.hashCode());
     }
   }
 
   @Override
-  public RoaringBitmap applyAggregatedValue(RoaringBitmap value, RoaringBitmap aggregatedValue) {
-    // The input may itself be a lazy accumulator (e.g. an on-heap star-tree record built through applyRawValue);
-    // repair it before the union because lazy unions require a non-lazy input
-    RoaringBitmapLazyUnion.repair(aggregatedValue);
-    RoaringBitmapLazyUnion.lazyOr(value, aggregatedValue);
-    _maxByteSize = Math.max(_maxByteSize, value.serializedSizeInBytes());
+  public RoaringBitmapUnion applyAggregatedValue(RoaringBitmapUnion value, RoaringBitmapUnion aggregatedValue) {
+    // get() finalizes the other accumulator without consuming it; it stays usable (and is serialized later itself)
+    value.add(aggregatedValue.get());
     return value;
   }
 
   @Override
-  public RoaringBitmap cloneAggregatedValue(RoaringBitmap value) {
-    return value.clone();
+  public RoaringBitmapUnion cloneAggregatedValue(RoaringBitmapUnion value) {
+    RoaringBitmapUnion clone = new RoaringBitmapUnion();
+    clone.add(value.get());
+    return clone;
   }
 
   @Override
@@ -113,13 +108,14 @@ public class DistinctCountBitmapValueAggregator implements ValueAggregator<Objec
   }
 
   @Override
-  public byte[] serializeAggregatedValue(RoaringBitmap value) {
-    RoaringBitmapLazyUnion.repair(value);
-    return RoaringBitmapUtils.serialize(value);
+  public byte[] serializeAggregatedValue(RoaringBitmapUnion value) {
+    byte[] bytes = RoaringBitmapUtils.serialize(value.get());
+    _maxByteSize = Math.max(_maxByteSize, bytes.length);
+    return bytes;
   }
 
   @Override
-  public RoaringBitmap deserializeAggregatedValue(byte[] bytes) {
-    return RoaringBitmapUtils.deserialize(bytes);
+  public RoaringBitmapUnion deserializeAggregatedValue(byte[] bytes) {
+    return RoaringBitmapUtils.deserializeToUnion(bytes);
   }
 }
