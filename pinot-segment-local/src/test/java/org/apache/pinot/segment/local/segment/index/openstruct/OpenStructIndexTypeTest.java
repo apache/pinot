@@ -26,8 +26,11 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -247,17 +250,28 @@ public class OpenStructIndexTypeTest {
             String.format(unsupported, "indexes.dictionary.onHeap")},
         {"{'name': 'clicks', 'indexes': {'dictionary': {'useVarLengthDictionary': true}}}",
             String.format(unsupported, "indexes.dictionary.useVarLengthDictionary")},
-        // The dictionary vs raw choice comes from the FieldConfig encodingType; the per-key forward and dictionary
-        // configs may only restate it.
+        // A key is dictionary-encoded when its encodingType is DICTIONARY or its inverted index is enabled; the
+        // per-key forward and dictionary configs may only restate that outcome.
         {"{'name': 'clicks', 'indexes': {'forward': {'encodingType': 'RAW'}}}",
-            "OPEN_STRUCT column 'payload': indexes.forward.encodingType RAW of key 'clicks' conflicts with its "
-                + "encodingType DICTIONARY; "},
+            "OPEN_STRUCT column 'payload': indexes.forward.encodingType RAW of key 'clicks' does not match the "
+                + "dictionary-encoded forward index it is built with; "},
+        {"{'name': 'clicks', 'encodingType': 'RAW', 'indexes': {'inverted': {}, 'forward': {'encodingType': 'RAW'}}}",
+            "OPEN_STRUCT column 'payload': indexes.forward.encodingType RAW of key 'clicks' does not match the "
+                + "dictionary-encoded forward index it is built with; "},
         {"{'name': 'clicks', 'indexes': {'dictionary': {'disabled': true}}}",
-            "OPEN_STRUCT column 'payload': indexes.dictionary of key 'clicks' disables the dictionary, which conflicts "
-                + "with its encodingType DICTIONARY; "},
+            "OPEN_STRUCT column 'payload': indexes.dictionary of key 'clicks' disables the dictionary, but the key is "
+                + "built with one; "},
         {"{'name': 'clicks', 'encodingType': 'RAW', 'indexes': {'dictionary': {}}}",
-            "OPEN_STRUCT column 'payload': indexes.dictionary of key 'clicks' enables the dictionary, which conflicts "
-                + "with its encodingType RAW; "}
+            "OPEN_STRUCT column 'payload': indexes.dictionary of key 'clicks' enables the dictionary, but the key is "
+                + "built without one; "},
+        // An enabled inverted index requires a dictionary, so a RAW key with one is still built with a dictionary.
+        {"{'name': 'clicks', 'encodingType': 'RAW', 'indexes': {'inverted': {}, 'dictionary': {'disabled': true}}}",
+            "OPEN_STRUCT column 'payload': indexes.dictionary of key 'clicks' disables the dictionary, but the key is "
+                + "built with one; "},
+        {"{'name': 'clicks', 'indexes': {'forward': 'LZ4'}}",
+            "OPEN_STRUCT column 'payload': indexes.forward of key 'clicks' must be a JSON object"},
+        {"{'name': 'clicks', 'indexes': {'dictionary': true}}",
+            "OPEN_STRUCT column 'payload': indexes.dictionary of key 'clicks' must be a JSON object"}
     };
   }
 
@@ -280,18 +294,42 @@ public class OpenStructIndexTypeTest {
         + "defaultValueFieldConfig; configure the key through encodingType and 'indexes'");
   }
 
-  /// Settings a materialized key honors, and forward/dictionary entries that only restate its encodingType, pass.
+  /// Settings a materialized key honors, and forward/dictionary entries that only restate how it is built, pass.
   @Test
   public void testValidateAllowsHonoredAndRestatedPerKeySettings()
       throws Exception {
     FieldConfig rawKey = parseFieldConfig("{'name': 'clicks', 'encodingType': 'RAW', 'indexes': {"
         + "'forward': {'encodingType': 'RAW', 'disabled': false}, 'dictionary': {'disabled': true}, "
-        + "'range': {'version': 2}, 'bloom': {'fpp': 0.01}}}");
+        + "'range': {'version': 2}, 'bloom': {'fpp': 0.01}, 'inverted': {'disabled': true}}}");
+    // Empty and JSON-null values count as unset.
     FieldConfig dictionaryKey = parseFieldConfig("{'name': 'views', 'properties': {}, 'tierOverwrites': {}, "
-        + "'indexes': {'forward': {}, 'dictionary': {'disabled': false}, 'inverted': {}}}");
+        + "'indexes': {'forward': {'compressionCodec': null}, 'dictionary': {'disabled': false, 'onHeap': null}, "
+        + "'inverted': {}}}");
+    // The inverted index makes a RAW key dictionary-encoded, which its forward and dictionary configs may restate.
+    FieldConfig rawInvertedKey = parseFieldConfig("{'name': 'tags', 'encodingType': 'RAW', 'indexes': {"
+        + "'inverted': {}, 'forward': {'encodingType': 'DICTIONARY'}, 'dictionary': {}}}");
     FieldConfig defaultConfig = parseFieldConfig("{'name': 'default', 'encodingType': 'RAW', "
         + "'indexes': {'forward': null, 'dictionary': null, 'bloom': {}}}");
-    validatePerKeyConfigs(defaultConfig, List.of(rawKey, dictionaryKey));
+    validatePerKeyConfigs(defaultConfig, List.of(rawKey, dictionaryKey, rawInvertedKey));
+  }
+
+  /// `validatePerKeyFieldConfig` treats an enabled inverted index as the only per-key index that forces a
+  /// dictionary; fail here if another vetted per-key index starts requiring one.
+  @Test
+  public void testInvertedIsTheOnlyVettedPerKeyIndexRequiringDictionary() {
+    FieldSpec keySpec = new DimensionFieldSpec("clicks", FieldSpec.DataType.INT, true);
+    for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
+      String name = indexType.getPrettyName();
+      if (OpenStructSupportedIndexes.ALLOWED_PRETTY_NAMES.contains(name)
+          && !name.equals(StandardIndexes.dictionary().getPrettyName())) {
+        assertEquals(requiresDictionary(indexType, keySpec), name.equals(StandardIndexes.inverted().getPrettyName()),
+            name);
+      }
+    }
+  }
+
+  private static <C extends IndexConfig> boolean requiresDictionary(IndexType<C, ?, ?> indexType, FieldSpec spec) {
+    return indexType.requiresDictionary(spec, indexType.getDefaultConfig());
   }
 
   /// The table-config path deserializes per-key configs from JSON; a round trip must neither lose a rejected setting

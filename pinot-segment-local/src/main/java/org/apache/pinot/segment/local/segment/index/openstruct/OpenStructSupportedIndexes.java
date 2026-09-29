@@ -25,7 +25,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 /// The set of index types (by pretty name) supported on OPEN_STRUCT materialized child columns. A key's
 /// `FieldConfig` may declare only these; non-vetted indexes are rejected at table-config validation.
 /// `dictionary` is built structurally (lifecycle CUSTOM) and `forward` is always written, so their per-key configs
-/// may only restate the key's `encodingType` (see `OpenStructIndexType`).
+/// may only restate how the key is built (see `OpenStructIndexType`).
 public final class OpenStructSupportedIndexes {
   private OpenStructSupportedIndexes() {
   }
