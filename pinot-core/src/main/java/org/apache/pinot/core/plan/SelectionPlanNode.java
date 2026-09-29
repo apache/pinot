@@ -77,7 +77,9 @@ public class SelectionPlanNode implements PlanNode {
     // Although it is a break of abstraction, some code, specially merging, assumes that if there is an order by
     // expression the operator will return a block whose selection result is a priority queue.
     int sortedColumnsPrefixSize = getSortedColumnsPrefix(orderByExpressions, _queryContext.isNullHandlingEnabled());
-    if (sortedColumnsPrefixSize > 0) {
+    // Literals (including constant-folded now()) count as sorted so a later identifier can extend the prefix, but
+    // the partial-order operators require an identifier. A prefix of only literals must use the general order-by path.
+    if (sortedColumnsPrefixSize > 0 && hasIdentifier(orderByExpressions, sortedColumnsPrefixSize)) {
       int maxDocsPerCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
       // The first order by expressions are sorted (either asc or desc).
       // ie: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column DESC LIMIT 10 OFFSET 5
@@ -138,6 +140,17 @@ public class SelectionPlanNode implements PlanNode {
       }
     }
     return projectOperator;
+  }
+
+  /// A literal is treated as sorted so a later identifier can still form a prefix, but the partial-order operators
+  /// require an identifier. {@code ORDER BY now()} is constant-folded to a literal and must not take that path.
+  private static boolean hasIdentifier(List<OrderByExpressionContext> orderByExpressions, int prefixSize) {
+    for (int i = 0; i < prefixSize; i++) {
+      if (orderByExpressions.get(i).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// This functions returns the number of expressions that are sorted by the implicit order in the index.
