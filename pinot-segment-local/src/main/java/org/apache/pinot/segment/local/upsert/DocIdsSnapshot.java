@@ -47,11 +47,17 @@ public record DocIdsSnapshot(MutableRoaringBitmap docIds, @Nullable Metadata met
   public record Trigger(String consumingSegmentName, String consumedUpToOffset) {
   }
 
-  public record Metadata(long docIdsCrc32, long snapshotCapturedAtMs,
+  /// Which bitmap a snapshot file holds, so its CRC says what it covers.
+  public enum DocIdsType {
+    VALID_DOC_IDS, QUERYABLE_DOC_IDS
+  }
+
+  public record Metadata(long docIdsCrc, DocIdsType docIdsType, long snapshotCapturedAtMs,
                          @Nullable String snapshotConsumingSegmentName, @Nullable String snapshotConsumedUpToOffset) {
     public Map<String, Object> toResponse(long nowMs) {
       Map<String, Object> response = new HashMap<>();
-      response.put("docIdsCrc32", docIdsCrc32);
+      response.put("docIdsCrc", docIdsCrc);
+      response.put("docIdsType", docIdsType.name());
       response.put("snapshotCapturedAtMs", snapshotCapturedAtMs);
       // Do not turn clock skew into an apparently fresh snapshot.
       if (nowMs >= snapshotCapturedAtMs) {
@@ -67,7 +73,7 @@ public record DocIdsSnapshot(MutableRoaringBitmap docIds, @Nullable Metadata met
 
   /// Capture the timestamp with the bitmap under its existing lock, then hash the detached bitmap outside that lock.
   public static ThreadSafeMutableRoaringBitmap.CardinalityAndBytes capture(ThreadSafeMutableRoaringBitmap bitmap,
-      @Nullable Trigger trigger)
+      DocIdsType docIdsType, @Nullable Trigger trigger)
       throws IOException {
     ThreadSafeMutableRoaringBitmap.CardinalityAndBytes snapshot;
     long capturedAtMs;
@@ -86,7 +92,7 @@ public record DocIdsSnapshot(MutableRoaringBitmap docIds, @Nullable Metadata met
       crc.update(docId >>> 8);
       crc.update(docId);
     }
-    Metadata metadata = new Metadata(crc.getValue(), capturedAtMs,
+    Metadata metadata = new Metadata(crc.getValue(), docIdsType, capturedAtMs,
         trigger != null ? trigger.consumingSegmentName() : null, trigger != null ? trigger.consumedUpToOffset() : null);
     byte[] json = JsonUtils.objectToString(metadata).getBytes(StandardCharsets.UTF_8);
     byte[] bytes = ByteBuffer.allocate(snapshot.getBytes().length + 2 * Integer.BYTES + json.length)
@@ -104,8 +110,8 @@ public record DocIdsSnapshot(MutableRoaringBitmap docIds, @Nullable Metadata met
         try {
           Metadata parsed = JsonUtils.stringToObject(
               new String(bytes, trailer.position(), trailer.remaining(), StandardCharsets.UTF_8), Metadata.class);
-          if (parsed.snapshotCapturedAtMs() > 0 && parsed.docIdsCrc32() >= 0
-              && parsed.docIdsCrc32() <= 0xFFFFFFFFL) {
+          if (parsed.docIdsType() != null && parsed.snapshotCapturedAtMs() > 0 && parsed.docIdsCrc() >= 0
+              && parsed.docIdsCrc() <= 0xFFFFFFFFL) {
             metadata = parsed;
           }
         } catch (Exception e) {

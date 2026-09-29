@@ -491,10 +491,13 @@ public class TablesResourceTest extends BaseResourceTest {
     downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME, segment);
     // Upgrade both legacy fixtures to real persisted captures, without changing the live bitmaps.
     DocIdsSnapshot.Trigger trigger = new DocIdsSnapshot.Trigger("testTable__0__2__0", "123");
-    for (String file : List.of(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME,
-        V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME)) {
-      ThreadSafeMutableRoaringBitmap bitmap = new ThreadSafeMutableRoaringBitmap(segment.loadDocIdsFromSnapshot(file));
-      segment.persistDocIdsSnapshot(file, DocIdsSnapshot.capture(bitmap, trigger));
+    Map<String, DocIdsSnapshot.DocIdsType> fileTypes =
+        Map.of(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, DocIdsSnapshot.DocIdsType.VALID_DOC_IDS,
+            V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, DocIdsSnapshot.DocIdsType.QUERYABLE_DOC_IDS);
+    for (Map.Entry<String, DocIdsSnapshot.DocIdsType> fileType : fileTypes.entrySet()) {
+      ThreadSafeMutableRoaringBitmap bitmap =
+          new ThreadSafeMutableRoaringBitmap(segment.loadDocIdsFromSnapshot(fileType.getKey()));
+      segment.persistDocIdsSnapshot(fileType.getKey(), DocIdsSnapshot.capture(bitmap, fileType.getValue(), trigger));
     }
     long beforeRequest = System.currentTimeMillis();
     String response = _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/validDocIdsMetadata")
@@ -518,7 +521,9 @@ public class TablesResourceTest extends BaseResourceTest {
     assertTrue(diagnostics.get("snapshotAgeMs").asLong() <= afterRequest - capturedAt);
     assertEquals(diagnostics.get("snapshotConsumingSegmentName").asText(), trigger.consumingSegmentName());
     assertEquals(diagnostics.get("snapshotConsumedUpToOffset").asText(), trigger.consumedUpToOffset());
-    assertEquals(diagnostics.get("docIdsCrc32").asLong(),
+    assertEquals(diagnostics.get("docIdsType").asText(),
+        expectedType.equals("SNAPSHOT") ? "VALID_DOC_IDS" : "QUERYABLE_DOC_IDS");
+    assertEquals(diagnostics.get("docIdsCrc").asLong(),
         expectedType.equals("SNAPSHOT") ? 4200314552L : 569535174L);
   }
 
