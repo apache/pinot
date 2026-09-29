@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
 
 // Singleton class.
 public class ControllerLeaderLocator {
-  private static volatile ControllerLeaderLocator _instance;
+  private static ControllerLeaderLocator _instance = null;
   public static final Logger LOGGER = LoggerFactory.getLogger(ControllerLeaderLocator.class);
 
   // Minimum millis which must elapse between consecutive invalidation of cache
@@ -74,15 +74,13 @@ public class ControllerLeaderLocator {
   /// To be called once when the server starts
   /// @param helixManager should already be started
   public static void create(HelixManager helixManager) {
-    if (_instance == null) {
-      synchronized (ControllerLeaderLocator.class) {
-        if (_instance == null) {
-          _instance = new ControllerLeaderLocator(helixManager);
-        }
-      }
-    } else {
-      LOGGER.warn("ControllerLeaderLocator instance already created.");
+    if (_instance != null) {
+      // We create multiple server instances in the hybrid cluster integration tests, so allow the call to create an
+      // instance even if there is already one.
+      LOGGER.warn("Already created");
+      return;
     }
+    _instance = new ControllerLeaderLocator(helixManager);
   }
 
   public static ControllerLeaderLocator getInstance() {
