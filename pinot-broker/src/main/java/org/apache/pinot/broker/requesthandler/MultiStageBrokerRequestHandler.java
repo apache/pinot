@@ -288,7 +288,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       try (var compiled = exec.submit(() -> warmupEnv.compile("SELECT 1")).get(5, TimeUnit.SECONDS)) {
         // result discarded; compile call is for JVM warmup only
       } finally {
-        exec.shutdownNow();
+        // Do not interrupt a warmup that takes longer than the wait. Planning stops on an interrupt, and then the first
+        // queries pay the rest of the warmup cost.
+        exec.shutdown();
       }
       LOGGER.info("MSE startup warmup completed in {}ms", System.currentTimeMillis() - startMs);
     } catch (Exception e) {
