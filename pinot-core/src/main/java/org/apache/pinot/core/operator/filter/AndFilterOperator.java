@@ -40,12 +40,19 @@ public class AndFilterOperator extends BaseFilterOperator {
 
   private final List<BaseFilterOperator> _filterOperators;
   private final Map<String, String> _queryOptions;
+  private final boolean _restrictionPushdownEnabled;
 
   public AndFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
       int numDocs, boolean nullHandlingEnabled) {
+    this(filterOperators, queryOptions, numDocs, nullHandlingEnabled, false);
+  }
+
+  public AndFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
+      int numDocs, boolean nullHandlingEnabled, boolean restrictionPushdownEnabled) {
     super(numDocs, nullHandlingEnabled);
     _filterOperators = filterOperators;
     _queryOptions = queryOptions;
+    _restrictionPushdownEnabled = restrictionPushdownEnabled;
   }
 
   @Override
@@ -68,7 +75,7 @@ public class AndFilterOperator extends BaseFilterOperator {
     if (blockDocIdSets.isEmpty()) {
       return new MatchAllDocIdSet(_numDocs);
     }
-    return new AndDocIdSet(blockDocIdSets, _queryOptions);
+    return new AndDocIdSet(blockDocIdSets, _queryOptions, _restrictionPushdownEnabled);
   }
 
   /// A conjunction is not false where no child is false: the intersection of the children's not-false documents.
@@ -88,7 +95,8 @@ public class AndFilterOperator extends BaseFilterOperator {
     if (notFalses.isEmpty()) {
       return new MatchAllDocIdSet(_numDocs);
     }
-    return notFalses.size() == 1 ? notFalses.get(0) : new AndDocIdSet(notFalses, _queryOptions);
+    return notFalses.size() == 1 ? notFalses.get(0)
+        : new AndDocIdSet(notFalses, _queryOptions, _restrictionPushdownEnabled);
   }
 
   @Override
