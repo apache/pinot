@@ -24,13 +24,15 @@ import org.apache.calcite.rel.rules.ProjectJoinTransposeRule;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 
 
-/**
- * Similar to {@link ProjectJoinTransposeRule} but do not transpose project into right side of lookup join.
- *
- * TODO: Allow transposing project into left side of lookup join.
- */
+/// Similar to [ProjectJoinTransposeRule] but do not transpose project into right side of lookup join.
+///
+/// TODO: Allow transposing project into left side of lookup join.
 public class PinotProjectJoinTransposeRule extends ProjectJoinTransposeRule {
   public static final PinotProjectJoinTransposeRule INSTANCE = new PinotProjectJoinTransposeRule(Config.DEFAULT);
+
+  public static PinotProjectJoinTransposeRule instanceWithDescription(String description) {
+    return new PinotProjectJoinTransposeRule((Config) Config.DEFAULT.withDescription(description));
+  }
 
   private PinotProjectJoinTransposeRule(Config config) {
     super(config);

@@ -20,50 +20,57 @@ package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
 import java.io.File;
 import java.io.IOException;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriterV7;
+import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkWriter;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
-import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Raw (non-dictionary-encoded) forward index creator for single-value column of fixed length data type (INT, LONG,
- * FLOAT, DOUBLE).
- */
-public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator {
-  private final FixedByteChunkForwardIndexWriter _indexWriter;
+/// Raw (non-dictionary-encoded) forward index creator for single-value column of fixed length
+/// data type (`INT`, `LONG`, `FLOAT`, `DOUBLE`).
+///
+/// The creator holds a single [FixedByteChunkWriter]; the concrete writer (legacy chunk format vs
+/// V7 codec-pipeline format) is chosen by the constructor and all `put*` calls delegate to it
+/// without branching. FLOAT/DOUBLE are supported only by the legacy writer; the V7 writer rejects
+/// them at the writer level.
+public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrackingForwardIndexCreator {
+  private final FixedByteChunkWriter _indexWriter;
   private final DataType _valueType;
+  @Nullable
+  private final ChunkCompressionType _chunkCompressionType;
+  // Whether compression-statistics tracking was requested. Mirrors the legacy writer's contract of
+  // reporting an uncompressed value size only when tracking is enabled.
+  private boolean _trackUncompressedValueSize;
 
-  /**
-   * Constructor for the class
-   *
-   * @param baseIndexDir Index directory
-   * @param compressionType Type of compression to use
-   * @param column Name of column to index
-   * @param totalDocs Total number of documents to index
-   * @param valueType Type of the values
-   * @throws IOException
-   */
+  /// Constructor for the class
+  ///
+  /// @param baseIndexDir Index directory
+  /// @param compressionType Type of compression to use
+  /// @param column Name of column to index
+  /// @param totalDocs Total number of documents to index
+  /// @param valueType Type of the values
+  /// @throws IOException
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
       int totalDocs, DataType valueType)
       throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, valueType, ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION,
-        ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK);
+    this(baseIndexDir, compressionType, column, totalDocs, valueType, ForwardIndexConfig.getDefaultRawWriterVersion(),
+        ForwardIndexConfig.getDefaultTargetDocsPerChunk());
   }
 
-  /**
-   * Constructor for the class
-   *
-   * @param baseIndexDir Index directory
-   * @param compressionType Type of compression to use
-   * @param column Name of column to index
-   * @param totalDocs Total number of documents to index
-   * @param valueType Type of the values
-   * @param writerVersion writer format version
-   * @throws IOException
-   */
+  /// Constructor for the class
+  ///
+  /// @param baseIndexDir Index directory
+  /// @param compressionType Type of compression to use
+  /// @param column Name of column to index
+  /// @param totalDocs Total number of documents to index
+  /// @param valueType Type of the values
+  /// @param writerVersion writer format version
+  /// @throws IOException
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
       int totalDocs, DataType valueType, int writerVersion, int targetDocsPerChunk)
       throws IOException {
@@ -72,6 +79,25 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
         new FixedByteChunkForwardIndexWriter(file, compressionType, totalDocs, targetDocsPerChunk, valueType.size(),
             writerVersion);
     _valueType = valueType;
+    _chunkCompressionType = compressionType;
+  }
+
+  /// Creates a raw fixed-byte creator backed by the V7 codec-pipeline writer.
+  ///
+  /// This path is used for every configured codec pipeline so all `codecSpec` values use V7 format.
+  public SingleValueFixedByteRawIndexCreator(File baseIndexDir, String column, int totalDocs, DataType valueType,
+      int targetDocsPerChunk, CodecPipelineExecutor executor)
+      throws IOException {
+    if (valueType != executor.getStoredType()) {
+      throw new IllegalArgumentException(
+          "Creator value type " + valueType + " does not match codec executor stored type "
+              + executor.getStoredType() + " for column: " + column);
+    }
+    File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+    _indexWriter = new FixedByteChunkForwardIndexWriterV7(file, executor, totalDocs, targetDocsPerChunk,
+        valueType.size());
+    _valueType = valueType;
+    _chunkCompressionType = null;
   }
 
   @Override
@@ -113,5 +139,32 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
   public void close()
       throws IOException {
     _indexWriter.close();
+  }
+
+  @Override
+  public long getRawForwardIndexUncompressedValueSizeInBytes() {
+    if (_indexWriter instanceof FixedByteChunkForwardIndexWriter legacyWriter) {
+      return legacyWriter.getRawForwardIndexUncompressedValueSizeInBytes();
+    }
+    // V7 codec-pipeline writer: like the legacy writer, report the value bytes actually written, or -1 unless
+    // tracking was requested.
+    if (_trackUncompressedValueSize && _indexWriter instanceof FixedByteChunkForwardIndexWriterV7 v7Writer) {
+      return v7Writer.getUncompressedValueSizeInBytes();
+    }
+    return -1;
+  }
+
+  @Override
+  @Nullable
+  public ChunkCompressionType getRawForwardIndexChunkCompressionType() {
+    return _chunkCompressionType;
+  }
+
+  @Override
+  public void enableRawForwardIndexUncompressedValueSizeTracking() {
+    _trackUncompressedValueSize = true;
+    if (_indexWriter instanceof FixedByteChunkForwardIndexWriter legacyWriter) {
+      legacyWriter.enableRawForwardIndexUncompressedValueSizeTracking();
+    }
   }
 }

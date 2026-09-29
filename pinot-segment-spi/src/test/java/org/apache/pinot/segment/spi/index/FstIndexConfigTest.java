@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
@@ -35,7 +34,6 @@ public class FstIndexConfigTest {
     FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertNull(config.getFstType(), "Unexpected type");
   }
 
   @Test
@@ -45,7 +43,6 @@ public class FstIndexConfigTest {
     FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertNull(config.getFstType(), "Unexpected type");
   }
 
   @Test
@@ -55,7 +52,6 @@ public class FstIndexConfigTest {
     FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertNull(config.getFstType(), "Unexpected type");
   }
 
   @Test
@@ -65,18 +61,5 @@ public class FstIndexConfigTest {
     FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
 
     assertTrue(config.isDisabled(), "Unexpected disabled");
-    assertNull(config.getFstType(), "Unexpected type");
-  }
-
-  @Test
-  public void withSomeData()
-      throws JsonProcessingException {
-    String confStr = "{\n"
-        + "        \"type\": \"NATIVE\"\n"
-        + "}";
-    FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
-
-    assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertEquals(config.getFstType(), FSTType.NATIVE, "Unexpected type");
   }
 }

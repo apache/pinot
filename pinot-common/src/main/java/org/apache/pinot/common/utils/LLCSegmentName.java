@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.common.base.Preconditions;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -58,31 +59,18 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     _segmentName = tableName + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
   }
 
-  private LLCSegmentName(String tableName, int partitionGroupId, int sequenceNumber, String creationTime,
-      String segmentName) {
-    _tableName = tableName;
-    _partitionGroupId = partitionGroupId;
-    _sequenceNumber = sequenceNumber;
-    _creationTime = creationTime;
-    _segmentName = segmentName;
-  }
-
-  /**
-   * Returns the {@link LLCSegmentName} for the given segment name, or {@code null} if the given segment name does not
-   * represent an LLC segment.
-   */
+  /// Returns the [LLCSegmentName] for the given segment name, or `null` if the given segment name does not
+  /// represent an LLC segment.
   @Nullable
   public static LLCSegmentName of(String segmentName) {
-    String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
-    if (parts.length != 4) {
+    try {
+      return new LLCSegmentName(segmentName);
+    } catch (Exception e) {
       return null;
     }
-    return new LLCSegmentName(parts[0], Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), parts[3], segmentName);
   }
 
-  /**
-   * Returns whether the given segment name represents an LLC segment.
-   */
+  /// Returns whether the given segment name represents an LLC segment.
   public static boolean isLLCSegment(String segmentName) {
     int numSeparators = 0;
     int index = 0;
@@ -93,14 +81,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     return numSeparators == 3;
   }
 
-  @Deprecated
-  public static boolean isLowLevelConsumerSegmentName(String segmentName) {
-    return isLLCSegment(segmentName);
-  }
-
-  /**
-   * Returns the sequence number of the given segment name.
-   */
+  /// Returns the sequence number of the given segment name.
   public static int getSequenceNumber(String segmentName) {
     return Integer.parseInt(StringUtils.splitByWholeSeparator(segmentName, SEPARATOR)[2]);
   }
@@ -126,6 +107,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     return dateTime.getMillis();
   }
 
+  @JsonValue
   public String getSegmentName() {
     return _segmentName;
   }

@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.startree;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Utf8;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
@@ -27,6 +28,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -34,8 +38,11 @@ import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -48,9 +55,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * The {@code StarTreeBuilderUtils} class contains utility methods for star-tree builders.
- */
+/// The `StarTreeBuilderUtils` class contains utility methods for star-tree builders.
 public class StarTreeBuilderUtils {
   private StarTreeBuilderUtils() {
   }
@@ -67,9 +72,7 @@ public class StarTreeBuilderUtils {
     public Map<Integer, TreeNode> _children;
   }
 
-  /**
-   * Generates the deduplicated star-tree builder configs.
-   */
+  /// Generates the deduplicated star-tree builder configs.
   public static List<StarTreeV2BuilderConfig> generateBuilderConfigs(@Nullable List<StarTreeIndexConfig> indexConfigs,
       boolean enableDefaultStarTree, SegmentMetadata segmentMetadata) {
     List<StarTreeV2BuilderConfig> builderConfigs = new ArrayList<>();
@@ -111,9 +114,7 @@ public class StarTreeBuilderUtils {
     return builderConfigs;
   }
 
-  /**
-   * Serialize the star-tree structure into a file.
-   */
+  /// Serialize the star-tree structure into a file.
   public static void serializeTree(File starTreeFile, TreeNode rootNode, String[] dimensions, int numNodes)
       throws IOException {
     int headerSizeInBytes = computeHeaderByteSize(dimensions);
@@ -128,19 +129,17 @@ public class StarTreeBuilderUtils {
     }
   }
 
-  /**
-   * Helper method to compute size of the star-tree header in bytes.
-   * <p>The header contains the following fields:
-   * <ul>
-   *   <li>Magic marker (long)</li>
-   *   <li>Size of the header (int)</li>
-   *   <li>Version (int)</li>
-   *   <li>Number of dimensions (int)</li>
-   *   <li>For each dimension, index of the dimension (int), number of bytes in the dimension string (int), and the byte
-   *   array for the string</li>
-   *   <li>Number of nodes in the tree (int)</li>
-   * </ul>
-   */
+  /// Helper method to compute size of the star-tree header in bytes.
+  ///
+  /// The header contains the following fields:
+  ///
+  /// - Magic marker (long)
+  /// - Size of the header (int)
+  /// - Version (int)
+  /// - Number of dimensions (int)
+  /// - For each dimension, index of the dimension (int), number of bytes in the dimension string (int), and the
+  ///   byte array for the string
+  /// - Number of nodes in the tree (int)
   private static int computeHeaderByteSize(String[] dimensions) {
     // Magic marker (8), version (4), size of header (4) and number of dimensions (4)
     int headerSizeInBytes = 20;
@@ -148,16 +147,14 @@ public class StarTreeBuilderUtils {
     for (String dimension : dimensions) {
       headerSizeInBytes += Integer.BYTES; // For dimension index
       headerSizeInBytes += Integer.BYTES; // For length of dimension name
-      headerSizeInBytes += dimension.getBytes(UTF_8).length; // For dimension name
+      headerSizeInBytes += Utf8.encodedLength(dimension); // For dimension name
     }
 
     headerSizeInBytes += Integer.BYTES; // For number of nodes.
     return headerSizeInBytes;
   }
 
-  /**
-   * Helper method to write the header into the data buffer.
-   */
+  /// Helper method to write the header into the data buffer.
   private static int writeHeader(PinotDataBuffer dataBuffer, int headerSizeInBytes, String[] dimensions, int numNodes) {
     int offset = 0;
 
@@ -194,9 +191,7 @@ public class StarTreeBuilderUtils {
     return offset;
   }
 
-  /**
-   * Helper method to traverse star-tree using BFS and write nodes into the data buffer.
-   */
+  /// Helper method to traverse star-tree using BFS and write nodes into the data buffer.
   private static void writeNodes(PinotDataBuffer dataBuffer, long offset, TreeNode rootNode) {
     Queue<TreeNode> queue = new LinkedList<>();
     queue.add(rootNode);
@@ -223,9 +218,7 @@ public class StarTreeBuilderUtils {
     }
   }
 
-  /**
-   * Helper method to write one node into the data buffer.
-   */
+  /// Helper method to write one node into the data buffer.
   private static long writeNode(PinotDataBuffer dataBuffer, long offset, TreeNode node, int firstChildId,
       int lastChildId) {
     dataBuffer.putInt(offset, node._dimensionId);
@@ -252,10 +245,8 @@ public class StarTreeBuilderUtils {
     return offset;
   }
 
-  /**
-   * Returns {@code true} if the given star-tree builder configs do not match the star-tree metadata, in which case the
-   * relevant star-trees need to be added/removed, {@code false} otherwise.
-   */
+  /// Returns `true` if the given star-tree builder configs do not match the star-tree metadata, in which case the
+  /// relevant star-trees need to be added/removed, `false` otherwise.
   public static boolean shouldModifyExistingStarTrees(List<StarTreeV2BuilderConfig> builderConfigs,
       List<StarTreeV2Metadata> metadataList) {
     int numStarTrees = builderConfigs.size();
@@ -272,19 +263,65 @@ public class StarTreeBuilderUtils {
           .equals(metadata.getSkipStarNodeCreationForDimensions())) {
         return true;
       }
-      if (!builderConfig.getAggregationSpecs().equals(metadata.getAggregationSpecs())) {
-        return true;
-      }
       if (builderConfig.getMaxLeafRecords() != metadata.getMaxLeafRecords()) {
         return true;
+      }
+      // Switching null handling on or off changes how the whole star-tree is pre-aggregated, so it has to be rebuilt
+      if (builderConfig.isNullHandlingEnabled() != metadata.isNullHandlingEnabled()) {
+        return true;
+      }
+      TreeMap<AggregationFunctionColumnPair, AggregationSpec> newSpecs = builderConfig.getAggregationSpecs();
+      TreeMap<AggregationFunctionColumnPair, AggregationSpec> existingSpecs = metadata.getAggregationSpecs();
+      if (newSpecs.size() != existingSpecs.size()) {
+        return true;
+      }
+      for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry : newSpecs.entrySet()) {
+        AggregationFunctionColumnPair functionColumnPair = entry.getKey();
+        AggregationSpec newSpec = entry.getValue();
+        AggregationSpec existingSpec = existingSpecs.get(functionColumnPair);
+        if (existingSpec == null) {
+          return true;
+        }
+        if (newSpec.shouldModifyStarTree(existingSpec)) {
+          return true;
+        }
       }
     }
     return false;
   }
 
-  /**
-   * Returns {@code true} if the given star-tree builder configs are equal, {@code false} otherwise.
-   */
+  /// Returns the first dimension of the given star-tree that the segment can no longer back with a dictionary
+  /// encoded forward index, or `null` if the star-tree is loadable.
+  ///
+  /// A star-tree stores its dimension values as dictionary ids in a fixed-bit forward index whose bit width is read
+  /// from the *main* column metadata at load time. Re-encoding a dimension column to raw (e.g. after adding it to
+  /// `noDictionaryColumns`) therefore leaves the star-tree unreadable, and loading the segment fails.
+  @Nullable
+  public static String findUnloadableDimension(StarTreeV2Metadata starTreeMetadata, SegmentMetadata segmentMetadata) {
+    for (String dimension : starTreeMetadata.getDimensionsSplitOrder()) {
+      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(dimension);
+      if (columnMetadata == null || !columnMetadata.hasDictionary()) {
+        return dimension;
+      }
+    }
+    return null;
+  }
+
+  /// Returns the dimensions that make the given star-trees unloadable, or an empty set if they are all loadable.
+  /// See [#findUnloadableDimension(StarTreeV2Metadata, SegmentMetadata)].
+  public static Set<String> findUnloadableDimensions(List<StarTreeV2Metadata> metadataList,
+      SegmentMetadata segmentMetadata) {
+    Set<String> dimensions = new TreeSet<>();
+    for (StarTreeV2Metadata starTreeMetadata : metadataList) {
+      String dimension = findUnloadableDimension(starTreeMetadata, segmentMetadata);
+      if (dimension != null) {
+        dimensions.add(dimension);
+      }
+    }
+    return dimensions;
+  }
+
+  /// Returns `true` if the given star-tree builder configs are equal, `false` otherwise.
   public static boolean areStarTreeBuilderConfigListsEqual(List<StarTreeV2BuilderConfig> builderConfig1,
       List<StarTreeV2BuilderConfig> builderConfig2) {
     int numStarTrees = builderConfig1.size();
@@ -301,9 +338,7 @@ public class StarTreeBuilderUtils {
     return true;
   }
 
-  /**
-   * Removes all the star-trees from the given segment.
-   */
+  /// Removes all the star-trees from the given segment.
   public static void removeStarTrees(File indexDir)
       throws Exception {
     // Remove the star-tree metadata

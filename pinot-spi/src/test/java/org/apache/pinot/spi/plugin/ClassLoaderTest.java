@@ -32,16 +32,14 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * IMPORTANT READ
- *
- * To avoid (huge) jars in the codebase just for testing, we let Maven download the jars required for these tests.
- * In the pom.xml the maven-dependency-plugin is configured to download (and sometimes unpack)
- * artifacts during the generate-test-resources phase. They will be put in _pluginsDirectory
- *
- * As this is the target/test-classes/plugins, it will contain the static files under src/test/resoources/plugins,
- * most of the time just the pinot-plugin.properties for that plugin.
- */
+/// IMPORTANT READ
+///
+/// To avoid (huge) jars in the codebase just for testing, we let Maven download the jars required for these tests.
+/// In the pom.xml the maven-dependency-plugin is configured to download (and sometimes unpack)
+/// artifacts during the generate-test-resources phase. They will be put in \_pluginsDirectory
+///
+/// As this is the target/test-classes/plugins, it will contain the static files under src/test/resoources/plugins,
+/// most of the time just the pinot-plugin.properties for that plugin.
 public class ClassLoaderTest {
   private static final String ORIGINAL_PLUGIN_DIR = System.getProperty(PluginManager.PLUGINS_DIR_PROPERTY_NAME);
 

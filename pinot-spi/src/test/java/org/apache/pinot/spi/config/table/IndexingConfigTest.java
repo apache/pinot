@@ -89,15 +89,7 @@ public class IndexingConfigTest {
 
     IndexingConfig actualIndexingConfig =
         JsonUtils.stringToObject(JsonUtils.objectToString(expectedIndexingConfig), IndexingConfig.class);
-
-    SegmentPartitionConfig actualPartitionConfig = actualIndexingConfig.getSegmentPartitionConfig();
-    Map<String, ColumnPartitionConfig> actualColumnPartitionMap = actualPartitionConfig.getColumnPartitionMap();
-    assertEquals(actualColumnPartitionMap.size(), expectedColumnPartitionMap.size());
-
-    for (String column : expectedColumnPartitionMap.keySet()) {
-      assertEquals(actualPartitionConfig.getFunctionName(column), expectedPartitionConfig.getFunctionName(column));
-      assertEquals(actualPartitionConfig.getNumPartitions(column), expectedPartitionConfig.getNumPartitions(column));
-    }
+    assertEquals(actualIndexingConfig.getSegmentPartitionConfig(), expectedPartitionConfig);
   }
 
   @Test

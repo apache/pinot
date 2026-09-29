@@ -54,12 +54,14 @@
       {
         "description": "Wrong partition key",
         "sql": "SELECT {tbl1}.num, COUNT(*), COUNT(DISTINCT {tbl1}.name) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='name', partition_size='4') */ GROUP BY {tbl1}.num",
-        "expectedException": "Error composing query plan for.*"
+        "expectedException": "Error composing query plan for.*",
+        "ignoreV2Optimizer": true
       },
       {
         "description": "Wrong partition size",
         "sql": "SELECT {tbl1}.num, COUNT(*), COUNT(DISTINCT {tbl1}.name) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='2') */ GROUP BY {tbl1}.num",
-        "expectedException": "Error composing query plan for.*"
+        "expectedException": "Error composing query plan for.*",
+        "ignoreV2Optimizer": true
       },
       {
         "description": "Group by partition column",
@@ -126,6 +128,22 @@
         "sql": "SET stageParallelism=2; SELECT {tbl1}.name, SUM({tbl2}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num GROUP BY {tbl1}.name"
       },
       {
+        "description": "Broadcast JOIN",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+      },
+      {
+        "description": "Broadcast JOIN with partition hint",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+      },
+      {
+        "description": "Broadcast JOIN with parallelism",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_parallelism='2') */ JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+      },
+      {
+        "description": "Broadcast JOIN with partition hint and parallelism",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4', partition_parallelism='2') */ JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+      },
+      {
         "description": "Colocated, Dynamic broadcast SEMI-JOIN with partition column",
         "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ {tbl1}.num, {tbl1}.name FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ WHERE {tbl2}.val IN ('xxx', 'yyy'))"
       },
@@ -144,6 +162,59 @@
       {
         "description": "Colocated, Dynamic broadcast SEMI-JOIN with partially empty right table result for some servers",
         "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ {tbl1}.name, COUNT(*) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ WHERE {tbl2}.val = 'z') GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "INTERSECT on the partition column num with is_colocated_by_set_op_keys hint forces a pre-partitioned (direct) exchange; tbl1 and tbl2 are both partitioned by num so results stay correct",
+        "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ {tbl1}.num FROM {tbl1} INTERSECT SELECT {tbl2}.num FROM {tbl2}"
+      },
+      {
+        "description": "GROUP BY above a colocated INTERSECT: the hint asserts equal rows already share a worker, so the set op's output is claimed hash distributed on all columns and the aggregate above skips its shuffle too -- it must still see complete groups",
+        "sql": "SELECT t.num, COUNT(*) FROM (SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ {tbl1}.num AS num FROM {tbl1} INTERSECT SELECT {tbl2}.num AS num FROM {tbl2}) AS t GROUP BY t.num"
+      },
+      {
+        "description": "EXCEPT on the partition column num with is_colocated_by_set_op_keys hint forces a pre-partitioned (direct) exchange; tbl1 and tbl2 are both partitioned by num so results stay correct",
+        "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ {tbl1}.num FROM {tbl1} EXCEPT SELECT {tbl2}.num FROM {tbl2}"
+      },
+      {
+        "description": "UNION ALL on the partition column num with is_colocated_by_set_op_keys hint forces a pre-partitioned (direct) exchange; UNION ALL only concatenates so a direct exchange is always correct",
+        "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ {tbl1}.num FROM {tbl1} UNION ALL SELECT {tbl2}.num FROM {tbl2}"
+      },
+      {
+        "description": "Multi-column INTERSECT with is_colocated_by_set_op_keys hint; both tables are partitioned by num, a subset of the projected columns, so equal rows still colocate and results stay correct. V1 only: the V2 optimizer derives set-op distributions itself and does not yet handle multi-column set ops over subset-partitioned inputs",
+        "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ {tbl1}.num, {tbl1}.name FROM {tbl1} INTERSECT SELECT {tbl2}.num, {tbl2}.val FROM {tbl2}",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "INTERSECT with is_colocated_by_set_op_keys='false' disables auto-detected pre-partitioning and falls back to a shuffle; results stay correct",
+        "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='false') */ {tbl1}.num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ INTERSECT SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */"
+      },
+      {
+        "description": "Chained colocated operations stay correct: a colocated JOIN on num feeding a window partitioned by num (the no-shuffle plan shape is asserted in QueryCompilationTest)",
+        "sql": "SELECT /*+ joinOptions(is_colocated_by_join_keys='true'), windowOptions(is_partitioned_by_window_keys='true') */ {tbl1}.num, COUNT(*) OVER (PARTITION BY {tbl1}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num"
+      },
+      {
+        "description": "Chained colocated operations stay correct: a UNION ALL of two colocated JOINs on num, set-op hint on the outer wrap and join hint per branch (the no-shuffle plan shape is asserted in QueryCompilationTest)",
+        "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ * FROM (SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num UNION ALL SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num)"
+      },
+      {
+        "description": "UNION ALL without any hint uses local (SINGLETON) exchanges; UNION ALL only concatenates so a direct exchange is always correct",
+        "sql": "SELECT {tbl1}.num FROM {tbl1} UNION ALL SELECT {tbl2}.num FROM {tbl2}"
+      },
+      {
+        "description": "UNION ALL of heterogeneous non-partition columns without any hint: the local exchange is correct under any row-to-worker mapping",
+        "sql": "SELECT {tbl1}.name FROM {tbl1} UNION ALL SELECT {tbl2}.val FROM {tbl2}"
+      },
+      {
+        "description": "Distinct UNION deduplicates correctly above the local UNION ALL exchange: the union's output claims no distribution, so the dedup aggregate shuffles for correct results",
+        "sql": "SELECT {tbl1}.name FROM {tbl1} UNION SELECT {tbl2}.val FROM {tbl2}"
+      },
+      {
+        "description": "GROUP BY above a hint-free UNION ALL deduplicates correctly: the union's output claims no distribution, so the aggregate shuffles for correct results",
+        "sql": "SELECT t.name, COUNT(*) FROM (SELECT {tbl1}.name AS name FROM {tbl1} UNION ALL SELECT {tbl2}.val AS name FROM {tbl2}) AS t GROUP BY t.name"
+      },
+      {
+        "description": "is_partitioned_by_group_by_keys above a hint-free self-UNION ALL: both branches route identically, so the assertion holds on the physical data and the direct (un-shuffled) aggregate sees complete groups",
+        "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ t.num, COUNT(*) FROM (SELECT {tbl1}.num AS num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ UNION ALL SELECT {tbl1}.num AS num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */) AS t GROUP BY t.num"
       }
     ]
   },
@@ -221,6 +292,14 @@
       {
         "description": "Colocated, Dynamic broadcast SEMI-JOIN with partially empty right table result for some servers",
         "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ {tbl1}.name, COUNT(*) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='2') */ WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ WHERE {tbl2}.val = 'z') GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "Forcing is_colocated_by_set_op_keys='true' when the inputs have mismatched partition counts (tbl1=2, tbl2=4): the planner cannot form a direct exchange, so it still shuffles and results stay correct",
+        "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ {tbl1}.num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='2') */ INTERSECT SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */"
+      },
+      {
+        "description": "Hint-free UNION ALL over inputs with mismatched partition counts (tbl1=2, tbl2=4): the branches cannot share one worker assignment, so the local exchange degrades to an arbitrary fan-out and results stay correct",
+        "sql": "SELECT {tbl1}.num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='2') */ UNION ALL SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */"
       }
     ]
   },
@@ -320,6 +399,14 @@
       {
         "description": "aggregate with skip intermediate stage hint (via hint option is_partitioned_by_group_by_keys)",
         "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ {tbl1}.num, COUNT(*), SUM({tbl1}.val), SUM({tbl1}.num), COUNT(DISTINCT {tbl1}.val) FROM {tbl1} WHERE {tbl1}.val >= 0 AND {tbl1}.name != 'a' GROUP BY {tbl1}.num"
+      },
+      {
+        "description": "aggregate with skip intermediate stage and enable group trim hint",
+        "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true', is_enable_group_trim='true') */ num, COUNT(*), SUM(val), SUM(num), COUNT(DISTINCT val) FROM {tbl1} WHERE val >= 0 AND name != 'a' GROUP BY num ORDER BY COUNT(*) DESC, num LIMIT 1"
+      },
+      {
+        "description": "distinct with enable group trim hint",
+        "sql": "SELECT /*+ aggOptions(is_enable_group_trim='true') */ DISTINCT num, val FROM {tbl1} WHERE val >= 0 AND name != 'a' ORDER BY val DESC, num LIMIT 1"
       },
       {
         "description": "join with pre-partitioned left and right tables",
@@ -559,5 +646,92 @@
         "sql": "SELECT {tbl2}.id, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num WHERE {tbl2}.data > 0 GROUP BY {tbl2}.id"
       }
     ]
-  }
+  },
+  "hint_option_replicated_table": {
+  "tables": {
+    "tbl1" : {
+      "schema": [
+        {"name": "num", "type": "INT"},
+        {"name": "name", "type": "STRING"}
+      ],
+      "inputs": [
+        [1, "a"],
+        [2, "b"],
+        [3, "c"],
+        [3, "yyy"],
+        [4, "e"],
+        [4, "e"],
+        [6, "e"],
+        [7, "d"],
+        [7, "f"],
+        [8, "z"]
+      ],
+      "partitionColumns": [
+        "num"
+      ]
+    },
+    "tbl2" : {
+      "schema": [
+        {"name": "num", "type": "INT"},
+        {"name": "val", "type": "STRING"}
+      ],
+      "inputs": [
+        [1, "xxx"],
+        [1, "xxx"],
+        [3, "yyy"],
+        [3, "zzz"],
+        [5, "zzz"],
+        [6, "e"],
+        [7, "d"],
+        [8, "z"]
+      ],
+      "replicated": true
+    }
+  },
+  "queries": [
+    {
+      "description": "Broadcast JOIN",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Broadcast JOIN with partition hint",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Broadcast JOIN with parallelism",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_parallelism='2') */ JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Broadcast JOIN with partition hint and parallelism",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4', partition_parallelism='2') */ JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Local replicated JOIN",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Local replicated JOIN with partition hint",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Local replicated JOIN with parallelism",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_parallelism='2') */ JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Local replicated JOIN with partition hint and parallelism",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4', partition_parallelism='2') */ JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Window PARTITION BY the table's partition column with is_partitioned_by_window_keys hint forces a pre-partitioned (direct) exchange; tbl1 is partitioned by num so results stay correct",
+      "sql": "SELECT /*+ windowOptions(is_partitioned_by_window_keys='true') */ {tbl1}.num, SUM({tbl1}.num) OVER (PARTITION BY {tbl1}.num) FROM {tbl1}"
+    },
+    {
+      "description": "Window PARTITION BY + ORDER BY on different keys with is_partitioned_by_window_keys hint forces a pre-partitioned sort exchange; tbl1 is partitioned by num so results stay correct",
+      "sql": "SELECT /*+ windowOptions(is_partitioned_by_window_keys='true') */ {tbl1}.num, {tbl1}.name, SUM({tbl1}.num) OVER (PARTITION BY {tbl1}.num ORDER BY {tbl1}.name) FROM {tbl1}"
+    },
+    {
+      "description": "Window with is_partitioned_by_window_keys='false' disables the auto-detected pre-partitioning (tbl1 is partitioned by num) and falls back to a shuffle; results stay correct",
+      "sql": "SELECT /*+ windowOptions(is_partitioned_by_window_keys='false') */ {tbl1}.num, SUM({tbl1}.num) OVER (PARTITION BY {tbl1}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */"
+    }
+  ]}
 }

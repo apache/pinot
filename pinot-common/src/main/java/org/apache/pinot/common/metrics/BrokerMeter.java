@@ -18,167 +18,319 @@
  */
 package org.apache.pinot.common.metrics;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.metrics.PinotMeter;
 
 
-/**
- * Enumeration containing all the metrics exposed by the Pinot broker.
- */
-public enum BrokerMeter implements AbstractMetrics.Meter {
-  UNCAUGHT_GET_EXCEPTIONS("exceptions", true),
-  UNCAUGHT_POST_EXCEPTIONS("exceptions", true),
-  HEALTHCHECK_BAD_CALLS("healthcheck", true),
-  HEALTHCHECK_OK_CALLS("healthcheck", true),
-  /**
-   * Number of queries executed.
-   * <p>
-   * At this moment this counter does not include queries executed in multi-stage mode.
-   */
-  QUERIES("queries", false),
-  /**
-   * Number of single-stage queries that have been started.
-   * <p>
-   * Unlike {@link #QUERIES}, this metric is global and not attached to a particular table.
-   * That means it can be used to know how many single-stage queries have been started in total.
-   */
-  QUERIES_GLOBAL("queries", true),
-  /**
-   * Number of multi-stage queries that have been started.
-   * <p>
-   * Unlike {@link #MULTI_STAGE_QUERIES}, this metric is global and not attached to a particular table.
-   * That means it can be used to know how many multi-stage queries have been started in total.
-   */
-  MULTI_STAGE_QUERIES_GLOBAL("queries", true),
-  /**
-   * Number of multi-stage queries that have been started touched a given table.
-   * <p>
-   * In case the query touch multiple tables (ie using joins)1, this metric will be incremented for each table, so the
-   * sum of this metric across all tables should be greater or equal than {@link #MULTI_STAGE_QUERIES_GLOBAL}.
-   */
-  MULTI_STAGE_QUERIES("queries", false),
-  /**
-   * Number of single-stage queries executed that would not have successfully run on the multi-stage query engine as is.
-   */
-  SINGLE_STAGE_QUERIES_INVALID_MULTI_STAGE("queries", true),
-  /**
-   * Number of time-series queries. This metric is not grouped on the table name.
-   */
-  TIME_SERIES_GLOBAL_QUERIES("queries", true),
-  /**
-   * Number of time-series queries that failed. This metric is not grouped on the table name.
-   */
-  TIME_SERIES_GLOBAL_QUERIES_FAILED("queries", true),
+/// Class containing all the meters exposed by the Pinot broker.
+/// This is implemented as a class rather than an enum to allow for dynamic addition of metrics for all QueryErrorCodes.
+public class BrokerMeter implements AbstractMetrics.Meter {
+  private static final List<BrokerMeter> BROKER_METERS = new ArrayList<>();
+
+  public static final BrokerMeter UNCAUGHT_GET_EXCEPTIONS = create("UNCAUGHT_GET_EXCEPTIONS", "exceptions", true);
+  public static final BrokerMeter UNCAUGHT_POST_EXCEPTIONS = create("UNCAUGHT_POST_EXCEPTIONS", "exceptions", true);
+  public static final BrokerMeter BAD_REQUEST_EXCEPTIONS = create("BAD_REQUEST_EXCEPTIONS", "exceptions", true);
+  public static final BrokerMeter WEB_APPLICATION_EXCEPTIONS = create("WEB_APPLICATION_EXCEPTIONS", "exceptions", true);
+  public static final BrokerMeter HEALTHCHECK_BAD_CALLS = create("HEALTHCHECK_BAD_CALLS", "healthcheck", true);
+  public static final BrokerMeter HEALTHCHECK_OK_CALLS = create("HEALTHCHECK_OK_CALLS", "healthcheck", true);
+  /// Number of queries executed.
+  ///
+  /// At this moment this counter does not include queries executed in multi-stage mode.
+  public static final BrokerMeter QUERIES = create("QUERIES", "queries", false);
+
+  /// Queries in which the broker rewrote at least one exact aggregation into its approximate counterpart, because
+  /// `pinot.broker.use.approximate.function` was on. The results of those queries are approximate.
+  public static final BrokerMeter APPROXIMATE_FUNCTION_OVERRIDES =
+      create("APPROXIMATE_FUNCTION_OVERRIDES", "queries", false);
+  /// Number of single-stage queries that have been started.
+  ///
+  /// Unlike [#QUERIES], this metric is global and not attached to a particular table.
+  /// That means it can be used to know how many single-stage queries have been started in total.
+  public static final BrokerMeter QUERIES_GLOBAL = create("QUERIES_GLOBAL", "queries", true);
+  /// Number of queries executed per pool.
+  ///
+  /// This metric is used to monitor query traffic distribution across pool.
+  /// Currently only includes single-stage queries.
+  public static final BrokerMeter POOL_QUERIES = create("POOL_QUERIES", "routing", false);
+  /// Number of segments selected per pool during query execution.
+  ///
+  /// This metric is not global and is attached to a particular pool.
+  /// Currently, this counter includes single-stage queries only.
+  ///
+  /// Let's say the query option orderedPreferredPools is set and a few nodes in the preferred pool are down.
+  /// The other metric [#POOL_QUERIES] shows the traffic is relatively equal over pool.
+  /// This metric is still going to show that most of the segments are still selected from the preferred pool.
+  public static final BrokerMeter POOL_SEG_QUERIES = create("POOL_SEG_QUERIES", "routing", false);
+  /// Number of segments whose replicas are not distributed into multiple pools in ideal state.
+  ///
+  /// This metric is not global and is attached to a particular table
+  public static final BrokerMeter SINGLE_POOL_SEGMENTS = create("SINGLE_POOL_SEGMENTS", "segments", false);
+  /// Number of multi-stage queries that have been started.
+  ///
+  /// Unlike [#MULTI_STAGE_QUERIES], this metric is global and not attached to a particular table.
+  /// That means it can be used to know how many multi-stage queries have been started in total.
+  public static final BrokerMeter MULTI_STAGE_QUERIES_GLOBAL = create("MULTI_STAGE_QUERIES_GLOBAL", "queries", true);
+  /// Number of multi-stage queries that have been started touched a given table.
+  ///
+  /// In case the query touch multiple tables (ie using joins)1, this metric will be incremented for each table, so the
+  /// sum of this metric across all tables should be greater or equal than [#MULTI_STAGE_QUERIES_GLOBAL].
+  public static final BrokerMeter MULTI_STAGE_QUERIES = create("MULTI_STAGE_QUERIES", "queries", false);
+  /// Number of single-stage queries executed that would not have successfully run on the multi-stage query engine as
+  /// is.
+  public static final BrokerMeter SINGLE_STAGE_QUERIES_INVALID_MULTI_STAGE = create(
+      "SINGLE_STAGE_QUERIES_INVALID_MULTI_STAGE", "queries", true);
+  /// Number of time-series queries. This metric is not grouped on the table name.
+  public static final BrokerMeter TIME_SERIES_GLOBAL_QUERIES = create("TIME_SERIES_GLOBAL_QUERIES", "queries", true);
+  /// Number of time-series queries that failed. This metric is not grouped on the table name.
+  public static final BrokerMeter TIME_SERIES_GLOBAL_QUERIES_FAILED = create(
+      "TIME_SERIES_GLOBAL_QUERIES_FAILED", "queries", true);
   // These metrics track the exceptions caught during query execution in broker side.
   // Query rejected by Jersey thread pool executor
-  QUERY_REJECTED_EXCEPTIONS("exceptions", true),
+  public static final BrokerMeter QUERY_REJECTED_EXCEPTIONS = create("QUERY_REJECTED_EXCEPTIONS", "exceptions", true);
   // Query compile phase.
-  REQUEST_COMPILATION_EXCEPTIONS("exceptions", true),
+  public static final BrokerMeter REQUEST_COMPILATION_EXCEPTIONS = create(
+      "REQUEST_COMPILATION_EXCEPTIONS", "exceptions", true);
   // Get resource phase.
-  RESOURCE_MISSING_EXCEPTIONS("exceptions", true),
+  public static final BrokerMeter RESOURCE_MISSING_EXCEPTIONS = create(
+      "RESOURCE_MISSING_EXCEPTIONS", "exceptions", true);
   // Query validation phase.
-  QUERY_VALIDATION_EXCEPTIONS("exceptions", false),
+  public static final BrokerMeter QUERY_VALIDATION_EXCEPTIONS = create(
+      "QUERY_VALIDATION_EXCEPTIONS", "exceptions", false);
   // Query validation phase.
-  UNKNOWN_COLUMN_EXCEPTIONS("exceptions", false),
+  public static final BrokerMeter UNKNOWN_COLUMN_EXCEPTIONS = create("UNKNOWN_COLUMN_EXCEPTIONS", "exceptions", false);
+  /// Materialized-view rewrite path: strategy bug or contract violation triggered the
+  /// defense-in-depth fallback to the base-table query path.  Non-zero values indicate a
+  /// strategy regression that must be investigated; the query itself still succeeded.
+  public static final BrokerMeter QUERY_REWRITE_EXCEPTIONS = create("QUERY_REWRITE_EXCEPTIONS", "exceptions", false);
   // Queries preempted by accountant
-  QUERIES_KILLED("query", true),
+  public static final BrokerMeter QUERIES_KILLED = create("QUERIES_KILLED", "query", true);
+  public static final BrokerMeter QUERIES_THROTTLED = create("QUERIES_THROTTLED", "query", true);
   // Scatter phase.
-  NO_SERVER_FOUND_EXCEPTIONS("exceptions", false),
-  REQUEST_TIMEOUT_BEFORE_SCATTERED_EXCEPTIONS("exceptions", false),
-  REQUEST_CHANNEL_LOCK_TIMEOUT_EXCEPTIONS("exceptions", false),
-  REQUEST_SEND_EXCEPTIONS("exceptions", false),
+  public static final BrokerMeter NO_SERVER_FOUND_EXCEPTIONS = create(
+      "NO_SERVER_FOUND_EXCEPTIONS", "exceptions", false);
+  public static final BrokerMeter REQUEST_TIMEOUT_BEFORE_SCATTERED_EXCEPTIONS = create(
+      "REQUEST_TIMEOUT_BEFORE_SCATTERED_EXCEPTIONS", "exceptions", false);
+  public static final BrokerMeter REQUEST_CHANNEL_LOCK_TIMEOUT_EXCEPTIONS = create(
+      "REQUEST_CHANNEL_LOCK_TIMEOUT_EXCEPTIONS", "exceptions", false);
+  public static final BrokerMeter REQUEST_SEND_EXCEPTIONS = create("REQUEST_SEND_EXCEPTIONS", "exceptions", false);
   // Gather phase.
-  RESPONSE_FETCH_EXCEPTIONS("exceptions", false),
-  // Response deserialize phase.
-  DATA_TABLE_DESERIALIZATION_EXCEPTIONS("exceptions", false),
+  public static final BrokerMeter RESPONSE_FETCH_EXCEPTIONS = create("RESPONSE_FETCH_EXCEPTIONS", "exceptions", false);
+  // Response deserialization phase.
+  public static final BrokerMeter DATA_TABLE_DESERIALIZATION_EXCEPTIONS = create(
+      "DATA_TABLE_DESERIALIZATION_EXCEPTIONS", "exceptions", false);
   // Reduce responses phase.
-  RESPONSE_MERGE_EXCEPTIONS("exceptions", false),
-  HEAP_CRITICAL_LEVEL_EXCEEDED("count", true),
-  HEAP_PANIC_LEVEL_EXCEEDED("count", true),
+  public static final BrokerMeter RESPONSE_MERGE_EXCEPTIONS = create("RESPONSE_MERGE_EXCEPTIONS", "exceptions", false);
+  public static final BrokerMeter HEAP_CRITICAL_LEVEL_EXCEEDED = create("HEAP_CRITICAL_LEVEL_EXCEEDED", "count", true);
+  public static final BrokerMeter HEAP_PANIC_LEVEL_EXCEEDED = create("HEAP_PANIC_LEVEL_EXCEEDED", "count", true);
 
   // These metrics track the number of bad broker responses.
   // This metric track the number of broker responses with processing exceptions inside.
   // The processing exceptions could be caught from both server side and broker side.
-  BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS("badResponses", false),
+  public static final BrokerMeter BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS = create(
+      "BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS", "badResponses", false);
   // This metric tracks the number of broker responses with unavailable segments.
-  BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS("badResponses", false),
+  public static final BrokerMeter BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS = create(
+      "BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS", "badResponses", false);
   // This metric track the number of broker responses with not all servers responded.
   // (numServersQueried > numServersResponded)
-  BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED("badResponses", false),
+  public static final BrokerMeter BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED = create(
+      "BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED", "badResponses", false);
 
-  SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED("badResponses", false),
+  public static final BrokerMeter SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED = create(
+      "SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED", "badResponses", false);
 
-  BROKER_RESPONSES_WITH_TIMEOUTS("badResponses", false),
+  // This metric tracks the number of times an in-flight server was skipped (its channel went inactive or a request
+  // send to it failed) because the query was submitted with skipUnavailableServers=true.
+  public static final BrokerMeter SERVER_MARKED_DOWN_SKIPPED =
+      create("SERVER_MARKED_DOWN_SKIPPED", "count", true);
 
-  SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS("badResponses", false),
+  // This metric tracks the number of broker responses carrying a BROKER_REQUEST_SEND (425) error
+  public static final BrokerMeter BROKER_RESPONSES_WITH_SEND_EXCEPTIONS = create(
+      "BROKER_RESPONSES_WITH_SEND_EXCEPTIONS", "badResponses", false);
+
+  public static final BrokerMeter BROKER_RESPONSES_WITH_TIMEOUTS = create(
+      "BROKER_RESPONSES_WITH_TIMEOUTS", "badResponses", false);
+
+  public static final BrokerMeter SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS = create(
+      "SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS", "badResponses", false);
+
+  // This metric track the number of broker responses with trimmed groups (potential bad responses).
+  public static final BrokerMeter BROKER_RESPONSES_WITH_GROUPS_TRIMMED = create(
+      "BROKER_RESPONSES_WITH_GROUPS_TRIMMED", "badResponses", false);
 
   // This metric track the number of broker responses with number of groups limit reached (potential bad responses).
-  BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED("badResponses", false),
+  public static final BrokerMeter BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED = create(
+      "BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED", "badResponses", false);
+
+  public static final BrokerMeter BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED = create(
+      "BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED", "badResponses", false);
 
   // These metrics track the cost of the query.
-  DOCUMENTS_SCANNED("documents", false),
-  ENTRIES_SCANNED_IN_FILTER("documents", false),
-  ENTRIES_SCANNED_POST_FILTER("documents", false),
+  public static final BrokerMeter DOCUMENTS_SCANNED = create(
+      "DOCUMENTS_SCANNED", "documents", false);
+  public static final BrokerMeter ENTRIES_SCANNED_IN_FILTER = create("ENTRIES_SCANNED_IN_FILTER", "documents", false);
+  public static final BrokerMeter ENTRIES_SCANNED_POST_FILTER = create(
+      "ENTRIES_SCANNED_POST_FILTER", "documents", false);
 
-  NUM_RESIZES("numResizes", false),
+  public static final BrokerMeter NUM_RESIZES = create("NUM_RESIZES", "numResizes", false);
 
-  HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
+  public static final BrokerMeter HELIX_ZOOKEEPER_RECONNECTS = create("HELIX_ZOOKEEPER_RECONNECTS", "reconnects", true);
 
-  REQUEST_DROPPED_DUE_TO_ACCESS_ERROR("requestsDropped", false),
+  public static final BrokerMeter MULTI_CLUSTER_BROKER_STARTUP_FAILURE = create(
+      "MULTI_CLUSTER_BROKER_STARTUP_FAILURE", "failureCount", true);
 
-  GROUP_BY_SIZE("queries", false),
-  TOTAL_SERVER_RESPONSE_SIZE("queries", false),
+  public static final BrokerMeter REQUEST_DROPPED_DUE_TO_ACCESS_ERROR = create(
+      "REQUEST_DROPPED_DUE_TO_ACCESS_ERROR", "requestsDropped", false);
 
-  QUERY_QUOTA_EXCEEDED("exceptions", false),
+  public static final BrokerMeter GROUP_BY_SIZE = create("GROUP_BY_SIZE", "queries", false);
+  public static final BrokerMeter TOTAL_SERVER_RESPONSE_SIZE = create("TOTAL_SERVER_RESPONSE_SIZE", "queries", false);
+
+  public static final BrokerMeter QUERY_QUOTA_EXCEEDED = create("QUERY_QUOTA_EXCEEDED", "exceptions", false);
 
   // tracks a case a segment is not hosted by any server
   // this is different from NO_SERVER_FOUND_EXCEPTIONS which tracks unavailability across all segments
-  NO_SERVING_HOST_FOR_SEGMENT("badResponses", false),
+  public static final BrokerMeter NO_SERVING_HOST_FOR_SEGMENT = create(
+      "NO_SERVING_HOST_FOR_SEGMENT", "badResponses", false);
 
   // Track the case where selected server is missing in RoutingManager
-  SERVER_MISSING_FOR_ROUTING("badResponses", false),
+  public static final BrokerMeter SERVER_MISSING_FOR_ROUTING = create(
+      "SERVER_MISSING_FOR_ROUTING", "badResponses", false);
 
   // Netty connection metrics
-  NETTY_CONNECTION_REQUESTS_SENT("nettyConnection", true),
-  NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
-  NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
+  public static final BrokerMeter NETTY_CONNECTION_REQUESTS_SENT = create(
+      "NETTY_CONNECTION_REQUESTS_SENT", "nettyConnection", true);
+  public static final BrokerMeter NETTY_CONNECTION_BYTES_SENT = create(
+      "NETTY_CONNECTION_BYTES_SENT", "nettyConnection", true);
+  public static final BrokerMeter NETTY_CONNECTION_BYTES_RECEIVED = create(
+      "NETTY_CONNECTION_BYTES_RECEIVED", "nettyConnection", true);
+  public static final BrokerMeter NETTY_CONNECTION_SEND_REQUEST_FAILURES = create(
+      "NETTY_CONNECTION_SEND_REQUEST_FAILURES", "nettyConnection", true);
+  // These track server channels transitioning to active/inactive on the broker (Netty channelActive/channelInactive).
+  // Non-global: emitted per server and tagged with the server short name (see DataTableHandler).
+  public static final BrokerMeter NETTY_CONNECTION_CHANNEL_ACTIVE = create(
+      "NETTY_CONNECTION_CHANNEL_ACTIVE", "nettyConnection", false);
+  public static final BrokerMeter NETTY_CONNECTION_CHANNEL_INACTIVE = create(
+      "NETTY_CONNECTION_CHANNEL_INACTIVE", "nettyConnection", false);
 
-  PROACTIVE_CLUSTER_CHANGE_CHECK("proactiveClusterChangeCheck", true),
-  DIRECT_MEMORY_OOM("directMemoryOOMCount", true),
+  public static final BrokerMeter PROACTIVE_CLUSTER_CHANGE_CHECK = create(
+      "PROACTIVE_CLUSTER_CHANGE_CHECK", "proactiveClusterChangeCheck", true);
+  public static final BrokerMeter DIRECT_MEMORY_OOM = create("DIRECT_MEMORY_OOM", "directMemoryOOMCount", true);
 
-  /**
-   * How many queries with joins have been executed.
-   * <p>
-   * For each query with at least one join, this meter is increased exactly once.
-   */
-  QUERIES_WITH_JOINS("queries", true),
-  /**
-   * How many joins have been executed.
-   * <p>
-   * For each query with at least one join, this meter is increased as many times as joins in the query.
-   */
-  JOIN_COUNT("queries", true),
-  /**
-   * How many queries with window functions have been executed.
-   * <p>
-   * For each query with at least one window function, this meter is increased exactly once.
-   */
-  QUERIES_WITH_WINDOW("queries", true),
-  /**
-   * How many window functions have been executed.
-   * <p>
-   * For each query with at least one window function, this meter is increased as many times as window functions in the
-   * query.
-   */
-  WINDOW_COUNT("queries", true),;
+  /// How many queries with joins have been executed.
+  ///
+  /// For each query with at least one join, this meter is increased exactly once.
+  public static final BrokerMeter QUERIES_WITH_JOINS = create("QUERIES_WITH_JOINS", "queries", true);
+  /// How many joins have been executed.
+  ///
+  /// For each query with at least one join, this meter is increased as many times as joins in the query.
+  public static final BrokerMeter JOIN_COUNT = create("JOIN_COUNT", "queries", true);
+  /// How many queries with window functions have been executed.
+  ///
+  /// For each query with at least one window function, this meter is increased exactly once.
+  public static final BrokerMeter QUERIES_WITH_WINDOW = create("QUERIES_WITH_WINDOW", "queries", true);
+  /// How many window functions have been executed.
+  ///
+  /// For each query with at least one window function, this meter is increased as many times as window functions in the
+  /// query.
+  public static final BrokerMeter WINDOW_COUNT = create("WINDOW_COUNT", "queries", true);
+
+  public static final BrokerMeter MSE_STAGES_STARTED = create("MSE_STAGES_STARTED", "stages", true);
+  public static final BrokerMeter MSE_STAGES_COMPLETED = create("MSE_STAGES_COMPLETED", "stages", true);
+  public static final BrokerMeter MSE_OPCHAINS_STARTED = create("MSE_OPCHAINS_STARTED", "opchains", true);
+  public static final BrokerMeter MSE_OPCHAINS_COMPLETED = create("MSE_OPCHAINS_COMPLETED", "opchains", true);
+
+  /// Number of MSE queries that used the `SubmitWithStream` bidi-RPC stats path (stream mode).
+  public static final BrokerMeter MSE_STREAM_STATS_QUERIES = create("MSE_STREAM_STATS_QUERIES", "queries", true);
+
+  /// Number of MSE stream-mode queries that returned with incomplete stats coverage (at least one stage had missing or
+  /// merge-failed opchain reports). Operators can alert on this counter to detect persistent stats gaps.
+  public static final BrokerMeter MSE_STREAM_STATS_INCOMPLETE_COVERAGE =
+      create("MSE_STREAM_STATS_INCOMPLETE_COVERAGE", "queries", true);
+
+  /// Number of non-empty cancel broadcasts sent by stream-mode queries to their peer servers. A broadcast is
+  /// triggered by the first peer error or by a broker-side processing exception; a single query can contribute more
+  /// than one (e.g. a peer error followed by a recovery-path cancel), so this counts broadcasts rather than affected
+  /// queries. At high QPS during a partial degradation this can amplify into a cancel storm, so operators can watch
+  /// this counter to detect that condition.
+  public static final BrokerMeter MSE_STREAM_STATS_CANCEL_FANOUTS =
+      create("MSE_STREAM_STATS_CANCEL_FANOUTS", "broadcasts", true);
+
+  /// How many MSE queries have encountered segments with invalid partitions.
+  ///
+  /// This is only emitted for when usePhysicalOptimizer is set to true.
+  public static final BrokerMeter INVALID_SEGMENT_PARTITION_IN_QUERY = create("INVALID_SEGMENT_PARTITION_IN_QUERY",
+      "queries", false);
+
+  /// Number of queries executed with cursors. This count includes queries that use SSE and MSE
+  public static final BrokerMeter CURSOR_QUERIES_GLOBAL = create("CURSOR_QUERIES_GLOBAL", "queries", true);
+  /// Number of exceptions when writing a response to the response store
+  public static final BrokerMeter CURSOR_WRITE_EXCEPTION = create("CURSOR_WRITE_EXCEPTION", "exceptions", true);
+  /// Number of exceptions when reading a response and result table from the response store
+  public static final BrokerMeter CURSOR_READ_EXCEPTION = create("CURSOR_READ_EXCEPTION", "exceptions", true);
+  /// The number of bytes stored in the response store. Only the size of the result table is tracked.
+  public static final BrokerMeter CURSOR_RESPONSE_STORE_SIZE = create("CURSOR_RESPONSE_STORE_SIZE", "bytes", true);
+
+  // GRPC related metrics
+  public static final BrokerMeter GRPC_QUERIES = create("GRPC_QUERIES", "grpcQueries", true);
+  public static final BrokerMeter GRPC_QUERY_EXCEPTIONS = create("GRPC_QUERY_EXCEPTIONS", "grpcExceptions", true);
+  public static final BrokerMeter GRPC_BYTES_RECEIVED = create("GRPC_BYTES_RECEIVED", "grpcBytesReceived", true);
+  public static final BrokerMeter GRPC_BYTES_SENT = create("GRPC_BYTES_SENT", "grpcBytesSent", true);
+  public static final BrokerMeter GRPC_TRANSPORT_READY = create("GRPC_TRANSPORT_READY", "grpcTransport", true);
+  public static final BrokerMeter GRPC_TRANSPORT_TERMINATED = create(
+      "GRPC_TRANSPORT_TERMINATED", "grpcTransport", true);
+  // Workload related metrics
+  public static final BrokerMeter WORKLOAD_QUERIES = create("WORKLOAD_QUERIES", "queries", false);
+  public static final BrokerMeter WORKLOAD_BUDGET_EXCEEDED = create("WORKLOAD_QUERY_EXCEPTIONS", "exceptions", true);
+
+  public static final BrokerMeter RLS_FILTERS_APPLIED = create("RLS_FILTERS_APPLIED", "queries", false);
+
+  // Audit logging metrics
+  public static final BrokerMeter AUDIT_REQUEST_FAILURES = create("AUDIT_REQUEST_FAILURES", "failures", true);
+  public static final BrokerMeter AUDIT_RESPONSE_FAILURES = create("AUDIT_RESPONSE_FAILURES", "failures", true);
+  public static final BrokerMeter AUDIT_REQUEST_PAYLOAD_TRUNCATED = create("AUDIT_REQUEST_PAYLOAD_TRUNCATED",
+      "count", true);
+
+  /// Total bytes of final query responses sent to clients.
+  ///
+  /// This metric tracks the serialized JSON response size in bytes for all queries.
+  public static final BrokerMeter QUERY_RESPONSE_SIZE_BYTES = create("QUERY_RESPONSE_SIZE_BYTES", "bytes", true);
+
+  /// SLA-style per-query error classification metrics.
+  public static final BrokerMeter QUERY_CRITICAL_ERROR = create("QUERY_CRITICAL_ERROR", "queries", true);
+  public static final BrokerMeter QUERY_NON_CRITICAL_ERROR = create("QUERY_NON_CRITICAL_ERROR", "queries", true);
+
+  private static final Map<QueryErrorCode, BrokerMeter> QUERY_ERROR_CODE_METER_MAP;
+
+  // Iterate through all query error codes from QueryErrorCode.getAllValues() and create a metric for each
+  static {
+    QUERY_ERROR_CODE_METER_MAP = new HashMap<>();
+    for (QueryErrorCode queryErrorCode : QueryErrorCode.values()) {
+      // Currently, creating a global meter rather than a table specific meter to not add too many new metrics
+      // The intention is to add alerts on these metrics, so a global metric is sufficient for now
+      BrokerMeter meter = create("QUERY_ERROR_" + queryErrorCode.name(), "queries", true);
+      QUERY_ERROR_CODE_METER_MAP.put(queryErrorCode, meter);
+    }
+  }
 
   private final String _brokerMeterName;
   private final String _unit;
   private final boolean _global;
 
-  BrokerMeter(String unit, boolean global) {
+  private BrokerMeter(String name, String unit, boolean global) {
     _unit = unit;
     _global = global;
-    _brokerMeterName = Utils.toCamelCase(name().toLowerCase());
+    _brokerMeterName = Utils.toCamelCase(name.toLowerCase());
+  }
+
+  private static BrokerMeter create(String name, String unit, boolean global) {
+    BrokerMeter brokerMeter = new BrokerMeter(name, unit, global);
+    BROKER_METERS.add(brokerMeter);
+    return brokerMeter;
   }
 
   @Override
@@ -191,13 +343,23 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
     return _unit;
   }
 
-  /**
-   * Returns true if the metric is global (not attached to a particular resource)
-   *
-   * @return true if the metric is global
-   */
+  /// Returns true if the metric is global (not attached to a particular resource)
+  ///
+  /// @return true if the metric is global
   @Override
   public boolean isGlobal() {
     return _global;
+  }
+
+  public static BrokerMeter[] values() {
+    return BROKER_METERS.toArray(new BrokerMeter[0]);
+  }
+
+  public static BrokerMeter getQueryErrorMeter(QueryErrorCode queryErrorCode) {
+    return QUERY_ERROR_CODE_METER_MAP.get(queryErrorCode);
+  }
+
+  public PinotMeter getGlobalMeter() {
+    return BrokerMetrics.get().getMeteredValue(this);
   }
 }

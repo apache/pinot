@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.tools;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -28,10 +27,8 @@ import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
-/**
- * This quickstart shows how RealtimeToOfflineSegmentsTask and MergeRollupTask minion
- * tasks continuously optimize segments as data gets ingested into Realtime table.
- */
+/// This quickstart shows how RealtimeToOfflineSegmentsTask and MergeRollupTask minion
+/// tasks continuously optimize segments as data gets ingested into Realtime table.
 public class RealtimeQuickStartWithMinion extends HybridQuickstart {
   @Override
   public List<String> types() {
@@ -74,9 +71,7 @@ public class RealtimeQuickStartWithMinion extends HybridQuickstart {
 
   @Override
   protected Map<String, String> getDefaultStreamTableDirectories() {
-    return ImmutableMap.<String, String>builder()
-        .put("githubEvents", "examples/minions/stream/githubEvents")
-        .build();
+    return Map.of("githubEvents", "examples/minions/stream/githubEvents");
   }
 
   @Override

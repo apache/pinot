@@ -23,62 +23,40 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
-/**
- * Interface wrapping streaming messages. Throws IndexOutOfBoundsException when trying to access a message at an invalid
- * index.
- * @param <T> type of the stream message values.
- */
+/// Interface wrapping streaming messages. Throws IndexOutOfBoundsException when trying to access a message at an
+/// invalid index.
+/// @param <T> type of the stream message values.
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface MessageBatch<T> {
 
-  /**
-   * Returns the number of available messages (excluding tombstone).
-   */
+  /// Returns the number of available messages (excluding tombstone).
   int getMessageCount();
 
-  /**
-   * Returns the number of messages returned from the stream (including tombstone).
-   */
+  /// Returns the number of messages returned from the stream (including tombstone).
   default int getUnfilteredMessageCount() {
     return getMessageCount();
   }
 
-  /**
-   * Returns the stream message at the given index within the batch.
-   */
-  default StreamMessage<T> getStreamMessage(int index) {
-    byte[] value = getMessageBytesAtIndex(index);
-    StreamMessageMetadata metadata = (StreamMessageMetadata) getMetadataAtIndex(index);
-    //noinspection unchecked
-    return (StreamMessage<T>) new StreamMessage<>(value, value.length, metadata);
-  }
+  /// Returns the stream message at the given index within the batch.
+  StreamMessage<T> getStreamMessage(int index);
 
-  /**
-   * Returns the start offset of the next batch.
-   */
-  default StreamPartitionMsgOffset getOffsetOfNextBatch() {
-    return getNextStreamPartitionMsgOffsetAtIndex(getMessageCount() - 1);
-  }
+  /// Returns the start offset of the next batch.
+  StreamPartitionMsgOffset getOffsetOfNextBatch();
 
-  /**
-   * Returns the offset of the first message (including tombstone) in the batch.
-   * This is useful to determine if there were gaps in the stream.
-   */
+  /// Returns the offset of the first message (including tombstone) in the batch.
+  /// This is useful to determine if there were gaps in the stream.
   @Nullable
   default StreamPartitionMsgOffset getFirstMessageOffset() {
     int numMessages = getMessageCount();
     if (numMessages == 0) {
       return null;
     }
-    StreamMessageMetadata firstMessageMetadata = getStreamMessage(0).getMetadata();
-    return firstMessageMetadata != null ? firstMessageMetadata.getOffset() : null;
+    return getStreamMessage(0).getMetadata().getOffset();
   }
 
-  /**
-   * Returns the message metadata for the last message (including tombstone) in the batch.
-   * This is useful while determining ingestion delay for a message batch.
-   */
+  /// Returns the message metadata for the last message (including tombstone) in the batch.
+  /// This is useful while determining ingestion delay for a message batch.
   @Nullable
   default StreamMessageMetadata getLastMessageMetadata() {
     int numMessages = getMessageCount();
@@ -88,54 +66,18 @@ public interface MessageBatch<T> {
     return getStreamMessage(numMessages - 1).getMetadata();
   }
 
-  /**
-   * Returns {code true} if the current batch is the end of the consumer, and no more messages can be read from this
-   * partition group.
-   */
+  /// Returns {code true} if the current batch is the end of the consumer, and no more messages can be read from this
+  /// partition group.
   default boolean isEndOfPartitionGroup() {
     return false;
   }
 
-  /**
-   * Returns {code true} if the current batch has data loss.
-   * This is useful to determine if there were gaps in the stream.
-   */
+  /// Returns {code true} if the current batch has data loss.
+  /// This is useful to determine if there were gaps in the stream.
   default boolean hasDataLoss() {
     return false;
   }
 
-  @Deprecated
-  default T getMessageAtIndex(int index) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Deprecated
-  default byte[] getMessageBytesAtIndex(int index) {
-    return (byte[]) getMessageAtIndex(index);
-  }
-
-  @Deprecated
-  default int getMessageLengthAtIndex(int index) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Deprecated
-  default int getMessageOffsetAtIndex(int index) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Deprecated
-  default RowMetadata getMetadataAtIndex(int index) {
-    return null;
-  }
-
-  @Deprecated
-  default long getNextStreamMessageOffsetAtIndex(int index) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Deprecated
-  default StreamPartitionMsgOffset getNextStreamPartitionMsgOffsetAtIndex(int index) {
-    return new LongMsgOffset(getNextStreamMessageOffsetAtIndex(index));
-  }
+  /// Returns the size of the serialized message batch in bytes
+  long getSizeInBytes();
 }

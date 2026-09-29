@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -35,13 +34,11 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pulsar.client.api.SubscriptionInitialPosition;
 
 
-/**
- * Pulsar specific stream config
- * contains pulsar brokers list, start offset and group id/subscriber id if using high level consumer/
- */
+/// Pulsar specific stream configs.
 public class PulsarConfig {
   public static final String STREAM_TYPE = "pulsar";
   public static final String BOOTSTRAP_SERVERS = "bootstrap.servers";
+  public static final String SERVICE_HTTP_URL = "serviceHttpUrl";
   public static final String AUTHENTICATION_TOKEN = "authenticationToken";
   public static final String TLS_TRUST_CERTS_FILE_PATH = "tlsTrustCertsFilePath";
   public static final String OAUTH_ISSUER_URL = "issuerUrl";
@@ -50,9 +47,9 @@ public class PulsarConfig {
   public static final String ENABLE_KEY_VALUE_STITCH = "enableKeyValueStitch";
   public static final String METADATA_FIELDS = "metadata.fields"; //list of the metadata fields comma separated
 
-  private final String _subscriberId;
   private final String _pulsarTopicName;
   private final String _bootstrapServers;
+  private final String _serviceHttpUrl;
   private final SubscriptionInitialPosition _subscriptionInitialPosition;
   private final String _authenticationToken;
   private final String _tlsTrustCertsFilePath;
@@ -71,14 +68,14 @@ public class PulsarConfig {
   private final boolean _populateMetadata;
   private final Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> _metadataFields;
 
-  public PulsarConfig(StreamConfig streamConfig, String subscriberId) {
+  public PulsarConfig(StreamConfig streamConfig) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
-    _subscriberId = subscriberId;
 
     _pulsarTopicName = streamConfig.getTopicName();
     _bootstrapServers = getConfigValue(streamConfigMap, BOOTSTRAP_SERVERS);
     Preconditions.checkNotNull(_bootstrapServers, "No brokers provided in the config");
 
+    _serviceHttpUrl = getConfigValue(streamConfigMap, SERVICE_HTTP_URL);
     _subscriptionInitialPosition = PulsarUtils.offsetCriteriaToSubscription(streamConfig.getOffsetCriteria());
     _authenticationToken = getConfigValue(streamConfigMap, AUTHENTICATION_TOKEN);
     _tlsTrustCertsFilePath = getConfigValue(streamConfigMap, TLS_TRUST_CERTS_FILE_PATH);
@@ -93,7 +90,7 @@ public class PulsarConfig {
     _populateMetadata = Boolean.parseBoolean(getConfigValue(streamConfigMap, StreamConfigProperties.METADATA_POPULATE));
     String metadataFieldsToExtractCSV = getConfigValueOrDefault(streamConfigMap, METADATA_FIELDS, "");
     if (StringUtils.isBlank(metadataFieldsToExtractCSV) || !_populateMetadata) {
-      _metadataFields = Collections.emptySet();
+      _metadataFields = Set.of();
     } else {
       _metadataFields = parseConfigStringToEnumSet(metadataFieldsToExtractCSV);
     }
@@ -141,12 +138,12 @@ public class PulsarConfig {
     return _pulsarTopicName;
   }
 
-  public String getSubscriberId() {
-    return _subscriberId;
-  }
-
   public String getBootstrapServers() {
     return _bootstrapServers;
+  }
+
+  public String getServiceHttpUrl() {
+    return _serviceHttpUrl;
   }
 
   public SubscriptionInitialPosition getInitialSubscriberPosition() {

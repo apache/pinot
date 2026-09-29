@@ -36,9 +36,7 @@ import static org.testng.Assert.fail;
 
 public class StreamConfigTest {
 
-  /**
-   * Checks that we fail if any of the mandatory properties are missing
-   */
+  /// Checks that we fail if any of the mandatory properties are missing
   @Test
   public void testStreamConfig() {
     String streamType = "fakeStream";
@@ -113,9 +111,7 @@ public class StreamConfigTest {
     }
   }
 
-  /**
-   * Checks that we use defaults where applicable
-   */
+  /// Checks that we use defaults where applicable
   @Test
   public void testStreamConfigDefaults() {
     String streamType = "fakeStream";
@@ -206,9 +202,7 @@ public class StreamConfigTest {
     assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(), DataSizeUtils.toBytes("10M"));
   }
 
-  /**
-   * Checks that we fail on invalid properties or use defaults
-   */
+  /// Checks that we fail on invalid properties or use defaults
   @Test
   public void testStreamConfigValidations() {
     String streamType = "fakeStream";
@@ -301,9 +295,7 @@ public class StreamConfigTest {
     }
   }
 
-  /**
-   * Checks that we return the right flush threshold for regular vs llc configs
-   */
+  /// Checks that we return the right flush threshold for regular vs llc configs
   @Test
   public void testFlushThresholdStreamConfigs() {
     StreamConfig streamConfig;
@@ -366,69 +358,5 @@ public class StreamConfigTest {
     assertEquals(streamConfig.getFlushThresholdRows(), Integer.parseInt(flushThresholdRowsLLC));
     assertEquals(streamConfig.getFlushThresholdSegmentRows(), -1);
     assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(), -1);
-  }
-
-  @Test
-  public void testConsumerTypes() {
-    String streamType = "fakeStream";
-    String topic = "fakeTopic";
-    String tableName = "fakeTable_REALTIME";
-    String consumerFactoryClass = FakeStreamConsumerFactory.class.getName();
-    String decoderClass = FakeStreamMessageDecoder.class.getName();
-
-    Map<String, String> streamConfigMap = new HashMap<>();
-    streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
-    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
-        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClass);
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-        decoderClass);
-
-    String consumerType = "simple";
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-        consumerType);
-    new StreamConfig(tableName, streamConfigMap);
-
-    consumerType = "lowlevel";
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-        consumerType);
-    new StreamConfig(tableName, streamConfigMap);
-
-    try {
-      consumerType = "highLevel";
-      streamConfigMap.put(
-          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-          consumerType);
-      new StreamConfig(tableName, streamConfigMap);
-      fail("Invalid consumer type(s) " + consumerType + " in stream config");
-    } catch (Exception e) {
-      // expected
-    }
-
-    try {
-      consumerType = "highLevel,simple";
-      streamConfigMap.put(
-          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-          consumerType);
-      new StreamConfig(tableName, streamConfigMap);
-      fail("Invalid consumer type(s) " + consumerType + " in stream config");
-    } catch (Exception e) {
-      // expected
-    }
-
-    try {
-      consumerType = "highLevel,lowlevel";
-      streamConfigMap.put(
-          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-          consumerType);
-      new StreamConfig(tableName, streamConfigMap);
-      fail("Invalid consumer type(s) " + consumerType + " in stream config");
-    } catch (Exception e) {
-      // expected
-    }
   }
 }

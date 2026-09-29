@@ -27,9 +27,7 @@ import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
-/**
- * A Quickstart to demo how multi directory support works and its typical configs.
- */
+/// A Quickstart to demo how multi directory support works and its typical configs.
 public class MultiDirQuickstart extends Quickstart {
   @Override
   public List<String> types() {

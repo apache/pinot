@@ -18,39 +18,46 @@
  */
 package org.apache.pinot.core.auth;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 
-/**
- * Container object for basic auth principal
- */
+
+/// Container object for basic auth principal
 public class ZkBasicAuthPrincipal extends BasicAuthPrincipal {
-    private final String _password;
-    private final String _component;
-    private final String _role;
+  private final String _password;
+  private final String _component;
+  private final String _role;
 
-    public ZkBasicAuthPrincipal(String name, String token, String password, String component, String role,
-        Set<String> tables, Set<String> permissions) {
-        super(name, token, tables, permissions);
-        _component = component;
-        _role = role;
-        _password = password;
-    }
+  public ZkBasicAuthPrincipal(String name, String token, String password, String component, String role,
+      Set<String> tables, Set<String> excludeTables, Set<String> permissions) {
+    this(name, token, password, component, role, tables, excludeTables, permissions, null);
+  }
 
-    public String getRole() {
-        return _role;
-    }
+  public ZkBasicAuthPrincipal(String name, String token, String password, String component, String role,
+      Set<String> tables, Set<String> excludeTables, Set<String> permissions,
+      Map<String, List<String>> tableRLSFilters) {
+    super(name, token, tables, excludeTables, permissions, tableRLSFilters);
+    _component = component;
+    _role = role;
+    _password = password;
+  }
 
-    public String getComponent() {
-        return _component;
-    }
+  public String getRole() {
+    return _role;
+  }
 
-    public String getPassword() {
-        return _password;
-    }
+  public String getComponent() {
+    return _component;
+  }
 
-    public boolean hasPermission(RoleType role, ComponentType component) {
-        return RoleType.valueOf(_role).equals(role) && ComponentType.valueOf(_component).equals(component);
-    }
+  public String getPassword() {
+    return _password;
+  }
+
+  public boolean hasPermission(RoleType role, ComponentType component) {
+    return RoleType.valueOf(_role).equals(role) && ComponentType.valueOf(_component).equals(component);
+  }
 }

@@ -22,10 +22,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -50,12 +49,17 @@ public class StarTreeV2BuilderConfigTest {
 
   @Test
   public void testDefaultConfig() {
-    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.INT)
-        .addSingleValueDimension("d2", DataType.LONG).addSingleValueDimension("d3", DataType.FLOAT)
-        .addSingleValueDimension("d4", DataType.DOUBLE).addMultiValueDimension("d5", DataType.INT)
-        .addMetric("m1", DataType.DOUBLE).addMetric("m2", DataType.BYTES)
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("d1", DataType.INT)
+        .addSingleValueDimension("d2", DataType.LONG)
+        .addSingleValueDimension("d3", DataType.FLOAT)
+        .addSingleValueDimension("d4", DataType.DOUBLE)
+        .addMultiValueDimension("d5", DataType.INT)
+        .addMetric("m1", DataType.DOUBLE)
+        .addMetric("m2", DataType.BYTES)
         .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "t"), null)
-        .addDateTime("dt", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS").build();
+        .addDateTime("dt", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
+        .build();
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getSchema()).thenReturn(schema);
     // Included
@@ -88,31 +92,41 @@ public class StarTreeV2BuilderConfigTest {
 
     StarTreeV2BuilderConfig defaultConfig = StarTreeV2BuilderConfig.generateDefaultConfig(segmentMetadata);
     // Sorted by cardinality in descending order, followed by the time column
-    assertEquals(defaultConfig.getDimensionsSplitOrder(), Arrays.asList("d2", "d1", "dt", "t"));
+    assertEquals(defaultConfig.getDimensionsSplitOrder(), List.of("d2", "d1", "dt", "t"));
     // No column should be skipped for star-node creation
     assertTrue(defaultConfig.getSkipStarNodeCreationForDimensions().isEmpty());
     // Should have COUNT(*) and SUM(m1) as the function column pairs
-    assertEquals(defaultConfig.getFunctionColumnPairs(), new HashSet<>(
-        Arrays.asList(AggregationFunctionColumnPair.COUNT_STAR,
-            new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "m1"))));
+    assertEquals(defaultConfig.getFunctionColumnPairs(), Set.of(AggregationFunctionColumnPair.COUNT_STAR,
+        new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "m1")));
     assertEquals(defaultConfig.getMaxLeafRecords(), StarTreeV2BuilderConfig.DEFAULT_MAX_LEAF_RECORDS);
   }
 
   @Test
   public void testDefaultConfigFromJsonNodeSegmentMetadata() {
-    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.INT)
-        .addSingleValueDimension("d2", DataType.LONG).addSingleValueDimension("d3", DataType.FLOAT)
-        .addSingleValueDimension("d4", DataType.DOUBLE).addMultiValueDimension("d5", DataType.INT)
-        .addMetric("m1", DataType.DOUBLE).addMetric("m2", DataType.BYTES)
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("d1", DataType.INT)
+        .addSingleValueDimension("d2", DataType.LONG)
+        .addSingleValueDimension("d3", DataType.FLOAT)
+        .addSingleValueDimension("d4", DataType.DOUBLE)
+        .addMultiValueDimension("d5", DataType.INT)
+        .addMetric("m1", DataType.DOUBLE)
+        .addMetric("m2", DataType.BYTES)
         .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "t"), null)
-        .addDateTime("dt", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS").build();
+        .addDateTime("dt", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
+        .build();
 
     // Create a list of string with column name, hasDictionary and cardinality.
-    List<List<String>> columnList =
-        Arrays.asList(Arrays.asList("d1", "true", "200"), Arrays.asList("d2", "true", "400"),
-            Arrays.asList("d3", "true", "20000"), Arrays.asList("d4", "false", "100"),
-            Arrays.asList("d5", "true", "100"), Arrays.asList("m1", "false", "-1"), Arrays.asList("m2", "true", "100"),
-            Arrays.asList("t", "true", "20000"), Arrays.asList("dt", "true", "30000"));
+    List<List<String>> columnList = List.of(
+        List.of("d1", "true", "200"),
+        List.of("d2", "true", "400"),
+        List.of("d3", "true", "20000"),
+        List.of("d4", "false", "100"),
+        List.of("d5", "true", "100"),
+        List.of("m1", "false", "-1"),
+        List.of("m2", "true", "100"),
+        List.of("t", "true", "20000"),
+        List.of("dt", "true", "30000")
+    );
 
     // Convert the list of string to JsonNode with appropriate key names.
     JsonNode segmentMetadataAsJsonNode = convertStringListToJsonNode(columnList);
@@ -121,13 +135,12 @@ public class StarTreeV2BuilderConfigTest {
     StarTreeV2BuilderConfig defaultConfig =
         StarTreeV2BuilderConfig.generateDefaultConfig(schema, segmentMetadataAsJsonNode);
     // Sorted by cardinality in descending order, followed by the time column
-    assertEquals(defaultConfig.getDimensionsSplitOrder(), Arrays.asList("d2", "d1", "dt", "t"));
+    assertEquals(defaultConfig.getDimensionsSplitOrder(), List.of("d2", "d1", "dt", "t"));
     // No column should be skipped for star-node creation
     assertTrue(defaultConfig.getSkipStarNodeCreationForDimensions().isEmpty());
     // Should have COUNT(*) and SUM(m1) as the function column pairs
-    assertEquals(defaultConfig.getFunctionColumnPairs(), new HashSet<>(
-        Arrays.asList(AggregationFunctionColumnPair.COUNT_STAR,
-            new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "m1"))));
+    assertEquals(defaultConfig.getFunctionColumnPairs(), Set.of(AggregationFunctionColumnPair.COUNT_STAR,
+        new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "m1")));
     assertEquals(defaultConfig.getMaxLeafRecords(), StarTreeV2BuilderConfig.DEFAULT_MAX_LEAF_RECORDS);
   }
 

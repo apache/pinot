@@ -1,5 +1,5 @@
 {
-  "schemaName": "test_pinot_table",
+  "schemaName": "testTable",
   "dimensionFieldSpecs": [
     {
       "name": "event_id",
@@ -14,12 +14,14 @@
       "dataType": "LONG"
     }
   ],
-  "timeFieldSpec": {
-    "incomingGranularitySpec": {
+  "dateTimeFieldSpecs": [
+    {
       "name": "secondsSinceEpoch",
       "dataType": "LONG",
-      "timeType": "SECONDS"
+      "defaultNullValue": 1514764800,
+      "format": "EPOCH|SECONDS",
+      "granularity": "1:SECONDS"
     }
-  },
+  ],
   "primaryKeyColumns": ["event_id"]
 }

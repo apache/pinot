@@ -22,6 +22,7 @@ import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.local.utils.HyperLogLogPlusUtils;
@@ -64,7 +65,10 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
   }
 
   @Override
-  public HyperLogLogPlus getInitialAggregatedValue(Object rawValue) {
+  public HyperLogLogPlus getInitialAggregatedValue(@Nullable Object rawValue) {
+    if (rawValue == null) {
+      return new HyperLogLogPlus(_p, _sp);
+    }
     HyperLogLogPlus initialValue;
     if (rawValue instanceof byte[]) {
       byte[] bytes = (byte[]) rawValue;
@@ -72,7 +76,7 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
       _maxByteSize = bytes.length;
     } else {
       initialValue = new HyperLogLogPlus(_p, _sp);
-      initialValue.offer(rawValue);
+      offerValue(initialValue, rawValue);
       _maxByteSize = HyperLogLogPlusUtils.byteSize(_p, _sp);
     }
     return initialValue;
@@ -87,9 +91,21 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
         throw new RuntimeException(e);
       }
     } else {
-      value.offer(rawValue);
+      offerValue(value, rawValue);
     }
     return value;
+  }
+
+  /// Offers a raw value (single value or multi-value array) to the HyperLogLogPlus.
+  protected void offerValue(HyperLogLogPlus hll, Object rawValue) {
+    if (rawValue instanceof Object[]) {
+      Object[] values = (Object[]) rawValue;
+      for (Object value : values) {
+        hll.offer(value);
+      }
+    } else {
+      hll.offer(rawValue);
+    }
   }
 
   @Override
@@ -105,6 +121,11 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
   @Override
   public HyperLogLogPlus cloneAggregatedValue(HyperLogLogPlus value) {
     return deserializeAggregatedValue(serializeAggregatedValue(value));
+  }
+
+  @Override
+  public boolean isAggregatedValueFixedSize() {
+    return true;
   }
 
   @Override

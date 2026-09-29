@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -208,7 +207,7 @@ public class BenchmarkDataBlock {
           for (int i = 0; i < numRows; i++) {
             column[i] = generateValue(r);
           }
-          return Collections.singletonList(column);
+          return List.<Object[]>of(column);
         case ROW:
           ArrayList<Object[]> data = new ArrayList<>();
           for (int i = 0; i < numRows; i++) {

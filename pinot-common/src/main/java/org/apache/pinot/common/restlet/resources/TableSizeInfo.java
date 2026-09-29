@@ -20,22 +20,34 @@ package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
+import javax.annotation.Nullable;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableSizeInfo {
+  /// Version of the server size contribution protocol emitted by this build.
+  public static final int CURRENT_METADATA_VERSION = 1;
+
   private final String _tableName;
   private final long _diskSizeInBytes;
   private final List<SegmentSizeInfo> _segments;
+  private final int _metadataVersion;
+
+  public TableSizeInfo(String tableName, long sizeInBytes, List<SegmentSizeInfo> segments) {
+    this(tableName, sizeInBytes, segments, 0);
+  }
 
   @JsonCreator
   public TableSizeInfo(@JsonProperty("tableName") String tableName, @JsonProperty("diskSizeInBytes") long sizeInBytes,
-      @JsonProperty("segments") List<SegmentSizeInfo> segments) {
+      @JsonProperty("segments") List<SegmentSizeInfo> segments,
+      @JsonProperty("metadataVersion") @Nullable Integer metadataVersion) {
     _tableName = tableName;
     _diskSizeInBytes = sizeInBytes;
     _segments = segments;
+    _metadataVersion = metadataVersion != null ? metadataVersion : 0;
   }
 
   public String getTableName() {
@@ -48,5 +60,11 @@ public class TableSizeInfo {
 
   public List<SegmentSizeInfo> getSegments() {
     return _segments;
+  }
+
+  /// Returns the server size contribution protocol version, or `0` for a legacy response.
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  public int getMetadataVersion() {
+    return _metadataVersion;
   }
 }

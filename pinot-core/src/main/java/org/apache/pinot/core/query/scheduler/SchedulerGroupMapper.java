@@ -18,16 +18,12 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
-/**
- * Selector class to map incoming request to one of the
- * multi-level scheduling groups. This decouples the logic
- * of mapping query request to one of the scheduler group.
- */
+/// Selector class to map incoming request to one of the
+/// multi-level scheduling groups. This decouples the logic
+/// of mapping query request to one of the scheduler group.
 public interface SchedulerGroupMapper {
-  /**
-   * Map query request to scheduler group
-   * @param query incoming query request
-   * @return Scheduler group name
-   */
+  /// Map query request to scheduler group
+  /// @param query incoming query request
+  /// @return Scheduler group name
   String getSchedulerGroupName(SchedulerQueryContext query);
 }

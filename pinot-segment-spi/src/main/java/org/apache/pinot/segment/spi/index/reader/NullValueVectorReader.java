@@ -23,24 +23,18 @@ import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * Reader interface to read from an underlying Null value vector. This is
- * primarily used to check if a particular column value corresponding to
- * a document ID is null or not.
- */
+/// Reader interface to read from an underlying Null value vector. This is
+/// primarily used to check if a particular column value corresponding to
+/// a document ID is null or not.
 public interface NullValueVectorReader extends IndexReader {
 
-  /**
-   * Check if the given docId has a null value in the corresponding column
-   *
-   * @param docId specifies ID to check for nullability
-   * @return true if docId is absent (null). False otherwise
-   */
+  /// Check if the given docId has a null value in the corresponding column
+  ///
+  /// @param docId specifies ID to check for nullability
+  /// @return true if docId is absent (null). False otherwise
   boolean isNull(int docId);
 
-  /**
-   * Return the underlying null bitmap (used in query execution)
-   */
+  /// Return the underlying null bitmap (used in query execution)
   ImmutableRoaringBitmap getNullBitmap();
 
   @Override

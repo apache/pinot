@@ -18,16 +18,15 @@
  */
 package org.apache.pinot.query.runtime.operator.exchange;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
 import java.util.List;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -37,6 +36,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
 
 
@@ -63,40 +63,42 @@ public class BlockExchangeTest {
   public void shouldSendEosBlockToAllDestinations()
       throws Exception {
     // Given:
-    List<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
+    List<SendingMailbox> destinations = List.of(_mailbox1, _mailbox2);
     BlockExchange exchange = new TestBlockExchange(destinations);
 
     // When:
-    exchange.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    exchange.send(SuccessMseBlock.INSTANCE, List.of());
 
     // Then:
-    ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
+    ArgumentCaptor<MseBlock.Eos> captor = ArgumentCaptor.forClass(MseBlock.Eos.class);
 
-    Mockito.verify(_mailbox1).complete();
-    Mockito.verify(_mailbox1, Mockito.times(1)).send(captor.capture());
-    Assert.assertTrue(captor.getValue().isEndOfStreamBlock());
+    Mockito.verify(_mailbox1).send(SuccessMseBlock.INSTANCE, List.of());
+    Mockito.verify(_mailbox1, Mockito.times(1)).send(captor.capture(), anyList());
+    Assert.assertTrue(captor.getValue().isEos());
 
-    Mockito.verify(_mailbox2).complete();
-    Mockito.verify(_mailbox2, Mockito.times(1)).send(captor.capture());
-    Assert.assertTrue(captor.getValue().isEndOfStreamBlock());
+    Mockito.verify(_mailbox2).send(SuccessMseBlock.INSTANCE, List.of());
+    Mockito.verify(_mailbox2, Mockito.times(1)).send(captor.capture(), anyList());
+    Assert.assertTrue(captor.getValue().isEos());
   }
 
   @Test
   public void shouldSendDataBlocksOnlyToTargetDestination()
       throws Exception {
     // Given:
-    List<SendingMailbox> destinations = ImmutableList.of(_mailbox1);
+    List<SendingMailbox> destinations = List.of(_mailbox1);
     BlockExchange exchange = new TestBlockExchange(destinations);
-    TransferableBlock block = new TransferableBlock(ImmutableList.of(new Object[]{"val"}),
-        new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING}), DataBlock.Type.ROW);
+    RowHeapDataBlock block = new RowHeapDataBlock(List.<Object[]>of(new Object[]{"val"}),
+        new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING}));
 
     // When:
     exchange.send(block);
 
     // Then:
-    ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
+    ArgumentCaptor<MseBlock.Data> captor = ArgumentCaptor.forClass(MseBlock.Data.class);
     Mockito.verify(_mailbox1, Mockito.times(1)).send(captor.capture());
-    Assert.assertEquals(captor.getValue().getContainer(), block.getContainer());
+    Assert.assertTrue(captor.getValue().isData(), "Expected data block");
+    MseBlock.Data dataBlock = captor.getValue();
+    Assert.assertEquals(dataBlock.asRowHeap().getRows(), block.getRows());
 
     Mockito.verify(_mailbox2, Mockito.never()).send(Mockito.any());
   }
@@ -105,10 +107,10 @@ public class BlockExchangeTest {
   public void shouldSignalEarlyTerminationProperly()
       throws Exception {
     // Given:
-    List<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
+    List<SendingMailbox> destinations = List.of(_mailbox1, _mailbox2);
     BlockExchange exchange = new TestBlockExchange(destinations);
-    TransferableBlock block = new TransferableBlock(ImmutableList.of(new Object[]{"val"}),
-        new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING}), DataBlock.Type.ROW);
+    RowHeapDataBlock block = new RowHeapDataBlock(List.<Object[]>of(new Object[]{"val"}),
+        new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING}));
 
     // When send normal block and some mailbox has terminated
     when(_mailbox1.isEarlyTerminated()).thenReturn(true);
@@ -136,47 +138,66 @@ public class BlockExchangeTest {
   public void shouldSplitBlocks()
       throws Exception {
     // Given:
-    List<SendingMailbox> destinations = ImmutableList.of(_mailbox1);
+    List<SendingMailbox> destinations = List.of(_mailbox1);
 
     DataSchema schema = new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING});
 
-    TransferableBlock inBlock =
-        new TransferableBlock(ImmutableList.of(new Object[]{"one"}, new Object[]{"two"}), schema, DataBlock.Type.ROW);
+    RowHeapDataBlock inBlock =
+        new RowHeapDataBlock(List.<Object[]>of(new Object[]{"one"}, new Object[]{"two"}), schema);
 
-    TransferableBlock outBlockOne =
-        new TransferableBlock(ImmutableList.of(new Object[]{"one"}), schema, DataBlock.Type.ROW);
+    RowHeapDataBlock outBlockOne = new RowHeapDataBlock(List.<Object[]>of(new Object[]{"one"}), schema);
 
-    TransferableBlock outBlockTwo =
-        new TransferableBlock(ImmutableList.of(new Object[]{"two"}), schema, DataBlock.Type.ROW);
+    RowHeapDataBlock outBlockTwo = new RowHeapDataBlock(List.<Object[]>of(new Object[]{"two"}), schema);
 
-    BlockExchange exchange = new TestBlockExchange(destinations,
-        (block, type, maxSize) -> ImmutableList.of(outBlockOne, outBlockTwo).iterator());
+    BlockSplitter blockSplitter = (block, maxSize) -> List.of(outBlockOne, outBlockTwo).iterator();
+    BlockExchange exchange = new TestBlockExchange(destinations, blockSplitter);
 
     // When:
     exchange.send(inBlock);
 
     // Then:
-    ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
+    ArgumentCaptor<MseBlock.Data> captor = ArgumentCaptor.forClass(MseBlock.Data.class);
     Mockito.verify(_mailbox1, Mockito.times(2)).send(captor.capture());
 
-    List<TransferableBlock> sentBlocks = captor.getAllValues();
+    List<MseBlock.Data> sentBlocks = captor.getAllValues();
     Assert.assertEquals(sentBlocks.size(), 2, "expected to send two blocks");
-    Assert.assertEquals(sentBlocks.get(0).getContainer(), outBlockOne.getContainer());
-    Assert.assertEquals(sentBlocks.get(1).getContainer(), outBlockTwo.getContainer());
+    Assert.assertEquals(sentBlocks.get(0).asRowHeap().getRows(), outBlockOne.getRows());
+    Assert.assertEquals(sentBlocks.get(1).asRowHeap().getRows(), outBlockTwo.getRows());
+  }
+
+  @Test
+  public void shouldDeliverByReferenceWhenAnyDestinationDoes() {
+    // Given: an exchange whose destinations are one mailbox that serializes blocks and one that does not
+    when(_mailbox2.deliversByReference()).thenReturn(true);
+    BlockExchange exchange = new TestBlockExchange(List.of(_mailbox1, _mailbox2));
+
+    // Then: the exchange exposed as a mailbox reports that it delivers by reference
+    Assert.assertTrue(exchange.asSendingMailbox("1").deliversByReference());
+  }
+
+  @Test
+  public void shouldNotDeliverByReferenceWhenNoDestinationDoes() {
+    // Given: an exchange whose destinations all serialize the blocks they are sent
+    BlockExchange exchange = new TestBlockExchange(List.of(_mailbox1, _mailbox2));
+
+    // Then: the exchange exposed as a mailbox reports that it does not deliver by reference. It still takes blocks
+    // whole, because splitting them is left to the exchange it decorates
+    SendingMailbox sendingMailbox = exchange.asSendingMailbox("1");
+    Assert.assertFalse(sendingMailbox.deliversByReference());
+    Assert.assertTrue(sendingMailbox.isLocal());
   }
 
   private static class TestBlockExchange extends BlockExchange {
     protected TestBlockExchange(List<SendingMailbox> destinations) {
-      this(destinations, (block, type, size) -> Iterators.singletonIterator(block));
+      this(destinations, (block, size) -> Iterators.singletonIterator(block));
     }
 
     protected TestBlockExchange(List<SendingMailbox> destinations, BlockSplitter splitter) {
-      super(destinations, splitter);
+      super(destinations, splitter, BlockExchange.RANDOM_INDEX_CHOOSER);
     }
 
     @Override
-    protected void route(List<SendingMailbox> destinations, TransferableBlock block)
-        throws Exception {
+    protected void route(List<SendingMailbox> destinations, MseBlock.Data block) {
       for (SendingMailbox mailbox : destinations) {
         sendBlock(mailbox, block);
       }

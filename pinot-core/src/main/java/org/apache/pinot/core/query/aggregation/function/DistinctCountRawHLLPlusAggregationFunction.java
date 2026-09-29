@@ -21,6 +21,8 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -34,13 +36,14 @@ public class DistinctCountRawHLLPlusAggregationFunction
     extends BaseSingleInputAggregationFunction<HyperLogLogPlus, SerializedHLLPlus> {
   private final DistinctCountHLLPlusAggregationFunction _distinctCountHLLPlusAggregationFunction;
 
-  public DistinctCountRawHLLPlusAggregationFunction(List<ExpressionContext> arguments) {
-    this(arguments.get(0), new DistinctCountHLLPlusAggregationFunction(arguments));
+  public DistinctCountRawHLLPlusAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    this(arguments.get(0), new DistinctCountHLLPlusAggregationFunction(arguments, nullHandlingEnabled),
+        nullHandlingEnabled);
   }
 
   DistinctCountRawHLLPlusAggregationFunction(ExpressionContext expression,
-      DistinctCountHLLPlusAggregationFunction distinctCountHLLPlusAggregationFunction) {
-    super(expression);
+      DistinctCountHLLPlusAggregationFunction distinctCountHLLPlusAggregationFunction, boolean nullHandlingEnabled) {
+    super(expression, nullHandlingEnabled);
     _distinctCountHLLPlusAggregationFunction = distinctCountHLLPlusAggregationFunction;
   }
 
@@ -104,12 +107,26 @@ public class DistinctCountRawHLLPlusAggregationFunction
   }
 
   @Override
+  public SerializedIntermediateResult serializeIntermediateResult(HyperLogLogPlus hyperLogLogPlus) {
+    return _distinctCountHLLPlusAggregationFunction.serializeIntermediateResult(hyperLogLogPlus);
+  }
+
+  @Override
+  public HyperLogLogPlus deserializeIntermediateResult(CustomObject customObject) {
+    return _distinctCountHLLPlusAggregationFunction.deserializeIntermediateResult(customObject);
+  }
+
+  @Override
   public ColumnDataType getFinalResultColumnType() {
     return ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
-  public SerializedHLLPlus extractFinalResult(HyperLogLogPlus intermediateResult) {
+  public SerializedHLLPlus extractFinalResult(@Nullable HyperLogLogPlus intermediateResult) {
+    if (intermediateResult == null) {
+      return null;
+    }
     return new SerializedHLLPlus(intermediateResult);
   }
 }

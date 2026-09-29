@@ -19,7 +19,9 @@
 package org.apache.pinot.controller.helix.core.util;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.ConfigAccessor;
@@ -29,7 +31,6 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.controller.HelixControllerMain;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZKHelixDataAccessor;
-import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
@@ -42,6 +43,7 @@ import org.apache.helix.model.builder.FullAutoModeISBuilder;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
+import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
@@ -59,41 +61,71 @@ public class HelixSetupUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixSetupUtils.class);
 
-  public static HelixManager setupHelixController(String helixClusterName, String zkPath, String instanceId) {
-    setupHelixClusterIfNeeded(helixClusterName, zkPath);
-    return HelixControllerMain
-        .startHelixController(zkPath, helixClusterName, instanceId, HelixControllerMain.STANDALONE);
-  }
-
-  private static void setupHelixClusterIfNeeded(String helixClusterName, String zkPath) {
-    HelixAdmin admin = null;
+  /// Set up Helix cluster with the given default configs as the Helix cluster config.
+  ///
+  /// - If the cluster doesn't exist, a new cluster will be created with the default configs.
+  /// - If the cluster already exists, it will be updated with the default configs. Default config will be set only if
+  ///   the config doesn't already exist.
+  public static void setupHelixClusterWithDefaultConfigs(String zkAddress, String clusterName,
+      Map<String, String> defaultConfigs) {
+    HelixAdmin admin = new ZKHelixAdmin.Builder().setZkAddress(zkAddress).build();
     try {
-      admin = new ZKHelixAdmin.Builder().setZkAddress(zkPath).build();
-      if (admin.getClusters().contains(helixClusterName)) {
-        LOGGER.info("Helix cluster: {} already exists", helixClusterName);
-      } else {
-        LOGGER.info("Creating a new Helix cluster: {}", helixClusterName);
-        admin.addCluster(helixClusterName, false);
-        // Enable Auto-Join for the cluster
+      if (admin.getClusters().contains(clusterName)) {
+        LOGGER.info("Helix cluster: {} already exists, updating default configs: {}", clusterName, defaultConfigs);
         HelixConfigScope configScope =
-            new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(helixClusterName).build();
-        Map<String, String> configMap = new HashMap<>();
-        configMap.put(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN, Boolean.toString(true));
-        configMap.put(ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(DEFAULT_ENABLE_CASE_INSENSITIVE));
-        configMap.put(DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(DEFAULT_HYPERLOGLOG_LOG2M));
-        configMap.put(CommonConstants.Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, Boolean.toString(false));
-        admin.setConfig(configScope, configMap);
-        LOGGER.info("New Helix cluster: {} created", helixClusterName);
+            new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(clusterName).build();
+        List<String> keys = new ArrayList<>(defaultConfigs.keySet());
+        Map<String, String> existingConfigs = admin.getConfig(configScope, keys);
+        Map<String, String> newConfigs = new HashMap<>();
+        Map<String, String> ignoredConfigs = new HashMap<>();
+        for (Map.Entry<String, String> entry : defaultConfigs.entrySet()) {
+          String key = entry.getKey();
+          String value = entry.getValue();
+          String existingValue = existingConfigs.get(key);
+          if (existingValue == null) {
+            newConfigs.put(key, value);
+          } else if (!existingValue.equals(value)) {
+            ignoredConfigs.put(key, existingValue);
+          }
+        }
+        if (newConfigs.isEmpty()) {
+          if (ignoredConfigs.isEmpty()) {
+            LOGGER.info("No config change needed for Helix cluster: {}. All configs are using default values",
+                clusterName);
+          } else {
+            LOGGER.info("No config change needed for Helix cluster: {}. Ignored configs using non-default values: {}",
+                clusterName, ignoredConfigs);
+          }
+        } else {
+          admin.setConfig(configScope, newConfigs);
+          if (ignoredConfigs.isEmpty()) {
+            LOGGER.info("Updated helix cluster: {} with new configs: {}. All other configs are using default values",
+                clusterName, newConfigs);
+          } else {
+            LOGGER.info("Updated helix cluster: {} with new configs: {}. Ignored configs using non-default values: {}",
+                clusterName, newConfigs, ignoredConfigs);
+          }
+        }
+      } else {
+        LOGGER.info("Creating a new Helix cluster: {} with default configs: {}", clusterName, defaultConfigs);
+        admin.addCluster(clusterName, false);
+        HelixConfigScope configScope =
+            new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(clusterName).build();
+        admin.setConfig(configScope, defaultConfigs);
+        LOGGER.info("New Helix cluster: {} created with default configs: {}", clusterName, defaultConfigs);
       }
     } finally {
-      if (admin != null) {
-        admin.close();
-      }
+      admin.close();
     }
   }
 
+  public static HelixManager setupHelixController(String helixClusterName, String zkPath, String instanceId) {
+    return HelixControllerMain.startHelixController(zkPath, helixClusterName, instanceId,
+        HelixControllerMain.STANDALONE);
+  }
+
   public static void setupPinotCluster(String helixClusterName, String zkPath, boolean isUpdateStateModel,
-      boolean enableBatchMessageMode, ControllerConf controllerConf) {
+      ControllerConf controllerConf) {
     ZkClient zkClient = null;
     int zkClientSessionConfig =
         controllerConf.getProperty(CommonConstants.Helix.ZkClient.ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG,
@@ -121,15 +153,12 @@ public class HelixSetupUtils {
       addSegmentStateModelDefinitionIfNeeded(helixClusterName, helixAdmin, helixDataAccessor, isUpdateStateModel);
 
       // Add broker resource if needed
-      createBrokerResourceIfNeeded(helixClusterName, helixAdmin, enableBatchMessageMode);
+      createBrokerResourceIfNeeded(helixClusterName, helixAdmin);
 
       // Add lead controller resource if needed
-      createLeadControllerResourceIfNeeded(helixClusterName, helixAdmin, configAccessor, enableBatchMessageMode,
-          controllerConf);
+      createLeadControllerResourceIfNeeded(helixClusterName, helixAdmin, configAccessor, controllerConf);
     } finally {
-      if (zkClient != null) {
-        zkClient.close();
-      }
+      ZkStarter.closeAsync(zkClient);
     }
   }
 
@@ -149,8 +178,7 @@ public class HelixSetupUtils {
     }
   }
 
-  private static void createBrokerResourceIfNeeded(String helixClusterName, HelixAdmin helixAdmin,
-      boolean enableBatchMessageMode) {
+  private static void createBrokerResourceIfNeeded(String helixClusterName, HelixAdmin helixAdmin) {
     // Add state model definition if needed
     String stateModel =
         PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.PINOT_BROKER_RESOURCE_ONLINE_OFFLINE_STATE_MODEL;
@@ -162,24 +190,27 @@ public class HelixSetupUtils {
     }
 
     // Add broker resource if needed
-    if (helixAdmin.getResourceIdealState(helixClusterName, BROKER_RESOURCE_INSTANCE) == null) {
+    IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, BROKER_RESOURCE_INSTANCE);
+    if (currentIdealState == null) {
       LOGGER.info("Adding resource: {}", BROKER_RESOURCE_INSTANCE);
       IdealState idealState = new CustomModeISBuilder(BROKER_RESOURCE_INSTANCE).setStateModel(stateModel).build();
-      idealState.setBatchMessageMode(enableBatchMessageMode);
       helixAdmin.addResource(helixClusterName, BROKER_RESOURCE_INSTANCE, idealState);
+    } else if (currentIdealState.getBatchMessageMode()) {
+      LOGGER.warn("Disabling batch message mode for resource: {}", BROKER_RESOURCE_INSTANCE);
+      currentIdealState.setBatchMessageMode(false);
+      helixAdmin.updateIdealState(helixClusterName, BROKER_RESOURCE_INSTANCE, currentIdealState);
     }
   }
 
   private static void createLeadControllerResourceIfNeeded(String helixClusterName, HelixAdmin helixAdmin,
-      ConfigAccessor configAccessor, boolean enableBatchMessageMode, ControllerConf controllerConf) {
+      ConfigAccessor configAccessor, ControllerConf controllerConf) {
     IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME);
     if (currentIdealState == null) {
       LOGGER.info("Adding resource: {}", LEAD_CONTROLLER_RESOURCE_NAME);
-      IdealState newIdealState = constructIdealState(enableBatchMessageMode, controllerConf);
+      IdealState newIdealState = constructIdealState(controllerConf);
       helixAdmin.addResource(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, newIdealState);
     } else {
-      enableAndUpdateLeadControllerResource(helixClusterName, helixAdmin, currentIdealState, enableBatchMessageMode,
-          controllerConf);
+      enableAndUpdateLeadControllerResource(helixClusterName, helixAdmin, currentIdealState, controllerConf);
     }
 
     // Create resource config for lead controller resource if it doesn't exist
@@ -194,7 +225,7 @@ public class HelixSetupUtils {
     configAccessor.setResourceConfig(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, resourceConfig);
   }
 
-  private static IdealState constructIdealState(boolean enableBatchMessageMode, ControllerConf controllerConf) {
+  private static IdealState constructIdealState(ControllerConf controllerConf) {
     // FULL-AUTO Master-Slave state model with a rebalance strategy, auto-rebalance by default
     FullAutoModeISBuilder idealStateBuilder = new FullAutoModeISBuilder(LEAD_CONTROLLER_RESOURCE_NAME);
     idealStateBuilder.setStateModel(MasterSlaveSMD.name)
@@ -218,16 +249,12 @@ public class HelixSetupUtils {
     // Set instance group tag
     IdealState idealState = idealStateBuilder.build();
     idealState.setInstanceGroupTag(CONTROLLER_INSTANCE);
-    // Set batch message mode
-    idealState.setBatchMessageMode(enableBatchMessageMode);
     return idealState;
   }
 
-  /**
-   * If user defined properties for the lead controller have changed, update the resource.
-   */
+  /// If user defined properties for the lead controller have changed, update the resource.
   private static void enableAndUpdateLeadControllerResource(String helixClusterName, HelixAdmin helixAdmin,
-      IdealState idealState, boolean enableBatchMessageMode, ControllerConf controllerConf) {
+      IdealState idealState, ControllerConf controllerConf) {
     boolean needsUpdating = false;
 
     if (!idealState.isEnabled()) {
@@ -237,10 +264,9 @@ public class HelixSetupUtils {
       idealState.enable(true);
       needsUpdating = true;
     }
-    if (idealState.getBatchMessageMode() != enableBatchMessageMode) {
-      LOGGER.info("Updating batch message mode to: {} for resource: {}", enableBatchMessageMode,
-          LEAD_CONTROLLER_RESOURCE_NAME);
-      idealState.setBatchMessageMode(enableBatchMessageMode);
+    if (idealState.getBatchMessageMode()) {
+      LOGGER.warn("Disabling batch message mode for resource: {}", LEAD_CONTROLLER_RESOURCE_NAME);
+      idealState.setBatchMessageMode(false);
       needsUpdating = true;
     }
     if (!idealState.getRebalanceStrategy().equals(controllerConf.getLeadControllerResourceRebalanceStrategy())) {

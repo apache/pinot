@@ -31,24 +31,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Registry for all {@link PinotTaskGenerator}.
- */
+/// Registry for all [PinotTaskGenerator].
 public class TaskGeneratorRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(TaskGeneratorRegistry.class);
 
   private final Map<String, PinotTaskGenerator> _taskGeneratorRegistry = new HashMap<>();
 
-  /**
-   * The package regex pattern for auto-registered {@link PinotTaskGenerator}.
-   */
+  /// The package regex pattern for auto-registered [PinotTaskGenerator].
   public static final String TASK_GENERATOR_PACKAGE_REGEX_PATTERN = ".*\\.plugin\\.minion\\.tasks\\..*";
 
-  /**
-   * Registers the task generators via reflection.
-   * NOTE: In order to plugin a class using reflection, the class should include ".plugin.minion.tasks." in its class
-   * path. This convention can significantly reduce the time of class scanning.
-   */
+  /// Registers the task generators via reflection.
+  /// NOTE: In order to plugin a class using reflection, the class should include ".plugin.minion.tasks." in its class
+  /// path. This convention can significantly reduce the time of class scanning.
   public TaskGeneratorRegistry(ClusterInfoAccessor clusterInfoAccessor) {
     long startTimeMs = System.currentTimeMillis();
     Set<Class<?>> classes = getTaskGeneratorClasses();
@@ -56,7 +50,7 @@ public class TaskGeneratorRegistry {
       TaskGenerator annotation = clazz.getAnnotation(TaskGenerator.class);
       if (annotation.enabled()) {
         try {
-          PinotTaskGenerator taskGenerator = (PinotTaskGenerator) clazz.newInstance();
+          PinotTaskGenerator taskGenerator = (PinotTaskGenerator) clazz.getDeclaredConstructor().newInstance();
           taskGenerator.init(clusterInfoAccessor);
           registerTaskGenerator(taskGenerator);
         } catch (Exception e) {
@@ -72,9 +66,7 @@ public class TaskGeneratorRegistry {
     return PinotReflectionUtils.getClassesThroughReflection(TASK_GENERATOR_PACKAGE_REGEX_PATTERN, TaskGenerator.class);
   }
 
-  /**
-   * Register a task generator.
-   */
+  /// Register a task generator.
   public void registerTaskGenerator(PinotTaskGenerator pinotTaskGenerator) {
     // Task type cannot contain the task name separator
     String taskType = pinotTaskGenerator.getTaskType();
@@ -84,16 +76,12 @@ public class TaskGeneratorRegistry {
     _taskGeneratorRegistry.put(taskType, pinotTaskGenerator);
   }
 
-  /**
-   * Returns all registered task types.
-   */
+  /// Returns all registered task types.
   public Set<String> getAllTaskTypes() {
     return _taskGeneratorRegistry.keySet();
   }
 
-  /**
-   * Returns the task generator for the given task type.
-   */
+  /// Returns the task generator for the given task type.
   @Nullable
   public PinotTaskGenerator getTaskGenerator(String taskType) {
     return _taskGeneratorRegistry.get(taskType);

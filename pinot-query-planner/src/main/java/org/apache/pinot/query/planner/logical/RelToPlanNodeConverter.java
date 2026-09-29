@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.logical;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -36,35 +37,41 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.TableScan;
+import org.apache.calcite.rel.core.Uncollect;
 import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.rel.logical.LogicalAsofJoin;
+import org.apache.calcite.rel.logical.LogicalCorrelate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
-import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.logical.LogicalWindow;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
+import org.apache.calcite.rex.RexCorrelVariable;
+import org.apache.calcite.rex.RexFieldAccess;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.sql.SqlLiteral;
+import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.calcite.rel.rules.GroupingSetsPlanUtils;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
@@ -74,37 +81,60 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@link RelToPlanNodeConverter} converts a logical {@link RelNode} to a {@link PlanNode}.
- */
+/// The [RelToPlanNodeConverter] converts a logical [RelNode] to a [PlanNode].
 public final class RelToPlanNodeConverter {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelToPlanNodeConverter.class);
   private static final int DEFAULT_STAGE_ID = -1;
+  /// Pattern used to detect Calcite/Pinot auto-generated aliases such as expr$0, item0, ord0, arr0, unnest_col_0, col0.
+  /// The matcher is case-insensitive because connectors may emit the aliases in different cases (e.g., EXPR$0 vs
+  /// expr$0).
 
   private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
   private boolean _joinFound;
   private boolean _windowFunctionFound;
   @Nullable
   private final TransformationTracker.Builder<PlanNode, RelNode> _tracker;
+  private final String _hashFunction;
+  private final boolean _caseSensitive;
+  // When true, UNNEST output is pruned to drop input (passthrough) columns not referenced downstream. Default off.
+  private final boolean _pruneUnnestColumns;
 
-  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
-    _tracker = tracker;
+  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
+      String hashFunction) {
+    this(tracker, hashFunction, !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
   }
 
-  /**
-   * Converts a {@link RelNode} into its serializable counterpart.
-   * NOTE: Stage ID is not determined yet.
-   */
+  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
+      String hashFunction, boolean caseSensitive) {
+    this(tracker, hashFunction, caseSensitive, false);
+  }
+
+  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
+      String hashFunction, boolean caseSensitive, boolean pruneUnnestColumns) {
+    _tracker = tracker;
+    _hashFunction = hashFunction;
+    _caseSensitive = caseSensitive;
+    _pruneUnnestColumns = pruneUnnestColumns;
+  }
+
+  /// Converts a [RelNode] into its serializable counterpart.
+  /// NOTE: Stage ID is not determined yet.
   public PlanNode toPlanNode(RelNode node) {
     PlanNode result;
-    if (node instanceof LogicalTableScan) {
-      result = convertLogicalTableScan((LogicalTableScan) node);
+    if (node instanceof PinotLogicalTableScan) {
+      result = convertPinotLogicalTableScan((PinotLogicalTableScan) node);
+    } else if (node instanceof Uncollect) {
+      result = convertLogicalUncollect((Uncollect) node);
+    } else if (node instanceof LogicalCorrelate) {
+      result = convertLogicalCorrelate((LogicalCorrelate) node);
     } else if (node instanceof LogicalProject) {
       result = convertLogicalProject((LogicalProject) node);
     } else if (node instanceof LogicalFilter) {
@@ -122,6 +152,13 @@ public final class RelToPlanNodeConverter {
         _joinFound = true;
       }
       result = convertLogicalJoin((LogicalJoin) node);
+    } else if (node instanceof LogicalAsofJoin) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.JOIN_COUNT, 1);
+      if (!_joinFound) {
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_JOINS, 1);
+        _joinFound = true;
+      }
+      result = convertLogicalAsofJoin((LogicalAsofJoin) node);
     } else if (node instanceof LogicalWindow) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WINDOW_COUNT, 1);
       if (!_windowFunctionFound) {
@@ -142,38 +179,436 @@ public final class RelToPlanNodeConverter {
     return result;
   }
 
+  private UnnestNode convertLogicalUncollect(Uncollect node) {
+    // Extract array expressions (typically from a Project with one or more expressions)
+    List<RexExpression> arrayExprs = new ArrayList<>();
+    RelNode input = node.getInput();
+    boolean withOrdinality = node.withOrdinality;
+
+    if (input instanceof Project) {
+      Project p = (Project) input;
+      List<RelDataTypeField> outputFields = node.getRowType().getFieldList();
+      List<RelDataTypeField> projectFields = p.getRowType().getFieldList();
+      int numProjects = p.getProjects().size();
+      int numOutputFields = outputFields.size();
+
+      // Check if WITH ORDINALITY is present: output fields = project expressions + ordinality
+      if (numOutputFields > numProjects) {
+        withOrdinality = true;
+      }
+
+      // Extract all array expressions from the Project
+      for (int i = 0; i < numProjects; i++) {
+        arrayExprs.add(RexExpressionUtils.fromRexNode(p.getProjects().get(i)));
+      }
+    }
+
+    if (arrayExprs.isEmpty()) {
+      // Fallback: refer to first input ref
+      arrayExprs.add(new RexExpression.InputRef(0));
+      List<RelDataTypeField> fields = node.getRowType().getFieldList();
+      // Check for ordinality in fallback case
+      if (fields.size() > 1 && !withOrdinality) {
+        withOrdinality = true;
+      }
+    }
+
+    List<Integer> elementIndexes = new ArrayList<>(arrayExprs.size());
+    for (int i = 0; i < arrayExprs.size(); i++) {
+      elementIndexes.add(i);
+    }
+    int ordinalityIndex = withOrdinality ? arrayExprs.size() : UnnestNode.UNSPECIFIED_INDEX;
+    UnnestNode.TableFunctionContext tableFunctionContext =
+        new UnnestNode.TableFunctionContext(withOrdinality, elementIndexes, ordinalityIndex);
+    return new UnnestNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.EMPTY,
+        convertInputs(node.getInputs()), arrayExprs, tableFunctionContext);
+  }
+
+  // NOTE: Besides the main dispatch, this is also invoked from tryPruneUnnestPassthrough. Its result is always used
+  // (either directly or rewritten into a pruned node), so it must remain free of non-idempotent side effects beyond
+  // converting/tracking its own subtree.
+  private BasePlanNode convertLogicalCorrelate(LogicalCorrelate node) {
+    // Pattern: Correlate(left, Uncollect(Project(correlatedFields...)))
+    RelNode right = node.getRight();
+    RelDataType leftRowType = node.getLeft().getRowType();
+    Project aliasProject = right instanceof Project ? (Project) right : null;
+    Project correlatedProject = findProjectUnderUncollect(right);
+    List<RexExpression> arrayExprs = new ArrayList<>();
+    if (correlatedProject != null) {
+      List<RelDataTypeField> outputFields = node.getRowType().getFieldList();
+      // Extract all array expressions from the Project
+      // The output fields include: left columns + array elements + (ordinality if present)
+      // We need to extract only the array element columns (skip left columns, skip ordinality if present)
+      int leftColumnCount = leftRowType.getFieldCount();
+      int numProjects = correlatedProject.getProjects().size();
+      List<RelDataTypeField> projectFields = correlatedProject.getRowType().getFieldList();
+      for (int i = 0; i < numProjects; i++) {
+        RexNode rex = correlatedProject.getProjects().get(i);
+        RexExpression arrayExpr = deriveArrayExpression(rex, correlatedProject, leftRowType);
+        if (arrayExpr == null) {
+          arrayExpr = RexExpressionUtils.fromRexNode(rex);
+        }
+        arrayExprs.add(arrayExpr);
+      }
+    }
+    if (arrayExprs.isEmpty()) {
+      // Fallback: refer to first input ref
+      arrayExprs.add(new RexExpression.InputRef(0));
+    }
+    LogicalFilter correlateFilter = findCorrelateFilter(right);
+    boolean wrapWithFilter = correlateFilter != null;
+    RexNode filterCondition = wrapWithFilter ? correlateFilter.getCondition() : null;
+    // Use the entire correlate output schema
+    PlanNode inputNode = toPlanNode(node.getLeft());
+    // Ensure inputs list is mutable because downstream visitors (e.g., withInputs methods) may modify the inputs list
+    List<PlanNode> inputs = new ArrayList<>();
+    inputs.add(inputNode);
+    ElementOrdinalInfo ordinalInfo = deriveElementOrdinalInfo(right, leftRowType, node.getRowType(), arrayExprs.size());
+    boolean withOrdinality = ordinalInfo.hasOrdinality();
+    List<Integer> elementIndexes = ordinalInfo.getElementIndexes();
+    int ordinalityIndex = ordinalInfo.getOrdinalityIndex();
+    UnnestNode.TableFunctionContext tableFunctionContext =
+        new UnnestNode.TableFunctionContext(withOrdinality, elementIndexes, ordinalityIndex);
+    UnnestNode unnest = new UnnestNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.EMPTY,
+        inputs, arrayExprs, tableFunctionContext);
+    if (wrapWithFilter) {
+      // Wrap Unnest with a FilterNode; rewrite filter InputRefs to absolute output indexes
+      // For multiple arrays, we need to handle rewriting differently
+      RexExpression rewritten = rewriteInputRefsForMultipleArrays(
+          RexExpressionUtils.fromRexNode(filterCondition), elementIndexes, ordinalityIndex);
+      return new FilterNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.EMPTY,
+          new ArrayList<>(List.of(unnest)), rewritten);
+    }
+    return unnest;
+  }
+
+  @Nullable
+  private static Project findProjectUnderUncollect(RelNode node) {
+    RelNode current = node;
+    while (current != null) {
+      if (current instanceof Uncollect) {
+        RelNode input = ((Uncollect) current).getInput();
+        return input instanceof Project ? (Project) input : null;
+      }
+      if (current instanceof Project) {
+        current = ((Project) current).getInput();
+      } else if (current instanceof LogicalFilter) {
+        current = ((LogicalFilter) current).getInput();
+      } else {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  private static Uncollect findUncollect(RelNode node) {
+    RelNode current = node;
+    while (current != null) {
+      if (current instanceof Uncollect) {
+        return (Uncollect) current;
+      }
+      if (current instanceof Project) {
+        current = ((Project) current).getInput();
+      } else if (current instanceof LogicalFilter) {
+        current = ((LogicalFilter) current).getInput();
+      } else {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  private RexExpression deriveArrayExpression(RexNode rex, Project project, RelDataType leftRowType) {
+    Integer idx = resolveInputRefFromCorrel(rex, leftRowType);
+    if (idx != null) {
+      return new RexExpression.InputRef(idx);
+    }
+    RexExpression candidate = RexExpressionUtils.fromRexNode(rex);
+    return candidate instanceof RexExpression.InputRef ? candidate : null;
+  }
+
+  @Nullable
+  private static LogicalFilter findCorrelateFilter(RelNode node) {
+    RelNode current = node;
+    while (current instanceof Project || current instanceof LogicalFilter) {
+      if (current instanceof LogicalFilter) {
+        return (LogicalFilter) current;
+      }
+      current = ((Project) current).getInput();
+    }
+    return null;
+  }
+
+  private static ElementOrdinalInfo deriveElementOrdinalInfo(RelNode right, RelDataType leftRowType,
+      RelDataType correlateOutputRowType, int numArrays) {
+    Uncollect uncollect = findUncollect(right);
+    boolean hasOrdinality = uncollect != null && uncollect.withOrdinality;
+    ElementOrdinalAccumulator accumulator =
+        new ElementOrdinalAccumulator(leftRowType.getFieldCount(), numArrays, hasOrdinality);
+    if (correlateOutputRowType != null) {
+      // Use the Correlate's output row type which includes left columns + unnested elements + ordinality
+      accumulator.populateFromCorrelateOutput(correlateOutputRowType, leftRowType.getFieldCount());
+    } else {
+      // Fallback to old logic for non-Correlate cases
+      if (right instanceof Uncollect) {
+        accumulator.populateFromRowType(right.getRowType());
+      } else if (right instanceof Project) {
+        accumulator.populateFromProject((Project) right);
+      } else if (right instanceof LogicalFilter) {
+        LogicalFilter filter = (LogicalFilter) right;
+        RelNode filterInput = filter.getInput();
+        if (filterInput instanceof Uncollect) {
+          accumulator.populateFromRowType(filter.getRowType());
+        } else if (filterInput instanceof Project) {
+          accumulator.populateFromProject((Project) filterInput);
+        }
+      }
+    }
+    if (uncollect != null) {
+      accumulator.ensureOrdinalityFromRowType(uncollect.getRowType(), uncollect.withOrdinality);
+    }
+    return accumulator.toInfo();
+  }
+
+  private static final class ElementOrdinalAccumulator {
+    private final int _base;
+    private final int _numArrays;
+    private final boolean _hasOrdinality;
+    private final List<Integer> _elementIndexes = new ArrayList<>();
+    private int _ordinalityIndex = -1;
+
+    ElementOrdinalAccumulator(int base, int numArrays, boolean hasOrdinality) {
+      _base = base;
+      _numArrays = numArrays;
+      _hasOrdinality = hasOrdinality;
+    }
+
+    void populateFromRowType(RelDataType rowType) {
+      List<RelDataTypeField> fields = rowType.getFieldList();
+      // Extract element aliases and indexes for all arrays
+      for (int i = 0; i < _numArrays && i < fields.size(); i++) {
+        _elementIndexes.add(_base + i);
+      }
+      for (int i = fields.size(); i < _numArrays; i++) {
+        _elementIndexes.add(_base + i);
+      }
+      // Check if ordinality is present: fields.size() should be numArrays + 1
+      if (fields.size() > _numArrays && _ordinalityIndex < 0) {
+        _ordinalityIndex = _base + _numArrays;
+      }
+    }
+
+    void populateFromProject(Project project) {
+      List<RexNode> projects = project.getProjects();
+      List<RelDataTypeField> projFields = project.getRowType().getFieldList();
+      // Extract element aliases and indexes from project outputs
+      for (int j = 0; j < projects.size() && j < _numArrays; j++) {
+        _elementIndexes.add(_base + j);
+      }
+      for (int j = projects.size(); j < _numArrays; j++) {
+        _elementIndexes.add(_base + j);
+      }
+      // Check if ordinality is present: projFields.size() should be numArrays + 1
+      if (projFields.size() > _numArrays && _ordinalityIndex < 0) {
+        _ordinalityIndex = _base + _numArrays;
+      }
+    }
+
+    void populateFromCorrelateOutput(RelDataType correlateOutputRowType, int leftColumnCount) {
+      List<RelDataTypeField> fields = correlateOutputRowType.getFieldList();
+      int rightFieldCount = Math.min(_numArrays + (_hasOrdinality ? 1 : 0), fields.size());
+      int actualLeftColumns = Math.max(0, fields.size() - rightFieldCount);
+      int missingLeftColumns = Math.max(0, leftColumnCount - actualLeftColumns);
+      int adjustedBase = Math.max(0, leftColumnCount - missingLeftColumns);
+
+      for (int i = 0; i < _numArrays; i++) {
+        int fieldIndex = adjustedBase + i;
+        if (fieldIndex < fields.size()) {
+          _elementIndexes.add(fieldIndex);
+        } else {
+          _elementIndexes.add(_base + i);
+        }
+      }
+      int ordinalityFieldIndex = adjustedBase + _numArrays;
+      if (_hasOrdinality && ordinalityFieldIndex < fields.size() && _ordinalityIndex < 0) {
+        _ordinalityIndex = ordinalityFieldIndex;
+      }
+    }
+
+    void ensureOrdinalityFromRowType(RelDataType rowType, boolean hasOrdinality) {
+      if (!hasOrdinality) {
+        return;
+      }
+      List<RelDataTypeField> fields = rowType.getFieldList();
+      if (_ordinalityIndex < 0) {
+        _ordinalityIndex = _base + _numArrays;
+      }
+    }
+
+    ElementOrdinalInfo toInfo() {
+      // For backward compatibility, provide single element index if only one array
+      int singleElementIndex = _elementIndexes.isEmpty() ? -1 : _elementIndexes.get(0);
+      return new ElementOrdinalInfo(singleElementIndex, _ordinalityIndex, _elementIndexes);
+    }
+  }
+
+  private static final class ElementOrdinalInfo {
+    private final int _elementIndex;
+    private final int _ordinalityIndex;
+    private final List<Integer> _elementIndexes;
+
+    ElementOrdinalInfo(int elementIndex, int ordinalityIndex) {
+      this(elementIndex, ordinalityIndex, elementIndex >= 0 ? List.of(elementIndex) : List.of());
+    }
+
+    ElementOrdinalInfo(int elementIndex, int ordinalityIndex, List<Integer> elementIndexes) {
+      _elementIndex = elementIndex;
+      _ordinalityIndex = ordinalityIndex;
+      _elementIndexes = elementIndexes;
+    }
+
+    int getElementIndex() {
+      return _elementIndex;
+    }
+
+    List<Integer> getElementIndexes() {
+      return _elementIndexes;
+    }
+
+    int getOrdinalityIndex() {
+      return _ordinalityIndex;
+    }
+
+    boolean hasOrdinality() {
+      return _ordinalityIndex >= 0;
+    }
+  }
+
+  private static RexExpression rewriteInputRefs(RexExpression expr, int elemOutIdx, int ordOutIdx) {
+    if (expr instanceof RexExpression.InputRef) {
+      int idx = ((RexExpression.InputRef) expr).getIndex();
+      if (idx == 0 && elemOutIdx >= 0) {
+        return new RexExpression.InputRef(elemOutIdx);
+      } else if (idx == 1 && ordOutIdx >= 0) {
+        return new RexExpression.InputRef(ordOutIdx);
+      } else {
+        return expr;
+      }
+    } else if (expr instanceof RexExpression.FunctionCall) {
+      RexExpression.FunctionCall fc = (RexExpression.FunctionCall) expr;
+      List<RexExpression> ops = fc.getFunctionOperands();
+      List<RexExpression> rewritten = new ArrayList<>(ops.size());
+      for (RexExpression op : ops) {
+        rewritten.add(rewriteInputRefs(op, elemOutIdx, ordOutIdx));
+      }
+      return new RexExpression.FunctionCall(fc.getDataType(), fc.getFunctionName(), rewritten);
+    } else {
+      return expr;
+    }
+  }
+
+  private static RexExpression rewriteInputRefsForMultipleArrays(RexExpression expr, List<Integer> elemOutIdxs,
+      int ordOutIdx) {
+    if (expr instanceof RexExpression.InputRef) {
+      int idx = ((RexExpression.InputRef) expr).getIndex();
+      // Map element indexes: 0 -> first element index, 1 -> second element index, etc.
+      if (idx >= 0 && idx < elemOutIdxs.size() && elemOutIdxs.get(idx) >= 0) {
+        return new RexExpression.InputRef(elemOutIdxs.get(idx));
+      } else if (idx == elemOutIdxs.size() && ordOutIdx >= 0) {
+        // Ordinality index comes after all element indexes
+        return new RexExpression.InputRef(ordOutIdx);
+      } else {
+        return expr;
+      }
+    } else if (expr instanceof RexExpression.FunctionCall) {
+      RexExpression.FunctionCall fc = (RexExpression.FunctionCall) expr;
+      List<RexExpression> ops = fc.getFunctionOperands();
+      List<RexExpression> rewritten = new ArrayList<>(ops.size());
+      for (RexExpression op : ops) {
+        rewritten.add(rewriteInputRefsForMultipleArrays(op, elemOutIdxs, ordOutIdx));
+      }
+      return new RexExpression.FunctionCall(fc.getDataType(), fc.getFunctionName(), rewritten);
+    } else {
+      return expr;
+    }
+  }
+
+  private Integer resolveInputRefFromCorrel(RexNode expr, RelDataType leftRowType) {
+    if (expr instanceof RexFieldAccess) {
+      RexFieldAccess fieldAccess = (RexFieldAccess) expr;
+      if (fieldAccess.getReferenceExpr() instanceof RexCorrelVariable) {
+        String fieldName = fieldAccess.getField().getName();
+        List<RelDataTypeField> fields = leftRowType.getFieldList();
+        // SQL field names are case-insensitive by default in Calcite, so we use equalsIgnoreCase for matching.
+        // NOTE: This assumes that the schema is configured with Calcite's default case-insensitivity.
+        // If the schema is case-sensitive, this approach may produce incorrect results. Update logic if needed.
+        for (int i = 0; i < fields.size(); i++) {
+          String candidateName = fields.get(i).getName();
+          if (candidateName == null) {
+            continue;
+          }
+          if (candidateName.equals(fieldName)) {
+            return i;
+          }
+          if (candidateName.equalsIgnoreCase(fieldName)) {
+            if (_caseSensitive) {
+              LOGGER.warn("Skipping correlated reference '{}' vs '{}' because schema is case-sensitive. "
+                  + "Adjust query or enable case-insensitive matching.", fieldName, candidateName);
+            } else {
+              LOGGER.warn("Case-insensitive field match for correlated reference '{}' vs '{}'. "
+                  + "Ensure schema case-sensitivity is configured as expected.", fieldName, candidateName);
+              return i;
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   private ExchangeNode convertLogicalExchange(Exchange node) {
+    RelDistribution distribution = node.getDistribution();
+    RelDistribution.Type distributionType = distribution.getType();
     PinotRelExchangeType exchangeType;
+    List<Integer> keys;
+    Boolean prePartitioned;
     List<RelFieldCollation> collations;
     boolean sortOnSender;
     boolean sortOnReceiver;
     if (node instanceof PinotLogicalSortExchange) {
       PinotLogicalSortExchange sortExchange = (PinotLogicalSortExchange) node;
       exchangeType = sortExchange.getExchangeType();
+      keys = distribution.getKeys();
+      prePartitioned = sortExchange.getPrePartitioned();
       collations = sortExchange.getCollation().getFieldCollations();
       sortOnSender = sortExchange.isSortOnSender();
       sortOnReceiver = sortExchange.isSortOnReceiver();
     } else {
       assert node instanceof PinotLogicalExchange;
-      exchangeType = ((PinotLogicalExchange) node).getExchangeType();
+      PinotLogicalExchange exchange = (PinotLogicalExchange) node;
+      exchangeType = exchange.getExchangeType();
+      keys = exchange.getKeys();
+      prePartitioned = exchange.getPrePartitioned();
       collations = null;
       sortOnSender = false;
       sortOnReceiver = false;
     }
-    RelDistribution distribution = node.getDistribution();
-    RelDistribution.Type distributionType = distribution.getType();
-    List<Integer> keys;
-    boolean prePartitioned;
-    if (distributionType == RelDistribution.Type.HASH_DISTRIBUTED) {
-      keys = distribution.getKeys();
-      RelDistribution inputDistributionTrait = node.getInputs().get(0).getTraitSet().getDistribution();
-      prePartitioned = distribution.equals(inputDistributionTrait);
-    } else {
+    if (keys.isEmpty()) {
       keys = null;
-      prePartitioned = false;
+    }
+    if (prePartitioned == null) {
+      if (distributionType == RelDistribution.Type.HASH_DISTRIBUTED) {
+        RelDistribution inputDistributionTrait = node.getInputs().get(0).getTraitSet().getDistribution();
+        prePartitioned = distribution.equals(inputDistributionTrait);
+      } else {
+        prePartitioned = false;
+      }
     }
     return new ExchangeNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), convertInputs(node.getInputs()),
-        exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender, sortOnReceiver, null);
+        exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender, sortOnReceiver, null, null,
+        _hashFunction);
   }
 
   private SetOpNode convertLogicalSetOp(SetOp node) {
@@ -243,7 +678,18 @@ public final class RelToPlanNodeConverter {
     }
     return new WindowNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         convertInputs(node.getInputs()), windowGroup.keys.asList(), windowGroup.orderKeys.getFieldCollations(),
-        aggCalls, windowFrameType, lowerBound, upperBound, constants);
+        aggCalls, windowFrameType, lowerBound, upperBound, fromRexWindowExclusion(windowGroup.exclude), constants);
+  }
+
+  public static WindowNode.WindowExclusion fromRexWindowExclusion(RexWindowExclusion exclude) {
+    if (exclude == RexWindowExclusion.EXCLUDE_CURRENT_ROW) {
+      return WindowNode.WindowExclusion.CURRENT_ROW;
+    } else if (exclude == RexWindowExclusion.EXCLUDE_GROUP) {
+      return WindowNode.WindowExclusion.GROUP;
+    } else if (exclude == RexWindowExclusion.EXCLUDE_TIES) {
+      return WindowNode.WindowExclusion.TIES;
+    }
+    return WindowNode.WindowExclusion.NO_OTHERS;
   }
 
   private SortNode convertLogicalSort(LogicalSort node) {
@@ -264,12 +710,192 @@ public final class RelToPlanNodeConverter {
     }
     return new AggregateNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         convertInputs(node.getInputs()), functionCalls, filterArgs, node.getGroupSet().asList(), node.getAggType(),
-        node.isLeafReturnFinalResult());
+        node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit(),
+        GroupingSetsPlanUtils.computeGroupingSets(node));
   }
 
   private ProjectNode convertLogicalProject(LogicalProject node) {
+    if (_pruneUnnestColumns) {
+      ProjectNode pruned = tryPruneUnnestPassthrough(node);
+      if (pruned != null) {
+        return pruned;
+      }
+    }
     return new ProjectNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         convertInputs(node.getInputs()), RexExpressionUtils.fromRexNodes(node.getProjects()));
+  }
+
+  /// When a Project sits directly above a CROSS JOIN UNNEST (a [LogicalCorrelate] over [Uncollect]), prunes
+  /// the input (passthrough) columns that the Project does not reference - notably the unnested source array - from the
+  /// [UnnestNode] output, so the operator does not copy them into every exploded row. The Project's own
+  /// `InputRef`s are remapped from the full correlate-output index space to the pruned space.
+  ///
+  /// Returns `null` (caller falls back to the default conversion, preserving all passthrough columns) when the
+  /// pattern is not recognized, the layout is not the standard one, or pruning would be a no-op.
+  @Nullable
+  private ProjectNode tryPruneUnnestPassthrough(LogicalProject node) {
+    List<RelNode> inputs = node.getInputs();
+    if (inputs.size() != 1 || !(inputs.get(0) instanceof LogicalCorrelate)) {
+      return null;
+    }
+    LogicalCorrelate correlate = (LogicalCorrelate) inputs.get(0);
+    RelNode right = correlate.getRight();
+    // Only handle the UNNEST pattern, and only when no correlate-filter wraps the Uncollect. With a wrapping filter,
+    // convertLogicalCorrelate emits a FilterNode, so the Project no longer sits directly on the UnnestNode.
+    if (findUncollect(right) == null || findCorrelateFilter(right) != null) {
+      // Cheap structural check failed before any conversion: let the caller fall back to the default conversion.
+      return null;
+    }
+    // Convert the correlate exactly once. From here we always return a ProjectNode wrapping this converted input, so
+    // the caller never re-runs the (side-effecting, tracker-registering) conversion of the left subtree.
+    BasePlanNode converted = convertLogicalCorrelate(correlate);
+    if (converted instanceof UnnestNode) {
+      ProjectNode pruned = buildPrunedProject(node, (UnnestNode) converted, correlate);
+      if (pruned != null) {
+        return pruned;
+      }
+    }
+    // Not prunable (unexpected layout, no-op, or non-UnnestNode): wrap the already-converted input in a Project.
+    if (_tracker != null) {
+      _tracker.trackCreation(correlate, converted);
+    }
+    return new ProjectNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
+        new ArrayList<>(List.of(converted)), RexExpressionUtils.fromRexNodes(node.getProjects()));
+  }
+
+  /// Builds the pruned Project-over-UnnestNode for the standard CROSS JOIN UNNEST layout, or returns `null` when
+  /// the layout is non-standard or pruning would be a no-op (all passthrough columns are referenced downstream). On
+  /// success it registers the new UnnestNode with the tracker against `correlate`.
+  @Nullable
+  private ProjectNode buildPrunedProject(LogicalProject node, UnnestNode full, RelNode correlate) {
+    if (full.isPrunedPassthrough()) {
+      return null;
+    }
+    DataSchema fullSchema = full.getDataSchema();
+    int outSize = fullSchema.size();
+    int numArrays = full.getArrayExprs().size();
+    boolean withOrdinality = full.isWithOrdinality();
+    int leftCount = outSize - numArrays - (withOrdinality ? 1 : 0);
+    if (leftCount <= 0) {
+      // No passthrough columns to prune.
+      return null;
+    }
+    // Only handle the clean layout produced by the standard path: passthrough columns occupy [0, leftCount) and the
+    // element (then ordinality) columns occupy the trailing region. Fall back otherwise.
+    List<Integer> elementIndexes = full.getElementIndexes();
+    if (elementIndexes.size() != numArrays) {
+      return null;
+    }
+    for (int k = 0; k < numArrays; k++) {
+      if (elementIndexes.get(k) != leftCount + k) {
+        return null;
+      }
+    }
+    if (withOrdinality && full.getOrdinalityIndex() != leftCount + numArrays) {
+      return null;
+    }
+    // Collect referenced passthrough (left) columns from the project expressions.
+    List<RexExpression> projects = RexExpressionUtils.fromRexNodes(node.getProjects());
+    boolean[] referenced = new boolean[leftCount];
+    for (RexExpression project : projects) {
+      collectReferencedColumns(project, leftCount, referenced);
+    }
+    List<Integer> retained = new ArrayList<>();
+    for (int i = 0; i < leftCount; i++) {
+      if (referenced[i]) {
+        retained.add(i);
+      }
+    }
+    if (retained.size() == leftCount) {
+      // All passthrough columns are used downstream; pruning would be a no-op.
+      return null;
+    }
+    int numRetained = retained.size();
+    // Build the old (full correlate output) -> new (pruned output) index map.
+    int[] oldToNew = new int[outSize];
+    Arrays.fill(oldToNew, -1);
+    for (int i = 0; i < numRetained; i++) {
+      oldToNew[retained.get(i)] = i;
+    }
+    for (int k = 0; k < numArrays; k++) {
+      oldToNew[leftCount + k] = numRetained + k;
+    }
+    if (withOrdinality) {
+      oldToNew[leftCount + numArrays] = numRetained + numArrays;
+    }
+    // Build the pruned output schema: retained passthrough columns, then element columns, then ordinality.
+    int newSize = numRetained + numArrays + (withOrdinality ? 1 : 0);
+    String[] columnNames = new String[newSize];
+    ColumnDataType[] columnTypes = new ColumnDataType[newSize];
+    for (int i = 0; i < numRetained; i++) {
+      int oldIdx = retained.get(i);
+      columnNames[i] = fullSchema.getColumnName(oldIdx);
+      columnTypes[i] = fullSchema.getColumnDataType(oldIdx);
+    }
+    for (int k = 0; k < numArrays; k++) {
+      columnNames[numRetained + k] = fullSchema.getColumnName(leftCount + k);
+      columnTypes[numRetained + k] = fullSchema.getColumnDataType(leftCount + k);
+    }
+    if (withOrdinality) {
+      columnNames[numRetained + numArrays] = fullSchema.getColumnName(leftCount + numArrays);
+      columnTypes[numRetained + numArrays] = fullSchema.getColumnDataType(leftCount + numArrays);
+    }
+    DataSchema prunedSchema = new DataSchema(columnNames, columnTypes);
+    // Recompute element/ordinality indexes against the pruned (smaller) output.
+    List<Integer> newElementIndexes = new ArrayList<>(numArrays);
+    for (int k = 0; k < numArrays; k++) {
+      newElementIndexes.add(numRetained + k);
+    }
+    int newOrdinalityIndex = withOrdinality ? numRetained + numArrays : UnnestNode.UNSPECIFIED_INDEX;
+    UnnestNode.TableFunctionContext context = new UnnestNode.TableFunctionContext(withOrdinality, newElementIndexes,
+        newOrdinalityIndex, retained, true);
+    UnnestNode prunedUnnest = new UnnestNode(DEFAULT_STAGE_ID, prunedSchema, full.getNodeHint(), full.getInputs(),
+        full.getArrayExprs(), context);
+    if (_tracker != null) {
+      _tracker.trackCreation(correlate, prunedUnnest);
+    }
+    // Remap the project's input refs from the full correlate-output space to the pruned space.
+    List<RexExpression> remappedProjects = new ArrayList<>(projects.size());
+    for (RexExpression project : projects) {
+      remappedProjects.add(remapInputRefs(project, oldToNew));
+    }
+    return new ProjectNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
+        new ArrayList<>(List.of(prunedUnnest)), remappedProjects);
+  }
+
+  private static void collectReferencedColumns(RexExpression expr, int leftCount, boolean[] referenced) {
+    if (expr instanceof RexExpression.InputRef) {
+      int idx = ((RexExpression.InputRef) expr).getIndex();
+      if (idx >= 0 && idx < leftCount) {
+        referenced[idx] = true;
+      }
+    } else if (expr instanceof RexExpression.FunctionCall) {
+      for (RexExpression op : ((RexExpression.FunctionCall) expr).getFunctionOperands()) {
+        collectReferencedColumns(op, leftCount, referenced);
+      }
+    }
+  }
+
+  private static RexExpression remapInputRefs(RexExpression expr, int[] oldToNew) {
+    if (expr instanceof RexExpression.InputRef) {
+      int idx = ((RexExpression.InputRef) expr).getIndex();
+      int mapped = (idx >= 0 && idx < oldToNew.length) ? oldToNew[idx] : -1;
+      // mapped is always >= 0 here: passthrough columns referenced by the project were retained, and element/
+      // ordinality columns are always mapped. Guard defensively to avoid silently corrupting indexes.
+      Preconditions.checkState(mapped >= 0, "Unexpected unmapped InputRef index %s while pruning UNNEST passthrough",
+          idx);
+      return new RexExpression.InputRef(mapped);
+    } else if (expr instanceof RexExpression.FunctionCall) {
+      RexExpression.FunctionCall fc = (RexExpression.FunctionCall) expr;
+      List<RexExpression> ops = fc.getFunctionOperands();
+      List<RexExpression> rewritten = new ArrayList<>(ops.size());
+      for (RexExpression op : ops) {
+        rewritten.add(remapInputRefs(op, oldToNew));
+      }
+      return new RexExpression.FunctionCall(fc.getDataType(), fc.getFunctionName(), rewritten);
+    } else {
+      return expr;
+    }
   }
 
   private FilterNode convertLogicalFilter(LogicalFilter node) {
@@ -277,7 +903,7 @@ public final class RelToPlanNodeConverter {
         convertInputs(node.getInputs()), RexExpressionUtils.fromRexNode(node.getCondition()));
   }
 
-  private TableScanNode convertLogicalTableScan(LogicalTableScan node) {
+  private TableScanNode convertPinotLogicalTableScan(PinotLogicalTableScan node) {
     String tableName = getTableNameFromTableScan(node);
     List<RelDataTypeField> fields = node.getRowType().getFieldList();
     List<String> columns = new ArrayList<>(fields.size());
@@ -343,6 +969,47 @@ public final class RelToPlanNodeConverter {
         joinStrategy);
   }
 
+  private JoinNode convertLogicalAsofJoin(LogicalAsofJoin join) {
+    JoinInfo joinInfo = join.analyzeCondition();
+    DataSchema dataSchema = toDataSchema(join.getRowType());
+    List<PlanNode> inputs = convertInputs(join.getInputs());
+    JoinRelType joinType = join.getJoinType();
+
+    // Basic validations
+    Preconditions.checkState(inputs.size() == 2, "Join should have exactly 2 inputs, got: %s", inputs.size());
+    Preconditions.checkState(joinInfo.nonEquiConditions.isEmpty(),
+        "Non-equi conditions are not supported for ASOF join, got: %s", joinInfo.nonEquiConditions);
+    Preconditions.checkState(joinType == JoinRelType.ASOF || joinType == JoinRelType.LEFT_ASOF,
+        "Join type should be ASOF or LEFT_ASOF, got: %s", joinType);
+
+    PlanNode left = inputs.get(0);
+    PlanNode right = inputs.get(1);
+    int numLeftColumns = left.getDataSchema().size();
+    int numResultColumns = dataSchema.size();
+    int numRightColumns = right.getDataSchema().size();
+    Preconditions.checkState(numLeftColumns + numRightColumns == numResultColumns,
+        "Invalid number of columns for join type: %s, left: %s, right: %s, result: %s", joinType, numLeftColumns,
+        numRightColumns, numResultColumns);
+
+    RexExpression matchCondition = RexExpressionUtils.fromRexNode(join.getMatchCondition());
+    Preconditions.checkState(matchCondition != null, "ASOF_JOIN must have a match condition");
+    Preconditions.checkState(matchCondition instanceof RexExpression.FunctionCall,
+        "ASOF JOIN only supports function call match condition, got: %s", matchCondition);
+
+    List<RexExpression> matchKeys = ((RexExpression.FunctionCall) matchCondition).getFunctionOperands();
+    // TODO: Add support for MATCH_CONDITION containing two columns of different types. In that case, there would be
+    //       a CAST RexExpression.FunctionCall on top of the RexExpression.InputRef, and the physical ASOF join operator
+    //       can't currently handle that.
+    Preconditions.checkState(
+        matchKeys.size() == 2 && matchKeys.get(0) instanceof RexExpression.InputRef
+            && matchKeys.get(1) instanceof RexExpression.InputRef,
+        "ASOF_JOIN only supports match conditions with a comparison between two columns of the same type");
+
+    return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(join.getHints()), inputs, joinType,
+        joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
+        JoinNode.JoinStrategy.ASOF, RexExpressionUtils.fromRexNode(join.getMatchCondition()));
+  }
+
   private List<PlanNode> convertInputs(List<RelNode> inputs) {
     // NOTE: Inputs can be modified in place. Do not create immutable List here.
     int numInputs = inputs.size();
@@ -375,7 +1042,8 @@ public final class RelToPlanNodeConverter {
     boolean isArray = (sqlTypeName == SqlTypeName.ARRAY);
     if (isArray) {
       assert relDataType.getComponentType() != null;
-      sqlTypeName = relDataType.getComponentType().getSqlTypeName();
+      relDataType = relDataType.getComponentType();
+      sqlTypeName = relDataType.getSqlTypeName();
     }
     switch (sqlTypeName) {
       case BOOLEAN:
@@ -383,9 +1051,21 @@ public final class RelToPlanNodeConverter {
       case TINYINT:
       case SMALLINT:
       case INTEGER:
+      // Calcite 1.41+ (CALCITE-1466) parses unsigned integer types under BABEL conformance. Pinot has no unsigned
+      // storage, so map each to the narrowest signed type that holds its full range: UTINYINT (0..2^8-1) and
+      // USMALLINT (0..2^16-1) fit in INT; UINTEGER (0..2^32-1) needs LONG (a signed INT would wrap values above 2^31).
+      case UTINYINT:
+      case USMALLINT:
         return isArray ? ColumnDataType.INT_ARRAY : ColumnDataType.INT;
       case BIGINT:
+      case UINTEGER:
         return isArray ? ColumnDataType.LONG_ARRAY : ColumnDataType.LONG;
+      // UBIGINT (0..2^64-1) has no signed Pinot type wide enough to hold its full range; mapping it to LONG would
+      // silently wrap values above Long.MAX_VALUE (a wrong result), so reject it at planning instead. CALCITE-1466.
+      case UBIGINT:
+        throw new IllegalArgumentException(
+            "Unsigned BIGINT (BIGINT UNSIGNED) is not supported: Pinot has no type that can represent the full "
+                + "unsigned 64-bit range. CAST to BIGINT or DECIMAL instead.");
       case DECIMAL:
         return resolveDecimal(relDataType, isArray);
       case FLOAT:
@@ -403,6 +1083,8 @@ public final class RelToPlanNodeConverter {
       case BINARY:
       case VARBINARY:
         return isArray ? ColumnDataType.BYTES_ARRAY : ColumnDataType.BYTES;
+      case UUID:
+        return isArray ? ColumnDataType.UUID_ARRAY : ColumnDataType.UUID;
       case MAP:
         return ColumnDataType.MAP;
       case OTHER:
@@ -417,19 +1099,18 @@ public final class RelToPlanNodeConverter {
     }
   }
 
-  /**
-   * Calcite uses DEMICAL type to infer data type hoisting and infer arithmetic result types. down casting this back to
-   * the proper primitive type for Pinot.
-   * TODO: Revisit this method:
-   *  - Currently we are converting exact value to approximate value
-   *  - Integer can only cover all values with precision 9; Long can only cover all values with precision 18
-   *
-   * {@link RequestUtils#getLiteralExpression(SqlLiteral)}
-   * @param relDataType the DECIMAL rel data type.
-   * @param isArray
-   * @return proper {@link ColumnDataType}.
-   * @see {@link org.apache.calcite.rel.type.RelDataTypeFactoryImpl#decimalOf}.
-   */
+  /// Calcite uses DEMICAL type to infer data type hoisting and infer arithmetic result types. down casting this back to
+  /// the proper primitive type for Pinot.
+  /// TODO: Revisit this method:
+  ///  - Currently we are converting exact value to approximate value
+  ///  - Integer can only cover all values with precision 9; Long can only cover all values with precision 18
+  ///
+  /// [org.apache.pinot.common.utils.request.RequestUtils#getLiteralExpression(
+///     org.apache.calcite.sql.SqlLiteral)]
+  /// @param relDataType the DECIMAL rel data type.
+  /// @param isArray
+  /// @return proper [ColumnDataType].
+  /// @see [org.apache.calcite.rel.type.RelDataTypeFactoryImpl#decimalOf].
   private static ColumnDataType resolveDecimal(RelDataType relDataType, boolean isArray) {
     int precision = relDataType.getPrecision();
     int scale = relDataType.getScale();
@@ -439,6 +1120,8 @@ public final class RelToPlanNodeConverter {
       } else if (precision <= 38) {
         return isArray ? ColumnDataType.LONG_ARRAY : ColumnDataType.LONG;
       } else {
+        // TODO: Modify it to return ColumnDataType.BIG_DECIMAL_ARRAY after `1.6.0` release
+        //       BIG_DECIMAL_ARRAY support is added in `1.6.0`
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.BIG_DECIMAL;
       }
     } else {
@@ -447,6 +1130,8 @@ public final class RelToPlanNodeConverter {
       if (precision <= 30) {
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.DOUBLE;
       } else {
+        // TODO: Modify it to return ColumnDataType.BIG_DECIMAL_ARRAY after `1.6.0` release
+        //       BIG_DECIMAL_ARRAY support is added in `1.6.0`
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.BIG_DECIMAL;
       }
     }

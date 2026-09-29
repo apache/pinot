@@ -38,6 +38,11 @@ public class IntAggregateResultHolder implements AggregationResultHolder {
   }
 
   @Override
+  public void setValue(long value) {
+    throw new RuntimeException("Method 'setValue' (with long value) not supported in IntAggregateResultHolder");
+  }
+
+  @Override
   public void setValue(Object value) {
     throw new RuntimeException("Method 'setValue' (with object value) not supported in IntAggregateResultHolder");
   }
@@ -50,6 +55,11 @@ public class IntAggregateResultHolder implements AggregationResultHolder {
   @Override
   public int getIntResult() {
     return _value;
+  }
+
+  @Override
+  public long getLongResult() {
+    throw new RuntimeException("Method 'getLongResult' not supported in IntAggregateResultHolder");
   }
 
   @Override

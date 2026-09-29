@@ -25,19 +25,14 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 20
-    ignore:
-    - dependency-name: "org.apache.pinot:pinot-dropwizard"
-      # Locked test resource for pinot-spi/src/test/java/org/apache/pinot/spi/plugin/ClassLoaderTest.java
-      versions: ["0.10.0"]
-    - dependency-name: "org.apache.pinot:pinot-yammer"
-      # Locked test resource for pinot-spi/src/test/java/org/apache/pinot/spi/plugin/ClassLoaderTest.java
-      versions: ["0.10.0"]
-    - dependency-name: "commons-io:commons-io"
-      # Locked test resource for pinot-spi/src/test/java/org/apache/pinot/spi/plugin/ClassLoaderTest.java
-      versions: ["2.11.0"]
-    - dependency-name: "com.yammer.metrics:metrics-core"
-      # Locked test resource for pinot-spi/src/test/java/org/apache/pinot/spi/plugin/ClassLoaderTest.java
-      versions: ["2.1.5"]
+    # No `ignore` rules needed for the ClassLoaderTest pinned test fixtures
+    # (pinot-dropwizard, pinot-yammer, commons-io, com.yammer.metrics:metrics-core).
+    # Those fixtures are resolved by pinot-spi/pom.xml via maven-dependency-plugin's
+    # `dependency:get` goal using single-string <artifact>groupId:artifactId:version</artifact>
+    # parameters — Dependabot's Maven updater scans structured groupId+artifactId+version
+    # triples inside <dependency>, <plugin>, and <artifactItem> blocks, not single-string
+    # <artifact> values in plugin configuration, so the pinned coordinates are invisible
+    # to Dependabot and no ignore rule is required.
 
   - package-ecosystem: "npm"
     directory: "/pinot-controller/src/main/resources"

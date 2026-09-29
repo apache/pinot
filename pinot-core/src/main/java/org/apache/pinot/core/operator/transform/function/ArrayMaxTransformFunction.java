@@ -20,21 +20,19 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * The ArrayMaxTransformFunction class implements arrayMax function for multi-valued columns
- *
- * Sample queries:
- * SELECT COUNT(*) FROM table WHERE arrayMax(mvColumn) > 2
- * SELECT COUNT(*) FROM table GROUP BY arrayMax(mvColumn)
- * SELECT SUM(arrayMax(mvColumn)) FROM table
- */
+/// The ArrayMaxTransformFunction class implements arrayMax function for multi-valued columns
+///
+/// Sample queries:
+/// SELECT COUNT(\*) FROM table WHERE arrayMax(mvColumn) > 2
+/// SELECT COUNT(\*) FROM table GROUP BY arrayMax(mvColumn)
+/// SELECT SUM(arrayMax(mvColumn)) FROM table
 public class ArrayMaxTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "arrayMax";
 
@@ -152,7 +150,7 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
     for (int i = 0; i < length; i++) {
       String maxRes = null;
       for (String value : stringValuesMV[i]) {
-        if (StringUtils.compare(maxRes, value) < 0) {
+        if (Strings.CS.compare(maxRes, value) < 0) {
           maxRes = value;
         }
       }

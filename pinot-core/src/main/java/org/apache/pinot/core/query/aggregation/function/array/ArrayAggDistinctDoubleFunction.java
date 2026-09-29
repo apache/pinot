@@ -19,31 +19,65 @@
 package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
+import it.unimi.dsi.fastutil.doubles.DoubleSet;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
+import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
 
 
-public class ArrayAggDistinctDoubleFunction extends BaseArrayAggDoubleFunction<DoubleOpenHashSet> {
+public class ArrayAggDistinctDoubleFunction extends BaseArrayAggDoubleFunction<DoubleSet> {
   public ArrayAggDistinctDoubleFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
+  }
+
+  @Override
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    return true;
   }
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    double[] value = blockValSet.getDoubleValuesSV();
-    DoubleOpenHashSet valueArray = new DoubleOpenHashSet(length);
-
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        valueArray.add(value[i]);
-      }
-    });
-    aggregationResultHolder.setValue(valueArray);
+    DoubleOpenHashSet valueSet = aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult()
+        : new DoubleOpenHashSet(length);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set to merge in.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueSet.addAll(ObjectSerDeUtils.DOUBLE_SET_SER_DE.deserialize(starTreeSetPayload(bytesValues[i],
+              ElementType.DOUBLE)));
+        }
+      });
+      aggregationResultHolder.setValue(valueSet);
+      return;
+    }
+    if (blockValSet.isSingleValue()) {
+      double[] values = blockValSet.getDoubleValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueSet.add(values[i]);
+        }
+      });
+    } else {
+      double[][] valuesArray = blockValSet.getDoubleValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          double[] values = valuesArray[i];
+          for (double v : values) {
+            valueSet.add(v);
+          }
+        }
+      });
+    }
+    aggregationResultHolder.setValue(valueSet);
   }
 
   @Override
@@ -54,5 +88,16 @@ public class ArrayAggDistinctDoubleFunction extends BaseArrayAggDoubleFunction<D
       resultHolder.setValueForKey(groupKey, valueSet);
     }
     valueSet.add(value);
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(DoubleSet doubleOpenHashSet) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleSet.getValue(),
+        ObjectSerDeUtils.DOUBLE_SET_SER_DE.serialize(doubleOpenHashSet));
+  }
+
+  @Override
+  public DoubleSet deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.DOUBLE_SET_SER_DE.deserialize(customObject.getBuffer());
   }
 }

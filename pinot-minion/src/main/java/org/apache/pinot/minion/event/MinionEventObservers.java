@@ -77,7 +77,7 @@ public class MinionEventObservers {
             if (task._endTs + _eventObserverCleanupDelayMs <= nowMs) {
               LOGGER.info("Cleaning up event observer for task: {} that ended at: {}, now at: {} after delay: {}",
                   task._taskId, task._endTs, nowMs, _eventObserverCleanupDelayMs);
-              _taskEventObservers.remove(task._taskId);
+              _taskEventObservers.remove(task._taskId).cleanup();
               _endedTaskQueue.poll();
             } else {
               _availableToClean.await(task._endTs + _eventObserverCleanupDelayMs - nowMs, TimeUnit.MILLISECONDS);
@@ -112,19 +112,15 @@ public class MinionEventObservers {
     return _taskEventObservers.get(taskId);
   }
 
-  /**
-   * Gets all {@link MinionEventObserver}s
-   * @return a map of subtask ID to {@link MinionEventObserver}
-   */
+  /// Gets all [MinionEventObserver]s
+  /// @return a map of subtask ID to [MinionEventObserver]
   public Map<String, MinionEventObserver> getMinionEventObservers() {
     return _taskEventObservers;
   }
 
-  /**
-   * Gets all {@link MinionEventObserver}s with the given {@link MinionTaskState}
-   * @param taskState the {@link MinionTaskState} to match
-   * @return a map of subtask ID to {@link MinionEventObserver}
-   */
+  /// Gets all [MinionEventObserver]s with the given [MinionTaskState]
+  /// @param taskState the [MinionTaskState] to match
+  /// @return a map of subtask ID to [MinionEventObserver]
   public Map<String, MinionEventObserver> getMinionEventObserverWithGivenState(MinionTaskState taskState) {
     return _taskEventObservers.entrySet().stream()
         .filter(e -> e.getValue().getTaskState() == taskState)
@@ -139,7 +135,7 @@ public class MinionEventObservers {
   public void removeMinionEventObserver(String taskId) {
     if (_eventObserverCleanupDelayMs <= 0) {
       LOGGER.debug("Clean up event observer for task: {} immediately", taskId);
-      _taskEventObservers.remove(taskId);
+      _taskEventObservers.remove(taskId).cleanup();
       return;
     }
     LOGGER.debug("Clean up event observer for task: {} after delay: {}", taskId, _eventObserverCleanupDelayMs);

@@ -37,12 +37,10 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
-/**
- * Creates a Kafka producer, for given kafka broker list
- * Continuously fetches github events data.
- * Creates a PullRequestMergedEvent for each valid PR event.
- * Publishes the PullRequestMergedEvent to the given kafka topic
- */
+/// Creates a Kafka producer, for given kafka broker list
+/// Continuously fetches github events data.
+/// Creates a PullRequestMergedEvent for each valid PR event.
+/// Publishes the PullRequestMergedEvent to the given kafka topic
 public class PullRequestMergedEventsStream {
   private static final Logger LOGGER = LoggerFactory.getLogger(PullRequestMergedEventsStream.class);
 
@@ -171,10 +169,8 @@ public class PullRequestMergedEventsStream {
     stream.execute();
   }
 
-  /**
-   * Starts the stream.
-   * Adds shutdown hook.
-   */
+  /// Starts the stream.
+  /// Adds shutdown hook.
   public void execute() {
     start();
 
@@ -187,9 +183,7 @@ public class PullRequestMergedEventsStream {
     }));
   }
 
-  /**
-   * Shuts down the stream.
-   */
+  /// Shuts down the stream.
   public void shutdown()
       throws Exception {
     printStatus(Quickstart.Color.GREEN, "***** Shutting down pullRequestMergedEvents Stream *****");

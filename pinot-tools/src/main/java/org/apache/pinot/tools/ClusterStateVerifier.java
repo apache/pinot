@@ -39,15 +39,13 @@ public class ClusterStateVerifier extends PinotZKChanger {
   private static final int MAX_SLEEP_BETWEEN_CHECKS_MILLIS = 30_000;
 
   public ClusterStateVerifier(String zkAddress, String clusterName) {
-    super(zkAddress, clusterName);
+    super("ClusterStateVerifier", zkAddress, clusterName);
   }
 
-  /**
-   * return true if all the tables are stable
-   * @param tableNames list of table names which are about to scan
-   * @param timeoutSec maximum timeout in second
-   * @return
-   */
+  /// return true if all the tables are stable
+  /// @param tableNames list of table names which are about to scan
+  /// @param timeoutSec maximum timeout in second
+  /// @return
   private boolean isClusterStable(final List<String> tableNames, final long timeoutSec) {
 
     final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -76,11 +74,9 @@ public class ClusterStateVerifier extends PinotZKChanger {
     return isStable;
   }
 
-  /**
-   * return true if all the tables are stable
-   * @param tableNames list of table names which are about to scan
-   * @return
-   */
+  /// return true if all the tables are stable
+  /// @param tableNames list of table names which are about to scan
+  /// @return
   private boolean waitForClusterStable(final List<String> tableNames, final long timeoutSec)
       throws InterruptedException {
     final long startTimeMillis = System.currentTimeMillis();
@@ -118,12 +114,10 @@ public class ClusterStateVerifier extends PinotZKChanger {
     return stable;
   }
 
-  /**
-   * Assemble and scan the candidate table names, return true if all the tables are stable.
-   * @param tableName optional table names which is provided by user and about to scan
-   * @param timeoutSec maximum timeout in second
-   * @return
-   */
+  /// Assemble and scan the candidate table names, return true if all the tables are stable.
+  /// @param tableName optional table names which is provided by user and about to scan
+  /// @param timeoutSec maximum timeout in second
+  /// @return
   public boolean verifyClusterState(String tableName, long timeoutSec) {
     List<String> tableNames;
     List<String> allTables = getAllTables();

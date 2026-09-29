@@ -29,13 +29,11 @@ import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 
 
-/**
- * Context class for converting a {@link StagePlan} into
- * {@link PinotQuery} to execute on server.
- *
- * On leaf-stage server node, {@link PlanNode} are split into {@link PinotQuery} part and
- *     {@link org.apache.pinot.query.runtime.operator.OpChain} part.
- */
+/// Context class for converting a [StagePlan] into
+/// [PinotQuery] to execute on server.
+///
+/// On leaf-stage server node, [PlanNode] are split into [PinotQuery] part and
+///     [org.apache.pinot.query.runtime.operator.OpChain] part.
 public class ServerPlanRequestContext {
   private final StagePlan _stagePlan;
   private final QueryExecutor _leafQueryExecutor;

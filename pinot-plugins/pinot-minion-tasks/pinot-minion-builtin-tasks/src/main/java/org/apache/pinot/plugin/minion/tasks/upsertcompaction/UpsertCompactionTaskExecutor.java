@@ -19,12 +19,10 @@
 package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
 import java.io.File;
-import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
-import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -35,8 +33,10 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.Obfuscator;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,35 +52,44 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
     String taskType = pinotTaskConfig.getTaskType();
-    LOGGER.info("Starting task: {} with configs: {}", taskType, configs);
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Starting task: {} with configs: {}", taskType, Obfuscator.DEFAULT.toJsonString(configs));
+    }
     long startMillis = System.currentTimeMillis();
 
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     TableConfig tableConfig = getTableConfig(tableNameWithType);
 
-    String validDocIdsTypeStr =
-        configs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.name());
+    String validDocIdsTypeStr = MinionTaskUtils.getValidDocIdsType(tableConfig.getUpsertConfig(), configs,
+        UpsertCompactionTask.VALID_DOC_IDS_TYPE).toString();
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    String originalSegmentCrcFromTaskGenerator = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
-    String crcFromDeepStorageSegment = segmentMetadata.getCrc();
+    long originalSegmentCrcFromTaskGenerator = Long.parseLong(configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY));
+    long crcFromDeepStorageSegment = segmentMetadata.getCrc();
     boolean ignoreCrcMismatch = Boolean.parseBoolean(configs.getOrDefault(UpsertCompactionTask.IGNORE_CRC_MISMATCH_KEY,
         String.valueOf(UpsertCompactionTask.DEFAULT_IGNORE_CRC_MISMATCH)));
-    if (!ignoreCrcMismatch && !originalSegmentCrcFromTaskGenerator.equals(crcFromDeepStorageSegment)) {
-      String message = String.format("Crc mismatched between ZK and deepstore copy of segment: %s. Expected crc "
-              + "from ZK: %s, crc from deepstore: %s", segmentName, originalSegmentCrcFromTaskGenerator,
-          crcFromDeepStorageSegment);
+    if (!ignoreCrcMismatch && originalSegmentCrcFromTaskGenerator != crcFromDeepStorageSegment) {
+      String message = "Crc mismatched between ZK and deepstore copy of segment: " + segmentName
+          + ". Expected crc from ZK: " + originalSegmentCrcFromTaskGenerator + ", crc from deepstore: "
+          + crcFromDeepStorageSegment;
       LOGGER.error(message);
       throw new IllegalStateException(message);
     }
+
+    // Executor-only: read comparison mode string from task config (no auth resolution or URL hits).
+    Map<String, String> taskConfigs =
+        tableConfig.getTaskConfig() != null ? tableConfig.getTaskConfig().getConfigsForTaskType(taskType) : null;
+    String consensusMode = taskConfigs != null
+        ? taskConfigs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
+            MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)
+        : MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE;
     RoaringBitmap validDocIds =
         MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsTypeStr,
-            MINION_CONTEXT, originalSegmentCrcFromTaskGenerator);
+            MINION_CONTEXT, originalSegmentCrcFromTaskGenerator, segmentMetadata.getDataCrc(), consensusMode);
     if (validDocIds == null) {
       // no valid crc match found or no validDocIds obtained from all servers
       // error out the task instead of silently failing so that we can track it via task-error metrics
-      String message = String.format("No validDocIds found from all servers. They either failed to download "
-              + "or did not match crc from segment copy obtained from deepstore / servers. " + "Expected crc: %s",
-          originalSegmentCrcFromTaskGenerator);
+      String message = "No validDocIds found from all servers. They either failed to download or did not match crc from"
+          + " segment copy obtained from deepstore / servers. Expected crc: " + originalSegmentCrcFromTaskGenerator;
       LOGGER.error(message);
       throw new IllegalStateException(message);
     }
@@ -98,13 +107,16 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     }
 
     int totalDocsAfterCompaction;
-    try (CompactedPinotSegmentRecordReader compactedRecordReader = new CompactedPinotSegmentRecordReader(indexDir,
-        validDocIds)) {
+    try (CompactedPinotSegmentRecordReader compactedRecordReader = new CompactedPinotSegmentRecordReader(validDocIds)) {
+      compactedRecordReader.init(indexDir, null, null);
       SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
           getSchema(tableNameWithType));
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(config, compactedRecordReader);
       driver.build();
+      _eventObserver.notifyProgress(pinotTaskConfig,
+          "Segment processing stats - incomplete rows:" + driver.getIncompleteRowsFound() + ", dropped rows:"
+              + driver.getSkippedRowsFound() + ", sanitized rows:" + driver.getSanitizedRowsFound());
       totalDocsAfterCompaction = driver.getSegmentStats().getTotalDocCount();
     }
 
@@ -116,9 +128,11 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
             segmentMetadata.getTotalDocs() - totalDocsAfterCompaction);
 
     long endMillis = System.currentTimeMillis();
-    LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms. Total docs before compaction: {}. "
-            + "Total docs after compaction: {}.", taskType, configs, (endMillis - startMillis),
-            segmentMetadata.getTotalDocs(), totalDocsAfterCompaction);
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms. Total docs before compaction: {}. "
+              + "Total docs after compaction: {}.", taskType, Obfuscator.DEFAULT.toJsonString(configs),
+          (endMillis - startMillis), segmentMetadata.getTotalDocs(), totalDocsAfterCompaction);
+    }
 
     return result;
   }
@@ -126,8 +140,10 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
   private static SegmentGeneratorConfig getSegmentGeneratorConfig(File workingDir, TableConfig tableConfig,
       SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema) {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setInstanceType(InstanceType.MINION);
     config.setOutDir(workingDir.getPath());
     config.setSegmentName(segmentName);
+
     // Keep index creation time the same as original segment because both segments use the same raw data.
     // This way, for REFRESH case, when new segment gets pushed to controller, we can use index creation time to
     // identify if the new pushed segment has newer data than the existing one.
@@ -148,7 +164,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
       SegmentConversionResult segmentConversionResult) {
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
-        Collections.singletonMap(UpsertCompactionTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
+        Map.of(UpsertCompactionTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
             String.valueOf(System.currentTimeMillis())));
   }
 }

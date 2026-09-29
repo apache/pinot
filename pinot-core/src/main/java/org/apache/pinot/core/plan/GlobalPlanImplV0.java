@@ -25,11 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * GlobalPlan for a query applied to all the pruned segments.
- *
- *
- */
+/// GlobalPlan for a query applied to all the pruned segments.
 public class GlobalPlanImplV0 implements Plan {
   private static final Logger LOGGER = LoggerFactory.getLogger(GlobalPlanImplV0.class);
 

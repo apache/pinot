@@ -18,17 +18,17 @@
  */
 package org.apache.pinot.perf.aggregation;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
-import org.apache.pinot.perf.SyntheticBlockValSets;
 import org.apache.pinot.perf.SyntheticNullBitmapFactories;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -68,7 +68,7 @@ public class BenchmarkSumAggregation extends AbstractAggregationFunctionBenchmar
 
   @Override
   protected AggregationFunction<?, ?> createAggregationFunction() {
-    return new SumAggregationFunction(Collections.singletonList(EXPR), _nullHandlingEnabled);
+    return new SumAggregationFunction(List.of(EXPR), _nullHandlingEnabled);
   }
 
   @Override

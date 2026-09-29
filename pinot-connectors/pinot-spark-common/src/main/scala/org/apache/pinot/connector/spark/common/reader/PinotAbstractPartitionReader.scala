@@ -25,8 +25,8 @@ import org.apache.pinot.connector.spark.common.partition.PinotSplit
 import java.io.Closeable
 
 /**
- * Abstract partition reader is designed to be shared between two concrete reader implementations
- * for Spark2 and Spark3 connectors.
+ * Abstract partition reader is designed to be shared between concrete reader implementations
+ * for Spark 3 connectors.
  *
  * @tparam RowType
  */
@@ -57,7 +57,7 @@ trait PinotAbstractPartitionReader[RowType] {
 
   private def getIteratorAndSource(): (Iterator[RowType], Closeable) = {
     if (_dataSourceOptions.useGrpcServer) {
-      val dataFetcher = PinotGrpcServerDataFetcher(_pinotSplit)
+      val dataFetcher = PinotGrpcServerDataFetcher(_pinotSplit, _dataSourceOptions)
       val iterable = dataFetcher.fetchData()
         .flatMap(_dataExtractor)
       (iterable, dataFetcher)

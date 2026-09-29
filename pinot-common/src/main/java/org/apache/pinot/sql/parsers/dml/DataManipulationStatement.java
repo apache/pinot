@@ -23,37 +23,25 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 
 
-/**
- * DML Statement
- */
+/// DML Statement
 public interface DataManipulationStatement {
-  /**
-   * The method to execute this Statement, e.g. MINION or HTTP.
-   * @return
-   */
+  /// The method to execute this Statement, e.g. MINION or HTTP.
+  /// @return
   ExecutionType getExecutionType();
 
-  /**
-   * Generate minion task config for this statement.
-   * @return Adhoc minion task config
-   */
+  /// Generate minion task config for this statement.
+  /// @return Adhoc minion task config
   AdhocTaskConfig generateAdhocTaskConfig();
 
-  /**
-   * Execute the statement and format response to response row format.
-   * Not used for Minion ExecutionType.
-   * @return Result rows
-   */
+  /// Execute the statement and format response to response row format.
+  /// Not used for Minion ExecutionType.
+  /// @return Result rows
   List<Object[]> execute();
 
-  /**
-   * @return Result schema for response
-   */
+  /// @return Result schema for response
   DataSchema getResultSchema();
 
-  /**
-   * Execution method for this SQL statement.
-   */
+  /// Execution method for this SQL statement.
   enum ExecutionType {
     HTTP,
     MINION

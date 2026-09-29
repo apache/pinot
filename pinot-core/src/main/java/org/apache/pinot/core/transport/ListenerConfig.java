@@ -21,10 +21,8 @@ package org.apache.pinot.core.transport;
 import org.apache.pinot.common.config.TlsConfig;
 
 
-/**
- * Provides configuration settings expected by an Http Server to
- * setup listeners for http and https protocols.
- */
+/// Provides configuration settings expected by an Http Server to
+/// setup listeners for http and https protocols.
 public class ListenerConfig {
   private final String _name;
   private final String _host;
@@ -32,15 +30,24 @@ public class ListenerConfig {
   private final String _protocol;
   private final TlsConfig _tlsConfig;
   private final HttpServerThreadPoolConfig _threadPoolConfig;
+  private final int _maxHttpHeaderSize;
+  private final int _maxRequestHeaders;
 
   public ListenerConfig(String name, String host, int port, String protocol, TlsConfig tlsConfig,
       HttpServerThreadPoolConfig threadPoolConfig) {
+    this(name, host, port, protocol, tlsConfig, threadPoolConfig, -1, -1);
+  }
+
+  public ListenerConfig(String name, String host, int port, String protocol, TlsConfig tlsConfig,
+      HttpServerThreadPoolConfig threadPoolConfig, int maxHttpHeaderSize, int maxRequestHeaders) {
     _name = name;
     _host = host;
     _port = port;
     _protocol = protocol;
     _tlsConfig = tlsConfig;
     _threadPoolConfig = threadPoolConfig;
+    _maxHttpHeaderSize = maxHttpHeaderSize;
+    _maxRequestHeaders = maxRequestHeaders;
   }
 
   public String getName() {
@@ -65,5 +72,13 @@ public class ListenerConfig {
 
   public HttpServerThreadPoolConfig getThreadPoolConfig() {
     return _threadPoolConfig;
+  }
+
+  public int getMaxHttpHeaderSize() {
+    return _maxHttpHeaderSize;
+  }
+
+  public int getMaxRequestHeaders() {
+    return _maxRequestHeaders;
   }
 }

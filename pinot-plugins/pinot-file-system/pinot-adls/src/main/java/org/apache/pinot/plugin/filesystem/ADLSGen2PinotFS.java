@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
+import com.azure.core.credential.AzureSasCredential;
 import com.azure.core.http.ProxyOptions;
 import com.azure.core.http.netty.NettyAsyncHttpClientBuilder;
 import com.azure.core.http.rest.PagedIterable;
@@ -43,6 +44,7 @@ import com.google.common.base.Preconditions;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -55,26 +57,28 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.apache.pinot.spi.filesystem.FileMetadata;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Azure Data Lake Storage Gen2 implementation for the PinotFS interface.
- */
+/// Azure Data Lake Storage Gen2 implementation for the PinotFS interface.
 public class ADLSGen2PinotFS extends BasePinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(ADLSGen2PinotFS.class);
 
   private enum AuthenticationType {
-    ACCESS_KEY, AZURE_AD, AZURE_AD_WITH_PROXY, ANONYMOUS_ACCESS, DEFAULT
+    ACCESS_KEY, AZURE_AD, AZURE_AD_WITH_PROXY, ANONYMOUS_ACCESS, DEFAULT, SAS_TOKEN
   }
 
   private static final String AUTHENTICATION_TYPE = "authenticationType";
@@ -91,6 +95,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
   private static final String PROXY_PORT = "proxyPort";
   private static final String PROXY_USERNAME = "proxyUsername";
   private static final String PROXY_PASSWORD = "proxyPassword";
+  private static final String SAS_TOKEN = "sasToken";
 
   private static final String HTTPS_URL_PREFIX = "https://";
 
@@ -121,7 +126,14 @@ public class ADLSGen2PinotFS extends BasePinotFS {
 
   @Override
   public void init(PinotConfiguration config) {
-    _enableChecksum = config.getProperty(ENABLE_CHECKSUM, false);
+    boolean checksumEnabled = config.getProperty(ENABLE_CHECKSUM, false);
+    if (checksumEnabled && PinotMd5Mode.isPinotMd5Disabled()) {
+      throw new IllegalStateException(String.format(
+          "ADLS checksum requires MD5, but MD5 is disabled via '%s=true'. Set '%s=false' or '%s=false'.",
+          CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED, CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED,
+          ENABLE_CHECKSUM));
+    }
+    _enableChecksum = checksumEnabled;
 
     // Azure storage account name
     String accountName = config.getProperty(ACCOUNT_NAME);
@@ -140,6 +152,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     String proxyUsername = config.getProperty(PROXY_USERNAME);
     String proxyPassword = config.getProperty(PROXY_PASSWORD);
     String proxyPort = config.getProperty(PROXY_PORT);
+    String sasToken = config.getProperty(SAS_TOKEN);
 
     String dfsServiceEndpointUrl = HTTPS_URL_PREFIX + accountName + AZURE_STORAGE_DNS_SUFFIX;
 
@@ -154,6 +167,15 @@ public class ADLSGen2PinotFS extends BasePinotFS {
 
         StorageSharedKeyCredential sharedKeyCredential = new StorageSharedKeyCredential(accountName, accessKey);
         dataLakeServiceClientBuilder.credential(sharedKeyCredential);
+        break;
+      }
+      case SAS_TOKEN: {
+        LOGGER.info("Authenticating using the sas token for the account.");
+        Preconditions.checkNotNull(accountName, "Account Name cannot be null");
+        Preconditions.checkNotNull(sasToken, "SAS Token cannot be null");
+
+        AzureSasCredential azureSasCredential = new AzureSasCredential(sasToken);
+        dataLakeServiceClientBuilder.credential(azureSasCredential);
         break;
       }
       case AZURE_AD: {
@@ -224,13 +246,11 @@ public class ADLSGen2PinotFS extends BasePinotFS {
         + "enableChecksum={})", accountName, fileSystemName, dfsServiceEndpointUrl, _enableChecksum);
   }
 
-  /**
-   * Returns the DataLakeFileSystemClient to the specified file system creating if it doesn't exist.
-   *
-   * @param serviceClient authenticated data lake service client to an account
-   * @param fileSystemName name of the file system (blob container)
-   * @return DataLakeFileSystemClient with the specified fileSystemName.
-   */
+  /// Returns the DataLakeFileSystemClient to the specified file system creating if it doesn't exist.
+  ///
+  /// @param serviceClient authenticated data lake service client to an account
+  /// @param fileSystemName name of the file system (blob container)
+  /// @return DataLakeFileSystemClient with the specified fileSystemName.
   @VisibleForTesting
   public DataLakeFileSystemClient getOrCreateClientWithFileSystem(DataLakeServiceClient serviceClient,
       String fileSystemName) {
@@ -249,12 +269,10 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Make a new directory at the given location.
-   *
-   * @param uri location to make the directory.
-   * @return true if creation succeeds else false.
-   */
+  /// Make a new directory at the given location.
+  ///
+  /// @param uri location to make the directory.
+  /// @return true if creation succeeds else false.
   @Override
   public boolean mkdir(URI uri)
       throws IOException {
@@ -277,13 +295,11 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Deletes a file/directory at a given location.
-   *
-   * @param segmentUri location to delete
-   * @param forceDelete to force delete non empty directory.
-   * @return true if deletion succeeds else false.
-   */
+  /// Deletes a file/directory at a given location.
+  ///
+  /// @param segmentUri location to delete
+  /// @param forceDelete to force delete non empty directory.
+  /// @return true if deletion succeeds else false.
   @Override
   public boolean delete(URI segmentUri, boolean forceDelete)
       throws IOException {
@@ -306,13 +322,11 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Move a file from source location to destination location.
-   *
-   * @param srcUri location to move the file from
-   * @param dstUri location to move the file to
-   * @return true if move succeeds else false.
-   */
+  /// Move a file from source location to destination location.
+  ///
+  /// @param srcUri location to move the file from
+  /// @param dstUri location to move the file to
+  /// @return true if move succeeds else false.
   @Override
   public boolean doMove(URI srcUri, URI dstUri)
       throws IOException {
@@ -327,13 +341,11 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Copy a file from source location to destination location.
-   *
-   * @param srcUri location to copy the file from
-   * @param dstUri location to copy the file to
-   * @return true if move succeeds else false.
-   */
+  /// Copy a file from source location to destination location.
+  ///
+  /// @param srcUri location to copy the file from
+  /// @param dstUri location to copy the file to
+  /// @return true if move succeeds else false.
   @Override
   public boolean copyDir(URI srcUri, URI dstUri)
       throws IOException {
@@ -381,12 +393,10 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Checks if the file exists at a given location
-   *
-   * @param fileUri location to check the existance of the file.
-   * @return true if exists else false.
-   */
+  /// Checks if the file exists at a given location
+  ///
+  /// @param fileUri location to check the existence of the file.
+  /// @return true if exists else false.
   @Override
   public boolean exists(URI fileUri)
       throws IOException {
@@ -402,12 +412,10 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Find the size of the file.
-   *
-   * @param fileUri location of the file to find the size of.
-   * @return size of the file
-   */
+  /// Find the size of the file.
+  ///
+  /// @param fileUri location of the file to find the size of.
+  /// @return size of the file
   @Override
   public long length(URI fileUri)
       throws IOException {
@@ -421,13 +429,11 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * List the names of files in a given directory.
-   *
-   * @param fileUri location to move the file from
-   * @param recursive flag to check the sub directories.
-   * @return array of all the files in the target directory.
-   */
+  /// List the names of files in a given directory.
+  ///
+  /// @param fileUri location to move the file from
+  /// @param recursive flag to check the sub directories.
+  /// @return array of all the files in the target directory.
   @Override
   public String[] listFiles(URI fileUri, boolean recursive)
       throws IOException {
@@ -453,6 +459,46 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
+  @Override
+  public List<FileMetadata> listFilesWithMetadata(final URI fileUri, final boolean recursive,
+      final Predicate<String> pathFilter, final int maxResults)
+      throws IOException {
+    if (maxResults <= 0) {
+      LOGGER.warn("listFilesWithMetadata called with maxResults={}, returning empty list", maxResults);
+      return new ArrayList<>();
+    }
+    LOGGER.debug("listFilesWithMetadata (paginated) is called with fileUri='{}', recursive='{}', maxResults={}",
+        fileUri, recursive, maxResults);
+    final List<FileMetadata> result = new ArrayList<>();
+    try {
+      // PagedIterable fetches pages lazily; breaking out stops further API calls
+      for (final PathItem item : listPathItems(fileUri, recursive)) {
+        if (item.isDirectory()) {
+          continue;
+        }
+        final String filePath = AzurePinotFSUtil.convertAzureStylePathToUriStylePath(item.getName());
+        if (pathFilter.test(filePath)) {
+          OffsetDateTime lastModified = item.getLastModified();
+          long lastModifiedTime = lastModified != null ? lastModified.toInstant().toEpochMilli() : 0L;
+          result.add(new FileMetadata.Builder()
+              .setFilePath(filePath)
+              .setLastModifiedTime(lastModifiedTime)
+              .setLength(item.getContentLength())
+              .setIsDirectory(false)
+              .build());
+          if (result.size() >= maxResults) {
+            break;
+          }
+        }
+      }
+    } catch (DataLakeStorageException e) {
+      throw new IOException(e);
+    }
+    LOGGER.info("Listed {} files (max: {}) from URI: {}, is recursive: {}",
+        result.size(), maxResults, fileUri, recursive);
+    return result;
+  }
+
   private PagedIterable<PathItem> listPathItems(URI fileUri, boolean recursive)
       throws IOException {
     // Unlike other Azure SDK APIs that takes url encoded path, ListPathsOptions takes decoded url
@@ -464,22 +510,26 @@ public class ADLSGen2PinotFS extends BasePinotFS {
 
   private static FileMetadata getFileMetadata(PathItem file) {
     String path = AzurePinotFSUtil.convertAzureStylePathToUriStylePath(file.getName());
+    OffsetDateTime lastModified = file.getLastModified();
+    long lastModifiedTime = lastModified != null ? lastModified.toInstant().toEpochMilli() : 0L;
     return new FileMetadata.Builder().setFilePath(path)
-        .setLastModifiedTime(file.getLastModified().toInstant().toEpochMilli()).setLength(file.getContentLength())
+        .setLastModifiedTime(lastModifiedTime).setLength(file.getContentLength())
         .setIsDirectory(file.isDirectory()).build();
   }
 
-  /**
-   * Copy a file from ADL to local location.
-   *
-   * @param srcUri location of the file.
-   * @param dstFile location to move the file to.
-   * @return nothing.
-   */
+  /// Copy a file from ADL to local location.
+  ///
+  /// @param srcUri location of the file.
+  /// @param dstFile location to move the file to.
+  /// @return nothing.
   @Override
   public void copyToLocalFile(URI srcUri, File dstFile)
       throws Exception {
     LOGGER.debug("copyToLocalFile is called with srcUri='{}', dstFile='{}'", srcUri, dstFile);
+
+    // Create parent directories if they don't exist.
+    FileUtils.forceMkdir(dstFile.getParentFile());
+
     if (dstFile.exists()) {
       if (dstFile.isDirectory()) {
         FileUtils.deleteDirectory(dstFile);
@@ -512,29 +562,25 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Copy a local file to the destination location in ADL.
-   *
-   * @param srcFile location of the file locally
-   * @param dstUri location to move the file to.
-   * @return nothing.
-   */
+  /// Copy a local file to the destination location in ADL.
+  ///
+  /// @param srcFile location of the file locally
+  /// @param dstUri location to move the file to.
+  /// @return nothing.
   @Override
   public void copyFromLocalFile(File srcFile, URI dstUri)
       throws Exception {
     LOGGER.debug("copyFromLocalFile is called with srcFile='{}', dstUri='{}'", srcFile, dstUri);
-    byte[] contentMd5 = computeContentMd5(srcFile);
+    byte[] contentMd5 = _enableChecksum ? computeContentMd5(srcFile) : null;
     try (InputStream fileInputStream = new FileInputStream(srcFile)) {
       copyInputStreamToDst(fileInputStream, dstUri, contentMd5);
     }
   }
 
-  /**
-   * Check if a given location is a directory.
-   *
-   * @param uri location make the check.
-   * @return true if it's a directory else false.
-   */
+  /// Check if a given location is a directory.
+  ///
+  /// @param uri location make the check.
+  /// @return true if it's a directory else false.
   @Override
   public boolean isDirectory(URI uri)
       throws IOException {
@@ -544,36 +590,35 @@ public class ADLSGen2PinotFS extends BasePinotFS {
       // TODO: need to find the other ways to check the directory if it becomes available. listFiles API returns
       // PathInfo, which includes "isDirectory" field; however, there's no API available for fetching PathInfo directly
       // from target uri.
-      return Boolean.valueOf(metadata.get(IS_DIRECTORY_KEY));
+      return metadata != null && Boolean.parseBoolean(metadata.get(IS_DIRECTORY_KEY));
     } catch (DataLakeStorageException e) {
       throw new IOException("Failed while checking isDirectory for : " + uri, e);
     }
   }
 
-  /**
-   * Get the last modified time of the given file location.
-   *
-   * @param uri location of the file to get the last modified time.
-   * @return the last modified time of the target file.
-   */
+  /// Get the last modified time of the given file location.
+  ///
+  /// @param uri location of the file to get the last modified time.
+  /// @return the last modified time of the target file.
   @Override
   public long lastModified(URI uri)
       throws IOException {
     try {
       PathProperties pathProperties = getPathProperties(uri);
       OffsetDateTime offsetDateTime = pathProperties.getLastModified();
-      return offsetDateTime.toInstant().toEpochMilli();
+      return offsetDateTime != null ? offsetDateTime.toInstant().toEpochMilli() : 0L;
     } catch (DataLakeStorageException e) {
+      if (e.getStatusCode() == NOT_FOUND_STATUS_CODE) {
+        return 0L;
+      }
       throw new IOException("Failed while checking lastModified time for : " + uri, e);
     }
   }
 
-  /**
-   * Touch (access) a given file.
-   *
-   * @param uri location of the file to touch the file
-   * @return true if touch succeeds else false.
-   */
+  /// Touch (access) a given file.
+  ///
+  /// @param uri location of the file to touch the file
+  /// @return true if touch succeeds else false.
   @Override
   public boolean touch(URI uri)
       throws IOException {
@@ -586,7 +631,17 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     try {
       DataLakeFileClient fileClient =
           _fileSystemClient.getFileClient(AzurePinotFSUtil.convertUriToAzureStylePath(uri));
-      PathProperties pathProperties = fileClient.getProperties();
+      PathProperties pathProperties;
+      try {
+        pathProperties = fileClient.getProperties();
+      } catch (DataLakeStorageException e) {
+        if (e.getStatusCode() == NOT_FOUND_STATUS_CODE) {
+          // File does not exist — create an empty file to satisfy the PinotFS touch() contract
+          _fileSystemClient.createFile(AzurePinotFSUtil.convertUriToAzureStylePath(uri));
+          return true;
+        }
+        throw new IOException(e);
+      }
       fileClient.setHttpHeaders(getPathHttpHeaders(pathProperties));
       return true;
     } catch (DataLakeStorageException e) {
@@ -594,37 +649,47 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Open the file at a given location.
-   *
-   * @param uri location of the file to open.
-   * @return the input stream with the contents of the file.
-   */
+  /// Open the file at a given location.
+  ///
+  /// @param uri location of the file to open.
+  /// @return the input stream with the contents of the file.
   @Override
   public InputStream open(URI uri)
       throws IOException {
-    return _fileSystemClient.getFileClient(AzurePinotFSUtil.convertUriToAzureStylePath(uri)).openInputStream()
-        .getInputStream();
+    try {
+      return _fileSystemClient.getFileClient(AzurePinotFSUtil.convertUriToAzureStylePath(uri)).openInputStream()
+          .getInputStream();
+    } catch (DataLakeStorageException e) {
+      if (e.getStatusCode() == NOT_FOUND_STATUS_CODE) {
+        throw new FileNotFoundException("File not found: " + uri);
+      }
+      throw new IOException(e);
+    }
   }
 
   private boolean copySrcToDst(URI srcUri, URI dstUri)
       throws IOException {
-    PathProperties pathProperties =
-        _fileSystemClient.getFileClient(AzurePinotFSUtil.convertUriToAzureStylePath(srcUri)).getProperties();
-    try (InputStream inputStream = open(srcUri)) {
-      return copyInputStreamToDst(inputStream, dstUri, pathProperties.getContentMd5());
+    try {
+      PathProperties pathProperties =
+          _fileSystemClient.getFileClient(AzurePinotFSUtil.convertUriToAzureStylePath(srcUri)).getProperties();
+      try (InputStream inputStream = open(srcUri)) {
+        return copyInputStreamToDst(inputStream, dstUri, pathProperties.getContentMd5());
+      }
+    } catch (DataLakeStorageException e) {
+      if (e.getStatusCode() == NOT_FOUND_STATUS_CODE) {
+        throw new FileNotFoundException("Source file not found: " + srcUri);
+      }
+      throw new IOException(e);
     }
   }
 
-  /**
-   * Helper function to copy input stream to destination URI.
-   *
-   * NOTE: the caller has to close the input stream.
-   *
-   * @param inputStream input stream that will be written to dstUri
-   * @param dstUri destination URI
-   * @return true if the copy succeeds
-   */
+  /// Helper function to copy input stream to destination URI.
+  ///
+  /// NOTE: the caller has to close the input stream.
+  ///
+  /// @param inputStream input stream that will be written to dstUri
+  /// @param dstUri destination URI
+  /// @return true if the copy succeeds
   private boolean copyInputStreamToDst(InputStream inputStream, URI dstUri, byte[] contentMd5)
       throws IOException {
     int bytesRead;
@@ -679,12 +744,10 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Compute md5 hash from the file
-   * @param file input file
-   * @return byte array of md5 hash
-   * @throws Exception
-   */
+  /// Compute md5 hash from the file
+  /// @param file input file
+  /// @return byte array of md5 hash
+  /// @throws Exception
   private byte[] computeContentMd5(File file)
       throws Exception {
     MessageDigest messageDigest = MessageDigest.getInstance("MD5");

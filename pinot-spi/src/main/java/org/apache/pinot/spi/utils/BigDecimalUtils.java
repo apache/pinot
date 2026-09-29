@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.spi.utils;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -27,26 +30,20 @@ public class BigDecimalUtils {
   private BigDecimalUtils() {
   }
 
-  /**
-   * Returns the number of bytes in the serialized big decimal.
-   */
+  /// Returns the number of bytes in the serialized big decimal.
   public static int byteSize(BigDecimal value) {
     BigInteger unscaledValue = value.unscaledValue();
     return (unscaledValue.bitLength() >>> 3) + 3;
   }
 
-  /**
-   * This gets the expected byte size of a big decimal with a specific precision.
-   * It is equal to (ceil(log2(10^precision) - 1)
-   */
+  /// This gets the expected byte size of a big decimal with a specific precision.
+  /// It is equal to (ceil(log2(10^precision) - 1)
   public static int byteSizeForFixedPrecision(int precision) {
     BigDecimal bd = generateMaximumNumberWithPrecision(precision);
     return byteSize(bd);
   }
 
-  /**
-   * Serializes a big decimal to a byte array.
-   */
+  /// Serializes a big decimal to a byte array.
   public static byte[] serialize(BigDecimal value) {
     int scale = value.scale();
     BigInteger unscaledValue = value.unscaledValue();
@@ -56,6 +53,41 @@ public class BigDecimalUtils {
     valueBytes[1] = (byte) scale;
     System.arraycopy(unscaledValueBytes, 0, valueBytes, 2, unscaledValueBytes.length);
     return valueBytes;
+  }
+
+  /// Serialize big decimal directly to data output stream.
+  public static void serialize(BigDecimal value, DataOutputStream out)
+      throws IOException {
+    if (value == null) {
+      out.writeInt(-1);
+    } else {
+      int scale = value.scale();
+      BigInteger unscaledValue = value.unscaledValue();
+      byte[] unscaledValueBytes = unscaledValue.toByteArray();
+      // avoid creating another temp array by writing directly to output stream
+      out.writeInt(unscaledValueBytes.length + 2);
+      out.write((byte) (scale >> 8));
+      out.write((byte) scale);
+      out.write(unscaledValueBytes);
+    }
+  }
+
+  /// Deserialize big decimal directly from data input stream.
+  public static BigDecimal deserialize(DataInputStream in)
+      throws IOException {
+    int length = in.readInt();
+    if (length == -1) {
+      return null;
+    }
+
+    byte scale0 = in.readByte();
+    byte scale1 = in.readByte();
+
+    int scale = (short) ((scale0 & 0xFF) << 8) | (scale1 & 0xFF);
+    byte[] unscaledValueBytes = new byte[length - 2];
+    in.readFully(unscaledValueBytes);
+    BigInteger unscaledValue = new BigInteger(unscaledValueBytes);
+    return new BigDecimal(unscaledValue, scale);
   }
 
   public static byte[] serializeWithSize(BigDecimal value, int fixedSize) {
@@ -86,9 +118,11 @@ public class BigDecimalUtils {
     return valueBytes;
   }
 
-  /**
-   * Deserializes a big decimal from a byte array.
-   */
+   /// Deserializes a `BigDecimal` from a byte array.
+   /// The expected format is:
+   /// - First 2 bytes: scale (big-endian, unsigned short)
+   /// - Remaining bytes: unscaled value (big-endian two's complement, as per `BigInteger.toByteArray()`)
+   /// This matches the serialization format used in `serialize(BigDecimal value)`.
   public static BigDecimal deserialize(byte[] bytes) {
     int scale = (short) ((bytes[0] & 0xFF) << 8) | (bytes[1] & 0xFF);
     byte[] unscaledValueBytes = new byte[bytes.length - 2];
@@ -97,16 +131,12 @@ public class BigDecimalUtils {
     return new BigDecimal(unscaledValue, scale);
   }
 
-  /**
-   * Deserializes a big decimal from ByteArray.
-   */
+  /// Deserializes a big decimal from ByteArray.
   public static BigDecimal deserialize(ByteArray byteArray) {
     return deserialize(byteArray.getBytes());
   }
 
-  /**
-   * Deserializes a big decimal from ByteBuffer.
-   */
+  /// Deserializes a big decimal from ByteBuffer.
   public static BigDecimal deserialize(ByteBuffer byteBuffer) {
     byte[] bytes = new byte[byteBuffer.remaining()];
     byteBuffer.get(bytes);

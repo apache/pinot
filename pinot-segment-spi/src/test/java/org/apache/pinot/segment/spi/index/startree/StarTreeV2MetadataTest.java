@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.spi.index.startree;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -27,8 +26,8 @@ import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.testng.annotations.Test;
 
-import static org.testng.AssertJUnit.assertEquals;
-import static org.testng.AssertJUnit.assertTrue;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class StarTreeV2MetadataTest {
@@ -42,7 +41,7 @@ public class StarTreeV2MetadataTest {
     Configuration metadataProperties = createMetadata(List.of("dimX"), expected);
     StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadataProperties);
     TreeMap<AggregationFunctionColumnPair, AggregationSpec> actual = starTreeV2Metadata.getAggregationSpecs();
-    assertEquals(expected, actual);
+    assertEquals(actual, expected);
   }
 
   @Test
@@ -60,7 +59,7 @@ public class StarTreeV2MetadataTest {
     StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadataProperties);
     TreeMap<AggregationFunctionColumnPair, AggregationSpec> actual = starTreeV2Metadata.getAggregationSpecs();
     expected.remove(rawThetaColumnPair);
-    assertEquals(expected, actual);
+    assertEquals(actual, expected);
     assertTrue(starTreeV2Metadata.containsFunctionColumnPair(thetaColumnPair));
   }
 
@@ -73,7 +72,7 @@ public class StarTreeV2MetadataTest {
     Configuration metadataProperties = createMetadata(List.of("dimX"), expected);
     StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadataProperties);
     Set<AggregationFunctionColumnPair> actual = starTreeV2Metadata.getFunctionColumnPairs();
-    assertEquals(expected, actual);
+    assertEquals(actual, expected);
   }
 
   @Test
@@ -87,19 +86,20 @@ public class StarTreeV2MetadataTest {
     expected.add(thetaColumnPair);
     expected.add(rawThetaColumnPair);
 
-    Configuration metadataProperties = createMetadata(Collections.singletonList("dimX"), expected);
+    Configuration metadataProperties = createMetadata(List.of("dimX"), expected);
     StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadataProperties);
     Set<AggregationFunctionColumnPair> actual = starTreeV2Metadata.getFunctionColumnPairs();
 
     expected.remove(rawThetaColumnPair);
-    assertEquals(expected, actual);
+    assertEquals(actual, expected);
     assertTrue(starTreeV2Metadata.containsFunctionColumnPair(thetaColumnPair));
   }
 
   private static Configuration createMetadata(List<String> dimensionsSplitOrder,
       TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs) {
     Configuration metadataProperties = new PropertiesConfiguration();
-    StarTreeV2Metadata.writeMetadata(metadataProperties, 1, dimensionsSplitOrder, aggregationSpecs, 10000, Set.of());
+    StarTreeV2Metadata.writeMetadata(metadataProperties, 1, dimensionsSplitOrder, aggregationSpecs, 10000, Set.of(),
+        false);
     return metadataProperties;
   }
 

@@ -26,12 +26,11 @@ import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * @deprecated Use {@link DateTimeFieldSpec} instead.
- * This should only be used in 1) tests 2) wherever required for backward compatible handling of schemas with
- * TimeFieldSpec
- * https://github.com/apache/pinot/issues/2756
- */
+/// @deprecated Use [DateTimeFieldSpec] instead.
+/// This should only be used in 1) tests 2) wherever required for backward compatible handling of schemas with
+/// TimeFieldSpec
+/// <https://github.com/apache/pinot/issues/2756>
+@Deprecated
 @JsonIgnoreProperties(ignoreUnknown = true)
 @SuppressWarnings("unused")
 public final class TimeFieldSpec extends FieldSpec {
@@ -115,6 +114,7 @@ public final class TimeFieldSpec extends FieldSpec {
     }
     appendDefaultNullValue(jsonObject);
     appendTransformFunction(jsonObject);
+    appendFieldIdAndAliases(jsonObject);
     return jsonObject;
   }
 

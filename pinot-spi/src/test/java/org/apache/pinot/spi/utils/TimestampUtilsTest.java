@@ -137,4 +137,46 @@ public class TimestampUtilsTest {
     //Too many digits in fractional seconds
     assertThrows(IllegalArgumentException.class, () -> TimestampUtils.toTimestamp("2024-07-12T15:32:36.12345678910Z"));
   }
+
+  @Test
+  public void testFromMicrosSinceEpochPreservesSubMillisNanos() {
+    // 1234s + 567,890 micros → seconds=1234, nanos=567,890,000.
+    Timestamp expected = new Timestamp(1234_000L);
+    expected.setNanos(567_890_000);
+    assertEquals(TimestampUtils.fromMicrosSinceEpoch(1234_567_890L), expected);
+  }
+
+  @Test
+  public void testFromMicrosSinceEpochHandlesZero() {
+    assertEquals(TimestampUtils.fromMicrosSinceEpoch(0L), new Timestamp(0L));
+  }
+
+  @Test
+  public void testFromMicrosSinceEpochHandlesNegative() {
+    // -1 micro before epoch → seconds=-1, nanos=999,999,000 (floorDiv/floorMod normalization).
+    Timestamp expected = new Timestamp(-1_000L);
+    expected.setNanos(999_999_000);
+    assertEquals(TimestampUtils.fromMicrosSinceEpoch(-1L), expected);
+  }
+
+  @Test
+  public void testFromNanosSinceEpochPreservesFullNanos() {
+    // 1234s + 567,890,123 nanos.
+    Timestamp expected = new Timestamp(1234_000L);
+    expected.setNanos(567_890_123);
+    assertEquals(TimestampUtils.fromNanosSinceEpoch(1234_567_890_123L), expected);
+  }
+
+  @Test
+  public void testFromNanosSinceEpochHandlesZero() {
+    assertEquals(TimestampUtils.fromNanosSinceEpoch(0L), new Timestamp(0L));
+  }
+
+  @Test
+  public void testFromNanosSinceEpochHandlesNegative() {
+    // -1 nano before epoch → seconds=-1, nanos=999,999,999.
+    Timestamp expected = new Timestamp(-1_000L);
+    expected.setNanos(999_999_999);
+    assertEquals(TimestampUtils.fromNanosSinceEpoch(-1L), expected);
+  }
 }

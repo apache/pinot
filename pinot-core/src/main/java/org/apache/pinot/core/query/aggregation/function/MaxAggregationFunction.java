@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -31,10 +32,11 @@ import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
-public class MaxAggregationFunction extends NullableSingleInputAggregationFunction<Double, Double> {
-  private static final double DEFAULT_INITIAL_VALUE = Double.NEGATIVE_INFINITY;
+public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<Double, Double> {
+  protected static final double DEFAULT_INITIAL_VALUE = Double.NEGATIVE_INFINITY;
 
   public MaxAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     this(verifySingleArgument(arguments, "MAX"), nullHandlingEnabled);
@@ -70,6 +72,14 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
+    if (blockValSet.isSingleValue()) {
+      aggregateSV(blockValSet, length, aggregationResultHolder);
+    } else {
+      aggregateMV(blockValSet, length, aggregationResultHolder);
+    }
+  }
+
+  protected void aggregateSV(BlockValSet blockValSet, int length, AggregationResultHolder aggregationResultHolder) {
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
         int[] values = blockValSet.getIntValuesSV();
@@ -143,11 +153,29 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
         break;
       }
       default:
-        throw new IllegalStateException("Cannot compute max for non-numeric type: " + blockValSet.getValueType());
+        throw new BadQueryRequestException("Cannot compute max for non-numeric type: " + blockValSet.getValueType());
     }
   }
 
-  private void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, Number max) {
+  protected void aggregateMV(BlockValSet blockValSet, int length, AggregationResultHolder aggregationResultHolder) {
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    Double max = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+      double innerMax = DEFAULT_INITIAL_VALUE;
+      for (int i = from; i < to; i++) {
+        double[] values = valuesArray[i];
+        for (double value : values) {
+          if (value > innerMax) {
+            innerMax = value;
+          }
+        }
+      }
+      return acum == null ? innerMax : Math.max(acum, innerMax);
+    });
+
+    updateAggregationResultHolder(aggregationResultHolder, max);
+  }
+
+  protected void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, Number max) {
     if (max != null) {
       if (_nullHandlingEnabled) {
         Double otherMax = aggregationResultHolder.getResult();
@@ -163,6 +191,16 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+    } else {
+      aggregateMVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+    }
+  }
+
+  protected void aggregateSVGroupBySV(BlockValSet blockValSet, int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder) {
     double[] valueArray = blockValSet.getDoubleValuesSV();
 
     if (_nullHandlingEnabled) {
@@ -187,10 +225,51 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
     }
   }
 
+  protected void aggregateMVGroupBySV(BlockValSet blockValSet, int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder) {
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+
+    if (_nullHandlingEnabled) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int groupKey = groupKeyArray[i];
+          Double max = groupByResultHolder.getResult(groupKey);
+          for (double value : valuesArray[i]) {
+            if (max == null || value > max) {
+              max = value;
+            }
+          }
+          groupByResultHolder.setValueForKey(groupKey, max);
+        }
+      });
+    } else {
+      for (int i = 0; i < length; i++) {
+        int groupKey = groupKeyArray[i];
+        double max = groupByResultHolder.getDoubleResult(groupKey);
+        for (double value : valuesArray[i]) {
+          if (value > max) {
+            max = value;
+          }
+        }
+        groupByResultHolder.setValueForKey(groupKey, max);
+      }
+    }
+  }
+
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+    } else {
+      aggregateMVGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+    }
+  }
+
+  protected void aggregateSVGroupByMV(BlockValSet blockValSet, int length, int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder) {
     double[] valueArray = blockValSet.getDoubleValuesSV();
 
     if (_nullHandlingEnabled) {
@@ -217,6 +296,45 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
     }
   }
 
+  protected void aggregateMVGroupByMV(BlockValSet blockValSet, int length, int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder) {
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+
+    if (_nullHandlingEnabled) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          Double max = null;
+          for (double value : valuesArray[i]) {
+            if (max == null || value > max) {
+              max = value;
+            }
+          }
+
+          for (int groupKey : groupKeysArray[i]) {
+            Double currentMax = groupByResultHolder.getResult(groupKey);
+            if (currentMax == null || (max != null && max > currentMax)) {
+              groupByResultHolder.setValueForKey(groupKey, max);
+            }
+          }
+        }
+      });
+    } else {
+      for (int i = 0; i < length; i++) {
+        double[] values = valuesArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          double max = groupByResultHolder.getDoubleResult(groupKey);
+          for (double value : values) {
+            if (value > max) {
+              max = value;
+            }
+          }
+          groupByResultHolder.setValueForKey(groupKey, max);
+        }
+      }
+    }
+  }
+
+  @Nullable
   @Override
   public Double extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     if (_nullHandlingEnabled) {
@@ -225,6 +343,7 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
     return aggregationResultHolder.getDoubleResult();
   }
 
+  @Nullable
   @Override
   public Double extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     if (_nullHandlingEnabled) {
@@ -235,15 +354,6 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
 
   @Override
   public Double merge(Double intermediateMaxResult1, Double intermediateMaxResult2) {
-    if (_nullHandlingEnabled) {
-      if (intermediateMaxResult1 == null) {
-        return intermediateMaxResult2;
-      }
-      if (intermediateMaxResult2 == null) {
-        return intermediateMaxResult1;
-      }
-    }
-
     if (intermediateMaxResult1 > intermediateMaxResult2) {
       return intermediateMaxResult1;
     }
@@ -260,8 +370,9 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
     return ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(Double intermediateResult) {
+  public Double extractFinalResult(@Nullable Double intermediateResult) {
     return intermediateResult;
   }
 

@@ -41,10 +41,23 @@ public class SchemaRegistryStarter {
   private SchemaRegistryStarter() {
   }
 
+  public static KafkaSchemaRegistryInstance createLocalInstance(int port) {
+    return new KafkaSchemaRegistryInstance(port);
+  }
+
   public static KafkaSchemaRegistryInstance startLocalInstance(int port) {
-    KafkaSchemaRegistryInstance kafkaSchemaRegistry = new KafkaSchemaRegistryInstance(port);
-    kafkaSchemaRegistry.start();
-    return kafkaSchemaRegistry;
+    KafkaSchemaRegistryInstance kafkaSchemaRegistry = createLocalInstance(port);
+    try {
+      kafkaSchemaRegistry.start();
+      return kafkaSchemaRegistry;
+    } catch (RuntimeException | Error startFailure) {
+      try {
+        kafkaSchemaRegistry.stop();
+      } catch (Throwable cleanupFailure) {
+        startFailure.addSuppressed(cleanupFailure);
+      }
+      throw startFailure;
+    }
   }
 
   public static class KafkaSchemaRegistryInstance {
@@ -63,13 +76,14 @@ public class SchemaRegistryStarter {
 
     public void start() {
       LOGGER.info("Starting schema registry");
-      if (_kafkaContainer != null || _schemaRegistryContainer != null) {
+      if (_network != null || _kafkaContainer != null || _schemaRegistryContainer != null) {
         throw new IllegalStateException("Schema registry is already running");
       }
 
       _network = Network.newNetwork();
 
-      _kafkaContainer = new KafkaContainer(KAFKA_DOCKER_IMAGE_NAME).withNetwork(_network).withNetworkAliases("kafka")
+      _kafkaContainer = new KafkaContainer(KAFKA_DOCKER_IMAGE_NAME)
+          .withNetwork(_network).withNetworkAliases("kafka")
           .withCreateContainerCmdModifier(it -> it.withHostName("kafka")).waitingFor(Wait.forListeningPort());
       _kafkaContainer.start();
 
@@ -87,19 +101,50 @@ public class SchemaRegistryStarter {
 
     public void stop() {
       LOGGER.info("Stopping schema registry");
+      Throwable cleanupFailure = null;
       if (_schemaRegistryContainer != null) {
-        _schemaRegistryContainer.stop();
-        _schemaRegistryContainer = null;
+        try {
+          _schemaRegistryContainer.stop();
+          _schemaRegistryContainer = null;
+        } catch (Throwable t) {
+          cleanupFailure = t;
+        }
       }
 
       if (_kafkaContainer != null) {
-        _kafkaContainer.stop();
-        _kafkaContainer = null;
+        try {
+          _kafkaContainer.stop();
+          _kafkaContainer = null;
+        } catch (Throwable t) {
+          cleanupFailure = appendCleanupFailure(cleanupFailure, t);
+        }
       }
 
       if (_network != null) {
-        _network.close();
+        try {
+          _network.close();
+          _network = null;
+        } catch (Throwable t) {
+          cleanupFailure = appendCleanupFailure(cleanupFailure, t);
+        }
       }
+      if (cleanupFailure != null) {
+        if (cleanupFailure instanceof Error) {
+          throw (Error) cleanupFailure;
+        }
+        if (cleanupFailure instanceof RuntimeException) {
+          throw (RuntimeException) cleanupFailure;
+        }
+        throw new RuntimeException("Failed to stop schema registry cleanly", cleanupFailure);
+      }
+    }
+
+    private static Throwable appendCleanupFailure(Throwable cleanupFailure, Throwable failure) {
+      if (cleanupFailure == null) {
+        return failure;
+      }
+      cleanupFailure.addSuppressed(failure);
+      return cleanupFailure;
     }
   }
 }

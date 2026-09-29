@@ -18,103 +18,39 @@
  */
 package org.apache.pinot.segment.local.function;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
-import groovy.lang.Binding;
-import groovy.lang.GroovyShell;
-import groovy.lang.Script;
-import java.util.Collections;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import org.apache.pinot.spi.data.readers.GenericRow;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 
-/**
- * An {@link FunctionEvaluator} for evaluating transform function expressions of a Schema field spec written in Groovy.
- * GroovyShell is used to execute expressions.
- *
- * The transform expression must follow the convention Groovy({expression}, arguments1, argument2...)
- * For example:
- * "dimensionFieldSpecs": [
- *     {
- *       "name": "fullName",
- *       "dataType": "STRING",
- *       "transformFunction": "Groovy({firstName+' '+lastName}, firstName, lastName)"
- *     }
- *  ]
- */
-public class GroovyFunctionEvaluator implements FunctionEvaluator {
-
-  private static final String GROOVY_EXPRESSION_PREFIX = "Groovy";
-  private static final String GROOVY_FUNCTION_REGEX = "Groovy\\(\\{(?<script>.+)}(,(?<arguments>.+))?\\)";
-  private static final Pattern GROOVY_FUNCTION_PATTERN =
-      Pattern.compile(GROOVY_FUNCTION_REGEX, Pattern.CASE_INSENSITIVE);
-  private static final String ARGUMENTS_GROUP_NAME = "arguments";
-  private static final String SCRIPT_GROUP_NAME = "script";
-  private static final String ARGUMENTS_SEPARATOR = ",";
-
-  private final List<String> _arguments;
-  private final int _numArguments;
-  private final Binding _binding;
-  private final Script _script;
-  private final String _expression;
-
+/// Deprecated forwarding wrapper for the legacy Groovy evaluator type name.
+///
+/// Instances inherit the thread-safety characteristics of
+/// [org.apache.pinot.common.evaluator.GroovyFunctionEvaluator].
+///
+/// TODO: Delete this shim after Pinot 1.6.0 is released.
+///
+/// @deprecated Use [org.apache.pinot.common.evaluator.GroovyFunctionEvaluator] instead.
+@Deprecated
+public class GroovyFunctionEvaluator extends org.apache.pinot.common.evaluator.GroovyFunctionEvaluator
+    implements FunctionEvaluator {
   public GroovyFunctionEvaluator(String closure) {
-    _expression = closure;
-    Matcher matcher = GROOVY_FUNCTION_PATTERN.matcher(closure);
-    Preconditions.checkState(matcher.matches(), "Invalid transform expression: %s", closure);
-    String arguments = matcher.group(ARGUMENTS_GROUP_NAME);
-    if (arguments != null) {
-      _arguments = Splitter.on(ARGUMENTS_SEPARATOR).trimResults().splitToList(arguments);
-    } else {
-      _arguments = Collections.emptyList();
-    }
-    _numArguments = _arguments.size();
-    _binding = new Binding();
-    _script = new GroovyShell(_binding).parse(matcher.group(SCRIPT_GROUP_NAME));
+    super(closure);
   }
 
   public static String getGroovyExpressionPrefix() {
-    return GROOVY_EXPRESSION_PREFIX;
+    return org.apache.pinot.common.evaluator.GroovyFunctionEvaluator.getGroovyExpressionPrefix();
   }
 
-  @Override
-  public List<String> getArguments() {
-    return _arguments;
+  public static void parseGroovyScript(String script) {
+    org.apache.pinot.common.evaluator.GroovyFunctionEvaluator.parseGroovyScript(script);
   }
 
-  @Override
-  public Object evaluate(GenericRow genericRow) {
-    boolean hasNullArgument = false;
-    for (String argument : _arguments) {
-      Object value = genericRow.getValue(argument);
-      if (value == null) {
-        hasNullArgument = true;
-      }
-      _binding.setVariable(argument, value);
-    }
-    try {
-      return _script.run();
-    } catch (Exception e) {
-      if (hasNullArgument) {
-        return null;
-      } else {
-        throw e;
-      }
-    }
+  public static void configureGroovySecurity(String groovyASTConfig)
+      throws Exception {
+    org.apache.pinot.common.evaluator.GroovyFunctionEvaluator.configureGroovySecurity(groovyASTConfig);
   }
 
-  @Override
-  public Object evaluate(Object[] values) {
-    for (int i = 0; i < _numArguments; i++) {
-      _binding.setVariable(_arguments.get(i), values[i]);
-    }
-    return _script.run();
-  }
-
-  @Override
-  public String toString() {
-    return _expression;
+  public static void setGroovyStaticAnalyzerConfig(GroovyStaticAnalyzerConfig groovyStaticAnalyzerConfig)
+      throws JsonProcessingException {
+    org.apache.pinot.common.evaluator.GroovyFunctionEvaluator.setGroovyStaticAnalyzerConfig(groovyStaticAnalyzerConfig);
   }
 }

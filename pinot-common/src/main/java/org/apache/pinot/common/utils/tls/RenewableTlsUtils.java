@@ -43,49 +43,46 @@ import nl.altindag.ssl.keymanager.HotSwappableX509ExtendedKeyManager;
 import nl.altindag.ssl.trustmanager.HotSwappableX509ExtendedTrustManager;
 import nl.altindag.ssl.util.SSLFactoryUtils;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Utility class for shared renewable TLS configuration logic
- */
+/// Utility class for shared renewable TLS configuration logic
 public class RenewableTlsUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(RenewableTlsUtils.class);
   private static final String FILE_SCHEME = "file";
   private static final int CERT_RELOAD_JOB_INTERVAL_IN_MINUTES = 1440;
   private static final int CERT_RELOAD_JOB_INITAL_DELAY_IN_MINUTES = 20;
+  private static final String SSL_FILE_WATCHER_THREAD_PREFIX = "ssl-file-watcher";
+  private static final String SSL_DAILY_RELOAD_THREAD_PREFIX = "ssl-daily-reload";
 
   private RenewableTlsUtils() {
     // left blank
   }
 
 
-  /**
-   * Create a {@link SSLFactory} instance with identity material and trust material swappable for a given TlsConfig,
-   * and nables auto renewal of the {@link SSLFactory} instance when
-   * 1. the {@link SSLFactory} is created with a key manager and trust manager swappable
-   * 2. the key store is null or a local file
-   * 3. the trust store is null or a local file
-   * 4. the key store or trust store file changes.
-   * @param tlsConfig {@link TlsConfig}
-   * @return a {@link SSLFactory} instance with identity material and trust material swappable
-   */
+  /// Create a [SSLFactory] instance with identity material and trust material swappable for a given TlsConfig,
+  /// and nables auto renewal of the [SSLFactory] instance when
+  /// 1. the [SSLFactory] is created with a key manager and trust manager swappable
+  /// 2. the key store is null or a local file
+  /// 3. the trust store is null or a local file
+  /// 4. the key store or trust store file changes.
+  /// @param tlsConfig [TlsConfig]
+  /// @return a [SSLFactory] instance with identity material and trust material swappable
   public static SSLFactory createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(TlsConfig tlsConfig) {
     return createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig, () -> false);
   }
 
-  /**
-   * Create a {@link SSLFactory} instance with identity material and trust material swappable for a given TlsConfig,
-   * and nables auto renewal of the {@link SSLFactory} instance when
-   * 1. the {@link SSLFactory} is created with a key manager and trust manager swappable
-   * 2. the key store is null or a local file
-   * 3. the trust store is null or a local file
-   * 4. the key store or trust store file changes.
-   * @param tlsConfig {@link TlsConfig}
-   * @param insecureModeSupplier a supplier to check if using insecure mode
-   * @return a {@link SSLFactory} instance with identity material and trust material swappable
-   */
+  /// Create a [SSLFactory] instance with identity material and trust material swappable for a given TlsConfig,
+  /// and nables auto renewal of the [SSLFactory] instance when
+  /// 1. the [SSLFactory] is created with a key manager and trust manager swappable
+  /// 2. the key store is null or a local file
+  /// 3. the trust store is null or a local file
+  /// 4. the key store or trust store file changes.
+  /// @param tlsConfig [TlsConfig]
+  /// @param insecureModeSupplier a supplier to check if using insecure mode
+  /// @return a [SSLFactory] instance with identity material and trust material swappable
   public static SSLFactory createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(
       TlsConfig tlsConfig, Supplier<Boolean> insecureModeSupplier) {
     SSLFactory sslFactory = createSSLFactory(tlsConfig, insecureModeSupplier.get());
@@ -96,12 +93,10 @@ public class RenewableTlsUtils {
     return sslFactory;
   }
 
-  /**
-   * Create a {@link SSLFactory} instance with identity material and trust material swappable for a given TlsConfig
-   * @param tlsConfig {@link TlsConfig}
-   * @param insecureMode if true, trust all certificates
-   * @return a {@link SSLFactory} instance with identity material and trust material swappable
-   */
+  /// Create a [SSLFactory] instance with identity material and trust material swappable for a given TlsConfig
+  /// @param tlsConfig [TlsConfig]
+  /// @param insecureMode if true, trust all certificates
+  /// @return a [SSLFactory] instance with identity material and trust material swappable
   private static SSLFactory createSSLFactory(TlsConfig tlsConfig, boolean insecureMode) {
     return createSSLFactory(
         tlsConfig.getKeyStoreType(), tlsConfig.getKeyStorePath(), tlsConfig.getKeyStorePassword(),
@@ -115,15 +110,14 @@ public class RenewableTlsUtils {
       String sslContextProtocol, SecureRandom secureRandom, boolean keyAndTrustMaterialSwappable, boolean isInsecure) {
     try {
       SSLFactory.Builder sslFactoryBuilder = SSLFactory.builder();
-      InputStream keyStoreStream = null;
-      InputStream trustStoreStream = null;
       if (keyStorePath != null) {
         Preconditions.checkNotNull(keyStorePassword, "key store password must not be null");
-        keyStoreStream = TlsUtils.makeKeyOrTrustStoreUrl(keyStorePath).openStream();
         if (keyAndTrustMaterialSwappable) {
           sslFactoryBuilder.withSwappableIdentityMaterial();
         }
-        sslFactoryBuilder.withIdentityMaterial(keyStoreStream, keyStorePassword.toCharArray(), keyStoreType);
+        try (InputStream keyStoreStream = TlsUtils.makeKeyOrTrustStoreUrl(keyStorePath).openStream()) {
+          sslFactoryBuilder.withIdentityMaterial(keyStoreStream, keyStorePassword.toCharArray(), keyStoreType);
+        }
       }
       if (isInsecure) {
         if (keyAndTrustMaterialSwappable) {
@@ -132,11 +126,12 @@ public class RenewableTlsUtils {
         sslFactoryBuilder.withUnsafeTrustMaterial();
       } else if (trustStorePath != null) {
         Preconditions.checkNotNull(trustStorePassword, "trust store password must not be null");
-        trustStoreStream = TlsUtils.makeKeyOrTrustStoreUrl(trustStorePath).openStream();
         if (keyAndTrustMaterialSwappable) {
           sslFactoryBuilder.withSwappableTrustMaterial();
         }
-        sslFactoryBuilder.withTrustMaterial(trustStoreStream, trustStorePassword.toCharArray(), trustStoreType);
+        try (InputStream trustStoreStream = TlsUtils.makeKeyOrTrustStoreUrl(trustStorePath).openStream()) {
+          sslFactoryBuilder.withTrustMaterial(trustStoreStream, trustStorePassword.toCharArray(), trustStoreType);
+        }
       }
       if (sslContextProtocol != null) {
         sslFactoryBuilder.withSslContextAlgorithm(sslContextProtocol);
@@ -145,12 +140,6 @@ public class RenewableTlsUtils {
         sslFactoryBuilder.withSecureRandom(secureRandom);
       }
       SSLFactory sslFactory = sslFactoryBuilder.build();
-      if (keyStoreStream != null) {
-        keyStoreStream.close();
-      }
-      if (trustStoreStream != null) {
-        trustStoreStream.close();
-      }
       LOGGER.info("Successfully created SSLFactory {} with key store {} and trust store {}. "
               + "Key and trust material swappable: {}",
           sslFactory, keyStorePath, trustStorePath, keyAndTrustMaterialSwappable);
@@ -160,16 +149,14 @@ public class RenewableTlsUtils {
     }
   }
 
-  /**
-   * Enables auto renewal of SSLFactory when
-   * 1. the {@link SSLFactory} is created with a key manager and trust manager swappable
-   * 2. the key store is null or a local file
-   * 3. the trust store is null or a local file
-   * 4. the key store or trust store file changes.
-   * @param sslFactory the {@link SSLFactory} to enable key manager and trust manager auto renewal
-   * @param tlsConfig the {@link TlsConfig} to get the key store and trust store information
-   * @param insecureModeSupplier a supplier to check if using insecure mode
-   */
+  /// Enables auto renewal of SSLFactory when
+  /// 1. the [SSLFactory] is created with a key manager and trust manager swappable
+  /// 2. the key store is null or a local file
+  /// 3. the trust store is null or a local file
+  /// 4. the key store or trust store file changes.
+  /// @param sslFactory the [SSLFactory] to enable key manager and trust manager auto renewal
+  /// @param tlsConfig the [TlsConfig] to get the key store and trust store information
+  /// @param insecureModeSupplier a supplier to check if using insecure mode
   @VisibleForTesting
   static void enableAutoRenewalFromFileStoreForSSLFactory(
       SSLFactory sslFactory, TlsConfig tlsConfig, Supplier<Boolean> insecureModeSupplier) {
@@ -209,7 +196,8 @@ public class RenewableTlsUtils {
       // The reloadSslFactoryWhenFileStoreChanges is a blocking call, so we need to create a new thread to run it.
       // Creating a new thread to run the reloadSslFactoryWhenFileStoreChanges is costly; however, unless we
       // invoke the createAutoRenewedSSLFactoryFromFileStore method crazily, this should not be a problem.
-      Executors.newSingleThreadExecutor().execute(() -> {
+      // Use daemon thread to allow JVM to exit when on-demand processes complete.
+      Executors.newSingleThreadExecutor(new NamedThreadFactory(SSL_FILE_WATCHER_THREAD_PREFIX, true)).execute(() -> {
         try {
           reloadSslFactoryWhenFileStoreChanges(sslFactory,
               keyStoreType, keyStorePath, keyStorePassword,
@@ -227,18 +215,19 @@ public class RenewableTlsUtils {
       // it was never detected and run in others. This will result in few components with
       // stale certificates. In order to prevent this issue, we are adding a new scheduled
       // thread which will run once a day and reload the certs.
-
-      Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
-        LOGGER.info("Creating a scheduled thread to reloadSsl once a day");
-        try {
-          reloadSslFactory(sslFactory,
-              keyStoreType, keyStorePath, keyStorePassword,
-              trustStoreType, trustStorePath, trustStorePassword,
-              sslContextProtocol, secureRandom, insecureModeSupplier);
-        } catch (Exception e) {
-          throw new RuntimeException(e);
-        }
-      }, CERT_RELOAD_JOB_INITAL_DELAY_IN_MINUTES, CERT_RELOAD_JOB_INTERVAL_IN_MINUTES, TimeUnit.MINUTES);
+      // Use daemon thread to allow JVM to exit when on-demand processes complete.
+      Executors.newSingleThreadScheduledExecutor(new NamedThreadFactory(SSL_DAILY_RELOAD_THREAD_PREFIX, true))
+              .scheduleAtFixedRate(() -> {
+                LOGGER.info("Creating a scheduled thread to reloadSsl once a day");
+                try {
+                  reloadSslFactory(sslFactory,
+                      keyStoreType, keyStorePath, keyStorePassword,
+                      trustStoreType, trustStorePath, trustStorePassword,
+                      sslContextProtocol, secureRandom, insecureModeSupplier);
+                } catch (Exception e) {
+                  throw new RuntimeException(e);
+                }
+              }, CERT_RELOAD_JOB_INITAL_DELAY_IN_MINUTES, CERT_RELOAD_JOB_INTERVAL_IN_MINUTES, TimeUnit.MINUTES);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -300,7 +289,7 @@ public class RenewableTlsUtils {
               LOGGER.info(
                   "reloadSslFactory :: Encountered issues when renewing SSLFactory "
                   + "{} (built from key store {} and "
-                  + "truststore {}) on ", baseSslFactory, keyStorePath, trustStorePath, e);
+                  + "truststore {}), retrying if attempts remain", baseSslFactory, keyStorePath, trustStorePath, e);
               return false;
             }
           });

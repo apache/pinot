@@ -22,6 +22,7 @@ import java.util.Map;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -32,21 +33,38 @@ public class DistinctCountCPCSketchAggregator implements ValueAggregator {
 
   @Override
   public Object aggregate(Object value1, Object value2, Map<String, String> functionParameters) {
-    CpcSketch first = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize((byte[]) value1);
-    CpcSketch second = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize((byte[]) value2);
-    CpcSketch result;
-    if (first == null && second == null) {
-      result = new CpcSketch(CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
-    } else if (second == null) {
-      result = first;
-    } else if (first == null) {
-      result = second;
-    } else {
-      CpcUnion union = new CpcUnion(CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
-      union.update(first);
-      union.update(second);
-      result = union.getResult();
+    byte[] bytes1 = (byte[]) value1;
+    byte[] bytes2 = (byte[]) value2;
+
+    // Empty byte arrays represent the default null value for BYTES columns.
+    // When both are empty, produce a serialized empty sketch so the stored value
+    // is always a valid sketch and does not propagate byte[0] into merged segments.
+    if (bytes1.length == 0 && bytes2.length == 0) {
+      String lgKParam = functionParameters.get(Constants.CPCSKETCH_LGK_KEY);
+      int lgK = lgKParam != null ? Integer.parseInt(lgKParam) : CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK;
+      return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(new CpcSketch(lgK));
     }
-    return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(result);
+    if (bytes1.length == 0) {
+      return bytes2;
+    }
+    if (bytes2.length == 0) {
+      return bytes1;
+    }
+
+    CpcSketch first = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(bytes1);
+    CpcSketch second = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(bytes2);
+    CpcUnion union;
+
+    String lgKParam = functionParameters.get(Constants.CPCSKETCH_LGK_KEY);
+    if (lgKParam != null) {
+      union = new CpcUnion(Integer.parseInt(lgKParam));
+    } else {
+      // If the functionParameters don't have an explicit lgK value set,
+      // use the default value for nominal entries
+      union = new CpcUnion(CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
+    }
+    union.update(first);
+    union.update(second);
+    return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(union.getResult());
   }
 }

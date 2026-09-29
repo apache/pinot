@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordFetchException;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
@@ -38,9 +39,7 @@ import org.apache.thrift.transport.TIOStreamTransport;
 import org.apache.thrift.transport.TTransportException;
 
 
-/**
- * Record reader for Thrift file.
- */
+/// Record reader for Thrift file.
 public class ThriftRecordReader implements RecordReader {
   private File _dataFile;
   private ThriftRecordExtractor _recordExtractor;
@@ -59,7 +58,7 @@ public class ThriftRecordReader implements RecordReader {
     TBase tObject;
     try {
       _thriftClass = this.getClass().getClassLoader().loadClass(recordReaderConfig.getThriftClass());
-      tObject = (TBase) _thriftClass.newInstance();
+      tObject = (TBase) _thriftClass.getDeclaredConstructor().newInstance();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -107,10 +106,10 @@ public class ThriftRecordReader implements RecordReader {
       throws IOException {
     TBase tObject;
     try {
-      tObject = (TBase) _thriftClass.newInstance();
+      tObject = (TBase) _thriftClass.getDeclaredConstructor().newInstance();
       tObject.read(_tProtocol);
     } catch (Exception e) {
-      throw new IOException("Caught exception while reading thrift object", e);
+      throw new RecordFetchException("Caught exception while reading thrift object", e);
     }
     _recordExtractor.extract(tObject, reuse);
     _hasNext = hasMoreToRead();

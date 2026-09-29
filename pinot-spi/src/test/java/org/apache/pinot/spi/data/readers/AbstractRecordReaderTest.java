@@ -45,14 +45,14 @@ import org.testng.collections.Lists;
 public abstract class AbstractRecordReaderTest {
   private final static Random RANDOM = new Random(System.currentTimeMillis());
   protected final static int SAMPLE_RECORDS_SIZE = 10000;
+  private static final double EPSILON = 1e-6d;
 
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
   protected final File _dataFile = new File(_tempDir, getDataFileName());
   protected List<Map<String, Object>> _records;
   protected List<Object[]> _primaryKeys;
-  protected org.apache.pinot.spi.data.Schema _pinotSchema;
+  protected Schema _pinotSchema;
   protected Set<String> _sourceFields;
-  protected RecordReader _recordReader;
 
   protected static List<Map<String, Object>> generateRandomRecords(Schema pinotSchema) {
     List<Map<String, Object>> records = new ArrayList<>();
@@ -104,7 +104,7 @@ public abstract class AbstractRecordReaderTest {
       case DOUBLE:
         return RANDOM.nextDouble();
       case STRING:
-        return RandomStringUtils.randomAscii(RANDOM.nextInt(50) + 1);
+        return RandomStringUtils.secure().nextAscii(RANDOM.nextInt(50) + 1);
       case BOOLEAN:
         return RANDOM.nextBoolean();
       default:
@@ -121,14 +121,14 @@ public abstract class AbstractRecordReaderTest {
       for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
         if (fieldSpec.isSingleValueField()) {
-          Assert.assertEquals(actualRecord.getValue(fieldSpecName), expectedRecord.get(fieldSpecName));
+          assertValueEquals(actualRecord.getValue(fieldSpecName), expectedRecord.get(fieldSpecName));
         } else {
           Object[] actualRecords = (Object[]) actualRecord.getValue(fieldSpecName);
           List expectedRecords = (List) expectedRecord.get(fieldSpecName);
           if (expectedRecords != null) {
             Assert.assertEquals(actualRecords.length, expectedRecords.size());
             for (int j = 0; j < actualRecords.length; j++) {
-              Assert.assertEquals(actualRecords[j], expectedRecords.get(j));
+              assertValueEquals(actualRecords[j], expectedRecords.get(j));
             }
           }
         }
@@ -139,8 +139,26 @@ public abstract class AbstractRecordReaderTest {
     Assert.assertFalse(recordReader.hasNext());
   }
 
-  protected org.apache.pinot.spi.data.Schema getPinotSchema() {
-    return new org.apache.pinot.spi.data.Schema.SchemaBuilder()
+  private void assertValueEquals(Object actualValue, Object expectedValue) {
+    if (expectedValue == null) {
+      Assert.assertNull(actualValue);
+      return;
+    }
+    if (actualValue == null) {
+      Assert.fail("Actual value is null while expected is " + expectedValue);
+      return;
+    }
+    boolean isFloating = expectedValue instanceof Float || expectedValue instanceof Double
+        || actualValue instanceof Float || actualValue instanceof Double;
+    if (isFloating) {
+      Assert.assertEquals(((Number) actualValue).doubleValue(), ((Number) expectedValue).doubleValue(), EPSILON);
+    } else {
+      Assert.assertEquals(actualValue, expectedValue);
+    }
+  }
+
+  protected Schema getPinotSchema() {
+    return new Schema.SchemaBuilder()
         .addSingleValueDimension("dim_sv_int", FieldSpec.DataType.INT)
         .addSingleValueDimension("dim_sv_long", FieldSpec.DataType.LONG)
         .addSingleValueDimension("dim_sv_float", FieldSpec.DataType.FLOAT)
@@ -188,8 +206,6 @@ public abstract class AbstractRecordReaderTest {
     _primaryKeys = generatePrimaryKeys(_records, getPrimaryKeyColumns());
     // Write generated random records to file
     writeRecordsToFile(_records);
-    // Create and init RecordReader
-    _recordReader = createRecordReader();
   }
 
   @AfterClass
@@ -201,9 +217,11 @@ public abstract class AbstractRecordReaderTest {
   @Test
   public void testRecordReader()
       throws Exception {
-    checkValue(_recordReader, _records, _primaryKeys);
-    _recordReader.rewind();
-    checkValue(_recordReader, _records, _primaryKeys);
+    try (RecordReader recordReader = createRecordReader()) {
+      checkValue(recordReader, _records, _primaryKeys);
+      recordReader.rewind();
+      checkValue(recordReader, _records, _primaryKeys);
+    }
   }
 
   @Test
@@ -226,35 +244,27 @@ public abstract class AbstractRecordReaderTest {
     checkValue(recordReader, _records, _primaryKeys);
   }
 
-  /**
-   * Create the record reader given a file
-   *
-   * @param file input file
-   * @return an implementation of RecordReader of the given file
-   * @throws Exception
-   */
+  /// Create the record reader given a file
+  ///
+  /// @param file input file
+  /// @return an implementation of RecordReader of the given file
+  /// @throws Exception
   protected abstract RecordReader createRecordReader(File file)
       throws Exception;
 
-  /**
-   * @return an implementation of RecordReader
-   * @throws Exception
-   */
+  /// @return an implementation of RecordReader
+  /// @throws Exception
   protected RecordReader createRecordReader()
       throws Exception {
     return createRecordReader(_dataFile);
   }
 
-  /**
-   * Write records into a file
-   * @throws Exception
-   */
+  /// Write records into a file
+  /// @throws Exception
   protected abstract void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
       throws Exception;
 
-  /**
-   * Get data file name
-   * @throws Exception
-   */
+  /// Get data file name
+  /// @throws Exception
   protected abstract String getDataFileName();
 }

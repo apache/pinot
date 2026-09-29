@@ -18,21 +18,25 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import org.apache.helix.AccessOption;
+import org.apache.helix.HelixManager;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.tier.TierSegmentSelector;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -43,13 +47,16 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests the {@link RealtimeSegmentAssignment#rebalanceTable} method for table with tiers
- */
+/// Tests the [RealtimeSegmentAssignment#rebalanceTable] method for table with tiers
 public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
   private static final int NUM_REPLICAS = 3;
   private static final int NUM_PARTITIONS = 4;
@@ -110,6 +117,24 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
           System.currentTimeMillis()).getSegmentName());
     }
 
+    HelixManager helixManager = mock(HelixManager.class);
+    //noinspection rawtypes
+    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+    when(propertyStore.get(anyString(), eq(null), eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> {
+      String path = invocation.getArgument(0, String.class);
+      String segmentName = path.substring(path.lastIndexOf('/') + 1);
+      return new ZNRecord(segmentName);
+    });
+    // Bulk read of all segment ZK metadata, used to resolve the eligible tier of each segment once per rebalance
+    List<ZNRecord> segmentZNRecords = new ArrayList<>(NUM_SEGMENTS);
+    for (String segmentName : _segments) {
+      segmentZNRecords.add(new ZNRecord(segmentName));
+    }
+    when(propertyStore.getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt())).thenReturn(
+        segmentZNRecords);
+    //noinspection unchecked
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+
     List<TierConfig> tierConfigList = Lists.newArrayList(
         new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_A_NAME, null, null),
@@ -117,12 +142,12 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_B_NAME, null, null),
         new TierConfig(TIER_C_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_C_NAME, null, null));
-
     Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setTierConfigList(tierConfigList).setStreamConfigs(streamConfigs).build();
-    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig, null);
+
+    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(helixManager, tableConfig, null);
 
     _instancePartitionsMap = new TreeMap<>();
     // CONSUMING instances:
@@ -165,7 +190,7 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
   @Test
   public void testRelocateCompletedSegments() {
     Map<InstancePartitionsType, InstancePartitions> onlyConsumingInstancePartitionMap =
-        ImmutableMap.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
+        Map.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       String segmentName = _segments.get(segmentId);
@@ -348,9 +373,7 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
         SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
   }
 
-  /**
-   * Selects segments with sequence number 5-14 i.e. 10 segments per partition (40 segments)
-   */
+  /// Selects segments with sequence number 5-14 i.e. 10 segments per partition (40 segments)
   private static class TestSegmentSelectorA implements TierSegmentSelector {
     @Override
     public String getType() {
@@ -358,15 +381,13 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     @Override
-    public boolean selectSegment(String tableNameWithType, String segmentName) {
-      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+    public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
       return llcSegmentName.getSequenceNumber() >= 5 && llcSegmentName.getSequenceNumber() < 15;
     }
   }
 
-  /**
-   * Selects segments with sequence number 0-4 i.e. 5 segments per partition (20 segments)
-   */
+  /// Selects segments with sequence number 0-4 i.e. 5 segments per partition (20 segments)
   private static class TestSegmentSelectorB implements TierSegmentSelector {
     @Override
     public String getType() {
@@ -374,15 +395,13 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     @Override
-    public boolean selectSegment(String tableNameWithType, String segmentName) {
-      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+    public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
       return llcSegmentName.getSequenceNumber() >= 0 && llcSegmentName.getSequenceNumber() < 5;
     }
   }
 
-  /**
-   * Selects no segments
-   */
+  /// Selects no segments
   private static class TestSegmentSelectorC implements TierSegmentSelector {
     @Override
     public String getType() {
@@ -390,7 +409,7 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     @Override
-    public boolean selectSegment(String tableNameWithType, String segmentName) {
+    public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
       return false;
     }
   }

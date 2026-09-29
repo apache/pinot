@@ -23,6 +23,8 @@ import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import java.math.BigDecimal;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -122,6 +124,29 @@ public class ArrayListUtilsTest {
   }
 
   @Test
+  public void testToBigDecimalArray() {
+    // Test empty list
+    ObjectArrayList<BigDecimal> bigDecimalArrayList = new ObjectArrayList<>();
+    BigDecimal[] bigDecimalArray = ArrayListUtils.toBigDecimalArray(bigDecimalArrayList);
+    assertEquals(bigDecimalArray.length, 0);
+
+    // Test list with one element
+    bigDecimalArrayList.add(new BigDecimal("1.1"));
+    bigDecimalArray = ArrayListUtils.toBigDecimalArray(bigDecimalArrayList);
+    assertEquals(bigDecimalArray.length, 1);
+    assertEquals(bigDecimalArray[0], new BigDecimal("1.1"));
+
+    // Test list with multiple elements
+    bigDecimalArrayList.add(new BigDecimal("2.22"));
+    bigDecimalArrayList.add(new BigDecimal("3.333"));
+    bigDecimalArray = ArrayListUtils.toBigDecimalArray(bigDecimalArrayList);
+    assertEquals(bigDecimalArray.length, 3);
+    assertEquals(bigDecimalArray[0], new BigDecimal("1.1"));
+    assertEquals(bigDecimalArray[1], new BigDecimal("2.22"));
+    assertEquals(bigDecimalArray[2], new BigDecimal("3.333"));
+  }
+
+  @Test
   public void testToStringArray() {
     // Test empty list
     ObjectArrayList<String> stringArrayList = new ObjectArrayList<String>();
@@ -142,5 +167,25 @@ public class ArrayListUtilsTest {
     assertEquals(stringArray[0], "1");
     assertEquals(stringArray[1], "2");
     assertEquals(stringArray[2], "3");
+  }
+
+  @Test
+  public void testToBytesArray() {
+    ObjectArrayList<ByteArray> bytesArrayList = new ObjectArrayList<>();
+    ByteArray[] bytesArray = ArrayListUtils.toBytesArray(bytesArrayList);
+    assertEquals(bytesArray.length, 0);
+
+    bytesArrayList.add(new ByteArray(new byte[]{0x01, 0x02}));
+    bytesArray = ArrayListUtils.toBytesArray(bytesArrayList);
+    assertEquals(bytesArray.length, 1);
+    assertEquals(bytesArray[0], new ByteArray(new byte[]{0x01, 0x02}));
+
+    bytesArrayList.add(new ByteArray(new byte[]{0x03}));
+    bytesArrayList.add(new ByteArray(new byte[]{0x04, 0x05, 0x06}));
+    bytesArray = ArrayListUtils.toBytesArray(bytesArrayList);
+    assertEquals(bytesArray.length, 3);
+    assertEquals(bytesArray[0], new ByteArray(new byte[]{0x01, 0x02}));
+    assertEquals(bytesArray[1], new ByteArray(new byte[]{0x03}));
+    assertEquals(bytesArray[2], new ByteArray(new byte[]{0x04, 0x05, 0x06}));
   }
 }

@@ -66,7 +66,7 @@ public class PinotFSBenchmarkDriver {
     _numOps = (numOps != null) ? numOps : DEFAULT_NUM_OPS;
     _dataSizeInMBsForCopyTest =
         (dataSizeInMBsForCopyTest != null) ? dataSizeInMBsForCopyTest : DEFAULT_DATA_SIZE_IN_MB_FOR_COPY_TEST;
-    LOGGER.info("PinotFS has been initialized sucessfully. (mode = {}, pinotFSClass = {}, configFile = {}, "
+    LOGGER.info("PinotFS has been initialized successfully. (mode = {}, pinotFSClass = {}, configFile = {}, "
             + "baseDirectoryUri = {}, localTempDir = {}, numSegmentsForListFilesTest = {}, "
             + "dataSizeInMBsForCopyTest = {}, numOps = {})", _mode, _pinotFS.getClass().getSimpleName(), configFilePath,
         baseDirectoryUri, _localTempDir, _numSegmentsForListFilesTest, _dataSizeInMBsForCopyTest, _numOps);

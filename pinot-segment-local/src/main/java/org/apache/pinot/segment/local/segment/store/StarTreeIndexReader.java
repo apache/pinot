@@ -42,10 +42,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class provides access to the StarTree index data in a segment directory. The StarTree index data is stored in
- * star_tree_index file, whose content can be parsed according to offset/size from star_tree_index_map file.
- */
+/// This class provides access to the StarTree index data in a segment directory. The StarTree index data is stored in
+/// star_tree_index file, whose content can be parsed according to offset/size from star_tree_index_map file.
 public class StarTreeIndexReader implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeIndexReader.class);
 
@@ -59,11 +57,9 @@ public class StarTreeIndexReader implements Closeable {
   private final List<Map<IndexKey, StarTreeIndexEntry>> _indexColumnEntries;
   private PinotDataBuffer _dataBuffer;
 
-  /**
-   * @param segmentDirectory the segment directory contains StarTree index
-   * @param segmentMetadata  segment metadata must be fully initialized
-   * @param readMode         mmap vs heap mode
-   */
+  /// @param segmentDirectory the segment directory contains StarTree index
+  /// @param segmentMetadata  segment metadata must be fully initialized
+  /// @param readMode         mmap vs heap mode
   public StarTreeIndexReader(File segmentDirectory, SegmentMetadataImpl segmentMetadata, ReadMode readMode)
       throws IOException, ConfigurationException {
     _segmentDirectory = segmentDirectory;
@@ -106,11 +102,15 @@ public class StarTreeIndexReader implements Closeable {
         new StarTreeIndexEntry(indexMap.get(StarTreeIndexMapUtils.STAR_TREE_INDEX_KEY), _dataBuffer,
             ByteOrder.LITTLE_ENDIAN));
     StarTreeV2Metadata starTreeMetadata = _starTreeMetadataList.get(starTreeId);
+    boolean nullHandlingEnabled = starTreeMetadata.isNullHandlingEnabled();
     // Load dimension forward indexes
     for (String dimension : starTreeMetadata.getDimensionsSplitOrder()) {
       columnEntries.put(new IndexKey(dimension, StandardIndexes.forward()), new StarTreeIndexEntry(
           indexMap.get(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, dimension)),
           _dataBuffer, ByteOrder.BIG_ENDIAN));
+      if (nullHandlingEnabled) {
+        mapNullValueVectorEntry(columnEntries, indexMap, dimension);
+      }
     }
     // Load metric (function-column pair) forward indexes
     for (AggregationFunctionColumnPair functionColumnPair : starTreeMetadata.getFunctionColumnPairs()) {
@@ -118,6 +118,23 @@ public class StarTreeIndexReader implements Closeable {
       columnEntries.put(new IndexKey(metric, StandardIndexes.forward()), new StarTreeIndexEntry(
           indexMap.get(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, metric)),
           _dataBuffer, ByteOrder.BIG_ENDIAN));
+      if (nullHandlingEnabled) {
+        mapNullValueVectorEntry(columnEntries, indexMap, metric);
+      }
+    }
+  }
+
+  /// Maps the null value vector of a null-aware star-tree column, if it has one.
+  ///
+  /// The builder only writes a null value vector for columns that actually contain null values, so a missing entry
+  /// simply means that the column has none.
+  private void mapNullValueVectorEntry(Map<IndexKey, StarTreeIndexEntry> columnEntries,
+      Map<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue> indexMap, String column) {
+    StarTreeIndexMapUtils.IndexValue indexValue =
+        indexMap.get(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.NULL_VALUE_VECTOR, column));
+    if (indexValue != null) {
+      columnEntries.put(new IndexKey(column, StandardIndexes.nullValueVector()),
+          new StarTreeIndexEntry(indexValue, _dataBuffer, ByteOrder.BIG_ENDIAN));
     }
   }
 

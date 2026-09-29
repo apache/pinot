@@ -33,8 +33,9 @@ import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
 import TableContainer from '@material-ui/core/TableContainer';
 import TableHead from '@material-ui/core/TableHead';
+import TablePagination, { TablePaginationProps } from '@material-ui/core/TablePagination';
 import TableRow from '@material-ui/core/TableRow';
-import { TablePagination, Tooltip } from '@material-ui/core';
+import { Tooltip } from '@material-ui/core';
 import {TableData, TableSortFunction} from 'Models';
 import IconButton from '@material-ui/core/IconButton';
 import FirstPageIcon from '@material-ui/icons/FirstPage';
@@ -47,10 +48,12 @@ import { Link } from 'react-router-dom';
 import Chip from '@material-ui/core/Chip';
 import { get, has, orderBy } from 'lodash';
 import app_state from '../app_state';
-import { sortBytes, sortNumberOfSegments } from '../utils/SortFunctions'
+import { sortBytes, sortCellValue, sortNumberOfSegments } from '../utils/SortFunctions'
 import Utils from '../utils/Utils';
 import TableToolbar from './TableToolbar';
 import SimpleAccordion from './SimpleAccordion';
+import clsx from 'clsx';
+import { getStatusChipClass } from './StatusFilter';
 
 type Props = {
   title?: string,
@@ -59,6 +62,7 @@ type Props = {
   addLinks?: boolean,
   cellClickCallback?: Function,
   isCellClickable?: boolean,
+  makeOnlyFirstCellClickable?: boolean,
   highlightBackground?: boolean,
   isSticky?: boolean,
   baseURL?: string,
@@ -71,7 +75,8 @@ type Props = {
     toggleName: string;
     toggleValue: boolean;
   },
-  tooltipData?: string[]
+  tooltipData?: string[],
+  additionalControls?: React.ReactNode
 };
 
 // These sort functions are applied to any columns with these names. Otherwise, we just
@@ -82,6 +87,27 @@ let staticSortFunctions: Map<string, TableSortFunction> = new Map()
 staticSortFunctions.set("Number of Segments", sortNumberOfSegments);
 staticSortFunctions.set("Estimated Size", sortBytes);
 staticSortFunctions.set("Reported Size", sortBytes);
+staticSortFunctions.set("Status", sortCellValue);
+
+// Safely coerce an arbitrary cell value to a string for display. Most cells are strings, but
+// complex column types (e.g. MAP, which the broker serializes as an object) arrive as non-strings.
+// JSON.stringify can itself throw (circular references, BigInt) or return undefined (functions,
+// symbols), so both are guarded — the results view has no error boundary, and any throw here
+// white-screens the whole page.
+const toDisplayString = (value: any): string => {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value === null || value === undefined) {
+    return String(value);
+  }
+  try {
+    const json = JSON.stringify(value);
+    return json === undefined ? String(value) : json;
+  } catch (e) {
+    return '<DATA COULD NOT BE PARSED TO DISPLAY>';
+  }
+};
 
 const StyledTableRow = withStyles((theme) =>
   createStyles({
@@ -164,6 +190,14 @@ const useStyles = makeStyles((theme) => ({
   spacer: {
     flex: '0 1 auto',
   },
+  chip: {
+    height: 24,
+    '& span': {
+      paddingLeft: 8,
+      paddingRight: 8,
+      fontWeight: 600,
+    },
+  },
   cellStatusGood: {
     color: '#4CAF50',
     border: '1px solid #4CAF50',
@@ -194,25 +228,43 @@ const usePaginationStyles = makeStyles({
   },
 });
 
-function TablePaginationActions(props) {
+type PageChangeHandler = (
+  event: React.MouseEvent<HTMLButtonElement> | null,
+  page: number
+) => void;
+
+type PaginationActionsProps = {
+  count: number,
+  onChangePage?: PageChangeHandler,
+  onPageChange?: PageChangeHandler,
+  page: number,
+  rowsPerPage: number
+};
+
+type DivTablePaginationProps = TablePaginationProps<'div'> & {
+  component: 'div'
+};
+
+function TablePaginationActions(props: PaginationActionsProps) {
   const classes = usePaginationStyles();
   const theme = useTheme();
-  const { count, page, rowsPerPage, onChangePage } = props;
+  const { count, page, rowsPerPage, onChangePage, onPageChange } = props;
+  const changePage = onPageChange || onChangePage;
 
   const handleFirstPageButtonClick = (event) => {
-    onChangePage(event, 0);
+    changePage?.(event, 0);
   };
 
   const handleBackButtonClick = (event) => {
-    onChangePage(event, page - 1);
+    changePage?.(event, page - 1);
   };
 
   const handleNextButtonClick = (event) => {
-    onChangePage(event, page + 1);
+    changePage?.(event, page + 1);
   };
 
   const handleLastPageButtonClick = (event) => {
-    onChangePage(event, Math.max(0, Math.ceil(count / rowsPerPage) - 1));
+    changePage?.(event, Math.max(0, Math.ceil(count / rowsPerPage) - 1));
   };
 
   return (
@@ -259,7 +311,8 @@ function TablePaginationActions(props) {
 
 TablePaginationActions.propTypes = {
   count: PropTypes.number.isRequired,
-  onChangePage: PropTypes.func.isRequired,
+  onChangePage: PropTypes.func,
+  onPageChange: PropTypes.func,
   page: PropTypes.number.isRequired,
   rowsPerPage: PropTypes.number.isRequired,
 };
@@ -271,6 +324,7 @@ export default function CustomizedTables({
   addLinks,
   cellClickCallback,
   isCellClickable,
+  makeOnlyFirstCellClickable,
   highlightBackground,
   isSticky,
   baseURL,
@@ -279,7 +333,8 @@ export default function CustomizedTables({
   inAccordionFormat,
   regexReplace,
   accordionToggleObject,
-  tooltipData
+  tooltipData,
+  additionalControls
 }: Props) {
   // Separate the initial and final data into two separated state variables.
   // This way we can filter and sort the data without affecting the original data.
@@ -289,6 +344,8 @@ export default function CustomizedTables({
   const [finalData, setFinalData] = React.useState(Utils.tableFormat(data));
   React.useEffect( () => {
     setInitialData(data);
+    // Reset pagination when data changes
+    setPage(0);
   }, [data]);
   // We do not use data.isLoading directly in the renderer because there's a gap between data
   // changing and finalData being set. Without this, there's a flicker where we go from
@@ -317,6 +374,20 @@ export default function CustomizedTables({
   };
 
   const [search, setSearch] = React.useState<string>('');
+
+  const paginationProps: DivTablePaginationProps = {
+    rowsPerPageOptions: [5, 10, 25, 50, 100],
+    component: 'div',
+    count: finalData.length,
+    rowsPerPage,
+    page,
+    onChangePage: handleChangePage,
+    onPageChange: handleChangePage,
+    onChangeRowsPerPage: handleChangeRowsPerPage,
+    onRowsPerPageChange: handleChangeRowsPerPage,
+    ActionsComponent: TablePaginationActions,
+    classes: { spacer: classes.spacer },
+  };
 
   const timeoutId = React.useRef<NodeJS.Timeout>();
 
@@ -354,6 +425,8 @@ export default function CustomizedTables({
       // Table.tsx currently doesn't support sorting after filtering. So for now, we just
       // remove the visual indicator of the sorted column until users sort again.
       setColumnClicked('')
+      // Reset pagination to first page when search changes
+      setPage(0);
     }, 200);
 
     return () => {
@@ -361,17 +434,20 @@ export default function CustomizedTables({
     };
   }, [search, timeoutId, filterSearchResults]);
 
-  const styleCell = (str: string) => {
-    if (str.toLowerCase() === 'good' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive' || str.toLowerCase() === 'true') {
-      return (
-        <StyledChip
-          label={str}
-          className={classes.cellStatusGood}
-          variant="outlined"
-        />
-      );
-    }
-    if (str.toLocaleLowerCase() === 'bad' || str.toLowerCase() === 'offline' || str.toLowerCase() === 'dead' || str.toLowerCase() === 'false') {
+  const styleCell = (cellValue: any) => {
+    // Coerce to a string first so the String methods below (toLowerCase/search/replace) never
+    // throw on a non-string cell value (e.g. a MAP column) and crash the whole results view.
+    const str = toDisplayString(cellValue);
+    if (str.toLowerCase() === 'good' || str.toLowerCase() === 'healthy' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive' || str.toLowerCase() === 'true') {
+          return (
+            <StyledChip
+              label={str}
+              className={classes.cellStatusGood}
+              variant="outlined"
+            />
+          );
+        }
+    if (str.toLowerCase() === 'bad' || str.toLowerCase() === 'offline' || str.toLowerCase() === 'dead' || str.toLowerCase() === 'false') {
       return (
         <StyledChip
           label={str}
@@ -380,7 +456,16 @@ export default function CustomizedTables({
         />
       );
     }
-    if (str.toLowerCase() === 'consuming' || str.toLocaleLowerCase() === "partial" || str.toLocaleLowerCase() === "updating" ) {
+    if (str.toLowerCase() === 'disabled' || str.toLowerCase() === "queries disabled" || str.toLowerCase() === 'unhealthy') {
+      return (
+        <StyledChip
+          label={str}
+          className={classes.cellStatusConsuming}
+          variant="outlined"
+        />
+      );
+    }
+    if (str.toLowerCase() === 'consuming' || str.toLowerCase() === "partial" || str.toLowerCase() === "updating") {
       return (
         <StyledChip
           label={str}
@@ -471,17 +556,15 @@ export default function CustomizedTables({
               {styleCell(cellData.value)}
             </Tooltip>
         );
-      } else if(has(cellData, 'value') && cellData.value) {
+      } else if (has(cellData, 'value')) {
+        // Render via the value path whenever the key is present, including falsy values
+        // (0, false, null, ''). styleCell safely coerces any type, so we no longer fall
+        // through to dumping the whole {value: ...} object for a falsy value.
         return styleCell(cellData.value);
       } else {
-          try {
-            const stringifiedJSON = JSON.stringify(cellData)
-            return stringifiedJSON
-          } catch(e) {
-            // If the data is corrupted and not recognizable by JSON.stringify, fallback to below error message instead
-            // of crashing the whole page for the user.
-            return '<DATA COULD NOT BE PARSED TO DISPLAY>'
-          }
+          // Fall back to a stringified representation. toDisplayString guards against
+          // JSON.stringify throwing (e.g. corrupted/circular data) so we never crash the page.
+          return toDisplayString(cellData);
       }
     }
     return styleCell(cellData.toString());
@@ -500,13 +583,15 @@ export default function CustomizedTables({
                     key={index}
                     onClick={() => {
                       if (staticSortFunctions.has(column)) {
-                        finalData.sort((a, b) => staticSortFunctions.get(column)(a, b, column, index, order));
-                        setFinalData(finalData);
+                        const sortFunction = staticSortFunctions.get(column);
+                        setFinalData([...finalData].sort((a, b) => sortFunction(a, b, column, index, order)));
                       } else {
                         setFinalData(orderBy(finalData, column+app_state.columnNameSeparator+index, order ? 'asc' : 'desc'));
                       }
                       setOrder(!order);
                       setColumnClicked(column);
+                      // Reset pagination when sorting
+                      setPage(0);
                     }}
                   >
                     <>
@@ -562,7 +647,7 @@ export default function CustomizedTables({
                         ) : (
                           <StyledTableCell
                             key={idx}
-                            className={isCellClickable ? classes.isCellClickable : (isSticky ? classes.isSticky : '')}
+                            className={isCellClickable && (!makeOnlyFirstCellClickable || !idx) ? classes.isCellClickable : (isSticky ? classes.isSticky : '')}
                             onClick={() => {cellClickCallback && cellClickCallback(cell);}}
                           >
                             {makeCell(cell ?? '--', index)}
@@ -576,17 +661,7 @@ export default function CustomizedTables({
           </Table>
         </TableContainer>
         {finalData.length > 10 ? (
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
-            component="div"
-            count={finalData.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onChangePage={handleChangePage}
-            onChangeRowsPerPage={handleChangeRowsPerPage}
-            ActionsComponent={TablePaginationActions}
-            classes={{ spacer: classes.spacer }}
-          />
+          <TablePagination {...paginationProps} />
         ) : null}
       </>
     );
@@ -602,6 +677,17 @@ export default function CustomizedTables({
           handleSearch={(val: string) => setSearch(val)}
           recordCount={recordsCount}
         />
+        {additionalControls && (
+          <div
+            style={{
+              marginTop: 8,
+              paddingTop: 8,
+              borderTop: '1px solid #BDCCD9',
+            }}
+          >
+            {additionalControls}
+          </div>
+        )}
         {renderTableComponent()}
       </>
     );
@@ -617,6 +703,7 @@ export default function CustomizedTables({
           handleSearch={(val: string) => setSearch(val)}
           recordCount={recordsCount}
           accordionToggleObject={accordionToggleObject}
+          additionalControls={additionalControls}
         >
           {renderTableComponent()}
         </SimpleAccordion>

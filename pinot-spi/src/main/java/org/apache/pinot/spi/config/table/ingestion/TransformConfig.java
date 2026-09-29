@@ -24,9 +24,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/**
- * Configs needed for performing simple transformations on the column
- */
+/// Configs needed for performing simple transformations on the column
 public class TransformConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Column name")

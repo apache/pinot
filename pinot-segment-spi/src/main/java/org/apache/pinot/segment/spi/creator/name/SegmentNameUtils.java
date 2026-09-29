@@ -21,9 +21,7 @@ package org.apache.pinot.segment.spi.creator.name;
 import java.util.regex.Pattern;
 
 
-/**
- * Utils for segment names.
- */
+/// Utils for segment names.
 public class SegmentNameUtils {
   // According to the invalid name pattern below, `|` is safer than `,` as the segment name separator.
   public static final char SEGMENT_NAME_SEPARATOR = '|';
@@ -32,11 +30,9 @@ public class SegmentNameUtils {
   private SegmentNameUtils() {
   }
 
-  /**
-   * A handy util to validate if segment name is valid.
-   *
-   * @param partialOrFullSegmentName provide partial or full segment name
-   */
+  /// A handy util to validate if segment name is valid.
+  ///
+  /// @param partialOrFullSegmentName provide partial or full segment name
   public static void validatePartialOrFullSegmentName(String partialOrFullSegmentName) {
     if (INVALID_SEGMENT_NAME_REGEX.matcher(partialOrFullSegmentName).matches()) {
       throw new IllegalArgumentException("Invalid partial or full segment name: " + partialOrFullSegmentName);

@@ -24,7 +24,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -41,6 +41,8 @@ import javax.ws.rs.core.Response;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
@@ -55,13 +57,12 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 
 @Api(tags = Constants.APPLICATION_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
-    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key =
-        SWAGGER_AUTHORIZATION_KEY, description =
-        "The format of the key is  ```\"Basic <token>\" or \"Bearer "
-            + "<token>\"```"), @ApiKeyAuthDefinition(name = CommonConstants.APPLICATION, in =
-    ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = CommonConstants.APPLICATION, description =
-    "Application context passed through http header. If no context is provided 'default' application "
-        + "context will be considered.")
+    @ApiKeyAuthDefinition(
+        name = HttpHeaders.AUTHORIZATION,
+        in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"
+    )
 }))
 @Path("/")
 public class PinotApplicationQuotaRestletResource {
@@ -70,9 +71,7 @@ public class PinotApplicationQuotaRestletResource {
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
 
-  /**
-   * API to get application quota configs. Will return null if application quotas are not defined
-   */
+  /// API to get application quota configs. Will return empty map if application quotas are not defined at all.
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/applicationQuotas")
@@ -83,13 +82,11 @@ public class PinotApplicationQuotaRestletResource {
     if (quotas != null) {
       return quotas;
     } else {
-      return Collections.emptyMap();
+      return Map.of();
     }
   }
 
-  /**
-   * API to get application quota configs. Will return null if application quotas are not defined
-   */
+  /// API to get application quota config. Will return null if application quotas is not defined.
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/applicationQuotas/{appName}")
@@ -102,22 +99,23 @@ public class PinotApplicationQuotaRestletResource {
       return quotas.get(appName);
     }
 
-    HelixConfigScope scope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
-        _pinotHelixResourceManager.getHelixClusterName()).build();
+    HelixConfigScope scope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+        .forCluster(_pinotHelixResourceManager.getHelixClusterName())
+        .build();
+
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     String defaultQuota =
-        helixAdmin.getConfig(scope, Collections.singletonList(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND))
-            .getOrDefault(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND, null);
+        helixAdmin.getConfig(scope, List.of(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND))
+            .get(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND);
     return defaultQuota != null ? Double.parseDouble(defaultQuota) : null;
   }
 
-  /**
-   * API to update the quota configs for application
-   */
+  /// API to update the quota config for application.
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/applicationQuotas/{appName}")
+  @Authenticate(AccessType.UPDATE)
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_APPLICATION_QUOTA)
   @ApiOperation(value = "Update application quota", notes = "Update application quota")
   public SuccessResponse setApplicationQuota(@PathParam("appName") String appName,

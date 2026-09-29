@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import java.math.BigDecimal;
+import java.util.Map;
 import java.util.OptionalInt;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.Constants;
@@ -30,15 +32,12 @@ import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * The {@code MVScanDocIdIterator} is the scan-based iterator for MVScanDocIdSet to scan a multi-value column for the
- * matching document ids.
- */
+/// The `MVScanDocIdIterator` is the scan-based iterator for MVScanDocIdSet to scan a multi-value column for the
+/// matching document ids.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final PredicateEvaluator _predicateEvaluator;
   private final ForwardIndexReader _reader;
-  // TODO: Figure out a way to close the reader context
   private final ForwardIndexReaderContext _readerContext;
   private final int _numDocs;
   private final int _maxNumValuesPerMVEntry;
@@ -48,10 +47,11 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
 
-  public MVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+  public MVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
+      Map<String, String> queryOptions) {
     _predicateEvaluator = predicateEvaluator;
     _reader = dataSource.getForwardIndex();
-    _readerContext = _reader.createContext();
+    _readerContext = _reader.createContext(queryOptions);
     _numDocs = numDocs;
     _maxNumValuesPerMVEntry = dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry();
     _valueMatcher = getValueMatcher();
@@ -69,6 +69,7 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
         return nextDocId;
       }
     }
+    close();
     return Constants.EOF;
   }
 
@@ -115,10 +116,8 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     return _numEntriesScanned;
   }
 
-  /**
-   * This is an approximation of probability calculation in
-   * org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender#percentSelected
-   */
+  /// This is an approximation of probability calculation in
+  /// org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender#percentSelected
   @Override
   public float getEstimatedCardinality(boolean isAndDocIdSet) {
     int numMatchingItems = _predicateEvaluator.getNumMatchingItems();
@@ -149,6 +148,8 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
           return new FloatMatcher();
         case DOUBLE:
           return new DoubleMatcher();
+        case BIG_DECIMAL:
+          return new BigDecimalMatcher();
         case STRING:
           return new StringMatcher();
         case BYTES:
@@ -162,9 +163,7 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   private interface ValueMatcher {
 
-    /**
-     * Returns {@code true} if the value for the given document id matches the predicate, {@code false} Otherwise.
-     */
+    /// Returns `true` if the value for the given document id matches the predicate, `false` Otherwise.
     boolean doesValueMatch(int docId);
   }
 
@@ -228,6 +227,18 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
   }
 
+  private class BigDecimalMatcher implements ValueMatcher {
+
+    private final BigDecimal[] _buffer = new BigDecimal[_maxNumValuesPerMVEntry];
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getBigDecimalMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
+    }
+  }
+
   private class StringMatcher implements ValueMatcher {
 
     private final String[] _buffer = new String[_maxNumValuesPerMVEntry];
@@ -249,6 +260,13 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
       int length = _reader.getBytesMV(docId, _buffer, _readerContext);
       _numEntriesScanned += length;
       return _predicateEvaluator.applyMV(_buffer, length);
+    }
+  }
+
+  @Override
+  public void close() {
+    if (_readerContext != null) {
+      _readerContext.close();
     }
   }
 }

@@ -31,13 +31,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Executes queries in the query file, and compares the results with the ones given in the
- * expected results file
- *
- * TODO:
- *  - If we use current timestamp for realtime tables, we may not be able to use pre-canned queries.
- */
+/// Executes queries in the query file, and compares the results with the ones given in the
+/// expected results file
+///
+/// TODO:
+///  - If we use current timestamp for realtime tables, we may not be able to use pre-canned queries.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class QueryOp extends BaseOp {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryOp.class);

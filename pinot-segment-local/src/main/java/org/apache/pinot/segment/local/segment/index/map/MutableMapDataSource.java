@@ -36,9 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code MutableDataSource} class is the data source for a map type column in the mutable segment.
- */
+/// The `MutableDataSource` class is the data source for a map type column in the mutable segment.
 @SuppressWarnings("rawtypes")
 public class MutableMapDataSource extends BaseMapDataSource {
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableMapDataSource.class);
@@ -55,15 +53,13 @@ public class MutableMapDataSource extends BaseMapDataSource {
             partitionFunction, partitions, minValue, maxValue, maxRowLengthInBytes),
         new ColumnIndexContainer.FromMap.Builder().withAll(mutableIndexes).build());
     _mutableIndexes = mutableIndexes;
-    MapIndexReader mapIndexReader = getMapIndex();
-    if (mapIndexReader == null) {
-      // Fallback to use forward index
-      ForwardIndexReader<?> forwardIndex = getForwardIndex();
-      if (forwardIndex instanceof MapIndexReader) {
-        mapIndexReader = (MapIndexReader) forwardIndex;
-      } else {
-        mapIndexReader = new MapIndexReaderWrapper(forwardIndex, getFieldSpec());
-      }
+    MapIndexReader mapIndexReader;
+    // Fallback to use forward index
+    ForwardIndexReader<?> forwardIndex = getForwardIndex();
+    if (forwardIndex instanceof MapIndexReader) {
+      mapIndexReader = (MapIndexReader) forwardIndex;
+    } else {
+      mapIndexReader = new MapIndexReaderWrapper(forwardIndex, getFieldSpec(), numDocs);
     }
     _mapIndexReader = mapIndexReader;
   }

@@ -35,6 +35,7 @@ import org.apache.pinot.common.utils.log.LocalLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -57,13 +58,16 @@ public class AdminApiApplication extends ResourceConfig {
 
   private final AtomicBoolean _shutDownInProgress = new AtomicBoolean();
   private final ServerInstance _serverInstance;
+  private final AccessControlFactory _accessControlFactory;
   private HttpServer _httpServer;
   private final String _adminApiResourcePackages;
 
 
   public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory,
+      ServerReloadJobStatusCache reloadJobStatusCache,
       PinotConfiguration serverConf) {
     _serverInstance = instance;
+    _accessControlFactory = accessControlFactory;
 
     _adminApiResourcePackages = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_RESOURCE_PACKAGES,
         CommonConstants.Server.DEFAULT_SERVER_RESOURCE_PACKAGES);
@@ -78,7 +82,9 @@ public class AdminApiApplication extends ResourceConfig {
         bind(_serverInstance).to(ServerInstance.class);
         bind(_serverInstance.getHelixManager()).to(HelixManager.class);
         bind(_serverInstance.getServerMetrics()).to(ServerMetrics.class);
-        bind(accessControlFactory).to(AccessControlFactory.class);
+        bind(_accessControlFactory).to(AccessControlFactory.class);
+        bind(reloadJobStatusCache).to(ServerReloadJobStatusCache.class);
+
         bind(serverConf.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID)).named(SERVER_INSTANCE_ID);
         String loggerRootDir = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
@@ -90,6 +96,8 @@ public class AdminApiApplication extends ResourceConfig {
       }
     });
 
+    register(ServerRequestMethodCaptureFilter.class);
+    register(ServerAdminApiAccessControlFilter.class);
     register(JacksonFeature.class);
 
     register(SwaggerApiListingResource.class);
@@ -123,21 +131,18 @@ public class AdminApiApplication extends ResourceConfig {
       boolean useHttps = Boolean.parseBoolean(
           pinotConfiguration.getProperty(CommonConstants.Server.CONFIG_OF_SWAGGER_USE_HTTPS));
       PinotReflectionUtils.runWithLock(() ->
-          SwaggerSetupUtils.setupSwagger("Server", _adminApiResourcePackages, useHttps, "/", _httpServer));
+          SwaggerSetupUtils.setupSwagger("Server", _adminApiResourcePackages, useHttps, "/", _httpServer,
+              handler -> new ServerAdminApiAccessControlHandler(handler, _accessControlFactory)));
     }
     return true;
   }
 
-  /**
-   * Starts shutting down the HTTP server, which rejects all requests except for the liveness check.
-   */
+  /// Starts shutting down the HTTP server, which rejects all requests except for the liveness check.
   public void startShuttingDown() {
     _shutDownInProgress.set(true);
   }
 
-  /**
-   * Stops the HTTP server.
-   */
+  /// Stops the HTTP server.
   public void stop() {
     _httpServer.shutdownNow();
   }

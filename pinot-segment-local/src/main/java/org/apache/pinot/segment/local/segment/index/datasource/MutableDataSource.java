@@ -28,13 +28,12 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
+import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * The {@code MutableDataSource} class is the data source for a column in the mutable segment.
- */
+/// The `MutableDataSource` class is the data source for a column in the mutable segment.
 @SuppressWarnings("rawtypes")
 public class MutableDataSource extends BaseDataSource {
 
@@ -42,13 +41,14 @@ public class MutableDataSource extends BaseDataSource {
       @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions, @Nullable Comparable minValue,
       @Nullable Comparable maxValue, Map<IndexType, MutableIndex> mutableIndexes,
       @Nullable MutableDictionary dictionary, @Nullable MutableNullValueVector nullValueVector,
-      int maxRowLengthInBytes) {
+      int maxRowLengthInBytes, @Nullable MultiColumnTextIndexReader multiColTextIndexReader) {
     super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, cardinality,
             partitionFunction, partitions, minValue, maxValue, maxRowLengthInBytes),
         new ColumnIndexContainer.FromMap.Builder()
             .withAll(mutableIndexes)
             .with(StandardIndexes.dictionary(), dictionary)
             .with(StandardIndexes.nullValueVector(), nullValueVector)
+            .with(multiColTextIndexReader)
             .build());
   }
 

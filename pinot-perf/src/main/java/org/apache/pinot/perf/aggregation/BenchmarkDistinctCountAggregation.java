@@ -18,18 +18,18 @@
  */
 package org.apache.pinot.perf.aggregation;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountAggregationFunction;
-import org.apache.pinot.perf.SyntheticBlockValSets;
 import org.apache.pinot.perf.SyntheticNullBitmapFactories;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -69,7 +69,7 @@ public class BenchmarkDistinctCountAggregation extends AbstractAggregationFuncti
 
   @Override
   protected AggregationFunction<?, ?> createAggregationFunction() {
-    return new DistinctCountAggregationFunction(Collections.singletonList(EXPR), _nullHandlingEnabled);
+    return new DistinctCountAggregationFunction(List.of(EXPR), _nullHandlingEnabled);
   }
 
   @Override

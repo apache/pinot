@@ -22,7 +22,6 @@ import java.io.File;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,8 +30,8 @@ public class V1DefaultColumnHandler extends BaseDefaultColumnHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(V1DefaultColumnHandler.class);
 
   public V1DefaultColumnHandler(File indexDir, SegmentMetadataImpl segmentMetadata,
-      IndexLoadingConfig indexLoadingConfig, Schema schema, SegmentDirectory.Writer segmentWriter) {
-    super(indexDir, segmentMetadata, indexLoadingConfig, schema, segmentWriter);
+      IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter) {
+    super(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter);
   }
 
   @Override

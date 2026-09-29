@@ -21,10 +21,10 @@ package org.apache.pinot.integration.tests;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
@@ -33,14 +33,17 @@ import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.MinionContext;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -49,18 +52,18 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test for minion task of type "PurgeTask"
- */
+/// Integration test for minion task of type "PurgeTask"
 public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String PURGE_FIRST_RUN_TABLE = "myTable1";
+  private static final String PURGE_METADATA_PUSH_FIRST_RUN_TABLE = "myTableMetadataPush";
   private static final String PURGE_DELTA_PASSED_TABLE = "myTable2";
   private static final String PURGE_DELTA_NOT_PASSED_TABLE = "myTable3";
   private static final String PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE = "myTable4";
+  private static final String PURGE_ALL_RECORDS_TABLE = "myTable5";
+  private static final String PURGE_REALTIME_LAST_SEGMENT_TABLE = "myTable6";
 
   protected PinotHelixTaskResourceManager _helixTaskResourceManager;
   protected PinotTaskManager _taskManager;
@@ -82,11 +85,15 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     startServer();
     startMinion();
 
-    List<String> allTables = List.of(PURGE_FIRST_RUN_TABLE, PURGE_DELTA_PASSED_TABLE, PURGE_DELTA_NOT_PASSED_TABLE,
-        PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
+    // Start Kafka for realtime table test
+    startKafka();
+
+    List<String> allOfflineTables =
+        List.of(PURGE_FIRST_RUN_TABLE, PURGE_METADATA_PUSH_FIRST_RUN_TABLE, PURGE_DELTA_PASSED_TABLE,
+            PURGE_DELTA_NOT_PASSED_TABLE, PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE, PURGE_ALL_RECORDS_TABLE);
     Schema schema = null;
     TableConfig tableConfig = null;
-    for (String tableName : allTables) {
+    for (String tableName : allOfflineTables) {
       // create and upload schema
       schema = createSchema();
       schema.setSchemaName(tableName);
@@ -95,7 +102,8 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
       // create and upload table config
       setTableName(tableName);
       tableConfig = createOfflineTableConfig();
-      tableConfig.setTaskConfig(getPurgeTaskConfig());
+      tableConfig.setTaskConfig(tableName.equals(PURGE_METADATA_PUSH_FIRST_RUN_TABLE)
+          ? getMetadataPushPurgeTaskConfig() : getPurgeTaskConfig());
       addTableConfig(tableConfig);
     }
 
@@ -107,9 +115,23 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
         _segmentTarDir);
 
     // Upload segments for all tables
-    for (String tableName : allTables) {
+    for (String tableName : allOfflineTables) {
       uploadSegments(tableName, _segmentTarDir);
     }
+
+    // Set up realtime table with purge task configuration
+    schema = createSchema();
+    schema.setSchemaName(PURGE_REALTIME_LAST_SEGMENT_TABLE);
+    addSchema(schema);
+    // Create realtime table config with purge task
+    TableConfig realtimeTableConfig = createRealtimeTableConfig(avroFiles.get(0));
+    realtimeTableConfig.setTableName(PURGE_REALTIME_LAST_SEGMENT_TABLE);
+    realtimeTableConfig.setTaskConfig(getPurgeTaskConfig());
+    addTableConfig(realtimeTableConfig);
+    // Push data into Kafka to create LLC segments
+    pushAvroIntoKafka(avroFiles);
+    // Wait for all documents loaded
+    waitForAllDocsLoaded(PURGE_REALTIME_LAST_SEGMENT_TABLE, 600_000L);
 
     setRecordPurger();
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
@@ -147,10 +169,14 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     MinionContext minionContext = MinionContext.getInstance();
     minionContext.setRecordPurgerFactory(rawTableName -> {
       List<String> tableNames =
-          Arrays.asList(PURGE_FIRST_RUN_TABLE, PURGE_DELTA_PASSED_TABLE, PURGE_DELTA_NOT_PASSED_TABLE,
-              PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
+          Arrays.asList(PURGE_FIRST_RUN_TABLE, PURGE_METADATA_PUSH_FIRST_RUN_TABLE, PURGE_DELTA_PASSED_TABLE,
+              PURGE_DELTA_NOT_PASSED_TABLE, PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
       if (tableNames.contains(rawTableName)) {
         return row -> row.getValue("ArrTime").equals(1);
+      } else if (PURGE_ALL_RECORDS_TABLE.equals(rawTableName) || PURGE_REALTIME_LAST_SEGMENT_TABLE.equals(
+          rawTableName)) {
+        // Purge ALL records to test segment deletion
+        return row -> true;
       } else {
         return null;
       }
@@ -166,32 +192,54 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     _tableName = tableName;
   }
 
-  private TableTaskConfig getPurgeTaskConfig() {
+  protected TableTaskConfig getPurgeTaskConfig() {
     Map<String, String> tableTaskConfigs = new HashMap<>();
     tableTaskConfigs.put(MinionConstants.PurgeTask.LAST_PURGE_TIME_THREESOLD_PERIOD, "1d");
-    return new TableTaskConfig(Collections.singletonMap(MinionConstants.PurgeTask.TASK_TYPE, tableTaskConfigs));
+    return new TableTaskConfig(Map.of(MinionConstants.PurgeTask.TASK_TYPE, tableTaskConfigs));
   }
 
-  /**
-   * Test purge with no metadata on the segments (checking null safe implementation)
-   */
+  private TableTaskConfig getMetadataPushPurgeTaskConfig() {
+    Map<String, String> tableTaskConfigs = new HashMap<>();
+    tableTaskConfigs.put(MinionConstants.PurgeTask.LAST_PURGE_TIME_THREESOLD_PERIOD, "1d");
+    tableTaskConfigs.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.METADATA.name());
+    tableTaskConfigs.put(MinionTaskUtils.ALLOW_METADATA_PUSH_WITH_LOCAL_FS, "true");
+    return new TableTaskConfig(Map.of(MinionConstants.PurgeTask.TASK_TYPE, tableTaskConfigs));
+  }
+
+  /// Test purge with no metadata on the segments (checking null safe implementation)
   @Test
   public void testFirstRunPurge()
       throws Exception {
+    runFirstRunPurge(PURGE_FIRST_RUN_TABLE);
+  }
+
+  /// Test the same first-run purge flow using metadata push.
+  @Test(priority = 1)
+  public void testFirstRunMetadataPushPurge()
+      throws Exception {
+    runFirstRunPurge(PURGE_METADATA_PUSH_FIRST_RUN_TABLE);
+  }
+
+  private void runFirstRunPurge(String tableName)
+      throws Exception {
     // Expected purge task generation :
-    // 1. No previous purge run so all segment should be processed and purge metadata sould be added to the segments
+    // 1. No previous purge run so all segment should be processed and purge metadata should be added to the segments
     // 2. Check that we cannot run on same time two purge generation ensuring running segment will be skipped
     // 3. Check segment ZK metadata to ensure purge time is updated into the metadata
     // 4. Check after the first run of the purge if we rerun a purge task generation no task should be scheduled
     // 5. Check the purge process itself by setting an expecting number of rows
 
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(PURGE_FIRST_RUN_TABLE);
-    assertNotNull(
-        _taskManager.scheduleAllTasksForTable(offlineTableName, null).get(MinionConstants.PurgeTask.TASK_TYPE));
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Set.of(offlineTableName)))
+        .get(MinionConstants.PurgeTask.TASK_TYPE));
     assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.PurgeTask.TASK_TYPE)));
     // Will not schedule task if there's incomplete task
-    assertNull(_taskManager.scheduleAllTasksForTable(offlineTableName, null).get(MinionConstants.PurgeTask.TASK_TYPE));
+    MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.PurgeTask.TASK_TYPE)),
+        _taskManager);
     waitForTaskToComplete();
 
     // Check that metadata contains expected values
@@ -201,25 +249,26 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
           metadata.getCustomMap().containsKey(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX));
     }
     // Should not generate new purge task as the last time purge is not greater than last + 1day (default purge delay)
-    assertNull(_taskManager.scheduleAllTasksForTable(offlineTableName, null).get(MinionConstants.PurgeTask.TASK_TYPE));
+    MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.PurgeTask.TASK_TYPE)),
+        _taskManager);
 
     // 52 rows with ArrTime = 1
     // 115545 totals rows
     // Expecting 115545 - 52 = 115493 rows after purging
     // It might take some time for server to load the purged segments
-    TestUtils.waitForCondition(aVoid -> getCurrentCountStarResult(PURGE_FIRST_RUN_TABLE) == 115493, 60_000L,
+    TestUtils.waitForCondition(aVoid -> getCurrentCountStarResult(tableName) == 115493, 60_000L,
         "Failed to get expected purged records");
 
     // Drop the table
-    dropOfflineTable(PURGE_FIRST_RUN_TABLE);
+    dropOfflineTable(tableName);
 
     // Check if the task metadata is cleaned up on table deletion
     verifyTableDelete(offlineTableName);
   }
 
-  /**
-   * Test purge with passed delay
-   */
+  /// Test purge with passed delay
   @Test
   public void testPassedDelayTimePurge()
       throws Exception {
@@ -232,11 +281,16 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(PURGE_DELTA_PASSED_TABLE);
     assertNotNull(
-        _taskManager.scheduleAllTasksForTable(offlineTableName, null).get(MinionConstants.PurgeTask.TASK_TYPE));
+        _taskManager.scheduleTasks(new TaskSchedulingContext()
+                .setTablesToSchedule(Set.of(offlineTableName)))
+            .get(MinionConstants.PurgeTask.TASK_TYPE));
     assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.PurgeTask.TASK_TYPE)));
     // Will not schedule task if there's incomplete task
-    assertNull(_taskManager.scheduleAllTasksForTable(offlineTableName, null).get(MinionConstants.PurgeTask.TASK_TYPE));
+    MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.PurgeTask.TASK_TYPE)),
+        _taskManager);
     waitForTaskToComplete();
 
     // Check that metadata contains expected values
@@ -248,7 +302,10 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
       assertTrue(System.currentTimeMillis() - Long.parseLong(purgeTime) < 86400000);
     }
     // Should not generate new purge task as the last time purge is not greater than last + 1day (default purge delay)
-    assertNull(_taskManager.scheduleAllTasksForTable(offlineTableName, null).get(MinionConstants.PurgeTask.TASK_TYPE));
+    MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.PurgeTask.TASK_TYPE)),
+        _taskManager);
 
     // 52 rows with ArrTime = 1
     // 115545 totals rows
@@ -264,9 +321,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     verifyTableDelete(offlineTableName);
   }
 
-  /**
-   * Test purge with not passed delay
-   */
+  /// Test purge with not passed delay
   @Test
   public void testNotPassedDelayTimePurge()
       throws Exception {
@@ -280,7 +335,10 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(PURGE_DELTA_NOT_PASSED_TABLE);
 
     // No task should be schedule as the delay is not passed
-    assertNull(_taskManager.scheduleAllTasksForTable(offlineTableName, null).get(MinionConstants.PurgeTask.TASK_TYPE));
+    MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.PurgeTask.TASK_TYPE)),
+        _taskManager);
     for (SegmentZKMetadata metadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
       // Check purge time
       String purgeTime =
@@ -301,10 +359,9 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     verifyTableDelete(offlineTableName);
   }
 
-  /**
-   * Test purge on segments which were built by older schema and table config.
-   * Two new columns are added after segments are built and indices are defined for the new columns in the table config.
-   */
+  /// Test purge on segments which were built by older schema and table config.
+  /// Two new columns are added after segments are built and indices are defined for the new columns in the table
+  /// config.
   @Test
   public void testPurgeOnOldSegmentsWithIndicesOnNewColumns()
       throws Exception {
@@ -331,11 +388,15 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
 
     // schedule purge tasks
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
-    assertNotNull(
-        _taskManager.scheduleAllTasksForTable(offlineTableName, null).get(MinionConstants.PurgeTask.TASK_TYPE));
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Set.of(offlineTableName)))
+        .get(MinionConstants.PurgeTask.TASK_TYPE));
     assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.PurgeTask.TASK_TYPE)));
-    assertNull(_taskManager.scheduleAllTasksForTable(offlineTableName, null).get(MinionConstants.PurgeTask.TASK_TYPE));
+    MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+            .setTablesToSchedule(Set.of(offlineTableName))
+            .setTasksToSchedule(Set.of(MinionConstants.PurgeTask.TASK_TYPE)),
+        _taskManager);
     waitForTaskToComplete();
 
     // Check that metadata contains expected values
@@ -357,6 +418,147 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
 
     // Check if the task metadata is cleaned up on table deletion
     verifyTableDelete(offlineTableName);
+  }
+
+  /// Test that segments are automatically deleted when all records are purged
+  @Test
+  public void testSegmentDeletionWhenAllRecordsPurged()
+      throws Exception {
+    // Expected behavior:
+    // 1. First run: All records in segments are purged (RecordPurger returns true for all records)
+    // 2. First run: Segments become empty but are still present with totalDocs = 0
+    // 3. Second run: Empty segments are automatically deleted by PurgeTaskGenerator during task generation
+    // 4. Verify that segments are removed from the table
+
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(PURGE_ALL_RECORDS_TABLE);
+
+    // Get initial segment count
+    List<SegmentZKMetadata> initialSegments = _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName);
+    int initialSegmentCount = initialSegments.size();
+    assertTrue(initialSegmentCount > 0, "Table should have segments initially");
+
+    // First run: Schedule purge task to create empty segments
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Set.of(offlineTableName)))
+        .get(MinionConstants.PurgeTask.TASK_TYPE));
+    assertTrue(_helixTaskResourceManager.getTaskQueues()
+        .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.PurgeTask.TASK_TYPE)));
+
+    // Wait for first task to complete
+    waitForTaskToComplete();
+
+    // Verify table now has no data but segments still exist (empty segments)
+    TestUtils.waitForCondition(aVoid -> getCurrentCountStarResult(PURGE_ALL_RECORDS_TABLE) == 0, 60_000L,
+        "Failed to get expected purged records");
+    List<SegmentZKMetadata> segmentsAfterFirstRun = _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName);
+    assertEquals(segmentsAfterFirstRun.size(), initialSegmentCount,
+        "Segments should still exist after first purge run");
+
+    // Verify segments have totalDocs = 0
+    for (SegmentZKMetadata segment : segmentsAfterFirstRun) {
+      assertEquals(segment.getTotalDocs(), 0L, "All segments should have zero documents after purging");
+    }
+
+    // Second run: Schedule purge task again - this should delete the empty segments during task generation
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Set.of(offlineTableName)))
+        .get(MinionConstants.PurgeTask.TASK_TYPE));
+
+    // Wait for second task to complete (if any tasks were generated)
+    waitForTaskToComplete();
+
+    // Verify that all empty segments have been deleted
+    TestUtils.waitForCondition(aVoid -> {
+      List<SegmentZKMetadata> remainingSegments = _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName);
+      return remainingSegments.isEmpty();
+    }, 60_000L, "Expected all empty segments to be deleted after second purge run");
+
+    // Verify table still has no data
+    assertEquals(getCurrentCountStarResult(PURGE_ALL_RECORDS_TABLE), 0);
+
+    // Drop the table
+    dropOfflineTable(PURGE_ALL_RECORDS_TABLE);
+
+    // Check if the task metadata is cleaned up on table deletion
+    verifyTableDelete(offlineTableName);
+  }
+
+  /// Test that empty segments are preserved when they are the last segment of a partition in realtime tables.
+  /// This test specifically covers the edge case where empty segments should only
+  /// be allowed when they are needed to mark the end of a stream partition (e.g. Kinesis).
+  @Test
+  public void testRealtimeLastSegmentPreservation()
+      throws Exception {
+    // Expected behavior:
+    // 1. First run: All records in completed segments are purged (RecordPurger returns true for all records)
+    // 2. First run: Completed segments become empty but are still present with totalDocs = 0
+    // 3. Second run: Empty non-last completed segments are deleted, but last segments per partition are preserved
+    // 4. Verify that consuming segments and last empty completed segments per partition remain
+
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(PURGE_REALTIME_LAST_SEGMENT_TABLE);
+
+    // Get initial segment count
+    List<SegmentZKMetadata> initialSegments = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
+    int initialSegmentCount = initialSegments.size();
+    assertTrue(initialSegmentCount > 0, "Table should have segments initially");
+
+    // First run: Schedule purge task to create empty segments
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Set.of(realtimeTableName)))
+        .get(MinionConstants.PurgeTask.TASK_TYPE));
+
+    // Wait for first task to complete
+    waitForTaskToComplete();
+
+    // Calculate expected remaining records after purging completed segments
+    // Expected remaining = totalRecords % recordsPerSegmentPerPartition
+    long expectedRemainingRecords = getCountStarResult() % (getRealtimeSegmentFlushSize() / getNumKafkaPartitions());
+    TestUtils.waitForCondition(
+        aVoid -> getCurrentCountStarResult(PURGE_REALTIME_LAST_SEGMENT_TABLE) == expectedRemainingRecords,
+        60_000L, "Failed to get expected purged records");
+    List<SegmentZKMetadata> segmentsAfterFirstRun = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
+    assertEquals(segmentsAfterFirstRun.size(), initialSegmentCount,
+        "Segments should still exist after first purge run");
+
+    // Verify segments have totalDocs = 0 (for completed segments)
+    for (SegmentZKMetadata segment : segmentsAfterFirstRun) {
+      if (segment.getStatus().isCompleted()) {
+        assertEquals(segment.getTotalDocs(), 0L, "All completed segments should have zero documents after purging");
+      }
+    }
+
+    // Second run: Schedule purge task again - this should delete empty non-last segments but preserve last segments
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Set.of(realtimeTableName)))
+        .get(MinionConstants.PurgeTask.TASK_TYPE));
+
+    // Wait for second task to complete
+    waitForTaskToComplete();
+
+    TestUtils.waitForCondition(aVoid -> {
+      // Verify that we have the expected number of segments remaining:
+      // - 1 consuming segment per partition (should not be deleted)
+      // - 1 completed empty segment per partition (last segment, should be preserved)
+      List<SegmentZKMetadata> remainingSegments = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
+      long consumingSegments = remainingSegments.stream()
+          .filter(s -> !s.getStatus().isCompleted())
+          .count();
+      long completedSegments = remainingSegments.stream()
+          .filter(s -> s.getStatus().isCompleted())
+          .count();
+
+      // We should have: 1 consuming segment per partition + 1 last empty completed segment per partition
+      return consumingSegments == getNumKafkaPartitions() && completedSegments == getNumKafkaPartitions();
+    }, 60_000L, "Expected all but last empty completed segments to be deleted after second purge run");
+
+    // Verify table still has expected remaining data (from consuming segments)
+    assertEquals(getCurrentCountStarResult(PURGE_REALTIME_LAST_SEGMENT_TABLE), expectedRemainingRecords);
+
+    // Drop the realtime table
+    dropRealtimeTable(PURGE_REALTIME_LAST_SEGMENT_TABLE);
+
+    // Verify cleanup
+    verifyTableDelete(realtimeTableName);
   }
 
   protected void verifyTableDelete(String tableNameWithType) {
@@ -394,6 +596,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     stopServer();
     stopBroker();
     stopController();
+    stopKafka();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
   }

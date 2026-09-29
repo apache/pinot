@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.serde;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.proto.Expressions;
@@ -27,9 +28,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * Converts Protobuf versions of RexExpression to appropriate RexExpression classes.
- */
+/// Converts Protobuf versions of RexExpression to appropriate RexExpression classes.
 public class ProtoExpressionToRexExpression {
   private ProtoExpressionToRexExpression() {
   }
@@ -125,6 +124,15 @@ public class ProtoExpressionToRexExpression {
         }
         return new RexExpression.Literal(dataType, values);
       }
+      case BIG_DECIMAL_ARRAY: {
+        Expressions.BytesArray bytesArray = literal.getBytesArray();
+        int numValues = bytesArray.getValuesCount();
+        BigDecimal[] values = new BigDecimal[numValues];
+        for (int i = 0; i < numValues; i++) {
+          values[i] = BigDecimalUtils.deserialize(bytesArray.getValues(i).toByteArray());
+        }
+        return new RexExpression.Literal(dataType, values);
+      }
       case STRING_ARRAY: {
         Expressions.StringArray stringArray = literal.getStringArray();
         int numValues = stringArray.getValuesCount();
@@ -133,6 +141,15 @@ public class ProtoExpressionToRexExpression {
           for (int i = 0; i < numValues; i++) {
             values[i] = stringArray.getValues(i);
           }
+        }
+        return new RexExpression.Literal(dataType, values);
+      }
+      case BYTES_ARRAY: {
+        Expressions.BytesArray bytesArray = literal.getBytesArray();
+        int numValues = bytesArray.getValuesCount();
+        ByteArray[] values = new ByteArray[numValues];
+        for (int i = 0; i < numValues; i++) {
+          values[i] = new ByteArray(bytesArray.getValues(i).toByteArray());
         }
         return new RexExpression.Literal(dataType, values);
       }
@@ -163,6 +180,8 @@ public class ProtoExpressionToRexExpression {
         return ColumnDataType.JSON;
       case BYTES:
         return ColumnDataType.BYTES;
+      case UUID:
+        return ColumnDataType.UUID;
       case INT_ARRAY:
         return ColumnDataType.INT_ARRAY;
       case LONG_ARRAY:
@@ -171,6 +190,8 @@ public class ProtoExpressionToRexExpression {
         return ColumnDataType.FLOAT_ARRAY;
       case DOUBLE_ARRAY:
         return ColumnDataType.DOUBLE_ARRAY;
+      case BIG_DECIMAL_ARRAY:
+        return ColumnDataType.BIG_DECIMAL_ARRAY;
       case BOOLEAN_ARRAY:
         return ColumnDataType.BOOLEAN_ARRAY;
       case TIMESTAMP_ARRAY:
@@ -179,6 +200,8 @@ public class ProtoExpressionToRexExpression {
         return ColumnDataType.STRING_ARRAY;
       case BYTES_ARRAY:
         return ColumnDataType.BYTES_ARRAY;
+      case UUID_ARRAY:
+        return ColumnDataType.UUID_ARRAY;
       case MAP:
         return ColumnDataType.MAP;
       case OBJECT:

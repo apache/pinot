@@ -19,61 +19,14 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * Aggregation function to compute the sum of distinct values for an MV column.
- */
-public class DistinctSumMVAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
+public class DistinctSumMVAggregationFunction extends DistinctSumAggregationFunction {
 
-  public DistinctSumMVAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "DISTINCT_SUM_MV"), AggregationFunctionType.DISTINCTSUMMV, false);
-  }
-
-  @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    mvAggregate(length, aggregationResultHolder, blockValSetMap);
-  }
-
-  @Override
-  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    mvAggregateGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap);
-  }
-
-  @Override
-  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    mvAggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap);
-  }
-
-  @Override
-  public DataSchema.ColumnDataType getFinalResultColumnType() {
-    return DataSchema.ColumnDataType.DOUBLE;
-  }
-
-  @Override
-  public Double extractFinalResult(Set intermediateResult) {
-    Double distinctSum = 0.0;
-
-    for (Object obj : intermediateResult) {
-      distinctSum += ((Number) obj).doubleValue();
-    }
-
-    return distinctSum;
-  }
-
-  @Override
-  public Double mergeFinalResult(Double finalResult1, Double finalResult2) {
-    return finalResult1 + finalResult2;
+  public DistinctSumMVAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "DISTINCT_SUM_MV"), AggregationFunctionType.DISTINCTSUMMV,
+        nullHandlingEnabled);
   }
 }

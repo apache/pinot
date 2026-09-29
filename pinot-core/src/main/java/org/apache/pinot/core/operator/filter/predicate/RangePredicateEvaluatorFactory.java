@@ -21,6 +21,8 @@ package org.apache.pinot.core.operator.filter.predicate;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.math.BigDecimal;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.operator.filter.predicate.traits.DoubleRange;
 import org.apache.pinot.core.operator.filter.predicate.traits.FloatRange;
@@ -32,23 +34,20 @@ import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
-/**
- * Factory for RANGE predicate evaluators.
- */
+/// Factory for RANGE predicate evaluators.
 public class RangePredicateEvaluatorFactory {
   private RangePredicateEvaluatorFactory() {
   }
 
-  /**
-   * Create a new instance of dictionary based RANGE predicate evaluator.
-   *
-   * @param rangePredicate RANGE predicate to evaluate
-   * @param dictionary Dictionary for the column
-   * @param dataType Data type for the column
-   * @return Dictionary based RANGE predicate evaluator
-   */
+  /// Create a new instance of dictionary based RANGE predicate evaluator.
+  ///
+  /// @param rangePredicate RANGE predicate to evaluate
+  /// @param dictionary Dictionary for the column
+  /// @param dataType Data type for the column
+  /// @return Dictionary based RANGE predicate evaluator
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(RangePredicate rangePredicate,
       Dictionary dictionary, DataType dataType) {
     if (dictionary.isSorted()) {
@@ -58,14 +57,12 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  /**
-   * Create a new instance of raw value based RANGE predicate evaluator.
-   *
-   * @param rangePredicate RANGE predicate to evaluate
-   * @param dataType Data type for the column
-   * @return Raw value based RANGE predicate evaluator
-   */
-  public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(RangePredicate rangePredicate,
+  /// Create a new instance of raw value based RANGE predicate evaluator.
+  ///
+  /// @param rangePredicate RANGE predicate to evaluate
+  /// @param dataType Data type for the column
+  /// @return Raw value based RANGE predicate evaluator
+  public static RangeRawPredicateEvaluator newRawValueBasedEvaluator(RangePredicate rangePredicate,
       DataType dataType) {
     String lowerBound = rangePredicate.getLowerBound();
     String upperBound = rangePredicate.getUpperBound();
@@ -111,6 +108,14 @@ public class RangePredicateEvaluatorFactory {
         return new BytesRawValueBasedRangePredicateEvaluator(rangePredicate,
             lowerUnbounded ? null : BytesUtils.toBytes(lowerBound),
             upperUnbounded ? null : BytesUtils.toBytes(upperBound), lowerInclusive, upperInclusive);
+      // UUID is stored as 16 raw bytes and its unsigned bytewise ordering is exactly UUID ordering, so -- like
+      // TIMESTAMP over LONG above -- convert the bounds to the stored form and reuse the BYTES evaluator. UUID
+      // dictionaries also report getValueType() == BYTES, so the unsorted dictionary-based evaluator dispatches on
+      // BYTES and feeds this the raw 16-byte values, directly comparable to the bounds.
+      case UUID:
+        return new BytesRawValueBasedRangePredicateEvaluator(rangePredicate,
+            lowerUnbounded ? null : UuidUtils.toBytes(lowerBound),
+            upperUnbounded ? null : UuidUtils.toBytes(upperBound), lowerInclusive, upperInclusive);
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }
@@ -301,7 +306,8 @@ public class RangePredicateEvaluatorFactory {
       if (_dictIdSetBased) {
         return _matchingDictIdSet.contains(dictId);
       } else {
-        switch (_dictionary.getValueType()) {
+        DataType storedType = _dictionary.getValueType();
+        switch (storedType) {
           case INT:
             return _rawValueBasedEvaluator.applySV(_dictionary.getIntValue(dictId));
           case LONG:
@@ -317,13 +323,46 @@ public class RangePredicateEvaluatorFactory {
           case BYTES:
             return _rawValueBasedEvaluator.applySV(_dictionary.getBytesValue(dictId));
           default:
-            throw new IllegalStateException("Unsupported value type: " + _dictionary.getValueType());
+            throw new IllegalStateException("Unsupported stored type: " + storedType);
         }
       }
     }
   }
 
-  private static final class IntRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator
+  public static abstract class RangeRawPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    public RangeRawPredicateEvaluator(Predicate predicate) {
+      super(predicate);
+    }
+
+    /// Visits the bounds of this predicate.
+    public abstract <R> R accept(Visitor<R> visitor);
+
+    /// Visitor for the bounds of a RANGE predicate, dispatched by the stored value type.
+    ///
+    /// For integral and floating point types, exclusive bounds are normalized to inclusive bounds, and unbounded
+    /// sides are normalized to the data type's min/max. For `BigDecimal`, `String`, and `byte[]`, the raw bounds are
+    /// passed through together with their inclusivity flags, and unbounded sides are represented by a `null` bound.
+    public interface Visitor<R> {
+      R visitInt(int inclusiveLowerBound, int inclusiveUpperBound);
+
+      R visitLong(long inclusiveLowerBound, long inclusiveUpperBound);
+
+      R visitFloat(float inclusiveLowerBound, float inclusiveUpperBound);
+
+      R visitDouble(double inclusiveLowerBound, double inclusiveUpperBound);
+
+      R visitBigDecimal(@Nullable BigDecimal lowerBound, @Nullable BigDecimal upperBound, boolean lowerInclusive,
+          boolean upperInclusive);
+
+      R visitString(@Nullable String lowerBound, @Nullable String upperBound, boolean lowerInclusive,
+          boolean upperInclusive);
+
+      R visitBytes(@Nullable byte[] lowerBound, @Nullable byte[] upperBound, boolean lowerInclusive,
+          boolean upperInclusive);
+    }
+  }
+
+  private static final class IntRawValueBasedRangePredicateEvaluator extends RangeRawPredicateEvaluator
       implements IntRange {
     final int _inclusiveLowerBound;
     final int _inclusiveUpperBound;
@@ -377,9 +416,14 @@ public class RangePredicateEvaluatorFactory {
       }
       return matches;
     }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitInt(_inclusiveLowerBound, _inclusiveUpperBound);
+    }
   }
 
-  private static final class LongRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator
+  private static final class LongRawValueBasedRangePredicateEvaluator extends RangeRawPredicateEvaluator
       implements LongRange {
     final long _inclusiveLowerBound;
     final long _inclusiveUpperBound;
@@ -433,9 +477,14 @@ public class RangePredicateEvaluatorFactory {
       }
       return matches;
     }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitLong(_inclusiveLowerBound, _inclusiveUpperBound);
+    }
   }
 
-  private static final class FloatRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator
+  private static final class FloatRawValueBasedRangePredicateEvaluator extends RangeRawPredicateEvaluator
       implements FloatRange {
     final float _inclusiveLowerBound;
     final float _inclusiveUpperBound;
@@ -489,9 +538,14 @@ public class RangePredicateEvaluatorFactory {
       }
       return matches;
     }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitFloat(_inclusiveLowerBound, _inclusiveUpperBound);
+    }
   }
 
-  private static final class DoubleRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator
+  private static final class DoubleRawValueBasedRangePredicateEvaluator extends RangeRawPredicateEvaluator
       implements DoubleRange {
     final double _inclusiveLowerBound;
     final double _inclusiveUpperBound;
@@ -545,11 +599,18 @@ public class RangePredicateEvaluatorFactory {
       }
       return matches;
     }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitDouble(_inclusiveLowerBound, _inclusiveUpperBound);
+    }
   }
 
-  public static final class BigDecimalRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  public static final class BigDecimalRawValueBasedRangePredicateEvaluator extends RangeRawPredicateEvaluator {
     final BigDecimal _lowerBound;
     final BigDecimal _upperBound;
+    final boolean _lowerInclusive;
+    final boolean _upperInclusive;
     final int _lowerComparisonValue;
     final int _upperComparisonValue;
 
@@ -558,6 +619,8 @@ public class RangePredicateEvaluatorFactory {
       super(rangePredicate);
       _lowerBound = lowerBound;
       _upperBound = upperBound;
+      _lowerInclusive = lowerInclusive;
+      _upperInclusive = upperInclusive;
       _lowerComparisonValue = lowerInclusive ? 0 : 1;
       _upperComparisonValue = upperInclusive ? 0 : -1;
     }
@@ -572,11 +635,18 @@ public class RangePredicateEvaluatorFactory {
       return (_lowerBound == null || value.compareTo(_lowerBound) >= _lowerComparisonValue) && (_upperBound == null
           || value.compareTo(_upperBound) <= _upperComparisonValue);
     }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitBigDecimal(_lowerBound, _upperBound, _lowerInclusive, _upperInclusive);
+    }
   }
 
-  private static final class StringRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static final class StringRawValueBasedRangePredicateEvaluator extends RangeRawPredicateEvaluator {
     final String _lowerBound;
     final String _upperBound;
+    final boolean _lowerInclusive;
+    final boolean _upperInclusive;
     final int _lowerComparisonValue;
     final int _upperComparisonValue;
 
@@ -585,6 +655,8 @@ public class RangePredicateEvaluatorFactory {
       super(rangePredicate);
       _lowerBound = lowerBound;
       _upperBound = upperBound;
+      _lowerInclusive = lowerInclusive;
+      _upperInclusive = upperInclusive;
       _lowerComparisonValue = lowerInclusive ? 0 : 1;
       _upperComparisonValue = upperInclusive ? 0 : -1;
     }
@@ -599,11 +671,18 @@ public class RangePredicateEvaluatorFactory {
       return (_lowerBound == null || value.compareTo(_lowerBound) >= _lowerComparisonValue) && (_upperBound == null
           || value.compareTo(_upperBound) <= _upperComparisonValue);
     }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitString(_lowerBound, _upperBound, _lowerInclusive, _upperInclusive);
+    }
   }
 
-  private static final class BytesRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static final class BytesRawValueBasedRangePredicateEvaluator extends RangeRawPredicateEvaluator {
     final byte[] _lowerBound;
     final byte[] _upperBound;
+    final boolean _lowerInclusive;
+    final boolean _upperInclusive;
     final int _lowerComparisonValue;
     final int _upperComparisonValue;
 
@@ -612,6 +691,8 @@ public class RangePredicateEvaluatorFactory {
       super(rangePredicate);
       _lowerBound = lowerBound;
       _upperBound = upperBound;
+      _lowerInclusive = lowerInclusive;
+      _upperInclusive = upperInclusive;
       _lowerComparisonValue = lowerInclusive ? 0 : 1;
       _upperComparisonValue = upperInclusive ? 0 : -1;
     }
@@ -625,6 +706,11 @@ public class RangePredicateEvaluatorFactory {
     public boolean applySV(byte[] value) {
       return (_lowerBound == null || ByteArray.compare(value, _lowerBound) >= _lowerComparisonValue) && (
           _upperBound == null || ByteArray.compare(value, _upperBound) <= _upperComparisonValue);
+    }
+
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitBytes(_lowerBound, _upperBound, _lowerInclusive, _upperInclusive);
     }
   }
 }

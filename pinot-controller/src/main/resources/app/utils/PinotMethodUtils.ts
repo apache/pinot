@@ -17,9 +17,21 @@
  * under the License.
  */
 
-import jwtDecode from "jwt-decode";
+import jwtDecode from 'jwt-decode';
 import { get, each, isEqual, isArray, keys, union } from 'lodash';
-import { DataTable, InstanceType, SchemaInfo, SegmentMetadata, SqlException, SQLResult } from 'Models';
+import {
+  DataTable,
+  InstanceStatus,
+  InstanceStatusCell,
+  InstanceType,
+  RebalanceTableSegmentJob,
+  RebalanceTableSegmentJobs,
+  SchemaInfo,
+  SegmentMetadata,
+  SqlException,
+  SQLResult,
+  TaskType,
+} from 'Models';
 import moment from 'moment';
 import {
   getTenants,
@@ -30,6 +42,8 @@ import {
   setTableState,
   dropInstance,
   getPeriodicTaskNames,
+  runPeriodicTask,
+  runPeriodicTaskWithErrors,
   getTaskTypes,
   getTaskTypeDebug,
   getTables,
@@ -46,11 +60,19 @@ import {
   getTasks,
   getTaskDebug,
   getTaskGeneratorDebug,
+  getTasksSummary,
+  getTaskCounts,
+  getTaskStates,
+  getCronSchedulerInformation,
+  deleteSingleTask,
+  getInstanceLogFiles,
+  downloadInstanceLogFile,
   updateInstanceTags,
   getClusterConfig,
   getQueryTables,
   getTableSchema,
   getQueryResult,
+  getTimeSeriesQueryResult,
   getTenantTable,
   getTableSize,
   getIdealState,
@@ -69,6 +91,7 @@ import {
   getBrokerListOfTenant,
   getServerListOfTenant,
   deleteSegment,
+  resetSegment,
   putTable,
   putSchema,
   deleteTable,
@@ -97,13 +120,23 @@ import {
   getTaskRuntimeConfig,
   getSchemaInfo,
   getSegmentsStatus,
-  getServerToSegmentsCount
+  getConsumingSegmentsInfo,
+  getServerToSegmentsCount,
+  pauseConsumption,
+  resumeConsumption,
+  getPauseStatus,
+  getVersions,
+  getLogicalTables,
+  getLogicalTable,
+  putLogicalTable,
+  deleteLogicalTable
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
-import { matchPath } from 'react-router';
+import { matchPath } from 'react-router-dom';
 import RouterData from '../router';
-const JSONbig = require('json-bigint')({'storeAsString': true})
+import JSONbigBase from 'json-bigint';
+const JSONbig = JSONbigBase({ storeAsString: true });
 
 // This method is used to display tenants listing on cluster manager home page
 // API: /tenants
@@ -155,10 +188,12 @@ const getAllInstances = () => {
       [InstanceType.SERVER]: [],
       [InstanceType.MINION]: []
     };
-    
+
     data.instances.forEach((instance) => {
       const instanceType =  instance.split('_')[0].toUpperCase();
-      instanceTypeToInstancesMap[instanceType].push(instance);
+      if (instanceTypeToInstancesMap[instanceType]) {
+        instanceTypeToInstancesMap[instanceType].push(instance);
+      }
     });
 
     return instanceTypeToInstancesMap;
@@ -171,18 +206,60 @@ const getAllInstances = () => {
 const getInstanceData = (instances, liveInstanceArr) => {
   const promiseArr = [...instances.map((inst) => getInstance(inst))];
 
-  return Promise.all(promiseArr).then((result) => {
+  return Promise.all(promiseArr).then(async (result) => {
+    // First, get all instance configs
+    const instanceRecords = result.map(({ data }) => {
+      const isAlive = liveInstanceArr.indexOf(data.instanceName) > -1;
+      const isEnabled = data.enabled;
+      const queriesDisabled = data.queriesDisabled === 'true' || data.queriesDisabled === true;
+      const shutdownInProgress = data.shutdownInProgress === true;
+      
+      return {
+        instanceName: data.instanceName,
+        enabled: data.enabled,
+        hostName: data.hostName,
+        port: data.port,
+        adminPort: data.adminPort,
+        isAlive,
+        isEnabled,
+        queriesDisabled,
+        shutdownInProgress
+      };
+    });
+
+    // Then check health endpoints for alive instances
+    const healthCheckPromises = instanceRecords.map(async (record) => {
+
+      let status: InstanceStatusCell = {value: InstanceStatus.DEAD, tooltip: 'Instance is not running'};
+
+      if (!record.isAlive) {
+        return { ...record, healthStatus: status };
+      }
+
+      if (record.shutdownInProgress) {
+        status = {value: InstanceStatus.UNHEALTHY, tooltip: 'Instance is running but is starting up or shutting down'};
+      } else if (!record.isEnabled) {
+        status = {value: InstanceStatus.INSTANCE_DISABLED, tooltip: 'Instance has been disabled in helix'};
+      } else if (record.queriesDisabled) {
+        status = {value: InstanceStatus.QUERIES_DISABLED, tooltip: 'Instance running but has queries disabled'};
+      } else {
+        status = {value: InstanceStatus.HEALTHY, tooltip: 'Instance is healthy and ready to serve requests'};
+      }
+
+      return { ...record, healthStatus: status };
+    });
+
+    const recordsWithHealth = await Promise.all(healthCheckPromises);
+
     return {
       columns: ['Instance Name', 'Enabled', 'Hostname', 'Port', 'Status'],
-      records: [
-        ...result.map(({ data }) => [
-          data.instanceName,
-          data.enabled,
-          data.hostName,
-          data.port,
-          liveInstanceArr.indexOf(data.instanceName) > -1 ? 'Alive' : 'Dead'
-        ]),
-      ],
+      records: recordsWithHealth.map(record => [
+        record.instanceName,
+        record.enabled,
+        record.hostName,
+        record.port,
+        record.healthStatus
+      ])
     };
   });
 };
@@ -199,10 +276,23 @@ const getClusterName = () => {
 // This method is used to fetch array of live instances name
 // API: /zk/ls?path=:ClusterName/LIVEINSTANCES
 // Expected Output: []
-const getLiveInstance = (clusterName) => {
+const getLiveInstance = (clusterName: string) => {
   const params = encodeURIComponent(`/${clusterName}/LIVEINSTANCES`);
   return zookeeperGetList(params).then((data) => {
     return data;
+  });
+};
+
+const getLiveInstances = () => {
+  let localclusterName: string | null = localStorage.getItem('pinot_ui:clusterName');
+  let clusterNameRes: Promise<string>;
+  if(!localclusterName || localclusterName === ''){
+    clusterNameRes = getClusterName();
+  } else {
+    clusterNameRes = Promise.resolve(localclusterName);
+  }
+  return clusterNameRes.then((clusterName) => {
+    return getLiveInstance(clusterName);
   });
 };
 
@@ -247,6 +337,22 @@ const getQueryTablesList = ({bothType = false}) => {
   });
 };
 
+// This method is used to display logical table listing on query page
+// API: /logicalTables
+// Expected Output: {columns: [], records: []}
+const getQueryLogicalTablesList = () => {
+  return getLogicalTables().then(({ data }) => {
+    const responseObj = {
+      columns: ['Logical Tables'],
+      records: []
+    };
+    data.map((logicalTable) => {
+      responseObj.records.push([logicalTable]);
+    });
+    return responseObj;
+  });
+};
+
 // This method is used to display particular table schema on query page
 // API: /tables/:tableName/schema
 const getTableSchemaData = (tableName) => {
@@ -266,79 +372,106 @@ const getAsObject = (str: SQLResult) => {
   return str;
 };
 
+// Query stats column names (used for both SQL and Timeseries queries)
+const QUERY_STATS_COLUMNS = ['timeUsedMs',
+  'numDocsScanned',
+  'totalDocs',
+  'numServersQueried',
+  'numServersResponded',
+  'numSegmentsQueried',
+  'numSegmentsProcessed',
+  'numSegmentsMatched',
+  'numConsumingSegmentsQueried',
+  'numEntriesScannedInFilter',
+  'numEntriesScannedPostFilter',
+  'numGroupsLimitReached',
+  'numGroupsWarningLimitReached',
+  'partialResult',
+  'minConsumingFreshnessTimeMs',
+  'offlineThreadCpuTimeNs',
+  'realtimeThreadCpuTimeNs',
+  'offlineSystemActivitiesCpuTimeNs',
+  'realtimeSystemActivitiesCpuTimeNs',
+  'offlineResponseSerializationCpuTimeNs',
+  'realtimeResponseSerializationCpuTimeNs',
+  'offlineTotalCpuTimeNs',
+  'realtimeTotalCpuTimeNs'
+];
+
+// Extract query stats from broker response
+// This utility can be used for both SQL and Timeseries queries
+const extractQueryStatsFromResponse = (queryResponse) => {
+  const partialResult = queryResponse.partialResult ?? queryResponse.partialResponse;
+
+  return {
+    columns: QUERY_STATS_COLUMNS,
+    records: [[queryResponse.timeUsedMs, queryResponse.numDocsScanned, queryResponse.totalDocs, queryResponse.numServersQueried, queryResponse.numServersResponded,
+      queryResponse.numSegmentsQueried, queryResponse.numSegmentsProcessed, queryResponse.numSegmentsMatched, queryResponse.numConsumingSegmentsQueried,
+      queryResponse.numEntriesScannedInFilter, queryResponse.numEntriesScannedPostFilter, queryResponse.numGroupsLimitReached, queryResponse.numGroupsWarningLimitReached,
+      partialResult ?? '-', queryResponse.minConsumingFreshnessTimeMs,
+      queryResponse.offlineThreadCpuTimeNs, queryResponse.realtimeThreadCpuTimeNs,
+      queryResponse.offlineSystemActivitiesCpuTimeNs, queryResponse.realtimeSystemActivitiesCpuTimeNs,
+      queryResponse.offlineResponseSerializationCpuTimeNs, queryResponse.realtimeResponseSerializationCpuTimeNs,
+      queryResponse.offlineTotalCpuTimeNs, queryResponse.realtimeTotalCpuTimeNs]]
+  };
+};
+
+// Process broker response (used for both SQL and Timeseries queries)
+// Both APIs return BrokerResponseNativeV2 structure
+const processBrokerResponse = (queryResponse) => {
+  let exceptions: SqlException[] = [];
+  let dataArray = [];
+  let columnList = [];
+
+  // if sql api throws error, handle here
+  if(typeof queryResponse === 'string'){
+    exceptions.push({errorCode: null, message: queryResponse});
+  }
+  // if sql api returns a structured error with a `code`, handle here
+  if (queryResponse && queryResponse.code) {
+    if (queryResponse.error) {
+      exceptions.push({errorCode: null, message: "Query failed with error code: " + queryResponse.code + " and error: " + queryResponse.error});
+    } else {
+      exceptions.push({errorCode: null, message: "Query failed with error code: " + queryResponse.code + " but no logs. Please see controller logs for error."});
+    }
+  }
+  if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
+    exceptions = queryResponse.exceptions as SqlException[];
+  }
+  if (queryResponse.resultTable?.dataSchema?.columnNames?.length) {
+    columnList = queryResponse.resultTable.dataSchema.columnNames;
+    dataArray = queryResponse.resultTable.rows;
+  }
+
+  return {
+    exceptions: exceptions,
+    result: {
+      columns: columnList,
+      records: dataArray,
+    },
+    queryStats: extractQueryStatsFromResponse(queryResponse),
+    data: queryResponse,
+  };
+};
+
 // This method is used to display query output in tabular format as well as JSON format on query page
 // API: /:urlName (Eg: sql or pql)
 // Expected Output: {columns: [], records: []}
 const getQueryResults = (params) => {
   return getQueryResult(params).then(({ data }) => {
     let queryResponse = getAsObject(data);
+    return processBrokerResponse(queryResponse);
+  });
+};
 
-    let exceptions: SqlException[] = [];
-    let dataArray = [];
-    let columnList = [];
-    // if sql api throws error, handle here
-    if(typeof queryResponse === 'string'){
-      exceptions.push({errorCode: null, message: queryResponse});
-    }
-    // if sql api returns a structured error with a `code`, handle here
-    if (queryResponse && queryResponse.code) {
-      if (queryResponse.error) {
-        exceptions.push({errorCode: null, message: "Query failed with error code: " + queryResponse.code + " and error: " + queryResponse.error});
-      } else {
-        exceptions.push({errorCode: null, message: "Query failed with error code: " + queryResponse.code + " but no logs. Please see controller logs for error."});
-      }
-    }
-    if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
-      exceptions = queryResponse.exceptions as SqlException[];
-    } 
-    if (queryResponse.resultTable?.dataSchema?.columnNames?.length) {
-      columnList = queryResponse.resultTable.dataSchema.columnNames;
-      dataArray = queryResponse.resultTable.rows;
-    }
-
-    const columnStats = ['timeUsedMs',
-      'numDocsScanned',
-      'totalDocs',
-      'numServersQueried',
-      'numServersResponded',
-      'numSegmentsQueried',
-      'numSegmentsProcessed',
-      'numSegmentsMatched',
-      'numConsumingSegmentsQueried',
-      'numEntriesScannedInFilter',
-      'numEntriesScannedPostFilter',
-      'numGroupsLimitReached',
-      'partialResponse',
-      'minConsumingFreshnessTimeMs',
-      'offlineThreadCpuTimeNs',
-      'realtimeThreadCpuTimeNs',
-      'offlineSystemActivitiesCpuTimeNs',
-      'realtimeSystemActivitiesCpuTimeNs',
-      'offlineResponseSerializationCpuTimeNs',
-      'realtimeResponseSerializationCpuTimeNs',
-      'offlineTotalCpuTimeNs',
-      'realtimeTotalCpuTimeNs'
-    ];
-
-    return {
-      exceptions: exceptions,
-      result: {
-        columns: columnList,
-        records: dataArray,
-      },
-      queryStats: {
-        columns: columnStats,
-        records: [[queryResponse.timeUsedMs, queryResponse.numDocsScanned, queryResponse.totalDocs, queryResponse.numServersQueried, queryResponse.numServersResponded,
-          queryResponse.numSegmentsQueried, queryResponse.numSegmentsProcessed, queryResponse.numSegmentsMatched, queryResponse.numConsumingSegmentsQueried,
-          queryResponse.numEntriesScannedInFilter, queryResponse.numEntriesScannedPostFilter, queryResponse.numGroupsLimitReached,
-          queryResponse.partialResponse ? queryResponse.partialResponse : '-', queryResponse.minConsumingFreshnessTimeMs,
-          queryResponse.offlineThreadCpuTimeNs, queryResponse.realtimeThreadCpuTimeNs,
-          queryResponse.offlineSystemActivitiesCpuTimeNs, queryResponse.realtimeSystemActivitiesCpuTimeNs,
-          queryResponse.offlineResponseSerializationCpuTimeNs, queryResponse.realtimeResponseSerializationCpuTimeNs,
-          queryResponse.offlineTotalCpuTimeNs, queryResponse.realtimeTotalCpuTimeNs]]
-      },
-      data: queryResponse,
-    };
+// This method processes timeseries query results
+// Uses the same processBrokerResponse as SQL queries since both return BrokerResponseNativeV2
+// API: /query/timeseries
+// Expected Output: {exceptions: [], result: {columns: [], records: []}, queryStats: {columns: [], records: []}, data: {}}
+const getTimeseriesQueryResults = (params) => {
+  return getTimeSeriesQueryResult(params).then(({ data }) => {
+    let queryResponse = getAsObject(data);
+    return processBrokerResponse(queryResponse);
   });
 };
 
@@ -406,7 +539,14 @@ const getAllSchemaDetails = async (schemaList) => {
     columns: allSchemaDetailsColumnHeader,
     records: schemaDetails
   };
-}
+};
+
+// Fetch consuming segments info for a given table
+// API: /tables/{tableName}/consumingSegmentsInfo
+// Expected Output: ConsumingSegmentsInfo
+const getConsumingSegmentsInfoData = (tableName) => {
+  return getConsumingSegmentsInfo(tableName).then(({ data }) => data);
+};
 
 const allTableDetailsColumnHeader = [
   'Table Name',
@@ -534,16 +674,16 @@ const getExternalViewObj = (tableName) => {
   return getExternalView(tableName).then((result) => {
     return result.data.OFFLINE || result.data.REALTIME;
   });
-}; 
+};
 
 const fetchServerToSegmentsCountData = (tableName, tableType) => {
   return getServerToSegmentsCount(tableName, tableType).then((results) => {
-    const segmentsArray = results.data; 
+    const segmentsArray = results.data;
     return {
       records: segmentsArray.flatMap((server) =>
-        Object.entries(server.serverToSegmentsCountMap).map(([serverName, segmentsCount]) => [ 
-          serverName,       
-          segmentsCount    
+        Object.entries(server.serverToSegmentsCountMap).map(([serverName, segmentsCount]) => [
+          serverName,
+          segmentsCount
         ])
       )
     };
@@ -700,16 +840,25 @@ const getZookeeperData = (path, count) => {
     isLeafNode: false,
     hasChildRendered: true
   }];
-  return getNodeData(path).then((obj)=>{
+
+  return getNodeData(path).then((obj) => {
     const { currentNodeData, currentNodeMetadata, currentNodeListStat } = obj;
-    const pathNames = Object.keys(currentNodeListStat);
-    pathNames.map((pathName)=>{
+    const pathNames = Object.keys(currentNodeListStat || {});
+
+    pathNames.forEach((pathName) => {
+      const nodeStat = currentNodeListStat[pathName];
+
+      // Skip if nodeStat is null or undefined
+      if (!nodeStat) {
+        console.warn(`Skipping null node for path: ${pathName}`);
+        return;
+      }
       newTreeData[0].child.push({
         nodeId: `${counter++}`,
         label: pathName,
-        fullPath: path === '/' ? path+pathName : `${path}/${pathName}`,
+        fullPath: path === '/' ? path + pathName : `${path}/${pathName}`,
         child: [],
-        isLeafNode: currentNodeListStat[pathName].numChildren === 0,
+        isLeafNode: nodeStat.numChildren === 0,
         hasChildRendered: false
       });
     });
@@ -745,9 +894,10 @@ const getNodeData = (path) => {
   });
 };
 
-const putNodeData = (data) => {
-  const serializedData = Utils.serialize(data);
-  return zookeeperPutData(serializedData).then((obj)=>{
+const putNodeData = (nodeParams) => {
+  const { data, ...queryParams } = nodeParams;
+  const serializedParams = Utils.serialize(queryParams);
+  return zookeeperPutData(serializedParams, data).then((obj)=>{
     return obj;
   });
 };
@@ -787,6 +937,19 @@ const toggleTableState = (tableName, state, tableType) => {
   return setTableState(tableName, state, tableType).then((response)=>{
     return response.data;
   });
+};
+// Pause or resume consumption of a realtime table
+// Returns PauseStatusDetails
+const pauseConsumptionOp = (tableName, comment) => {
+  return pauseConsumption(tableName, comment).then((response) => response.data);
+};
+
+const resumeConsumptionOp = (tableName, comment, consumeFrom) => {
+  return resumeConsumption(tableName, comment, consumeFrom).then((response) => response.data);
+};
+
+const getPauseStatusData = (tableName) => {
+  return getPauseStatus(tableName).then((response) => response.data);
 };
 
 const deleteInstance = (instanceName) => {
@@ -873,21 +1036,34 @@ const getElapsedTime = (startTime) => {
 }
 
 const getTasksList = async (tableName, taskType) => {
+  const { formatTimeInTimezone } = await import('./TimezoneUtils');
   const finalResponse = {
-    columns: ['Task ID', 'Status', 'Start Time', 'Finish Time', 'Num of Sub Tasks'],
+    columns: ['Task ID', 'Status', 'Start Time', 'Finish Time', 'Sub Tasks (Total/Completed/Running/Waiting/Error/Other)'],
     records: []
   }
   await new Promise((resolve, reject) => {
     getTasks(tableName, taskType).then(async (response)=>{
       const promiseArr = [];
       const fetchInfo = async (taskID, status) => {
-        const debugData = await getTaskDebugData(taskID);
+        const debugData = await getTaskDebugData(taskID, tableName);
+        const subtaskCount = get(debugData, 'data.subtaskCount', {});
+        const total = get(subtaskCount, 'total', 0);
+        const completed = get(subtaskCount, 'completed', 0);
+        const running = get(subtaskCount, 'running', 0);
+        const waiting = get(subtaskCount, 'waiting', 0);
+        const error = get(subtaskCount, 'error', 0);
+        const unknown = get(subtaskCount, 'unknown', 0);
+        const dropped = get(subtaskCount, 'dropped', 0);
+        const timedOut = get(subtaskCount, 'timedOut', 0);
+        const aborted = get(subtaskCount, 'aborted', 0);
+        const other = unknown + dropped + timedOut + aborted;
+
         finalResponse.records.push([
           taskID,
           status,
-          get(debugData, 'data.startTime', ''),
-          get(debugData, 'data.finishTime', ''),
-          get(debugData, 'data.subtaskCount.total', 0)
+          get(debugData, 'data.startTime') ? formatTimeInTimezone(get(debugData, 'data.startTime'), 'MMMM Do YYYY, HH:mm:ss z') : '',
+          get(debugData, 'data.finishTime') ? formatTimeInTimezone(get(debugData, 'data.finishTime'), 'MMMM Do YYYY, HH:mm:ss z') : '',
+          `${total}/${completed}/${running}/${waiting}/${error}/${other}`
         ]);
       };
       each(response.data, async (val, key) => {
@@ -902,12 +1078,12 @@ const getTasksList = async (tableName, taskType) => {
 
 const getTaskRuntimeConfigData = async (taskName: string) => {
   const response = await getTaskRuntimeConfig(taskName);
-  
+
   return response.data;
 }
 
-const getTaskDebugData = async (taskName) => {
-  const debugRes = await getTaskDebug(taskName);
+const getTaskDebugData = async (taskName, tableName) => {
+  const debugRes = await getTaskDebug(taskName, tableName);
   return debugRes;
 };
 
@@ -940,6 +1116,12 @@ const reloadStatusOp = (tableName, tableType) => {
   });
 }
 
+const resetSegmentOp = (tableName, segmentName) => {
+  return resetSegment(tableName, segmentName).then((response) => {
+    return response.data;
+  });
+};
+
 const deleteSegmentOp = (tableName, segmentName) => {
   return deleteSegment(tableName, segmentName).then((response)=>{
     return response.data;
@@ -948,13 +1130,25 @@ const deleteSegmentOp = (tableName, segmentName) => {
 
 const fetchTableJobs = async (tableName: string, jobTypes?: string) => {
   const response = await getTableJobs(tableName, jobTypes);
-  
+
   return response.data;
+}
+
+const fetchRebalanceTableJobs = async (tableName: string): Promise<RebalanceTableSegmentJob[]> => {
+  const response = await getTableJobs(tableName, "TABLE_REBALANCE");
+  if (response.data.error) {
+    return [];
+  }
+
+  const rebalanceTableSegmentJobs: RebalanceTableSegmentJob[] = Object.keys(response.data as RebalanceTableSegmentJobs)
+      .map(jobId => response.data[jobId] as RebalanceTableSegmentJob)
+      .sort((j1, j2) => j1.submissionTimeMs < j2.submissionTimeMs ? 1 : -1);
+  return rebalanceTableSegmentJobs;
 }
 
 const fetchSegmentReloadStatus = async (jobId: string) => {
   const response = await getSegmentReloadStatus(jobId);
-  
+
   return response.data;
 }
 
@@ -970,8 +1164,8 @@ const updateSchema = (schemaName: string, schema: string, reload?: boolean) => {
   })
 };
 
-const deleteTableOp = (tableName) => {
-  return deleteTable(tableName).then((response)=>{
+const deleteTableOp = (tableName: string, retention?: string) => {
+  return deleteTable(tableName, retention).then((response)=>{
     return response.data;
   });
 };
@@ -995,6 +1189,11 @@ const rebalanceBrokersForTableOp = (tableName) => {
   });
 };
 
+const repairTableOp = (tableName, tableType) => {
+  return runPeriodicTask(TaskType.RealtimeSegmentValidationManager, tableName, tableType).then((response) => {
+    return response.data;
+  });
+};
 const validateSchemaAction = (schemaObj) => {
   return validateSchema(schemaObj).then((response)=>{
     return response.data;
@@ -1060,7 +1259,7 @@ const verifyAuth = (authToken) => {
 const getAccessTokenFromHashParams = () => {
   let accessToken = '';
   const hashParam = removeAllLeadingForwardSlash(location.hash.substring(1));
-  
+
   const urlSearchParams = new URLSearchParams(hashParam);
   if (urlSearchParams.has('access_token')) {
     accessToken = urlSearchParams.get('access_token') as string;
@@ -1099,7 +1298,7 @@ const validateRedirectPath = (path: string): boolean => {
 
   const knownAppRoutes = RouterData.map((data) => data.path);
   const routeMatches = matchPath(pathName, {path: knownAppRoutes, exact: true});
-  
+
   if(!routeMatches) {
     return false;
   }
@@ -1136,7 +1335,7 @@ const getURLWithoutAccessToken = (fallbackUrl = '/'): string => {
     if(urlSearchParams.toString()){
       urlParams.unshift(urlSearchParams.toString());
     }
-    
+
     url = urlParams.join('&');
 
     if(!validateRedirectPath(url)) {
@@ -1184,6 +1383,86 @@ const getScheduleJobDetail = (tableName, taskType)=>{
   return getJobDetail(tableName, taskType).then(response=>{
     return response.data;
   })
+};
+
+// Returns a TaskSummaryResponse covering all task types across all tenants.
+// Shape: { tasks: { tenant: { taskType: TaskCount } } } depending on backend version.
+const getTasksSummaryData = (tenant?: string) => {
+  return getTasksSummary(tenant).then(response => response.data);
+};
+
+// Returns a map from task name to TaskCount {total, running, waiting, error, completed, ...}
+const getTaskCountsData = (taskType: string) => {
+  return getTaskCounts(taskType).then(response => response.data);
+};
+
+// Returns a map from task name to TaskState (NOT_STARTED, IN_PROGRESS, COMPLETED, FAILED, ABORTED, ...).
+const getTaskStatesData = (taskType: string) => {
+  return getTaskStates(taskType).then(response => response.data);
+};
+
+// Returns null only when the controller has the scheduler disabled (404 or
+// "Task scheduler is disabled" 500). Other errors propagate so the caller can
+// distinguish "scheduler off" from "controller unreachable" / "auth failed".
+const getCronSchedulerInformationData = () => {
+  return getCronSchedulerInformation()
+    .then(response => response.data)
+    .catch((err) => {
+      const status = get(err, 'response.status');
+      const message = String(get(err, 'response.data.error') || get(err, 'response.data.message') || '');
+      if (status === 404 || (status === 500 && /scheduler is disabled/i.test(message))) {
+        return null;
+      }
+      throw err;
+    });
+};
+
+const deleteSingleTaskOp = (taskName: string, forceDelete = false) => {
+  return deleteSingleTask(taskName, forceDelete).then(response => response.data);
+};
+
+const runPeriodicTaskAction = (taskName: string, tableName?: string, tableType?: string) => {
+  return runPeriodicTaskWithErrors(taskName, tableName || undefined, tableType || undefined).then(response => response.data);
+};
+
+const getInstanceLogFilesData = (instanceName: string): Promise<string[]> => {
+  return getInstanceLogFiles(instanceName).then(response => {
+    const data = response.data;
+    if (Array.isArray(data)) {
+      return data as string[];
+    }
+    // Anything that isn't a JSON array is treated as a backend error. Returning
+    // [] here silently would render "No log files reported by minion." on the UI,
+    // which masks proxy misconfiguration or controller errors. Surface it instead.
+    const embeddedError = (data && typeof data === 'object' && 'error' in (data as Record<string, unknown>))
+      ? String((data as Record<string, unknown>).error)
+      : null;
+    throw new Error(embeddedError || 'Unexpected log-file response shape');
+  });
+};
+
+// Fetches the requested minion log file as a Blob through the authenticated axios
+// client and triggers a browser download via a temporary anchor + createObjectURL.
+// This avoids the auth header gap that a plain `<a href>` open would have hit on
+// the controller's `/loggers/instances/{name}/download` endpoint.
+const downloadInstanceLogFileToBrowser = async (instanceName: string, filePath: string): Promise<void> => {
+  const response = await downloadInstanceLogFile(instanceName, filePath);
+  const blob: Blob = response.data instanceof Blob ? response.data : new Blob([response.data]);
+  const objectUrl = window.URL.createObjectURL(blob);
+  try {
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    // Last path component for filename; controller serves the whole file path so
+    // we slash-strip locally for a sane saved name.
+    const nameParts = filePath.split('/');
+    a.download = nameParts[nameParts.length - 1] || 'minion.log';
+    document.body.appendChild(a);
+    a.click();
+    a.parentNode?.removeChild(a);
+  } finally {
+    // Defer revoke to next tick so the browser has time to start the download.
+    setTimeout(() => window.URL.revokeObjectURL(objectUrl), 0);
+  }
 };
 
 const getUserList = ()=>{
@@ -1256,6 +1535,50 @@ const getAuthUserEmailFromAccessToken = (
   return email;
 };
 
+// This method is used to display package versions in tabular format on cluster manager home page
+// API: /version
+// Expected Output: {columns: [], records: []}
+const getPackageVersionsData = () => {
+  return getVersions().then(({ data }) => {
+    const records = Object.entries(data).map(([packageName, version]) => [
+      packageName,
+      String(version)
+    ]);
+
+    return {
+      columns: ['Package', 'Version'],
+      records: records
+    };
+  });
+};
+
+const getLogicalTablesData = async (columnHeader: string) => {
+  const { data } = await getLogicalTables();
+  return {
+    columns: [columnHeader],
+    records: data.map((name) => [name])
+  };
+};
+
+const getLogicalTablesList = async () => {
+  return getLogicalTablesData('Logical Table Name');
+};
+
+const getLogicalTableConfig = async (tableName: string) => {
+  const { data } = await getLogicalTable(tableName);
+  return data;
+};
+
+const updateLogicalTableConfig = async (tableName: string, config: string) => {
+  const { data } = await putLogicalTable(tableName, config);
+  return data;
+};
+
+const deleteLogicalTableOp = async (tableName: string) => {
+  const { data } = await deleteLogicalTable(tableName);
+  return data;
+};
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -1263,8 +1586,10 @@ export default {
   getClusterConfigData,
   getClusterConfigJSON,
   getQueryTablesList,
+  getQueryLogicalTablesList,
   getTableSchemaData,
   getQueryResults,
+  getTimeseriesQueryResults,
   getTenantTableData,
   allTableDetailsColumnHeader,
   getAllTableDetails,
@@ -1277,6 +1602,7 @@ export default {
   getSegmentCountAndStatus,
   getClusterName,
   getLiveInstance,
+  getLiveInstances,
   getLiveInstanceConfig,
   getInstanceConfig,
   getInstanceDetails,
@@ -1294,6 +1620,7 @@ export default {
   getAllPeriodicTaskNames,
   getAllTaskTypes,
   fetchTableJobs,
+  fetchRebalanceTableJobs,
   fetchSegmentReloadStatus,
   getTaskTypeDebugData,
   getTableData,
@@ -1307,6 +1634,14 @@ export default {
   scheduleTaskAction,
   executeTaskAction,
   getScheduleJobDetail,
+  getTasksSummaryData,
+  getTaskCountsData,
+  getTaskStatesData,
+  getCronSchedulerInformationData,
+  deleteSingleTaskOp,
+  runPeriodicTaskAction,
+  getInstanceLogFilesData,
+  downloadInstanceLogFileToBrowser,
   getMinionMetaData,
   getElapsedTime,
   getTasksList,
@@ -1314,6 +1649,7 @@ export default {
   getTaskProgressData,
   getTaskGeneratorDebugData,
   deleteSegmentOp,
+  resetSegmentOp,
   reloadSegmentOp,
   reloadStatusOp,
   reloadAllSegmentsOp,
@@ -1323,6 +1659,7 @@ export default {
   deleteSchemaOp,
   rebalanceServersForTableOp,
   rebalanceBrokersForTableOp,
+  repairTableOp,
   validateSchemaAction,
   validateTableAction,
   saveSchemaAction,
@@ -1344,5 +1681,18 @@ export default {
   updateUser,
   getAuthUserNameFromAccessToken,
   getAuthUserEmailFromAccessToken,
-  fetchServerToSegmentsCountData
+  // Pause/resume consumption of realtime tables
+  pauseConsumptionOp,
+  resumeConsumptionOp,
+  getPauseStatusData,
+  fetchServerToSegmentsCountData,
+  getConsumingSegmentsInfoData,
+  getPackageVersionsData,
+  getLogicalTablesList,
+  getLogicalTableConfig,
+  updateLogicalTableConfig,
+  deleteLogicalTableOp
 };
+
+// Named exports for shared constants and utilities
+export { QUERY_STATS_COLUMNS, processBrokerResponse };

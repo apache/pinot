@@ -23,6 +23,9 @@ public class Constants {
   }
 
   public static final int EOF = Integer.MIN_VALUE;
+
+  // TODO: Consider modifying it to -1 to be more readable when stored in segment metadata. Reader accepts all negative
+  //       values as unknown in release 1.6.0. Change writer side after 1.6.0 release.
   public static final int UNKNOWN_CARDINALITY = Integer.MIN_VALUE;
 
   public static final String HLL_LOG2M_KEY = "log2m";
@@ -30,6 +33,8 @@ public class Constants {
   public static final String HLLPLUS_SP_KEY = "sp";
   public static final String CPCSKETCH_LGK_KEY = "lgK";
   public static final String THETA_TUPLE_SKETCH_NOMINAL_ENTRIES = "nominalEntries";
+  public static final String THETA_TUPLE_SKETCH_SAMPLING_PROBABILITY = "samplingProbability";
   public static final String PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY = "compressionFactor";
   public static final String SUMPRECISION_PRECISION_KEY = "precision";
+  public static final String KLL_DOUBLE_SKETCH_K = "K";
 }

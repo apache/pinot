@@ -28,23 +28,21 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * The <code>Not</code> extends implement the Not operator.
- *
- * The results are in boolean format and stored as an integer array with 1 represents true and 0 represents false.
- * It takes a single argument and negates it and the argument has to be a boolean/integer.
- *
- * Expected result:
- * Not (1 = 1) | 0
- * Not 1       | 0
- *
- * SQL Syntax:
- *    Not <Boolean Expression>
- *
- * Sample Usage:
- *    Not(booleanA)
- *    Not booleanA
- */
+/// The `Not` extends implement the Not operator.
+///
+/// The results are in boolean format and stored as an integer array with 1 represents true and 0 represents false.
+/// It takes a single argument and negates it and the argument has to be a boolean/integer.
+///
+/// Expected result:
+/// Not (1 = 1) | 0
+/// Not 1       | 0
+///
+/// SQL Syntax:
+///    Not <Boolean Expression>
+///
+/// Sample Usage:
+///    Not(booleanA)
+///    Not booleanA
 public class NotOperatorTransformFunction extends BaseTransformFunction {
   private TransformFunction _argument;
 

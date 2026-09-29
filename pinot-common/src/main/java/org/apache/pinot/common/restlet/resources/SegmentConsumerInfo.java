@@ -23,9 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 
 
-/**
- * Information regarding the consumer of a segment
- */
+/// Information regarding the consumer of a segment
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentConsumerInfo {
   private final String _segmentName;

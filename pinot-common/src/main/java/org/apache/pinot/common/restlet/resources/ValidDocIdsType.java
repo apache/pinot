@@ -23,6 +23,11 @@ public enum ValidDocIdsType {
   // Pinot segment. UpsertConfig's 'enableSnapshot' must be enabled for this type.
   SNAPSHOT,
 
+  // This indicates that the validDocIds bitmap is loaded from the snapshot from the Pinot segment.
+  // The valid document ids here does take account into the deleted records. UpsertConfig's 'enableSnapshot' must be
+  // enabled for this type. UpsertConfig's 'deleteRecordColumn' must be provided for this type.
+  SNAPSHOT_WITH_DELETE,
+
   // This indicates that the validDocIds bitmap is loaded from the real-time server's in-memory.
   //
   // NOTE: Using in-memory based validDocids bitmap is a bit dangerous as it will not give us the consistency in some

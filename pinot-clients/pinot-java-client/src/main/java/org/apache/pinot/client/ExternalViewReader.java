@@ -30,7 +30,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -42,9 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Reads brokers external view from Zookeeper
- */
+/// Reads brokers external view from Zookeeper
 public class ExternalViewReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExternalViewReader.class);
   private static final ObjectReader OBJECT_READER = JsonUtils.DEFAULT_READER;
@@ -53,6 +50,7 @@ public class ExternalViewReader {
   public static final String REALTIME_SUFFIX = "_REALTIME";
   public static final String OFFLINE_SUFFIX = "_OFFLINE";
   public static final String KEY_PINOT_TLS_PORT = "PINOT_TLS_PORT";
+  public static final String KEY_PINOT_GRPC_PORT = "grpcPort";
   public static final String KEY_SIMPLE_FIELDS = "simpleFields";
   public static final String KEY_HELIX_HOST = "HELIX_HOST";
   public static final String KEY_HELIX_PORT = "HELIX_PORT";
@@ -61,31 +59,38 @@ public class ExternalViewReader {
 
   @VisibleForTesting
   boolean _preferTlsPort;
-  public ExternalViewReader(ZkClient zkClient, boolean preferTlsPort) {
-    _preferTlsPort = preferTlsPort;
-    _zkClient = zkClient;
-  }
+
+  boolean _useGrpcPort;
+
   public ExternalViewReader(ZkClient zkClient) {
     this(zkClient, false);
   }
 
+  public ExternalViewReader(ZkClient zkClient, boolean preferTlsPort) {
+    this(zkClient, preferTlsPort, false);
+  }
+
+  public ExternalViewReader(ZkClient zkClient, boolean preferTlsPort, boolean useGrpcPort) {
+    _preferTlsPort = preferTlsPort;
+    _zkClient = zkClient;
+    _useGrpcPort = useGrpcPort;
+  }
+
   public List<String> getLiveBrokers() {
     List<String> brokerUrls = new ArrayList<>();
+    Map<String, String> hostPortByBroker = new HashMap<>();
     try {
       byte[] brokerResourceNodeData = _zkClient.readData(BROKER_EXTERNAL_VIEW_PATH, true);
       brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
       JsonNode jsonObject = OBJECT_READER.readTree(getInputStream(brokerResourceNodeData));
       JsonNode brokerResourceNode = jsonObject.get("mapFields");
 
-      Iterator<Entry<String, JsonNode>> resourceEntries = brokerResourceNode.fields();
-      while (resourceEntries.hasNext()) {
-        JsonNode resource = resourceEntries.next().getValue();
-        Iterator<Entry<String, JsonNode>> brokerEntries = resource.fields();
-        while (brokerEntries.hasNext()) {
-          Entry<String, JsonNode> brokerEntry = brokerEntries.next();
+      for (Entry<String, JsonNode> stringJsonNodeEntry : brokerResourceNode.properties()) {
+        JsonNode resource = stringJsonNodeEntry.getValue();
+        for (Entry<String, JsonNode> brokerEntry : resource.properties()) {
           String brokerName = brokerEntry.getKey();
           if (brokerName.startsWith("Broker_") && "ONLINE".equals(brokerEntry.getValue().asText())) {
-            brokerUrls.add(getHostPort(brokerName));
+            brokerUrls.add(resolveHostPort(brokerName, hostPortByBroker));
           }
         }
       }
@@ -94,6 +99,20 @@ public class ExternalViewReader {
       // ignore
     }
     return brokerUrls;
+  }
+
+  /// Resolves a broker's address, reading its instance config at most once per enclosing call.
+  ///
+  /// A broker's address is a property of the broker, not of the table being examined, but the
+  /// callers walk the broker resource table by table and so meet the same broker once per table it
+  /// serves. Resolving through this map turns those N x M reads into one per distinct broker.
+  ///
+  /// The map is supplied by the caller and lives only for that call, deliberately. An instance
+  /// field would have to be both synchronised, since these methods are called concurrently, and
+  /// invalidated whenever a broker's host or port changes; a per-call map can be neither stale nor
+  /// contended, and the redundancy it removes is entirely within a single traversal anyway.
+  private String resolveHostPort(String brokerName, Map<String, String> hostPortByBroker) {
+    return hostPortByBroker.computeIfAbsent(brokerName, this::getHostPort);
   }
 
   @VisibleForTesting
@@ -108,6 +127,7 @@ public class ExternalViewReader {
           if (simpleFields != null) {
             JsonNode hostNameNode = simpleFields.get(KEY_HELIX_HOST);
             JsonNode tlsPortNode = simpleFields.get(KEY_PINOT_TLS_PORT);
+            JsonNode grpcPortNode = simpleFields.get(KEY_PINOT_GRPC_PORT);
             JsonNode helixPortNode = simpleFields.get(KEY_HELIX_PORT);
             String[] splitItems = brokerName.split("_");
             if (splitItems.length < 3) {
@@ -116,6 +136,10 @@ public class ExternalViewReader {
             String hostName = splitItems[1];
             if (hostNameNode != null && !Strings.isNullOrEmpty(hostNameNode.asText())) {
               hostName = hostNameNode.asText();
+            }
+
+            if (grpcPortNode != null && !Strings.isNullOrEmpty(grpcPortNode.asText()) && _useGrpcPort) {
+              return hostName + ":" + grpcPortNode.asText();
             }
             if (tlsPortNode != null && !Strings.isNullOrEmpty(tlsPortNode.asText()) && _preferTlsPort) {
               return hostName + ":" + tlsPortNode.asText();
@@ -139,25 +163,22 @@ public class ExternalViewReader {
 
   public Map<String, List<String>> getTableToBrokersMap() {
     Map<String, Set<String>> brokerUrlsMap = new HashMap<>();
+    Map<String, String> hostPortByBroker = new HashMap<>();
     try {
       byte[] brokerResourceNodeData = _zkClient.readData(BROKER_EXTERNAL_VIEW_PATH, true);
       brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
       JsonNode jsonObject = OBJECT_READER.readTree(getInputStream(brokerResourceNodeData));
       JsonNode brokerResourceNode = jsonObject.get("mapFields");
 
-      Iterator<Entry<String, JsonNode>> resourceEntries = brokerResourceNode.fields();
-      while (resourceEntries.hasNext()) {
-        Entry<String, JsonNode> resourceEntry = resourceEntries.next();
+      for (Entry<String, JsonNode> resourceEntry : brokerResourceNode.properties()) {
         String resourceName = resourceEntry.getKey();
         String tableName = resourceName.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
         Set<String> brokerUrls = brokerUrlsMap.computeIfAbsent(tableName, k -> new HashSet<>());
         JsonNode resource = resourceEntry.getValue();
-        Iterator<Entry<String, JsonNode>> brokerEntries = resource.fields();
-        while (brokerEntries.hasNext()) {
-          Entry<String, JsonNode> brokerEntry = brokerEntries.next();
+        for (Entry<String, JsonNode> brokerEntry : resource.properties()) {
           String brokerName = brokerEntry.getKey();
           if (brokerName.startsWith("Broker_") && "ONLINE".equals(brokerEntry.getValue().asText())) {
-            brokerUrls.add(getHostPort(brokerName));
+            brokerUrls.add(resolveHostPort(brokerName, hostPortByBroker));
           }
         }
       }

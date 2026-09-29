@@ -21,11 +21,11 @@ package org.apache.pinot.segment.local.segment.creator;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -52,10 +52,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit tests for On-Heap dictionary implementations.
- */
-public class OnHeapDictionariesTest {
+/// Unit tests for On-Heap dictionary implementations.
+public class OnHeapDictionariesTest implements PinotBuffersAfterClassCheckRule {
   private static final Logger LOGGER = LoggerFactory.getLogger(OnHeapDictionariesTest.class);
 
   private static final String SEGMENT_DIR_NAME = System.getProperty("java.io.tmpdir") + File.separator + "onHeapDict";
@@ -91,12 +89,12 @@ public class OnHeapDictionariesTest {
   @AfterClass
   public void tearDown()
       throws IOException {
+    _onHeapSegment.destroy();
+    _offHeapSegment.destroy();
     FileUtils.deleteDirectory(new File(SEGMENT_DIR_NAME));
   }
 
-  /**
-   * This test compares the on-heap and off-heap loaded dictionaries for the same segment.
-   */
+  /// This test compares the on-heap and off-heap loaded dictionaries for the same segment.
   @Test
   public void test() {
     testColumn(INT_COLUMN);
@@ -154,15 +152,13 @@ public class OnHeapDictionariesTest {
     }
   }
 
-  /**
-   * Helper method to build a segment with random data as per the schema.
-   *
-   * @param segmentDirName Name of segment directory
-   * @param segmentName Name of segment
-   * @param schema Schema for segment
-   * @return Schema built for the segment
-   * @throws Exception
-   */
+  /// Helper method to build a segment with random data as per the schema.
+  ///
+  /// @param segmentDirName Name of segment directory
+  /// @param segmentName Name of segment
+  /// @param schema Schema for segment
+  /// @return Schema built for the segment
+  /// @throws Exception
   private Schema buildSegment(String segmentDirName, String segmentName, TableConfig tableConfig, Schema schema)
       throws Exception {
 
@@ -176,17 +172,13 @@ public class OnHeapDictionariesTest {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
 
     for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
-      HashMap<String, Object> map = new HashMap<>();
-
-      map.put(INT_COLUMN, random.nextInt());
-      map.put(LONG_COLUMN, random.nextLong());
-      map.put(FLOAT_COLUMN, random.nextFloat());
-      map.put(DOUBLE_COLUMN, random.nextDouble());
-      map.put(STRING_COLUMN, RandomStringUtils.randomAscii(100));
-
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(map);
-      rows.add(genericRow);
+      GenericRow row = new GenericRow();
+      row.putValue(INT_COLUMN, random.nextInt());
+      row.putValue(LONG_COLUMN, random.nextLong());
+      row.putValue(FLOAT_COLUMN, random.nextFloat());
+      row.putValue(DOUBLE_COLUMN, random.nextDouble());
+      row.putValue(STRING_COLUMN, RandomStringUtils.secure().nextAscii(100));
+      rows.add(row);
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -197,11 +189,9 @@ public class OnHeapDictionariesTest {
     return schema;
   }
 
-  /**
-   * Helper method to build a schema with provided number of metric columns.
-   *
-   * @return Schema containing the given number of metric columns
-   */
+  /// Helper method to build a schema with provided number of metric columns.
+  ///
+  /// @return Schema containing the given number of metric columns
   private static Schema buildSchema() {
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec(INT_COLUMN, FieldSpec.DataType.INT, true));

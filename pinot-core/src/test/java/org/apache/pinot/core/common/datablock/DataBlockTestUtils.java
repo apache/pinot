@@ -24,11 +24,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -68,10 +70,13 @@ public class DataBlockTestUtils {
           row[colId] = RANDOM.nextLong();
           break;
         case STRING:
-          row[colId] = RandomStringUtils.random(RANDOM.nextInt(20));
+          row[colId] = RandomStringUtils.secure().next(RANDOM.nextInt(20));
           break;
         case BYTES:
-          row[colId] = new ByteArray(RandomStringUtils.random(RANDOM.nextInt(20)).getBytes());
+          row[colId] = new ByteArray(RandomStringUtils.secure().next(RANDOM.nextInt(20)).getBytes());
+          break;
+        case UUID:
+          row[colId] = new ByteArray(UuidUtils.toBytes(new UUID(RANDOM.nextLong(), RANDOM.nextLong())));
           break;
         case INT_ARRAY:
           int length = RANDOM.nextInt(ARRAY_SIZE);
@@ -105,13 +110,13 @@ public class DataBlockTestUtils {
           }
           row[colId] = doubleArray;
           break;
-        case STRING_ARRAY:
+        case BIG_DECIMAL_ARRAY:
           length = RANDOM.nextInt(ARRAY_SIZE);
-          String[] stringArray = new String[length];
+          BigDecimal[] bigDecimalArray = new BigDecimal[length];
           for (int i = 0; i < length; i++) {
-            stringArray[i] = RandomStringUtils.random(RANDOM.nextInt(20));
+            bigDecimalArray[i] = BigDecimal.valueOf(RANDOM.nextDouble());
           }
-          row[colId] = stringArray;
+          row[colId] = bigDecimalArray;
           break;
         case BOOLEAN_ARRAY:
           length = RANDOM.nextInt(ARRAY_SIZE);
@@ -129,15 +134,41 @@ public class DataBlockTestUtils {
           }
           row[colId] = timestampArray;
           break;
+        case STRING_ARRAY:
+          length = RANDOM.nextInt(ARRAY_SIZE);
+          String[] stringArray = new String[length];
+          for (int i = 0; i < length; i++) {
+            stringArray[i] = RandomStringUtils.secure().next(RANDOM.nextInt(20));
+          }
+          row[colId] = stringArray;
+          break;
+        case BYTES_ARRAY:
+          length = RANDOM.nextInt(ARRAY_SIZE);
+          ByteArray[] bytesArray = new ByteArray[length];
+          for (int i = 0; i < length; i++) {
+            byte[] bytes = new byte[RANDOM.nextInt(20)];
+            RANDOM.nextBytes(bytes);
+            bytesArray[i] = new ByteArray(bytes);
+          }
+          row[colId] = bytesArray;
+          break;
+        case UUID_ARRAY:
+          length = RANDOM.nextInt(ARRAY_SIZE);
+          ByteArray[] uuidArray = new ByteArray[length];
+          for (int i = 0; i < length; i++) {
+            uuidArray[i] = new ByteArray(UuidUtils.toBytes(new UUID(RANDOM.nextLong(), RANDOM.nextLong())));
+          }
+          row[colId] = uuidArray;
+          break;
         case MAP:
           length = RANDOM.nextInt(ARRAY_SIZE);
           Map<String, Object> map = new HashMap<>();
           for (int i = 0; i < length; i++) {
             int mapSize = RANDOM.nextInt(20);
             for (int j = 0; j < mapSize; j++) {
-              map.put("k0", RandomStringUtils.random(RANDOM.nextInt(5)));
-              map.put("k1", RandomStringUtils.random(RANDOM.nextInt(10)));
-              map.put("k2", RandomStringUtils.random(RANDOM.nextInt(20)));
+              map.put("k0", RandomStringUtils.secure().next(RANDOM.nextInt(5)));
+              map.put("k1", RandomStringUtils.secure().next(RANDOM.nextInt(10)));
+              map.put("k2", RandomStringUtils.secure().next(RANDOM.nextInt(20)));
             }
           }
           row[colId] = map;
@@ -186,8 +217,12 @@ public class DataBlockTestUtils {
         return dataBlock.getFloatArray(rowId, colId);
       case DOUBLE_ARRAY:
         return dataBlock.getDoubleArray(rowId, colId);
+      case BIG_DECIMAL_ARRAY:
+        return dataBlock.getBigDecimalArray(rowId, colId);
       case STRING_ARRAY:
         return dataBlock.getStringArray(rowId, colId);
+      case BYTES_ARRAY:
+        return dataBlock.getBytesArray(rowId, colId);
       case MAP:
         return dataBlock.getMap(rowId, colId);
       case UNKNOWN:

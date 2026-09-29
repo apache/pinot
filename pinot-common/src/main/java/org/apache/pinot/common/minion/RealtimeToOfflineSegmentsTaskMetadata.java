@@ -21,23 +21,21 @@ package org.apache.pinot.common.minion;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
-/**
- * Metadata for the minion task of type <code>RealtimeToOfflineSegmentsTask</code>.
- * The <code>watermarkMs</code> denotes the time (exclusive) upto which tasks have been executed.
- *
- * This gets serialized and stored in zookeeper under the path
- * MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
- *
- * PinotTaskGenerator:
- * The <code>watermarkMs</code>> is used by the <code>RealtimeToOfflineSegmentsTaskGenerator</code>,
- * to determine the window of execution for the task it is generating.
- * The window of execution will be [watermarkMs, watermarkMs + bucketSize)
- *
- * PinotTaskExecutor:
- * The same watermark is used by the <code>RealtimeToOfflineSegmentsTaskExecutor</code>, to:
- * - Verify that is is running the latest task scheduled by the task generator
- * - Update the watermark as the end of the window that it executed for
- */
+/// Metadata for the minion task of type `RealtimeToOfflineSegmentsTask`.
+/// The `watermarkMs` denotes the time (exclusive) upto which tasks have been executed.
+///
+/// This gets serialized and stored in zookeeper under the path
+/// MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
+///
+/// PinotTaskGenerator:
+/// The `watermarkMs`> is used by the `RealtimeToOfflineSegmentsTaskGenerator`,
+/// to determine the window of execution for the task it is generating.
+/// The window of execution will be \[watermarkMs, watermarkMs + bucketSize)
+///
+/// PinotTaskExecutor:
+/// The same watermark is used by the `RealtimeToOfflineSegmentsTaskExecutor`, to:
+/// - Verify that it is running the latest task scheduled by the task generator
+/// - Update the watermark as the end of the window that it executed for
 public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
 
   private static final String WATERMARK_KEY = "watermarkMs";
@@ -54,9 +52,7 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
     return _tableNameWithType;
   }
 
-  /**
-   * Get the watermark in millis
-   */
+  /// Get the watermark in millis
   public long getWatermarkMs() {
     return _watermarkMs;
   }

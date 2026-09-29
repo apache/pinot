@@ -18,16 +18,16 @@
  */
 package org.apache.pinot.spi.exception;
 
-public class BadQueryRequestException extends RuntimeException {
+public class BadQueryRequestException extends QueryException {
   public BadQueryRequestException(String message) {
-    super(message);
+    super(QueryErrorCode.QUERY_VALIDATION, message);
   }
 
   public BadQueryRequestException(String message, Throwable cause) {
-    super(message, cause);
+    super(QueryErrorCode.QUERY_VALIDATION, message, cause);
   }
 
   public BadQueryRequestException(Throwable cause) {
-    super(cause);
+    super(QueryErrorCode.QUERY_VALIDATION, cause);
   }
 }

@@ -34,11 +34,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * On-heap creator for guava bloom filter.
- * <p>TODO: Remove the dependency on {@link BloomFilter} and have our own implementation to prevent guava library
- *          changes that breaks the alignment between creator and reader.
- */
+/// On-heap creator for guava bloom filter.
+///
+/// TODO: Remove the dependency on [BloomFilter] and have our own implementation to prevent guava library
+///          changes that breaks the alignment between creator and reader.
 @SuppressWarnings("UnstableApiUsage")
 public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(OnHeapGuavaBloomFilterCreator.class);
@@ -49,14 +48,6 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
   private final File _bloomFilterFile;
   private final BloomFilter<String> _bloomFilter;
   private final FieldSpec.DataType _dataType;
-
-  // TODO: This method is here for compatibility reasons, should be removed in future PRs
-  //  exit_criteria: Not needed in Apache Pinot once #10184 is merged
-  @Deprecated
-  public OnHeapGuavaBloomFilterCreator(File indexDir, String columnName, int cardinality,
-      BloomFilterConfig bloomFilterConfig) {
-    this(indexDir, columnName, cardinality, bloomFilterConfig, null);
-  }
 
   public OnHeapGuavaBloomFilterCreator(File indexDir, String columnName, int cardinality,
       BloomFilterConfig bloomFilterConfig, FieldSpec.DataType dataType) {

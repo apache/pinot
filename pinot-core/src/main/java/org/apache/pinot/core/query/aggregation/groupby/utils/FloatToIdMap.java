@@ -22,9 +22,7 @@ import it.unimi.dsi.fastutil.floats.Float2IntOpenHashMap;
 import it.unimi.dsi.fastutil.floats.FloatArrayList;
 
 
-/**
- * Implementation of {@link ValueToIdMap} for float.
- */
+/// Implementation of [ValueToIdMap] for float.
 public class FloatToIdMap implements ValueToIdMap {
   private final Float2IntOpenHashMap _valueToIdMap;
   private final FloatArrayList _idToValueMap;
@@ -38,9 +36,10 @@ public class FloatToIdMap implements ValueToIdMap {
   @Override
   public int put(float value) {
     int numValues = _valueToIdMap.size();
-    int id = _valueToIdMap.computeIfAbsent(value, k -> numValues);
-    if (id == numValues) {
+    int id = _valueToIdMap.putIfAbsent(value, numValues);
+    if (id == INVALID_KEY) {
       _idToValueMap.add(value);
+      return numValues;
     }
     return id;
   }

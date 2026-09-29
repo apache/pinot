@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.server.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Utf8;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -29,8 +32,9 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.File;
+import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,9 +43,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.ws.rs.BadRequestException;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
@@ -61,12 +70,15 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
+import org.apache.pinot.common.restlet.resources.SegmentCompressionStatsContribution;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
+import org.apache.pinot.common.restlet.resources.ServerCompressionStatsResponse;
 import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckResponse;
+import org.apache.pinot.common.restlet.resources.ServerTableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
-import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
@@ -75,12 +87,17 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentMetadataUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -90,19 +107,25 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
-import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
+import org.apache.pinot.server.api.ServerDataAccess;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.config.table.PageCacheWarmupRequest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.stream.PartitionLagState;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -110,19 +133,18 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
-import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
-
-@Api(tags = "Table", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = "Table", authorizations = {
+    @Authorization(value = CommonConstants.SWAGGER_AUTHORIZATION_KEY), @Authorization(value = CommonConstants.DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
-    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY,
-        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
-    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
-        description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key =
+        CommonConstants.SWAGGER_AUTHORIZATION_KEY, description = "The format of the key is  ```\"Basic <token>\" or "
+        + "\"Bearer <token>\"```"), @ApiKeyAuthDefinition(name = CommonConstants.DATABASE, in =
+    ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = CommonConstants.DATABASE, description =
+    "Database context passed through http header. If no context is provided 'default' database "
+        + "context will be considered.")
+}))
 @Path("/")
 public class TablesResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(TablesResource.class);
@@ -138,6 +160,8 @@ public class TablesResource {
   @Inject
   @Named(AdminApiApplication.SERVER_INSTANCE_ID)
   private String _instanceId;
+
+  private final Set<String> _tablesWithWarmupInProgress = ConcurrentHashMap.newKeySet();
 
   @GET
   @Path("/tables")
@@ -182,7 +206,6 @@ public class TablesResource {
   }
 
   @GET
-  @Encoded
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/metadata")
   @ApiOperation(value = "List metadata for all segments of a given table", notes = "List segments metadata of table "
@@ -194,8 +217,8 @@ public class TablesResource {
   })
   public String getSegmentMetadata(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-      List<String> columns, @Context HttpHeaders headers)
+      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") List<String> columns,
+      @Context HttpHeaders headers)
       throws WebApplicationException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
@@ -209,21 +232,7 @@ public class TablesResource {
       throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
     }
 
-    List<String> decodedColumns = new ArrayList<>(columns.size());
-    for (String column : columns) {
-      decodedColumns.add(URIUtils.decode(column));
-    }
-
-    boolean allColumns = false;
-    // For robustness, loop over all columns, if any of the columns is "*", return metadata for all columns.
-    for (String column : decodedColumns) {
-      if (column.equals("*")) {
-        allColumns = true;
-        break;
-      }
-    }
-    Set<String> columnSet = allColumns ? null : new HashSet<>(decodedColumns);
-
+    Set<String> columnSet = columns.contains("*") ? null : new HashSet<>(columns);
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     long totalSegmentSizeBytes = 0;
     long totalNumRows = 0;
@@ -233,56 +242,58 @@ public class TablesResource {
     Map<String, Map<String, Double>> columnIndexSizesMap = new HashMap<>();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        if (segmentDataManager instanceof ImmutableSegmentDataManager) {
-          ImmutableSegment immutableSegment = (ImmutableSegment) segmentDataManager.getSegment();
-          long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
-          SegmentMetadataImpl segmentMetadata =
-              (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
+        for (IndexSegment indexSegment : segmentDataManager.getReportableSegments()) {
+          if (indexSegment instanceof ImmutableSegment immutableSegment) {
+            long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
+            SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) immutableSegment.getSegmentMetadata();
 
-          totalSegmentSizeBytes += segmentSizeBytes;
-          totalNumRows += segmentMetadata.getTotalDocs();
+            totalSegmentSizeBytes += segmentSizeBytes;
+            totalNumRows += segmentMetadata.getTotalDocs();
 
-          if (columnSet == null) {
-            columnSet = segmentMetadata.getAllColumns();
-          } else {
-            columnSet.retainAll(segmentMetadata.getAllColumns());
-          }
-          for (String column : columnSet) {
-            ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
-            int columnLength = 0;
-            DataType storedDataType = columnMetadata.getDataType().getStoredType();
-            if (storedDataType.isFixedWidth()) {
-              // For type of fixed width: INT, LONG, FLOAT, DOUBLE, BOOLEAN (stored as INT), TIMESTAMP (stored as LONG),
-              // set the columnLength as the fixed width.
-              columnLength = storedDataType.size();
-            } else if (columnMetadata.hasDictionary()) {
-              // For type of variable width (String, Bytes), if it's stored using dictionary encoding, set the
-              // columnLength as the max length in dictionary.
-              columnLength = columnMetadata.getColumnMaxLength();
-            } else if (storedDataType == DataType.STRING || storedDataType == DataType.BYTES) {
-              // For type of variable width (String, Bytes), if it's stored using raw bytes, set the columnLength as
-              // the length of the max value.
-              if (columnMetadata.getMaxValue() != null) {
-                String maxValueString = (String) columnMetadata.getMaxValue();
-                columnLength = maxValueString.getBytes(StandardCharsets.UTF_8).length;
-              }
+            Set<String> allSegmentColumns = segmentMetadata.getAllColumns();
+            if (columnSet == null) {
+              // Copy: getAllColumns() is a view of the segment's own columns, and retainAll below would otherwise
+              // narrow the first segment's metadata rather than the running intersection.
+              columnSet = new HashSet<>(allSegmentColumns);
             } else {
-              // For type of STRUCT, MAP, LIST, set the columnLength as DEFAULT_MAX_LENGTH (512).
-              columnLength = FieldSpec.DEFAULT_MAX_LENGTH;
+              columnSet.retainAll(allSegmentColumns);
             }
-            int columnCardinality = columnMetadata.getCardinality();
-            columnLengthMap.merge(column, (double) columnLength, Double::sum);
-            columnCardinalityMap.merge(column, (double) columnCardinality, Double::sum);
-            if (!columnMetadata.isSingleValue()) {
-              int maxNumMultiValues = columnMetadata.getMaxNumberOfMultiValues();
-              maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
-            }
-            for (Map.Entry<IndexType<?, ?, ?>, Long> entry : columnMetadata.getIndexSizeMap().entrySet()) {
-              String indexName = entry.getKey().getId();
-              Map<String, Double> columnIndexSizes = columnIndexSizesMap.getOrDefault(column, new HashMap<>());
-              Double indexSize = columnIndexSizes.getOrDefault(indexName, 0d) + entry.getValue();
-              columnIndexSizes.put(indexName, indexSize);
-              columnIndexSizesMap.put(column, columnIndexSizes);
+            IndexService indexService = IndexService.getInstance();
+
+            // Column stats are scoped to the caller's column filter.
+            for (String column : columnSet) {
+              ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
+              int columnLength = columnMetadata.getLengthOfLongestElement();
+              if (columnLength < 0) {
+                // For raw STRING/BYTES/BIG_DECIMAL column, set the columnLength as the length of the max value.
+                Comparable<?> maxValue = columnMetadata.getMaxValue();
+                if (maxValue instanceof String) {
+                  columnLength = Utf8.encodedLength((String) maxValue);
+                } else if (maxValue instanceof ByteArray) {
+                  columnLength = ((ByteArray) maxValue).length();
+                } else if (maxValue instanceof BigDecimal) {
+                  columnLength = BigDecimalUtils.byteSize((BigDecimal) maxValue);
+                } else {
+                  // For type of STRUCT, MAP, LIST, set the columnLength as DEFAULT_MAX_LENGTH (512).
+                  columnLength = FieldSpec.DEFAULT_MAX_LENGTH;
+                }
+              }
+              int columnCardinality = columnMetadata.getCardinality();
+              columnLengthMap.merge(column, (double) columnLength, Double::sum);
+              columnCardinalityMap.merge(column, (double) columnCardinality, Double::sum);
+              if (!columnMetadata.isSingleValue()) {
+                int maxNumMultiValues = columnMetadata.getMaxNumberOfMultiValues();
+                maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
+              }
+
+              for (int i = 0, n = columnMetadata.getNumIndexes(); i < n; i++) {
+                String indexName = indexService.get(columnMetadata.getIndexType(i)).getId();
+                long value = columnMetadata.getIndexSize(i);
+
+                Map<String, Double> columnIndexSizes = columnIndexSizesMap.getOrDefault(column, new HashMap<>());
+                columnIndexSizes.put(indexName, columnIndexSizes.getOrDefault(indexName, 0d) + value);
+                columnIndexSizesMap.put(column, columnIndexSizes);
+              }
             }
           }
         }
@@ -296,35 +307,117 @@ public class TablesResource {
       }
     }
 
-    // fetch partition to primary key count for realtime tables that have upsert enabled
-    Map<Integer, Long> upsertPartitionToPrimaryKeyCountMap = new HashMap<>();
-    if (tableDataManager instanceof RealtimeTableDataManager) {
-      RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
-      upsertPartitionToPrimaryKeyCountMap = realtimeTableDataManager.getUpsertPartitionToPrimaryKeyCount();
-    }
+    // fetch partition to primary key count for tables that have upsert or dedup enabled
+    Map<Integer, Long> partitionToPrimaryKeyCountMap = tableDataManager.getPartitionToPrimaryKeyCount();
 
-    // construct upsertPartitionToServerPrimaryKeyCountMap to populate in TableMetadataInfo
-    Map<Integer, Map<String, Long>> upsertPartitionToServerPrimaryKeyCountMap = new HashMap<>();
-    upsertPartitionToPrimaryKeyCountMap.forEach(
-        (partition, primaryKeyCount) -> upsertPartitionToServerPrimaryKeyCountMap.put(partition,
+    // construct partitionToServerPrimaryKeyCountMap to populate in TableMetadataInfo
+    Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap = new HashMap<>();
+    partitionToPrimaryKeyCountMap.forEach(
+        (partition, primaryKeyCount) -> partitionToServerPrimaryKeyCountMap.put(partition,
             Map.of(instanceDataManager.getInstanceId(), primaryKeyCount)));
 
-    TableMetadataInfo tableMetadataInfo =
-        new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
-            totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizesMap,
-            upsertPartitionToServerPrimaryKeyCountMap);
+    ServerTableMetadataInfo tableMetadataInfo = ServerTableMetadataInfo.builder(tableDataManager.getTableName())
+        .withDiskSizeInBytes(totalSegmentSizeBytes)
+        .withNumSegments(segmentDataManagers.size())
+        .withNumRows(totalNumRows)
+        .withColumnLengthMap(columnLengthMap)
+        .withColumnCardinalityMap(columnCardinalityMap)
+        .withMaxNumMultiValuesMap(maxNumMultiValuesMap)
+        .withColumnIndexSizeMap(columnIndexSizesMap)
+        .withPartitionToServerPrimaryKeyCountMap(partitionToServerPrimaryKeyCountMap)
+        .build();
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
   }
 
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/compression-stats")
+  @ApiOperation(value = "Read compression statistics for selected table segments", hidden = true)
+  public String getCompressionStats(
+      @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") List<String> columns,
+      @ApiParam(value = "Include per-column compression stats")
+      @DefaultValue("false") @QueryParam("includeColumnCompressionStats") boolean includeColumnCompressionStats,
+      @Nullable TableSegments tableSegments, @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+    if (instanceDataManager == null) {
+      throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableName);
+    if (tableDataManager == null) {
+      throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
+    }
+
+    List<String> requestedSegments = tableSegments != null && tableSegments.getSegments() != null
+        ? tableSegments.getSegments() : List.of();
+    Map<String, SegmentCompressionStatsContribution> contributions = new HashMap<>(requestedSegments.size());
+    for (String segment : requestedSegments) {
+      contributions.put(segment, new SegmentCompressionStatsContribution(segment, false, -1, -1, null));
+    }
+    Pair<TableConfig, ?> cachedPair = tableDataManager.getCachedTableConfigAndSchema();
+    boolean compressionStatsEnabled = cachedPair != null && cachedPair.getLeft() != null
+        && cachedPair.getLeft().getIndexingConfig() != null
+        && cachedPair.getLeft().getIndexingConfig().isCompressionStatsEnabled();
+    if (compressionStatsEnabled && !requestedSegments.isEmpty()) {
+      Set<String> columnFilter = columns.isEmpty() || columns.contains("*") ? null : new HashSet<>(columns);
+      List<String> missingSegments = new ArrayList<>();
+      List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(requestedSegments,
+          missingSegments);
+      try {
+        int columnContributions = 0;
+        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+          for (IndexSegment indexSegment : segmentDataManager.getReportableSegments()) {
+            if (indexSegment instanceof ImmutableSegment immutableSegment) {
+              if (includeColumnCompressionStats) {
+                columnContributions = addColumnContributions(columnContributions, immutableSegment, columnFilter);
+              }
+              SegmentCompressionStatsContribution contribution = SegmentCompressionStatsReader.read(
+                  immutableSegment.getSegmentMetadata(), includeColumnCompressionStats, columnFilter);
+              contributions.put(contribution.getSegmentName(), contribution);
+            }
+          }
+        }
+      } finally {
+        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+          tableDataManager.releaseSegment(segmentDataManager);
+        }
+      }
+    }
+
+    ServerCompressionStatsResponse response = new ServerCompressionStatsResponse(
+        ServerCompressionStatsResponse.CURRENT_METADATA_VERSION, new ArrayList<>(contributions.values()));
+    return ResourceUtils.convertToJsonString(response);
+  }
+
+  static int addColumnContributions(int currentCount, ImmutableSegment segment,
+      @Nullable Set<String> columnFilter) {
+    int additionalCount = 0;
+    if (columnFilter == null) {
+      additionalCount = segment.getSegmentMetadata().getColumnMetadataMap().size();
+    } else {
+      for (String column : columnFilter) {
+        if (segment.getSegmentMetadata().getColumnMetadataMap().containsKey(column)) {
+          additionalCount++;
+        }
+      }
+    }
+    long totalCount = (long) currentCount + additionalCount;
+    if (totalCount > ServerCompressionStatsResponse.MAX_COLUMN_CONTRIBUTIONS_PER_RESPONSE) {
+      throw new WebApplicationException("Compression statistics response exceeds the per-request column "
+          + "contribution limit", Response.Status.REQUEST_ENTITY_TOO_LARGE);
+    }
+    return (int) totalCount;
+  }
+
   @GET
-  @Encoded
   @Path("/tables/{tableName}/indexes")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provide index metadata", notes = "Provide index details for the table")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error",
-      response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response =
-      ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
   })
   public String getTableIndexes(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
@@ -341,16 +434,17 @@ public class TablesResource {
           // REALTIME segments may not have indexes since not all indexes have mutable implementations
           continue;
         }
-        totalSegmentCount++;
-        IndexSegment segment = segmentDataManager.getSegment();
-        segment.getColumnNames().forEach(col -> {
-          columnToIndexesCount.putIfAbsent(col, new HashMap<>());
-          DataSource colDataSource = segment.getDataSource(col);
-          IndexService.getInstance().getAllIndexes().forEach(idxType -> {
-            int count = colDataSource.getIndex(idxType) != null ? 1 : 0;
-            columnToIndexesCount.get(col).merge(idxType.getId(), count, Integer::sum);
+        for (IndexSegment segment : segmentDataManager.getReportableSegments()) {
+          totalSegmentCount++;
+          segment.getColumnNames().forEach(col -> {
+            columnToIndexesCount.putIfAbsent(col, new HashMap<>());
+            DataSource colDataSource = segment.getDataSource(col);
+            IndexService.getInstance().getAllIndexes().forEach(idxType -> {
+              int count = colDataSource.getIndex(idxType) != null ? 1 : 0;
+              columnToIndexesCount.get(col).merge(idxType.getId(), count, Integer::sum);
+            });
           });
-        });
+        }
       }
       TableIndexMetadataResponse tableIndexMetadataResponse =
           new TableIndexMetadataResponse(totalSegmentCount, columnToIndexesCount);
@@ -363,7 +457,6 @@ public class TablesResource {
   }
 
   @GET
-  @Encoded
   @Path("/tables/{tableName}/segments/{segmentName}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provide segment metadata", notes = "Provide segments metadata for the segment on server")
@@ -375,16 +468,13 @@ public class TablesResource {
   public String getSegmentMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
       @PathParam("tableName") String tableName,
-      @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName,
-      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-      List<String> columns, @Context HttpHeaders headers) {
+      @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") List<String> columns,
+      @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    for (int i = 0; i < columns.size(); i++) {
-      columns.set(i, URIUtils.decode(columns.get(i)));
-    }
+    segmentName = URIUtils.decode(segmentName);
 
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
-    segmentName = URIUtils.decode(segmentName);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     if (segmentDataManager == null) {
       throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),
@@ -400,6 +490,52 @@ public class TablesResource {
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
+  }
+
+  @GET
+  @Path("/tables/{tableName}/segments/metadata")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Provide segments metadata", notes = "Provide segments metadata for the segments on server")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
+  })
+  public String getSegmentsMetadata(
+      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
+      @PathParam("tableName") String tableName,
+      @ApiParam(value = "Segments to include (all if not specified)", allowMultiple = true) @QueryParam("segments")
+      List<String> segments,
+      @ApiParam(value = "Columns to include (use '*' to include all)", allowMultiple = true) @QueryParam("columns")
+      List<String> columns,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
+    List<SegmentDataManager> segmentDataManagers;
+    if (!segments.isEmpty()) {
+      segmentDataManagers = tableDataManager.acquireSegments(segments, new ArrayList<>());
+    } else {
+      segmentDataManagers = tableDataManager.acquireAllSegments();
+    }
+    // get metadata for every segment in the list
+    Map<String, JsonNode> response = new HashMap<>();
+    try {
+      for (SegmentDataManager segmentDataManager: segmentDataManagers) {
+        String segmentName = segmentDataManager.getSegmentName();
+        String segmentMetadata = SegmentMetadataFetcher.getSegmentMetadata(segmentDataManager, columns);
+        JsonNode segmentMetadataJson = JsonUtils.stringToJsonNode(segmentMetadata);
+        response.put(segmentName, segmentMetadataJson);
+      }
+    } catch (Exception e) {
+      LOGGER.error("Failed to convert table {} segments to json", tableName);
+      throw new WebApplicationException("Failed to convert segment metadata to json",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    } finally {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
+    }
+    return ResourceUtils.convertToJsonString(response);
   }
 
   @GET
@@ -420,8 +556,7 @@ public class TablesResource {
     try {
       Map<String, String> segmentCrcForTable = new HashMap<>();
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        segmentCrcForTable.put(segmentDataManager.getSegmentName(),
-            segmentDataManager.getSegment().getSegmentMetadata().getCrc());
+        segmentCrcForTable.put(segmentDataManager.getSegmentName(), Long.toString(segmentDataManager.getCrc()));
       }
       return ResourceUtils.convertToJsonString(segmentCrcForTable);
     } catch (Exception e) {
@@ -434,10 +569,11 @@ public class TablesResource {
     }
   }
 
-  // TODO Add access control similar to PinotSegmentUploadDownloadRestletResource for segment download.
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableNameWithType}/{segmentName}")
+  @ServerDataAccess
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.DOWNLOAD_SEGMENT)
   @ApiOperation(value = "Download an immutable segment", notes = "Download an immutable segment in zipped tar format.")
   public Response downloadSegment(
       @ApiParam(value = "Name of the table with type REALTIME OR OFFLINE", required = true, example = "myTable_OFFLINE")
@@ -446,6 +582,7 @@ public class TablesResource {
       @Context HttpHeaders httpHeaders)
       throws Exception {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
+    segmentName = URIUtils.decode(segmentName);
     LOGGER.info("Received a request to download segment {} for table {}", segmentName, tableNameWithType);
     // Validate data access
     ServerResourceUtils.validateDataAccess(_accessControlFactory, tableNameWithType, httpHeaders);
@@ -492,13 +629,13 @@ public class TablesResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableNameWithType}/{segmentName}/validDocIdsBitmap")
+  @ServerDataAccess
   @ApiOperation(value = "Download validDocIds bitmap for an REALTIME immutable segment", notes =
       "Download validDocIds for " + "an immutable segment in bitmap format.")
   public ValidDocIdsBitmapResponse downloadValidDocIdsBitmap(
       @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc ids type")
-      @QueryParam("validDocIdsType") String validDocIdsType,
+      @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
@@ -523,6 +660,7 @@ public class TablesResource {
             String.format("Table %s segment %s is not a immutable segment", tableNameWithType, segmentName),
             Response.Status.BAD_REQUEST);
       }
+      ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
 
       final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdsSnapshotPair =
           getValidDocIds(indexSegment, validDocIdsType);
@@ -532,100 +670,18 @@ public class TablesResource {
       if (validDocIdSnapshot == null) {
         String msg = String.format(
             "Found that validDocIds is missing while fetching validDocIds for table %s segment %s while "
-                + "reading the validDocIds with validDocIdType %s",
-            tableNameWithType, segmentDataManager.getSegmentName(), validDocIdsType);
+                + "reading the validDocIds with validDocIdType %s", tableNameWithType,
+            segmentDataManager.getSegmentName(), validDocIdsType);
         LOGGER.warn(msg);
         throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
       }
-
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
-      return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
-          finalValidDocIdsType, validDocIdsBytes);
+      return new ValidDocIdsBitmapResponse(segmentName, Long.toString(indexSegment.getSegmentMetadata().getCrc()),
+          toReportableDataCrc(indexSegment.getSegmentMetadata().getDataCrc()), finalValidDocIdsType, validDocIdsBytes,
+          _serverInstance.getInstanceDataManager().getInstanceId(), status);
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
-  }
-
-  /**
-   * Download snapshot for the given immutable segment for upsert table. This endpoint is used when get snapshot from
-   * peer to avoid recompute when reload segments.
-   */
-  @Deprecated
-  @GET
-  @Produces(MediaType.APPLICATION_OCTET_STREAM)
-  @Path("/segments/{tableNameWithType}/{segmentName}/validDocIds")
-  @ApiOperation(value = "Download validDocIds for an REALTIME immutable segment", notes = "Download validDocIds for "
-      + "an immutable segment in bitmap format.")
-  public Response downloadValidDocIds(
-      @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
-      @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "Valid doc ids type")
-      @QueryParam("validDocIdsType") String validDocIdsType, @Context HttpHeaders httpHeaders) {
-    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
-    segmentName = URIUtils.decode(segmentName);
-    LOGGER.info("Received a request to download validDocIds for segment {} table {}", segmentName, tableNameWithType);
-    // Validate data access
-    ServerResourceUtils.validateDataAccess(_accessControlFactory, tableNameWithType, httpHeaders);
-
-    TableDataManager tableDataManager =
-        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
-    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
-    if (segmentDataManager == null) {
-      throw new WebApplicationException(
-          String.format("Table %s segment %s does not exist", tableNameWithType, segmentName),
-          Response.Status.NOT_FOUND);
-    }
-
-    try {
-      IndexSegment indexSegment = segmentDataManager.getSegment();
-      if (!(indexSegment instanceof ImmutableSegmentImpl)) {
-        throw new WebApplicationException(
-            String.format("Table %s segment %s is not a immutable segment", tableNameWithType, segmentName),
-            Response.Status.BAD_REQUEST);
-      }
-
-      final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdSnapshotPair =
-          getValidDocIds(indexSegment, validDocIdsType);
-      MutableRoaringBitmap validDocIdSnapshot = validDocIdSnapshotPair.getRight();
-      if (validDocIdSnapshot == null) {
-        String msg = String.format(
-            "Found that validDocIds is missing while fetching validDocIds for table %s segment %s while "
-                + "reading the validDocIds with validDocIdType %s",
-            tableNameWithType, segmentDataManager.getSegmentName(), validDocIdsType);
-        LOGGER.warn(msg);
-        throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
-      }
-
-      byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
-      Response.ResponseBuilder builder = Response.ok(validDocIdsBytes);
-      builder.header(HttpHeaders.CONTENT_LENGTH, validDocIdsBytes.length);
-      return builder.build();
-    } finally {
-      tableDataManager.releaseSegment(segmentDataManager);
-    }
-  }
-
-  @Deprecated
-  @GET
-  @Path("/tables/{tableNameWithType}/validDocIdMetadata")
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Provides segment validDocId metadata", notes = "Provides segment validDocId metadata")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error",
-      response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response =
-      ErrorInfo.class)
-  })
-  public String getValidDocIdsMetadata(
-      @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
-      @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc ids type")
-      @QueryParam("validDocIdsType") String validDocIdsType,
-      @ApiParam(value = "Segment name", allowMultiple = true) @QueryParam("segmentNames") List<String> segmentNames,
-      @Context HttpHeaders headers) {
-    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
-    return ResourceUtils.convertToJsonString(
-        processValidDocIdsMetadata(tableNameWithType, segmentNames, validDocIdsType));
   }
 
   @POST
@@ -633,16 +689,15 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provides segment validDocIds metadata", notes = "Provides segment validDocIds metadata")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error",
-      response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response =
-      ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
   })
   public String getValidDocIdsMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc ids type")
-      @QueryParam("validDocIdsType") String validDocIdsType, TableSegments tableSegments,
-      @Context HttpHeaders headers) {
+      @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") String validDocIdsType,
+      TableSegments tableSegments, @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     List<String> segmentNames = tableSegments.getSegments();
     return ResourceUtils.convertToJsonString(
@@ -655,7 +710,7 @@ public class TablesResource {
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<String> missingSegments = new ArrayList<>();
     int nonImmutableSegmentCount = 0;
-    int missingValidDocIdSnapshotSegmentCount = 0;
+    List<String> missingValidDocsSegments = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers;
     if (segments == null) {
       segmentDataManagers = tableDataManager.acquireAllSegments();
@@ -670,6 +725,8 @@ public class TablesResource {
         // process the remaining available segments.
         LOGGER.warn("Table {} has missing segments {}", tableNameWithType, missingSegments);
       }
+      ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
+
       List<Map<String, Object>> allValidDocIdsMetadata = new ArrayList<>(segmentDataManagers.size());
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         IndexSegment indexSegment = segmentDataManager.getSegment();
@@ -700,7 +757,7 @@ public class TablesResource {
                 segmentDataManager.getSegmentName(), validDocIdsType);
             LOGGER.debug(msg);
           }
-          missingValidDocIdSnapshotSegmentCount++;
+          missingValidDocsSegments.add(segmentDataManager.getSegmentName());
           continue;
         }
 
@@ -712,18 +769,29 @@ public class TablesResource {
         validDocIdsMetadata.put("totalDocs", totalDocs);
         validDocIdsMetadata.put("totalValidDocs", totalValidDocs);
         validDocIdsMetadata.put("totalInvalidDocs", totalInvalidDocs);
-        validDocIdsMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
+        validDocIdsMetadata.put("segmentCrc", Long.toString(indexSegment.getSegmentMetadata().getCrc()));
+        String reportableDataCrc = toReportableDataCrc(indexSegment.getSegmentMetadata().getDataCrc());
+        if (reportableDataCrc != null) {
+          validDocIdsMetadata.put("segmentDataCrc", reportableDataCrc);
+        }
         validDocIdsMetadata.put("validDocIdsType", finalValidDocIdsType);
+        validDocIdsMetadata.put("serverStatus", status);
+        validDocIdsMetadata.put("instanceId", _serverInstance.getInstanceDataManager().getInstanceId());
+        if (segmentDataManager instanceof ImmutableSegmentDataManager) {
+          validDocIdsMetadata.put("segmentSizeInBytes",
+              ((ImmutableSegment) segmentDataManager.getSegment()).getSegmentSizeBytes());
+        }
+        validDocIdsMetadata.put("segmentCreationTimeMillis", indexSegment.getSegmentMetadata().getIndexCreationTime());
         allValidDocIdsMetadata.add(validDocIdsMetadata);
       }
       if (nonImmutableSegmentCount > 0) {
         LOGGER.warn("Table {} has {} non-immutable segments found while processing validDocIdsMetadata",
             tableNameWithType, nonImmutableSegmentCount);
       }
-      if (missingValidDocIdSnapshotSegmentCount > 0) {
-        LOGGER.warn("Found that validDocIds is missing for {} segments while processing validDocIdsMetadata "
-                + "for table {} while reading the validDocIds with validDocIdType {}. ",
-            missingValidDocIdSnapshotSegmentCount, tableNameWithType, validDocIdsType);
+      if (!missingValidDocsSegments.isEmpty()) {
+        LOGGER.warn("Found that validDocIds is missing for segments {} while processing validDocIdsMetadata "
+                + "for table {} while reading the validDocIds with validDocIdType {}. ", missingValidDocsSegments,
+            tableNameWithType, validDocIdsType);
       }
       return allValidDocIdsMetadata;
     } finally {
@@ -733,16 +801,28 @@ public class TablesResource {
     }
   }
 
+  /// The segment's data CRC to report, or null when unavailable (negative).
+  @Nullable
+  private static String toReportableDataCrc(long dataCrc) {
+    return dataCrc >= 0 ? Long.toString(dataCrc) : null;
+  }
+
   private Pair<ValidDocIdsType, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment,
       String validDocIdsTypeStr) {
     if (validDocIdsTypeStr == null) {
       // By default, we read the valid doc ids from snapshot.
-      return Pair.of(ValidDocIdsType.SNAPSHOT, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
+      return Pair.of(ValidDocIdsType.SNAPSHOT,
+          ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     }
     ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
     switch (validDocIdsType) {
       case SNAPSHOT:
-        return Pair.of(validDocIdsType, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
+        return Pair.of(validDocIdsType,
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+      case SNAPSHOT_WITH_DELETE:
+        return Pair.of(validDocIdsType,
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(
+                V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
       case IN_MEMORY:
         return Pair.of(validDocIdsType, indexSegment.getValidDocIds().getMutableRoaringBitmap());
       case IN_MEMORY_WITH_DELETE:
@@ -751,25 +831,24 @@ public class TablesResource {
         // By default, we read the valid doc ids from snapshot.
         LOGGER.warn("Invalid validDocIdsType: {}. Using default validDocIdsType: {}", validDocIdsType,
             ValidDocIdsType.SNAPSHOT);
-        return Pair.of(ValidDocIdsType.SNAPSHOT, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
+        return Pair.of(ValidDocIdsType.SNAPSHOT,
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     }
   }
 
-  /**
-   * Deprecated. Use /segments/{realtimeTableName}/{segmentName}/uploadLLCSegment instead.
-   * Upload a low level consumer segment to segment store and return the segment download url. This endpoint is used
-   * when segment store copy is unavailable for committed low level consumer segments.
-   * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
-   * to upload it.
-   *
-   * @see <a href="https://tinyurl.com/f63ru4sb></a>
-   * @param realtimeTableName table name with type.
-   * @param segmentName name of the segment to be uploaded
-   * @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
-   *                  would be used.
-   * @return full url where the segment is uploaded
-   * @throws Exception if an error occurred during the segment upload.
-   */
+  /// Deprecated. Use /segments/{realtimeTableName}/{segmentName}/uploadLLCSegment instead.
+  /// Upload a low level consumer segment to segment store and return the segment download url. This endpoint is used
+  /// when segment store copy is unavailable for committed low level consumer segments.
+  /// Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
+  /// to upload it.
+  ///
+  /// @see <a href="https://tinyurl.com/f63ru4sb></a>
+  /// @param realtimeTableName table name with type.
+  /// @param segmentName name of the segment to be uploaded
+  /// @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
+  ///                  would be used.
+  /// @return full url where the segment is uploaded
+  /// @throws Exception if an error occurred during the segment upload.
   @Deprecated
   @POST
   @Path("/segments/{realtimeTableName}/{segmentName}/upload")
@@ -785,11 +864,12 @@ public class TablesResource {
   public String uploadLLCSegment(
       @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName")
       String realtimeTableName,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs,
       @Context HttpHeaders headers)
       throws Exception {
     realtimeTableName = DatabaseUtils.translateTableName(realtimeTableName, headers);
+    segmentName = URIUtils.decode(segmentName);
     LOGGER.info("Received a request to upload low level consumer segment {} for table {}", segmentName,
         realtimeTableName);
 
@@ -819,60 +899,34 @@ public class TablesResource {
 
     File segmentTarFile = null;
     try {
-      // Create the tar.gz segment file in the server's segmentTarUploadDir folder with a unique file name.
-      File segmentTarUploadDir =
-          new File(_serverInstance.getInstanceDataManager().getSegmentFileDirectory(), SEGMENT_UPLOAD_DIR);
-      segmentTarUploadDir.mkdir();
-
-      segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(segmentTarUploadDir,
-          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
-          "Invalid table / segment name: %s, %s", tableNameWithType, segmentName);
-
-      TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
-          segmentTarFile);
-
-      // Use segment uploader to upload the segment tar file to segment store and return the segment download url.
-      SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();
-      URI segmentDownloadUrl;
-      if (timeoutMs <= 0) {
-        // Use default timeout if passed timeout is not positive
-        segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName));
-      } else {
-        segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName), timeoutMs);
-      }
-      if (segmentDownloadUrl == null) {
-        throw new WebApplicationException(
-            String.format("Failed to upload table %s segment %s to segment store", realtimeTableName, segmentName),
-            Response.Status.INTERNAL_SERVER_ERROR);
-      }
-      return segmentDownloadUrl.toString();
+      segmentTarFile = createSegmentTarFile(tableDataManager, segmentName);
+      return uploadSegment(segmentTarFile, tableNameWithType, segmentName, timeoutMs);
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);
     }
   }
 
-  /**
-   * Upload a low level consumer segment to segment store and return the segment download url, crc and
-   * other segment metadata. This endpoint is used when segment store copy is unavailable for committed
-   * low level consumer segments.
-   * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
-   * to upload it.
-   *
-   * @see <a href="https://tinyurl.com/f63ru4sb></a>
-   * @param realtimeTableNameWithType table name with type.
-   * @param segmentName name of the segment to be uploaded
-   * @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
-   *                  would be used.
-   * @return full url where the segment is uploaded, crc, segmentName. Can add more segment metadata in the future.
-   * @throws Exception if an error occurred during the segment upload.
-   */
+  /// Upload a low level consumer segment to segment store and return the segment download url, crc and
+  /// other segment metadata. This endpoint is used when segment store copy is unavailable for committed
+  /// low level consumer segments.
+  /// Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
+  /// to upload it.
+  ///
+  /// @see <a href="https://tinyurl.com/f63ru4sb></a>
+  /// @param realtimeTableNameWithType table name with type.
+  /// @param segmentName name of the segment to be uploaded
+  /// @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
+  ///                  would be used.
+  /// @return full url where the segment is uploaded, crc, segmentName. Can add more segment metadata in the future.
+  /// @throws Exception if an error occurred during the segment upload.
+  @Deprecated
   @POST
   @Path("/segments/{realtimeTableNameWithType}/{segmentName}/uploadLLCSegment")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Upload a low level consumer segment to segment store and return the segment download url,"
       + "crc and other segment metadata",
-      notes = "Upload a low level consumer segment to segment store and return the segment download url, crc "
+      notes = "Upload a low level consumer segment to segment store and return the segment download url, crc, data crc "
           + "and other segment metadata")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -883,11 +937,12 @@ public class TablesResource {
   public TableLLCSegmentUploadResponse uploadLLCSegmentV2(
       @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableNameWithType")
       String realtimeTableNameWithType,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs,
       @Context HttpHeaders headers)
       throws Exception {
     realtimeTableNameWithType = DatabaseUtils.translateTableName(realtimeTableNameWithType, headers);
+    segmentName = URIUtils.decode(segmentName);
     LOGGER.info("Received a request to upload low level consumer segment {} for table {}", segmentName,
         realtimeTableNameWithType);
 
@@ -913,44 +968,137 @@ public class TablesResource {
           String.format("Table %s segment %s does not exist", realtimeTableNameWithType, segmentName),
           Response.Status.NOT_FOUND);
     }
-    String crc = segmentDataManager.getSegment().getSegmentMetadata().getCrc();
 
     File segmentTarFile = null;
     try {
-      // Create the tar.gz segment file in the server's segmentTarUploadDir folder with a unique file name.
-      File segmentTarUploadDir =
-          new File(_serverInstance.getInstanceDataManager().getSegmentFileDirectory(), SEGMENT_UPLOAD_DIR);
-      segmentTarUploadDir.mkdir();
-
-      segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(segmentTarUploadDir,
-          realtimeTableNameWithType + "_" + segmentName + "_" + UUID.randomUUID()
-              + TarCompressionUtils.TAR_GZ_FILE_EXTENSION, "Invalid table / segment name: %s, %s",
-          realtimeTableNameWithType, segmentName);
-
-      TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
-          segmentTarFile);
-
-      // Use segment uploader to upload the segment tar file to segment store and return the segment download url.
-      SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();
-      URI segmentDownloadUrl;
-      if (timeoutMs <= 0) {
-        // Use default timeout if passed timeout is not positive
-        segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName));
-      } else {
-        segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName), timeoutMs);
-      }
-      if (segmentDownloadUrl == null) {
-        throw new WebApplicationException(
-            String.format("Failed to upload table %s segment %s to segment store", realtimeTableNameWithType,
-                segmentName), Response.Status.INTERNAL_SERVER_ERROR);
-      }
-      return new TableLLCSegmentUploadResponse(segmentName, Long.parseLong(crc), segmentDownloadUrl.toString());
+      segmentTarFile = createSegmentTarFile(tableDataManager, segmentName);
+      String downloadUrl = uploadSegment(segmentTarFile, realtimeTableNameWithType, segmentName, timeoutMs);
+      return new TableLLCSegmentUploadResponse(
+          segmentName,
+          segmentDataManager.getSegment().getSegmentMetadata().getCrc(),
+          segmentDataManager.getSegment().getSegmentMetadata().getDataCrc(),
+          downloadUrl);
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);
     }
   }
 
+  /// Upload a real-time committed segment to segment store and return the segment ZK metadata in json format.
+  /// This endpoint is used when segment store copy is unavailable for real-time committed segments.
+  /// Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment to
+  /// upload it.
+  ///
+  /// @see <a href="https://tinyurl.com/f63ru4sb></a>
+  /// @param realtimeTableName table name with type.
+  /// @param segmentName name of the segment to be uploaded
+  /// @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
+  ///                  would be used.
+  /// @return segment ZK metadata in json format.
+  /// @throws Exception if an error occurred during the segment upload.
+  @POST
+  @Path("/segments/{realtimeTableName}/{segmentName}/uploadCommittedSegment")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Upload a real-time committed segment to segment store and return the segment ZK metadata",
+      notes = "Upload a real-time committed segment to segment store and return the segment ZK metadata")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Bad request", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class)
+  })
+  public String uploadCommittedSegment(
+      @ApiParam(value = "Name of the real-time table", required = true) @PathParam("realtimeTableName")
+      String realtimeTableName,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs, @Context HttpHeaders headers)
+      throws Exception {
+    realtimeTableName = DatabaseUtils.translateTableName(realtimeTableName, headers);
+    segmentName = URIUtils.decode(segmentName);
+    LOGGER.info("Received a request to upload committed segment: {} for table: {}", segmentName, realtimeTableName);
+
+    // Check it's real-time table
+    if (!TableNameBuilder.isRealtimeTableResource(realtimeTableName)) {
+      throw new WebApplicationException(
+          "Cannot upload committed segment for a non-realtime table: " + realtimeTableName,
+          Response.Status.BAD_REQUEST);
+    }
+
+    // Check the segment is low level consumer segment
+    if (!LLCSegmentName.isLLCSegment(segmentName)) {
+      throw new WebApplicationException(String.format("Segment: %s is not a low level consumer segment", segmentName),
+          Response.Status.BAD_REQUEST);
+    }
+
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, realtimeTableName);
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+    if (segmentDataManager == null) {
+      throw new WebApplicationException(
+          String.format("Failed to find table: %s, segment: %s", realtimeTableName, segmentName),
+          Response.Status.NOT_FOUND);
+    }
+    if (!(segmentDataManager instanceof ImmutableSegmentDataManager)) {
+      throw new WebApplicationException(
+          String.format("Table: %s, segment: %s hasn't been sealed", realtimeTableName, segmentName),
+          Response.Status.NOT_FOUND);
+    }
+
+    File segmentTarFile = null;
+    try {
+      segmentTarFile = createSegmentTarFile(tableDataManager, segmentName);
+      String downloadUrl = uploadSegment(segmentTarFile, realtimeTableName, segmentName, timeoutMs);
+
+      // Fetch existing segment ZK Metadata
+      SegmentZKMetadata segmentZKMetadata =
+          ZKMetadataProvider.getSegmentZKMetadata(_serverInstance.getHelixManager().getHelixPropertyStore(),
+              realtimeTableName, segmentName);
+      Preconditions.checkState(segmentZKMetadata != null,
+          "Failed to find segment ZK metadata for table: %s, segment: %s", realtimeTableName, segmentName);
+
+      // Update the Segment ZK Metadata with the segment metadata present on the server
+      ImmutableSegment segment = ((ImmutableSegmentDataManager) segmentDataManager).getSegment();
+      SegmentZKMetadataUtils.updateCommittingSegmentZKMetadata(realtimeTableName, segmentZKMetadata,
+          segment.getSegmentMetadata(), downloadUrl, segment.getSegmentSizeBytes(), segmentZKMetadata.getEndOffset());
+      return segmentZKMetadata.toJsonString();
+    } finally {
+      FileUtils.deleteQuietly(segmentTarFile);
+      tableDataManager.releaseSegment(segmentDataManager);
+    }
+  }
+
+  /// Creates a tar.gz segment file in the server's segmentTarUploadDir folder with a unique file name.
+  private File createSegmentTarFile(TableDataManager tableDataManager, String segmentName)
+      throws IOException {
+    File segmentTarUploadDir =
+        new File(_serverInstance.getInstanceDataManager().getSegmentFileDirectory(), SEGMENT_UPLOAD_DIR);
+    segmentTarUploadDir.mkdir();
+    String tableNameWithType = tableDataManager.getTableName();
+    File segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(segmentTarUploadDir,
+        tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
+        "Invalid table / segment name: %s, %s", tableNameWithType, segmentName);
+    TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
+        segmentTarFile);
+    return segmentTarFile;
+  }
+
+  /// Uploads a segment tar file to the segment store and returns the segment download url.
+  private String uploadSegment(File segmentTarFile, String tableNameWithType, String segmentName, int timeoutMs) {
+    SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();
+    URI segmentDownloadUrl;
+    if (timeoutMs <= 0) {
+      // Use default timeout if passed timeout is not positive
+      segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName));
+    } else {
+      segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName), timeoutMs);
+    }
+    if (segmentDownloadUrl == null) {
+      throw new WebApplicationException(
+          String.format("Failed to upload table: %s, segment: %s to segment store", tableNameWithType, segmentName),
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return segmentDownloadUrl.toString();
+  }
 
   @GET
   @Path("tables/{realtimeTableName}/consumingSegmentsInfo")
@@ -977,11 +1125,17 @@ public class TablesResource {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof RealtimeSegmentDataManager) {
           RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-          Map<String, ConsumerPartitionState> partitionStateMap =
-              realtimeSegmentDataManager.getConsumerPartitionState();
+          StreamMetadataProvider streamMetadataProvider =
+              ((RealtimeTableDataManager) (tableDataManager)).getStreamMetadataProvider(realtimeSegmentDataManager);
+          StreamPartitionMsgOffset latestMsgOffset =
+              RealtimeSegmentMetadataUtils.fetchLatestStreamOffset(realtimeSegmentDataManager, streamMetadataProvider);
+          Map<String, ConsumerPartitionState> partitionIdToStateMap =
+              realtimeSegmentDataManager.getConsumerPartitionState(latestMsgOffset);
           Map<String, String> recordsLagMap = new HashMap<>();
           Map<String, String> availabilityLagMsMap = new HashMap<>();
-          realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap).forEach((k, v) -> {
+          Map<String, PartitionLagState> partitionToLagState =
+              streamMetadataProvider.getCurrentPartitionLagState(partitionIdToStateMap);
+          partitionToLagState.forEach((k, v) -> {
             recordsLagMap.put(k, v.getRecordsLag());
             availabilityLagMsMap.put(k, v.getAvailabilityLagMs());
           });
@@ -990,7 +1144,8 @@ public class TablesResource {
           segmentConsumerInfoList.add(new SegmentConsumerInfo(segmentDataManager.getSegmentName(),
               realtimeSegmentDataManager.getConsumerState().toString(),
               realtimeSegmentDataManager.getLastConsumedTimestamp(), partitiionToOffsetMap,
-              new SegmentConsumerInfo.PartitionOffsetInfo(partitiionToOffsetMap, partitionStateMap.entrySet().stream()
+              new SegmentConsumerInfo.PartitionOffsetInfo(partitiionToOffsetMap, partitionIdToStateMap.entrySet()
+                  .stream()
                   .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())),
                   recordsLagMap, availabilityLagMsMap)));
         }
@@ -1049,12 +1204,11 @@ public class TablesResource {
                 String invalidReason = String.format(
                     "Segment %s is in ONLINE state, but segmentDataManager is null", segmentName);
                 return new TableSegmentValidationInfo(false, invalidReason, -1);
-              } else if (!segmentDataManager.getSegment().getSegmentMetadata().getCrc()
-                  .equals(String.valueOf(zkMetadata.getCrc()))) {
+              } else if (segmentDataManager.getCrc() != zkMetadata.getCrc()) {
                 String invalidReason = String.format(
                     "Segment %s is in ONLINE state, but has CRC mismatch. "
                         + "zk_metadata_crc=%s, segment_data_manager_crc=%s",
-                    segmentName, zkMetadata.getCrc(), segmentDataManager.getSegment().getSegmentMetadata().getCrc());
+                    segmentName, zkMetadata.getCrc(), segmentDataManager.getCrc());
                 return new TableSegmentValidationInfo(false, invalidReason, -1);
               }
               maxEndTimeMs = Math.max(maxEndTimeMs, zkMetadata.getEndTimeMs());
@@ -1111,10 +1265,118 @@ public class TablesResource {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     try {
-      Pair<TableConfig, Schema> tableConfigSchemaPair = tableDataManager.fetchTableConfigAndSchema();
-      return tableDataManager.getStaleSegments(tableConfigSchemaPair.getLeft(), tableConfigSchemaPair.getRight());
+      return tableDataManager.getStaleSegments();
     } catch (Exception e) {
       throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @DELETE
+  @Path("/tables/{tableName}/ingestionMetrics")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Remove ingestion metrics for partition(s)", notes = "Removes ingestion-related metrics for "
+      + "the given table. If no partitionId is provided, metrics for all partitions hosted by this server will be "
+      + "removed.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Successfully removed ingestion metrics"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
+  public String removeIngestionMetrics(
+      @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
+      @Nullable @ApiParam(value = "List of partition Ids (optional)") @QueryParam("partitionId")
+      Set<Integer> partitionIds,
+      @Context HttpHeaders headers) {
+    try {
+      tableName = DatabaseUtils.translateTableName(tableName, headers);
+    } catch (Exception e) {
+      throw new WebApplicationException(e.getMessage(), Response.Status.BAD_REQUEST);
+    }
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    try {
+      if (tableDataManager instanceof RealtimeTableDataManager) {
+        RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
+        Set<Integer> removedPartitionIds = realtimeTableDataManager.stopTrackingPartitionIngestionDelay(partitionIds);
+        return "Successfully removed ingestion metrics for partitions: " + removedPartitionIds + " in table: "
+            + tableNameWithType;
+      } else {
+        throw new WebApplicationException(
+            "TableDataManager is not RealtimeTableDataManager for table: " + tableNameWithType,
+            Response.Status.BAD_REQUEST);
+      }
+    } catch (Exception e) {
+      throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  /// Initiates an on‑demand page‑cache warm‑up for the given table.
+  ///
+  /// <p><b>Request body</b> — JSON object containing:</p>
+  /// <pre>{@code
+  /// {
+  ///   "queries":  ["SELECT COUNT(*) FROM myTable", "SELECT SUM(col) FROM myTable"],
+  ///   "segments": ["myTable_0_99_OFFLINE", "myTable_100_199_OFFLINE"]
+  /// }
+  /// }</pre>
+  ///
+  /// <ul>
+  ///   <li><code>queries</code> – List of queries execute. Each is prefixed with
+  ///       <code>SET isSecondaryWorkload=true;</code> on the server so it runs on the secondary
+  ///       workload queue, if that is configured</li>
+  ///   <li><code>segments</code> – List of segment names to warm up. An empty list means all segments.</li>
+  /// </ul>
+  ///
+  /// <h4>Concurrency</h4>
+  /// Only <em>one</em> warm‑up per table can run at a time. If another warm‑up is already in progress,
+  /// the endpoint returns <strong>409 CONFLICT</strong>.
+  ///
+  /// @param tableNameWithType Fully‑qualified table name (e.g. {@code myTable_OFFLINE})
+  /// @param requestString     Raw JSON payload described above
+  /// @return {@link Response} – 200 OK on success; 400 BAD REQUEST for malformed payload; 409 CONFLICT if
+  ///         a warm‑up is already running; 500 INTERNAL_SERVER_ERROR for unexpected failures.
+  @POST
+  @Path("/tables/{tableNameWithType}/triggerWarmup")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Trigger page cache warmup",
+      notes = "Initiates page cache warmup process for provided table and segments by executing the provided queries.")
+  public Response triggerPageCacheWarmup(
+      @ApiParam(required = true) @PathParam("tableNameWithType") String tableNameWithType, String requestString
+  ) {
+    LOGGER.info("Received request to initiate page cache warmup with request: {}", requestString);
+    // Atomically claim the table to prevent concurrent warmup requests; add() returns false if already claimed.
+    if (!_tablesWithWarmupInProgress.add(tableNameWithType)) {
+      String message = String.format("Page cache warmup is already in progress for table: %s. ", tableNameWithType);
+      LOGGER.warn(message);
+      return Response.status(Response.Status.CONFLICT).entity(message).build();
+    }
+    try {
+      PageCacheWarmupRequest warmupRequest = JsonUtils.stringToObject(requestString, PageCacheWarmupRequest.class);
+      // Validate the parsed request
+      if (warmupRequest.getQueries() == null || warmupRequest.getQueries().isEmpty()) {
+        throw new BadRequestException("Queries cannot be null or empty.");
+      } else if (warmupRequest.getSegments() == null || warmupRequest.getSegments().isEmpty()) {
+        throw new BadRequestException("Segments cannot be null or empty.");
+      }
+      // Trigger the warmup
+      _serverInstance.getPageCacheWarmupServerQueryExecutor().startWarmupOnRefresh(tableNameWithType,
+          warmupRequest.getQueries(), warmupRequest.getSegments());
+      String responseString = String.format("Successfully triggered page cache warmup for table: %s",
+          tableNameWithType);
+      LOGGER.info(responseString);
+      return Response.ok(responseString).build();
+    } catch (BadRequestException | JsonProcessingException e) {
+      String errorMessage = String.format("Invalid request: %s, error: %s", requestString, e.getMessage());
+      LOGGER.error(errorMessage, e);
+      return Response.status(Response.Status.BAD_REQUEST).entity(errorMessage).build();
+    } catch (Exception e) {
+      String errorMessage = String.format("Failed to trigger page cache error on refresh: %s", e);
+      LOGGER.error(errorMessage, e);
+      return Response.serverError().entity(errorMessage).build();
+    } finally {
+      // Only the request that claimed the table clears the flag.
+      _tablesWithWarmupInProgress.remove(tableNameWithType);
     }
   }
 }

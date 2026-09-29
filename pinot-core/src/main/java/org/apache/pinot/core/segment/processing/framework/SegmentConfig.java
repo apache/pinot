@@ -25,9 +25,7 @@ import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 
 
-/**
- * Config for the final segment generation phase of the SegmentProcessorFramework
- */
+/// Config for the final segment generation phase of the SegmentProcessorFramework
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentConfig {
   public static final int DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 5_000_000;
@@ -38,6 +36,7 @@ public class SegmentConfig {
   private final String _segmentNamePostfix;
   private final String _fixedSegmentName;
   private final long _segmentMapperFileSizeThresholdInBytes;
+  private final int _maxDiskUsagePercentage;
 
   @JsonCreator
   private SegmentConfig(@JsonProperty(value = "maxNumRecordsPerSegment", required = true) int maxNumRecordsPerSegment,
@@ -45,7 +44,8 @@ public class SegmentConfig {
       @JsonProperty("segmentNamePostfix") @Nullable String segmentNamePostfix,
       @JsonProperty("fixedSegmentName") @Nullable String fixedSegmentName,
       @JsonProperty(value = "segmentMapperFileSizeThresholdInBytes", required = true)
-      long segmentMapperFileSizeThresholdInBytes) {
+      long segmentMapperFileSizeThresholdInBytes,
+      @JsonProperty("maxDiskUsagePercentage") int maxDiskUsagePercentage) {
     Preconditions.checkState(maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
     Preconditions.checkState(segmentMapperFileSizeThresholdInBytes > 0, "Intermediate file size threshold must be > 0");
     _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
@@ -53,11 +53,10 @@ public class SegmentConfig {
     _segmentNamePostfix = segmentNamePostfix;
     _fixedSegmentName = fixedSegmentName;
     _segmentMapperFileSizeThresholdInBytes = segmentMapperFileSizeThresholdInBytes;
+    _maxDiskUsagePercentage = maxDiskUsagePercentage;
   }
 
-  /**
-   * The max number of records allowed per segment
-   */
+  /// The max number of records allowed per segment
   public int getMaxNumRecordsPerSegment() {
     return _maxNumRecordsPerSegment;
   }
@@ -81,12 +80,15 @@ public class SegmentConfig {
     return _segmentMapperFileSizeThresholdInBytes;
   }
 
-  /**
-   * Builder for SegmentConfig
-   */
+  public int getMaxDiskUsagePercentage() {
+    return _maxDiskUsagePercentage;
+  }
+
+  /// Builder for SegmentConfig
   public static class Builder {
     private int _maxNumRecordsPerSegment = DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT;
     private long _segmentMapperFileSizeThresholdInBytes = DEFAULT_SEGMENT_MAPPER_FILE_SIZE_IN_BYTES;
+    private int _maxDiskUsagePercentage = 100;
     private String _segmentNamePrefix;
     private String _segmentNamePostfix;
     private String _fixedSegmentName;
@@ -115,13 +117,17 @@ public class SegmentConfig {
       _segmentMapperFileSizeThresholdInBytes = segmentMapperFileSizeThresholdInBytes;
       return this;
     }
+    public Builder setMaxDiskUsagePercentage(int maxDiskUsagePercentage) {
+      _maxDiskUsagePercentage = maxDiskUsagePercentage;
+      return this;
+    }
 
     public SegmentConfig build() {
       Preconditions.checkState(_maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
       Preconditions.checkState(_segmentMapperFileSizeThresholdInBytes > 0,
           "Intermediate file size threshold must be > 0");
       return new SegmentConfig(_maxNumRecordsPerSegment, _segmentNamePrefix, _segmentNamePostfix, _fixedSegmentName,
-          _segmentMapperFileSizeThresholdInBytes);
+          _segmentMapperFileSizeThresholdInBytes, _maxDiskUsagePercentage);
     }
   }
 
@@ -129,6 +135,7 @@ public class SegmentConfig {
   public String toString() {
     return "SegmentConfig{" + "_maxNumRecordsPerSegment=" + _maxNumRecordsPerSegment
         + ", _segmentMapperFileSizeThresholdInBytes=" + _segmentMapperFileSizeThresholdInBytes
+        + ", _maxDiskUsagePercentage=" + _maxDiskUsagePercentage
         + ", _segmentNamePrefix='" + _segmentNamePrefix + '\'' + ", _segmentNamePostfix='" + _segmentNamePostfix + '\''
         + ", _fixedSegmentName='" + _fixedSegmentName + '\'' + '}';
   }

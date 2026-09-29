@@ -22,18 +22,16 @@ import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
-import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.FunctionUtils;
+import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/**
- * Post-aggregation function on the annotated scalar function.
- */
+/// Post-aggregation function on the annotated scalar function.
 public class PostAggregationFunction {
-  private final FunctionInvoker _functionInvoker;
+  private final QueryFunctionInvoker _functionInvoker;
   private final ColumnDataType _resultType;
   @Nullable
   private PinotDataType[] _argumentTypes;
@@ -49,7 +47,7 @@ public class PostAggregationFunction {
         throw new IllegalArgumentException("Unsupported function: " + functionName);
       }
     }
-    _functionInvoker = new FunctionInvoker(functionInfo);
+    _functionInvoker = new QueryFunctionInvoker(functionInfo);
     ColumnDataType resultType = FunctionUtils.getColumnDataType(_functionInvoker.getResultClass());
     // Handle unrecognized result class with STRING
     _resultType = resultType != null ? resultType : ColumnDataType.STRING;
@@ -68,36 +66,24 @@ public class PostAggregationFunction {
       }
       _argumentTypes = new PinotDataType[numArguments];
       for (int i = 0; i < numArguments; i++) {
-        _argumentTypes[i] = PinotDataType.getPinotDataTypeForExecution(argumentTypes[i]);
+        _argumentTypes[i] = argumentTypes[i].toPinotDataType();
       }
     }
   }
 
-  /**
-   * Returns the ColumnDataType of the result.
-   */
+  /// Returns the ColumnDataType of the result.
   public ColumnDataType getResultType() {
     return _resultType;
   }
 
-  /**
-   * Invoke the function with the given arguments.
-   * NOTE: The passed in arguments could be modified during the type conversion.
-   */
+  /// Invoke the function with the given arguments.
+  /// NOTE: The passed in arguments could be modified during the type conversion.
   public Object invoke(Object[] arguments) {
     Object result;
     if (_functionInvoker.getMethod().isVarArgs()) {
       result = _functionInvoker.invoke(new Object[]{arguments});
     } else {
-      int numArguments = arguments.length;
-      PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
-      for (int i = 0; i < numArguments; i++) {
-        PinotDataType parameterType = parameterTypes[i];
-        PinotDataType argumentType = _argumentTypes[i];
-        if (parameterType != argumentType) {
-          arguments[i] = parameterType.convert(arguments[i], argumentType);
-        }
-      }
+      _functionInvoker.convertTypes(arguments);
       result = _functionInvoker.invoke(arguments);
     }
 

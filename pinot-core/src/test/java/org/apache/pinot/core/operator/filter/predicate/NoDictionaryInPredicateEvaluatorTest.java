@@ -39,14 +39,13 @@ import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit test for all implementations of no-dictionary based predicate evaluators.
- */
+/// Unit test for all implementations of no-dictionary based predicate evaluators.
 public class NoDictionaryInPredicateEvaluatorTest {
   private static final ExpressionContext COLUMN_EXPRESSION = ExpressionContext.forIdentifier("column");
   private static final int NUM_PREDICATE_VALUES = 100;
@@ -251,7 +250,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
     Set<String> valueSet = new HashSet<>();
 
     for (int i = 0; i < 100; i++) {
-      String value = RandomStringUtils.random(MAX_STRING_LENGTH);
+      String value = RandomStringUtils.secure().next(MAX_STRING_LENGTH);
       stringValues.add(value);
       valueSet.add(value);
     }
@@ -270,7 +269,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
     }
 
     for (int i = 0; i < 100; i++) {
-      String value = RandomStringUtils.random(MAX_STRING_LENGTH);
+      String value = RandomStringUtils.secure().next(MAX_STRING_LENGTH);
       Assert.assertEquals(inPredicateEvaluator.applySV(value), valueSet.contains(value));
       Assert.assertEquals(notInPredicateEvaluator.applySV(value), !valueSet.contains(value));
     }
@@ -292,8 +291,8 @@ public class NoDictionaryInPredicateEvaluatorTest {
 
     for (int i = 0; i < 100; i++) {
       String jsonString = String.format(jsonStringTemplate,
-          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH),
-          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH));
+          RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH),
+          RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH));
       jsonValues.add(jsonString);
       jsonValueSet.add(jsonString);
     }
@@ -313,8 +312,8 @@ public class NoDictionaryInPredicateEvaluatorTest {
 
     for (int i = 0; i < 100; i++) {
       String randomJsonValue = String.format(jsonStringTemplate,
-          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH),
-          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH));
+          RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH),
+          RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH));
       Assert.assertEquals(inPredicateEvaluator.applySV(randomJsonValue), jsonValueSet.contains(randomJsonValue));
       Assert.assertEquals(notInPredicateEvaluator.applySV(randomJsonValue), !jsonValueSet.contains(randomJsonValue));
     }
@@ -333,7 +332,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
     Set<byte[]> valueSet = new HashSet<>();
 
     for (int i = 0; i < 100; i++) {
-      byte[] value = RandomStringUtils.random(MAX_STRING_LENGTH).getBytes();
+      byte[] value = RandomStringUtils.secure().next(MAX_STRING_LENGTH).getBytes();
       valueSet.add(value);
       stringValues.add(BytesUtils.toHexString(value));
     }
@@ -352,7 +351,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
     }
 
     for (int i = 0; i < 100; i++) {
-      byte[] value = RandomStringUtils.random(MAX_STRING_LENGTH).getBytes();
+      byte[] value = RandomStringUtils.secure().next(MAX_STRING_LENGTH).getBytes();
       Assert.assertEquals(inPredicateEvaluator.applySV(value), valueSet.contains(value));
       Assert.assertEquals(notInPredicateEvaluator.applySV(value), !valueSet.contains(value));
     }
@@ -364,5 +363,77 @@ public class NoDictionaryInPredicateEvaluatorTest {
 
     Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
     Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+  }
+
+  @Test
+  public void testUuidPredicateEvaluators() {
+    List<String> uuidStrings = new ArrayList<>(NUM_PREDICATE_VALUES);
+    Set<String> uuidStringSet = new HashSet<>();
+
+    for (int i = 0; i < NUM_PREDICATE_VALUES; i++) {
+      String uuidString = java.util.UUID.randomUUID().toString();
+      uuidStrings.add(uuidString);
+      uuidStringSet.add(uuidString);
+    }
+
+    InPredicate inPredicate = new InPredicate(COLUMN_EXPRESSION, uuidStrings);
+    PredicateEvaluator inPredicateEvaluator =
+        InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.UUID);
+
+    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_EXPRESSION, uuidStrings);
+    PredicateEvaluator notInPredicateEvaluator =
+        NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.UUID);
+
+    // getDataType() reports the type applySV consumes, not the column's logical type -- exactly as a TIMESTAMP
+    // column's evaluator reports LONG. UUID literals are converted to their 16-byte stored form up front, so the
+    // BYTES raw evaluator is reused as-is and reports BYTES.
+    Assert.assertEquals(inPredicateEvaluator.getDataType(), FieldSpec.DataType.BYTES);
+    Assert.assertEquals(notInPredicateEvaluator.getDataType(), FieldSpec.DataType.BYTES);
+
+    for (String uuidString : uuidStringSet) {
+      byte[] uuidBytes = UuidUtils.toBytes(uuidString);
+      Assert.assertTrue(inPredicateEvaluator.applySV(uuidBytes));
+      Assert.assertFalse(notInPredicateEvaluator.applySV(uuidBytes));
+    }
+
+    for (int i = 0; i < NUM_PREDICATE_VALUES; i++) {
+      byte[] value = UuidUtils.toBytes(java.util.UUID.randomUUID());
+      boolean expected = uuidStringSet.contains(UuidUtils.toString(value));
+      Assert.assertEquals(inPredicateEvaluator.applySV(value), expected);
+      Assert.assertEquals(notInPredicateEvaluator.applySV(value), !expected);
+    }
+  }
+
+  /// The BYTES/UUID raw evaluators key their matching set on the raw `byte[]` so that `applySV` does not
+  /// wrap every scanned value. That only works if the set compares by *content*: with identity semantics a
+  /// scanned array would never match a predicate array, and IN would silently return nothing while NOT IN returned
+  /// everything. Probe with arrays that are equal but deliberately not the same instance.
+  @Test
+  public void testBytesAndUuidPredicatesMatchByValueNotIdentity() {
+    String uuidString = "550e8400-e29b-41d4-a716-446655440000";
+    String bytesHex = "0a1b2c3d";
+
+    for (Object[] testCase : new Object[][]{
+        {FieldSpec.DataType.UUID, uuidString, UuidUtils.toBytes(uuidString)},
+        {FieldSpec.DataType.BYTES, bytesHex, BytesUtils.toBytes(bytesHex)}
+    }) {
+      FieldSpec.DataType dataType = (FieldSpec.DataType) testCase[0];
+      List<String> values = List.of((String) testCase[1]);
+      byte[] probe = ((byte[]) testCase[2]).clone();
+
+      PredicateEvaluator inEvaluator = InPredicateEvaluatorFactory.newRawValueBasedEvaluator(
+          new InPredicate(COLUMN_EXPRESSION, values), dataType);
+      PredicateEvaluator notInEvaluator = NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(
+          new NotInPredicate(COLUMN_EXPRESSION, values), dataType);
+
+      Assert.assertTrue(inEvaluator.applySV(probe), dataType + " IN must match an equal-but-distinct array");
+      Assert.assertFalse(notInEvaluator.applySV(probe),
+          dataType + " NOT IN must not match an equal-but-distinct array");
+
+      byte[] different = probe.clone();
+      different[0] ^= 0xff;
+      Assert.assertFalse(inEvaluator.applySV(different), dataType + " IN must not match a different value");
+      Assert.assertTrue(notInEvaluator.applySV(different), dataType + " NOT IN must match a different value");
+    }
   }
 }

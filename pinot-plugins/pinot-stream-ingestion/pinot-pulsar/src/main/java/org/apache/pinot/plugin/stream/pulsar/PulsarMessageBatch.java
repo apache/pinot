@@ -23,19 +23,19 @@ import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.MessageBatch;
 
 
-/**
- * A {@link MessageBatch} for collecting messages from pulsar topic
- */
+/// A [MessageBatch] for collecting messages from pulsar topic
 public class PulsarMessageBatch implements MessageBatch<byte[]> {
   private final List<BytesStreamMessage> _messages;
   private final MessageIdStreamOffset _offsetOfNextBatch;
   private final boolean _endOfTopic;
+  private final long _sizeInBytes;
 
   public PulsarMessageBatch(List<BytesStreamMessage> messages, MessageIdStreamOffset offsetOfNextBatch,
-      boolean endOfTopic) {
+      boolean endOfTopic, long sizeInBytes) {
     _messages = messages;
     _offsetOfNextBatch = offsetOfNextBatch;
     _endOfTopic = endOfTopic;
+    _sizeInBytes = sizeInBytes;
   }
 
   @Override
@@ -56,5 +56,10 @@ public class PulsarMessageBatch implements MessageBatch<byte[]> {
   @Override
   public boolean isEndOfPartitionGroup() {
     return _endOfTopic;
+  }
+
+  @Override
+  public long getSizeInBytes() {
+    return _sizeInBytes;
   }
 }

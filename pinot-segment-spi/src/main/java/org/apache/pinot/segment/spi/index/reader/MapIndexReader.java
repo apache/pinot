@@ -23,46 +23,20 @@ import java.util.Set;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Interface for reading from the Mutable Map Index.
- *
- * @param <T> Type of the ReaderContext
- */
-public interface MapIndexReader<T extends ForwardIndexReaderContext, R extends IndexReader>
-    extends ForwardIndexReader<T> {
+/// Interface for reading from the Mutable Map Index.
+///
+/// @param <T> Type of the ReaderContext
+@SuppressWarnings("rawtypes")
+public interface MapIndexReader<T extends ForwardIndexReaderContext> extends ForwardIndexReader<T> {
 
-  /**
-   * Returns the keys in the map index.
-   */
+  /// Returns the keys in the map index.
   Set<String> getKeys();
 
-  /**
-   * Returns all the indexes for the given key.
-   */
-  Map<IndexType, R> getKeyIndexes(String key);
+  /// Returns all the indexes for the given key.
+  Map<IndexType, IndexReader> getIndexes(String key);
 
-  /**
-   * Returns the reader for the given key.
-   */
-  IndexReader getKeyReader(String key, IndexType<?, ?, ?> indexType);
-
-  /**
-   * Returns the field spec of the values in the forward index.
-   */
-  FieldSpec getKeyFieldSpec(String key);
-
-  /**
-   * Returns the data type of the values in the forward index. Returns {@link DataType#INT} for dictionary-encoded
-   * forward index.
-   */
-  DataType getKeyStoredType(String key);
-
-  /**
-   * Returns the column metadata for the given key.
-   */
-  ColumnMetadata getKeyMetadata(String key);
+  /// Returns the column metadata for the given key.
+  ColumnMetadata getColumnMetadata(String key);
 }

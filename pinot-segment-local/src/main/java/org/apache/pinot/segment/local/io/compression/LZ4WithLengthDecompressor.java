@@ -24,10 +24,8 @@ import net.jpountz.lz4.LZ4DecompressorWithLength;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 
 
-/**
- * Identical to {@code LZ4Decompressor} but can determine the length of
- * the decompressed output
- */
+/// Identical to `LZ4Decompressor` but can determine the length of
+/// the decompressed output
 class LZ4WithLengthDecompressor implements ChunkDecompressor {
 
   static final LZ4WithLengthDecompressor INSTANCE = new LZ4WithLengthDecompressor();

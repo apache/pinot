@@ -28,13 +28,11 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 
 
-/**
- * SingleValue MultiColumn reader and writer for fixed size columns.
- *
- * This implementation currently does not support reading with context, but can be enhanced to do so.
- *
- * TODO: Clean this up
- */
+/// SingleValue MultiColumn reader and writer for fixed size columns.
+///
+/// This implementation currently does not support reading with context, but can be enhanced to do so.
+///
+/// TODO: Clean this up
 public class FixedByteSingleValueMultiColumnReaderWriter implements Closeable {
 
   private final List<FixedByteSingleValueMultiColWriter> _writers;
@@ -48,14 +46,12 @@ public class FixedByteSingleValueMultiColumnReaderWriter implements Closeable {
   private int _capacityInRows;
   private final int _numColumns;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param numRowsPerChunk Number of rows per chunk of data buffer.
-   * @param columnSizesInBytes Int array containing size of columns in bytes.
-   * @param memoryManager Memory manager to be used for allocating memory.
-   * @param allocationContext Allocation context (for debugging).
-   */
+  /// Constructor for the class.
+  ///
+  /// @param numRowsPerChunk Number of rows per chunk of data buffer.
+  /// @param columnSizesInBytes Int array containing size of columns in bytes.
+  /// @param memoryManager Memory manager to be used for allocating memory.
+  /// @param allocationContext Allocation context (for debugging).
   public FixedByteSingleValueMultiColumnReaderWriter(int numRowsPerChunk, int[] columnSizesInBytes,
       PinotDataBufferMemoryManager memoryManager, String allocationContext) {
 
@@ -158,12 +154,10 @@ public class FixedByteSingleValueMultiColumnReaderWriter implements Closeable {
     }
   }
 
-  /**
-   * Helper method to ensure capacity so that a row at specified location is available
-   * for write.
-   *
-   * @param row row id to be written at.
-   */
+  /// Helper method to ensure capacity so that a row at specified location is available
+  /// for write.
+  ///
+  /// @param row row id to be written at.
   private void ensureCapacity(int row) {
     if (row >= _capacityInRows) {
 
@@ -175,9 +169,7 @@ public class FixedByteSingleValueMultiColumnReaderWriter implements Closeable {
     }
   }
 
-  /**
-   * Helper method to add data buffer during expansion.
-   */
+  /// Helper method to add data buffer during expansion.
   private void addBuffer() {
     // NOTE: PinotDataBuffer is tracked in the PinotDataBufferMemoryManager. No need to track it inside the class.
     PinotDataBuffer buffer = _memoryManager.allocate(_chunkSizeInBytes, _allocationContext);
@@ -186,7 +178,7 @@ public class FixedByteSingleValueMultiColumnReaderWriter implements Closeable {
 
     FixedByteSingleValueMultiColReader reader =
         new FixedByteSingleValueMultiColReader(buffer, _numRowsPerChunk, _columnSizesInBytes);
-    // ArrayList is non-threadsafe. So add to a new copy and then change teh reference (_readers is volatile).
+    // ArrayList is non-threadsafe. So add to a new copy and then change the reference (_readers is volatile).
     List<FixedByteSingleValueMultiColReader> readers = new ArrayList<>(_readers);
     readers.add(reader);
     _readers = readers;

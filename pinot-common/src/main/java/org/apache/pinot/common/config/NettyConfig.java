@@ -21,9 +21,7 @@ package org.apache.pinot.common.config;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Container object for netty configuration of pinot clients and servers (netty, grizzly, etc.)
- */
+/// Container object for netty configuration of pinot clients and servers (netty, grizzly, etc.)
 public class NettyConfig {
   private static final String NATIVE_TRANSPORTS_ENABLED = "native.transports.enabled";
   private boolean _nativeTransportsEnabled = false;

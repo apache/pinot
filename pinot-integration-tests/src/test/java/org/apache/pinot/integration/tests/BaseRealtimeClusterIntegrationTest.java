@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -34,9 +36,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
- */
+/// Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
 public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @BeforeClass
@@ -46,12 +46,22 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
 
     // Start the Pinot cluster
     startZk();
-    startController();
-    startBroker();
-    startServer();
-
     // Start Kafka
     startKafka();
+    startController();
+
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    // Set max segment preprocess parallelism to 8
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(8));
+    // Set max segment startree preprocess parallelism to 6
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM, Integer.toString(6));
+
+    startBroker();
+    startServer();
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
@@ -61,6 +71,8 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
     addSchema(schema);
     TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
     addTableConfig(tableConfig);
+    waitForAllRealtimePartitionsConsuming(TableNameBuilder.REALTIME.tableNameWithType(getTableName()),
+        getRealtimePartitionsReadyTimeoutMs());
 
     // Push data into Kafka
     pushAvroIntoKafka(avroFiles);
@@ -77,7 +89,15 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
     runValidationJob(600_000);
 
     // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
+    waitForAllDocsLoaded(getDocsLoadedTimeoutMs());
+  }
+
+  protected long getDocsLoadedTimeoutMs() {
+    return useKafkaTransaction() ? 900_000L : 600_000L;
+  }
+
+  protected long getRealtimePartitionsReadyTimeoutMs() {
+    return useKafkaTransaction() ? 300_000L : 120_000L;
   }
 
   protected void runValidationJob(long timeoutMs)
@@ -104,14 +124,12 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
     return noDictionaryColumns;
   }
 
-  /**
-   * In realtime consuming segments, the dictionary is not sorted,
-   * and the dictionary based operator should not be used
-   *
-   * Adding explicit queries to test dictionary based functions,
-   * to ensure the right result is computed, wherein dictionary is not read if it is mutable
-   * @throws Exception
-   */
+  /// In realtime consuming segments, the dictionary is not sorted,
+  /// and the dictionary based operator should not be used
+  ///
+  /// Adding explicit queries to test dictionary based functions,
+  /// to ensure the right result is computed, wherein dictionary is not read if it is mutable
+  /// @throws Exception
   @Test(dataProvider = "useBothQueryEngines")
   public void testDictionaryBasedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -173,18 +191,18 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
     testGeneratedQueries(true, useMultiStageQueryEngine);
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testQueryExceptions(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    super.testQueryExceptions();
-  }
-
   @Test
   @Override
   public void testInstanceShutdown()
       throws Exception {
     super.testInstanceShutdown();
+  }
+
+  @Test
+  @Override
+  public void testQueriesDisabled()
+      throws Exception {
+    super.testQueriesDisabled();
   }
 
   @AfterClass

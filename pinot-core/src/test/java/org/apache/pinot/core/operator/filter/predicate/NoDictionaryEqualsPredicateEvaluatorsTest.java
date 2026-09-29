@@ -19,7 +19,10 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.Locale;
 import java.util.Random;
+import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -27,14 +30,13 @@ import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit test for no-dictionary based Eq and NEq predicate evaluators.
- */
+/// Unit test for no-dictionary based Eq and NEq predicate evaluators.
 public class NoDictionaryEqualsPredicateEvaluatorsTest {
   private static final ExpressionContext COLUMN_EXPRESSION = ExpressionContext.forIdentifier("column");
   private static final int NUM_MULTI_VALUES = 100;
@@ -215,7 +217,7 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
 
   @Test
   public void testStringPredicateEvaluators() {
-    String stringValue = RandomStringUtils.random(MAX_STRING_LENGTH);
+    String stringValue = RandomStringUtils.secure().next(MAX_STRING_LENGTH);
 
     EqPredicate eqPredicate = new EqPredicate(COLUMN_EXPRESSION, stringValue);
     PredicateEvaluator eqPredicateEvaluator =
@@ -236,7 +238,7 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
     Assert.assertFalse(neqPredicateEvaluator.applyMV(randomStrings, NUM_MULTI_VALUES));
 
     for (int i = 0; i < 100; i++) {
-      String random = RandomStringUtils.random(MAX_STRING_LENGTH);
+      String random = RandomStringUtils.secure().next(MAX_STRING_LENGTH);
       Assert.assertEquals(eqPredicateEvaluator.applySV(random), (random.equals(stringValue)));
       Assert.assertEquals(neqPredicateEvaluator.applySV(random), (!random.equals(stringValue)));
 
@@ -252,8 +254,8 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
   public void testJsonPredicateEvaluators() {
     String jsonStringTemplate = "{\"id\": %s, \"name\": %s}";
     String jsonString = String.format(jsonStringTemplate,
-        RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH),
-        RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH));
+        RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH),
+        RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH));
 
     EqPredicate eqPredicate = new EqPredicate(COLUMN_EXPRESSION, jsonString);
     PredicateEvaluator eqPredicateEvaluator =
@@ -275,8 +277,8 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
 
     for (int i = 0; i < 100; i++) {
       String randomJson = String.format(jsonStringTemplate,
-          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH),
-          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH));
+          RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH),
+          RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH));
       Assert.assertEquals(eqPredicateEvaluator.applySV(randomJson), (randomJson.equals(jsonString)));
       Assert.assertEquals(neqPredicateEvaluator.applySV(randomJson), (!randomJson.equals(jsonString)));
 
@@ -290,7 +292,7 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
 
   @Test
   public void testBytesPredicateEvaluators() {
-    byte[] bytesValue = RandomStringUtils.random(MAX_STRING_LENGTH).getBytes();
+    byte[] bytesValue = RandomStringUtils.secure().next(MAX_STRING_LENGTH).getBytes();
     String stringValue = BytesUtils.toHexString(bytesValue);
 
     EqPredicate eqPredicate = new EqPredicate(COLUMN_EXPRESSION, stringValue);
@@ -312,7 +314,7 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
     Assert.assertFalse(neqPredicateEvaluator.applyMV(randomBytesArray, NUM_MULTI_VALUES));
 
     for (int i = 0; i < 100; i++) {
-      byte[] randomBytes = RandomStringUtils.random(MAX_STRING_LENGTH).getBytes();
+      byte[] randomBytes = RandomStringUtils.secure().next(MAX_STRING_LENGTH).getBytes();
       String randomString = BytesUtils.toHexString(randomBytes);
       Assert.assertEquals(eqPredicateEvaluator.applySV(randomBytes), (randomString.equals(stringValue)));
       Assert.assertEquals(neqPredicateEvaluator.applySV(randomBytes), (!randomString.equals(stringValue)));
@@ -322,6 +324,45 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
           ArrayUtils.contains(randomBytesArray, stringValue));
       Assert.assertEquals(neqPredicateEvaluator.applyMV(randomBytesArray, NUM_MULTI_VALUES),
           !ArrayUtils.contains(randomBytesArray, stringValue));
+    }
+  }
+
+  @Test
+  public void testUuidPredicateEvaluators() {
+    UUID uuidValue = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    byte[] uuidBytes = UuidUtils.toBytes(uuidValue);
+    // Predicate literals reach the evaluator as UUID strings. Use an upper-cased one to pin down that the hex digits
+    // are matched case-insensitively rather than compared as raw strings.
+    String stringValue = uuidValue.toString().toUpperCase(Locale.ROOT);
+
+    EqPredicate eqPredicate = new EqPredicate(COLUMN_EXPRESSION, stringValue);
+    PredicateEvaluator eqPredicateEvaluator =
+        EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(eqPredicate, FieldSpec.DataType.UUID);
+
+    NotEqPredicate notEqPredicate = new NotEqPredicate(COLUMN_EXPRESSION, stringValue);
+    PredicateEvaluator neqPredicateEvaluator =
+        NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(notEqPredicate, FieldSpec.DataType.UUID);
+
+    // getDataType() reports the type applySV consumes, not the column's logical type -- exactly as a TIMESTAMP
+    // column's evaluator reports LONG. UUID literals are converted to their 16-byte stored form up front, so the
+    // BYTES raw evaluator is reused as-is and reports BYTES.
+    Assert.assertEquals(eqPredicateEvaluator.getDataType(), FieldSpec.DataType.BYTES);
+    Assert.assertEquals(neqPredicateEvaluator.getDataType(), FieldSpec.DataType.BYTES);
+
+    Assert.assertTrue(eqPredicateEvaluator.applySV(uuidBytes));
+    Assert.assertFalse(neqPredicateEvaluator.applySV(uuidBytes));
+
+    // A UUID differing only in the last byte must not match, guarding against a truncated comparison.
+    byte[] nearMissBytes = Arrays.copyOf(uuidBytes, uuidBytes.length);
+    nearMissBytes[nearMissBytes.length - 1] ^= 0x01;
+    Assert.assertFalse(eqPredicateEvaluator.applySV(nearMissBytes));
+    Assert.assertTrue(neqPredicateEvaluator.applySV(nearMissBytes));
+
+    for (int i = 0; i < 100; i++) {
+      byte[] randomUuidBytes = UuidUtils.toBytes(UUID.randomUUID());
+      boolean matches = Arrays.equals(randomUuidBytes, uuidBytes);
+      Assert.assertEquals(eqPredicateEvaluator.applySV(randomUuidBytes), matches);
+      Assert.assertEquals(neqPredicateEvaluator.applySV(randomUuidBytes), !matches);
     }
   }
 }

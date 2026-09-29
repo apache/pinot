@@ -27,32 +27,29 @@ import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.datasketches.theta.Sketch;
-import org.apache.datasketches.theta.UpdateSketch;
+import org.apache.datasketches.theta.ThetaSketch;
+import org.apache.datasketches.theta.UpdatableThetaSketch;
 import org.apache.datasketches.thetacommon.ThetaUtil;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.DistinctCountAggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.DistinctCountBitmapAggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.DistinctCountThetaSketchAggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.SegmentPartitionedDistinctCountAggregationFunction;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The {@code FunnelCountAggregationFunctionFactory} builds a {@code FunnelCountAggregationFunction}.
- * Primary role is to validate inputs and select the appropriate aggregation strategy to use based on settings.
- *
- * There are 5 strategies available, mirroring the corresponding distinct count implementations as per below.
- *  <p><ul>
- *  <li>'set': See DISTINCTCOUNT at {@link DistinctCountAggregationFunction}
- *  <li>'bitmap' (default): See DISTINCTCOUNTBITMAP at {@link DistinctCountBitmapAggregationFunction}
- *  <li>'theta_sketch': See DISTINCTCOUNTTHETASKETCH at {@link DistinctCountThetaSketchAggregationFunction}
- *  <li>'partitioned': See SEGMENTPARTITIONEDDISTINCTCOUNT {@link SegmentPartitionedDistinctCountAggregationFunction}
- *  <li>'sorted': sorted counts per segment then sums up. Only availabe in combination with 'partitioned'.
- *  <li>'nominalEntries=4096': theta sketch configuration, default is 4096.
- *  </ul><p>
- */
+/// The `FunnelCountAggregationFunctionFactory` builds a `FunnelCountAggregationFunction`.
+/// Primary role is to validate inputs and select the appropriate aggregation strategy to use based on settings.
+///
+/// There are 5 strategies available, mirroring the corresponding distinct count implementations as per below.
+///
+/// - 'set': See DISTINCTCOUNT at
+///   [org.apache.pinot.core.query.aggregation.function.DistinctCountAggregationFunction]
+/// - 'bitmap' (default): See DISTINCTCOUNTBITMAP at
+///   [org.apache.pinot.core.query.aggregation.function.DistinctCountBitmapAggregationFunction]
+/// - 'theta_sketch': See DISTINCTCOUNTTHETASKETCH at
+///   [org.apache.pinot.core.query.aggregation.function.DistinctCountThetaSketchAggregationFunction]
+/// - 'partitioned': See SEGMENTPARTITIONEDDISTINCTCOUNT
+///   [org.apache.pinot.core.query.aggregation.function.SegmentPartitionedDistinctCountAggregationFunction]
+/// - 'sorted': sorted counts per segment then sums up. Only available in combination with 'partitioned'.
+/// - 'nominalEntries=4096': theta sketch configuration, default is 4096.
 public class FunnelCountAggregationFunctionFactory implements Supplier<AggregationFunction> {
   final List<ExpressionContext> _expressions;
   final List<ExpressionContext> _stepExpressions;
@@ -65,7 +62,10 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
   final boolean _thetaSketchSetting;
   final boolean _setSetting;
 
-  public FunnelCountAggregationFunctionFactory(List<ExpressionContext> expressions) {
+  private final boolean _nullHandlingEnabled;
+
+  public FunnelCountAggregationFunctionFactory(List<ExpressionContext> expressions, boolean nullHandlingEnabled) {
+    _nullHandlingEnabled = nullHandlingEnabled;
     _expressions = expressions;
     Option.validate(expressions);
     _correlateByExpressions = Option.CORRELATE_BY.getInputExpressions(expressions);
@@ -123,22 +123,23 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
       MergeStrategy<List<Long>> mergeStrategy) {
     if (_sortingSetting) {
       return new FunnelCountSortedAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
-          aggregationStrategy, resultExtractionStrategy, mergeStrategy);
+          aggregationStrategy, resultExtractionStrategy, mergeStrategy, _nullHandlingEnabled);
     } else {
       return new FunnelCountAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
           aggregationStrategy, resultExtractionStrategy, mergeStrategy);
     }
   }
 
-  AggregationStrategy<UpdateSketch[]> thetaSketchAggregationStrategy() {
-    return new ThetaSketchAggregationStrategy(_stepExpressions, _correlateByExpressions, _nominalEntries);
+  AggregationStrategy<UpdatableThetaSketch[]> thetaSketchAggregationStrategy() {
+    return new ThetaSketchAggregationStrategy(_stepExpressions, _correlateByExpressions, _nominalEntries,
+        _nullHandlingEnabled);
   }
 
   AggregationStrategy<DictIdsWrapper> bitmapAggregationStrategy() {
-    return new BitmapAggregationStrategy(_stepExpressions, _correlateByExpressions);
+    return new BitmapAggregationStrategy(_stepExpressions, _correlateByExpressions, _nullHandlingEnabled);
   }
 
-  MergeStrategy<List<Sketch>> thetaSketchMergeStrategy() {
+  MergeStrategy<List<ThetaSketch>> thetaSketchMergeStrategy() {
     return new ThetaSketchMergeStrategy(_numSteps, _nominalEntries);
   }
 
@@ -154,7 +155,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
     return new PartitionedMergeStrategy(_numSteps);
   }
 
-  ResultExtractionStrategy<UpdateSketch[], List<Sketch>> thetaSketchResultExtractionStrategy() {
+  ResultExtractionStrategy<UpdatableThetaSketch[], List<ThetaSketch>> thetaSketchResultExtractionStrategy() {
     return new ThetaSketchResultExtractionStrategy(_numSteps);
   }
 
@@ -168,12 +169,25 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
 
   ResultExtractionStrategy<DictIdsWrapper, List<Long>> bitmapPartitionedResultExtractionStrategy() {
     final MergeStrategy<List<RoaringBitmap>> bitmapMergeStrategy = bitmapMergeStrategy();
-    return dictIdsWrapper -> bitmapMergeStrategy.extractFinalResult(Arrays.asList(dictIdsWrapper._stepsBitmaps));
+    // For partitioned mode, each segment is self-contained: every row for a given correlation key
+    // appears in exactly one segment. Therefore we can count bitmap cardinality directly without
+    // converting segment-local composite IDs to global values — they will never be merged across segments.
+    return dictIdsWrapper -> {
+      if (dictIdsWrapper == null) {
+        return Collections.nCopies(_numSteps, 0L);
+      }
+      return bitmapMergeStrategy.extractFinalResult(Arrays.asList(dictIdsWrapper._stepsBitmaps));
+    };
   }
 
-  ResultExtractionStrategy<UpdateSketch[], List<Long>> thetaSketchPartitionedResultExtractionStrategy() {
-    final MergeStrategy<List<Sketch>> thetaSketchMergeStrategy = thetaSketchMergeStrategy();
-    return sketches -> thetaSketchMergeStrategy.extractFinalResult(Arrays.asList(sketches));
+  ResultExtractionStrategy<UpdatableThetaSketch[], List<Long>> thetaSketchPartitionedResultExtractionStrategy() {
+    final MergeStrategy<List<ThetaSketch>> thetaSketchMergeStrategy = thetaSketchMergeStrategy();
+    return sketches -> {
+      if (sketches == null) {
+        return Collections.nCopies(_numSteps, 0L);
+      }
+      return thetaSketchMergeStrategy.extractFinalResult(Arrays.asList(sketches));
+    };
   }
 
   enum Option {
@@ -216,7 +230,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
 
     public List<String> getLiterals(List<ExpressionContext> expressions) {
       List<ExpressionContext> inputExpressions =
-          find(expressions).map(exp -> exp.getFunction().getArguments()).orElseGet(Collections::emptyList);
+          find(expressions).map(exp -> exp.getFunction().getArguments()).orElseGet(List::of);
       Preconditions.checkArgument(
           inputExpressions.stream().allMatch(exp -> exp.getType() == ExpressionContext.Type.LITERAL),
           "FUNNELCOUNT: " + _name + " parameters must be literals");

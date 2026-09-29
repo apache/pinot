@@ -19,14 +19,12 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import groovy.lang.IntRange;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +33,7 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
@@ -53,15 +52,20 @@ import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.PinotDriver;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
-import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.integration.tests.access.CertBasedTlsChannelAccessControlFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -94,11 +98,28 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   private int _externalControllerPort;
   private int _internalBrokerPort;
   private int _externalBrokerPort;
+  private javax.net.ssl.SSLContext _sslContext;
 
   @BeforeClass
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    java.security.KeyStore keyStore = java.security.KeyStore.getInstance(PKCS_12);
+    try (java.io.InputStream ksStream =
+        new java.io.FileInputStream(new File(Objects.requireNonNull(TLS_STORE_PKCS_12).toURI()))) {
+      keyStore.load(ksStream, PASSWORD_CHAR);
+    }
+    java.security.KeyStore trustStore = java.security.KeyStore.getInstance(PKCS_12);
+    try (java.io.InputStream tsStream =
+        new java.io.FileInputStream(new File(Objects.requireNonNull(TLS_STORE_PKCS_12).toURI()))) {
+      trustStore.load(tsStream, PASSWORD_CHAR);
+    }
+    _sslContext = org.apache.hc.core5.ssl.SSLContexts.custom()
+        .loadKeyMaterial(keyStore, PASSWORD_CHAR)
+        .loadTrustMaterial(trustStore, null)
+        .build();
+    TlsUtils.setSslContext(_sslContext);
+    _httpClient = new HttpClient(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG, _sslContext);
 
     startZk();
     startController();
@@ -115,6 +136,12 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     addTableConfig(createRealtimeTableConfig(avroFiles.get(0)));
     addTableConfig(createOfflineTableConfig());
 
+    // Create a logical table backed by the physical tables
+    Schema logicalTableSchema = createSchema(getSchemaFileName());
+    logicalTableSchema.setSchemaName(getLogicalTableName());
+    addSchema(logicalTableSchema);
+    createLogicalTable();
+
     // Push data into Kafka
     pushAvroIntoKafka(avroFiles);
     waitForAllDocsLoaded(600_000L);
@@ -123,6 +150,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
+    dropLogicalTable(getLogicalTableName());
+    dropOfflineTable(getTableName());
     dropRealtimeTable(getTableName());
     stopMinion();
     stopServer();
@@ -238,7 +267,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
 
     minionConf.setProperty("pinot.minion.tls.keystore.path", TLS_STORE_PKCS_12);
     minionConf.setProperty("pinot.minion.tls.keystore.password", "changeit");
-    minionConf.setProperty("pinot.server.tls.keystore.type", "PKCS12");
+    minionConf.setProperty("pinot.minion.tls.keystore.type", "PKCS12");
     minionConf.setProperty("pinot.minion.tls.truststore.path", TLS_STORE_PKCS_12);
     minionConf.setProperty("pinot.minion.tls.truststore.password", "changeit");
     minionConf.setProperty("pinot.minion.tls.truststore.type", "PKCS12");
@@ -246,26 +275,53 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
+  protected javax.net.ssl.SSLContext getControllerTransportSslContext() {
+    return _sslContext;
+  }
+
+  @Override
+  protected Map<String, String> getAdminClientHeaders() {
+    return AUTH_HEADER;
+  }
+
+  @Override
   protected TableTaskConfig getTaskConfig() {
     Map<String, String> prop = new HashMap<>();
     prop.put("bucketTimePeriod", "30d");
 
-    return new TableTaskConfig(Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, prop));
+    return new TableTaskConfig(Map.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, prop));
   }
 
   @Override
   public void addSchema(Schema schema)
       throws IOException {
-    SimpleHttpResponse response =
-        sendMultipartPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.toSingleLineJsonString(),
-            AUTH_HEADER);
-    Assert.assertEquals(response.getStatusCode(), 200);
+    try {
+      getOrCreateAdminClient().getSchemaClient().createSchema(schema.toSingleLineJsonString());
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
   }
 
   @Override
   public void addTableConfig(TableConfig tableConfig)
       throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString(), AUTH_HEADER);
+    try {
+      getOrCreateAdminClient().getTableClient().createTable(tableConfig.toJsonString(), null);
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
+  }
+
+  @Override
+  protected void createLogicalTable()
+      throws IOException {
+    LogicalTableConfig logicalTableConfig = createLogicalTableConfig();
+    try {
+      getOrCreateAdminClient().getLogicalTableClient()
+          .createLogicalTable(logicalTableConfig.toSingleLineJsonString(), AUTH_HEADER);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   @Override
@@ -283,11 +339,35 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
+  public void dropLogicalTable(String logicalTableName)
+      throws IOException {
+    try {
+      getOrCreateAdminClient().getLogicalTableClient().deleteLogicalTable(logicalTableName, AUTH_HEADER);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
+  }
+
+  @Override
+  public void dropOfflineTable(String tableName)
+      throws IOException {
+    try {
+      getOrCreateAdminClient().getTableClient()
+          .deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
+  }
+
+  @Override
   public void dropRealtimeTable(String tableName)
       throws IOException {
-    sendDeleteRequest(
-        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)),
-        AUTH_HEADER);
+    try {
+      getOrCreateAdminClient().getTableClient()
+          .deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
   }
 
   @Test
@@ -465,8 +545,12 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Test(expectedExceptions = IOException.class)
   public void testUnauthenticatedFailure()
       throws IOException {
-    sendDeleteRequest(
-        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType("mytable")));
+    HttpDelete request = new HttpDelete(
+        "https://localhost:" + _externalControllerPort + "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(
+            getTableName()));
+    try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
+      client.execute(request);
+    }
   }
 
   @Test
@@ -478,17 +562,19 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     Assert.assertTrue(resultBeforeOffline.getResultSet(0).getLong(0) > 0);
 
     // schedule offline segment generation
-    Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleAllTasksForAllTables(null));
+    Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleTasks(new TaskSchedulingContext()));
 
     // wait for offline segments
     JsonNode offlineSegments = TestUtils.waitForResult(() -> {
-      JsonNode segmentSets = JsonUtils.stringToJsonNode(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()), AUTH_HEADER));
-      JsonNode currentOfflineSegments =
-          new IntRange(0, segmentSets.size()).stream().map(segmentSets::get).filter(s -> s.has("OFFLINE"))
-              .map(s -> s.get("OFFLINE")).findFirst().get();
-      Assert.assertFalse(currentOfflineSegments.isEmpty());
-      return currentOfflineSegments;
+      try {
+        List<String> segments =
+            getOrCreateAdminClient().getSegmentClient().listSegments(getTableName(), TableType.OFFLINE.name(), false);
+        JsonNode node = JsonUtils.objectToJsonNode(segments);
+        Assert.assertFalse(segments.isEmpty());
+        return node;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }, 30000);
 
     // Verify constant row count
@@ -498,9 +584,61 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     // download and sanity-check size of offline segment(s)
     for (int i = 0; i < offlineSegments.size(); i++) {
       String segment = offlineSegments.get(i).asText();
-      Assert.assertTrue(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
-              > 200000); // download segment
+      byte[] bytes = getOrCreateAdminClient().getSegmentClient().downloadSegment(getTableName(), segment);
+      Assert.assertTrue(bytes.length > 200000);
+    }
+  }
+
+  /// Startup pre-connect over a **real** broker-to-server TLS channel. This cluster runs the server with
+  /// `netty.enabled=false` and `nettytls.enabled=true`, so every single-stage channel the broker opens
+  /// carries an `SslHandler` -- which is the case pre-connect exists for, and the one no plaintext test
+  /// can reach.
+  ///
+  /// The assertion is the channel count rather than a log line because `preConnectServers` awaits the
+  /// handshake and reports a channel as connected only once it has completed: a handshake that failed,
+  /// timed out, or was never awaited would show up here as a short count. Pre-connect swallows its own
+  /// failures by design, so without this the TLS path could break silently and every other assertion in
+  /// this class would still pass.
+  ///
+  /// Connecting an already-open channel is a no-op that still counts, so the expected count holds
+  /// regardless of channels the preceding tests' queries already opened lazily.
+  ///
+  /// Pre-connect opens only the (server, table type) pairs routing derives. This cluster's offline table
+  /// has no segments uploaded -- only the realtime table is fed, via Kafka -- so only the REALTIME channel
+  /// is routed: one per serving server, and no OFFLINE channel. The old cross product would have opened an
+  /// OFFLINE channel here too, to a server holding no offline segment: exactly the wasted TLS handshake and
+  /// idle socket this change removes.
+  @Test
+  public void testPreConnectOpensTlsChannelsToEveryServer() {
+    int expectedChannels = _serverStarters.size();
+    int connected = _brokerStarters.get(0).getBrokerRequestHandler()
+        .preConnectServers(System.currentTimeMillis() + 30_000L);
+    Assert.assertEquals(connected, expectedChannels,
+        "Pre-connect should complete the TLS handshake for the realtime channel each server serves, and open "
+            + "no offline channel");
+  }
+
+  @Test
+  public void testLogicalTableTlsRouting()
+      throws Exception {
+    String query = "SELECT count(*) FROM " + getLogicalTableName();
+
+    // Query via Pinot connection (TLS-enabled)
+    ResultSetGroup resultSetGroup = getPinotConnection().execute(query);
+    Assert.assertTrue(resultSetGroup.getResultSet(0).getLong(0) > 0);
+
+    // Query via external broker TLS endpoint
+    try (CloseableHttpClient client = makeClient(JKS, TLS_STORE_EMPTY_JKS, TLS_STORE_JKS)) {
+      HttpPost request = new HttpPost("https://localhost:" + _externalBrokerPort + "/query/sql");
+      request.addHeader(CLIENT_HEADER);
+      request.setEntity(
+          new StringEntity("{\"sql\":\"SELECT count(*) FROM " + getLogicalTableName() + "\"}"));
+      try (CloseableHttpResponse response = client.execute(request)) {
+        Assert.assertEquals(response.getCode(), 200);
+        JsonNode resultTable =
+            JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
+        Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 0);
+      }
     }
   }
 
@@ -607,7 +745,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     HttpPost request = new HttpPost("https://localhost:" + port + "/query/sql");
     request.addHeader(CLIENT_HEADER);
     request.setEntity(
-        new StringEntity(String.format("{\"sql\":\"%s\", \"queryOptions\": \"useMultistageEngine=true\"}", query)));
+        new StringEntity("{\"sql\":\"" + query + "\", \"queryOptions\": \"useMultistageEngine=true\"}"));
     return request;
   }
 

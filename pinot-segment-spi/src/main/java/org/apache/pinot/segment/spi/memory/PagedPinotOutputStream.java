@@ -27,24 +27,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * An implementation of {@link PinotOutputStream} that writes to a sequence of pages.
- * <p>
- * When a page is full, a new page is allocated and writing continues there.
- * The page size is determined by the {@link PageAllocator} used to create the stream.
- * <p>
- * This class is specially useful when writing data whose final size is not known in advance or when it is needed to
- * {@link #seek(long) seek} to a specific position in the stream.
- * Writes that cross page boundaries are handled transparently, although a performance penalty will be paid.
- * <p>
- * Some {@link PageAllocator} implementations may support releasing pages, which can be useful to reduce memory usage.
- * The smaller the page size, the more pages will be allocated, but the allocation is quite faster. This is specially
- * important in the case of heap allocation, in which case allocations smaller than TLAB will be faster.
- * <p>
- * Data written in this stream can be retrieved as a list of {@link ByteBuffer} pages using {@link #getPages()}, which
- * can be directly read using {@link CompoundDataBuffer} or send to the network as using
- * {@link com.google.protobuf.UnsafeByteOperations#unsafeWrap(byte[]) GRPC}.
- */
+/// An implementation of [PinotOutputStream] that writes to a sequence of pages.
+///
+/// When a page is full, a new page is allocated and writing continues there.
+/// The page size is determined by the [PageAllocator] used to create the stream.
+///
+/// This class is specially useful when writing data whose final size is not known in advance or when it is needed to
+/// [`seek`]\[#seek(long)\] to a specific position in the stream.
+/// Writes that cross page boundaries are handled transparently, although a performance penalty will be paid.
+///
+/// Some [PageAllocator] implementations may support releasing pages, which can be useful to reduce memory usage.
+/// The smaller the page size, the more pages will be allocated, but the allocation is quite faster. This is specially
+/// important in the case of heap allocation, in which case allocations smaller than TLAB will be faster.
+///
+/// Data written in this stream can be retrieved as a list of [ByteBuffer] pages using [#getPages()], which
+/// can be directly read using [CompoundDataBuffer] or send to the network as using
+/// [`GRPC`][com.google.protobuf.UnsafeByteOperations#unsafeWrap(byte[])].
 public class PagedPinotOutputStream extends PinotOutputStream {
   private final PageAllocator _allocator;
   private final int _pageSize;
@@ -77,14 +75,12 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     return _pageSize - _offsetInPage;
   }
 
-  /**
-   * Returns a read only view of the pages written so far.
-   * <p>
-   * All pages but the last one will have its position set to 0 and the limit to their capacity.
-   * The latest page will have its position set to 0 and its limit set to the last byte written.
-   *
-   * TODO: Add one option that let caller choose start and end offset.
-   */
+  /// Returns a read only view of the pages written so far.
+  ///
+  /// All pages but the last one will have its position set to 0 and the limit to their capacity.
+  /// The latest page will have its position set to 0 and its limit set to the last byte written.
+  ///
+  /// TODO: Add one option that let caller choose start and end offset.
   public ByteBuffer[] getPages() {
     int numPages = _pages.size();
 
@@ -240,14 +236,12 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
   }
 
-  /**
-   * Returns a view of the data written so far as a {@link DataBuffer}.
-   * <p>
-   * The returned DataBuffer will contain all the data being written. This is specially important when
-   * {@link #getCurrentOffset()} has been moved back from the latest written position.
-   *
-   * TODO: Add one option that let caller choose start and end offset.
-   */
+  /// Returns a view of the data written so far as a [DataBuffer].
+  ///
+  /// The returned DataBuffer will contain all the data being written. This is specially important when
+  /// [#getCurrentOffset()] has been moved back from the latest written position.
+  ///
+  /// TODO: Add one option that let caller choose start and end offset.
   public DataBuffer asBuffer(ByteOrder order, boolean owner) {
     if (_written == 0) {
       return PinotDataBuffer.empty();
@@ -277,9 +271,10 @@ public class PagedPinotOutputStream extends PinotOutputStream {
       try {
         _allocator.release(page);
       } catch (IOException e) {
+        // This module doesn't import pinot-common, so we cannot use ExceptionUtils.suppress here.
         if (ex == null) {
           ex = e;
-        } else {
+        } else if (e != ex) {
           ex.addSuppressed(e);
         }
       }

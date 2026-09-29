@@ -34,10 +34,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class to implement StartMinion command.
- *
- */
+/// Class to implement StartMinion command.
 @CommandLine.Command(name = "StartMinion", mixinStandardHelpOptions = true)
 public class StartMinionCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartMinionCommand.class);
@@ -49,9 +46,9 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
   @CommandLine.Option(names = {"-clusterName"}, required = false, description = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
-  @CommandLine.Option(names = {"-configFileName"}, required = false,
-      description = "Minion Starter Config file.")
-      // TODO: support forbids = {"-minionHost", "-minionPort"}
+  @CommandLine.Option(names = {"-configFileName", "-config", "-configFile", "-minionConfig", "-minionConf"},
+      required = false, description = "Minion Starter Config file.")
+  // TODO: support forbids = {"-minionHost", "-minionPort"}
   private String _configFileName;
 
   private Map<String, Object> _configOverrides = new HashMap<>();
@@ -136,7 +133,7 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
       properties.putAll(PinotConfigUtils.readConfigFromFile(_configFileName));
       // Override the zkAddress and clusterName to ensure ServiceManager is connecting to the right Zookeeper and
       // Cluster.
-      _zkAddress = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+      _zkAddress = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
       _clusterName = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     } else {
       properties.putAll(PinotConfigUtils.generateMinionConf(_clusterName, _zkAddress, _minionHost, _minionPort));

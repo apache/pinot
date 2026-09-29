@@ -39,9 +39,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Pinot admin command to list all offline segments with invalid intervals, group by table name
- */
+/// Pinot admin command to list all offline segments with invalid intervals, group by table name
 @CommandLine.Command(name = "OfflineSegmentIntervalChecker", mixinStandardHelpOptions = true)
 public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(OfflineSegmentIntervalCheckerCommand.class);
@@ -117,10 +115,8 @@ public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminComma
     return true;
   }
 
-  /**
-   * Checks segments of table for invalid intervals and prints them out
-   * @param offlineTableName
-   */
+  /// Checks segments of table for invalid intervals and prints them out
+  /// @param offlineTableName
   private List<String> checkOfflineTablesSegmentIntervals(String offlineTableName) {
     TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, offlineTableName);
     List<SegmentZKMetadata> segmentsZKMetadata =

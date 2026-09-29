@@ -26,6 +26,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -35,9 +36,11 @@ public class RexExpressionSerDeTest {
   private static final List<ColumnDataType> SUPPORTED_DATE_TYPES =
       List.of(ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
           ColumnDataType.BIG_DECIMAL, ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.STRING,
-          ColumnDataType.BYTES, ColumnDataType.INT_ARRAY, ColumnDataType.LONG_ARRAY, ColumnDataType.FLOAT_ARRAY,
-          ColumnDataType.DOUBLE_ARRAY, ColumnDataType.BOOLEAN_ARRAY, ColumnDataType.TIMESTAMP_ARRAY,
-          ColumnDataType.STRING_ARRAY, ColumnDataType.UNKNOWN);
+          ColumnDataType.BYTES, ColumnDataType.UUID, ColumnDataType.INT_ARRAY, ColumnDataType.LONG_ARRAY,
+          ColumnDataType.FLOAT_ARRAY, ColumnDataType.DOUBLE_ARRAY, ColumnDataType.BOOLEAN_ARRAY,
+          ColumnDataType.TIMESTAMP_ARRAY, ColumnDataType.STRING_ARRAY, ColumnDataType.BYTES_ARRAY,
+          ColumnDataType.UUID_ARRAY,
+          ColumnDataType.UNKNOWN);
   private static final Random RANDOM = new Random();
 
   @Test
@@ -85,7 +88,8 @@ public class RexExpressionSerDeTest {
 
   @Test
   public void testStringLiteral() {
-    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.STRING, RandomStringUtils.random(RANDOM.nextInt(10))));
+    verifyLiteralSerDe(
+        new RexExpression.Literal(ColumnDataType.STRING, RandomStringUtils.secure().next(RANDOM.nextInt(10))));
   }
 
   @Test
@@ -93,6 +97,12 @@ public class RexExpressionSerDeTest {
     byte[] bytes = new byte[RANDOM.nextInt(10)];
     RANDOM.nextBytes(bytes);
     verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.BYTES, new ByteArray(bytes)));
+  }
+
+  @Test
+  public void testUuidLiteral() {
+    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.UUID,
+        new ByteArray(UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440000"))));
   }
 
   @Test
@@ -153,9 +163,24 @@ public class RexExpressionSerDeTest {
   public void testStringArrayLiteral() {
     String[] values = new String[RANDOM.nextInt(10)];
     for (int i = 0; i < values.length; i++) {
-      values[i] = RandomStringUtils.random(RANDOM.nextInt(10));
+      values[i] = RandomStringUtils.secure().next(RANDOM.nextInt(10));
     }
     verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.STRING_ARRAY, values));
+  }
+
+  @Test
+  public void testBytesArrayLiteral() {
+    ByteArray[] values = {new ByteArray(new byte[0]), new ByteArray(new byte[]{1, 2, 3})};
+    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.BYTES_ARRAY, values));
+  }
+
+  @Test
+  public void testUuidArrayLiteral() {
+    ByteArray[] values = {
+        new ByteArray(UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440000")),
+        new ByteArray(UuidUtils.toBytes("017f22e2-79b0-7cc3-98c4-dc0c0c07398f"))
+    };
+    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.UUID_ARRAY, values));
   }
 
   private void verifyLiteralSerDe(RexExpression.Literal literal) {

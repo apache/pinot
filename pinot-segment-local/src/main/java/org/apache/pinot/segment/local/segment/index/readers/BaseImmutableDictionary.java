@@ -33,9 +33,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * Base implementation of immutable dictionary.
- */
+/// Base implementation of immutable dictionary.
 @SuppressWarnings("rawtypes")
 public abstract class BaseImmutableDictionary implements Dictionary {
   private final ValueReader _valueReader;
@@ -57,9 +55,7 @@ public abstract class BaseImmutableDictionary implements Dictionary {
     _numBytesPerValue = numBytesPerValue;
   }
 
-  /**
-   * For virtual dictionary.
-   */
+  /// For virtual dictionary.
   protected BaseImmutableDictionary(int length) {
     _valueReader = null;
     _length = length;
@@ -104,13 +100,6 @@ public abstract class BaseImmutableDictionary implements Dictionary {
   @Override
   public Comparable getMaxVal() {
     return (Comparable) get(_length - 1);
-  }
-
-  @Override
-  public Object getSortedValues() {
-    // This method is for the stats collection phase when sealing the consuming segment, so it is not required for
-    // regular immutable dictionary within the immutable segment.
-    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -262,6 +251,10 @@ public abstract class BaseImmutableDictionary implements Dictionary {
     return _valueReader.getBigDecimal(dictId, _numBytesPerValue);
   }
 
+  protected int readUnpaddedBytes(int dictId, byte[] buffer) {
+    return _valueReader.readUnpaddedBytes(dictId, _numBytesPerValue, buffer);
+  }
+
   protected byte[] getUnpaddedBytes(int dictId, byte[] buffer) {
     return _valueReader.getUnpaddedBytes(dictId, _numBytesPerValue, buffer);
   }
@@ -270,12 +263,20 @@ public abstract class BaseImmutableDictionary implements Dictionary {
     return _valueReader.getUnpaddedString(dictId, _numBytesPerValue, buffer);
   }
 
-  protected String getPaddedString(int dictId, byte[] buffer) {
-    return _valueReader.getPaddedString(dictId, _numBytesPerValue, buffer);
+  protected int readBytes(int dictId, byte[] buffer) {
+    return _valueReader.readBytes(dictId, _numBytesPerValue, buffer);
   }
 
   protected byte[] getBytes(int dictId) {
     return _valueReader.getBytes(dictId, _numBytesPerValue);
+  }
+
+  protected int getUnpaddedByteSize(int dictId) {
+    return _valueReader.getUnpaddedByteSize(dictId, _numBytesPerValue);
+  }
+
+  protected int getByteSize(int dictId) {
+    return _valueReader.getByteSize(dictId, _numBytesPerValue);
   }
 
   protected byte[] getBuffer() {

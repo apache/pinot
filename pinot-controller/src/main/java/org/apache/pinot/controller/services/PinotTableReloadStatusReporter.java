@@ -1,0 +1,308 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.controller.services;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.BiMap;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Executor;
+import javax.annotation.Nullable;
+import javax.inject.Inject;
+import javax.inject.Singleton;
+import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
+import org.apache.pinot.common.response.server.ServerReloadStatusResponse;
+import org.apache.pinot.common.restlet.resources.PinotControllerJobMetadataDto;
+import org.apache.pinot.common.restlet.resources.PinotTableReloadStatusResponse;
+import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
+import org.apache.pinot.controller.util.CompletionServiceHelper;
+import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+
+@Singleton
+public class PinotTableReloadStatusReporter {
+  private static final Logger LOG = LoggerFactory.getLogger(PinotTableReloadStatusReporter.class);
+
+  private final PinotHelixResourceManager _pinotHelixResourceManager;
+  private final Executor _executor;
+  private final HttpClientConnectionManager _connectionManager;
+
+  @Inject
+  public PinotTableReloadStatusReporter(PinotHelixResourceManager pinotHelixResourceManager, Executor executor,
+      HttpClientConnectionManager connectionManager) {
+    _pinotHelixResourceManager = pinotHelixResourceManager;
+    _executor = executor;
+    _connectionManager = connectionManager;
+  }
+
+  private static double computeEstimatedRemainingTimeInMinutes(PinotTableReloadStatusResponse finalResponse,
+      double timeElapsedInMinutes) {
+    // Clamp to 0 to handle cases where successCount > totalSegmentCount (e.g. segments added after job started)
+    int remainingSegments = Math.max(0, finalResponse.getTotalSegmentCount() - finalResponse.getSuccessCount());
+
+    double estimatedRemainingTimeInMinutes = -1;
+    if (finalResponse.getSuccessCount() > 0) {
+      estimatedRemainingTimeInMinutes =
+          ((double) remainingSegments / (double) finalResponse.getSuccessCount()) * timeElapsedInMinutes;
+    }
+    return estimatedRemainingTimeInMinutes;
+  }
+
+  /// Derives the overall reload job status from aggregated counts.
+  /// - COMPLETED: all segments reloaded successfully, no server call failures
+  /// - COMPLETED_WITH_ERRORS: reload finished but some segments failed
+  /// - IN_PROGRESS: reload is still running
+  private static String deriveReloadStatus(PinotTableReloadStatusResponse response) {
+    int processed = response.getSuccessCount() + (response.getFailureCount() != null
+        ? response.getFailureCount().intValue() : 0);
+    boolean allProcessed = processed >= response.getTotalSegmentCount();
+
+    if (allProcessed && response.getTotalServerCallsFailed() == 0) {
+      if (response.getFailureCount() != null && response.getFailureCount() > 0) {
+        return "COMPLETED_WITH_ERRORS";
+      }
+      return "COMPLETED";
+    }
+    return "IN_PROGRESS";
+  }
+
+  private static double computeTimeElapsedInMinutes(double submissionTime) {
+    return ((double) System.currentTimeMillis() - submissionTime) / (1000.0 * 60.0);
+  }
+
+  private static int computeTotalSegments(Map<String, List<String>> serverToSegments) {
+    int totalSegments = 0;
+    for (Map.Entry<String, List<String>> entry : serverToSegments.entrySet()) {
+      totalSegments += entry.getValue().size();
+    }
+    return totalSegments;
+  }
+
+  private static List<String> getServerUrls(BiMap<String, String> serverEndPoints,
+      PinotControllerJobMetadataDto reloadJob,
+      Map<String, List<String>> serverToSegments) {
+    List<String> serverUrls = new ArrayList<>();
+    for (Map.Entry<String, String> entry : serverEndPoints.entrySet()) {
+      final String server = entry.getKey();
+      final String endpoint = entry.getValue();
+      serverUrls.add(constructReloadTaskStatusEndpoint(reloadJob, serverToSegments, endpoint, server));
+    }
+    return serverUrls;
+  }
+
+  private static String constructReloadTaskStatusEndpoint(PinotControllerJobMetadataDto reloadJob,
+      Map<String, List<String>> serverToSegments, String endpoint, String server) {
+    String reloadTaskStatusEndpoint = constructReloadStatusEndpoint(reloadJob, endpoint);
+    if (reloadJob.getSegmentName() == null) {
+      return reloadTaskStatusEndpoint;
+    }
+
+    List<String> segmentsForServer = serverToSegments.get(server);
+    StringBuilder encodedSegmentsBuilder = new StringBuilder();
+    if (!segmentsForServer.isEmpty()) {
+      Iterator<String> segmentIterator = segmentsForServer.iterator();
+      // Append first segment without a leading separator
+      encodedSegmentsBuilder.append(URIUtils.encode(segmentIterator.next()));
+      // Append remaining segments, each prefixed by the separator
+      while (segmentIterator.hasNext()) {
+        encodedSegmentsBuilder.append(SegmentNameUtils.SEGMENT_NAME_SEPARATOR)
+            .append(URIUtils.encode(segmentIterator.next()));
+      }
+    }
+    reloadTaskStatusEndpoint += "&segmentName=" + encodedSegmentsBuilder;
+    return reloadTaskStatusEndpoint;
+  }
+
+  private static String constructReloadStatusEndpoint(PinotControllerJobMetadataDto jobMetadata, String endpoint) {
+    String url = endpoint + "/controllerJob/reloadStatus/" + jobMetadata.getTableNameWithType()
+        + "?reloadJobTimestamp=" + jobMetadata.getSubmissionTimeMs();
+    if (jobMetadata.getJobId() != null) {
+      url += "&reloadJobId=" + jobMetadata.getJobId();
+    }
+    return url;
+  }
+
+  public PinotTableReloadStatusResponse getReloadJobStatus(String reloadJobId)
+      throws InvalidConfigException {
+    final PinotControllerJobMetadataDto reloadJobMetadata = getControllerJobMetadataFromZk(reloadJobId);
+    final Map<String, List<String>> serverToSegments = getServerToSegments(reloadJobMetadata);
+
+    final BiMap<String, String> serverEndPoints =
+        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
+    final List<String> serverUrls = getServerUrls(serverEndPoints, reloadJobMetadata, serverToSegments);
+
+    final CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints,
+            _pinotHelixResourceManager.getServerAdminAuthProvider());
+    final CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000);
+
+    final PinotTableReloadStatusResponse response = new PinotTableReloadStatusResponse().setSuccessCount(0)
+        .setTotalSegmentCount(computeTotalSegments(serverToSegments))
+        .setTotalServersQueried(serverUrls.size())
+        .setTotalServerCallsFailed(serviceResponse._failedResponseCount);
+
+    long totalFailureCount = 0;
+    boolean hasFailureCountData = false;
+    List<SegmentReloadFailureResponse> allFailedSegments = new ArrayList<>();
+
+    // Single iteration to aggregate counts and collect failed segments
+    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+      String responseString = streamResponse.getValue();
+      try {
+        ServerReloadStatusResponse serverResponse =
+            JsonUtils.stringToObject(responseString, ServerReloadStatusResponse.class);
+
+        // Aggregate success count
+        response.setSuccessCount(response.getSuccessCount() + serverResponse.getSuccessCount());
+
+        // Aggregate failure counts if available
+        if (serverResponse.getFailureCount() != null) {
+          totalFailureCount += serverResponse.getFailureCount();
+          hasFailureCountData = true;
+        }
+
+        // Collect failed segments
+        if (serverResponse.getSampleSegmentReloadFailures() != null
+            && !serverResponse.getSampleSegmentReloadFailures().isEmpty()) {
+          allFailedSegments.addAll(serverResponse.getSampleSegmentReloadFailures());
+        }
+      } catch (Exception e) {
+        response.setTotalServerCallsFailed(response.getTotalServerCallsFailed() + 1);
+      }
+    }
+
+    // Only set failure count if at least one server provided data
+    if (hasFailureCountData) {
+      response.setFailureCount(totalFailureCount);
+    }
+
+    // Set failed segments in response if any were collected
+    if (!allFailedSegments.isEmpty()) {
+      // Limit to prevent huge responses (e.g., max 500 failures across all servers)
+      // This limit is higher than per-server limit since we're aggregating
+      int maxFailuresInResponse = 500;
+      if (allFailedSegments.size() > maxFailuresInResponse) {
+        LOG.warn("Truncating failed segments list from {} to {} for job {}",
+            allFailedSegments.size(), maxFailuresInResponse, reloadJobId);
+        allFailedSegments = allFailedSegments.subList(0, maxFailuresInResponse);
+      }
+      response.setSegmentReloadFailures(allFailedSegments);
+    }
+
+    // Add derived fields
+    final double timeElapsedInMinutes = computeTimeElapsedInMinutes(reloadJobMetadata.getSubmissionTimeMs());
+    final double estimatedRemainingTimeInMinutes =
+        computeEstimatedRemainingTimeInMinutes(response, timeElapsedInMinutes);
+
+    return response.setMetadata(reloadJobMetadata)
+        .setTimeElapsedInMinutes(timeElapsedInMinutes)
+        .setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes)
+        .setStatus(deriveReloadStatus(response));
+  }
+
+  private PinotControllerJobMetadataDto getControllerJobMetadataFromZk(String reloadJobId) {
+    Map<String, String> controllerJobZKMetadata =
+        _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId, ControllerJobTypes.RELOAD_SEGMENT);
+    if (controllerJobZKMetadata == null) {
+      throw new ControllerApplicationException(LOG, "Failed to find controller job id: " + reloadJobId,
+          Response.Status.NOT_FOUND);
+    }
+    try {
+      return JsonUtils.jsonNodeToObject(JsonUtils.objectToJsonNode(controllerJobZKMetadata),
+          PinotControllerJobMetadataDto.class);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Failed to convert metadata to PinotControllerJobDTO", e);
+    }
+  }
+
+  @VisibleForTesting
+  Map<String, List<String>> getServerToSegments(PinotControllerJobMetadataDto job) {
+    if (job.getInstanceToSegmentsMap() != null) {
+      try {
+        return JsonUtils.stringToObject(job.getInstanceToSegmentsMap(), new TypeReference<>() {
+        });
+      } catch (Exception e) {
+        throw new IllegalArgumentException("Failed to parse controller job instanceToSegmentsMap", e);
+      }
+    }
+    return getServerToSegments(job.getTableNameWithType(), job.getSegmentName(), job.getInstanceName());
+  }
+
+  @VisibleForTesting
+  Map<String, List<String>> getServerToSegments(String tableNameWithType, @Nullable String segmentNamesString,
+      @Nullable String instanceName) {
+    if (segmentNamesString == null) {
+      // instanceName can be null or not null, and this method below can handle both cases.
+      return _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, instanceName, true);
+    }
+    // Skip servers and segments not involved in the segment reloading job.
+    List<String> segmentNames = new ArrayList<>();
+    Collections.addAll(segmentNames, StringUtils.split(segmentNamesString, SegmentNameUtils.SEGMENT_NAME_SEPARATOR));
+    if (instanceName != null) {
+      return Map.of(instanceName, segmentNames);
+    }
+    if (segmentNames.size() == 1) {
+      String segmentName = segmentNames.get(0);
+      Map<String, List<String>> serverToSegments = new HashMap<>();
+      Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentName);
+      for (String server : servers) {
+        serverToSegments.put(server, List.of(segmentName));
+      }
+      return serverToSegments;
+    }
+    // TODO: For large tables with many segments, consider adding a HelixResourceManager helper
+    //  that maps servers for a provided segment set directly, rather than fetching the full
+    //  server-to-all-segments map and filtering.
+    Set<String> targetSegments = new HashSet<>(segmentNames);
+    Map<String, List<String>> serverToSegments = new HashMap<>();
+    Map<String, List<String>> serverToAllSegments =
+        _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, null, true);
+    for (Map.Entry<String, List<String>> entry : serverToAllSegments.entrySet()) {
+      List<String> filteredSegments = new ArrayList<>();
+      for (String segmentName : entry.getValue()) {
+        if (targetSegments.contains(segmentName)) {
+          filteredSegments.add(segmentName);
+        }
+      }
+      if (!filteredSegments.isEmpty()) {
+        serverToSegments.put(entry.getKey(), filteredSegments);
+      }
+    }
+    return serverToSegments;
+  }
+}

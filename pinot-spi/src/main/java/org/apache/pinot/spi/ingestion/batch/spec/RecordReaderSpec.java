@@ -22,49 +22,37 @@ import java.io.Serializable;
 import java.util.Map;
 
 
-/**
- * RecordReaderSpec defines how to initialize a RecordReader.
- */
+/// RecordReaderSpec defines how to initialize a RecordReader.
 public class RecordReaderSpec implements Serializable {
 
-  /**
-   * Record data format, e.g. 'avro', 'parquet', 'orc', 'csv', 'json', 'thrift' etc.
-   */
+  /// Record data format, e.g. 'avro', 'parquet', 'orc', 'csv', 'json', 'thrift' etc.
   private String _dataFormat;
 
-  /**
-   * Corresponding RecordReader class name.
-   * E.g.
-   *    org.apache.pinot.plugin.inputformat.avro.AvroRecordReader
-   *    org.apache.pinot.plugin.inputformat.csv.CSVRecordReader
-   *    org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader
-   *    org.apache.pinot.plugin.inputformat.json.JSONRecordReader
-   *    org.apache.pinot.plugin.inputformat.orc.ORCRecordReader
-   *    org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader
-   */
+  /// Corresponding RecordReader class name.
+  /// E.g.
+  ///    org.apache.pinot.plugin.inputformat.avro.AvroRecordReader
+  ///    org.apache.pinot.plugin.inputformat.csv.CSVRecordReader
+  ///    org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader
+  ///    org.apache.pinot.plugin.inputformat.json.JSONRecordReader
+  ///    org.apache.pinot.plugin.inputformat.orc.ORCRecordReader
+  ///    org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader
   private String _className;
 
-  /**
-   * Corresponding RecordReaderConfig class name, it's mandatory for CSV and Thrift file format.
-   * E.g.
-   *    org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig
-   *    org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig
-   */
+  /// Corresponding RecordReaderConfig class name, it's mandatory for CSV and Thrift file format.
+  /// E.g.
+  ///    org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig
+  ///    org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig
   private String _configClassName;
 
-  /**
-   * Used to init RecordReaderConfig class name, this config is required for CSV and Thrift data format.
-   */
+  /// Used to init RecordReaderConfig class name, this config is required for CSV and Thrift data format.
   private Map<String, String> _configs;
 
   public String getDataFormat() {
     return _dataFormat;
   }
 
-  /**
-   * Record data format, e.g. 'avro', 'parquet', 'orc', 'csv', 'json', 'thrift' etc.
-   * @param dataFormat
-   */
+  /// Record data format, e.g. 'avro', 'parquet', 'orc', 'csv', 'json', 'thrift' etc.
+  /// @param dataFormat
   public void setDataFormat(String dataFormat) {
     _dataFormat = dataFormat;
   }
@@ -73,18 +61,16 @@ public class RecordReaderSpec implements Serializable {
     return _className;
   }
 
-  /**
-   * Corresponding RecordReader class name.
-   * E.g.
-   *    org.apache.pinot.plugin.inputformat.avro.AvroRecordReader
-   *    org.apache.pinot.plugin.inputformat.csv.CSVRecordReader
-   *    org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader
-   *    org.apache.pinot.plugin.inputformat.json.JSONRecordReader
-   *    org.apache.pinot.plugin.inputformat.orc.ORCRecordReader
-   *    org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader
-   *
-   * @param className
-   */
+  /// Corresponding RecordReader class name.
+  /// E.g.
+  ///    org.apache.pinot.plugin.inputformat.avro.AvroRecordReader
+  ///    org.apache.pinot.plugin.inputformat.csv.CSVRecordReader
+  ///    org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader
+  ///    org.apache.pinot.plugin.inputformat.json.JSONRecordReader
+  ///    org.apache.pinot.plugin.inputformat.orc.ORCRecordReader
+  ///    org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader
+  ///
+  /// @param className
   public void setClassName(String className) {
     _className = className;
   }
@@ -93,11 +79,9 @@ public class RecordReaderSpec implements Serializable {
     return _configs;
   }
 
-  /**
-   * Used to init RecordReaderConfig class name, this config is required for CSV and Thrift data format.
-   *
-   * @param configs
-   */
+  /// Used to init RecordReaderConfig class name, this config is required for CSV and Thrift data format.
+  ///
+  /// @param configs
   public void setConfigs(Map<String, String> configs) {
     _configs = configs;
   }
@@ -106,14 +90,12 @@ public class RecordReaderSpec implements Serializable {
     return _configClassName;
   }
 
-  /**
-   * Corresponding RecordReaderConfig class name, it's mandatory for CSV and Thrift file format.
-   * E.g.
-   *    org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig
-   *    org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig
-   *
-   * @param configClassName
-   */
+  /// Corresponding RecordReaderConfig class name, it's mandatory for CSV and Thrift file format.
+  /// E.g.
+  ///    org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig
+  ///    org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig
+  ///
+  /// @param configClassName
   public void setConfigClassName(String configClassName) {
     _configClassName = configClassName;
   }

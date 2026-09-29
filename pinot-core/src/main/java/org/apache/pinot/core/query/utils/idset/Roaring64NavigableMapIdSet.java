@@ -28,10 +28,8 @@ import java.nio.ByteBuffer;
 import org.roaringbitmap.longlong.Roaring64NavigableMap;
 
 
-/**
- * The {@code Roaring64NavigableMapIdSet} is an IdSet backed by the {@link Roaring64NavigableMap}, and can be used to
- * store LONG ids.
- */
+/// The `Roaring64NavigableMapIdSet` is an IdSet backed by the [Roaring64NavigableMap], and can be used to
+/// store LONG ids.
 public class Roaring64NavigableMapIdSet implements IdSet {
   private final Roaring64NavigableMap _bitmap;
 
@@ -79,10 +77,9 @@ public class Roaring64NavigableMapIdSet implements IdSet {
     return byteArrayOutputStream.toByteArray();
   }
 
-  /**
-   * Deserializes the Roaring64NavigableMapIdSet from a ByteBuffer.
-   * <p>NOTE: The ByteBuffer does not include the IdSet.Type byte.
-   */
+  /// Deserializes the Roaring64NavigableMapIdSet from a ByteBuffer.
+  ///
+  /// NOTE: The ByteBuffer does not include the IdSet.Type byte.
   static Roaring64NavigableMapIdSet fromByteBuffer(ByteBuffer byteBuffer)
       throws IOException {
     Preconditions.checkArgument(byteBuffer.hasArray(),

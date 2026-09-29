@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator.window.value;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -31,13 +30,12 @@ import org.apache.pinot.query.runtime.operator.window.WindowFunction;
 public abstract class ValueWindowFunction extends WindowFunction {
   //@formatter:off
   public static final Map<String, Class<? extends WindowFunction>> WINDOW_FUNCTION_MAP =
-      ImmutableMap.<String, Class<? extends WindowFunction>>builder()
-          // Value window functions
-          .put("LEAD", LeadValueWindowFunction.class)
-          .put("LAG", LagValueWindowFunction.class)
-          .put("FIRST_VALUE", FirstValueWindowFunction.class)
-          .put("LAST_VALUE", LastValueWindowFunction.class)
-          .build();
+      Map.of(
+          "LEAD", LeadValueWindowFunction.class,
+          "LAG", LagValueWindowFunction.class,
+          "FIRST_VALUE", FirstValueWindowFunction.class,
+          "LAST_VALUE", LastValueWindowFunction.class
+      );
   //@formatter:on
 
   protected final boolean _ignoreNulls;

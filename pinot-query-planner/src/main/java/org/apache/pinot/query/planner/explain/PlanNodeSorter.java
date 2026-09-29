@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.TreeSet;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -37,28 +38,25 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
-/**
- * A utility class used to sort the plan nodes in a deterministic order.
- *
- * Any comparator can be passed to the sort method to sort the plan nodes, although the default comparator
- * is used to sort the plan nodes based on the type and the attributes of the node.
- *
- * Only nodes that are simplifiable will be sorted. See {@link ExplainNodeSimplifier} for more information.
- */
+/// A utility class used to sort the plan nodes in a deterministic order.
+///
+/// Any comparator can be passed to the sort method to sort the plan nodes, although the default comparator
+/// is used to sort the plan nodes based on the type and the attributes of the node.
+///
+/// Only nodes that are simplifiable will be sorted. See [ExplainNodeSimplifier] for more information.
 public class PlanNodeSorter {
 
   private PlanNodeSorter() {
   }
 
-  /**
-   * Applies a default comparator to sort the plan nodes.
-   *
-   * The result may be the same as the input if the plan nodes are already sorted.
-   */
+  /// Applies a default comparator to sort the plan nodes.
+  ///
+  /// The result may be the same as the input if the plan nodes are already sorted.
   public static PlanNode sort(PlanNode planNode) {
     return planNode.visit(new Sorter(), DefaultComparator.INSTANCE);
   }
@@ -89,6 +87,12 @@ public class PlanNodeSorter {
     @Override
     public PlanNode visitJoin(JoinNode node, Comparator<PlanNode> comparator) {
       return defaultNode(node, comparator);
+    }
+
+    @Deprecated(forRemoval = true, since = "1.6.0")
+    @Override
+    public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Comparator<PlanNode> comparator) {
+      return visitJoin(node, comparator);
     }
 
     @Override
@@ -147,6 +151,11 @@ public class PlanNodeSorter {
         return node;
       }
       return node.withInputs(simplifiedChildren);
+    }
+
+    @Override
+    public PlanNode visitUnnest(UnnestNode node, Comparator<PlanNode> comparator) {
+      return defaultNode(node, comparator);
     }
 
     private List<PlanNode> applyToChildren(List<PlanNode> children, Comparator<PlanNode> comparator) {

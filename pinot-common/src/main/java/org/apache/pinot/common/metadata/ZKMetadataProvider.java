@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.common.metadata;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -34,22 +37,26 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.SchemaUtils;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.user.UserConfig;
+import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.ZkPaths;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.TableConfigDecoratorRegistry;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -66,25 +73,28 @@ public class ZKMetadataProvider {
   private static final String CLUSTER_APPLICATION_QUOTAS = "applicationQuotas";
   private static final String PROPERTYSTORE_CONTROLLER_JOBS_PREFIX = "/CONTROLLER_JOBS";
   private static final String PROPERTYSTORE_SEGMENTS_PREFIX = "/SEGMENTS";
+  private static final String PROPERTYSTORE_PAUSELESS_DEBUG_METADATA_PREFIX = "/PAUSELESS_DEBUG_METADATA";
   private static final String PROPERTYSTORE_SCHEMAS_PREFIX = "/SCHEMAS";
   private static final String PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX = "/INSTANCE_PARTITIONS";
   private static final String PROPERTYSTORE_DATABASE_CONFIGS_PREFIX = "/CONFIGS/DATABASE";
   private static final String PROPERTYSTORE_TABLE_CONFIGS_PREFIX = "/CONFIGS/TABLE";
   private static final String PROPERTYSTORE_USER_CONFIGS_PREFIX = "/CONFIGS/USER";
-  private static final String PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX = "/CONFIGS/INSTANCE";
   private static final String PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX = "/CONFIGS/CLUSTER";
   private static final String PROPERTYSTORE_SEGMENT_LINEAGE = "/SEGMENT_LINEAGE";
   private static final String PROPERTYSTORE_MINION_TASK_METADATA_PREFIX = "/MINION_TASK_METADATA";
+  private static final String PROPERTYSTORE_MATERIALIZED_VIEW_DEFINITION_PREFIX =
+      "/CONFIGS/MATERIALIZED_VIEW/DEFINITION";
+  private static final String PROPERTYSTORE_MATERIALIZED_VIEW_RUNTIME_PREFIX = "/CONFIGS/MATERIALIZED_VIEW/RUNTIME";
+  private static final String PROPERTYSTORE_QUERY_WORKLOAD_CONFIGS_PREFIX = "/CONFIGS/QUERYWORKLOAD";
+  private static final String PROPERTYSTORE_TASK_LOCK_SUFFIX = "-Lock";
 
   public static void setUserConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String username, ZNRecord znRecord) {
     propertyStore.set(constructPropertyStorePathForUserConfig(username), znRecord, AccessOption.PERSISTENT);
   }
 
-  /**
-   * Create database config, fail if exists.
-   *
-   * @return true if creation is successful.
-   */
+  /// Create database config, fail if exists.
+  ///
+  /// @return true if creation is successful.
   public static boolean createDatabaseConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
       DatabaseConfig databaseConfig) {
     String databaseName = databaseConfig.getDatabaseName();
@@ -93,11 +103,9 @@ public class ZKMetadataProvider {
     return propertyStore.create(databaseConfigPath, databaseConfigZNRecord, AccessOption.PERSISTENT);
   }
 
-  /**
-   * Update database config.
-   *
-   * @return true if update is successful.
-   */
+  /// Update database config.
+  ///
+  /// @return true if update is successful.
   public static boolean setDatabaseConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, DatabaseConfig databaseConfig) {
     String databaseName = databaseConfig.getDatabaseName();
     ZNRecord databaseConfigZNRecord = toZNRecord(databaseConfig);
@@ -105,17 +113,13 @@ public class ZKMetadataProvider {
         AccessOption.PERSISTENT);
   }
 
-  /**
-   * Remove database config.
-   */
+  /// Remove database config.
   @VisibleForTesting
   public static void removeDatabaseConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String databaseName) {
     propertyStore.remove(constructPropertyStorePathForDatabaseConfig(databaseName), AccessOption.PERSISTENT);
   }
 
-  /**
-   * Remove database config.
-   */
+  /// Remove database config.
   @VisibleForTesting
   public static void removeApplicationQuotas(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     propertyStore.remove(constructPropertyStorePathForControllerConfig(CLUSTER_APPLICATION_QUOTAS),
@@ -158,24 +162,15 @@ public class ZKMetadataProvider {
     }
   }
 
-  @Deprecated
-  public static void setTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
-      ZNRecord znRecord) {
-    propertyStore.set(constructPropertyStorePathForResourceConfig(tableNameWithType), znRecord,
-        AccessOption.PERSISTENT);
-  }
-
-  /**
-   * Create table config, fail if existed.
-   *
-   * @return true if creation is successful.
-   */
+  /// Create table config, fail if existed.
+  ///
+  /// @return true if creation is successful.
   public static boolean createTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, TableConfig tableConfig) {
     String tableNameWithType = tableConfig.getTableName();
     String tableConfigPath = constructPropertyStorePathForResourceConfig(tableNameWithType);
     ZNRecord tableConfigZNRecord;
     try {
-      tableConfigZNRecord = TableConfigUtils.toZNRecord(tableConfig);
+      tableConfigZNRecord = TableConfigSerDeUtils.toZNRecord(tableConfig);
     } catch (Exception e) {
       LOGGER.error("Caught exception constructing ZNRecord from table config for table: {}", tableNameWithType, e);
       return false;
@@ -183,28 +178,24 @@ public class ZKMetadataProvider {
     return propertyStore.create(tableConfigPath, tableConfigZNRecord, AccessOption.PERSISTENT);
   }
 
-  /**
-   * Full override table config.
-   *
-   * @return true if update is successful.
-   */
+  /// Full override table config.
+  ///
+  /// @return true if update is successful.
   public static boolean setTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, TableConfig tableConfig) {
     return setTableConfig(propertyStore, tableConfig, -1);
   }
 
-  /**
-   * Update table config with an expected version. This is to avoid race condition for table config update issued by
-   * multiple clients, especially when update configs in a programmatic way.
-   * The typical usage is to read table config, apply some changes, then update it.
-   *
-   * @return true if update is successful.
-   */
+  /// Update table config with an expected version. This is to avoid race condition for table config update issued by
+  /// multiple clients, especially when update configs in a programmatic way.
+  /// The typical usage is to read table config, apply some changes, then update it.
+  ///
+  /// @return true if update is successful.
   public static boolean setTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, TableConfig tableConfig,
       int expectedVersion) {
     String tableNameWithType = tableConfig.getTableName();
     ZNRecord tableConfigZNRecord;
     try {
-      tableConfigZNRecord = TableConfigUtils.toZNRecord(tableConfig);
+      tableConfigZNRecord = TableConfigSerDeUtils.toZNRecord(tableConfig);
     } catch (Exception e) {
       LOGGER.error("Caught exception constructing ZNRecord from table config for table: {}", tableNameWithType, e);
       return false;
@@ -213,37 +204,12 @@ public class ZKMetadataProvider {
         expectedVersion, AccessOption.PERSISTENT);
   }
 
-  @Deprecated
-  public static void setRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName,
-      ZNRecord znRecord) {
-    setTableConfig(propertyStore, realtimeTableName, znRecord);
-  }
-
-  @Deprecated
-  public static void setOfflineTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String offlineTableName,
-      ZNRecord znRecord) {
-    setTableConfig(propertyStore, offlineTableName, znRecord);
-  }
-
-  public static void setInstanceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      InstanceZKMetadata instanceZKMetadata) {
-    ZNRecord znRecord = instanceZKMetadata.toZNRecord();
-    propertyStore.set(StringUtil.join("/", PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX, instanceZKMetadata.getId()), znRecord,
-        AccessOption.PERSISTENT);
-  }
-
-  public static InstanceZKMetadata getInstanceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String instanceId) {
-    ZNRecord znRecord = propertyStore.get(StringUtil.join("/", PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX, instanceId), null,
-        AccessOption.PERSISTENT);
-    if (znRecord == null) {
-      return null;
-    }
-    return new InstanceZKMetadata(znRecord);
-  }
-
   public static String constructPropertyStorePathForSegment(String resourceName, String segmentName) {
     return StringUtil.join("/", PROPERTYSTORE_SEGMENTS_PREFIX, resourceName, segmentName);
+  }
+
+  public static String constructPropertyStorePathForPauselessDebugMetadata(String resourceName) {
+    return StringUtil.join("/", PROPERTYSTORE_PAUSELESS_DEBUG_METADATA_PREFIX, resourceName);
   }
 
   public static String constructPropertyStorePathForSchema(String schemaName) {
@@ -294,10 +260,44 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, tableNameWithType);
   }
 
+  public static String constructPropertyStorePathForMinionTaskGenerationLock(String tableNameWithType) {
+    return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, tableNameWithType
+        + PROPERTYSTORE_TASK_LOCK_SUFFIX);
+  }
+
+  public static String getPropertyStoreWorkloadConfigsPrefix() {
+    return PROPERTYSTORE_QUERY_WORKLOAD_CONFIGS_PREFIX;
+  }
+
+  public static String constructPropertyStorePathForQueryWorkloadConfig(String workloadName) {
+    return StringUtil.join("/", PROPERTYSTORE_QUERY_WORKLOAD_CONFIGS_PREFIX, workloadName);
+  }
+
   @Deprecated
   public static String constructPropertyStorePathForMinionTaskMetadataDeprecated(String taskType,
       String tableNameWithType) {
     return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, taskType, tableNameWithType);
+  }
+
+  public static String getPropertyStorePathForMaterializedViewDefinitionPrefix() {
+    return PROPERTYSTORE_MATERIALIZED_VIEW_DEFINITION_PREFIX;
+  }
+
+  public static String constructPropertyStorePathForMaterializedViewDefinition(
+      String materializedViewTableNameWithType) {
+    return StringUtil.join("/", PROPERTYSTORE_MATERIALIZED_VIEW_DEFINITION_PREFIX, materializedViewTableNameWithType);
+  }
+
+  public static String getPropertyStorePathForMaterializedViewRuntimePrefix() {
+    return PROPERTYSTORE_MATERIALIZED_VIEW_RUNTIME_PREFIX;
+  }
+
+  public static String constructPropertyStorePathForMaterializedViewRuntime(String materializedViewTableNameWithType) {
+    return StringUtil.join("/", PROPERTYSTORE_MATERIALIZED_VIEW_RUNTIME_PREFIX, materializedViewTableNameWithType);
+  }
+
+  public static String constructPropertyStorePathForLogical(String tableName) {
+    return StringUtil.join("/", ZkPaths.LOGICAL_TABLE_PARENT_PATH, tableName);
   }
 
   public static boolean isSegmentExisted(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceNameForResource,
@@ -329,15 +329,13 @@ public class ZKMetadataProvider {
     }
   }
 
-  /**
-   * Creates a new znode for SegmentZkMetadata. This call is atomic. If there are concurrent calls trying to create the
-   * same znode, only one of them would succeed.
-   *
-   * @param propertyStore Helix property store
-   * @param tableNameWithType Table name with type
-   * @param segmentZKMetadata Segment Zk metadata
-   * @return boolean indicating success/failure
-   */
+  /// Creates a new znode for SegmentZkMetadata. This call is atomic. If there are concurrent calls trying to create the
+  /// same znode, only one of them would succeed.
+  ///
+  /// @param propertyStore Helix property store
+  /// @param tableNameWithType Table name with type
+  /// @param segmentZKMetadata Segment Zk metadata
+  /// @return boolean indicating success/failure
   public static boolean createSegmentZkMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
       SegmentZKMetadata segmentZKMetadata) {
     try {
@@ -371,6 +369,15 @@ public class ZKMetadataProvider {
       String segmentName) {
     return propertyStore.remove(constructPropertyStorePathForSegment(tableNameWithType, segmentName),
         AccessOption.PERSISTENT);
+  }
+
+  public static boolean removePauselessDebugMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType) {
+    String pauselessDebugMetadataPath = constructPropertyStorePathForPauselessDebugMetadata(tableNameWithType);
+    if (propertyStore.exists(pauselessDebugMetadataPath, AccessOption.PERSISTENT)) {
+      return propertyStore.remove(pauselessDebugMetadataPath, AccessOption.PERSISTENT);
+    }
+    return true;
   }
 
   @Nullable
@@ -455,27 +462,23 @@ public class ZKMetadataProvider {
         propertyStore.get(constructPropertyStorePathForDatabaseConfig(databaseName), null, AccessOption.PERSISTENT));
   }
 
-  /**
-   * Get the table config for the given table name with type. Any environment variables and system properties will be
-   * replaced with their actual values.
-   */
+  /// Get the table config for the given table name with type. Any environment variables and system properties will be
+  /// replaced with their actual values.
   @Nullable
   public static TableConfig getTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
-    return getTableConfig(propertyStore, tableNameWithType, true);
+    return getTableConfig(propertyStore, tableNameWithType, true, true);
   }
 
-  /**
-   * Get the table config for the given table name with type
-   *
-   * @param tableNameWithType Table name with type
-   * @param replaceVariables Whether to replace environment variables and system properties with their actual values
-   * @return Table config
-   */
+  /// Get the table config for the given table name with type
+  ///
+  /// @param tableNameWithType Table name with type
+  /// @param replaceVariables Whether to replace environment variables and system properties with their actual values
+  /// @return Table config
   @Nullable
   public static TableConfig getTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
-      boolean replaceVariables) {
+      boolean replaceVariables, boolean applyDecorator) {
     return toTableConfig(propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), null,
-        AccessOption.PERSISTENT), replaceVariables);
+        AccessOption.PERSISTENT), replaceVariables, applyDecorator);
   }
 
   @Nullable
@@ -488,9 +491,7 @@ public class ZKMetadataProvider {
     return tableConfig != null ? ImmutablePair.of(tableConfig, tableConfigStat) : null;
   }
 
-  /**
-   * @return a pair of table config and current version from znRecord, null if table config does not exist.
-   */
+  /// @return a pair of table config and current version from znRecord, null if table config does not exist.
   @Nullable
   public static ImmutablePair<TableConfig, Integer> getTableConfigWithVersion(
       ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
@@ -504,54 +505,48 @@ public class ZKMetadataProvider {
     return ImmutablePair.of(tableConfig, tableConfigStat.getVersion());
   }
 
-  /**
-   * Get the offline table config for the given table name. Any environment variables and system properties will be
-   * replaced with their actual values.
-   *
-   * @param tableName Table name with or without type suffix
-   * @return Table config
-   */
+  /// Get the offline table config for the given table name. Any environment variables and system properties will be
+  /// replaced with their actual values.
+  ///
+  /// @param tableName Table name with or without type suffix
+  /// @return Table config
   @Nullable
   public static TableConfig getOfflineTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
-    return getOfflineTableConfig(propertyStore, tableName, true);
+    return getOfflineTableConfig(propertyStore, tableName, true, true);
   }
 
-  /**
-   * Get the offline table config for the given table name.
-   *
-   * @param tableName Table name with or without type suffix
-   * @param replaceVariables Whether to replace environment variables and system properties with their actual values
-   * @return Table config
-   */
+  /// Get the offline table config for the given table name.
+  ///
+  /// @param tableName Table name with or without type suffix
+  /// @param replaceVariables Whether to replace environment variables and system properties with their actual values
+  /// @return Table config
   @Nullable
   public static TableConfig getOfflineTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName,
-      boolean replaceVariables) {
-    return getTableConfig(propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(tableName), replaceVariables);
+      boolean replaceVariables, boolean applyDecorator) {
+    return getTableConfig(propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(tableName), replaceVariables,
+        applyDecorator);
   }
 
-  /**
-   * Get the realtime table config for the given table name. Any environment variables and system properties will be
-   * replaced with their actual values.
-   *
-   * @param tableName Table name with or without type suffix
-   * @return Table config
-   */
+  /// Get the realtime table config for the given table name. Any environment variables and system properties will be
+  /// replaced with their actual values.
+  ///
+  /// @param tableName Table name with or without type suffix
+  /// @return Table config
   @Nullable
   public static TableConfig getRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
-    return getRealtimeTableConfig(propertyStore, tableName, true);
+    return getRealtimeTableConfig(propertyStore, tableName, true, true);
   }
 
-  /**
-   * Get the realtime table config for the given table name.
-   *
-   * @param tableName Table name with or without type suffix
-   * @param replaceVariables Whether to replace environment variables and system properties with their actual values
-   * @return Table config
-   */
+  /// Get the realtime table config for the given table name.
+  ///
+  /// @param tableName Table name with or without type suffix
+  /// @param replaceVariables Whether to replace environment variables and system properties with their actual values
+  /// @return Table config
   @Nullable
   public static TableConfig getRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName,
-      boolean replaceVariables) {
-    return getTableConfig(propertyStore, TableNameBuilder.REALTIME.tableNameWithType(tableName), replaceVariables);
+      boolean replaceVariables, boolean applyDecorator) {
+    return getTableConfig(propertyStore, TableNameBuilder.REALTIME.tableNameWithType(tableName), replaceVariables,
+        applyDecorator);
   }
 
   public static List<TableConfig> getAllTableConfigs(ZkHelixPropertyStore<ZNRecord> propertyStore) {
@@ -573,23 +568,26 @@ public class ZKMetadataProvider {
       return tableConfigs;
     } else {
       LOGGER.warn("Path: {} does not exist", PROPERTYSTORE_TABLE_CONFIGS_PREFIX);
-      return Collections.emptyList();
+      return List.of();
     }
   }
 
   @Nullable
   private static TableConfig toTableConfig(@Nullable ZNRecord znRecord) {
-    return toTableConfig(znRecord, true);
+    return toTableConfig(znRecord, true, true);
   }
 
   @Nullable
-  private static TableConfig toTableConfig(@Nullable ZNRecord znRecord, boolean replaceVariables) {
+  private static TableConfig toTableConfig(@Nullable ZNRecord znRecord, boolean replaceVariables,
+      boolean applyDecorator) {
     if (znRecord == null) {
       return null;
     }
     try {
-      TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
-      return replaceVariables ? ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(tableConfig) : tableConfig;
+      TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(znRecord);
+      TableConfig processedTableConfig = replaceVariables
+          ? ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(tableConfig) : tableConfig;
+      return applyDecorator ? TableConfigDecoratorRegistry.applyDecorator(processedTableConfig) : tableConfig;
     } catch (Exception e) {
       LOGGER.error("Caught exception while creating table config from ZNRecord: {}", znRecord.getId(), e);
       return null;
@@ -597,7 +595,7 @@ public class ZKMetadataProvider {
   }
 
   public static void setSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, Schema schema) {
-    propertyStore.set(constructPropertyStorePathForSchema(schema.getSchemaName()), SchemaUtils.toZNRecord(schema),
+    propertyStore.set(constructPropertyStorePathForSchema(schema.getSchemaName()), SchemaSerDeUtils.toZNRecord(schema),
         AccessOption.PERSISTENT);
   }
 
@@ -609,82 +607,69 @@ public class ZKMetadataProvider {
       if (schemaZNRecord == null) {
         return null;
       }
-      return SchemaUtils.fromZNRecord(schemaZNRecord);
+      return SchemaSerDeUtils.fromZNRecord(schemaZNRecord);
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting schema: {}", schemaName, e);
       return null;
     }
   }
 
-  /**
-   * Get the schema associated with the given table name.
-   *
-   * @param propertyStore Helix property store
-   * @param tableName Table name with or without type suffix.
-   * @return Schema associated with the given table name.
-   */
+  /// Check if the schema exists in the property store.
+  ///
+  /// @param propertyStore Helix property store
+  /// @param schemaName Schema name
+  /// @return true if the schema exists, false otherwise
+  public static boolean isSchemaExists(ZkHelixPropertyStore<ZNRecord> propertyStore, String schemaName) {
+    return propertyStore.exists(constructPropertyStorePathForSchema(schemaName), AccessOption.PERSISTENT);
+  }
+
+  /// Get the schema associated with the given table name.
+  ///
+  /// @param propertyStore Helix property store
+  /// @param tableName Table name with or without type suffix.
+  /// @return Schema associated with the given table name.
   @Nullable
   public static Schema getTableSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    Schema schema = getSchema(propertyStore, rawTableName);
-    if (schema != null) {
-      return schema;
-    }
-
-    // For backward compatible where schema name is not the same as raw table name
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    // Try to fetch realtime schema first
-    if (tableType == null || tableType == TableType.REALTIME) {
-      TableConfig realtimeTableConfig = getRealtimeTableConfig(propertyStore, tableName);
-      if (realtimeTableConfig != null) {
-        String realtimeSchemaNameFromValidationConfig = realtimeTableConfig.getValidationConfig().getSchemaName();
-        if (realtimeSchemaNameFromValidationConfig != null) {
-          schema = getSchema(propertyStore, realtimeSchemaNameFromValidationConfig);
-        }
-      }
-    }
-    // Try to fetch offline schema if realtime schema does not exist
-    if (schema == null && (tableType == null || tableType == TableType.OFFLINE)) {
-      TableConfig offlineTableConfig = getOfflineTableConfig(propertyStore, tableName);
-      if (offlineTableConfig != null) {
-        String offlineSchemaNameFromValidationConfig = offlineTableConfig.getValidationConfig().getSchemaName();
-        if (offlineSchemaNameFromValidationConfig != null) {
-          schema = getSchema(propertyStore, offlineSchemaNameFromValidationConfig);
-        }
-      }
-    }
-    if (schema != null && LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Schema name does not match raw table name, schema name: {}, raw table name: {}",
-          schema.getSchemaName(), TableNameBuilder.extractRawTableName(tableName));
-    }
-    return schema;
+    return getSchema(propertyStore, TableNameBuilder.extractRawTableName(tableName));
   }
 
-  /**
-   * Get the schema associated with the given table.
-   */
+  /// Get the schema associated with the given table.
+  @Deprecated
   @Nullable
   public static Schema getTableSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, TableConfig tableConfig) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
-    Schema schema = getSchema(propertyStore, rawTableName);
-    if (schema != null) {
-      return schema;
-    }
-    String schemaNameFromTableConfig = tableConfig.getValidationConfig().getSchemaName();
-    if (schemaNameFromTableConfig != null) {
-      schema = getSchema(propertyStore, schemaNameFromTableConfig);
-    }
-    if (schema != null && LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Schema name does not match raw table name, schema name: {}, raw table name: {}",
-          schemaNameFromTableConfig, rawTableName);
-    }
-    return schema;
+    return getTableSchema(propertyStore, tableConfig.getTableName());
   }
 
-  /**
-   * NOTE: this method is very expensive, use {@link #getSegments(ZkHelixPropertyStore, String)} instead if only segment
-   * names are needed.
-   */
+  /// Reads the ZK metadata of the named segments of the given table in a single batched request, and returns it
+  /// index-aligned with `segmentNames`. An entry is `null` when the segment's znode could not be read, either because
+  /// it does not exist or because the read failed; the two are not distinguished.
+  ///
+  /// When `stats` is non-null it is filled with the [Stat] of each segment's znode, also index-aligned with
+  /// `segmentNames`, and `null` wherever the record is `null`.
+  public static List<SegmentZKMetadata> getSegmentsZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType, List<String> segmentNames, @Nullable List<Stat> stats) {
+    int numSegments = segmentNames.size();
+    List<String> paths = new ArrayList<>(numSegments);
+    for (String segmentName : segmentNames) {
+      paths.add(constructPropertyStorePathForSegment(tableNameWithType, segmentName));
+    }
+    List<ZNRecord> znRecords = propertyStore.get(paths, stats, AccessOption.PERSISTENT, false);
+    Preconditions.checkState(znRecords.size() == numSegments,
+        "Got %s segment ZN records for %s segments of table: %s", znRecords.size(), numSegments, tableNameWithType);
+    Preconditions.checkState(stats == null || stats.size() == numSegments,
+        "Got %s znode stats for %s segments of table: %s", stats != null ? stats.size() : 0, numSegments,
+        tableNameWithType);
+    List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>(numSegments);
+    for (ZNRecord znRecord : znRecords) {
+      segmentsZKMetadata.add(znRecord != null ? new SegmentZKMetadata(znRecord) : null);
+    }
+    return segmentsZKMetadata;
+  }
+
+  /// NOTE: this method is very expensive, use [#getSegments(ZkHelixPropertyStore, String)] instead if only
+  /// segment names are needed. Segments whose ZK metadata cannot be read are dropped from the returned list; use
+  /// [#getSegmentsZKMetadata(ZkHelixPropertyStore, String, List, List)] when the result must line up with a known list
+  /// of segments, or when the znodes' [Stat] is needed.
   public static List<SegmentZKMetadata> getSegmentsZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
       String tableNameWithType) {
     String parentPath = constructPropertyStorePathForResource(tableNameWithType);
@@ -708,33 +693,29 @@ public class ZKMetadataProvider {
       return segmentsZKMetadata;
     } else {
       LOGGER.warn("Path: {} does not exist", parentPath);
-      return Collections.emptyList();
+      return List.of();
     }
   }
 
-  /**
-   * Returns the segments for the given table.
-   *
-   * @param propertyStore Helix property store
-   * @param tableNameWithType Table name with type suffix
-   * @return List of segment names
-   */
+  /// Returns the segments for the given table.
+  ///
+  /// @param propertyStore Helix property store
+  /// @param tableNameWithType Table name with type suffix
+  /// @return List of segment names
   public static List<String> getSegments(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
     String segmentsPath = constructPropertyStorePathForResource(tableNameWithType);
     if (propertyStore.exists(segmentsPath, AccessOption.PERSISTENT)) {
       return propertyStore.getChildNames(segmentsPath, AccessOption.PERSISTENT);
     } else {
-      return Collections.emptyList();
+      return List.of();
     }
   }
 
-  /**
-   * Returns the LLC realtime segments for the given table.
-   *
-   * @param propertyStore Helix property store
-   * @param realtimeTableName Realtime table name
-   * @return List of LLC realtime segment names
-   */
+  /// Returns the LLC realtime segments for the given table.
+  ///
+  /// @param propertyStore Helix property store
+  /// @param realtimeTableName Realtime table name
+  /// @return List of LLC realtime segment names
   public static List<String> getLLCRealtimeSegments(ZkHelixPropertyStore<ZNRecord> propertyStore,
       String realtimeTableName) {
     List<String> llcRealtimeSegments = new ArrayList<>();
@@ -839,5 +820,103 @@ public class ZKMetadataProvider {
       }
       return result;
     }
+  }
+
+  public static List<QueryWorkloadConfig> getAllQueryWorkloadConfigs(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    List<ZNRecord> znRecords =
+        propertyStore.getChildren(getPropertyStoreWorkloadConfigsPrefix(), null, AccessOption.PERSISTENT,
+            CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
+    if (znRecords == null) {
+      return List.of();
+    }
+    int numZNRecords = znRecords.size();
+    List<QueryWorkloadConfig> queryWorkloadConfigs = new ArrayList<>(numZNRecords);
+    for (ZNRecord znRecord : znRecords) {
+      queryWorkloadConfigs.add(QueryWorkloadConfigUtils.fromZNRecord(znRecord));
+    }
+    return queryWorkloadConfigs;
+  }
+
+  @Nullable
+  public static QueryWorkloadConfig getQueryWorkloadConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String workloadName) {
+    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForQueryWorkloadConfig(workloadName),
+        null, AccessOption.PERSISTENT);
+    if (znRecord == null) {
+      return null;
+    }
+    return QueryWorkloadConfigUtils.fromZNRecord(znRecord);
+  }
+
+  public static boolean setQueryWorkloadConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      QueryWorkloadConfig queryWorkloadConfig) {
+    String path = constructPropertyStorePathForQueryWorkloadConfig(queryWorkloadConfig.getQueryWorkloadName());
+    boolean isNewConfig = !propertyStore.exists(path, AccessOption.PERSISTENT);
+    ZNRecord znRecord = isNewConfig ? new ZNRecord(queryWorkloadConfig.getQueryWorkloadName())
+        : propertyStore.get(path, null, AccessOption.PERSISTENT);
+    // Update the record with new workload configuration
+    QueryWorkloadConfigUtils.updateZNRecordWithWorkloadConfig(znRecord, queryWorkloadConfig);
+    // Create or update based on existence
+    return isNewConfig ? propertyStore.create(path, znRecord, AccessOption.PERSISTENT)
+        : propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
+  }
+
+  public static void deleteQueryWorkloadConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String workloadName) {
+    String propertyStorePath = constructPropertyStorePathForQueryWorkloadConfig(workloadName);
+    if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
+      propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
+    }
+  }
+
+  public static void setLogicalTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      LogicalTableConfig logicalTableConfig) {
+    try {
+      ZNRecord znRecord = LogicalTableConfigUtils.toZNRecord(logicalTableConfig);
+      String path = constructPropertyStorePathForLogical(logicalTableConfig.getTableName());
+      propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to convert logical table to ZNRecord", e);
+    }
+  }
+
+  public static List<LogicalTableConfig> getAllLogicalTableConfigs(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    List<ZNRecord> znRecords =
+        propertyStore.getChildren(ZkPaths.LOGICAL_TABLE_PARENT_PATH, null, AccessOption.PERSISTENT, 0, 0);
+    if (znRecords != null) {
+      return znRecords.stream().map(znRecord -> {
+        try {
+          return LogicalTableConfigUtils.fromZNRecord(znRecord);
+        } catch (IOException e) {
+          LOGGER.error("Caught exception while converting ZNRecord to LogicalTable: {}", znRecord.getId(), e);
+          return null;
+        }
+      }).filter(Objects::nonNull).collect(Collectors.toList());
+    } else {
+      return List.of();
+    }
+  }
+
+  public static LogicalTableConfig getLogicalTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableName) {
+    try {
+      ZNRecord logicalTableZNRecord =
+          propertyStore.get(constructPropertyStorePathForLogical(tableName), null, AccessOption.PERSISTENT);
+      if (logicalTableZNRecord == null) {
+        return null;
+      }
+      return LogicalTableConfigUtils.fromZNRecord(logicalTableZNRecord);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while getting logical table: {}", tableName, e);
+      return null;
+    }
+  }
+
+  public static boolean isLogicalTableExists(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
+    return propertyStore.exists(constructPropertyStorePathForLogical(tableName), AccessOption.PERSISTENT);
+  }
+
+  public static boolean isTableConfigExists(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
+    return propertyStore.exists(constructPropertyStorePathForResourceConfig(tableNameWithType),
+        AccessOption.PERSISTENT);
   }
 }

@@ -25,10 +25,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -36,15 +40,16 @@ public class QueryOptionsUtilsTest {
   private static final List<String> POSITIVE_INT_KEYS =
       List.of(NUM_REPLICA_GROUPS_TO_QUERY, MAX_EXECUTION_THREADS, NUM_GROUPS_LIMIT, MAX_INITIAL_RESULT_HOLDER_CAPACITY,
           MAX_STREAMING_PENDING_BLOCKS, MAX_ROWS_IN_JOIN, MAX_ROWS_IN_WINDOW);
-  private static final List<String> NON_NEGATIVE_INT_KEYS = List.of(MULTI_STAGE_LEAF_LIMIT);
+  private static final List<String> NON_NEGATIVE_INT_KEYS =
+      List.of(MULTI_STAGE_LEAF_LIMIT, STREAMING_GROUP_BY_FLUSH_THRESHOLD, STREAMING_DISTINCT_FLUSH_THRESHOLD);
   private static final List<String> UNBOUNDED_INT_KEYS =
       List.of(MIN_SEGMENT_GROUP_TRIM_SIZE, MIN_SERVER_GROUP_TRIM_SIZE, MIN_BROKER_GROUP_TRIM_SIZE,
           GROUP_TRIM_THRESHOLD);
   private static final List<String> INT_KEYS = new ArrayList<>() {{
-    addAll(POSITIVE_INT_KEYS);
-    addAll(NON_NEGATIVE_INT_KEYS);
-    addAll(UNBOUNDED_INT_KEYS);
-  }};
+      addAll(POSITIVE_INT_KEYS);
+      addAll(NON_NEGATIVE_INT_KEYS);
+      addAll(UNBOUNDED_INT_KEYS);
+    }};
   private static final List<String> POSITIVE_LONG_KEYS =
       List.of(TIMEOUT_MS, MAX_SERVER_RESPONSE_SIZE_BYTES, MAX_QUERY_RESPONSE_SIZE_BYTES);
 
@@ -62,6 +67,64 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
+  public void shouldResolveSamplerOptionCaseInsensitively() {
+    Map<String, String> resolved = QueryOptionsUtils.resolveCaseInsensitiveOptions(Map.of("SAMPLER", "firstOnly"));
+
+    assertEquals(resolved.get(TABLE_SAMPLER), "firstOnly");
+  }
+
+  @Test
+  public void materializedViewRewriteDefaultsToEnabled() {
+    // Absent option and null map both default to enabled (back-compat with pre-option behavior).
+    assertTrue(QueryOptionsUtils.isMaterializedViewRewriteEnabled(null));
+    assertTrue(QueryOptionsUtils.isMaterializedViewRewriteEnabled(new HashMap<>()));
+    assertTrue(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "true")));
+    assertTrue(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "TRUE")));
+    // Anything that is not "true" disables (explicit false, case variants, and any non-true value).
+    assertFalse(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "false")));
+    assertFalse(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "FALSE")));
+    assertFalse(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "1")));
+  }
+
+  @Test
+  public void shouldExtractTableSamplerOption() {
+    assertEquals(QueryOptionsUtils.getTableSampler(Map.of(TABLE_SAMPLER, "firstOnly")), "firstOnly");
+    assertNull(QueryOptionsUtils.getTableSampler(Map.of()));
+    assertNull(QueryOptionsUtils.getTableSampler(null));
+  }
+
+  @Test
+  public void shouldReadIgnoreMissingSegmentsOption() {
+    // Given:
+    Map<String, String> optsTrue = Map.of(IGNORE_MISSING_SEGMENTS, "true");
+    Map<String, String> optsFalse = Map.of(IGNORE_MISSING_SEGMENTS, "false");
+    Map<String, String> optsMissing = Map.of();
+
+    // Then:
+    org.testng.Assert.assertTrue(QueryOptionsUtils.isIgnoreMissingSegments(optsTrue));
+    org.testng.Assert.assertFalse(QueryOptionsUtils.isIgnoreMissingSegments(optsFalse));
+    org.testng.Assert.assertFalse(QueryOptionsUtils.isIgnoreMissingSegments(optsMissing));
+  }
+
+  @Test
+  public void shouldReadInPredicatePruningThresholdOption() {
+    // Any integer is accepted; a negative value means always attempt IN-predicate pruning
+    assertEquals(QueryOptionsUtils.getInPredicatePruningThreshold(Map.of(IN_PREDICATE_PRUNING_THRESHOLD, "20")), 20);
+    assertEquals(QueryOptionsUtils.getInPredicatePruningThreshold(Map.of(IN_PREDICATE_PRUNING_THRESHOLD, "-1")), -1);
+    assertNull(QueryOptionsUtils.getInPredicatePruningThreshold(Map.of()));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void shouldRejectInvalidInPredicatePruningThreshold() {
+    QueryOptionsUtils.getInPredicatePruningThreshold(Map.of(IN_PREDICATE_PRUNING_THRESHOLD, "invalid"));
+  }
+
+  @Test
   public void testSkipIndexesParsing() {
     String skipIndexesStr = "col1=inverted,range&col2=sorted";
     Map<String, String> queryOptions = Map.of(SKIP_INDEXES, skipIndexesStr);
@@ -70,11 +133,43 @@ public class QueryOptionsUtilsTest {
     assertEquals(skipIndexes.get("col2"), Set.of(FieldConfig.IndexType.SORTED));
   }
 
+  /// Asserts that spaces around column names and index types are ignored.
+  @Test(dataProvider = "skipIndexesWithSpaces")
+  public void testSkipIndexesParsingWithSpaces(String skipIndexesStr) {
+    Map<String, Set<FieldConfig.IndexType>> skipIndexes =
+        QueryOptionsUtils.getSkipIndexes(Map.of(SKIP_INDEXES, skipIndexesStr));
+    assertEquals(skipIndexes, Map.of("col1", Set.of(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE),
+        "col2", Set.of(FieldConfig.IndexType.SORTED)));
+  }
+
+  @DataProvider
+  public Object[][] skipIndexesWithSpaces() {
+    return new Object[][]{
+        {"col1=inverted, range&col2=sorted"},
+        {"col1=inverted,range& col2=sorted"},
+        {" col1 = inverted , range & col2 = sorted "}
+    };
+  }
+
   @Test(expectedExceptions = RuntimeException.class)
   public void testSkipIndexesParsingInvalid() {
     String skipIndexesStr = "col1=inverted,range&col2";
     Map<String, String> queryOptions = Map.of(SKIP_INDEXES, skipIndexesStr);
     QueryOptionsUtils.getSkipIndexes(queryOptions);
+  }
+
+  @Test
+  public void testPlannerRulesParsing() {
+    // Rule names are trimmed, and empty names are dropped
+    Map<String, String> queryOptions = Map.of(USE_PLANNER_RULES, "SortJoinTranspose, AggregateJoinTransposeExtended, ",
+        SKIP_PLANNER_RULES, " FilterIntoJoin ,,FilterAggregateTranspose");
+    assertEquals(QueryOptionsUtils.getUsePlannerRules(queryOptions),
+        Set.of("SortJoinTranspose", "AggregateJoinTransposeExtended"));
+    assertEquals(QueryOptionsUtils.getSkipPlannerRules(queryOptions),
+        Set.of("FilterIntoJoin", "FilterAggregateTranspose"));
+
+    assertEquals(QueryOptionsUtils.getUsePlannerRules(Map.of()), Set.of());
+    assertEquals(QueryOptionsUtils.getSkipPlannerRules(Map.of()), Set.of());
   }
 
   @Test
@@ -145,6 +240,116 @@ public class QueryOptionsUtilsTest {
     }
   }
 
+  @Test
+  public void testGetQueryHashWithValue() {
+    Map<String, String> queryOptions = Map.of(QUERY_HASH, "abc123def456");
+    String actualHash = QueryOptionsUtils.getQueryHash(queryOptions);
+    assertEquals(actualHash, "abc123def456");
+  }
+
+  @Test
+  public void testGetQueryHashWithEmptyString() {
+    Map<String, String> queryOptions = Map.of(QUERY_HASH, "");
+    String actualHash = QueryOptionsUtils.getQueryHash(queryOptions);
+    assertEquals(actualHash, "");
+  }
+
+  @Test
+  public void testGetQueryHashWithoutValue() {
+    Map<String, String> queryOptions = new HashMap<>();
+    String actualHash = QueryOptionsUtils.getQueryHash(queryOptions);
+    assertEquals(actualHash, "");
+  }
+
+  // --- Vector search query option tests ---
+
+  @Test
+  public void testVectorNprobeValid() {
+    assertEquals(QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "8")), Integer.valueOf(8));
+    assertEquals(QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "1")), Integer.valueOf(1));
+    assertEquals(QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "128")), Integer.valueOf(128));
+  }
+
+  @Test
+  public void testVectorNprobeNull() {
+    assertNull(QueryOptionsUtils.getVectorNprobe(Map.of()));
+    assertNull(QueryOptionsUtils.getVectorNprobe(new HashMap<>()));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testVectorNprobeZero() {
+    QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "0"));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testVectorNprobeNegative() {
+    QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "-1"));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testVectorNprobeNonNumeric() {
+    QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "abc"));
+  }
+
+  @Test
+  public void testVectorExactRerank() {
+    org.testng.Assert.assertTrue(QueryOptionsUtils.isVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "true")));
+    org.testng.Assert.assertFalse(QueryOptionsUtils.isVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "false")));
+    org.testng.Assert.assertFalse(QueryOptionsUtils.isVectorExactRerank(Map.of()));
+    assertEquals(QueryOptionsUtils.getVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "true")), Boolean.TRUE);
+    assertEquals(QueryOptionsUtils.getVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "false")), Boolean.FALSE);
+    assertNull(QueryOptionsUtils.getVectorExactRerank(Map.of()));
+  }
+
+  @Test
+  public void testVectorMaxCandidatesValid() {
+    assertEquals(QueryOptionsUtils.getVectorMaxCandidates(Map.of(VECTOR_MAX_CANDIDATES, "100")),
+        Integer.valueOf(100));
+    assertEquals(QueryOptionsUtils.getVectorMaxCandidates(Map.of(VECTOR_MAX_CANDIDATES, "1")),
+        Integer.valueOf(1));
+  }
+
+  @Test
+  public void testVectorMaxCandidatesNull() {
+    assertNull(QueryOptionsUtils.getVectorMaxCandidates(Map.of()));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testVectorMaxCandidatesZero() {
+    QueryOptionsUtils.getVectorMaxCandidates(Map.of(VECTOR_MAX_CANDIDATES, "0"));
+  }
+
+  @Test
+  public void testVectorNprobeCaseInsensitiveResolution() {
+    Map<String, String> opts = Map.of("VECTORNPROBE", "16");
+    Map<String, String> resolved = QueryOptionsUtils.resolveCaseInsensitiveOptions(opts);
+    assertEquals(QueryOptionsUtils.getVectorNprobe(resolved), Integer.valueOf(16));
+  }
+
+  @Test
+  public void testInvertedIndexDistinctCostRatioValid() {
+    assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
+        Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, "0")), Double.valueOf(0));
+    assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
+        Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, "2.5")), Double.valueOf(2.5));
+    assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
+        Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, " 3.5 ")), Double.valueOf(3.5));
+    assertNull(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(Map.of()));
+  }
+
+  @Test
+  public void testInvertedIndexDistinctCostRatioRejectsNonFiniteValues() {
+    for (String value : new String[]{"NaN", "Infinity", "-Infinity", "-1", "invalid"}) {
+      try {
+        QueryOptionsUtils.getInvertedIndexDistinctCostRatio(Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, value));
+        fail();
+      } catch (IllegalArgumentException e) {
+        assertEquals(e.getMessage(),
+            INVERTED_INDEX_DISTINCT_COST_RATIO + " must be a non-negative number, got: " + value);
+      }
+    }
+  }
+
   private static Object getValue(Map<String, String> map, String key) {
     switch (key) {
       // Positive ints
@@ -165,6 +370,10 @@ public class QueryOptionsUtilsTest {
       // Non-negative ints
       case MULTI_STAGE_LEAF_LIMIT:
         return QueryOptionsUtils.getMultiStageLeafLimit(map);
+      case STREAMING_GROUP_BY_FLUSH_THRESHOLD:
+        return QueryOptionsUtils.getStreamingGroupByFlushThreshold(map);
+      case STREAMING_DISTINCT_FLUSH_THRESHOLD:
+        return QueryOptionsUtils.getStreamingDistinctFlushThreshold(map);
       // Unbounded ints
       case MIN_SEGMENT_GROUP_TRIM_SIZE:
         return QueryOptionsUtils.getMinSegmentGroupTrimSize(map);
@@ -184,5 +393,21 @@ public class QueryOptionsUtilsTest {
       default:
         throw new IllegalArgumentException("Unexpected key!");
     }
+  }
+
+  @Test
+  public void testGetLiteModeImplicitLeafStageLimit() {
+    Map<String, String> queryOptions = new HashMap<>();
+
+    // Absent → null
+    assertNull(QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(queryOptions));
+
+    // Present → parsed value
+    queryOptions.put(LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT, "42");
+    assertEquals(QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(queryOptions), Integer.valueOf(42));
+
+    // Zero
+    queryOptions.put(LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT, "0");
+    assertEquals(QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(queryOptions), Integer.valueOf(0));
   }
 }

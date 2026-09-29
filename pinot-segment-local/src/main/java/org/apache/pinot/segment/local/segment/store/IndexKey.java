@@ -20,31 +20,21 @@ package org.apache.pinot.segment.local.segment.store;
 
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
-/**
- * Class representing index name and type
- */
+/// Class representing index name and type
 public class IndexKey implements Comparable<IndexKey> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(IndexKey.class);
-
   final String _name;
   final IndexType<?, ?, ?> _type;
 
-  /**
-   * @param name column name
-   * @param type index type
-   */
+  /// @param name column name
+  /// @param type index type
   public IndexKey(String name, IndexType<?, ?, ?> type) {
     _name = name;
     _type = type;
   }
 
-  /**
-   * @throws IllegalArgumentException if there is no index with the given index id
-   */
+  /// @throws IllegalArgumentException if there is no index with the given index id
   public static IndexKey fromIndexName(String name, String indexName) {
     IndexType<?, ?, ?> type = IndexService.getInstance().get(indexName);
     return new IndexKey(name, type);

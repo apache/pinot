@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.ByteString;
 import org.apache.calcite.plan.RelOptCluster;
@@ -36,6 +37,7 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexUnknownAs;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
@@ -48,9 +50,11 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
 import org.apache.calcite.util.TimestampString;
+import org.apache.pinot.common.function.scalar.arithmetic.NegateScalarFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,11 +119,13 @@ public class RexExpressionUtils {
       }
       case FLOAT: {
         assert value != null;
-        return rexBuilder.makeApproxLiteral(BigDecimal.valueOf((float) value));
+        return rexBuilder.makeApproxLiteral((double) value,
+            rexBuilder.getTypeFactory().createSqlType(SqlTypeName.REAL));
       }
       case DOUBLE: {
         assert value != null;
-        return rexBuilder.makeApproxLiteral(BigDecimal.valueOf((double) value));
+        return rexBuilder.makeApproxLiteral((double) value,
+            rexBuilder.getTypeFactory().createSqlType(SqlTypeName.DOUBLE));
       }
       case BIG_DECIMAL: {
         assert value != null;
@@ -134,7 +140,6 @@ public class RexExpressionUtils {
         TimestampString tsString = TimestampString.fromMillisSinceEpoch((long) value);
         return rexBuilder.makeTimestampLiteral(tsString, 1);
       }
-      case JSON:
       case STRING: {
         assert value != null;
         return rexBuilder.makeLiteral((String) value);
@@ -146,16 +151,9 @@ public class RexExpressionUtils {
         ByteString byteString = new ByteString(bytes);
         return rexBuilder.makeBinaryLiteral(byteString);
       }
-      case BOOLEAN_ARRAY:
-      case BYTES_ARRAY:
-      case DOUBLE_ARRAY:
-      case FLOAT_ARRAY:
-      case INT_ARRAY:
-      case LONG_ARRAY:
-      case STRING_ARRAY:
-      case TIMESTAMP_ARRAY:
-      case OBJECT:
-      case UNKNOWN:
+      case UUID:
+        assert value != null;
+        return rexBuilder.makeUuidLiteral(UuidUtils.toUUID((ByteArray) value));
       default:
         throw new IllegalStateException("Unsupported ColumnDataType: " + literal.getDataType());
     }
@@ -244,10 +242,10 @@ public class RexExpressionUtils {
         value = ((BigDecimal) value).longValue();
         break;
       case FLOAT:
-        value = ((BigDecimal) value).floatValue();
+        value = ((Double) value).floatValue();
         break;
       case DOUBLE:
-        value = ((BigDecimal) value).doubleValue();
+        value = ((Number) value).doubleValue();
         break;
       case BIG_DECIMAL:
         break;
@@ -271,6 +269,9 @@ public class RexExpressionUtils {
       case BYTES:
         value = new ByteArray(((ByteString) value).getBytes());
         break;
+      case UUID:
+        value = new ByteArray(UuidUtils.toBytes((UUID) value));
+        break;
       default:
         throw new IllegalStateException("Unsupported ColumnDataType: " + dataType);
     }
@@ -285,6 +286,14 @@ public class RexExpressionUtils {
         return handleReinterpret(rexCall);
       case SEARCH:
         return handleSearch(rexCall);
+      case MINUS_PREFIX:
+        // Without this explicit case the default branch calls getFunctionName(), which returns
+        // SqlKind.MINUS_PREFIX.name() = "MINUS_PREFIX". That canonicalizes to "minusprefix", which is
+        // not registered in FunctionRegistry. Map directly to NegateScalarFunction's registered name.
+        // Note: PLUS_PREFIX is intentionally not handled here. Calcite's StandardConvertletTable strips
+        // UNARY_PLUS during SqlNode -> RexNode conversion, so it never reaches this switch.
+        return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(rexCall.type),
+            NegateScalarFunction.FUNCTION_NAME, fromRexNodes(rexCall.operands));
       default:
         return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(rexCall.type),
             getFunctionName(rexCall.op), fromRexNodes(rexCall.operands));
@@ -293,11 +302,28 @@ public class RexExpressionUtils {
 
   private static String getFunctionName(SqlOperator operator) {
     switch (operator.kind) {
-      case OTHER:
+      case OTHER: {
         // NOTE: SqlStdOperatorTable.CONCAT has OTHER kind and "||" as name
-        return operator.getName().equals("||") ? "CONCAT" : operator.getName();
-      case OTHER_FUNCTION:
-        return operator.getName();
+        String name = operator.getName();
+        return name.equals("||") ? "CONCAT" : name;
+      }
+      case OTHER_FUNCTION: {
+        // See https://github.com/apache/pinot/pull/16658
+        // If null handling is disabled, functions `is null` and `is not null` are registered as OTHER_FUNCTION with
+        // name "IS NULL" and "IS NOT NULL".
+        // They have to be registered with these names in order to be recognized in the SQL parser, but at the same
+        // time, servers won't recognize function names with spaces. This is why we convert them to "IS_NULL" and
+        // "IS_NOT_NULL" here to match the SqlKind name.
+        String name = operator.getName();
+        switch (name) {
+          case "IS NULL":
+            return SqlKind.IS_NULL.name();
+          case "IS NOT NULL":
+            return SqlKind.IS_NOT_NULL.name();
+          default:
+            return name;
+        }
+      }
       default:
         return operator.kind.name();
     }
@@ -314,9 +340,7 @@ public class RexExpressionUtils {
     return new RexExpression.FunctionCall(castType, SqlKind.CAST.name(), operands);
   }
 
-  /**
-   * Reinterpret is a pass-through function that does not change the type of the input.
-   */
+  /// Reinterpret is a pass-through function that does not change the type of the input.
   private static RexExpression handleReinterpret(RexCall rexCall) {
     assert rexCall.operands.size() == 1;
     return fromRexNode(rexCall.operands.get(0));
@@ -330,14 +354,105 @@ public class RexExpressionUtils {
     Sarg sarg = searchArgument.getValueAs(Sarg.class);
     assert sarg != null;
     if (sarg.isPoints()) {
-      return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(),
+      if (leftOperand instanceof RexLiteral) {
+        return evaluateLiteralIn((RexLiteral) leftOperand, sarg.rangeSet.asRanges(), sarg.nullAs);
+      }
+      RexExpression inExpr = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(),
           toSearchFunctionOperands(leftOperand, sarg.rangeSet.asRanges(), dataType));
+      return addNullCheckIfRequired(leftOperand, sarg.nullAs, inExpr);
     } else if (sarg.isComplementedPoints()) {
-      return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(),
+      if (leftOperand instanceof RexLiteral) {
+        return evaluateLiteralNotIn((RexLiteral) leftOperand, sarg.rangeSet.complement().asRanges(), sarg.nullAs);
+      }
+      RexExpression notInExpr = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(),
           toSearchFunctionOperands(leftOperand, sarg.rangeSet.complement().asRanges(), dataType));
+      return addNullCheckIfRequired(leftOperand, sarg.nullAs, notInExpr);
     } else {
-      Set<Range> ranges = sarg.rangeSet.asRanges();
-      return convertRangesToOr(dataType, leftOperand, ranges);
+      if (leftOperand instanceof RexLiteral) {
+        return evaluateLiteralOrRanges((RexLiteral) leftOperand, sarg.rangeSet.asRanges(), sarg.nullAs);
+      }
+      RexExpression orExpr = convertRangesToOr(dataType, leftOperand, sarg.rangeSet.asRanges());
+      return addNullCheckIfRequired(leftOperand, sarg.nullAs, orExpr);
+    }
+  }
+
+  private static RexExpression evaluateLiteralIn(RexLiteral leftOperand, Set<Range> ranges, RexUnknownAs nullAs) {
+    // No need to do normal evaluation if the literal is a null literal and nulls need to be included/excluded, so we
+    // can return early. Otherwise, continue with normal evaluation
+    if (leftOperand.isNull() && nullAs != RexUnknownAs.UNKNOWN) {
+      return fromRexUnknownAs(nullAs);
+    }
+    Comparable leftVal = leftOperand.getValue();
+    for (Range range : ranges) {
+      if (range.lowerEndpoint().equals(leftVal)) {
+        return RexExpression.Literal.TRUE;
+      }
+    }
+    return RexExpression.Literal.FALSE;
+  }
+
+  private static RexExpression evaluateLiteralNotIn(RexLiteral leftOperand, Set<Range> ranges, RexUnknownAs nullAs) {
+    // No need to do normal evaluation if the literal is a null literal and nulls need to be included/excluded, so we
+    // can return early. Otherwise, continue with normal evaluation
+    if (leftOperand.isNull() && nullAs != RexUnknownAs.UNKNOWN) {
+      return fromRexUnknownAs(nullAs);
+    }
+    Comparable leftVal = leftOperand.getValue();
+    for (Range range : ranges) {
+      if (range.lowerEndpoint().equals(leftVal)) {
+        return RexExpression.Literal.FALSE;
+      }
+    }
+    return RexExpression.Literal.TRUE;
+  }
+
+  private static RexExpression evaluateLiteralOrRanges(RexLiteral leftOperand, Set<Range> ranges, RexUnknownAs nullAs) {
+    // No need to do normal evaluation if the literal is a null literal and nulls need to be included/excluded, so we
+    // can return early. If the literal is a null literal but nulls should be treated as unknown, we cannot continue
+    // with normal evaluation because it fails for null values and we cannot evaluate an unknown value anyway, so we
+    // return false instead
+    if (leftOperand.isNull()) {
+      if (nullAs != RexUnknownAs.UNKNOWN) {
+        return fromRexUnknownAs(nullAs);
+      }
+      return RexExpression.Literal.FALSE;
+    }
+    Comparable leftVal = leftOperand.getValue();
+    for (Range range : ranges) {
+      if (range.contains(leftVal)) {
+        return RexExpression.Literal.TRUE;
+      }
+    }
+    return RexExpression.Literal.FALSE;
+  }
+
+  private static RexExpression fromRexUnknownAs(RexUnknownAs nullAs) {
+    switch (nullAs) {
+      case TRUE:
+        return RexExpression.Literal.TRUE;
+
+      case FALSE:
+        return RexExpression.Literal.FALSE;
+
+      default:
+        throw new IllegalArgumentException("Unsupported RexUnknownAs: " + nullAs);
+    }
+  }
+
+  private static RexExpression addNullCheckIfRequired(RexNode leftOperand, RexUnknownAs nullAs, RexExpression expr) {
+    switch (nullAs) {
+      case TRUE:
+        RexExpression isNullExpr = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IS_NULL.name(),
+            List.of(fromRexNode(leftOperand)));
+        return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.OR.name(), List.of(expr, isNullExpr));
+
+      case FALSE:
+        RexExpression isNotNullExpr = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IS_NOT_NULL.name(),
+            List.of(fromRexNode(leftOperand)));
+        return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.AND.name(), List.of(expr, isNotNullExpr));
+
+      default:
+        return expr;
     }
   }
 
@@ -397,9 +512,7 @@ public class RexExpressionUtils {
         List.of(leftOperand, fromRexLiteralValue(dataType, range.upperEndpoint())));
   }
 
-  /**
-   * Transforms a set of <b>point based</b> ranges into a list of expressions.
-   */
+  /// Transforms a set of **point based** ranges into a list of expressions.
   private static List<RexExpression> toSearchFunctionOperands(RexNode leftOperand, Set<Range> ranges,
       ColumnDataType dataType) {
     List<RexExpression> operands = new ArrayList<>(1 + ranges.size());

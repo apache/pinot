@@ -22,13 +22,13 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.primitives.Longs;
-import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
 import java.io.IOException;
+import java.lang.foreign.MemorySegment;
 import java.nio.ByteBuffer;
 import org.apache.datasketches.cpc.CpcSketch;
-import org.apache.datasketches.memory.Memory;
-import org.apache.datasketches.theta.Sketch;
+import org.apache.datasketches.theta.ThetaSketch;
+import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.pinot.segment.local.customobject.AvgPair;
@@ -44,26 +44,18 @@ public class CustomSerDeUtils {
   private CustomSerDeUtils() {
   }
 
-  /**
-   * Serializer/De-serializer for a specific type of object.
-   *
-   * @param <T> Type of the object
-   */
+  /// Serializer/De-serializer for a specific type of object.
+  ///
+  /// @param <T> Type of the object
   public interface ObjectSerDe<T> {
 
-    /**
-     * Serializes a value into a byte array.
-     */
+    /// Serializes a value into a byte array.
     byte[] serialize(T value);
 
-    /**
-     * De-serializes a value from a byte array.
-     */
+    /// De-serializes a value from a byte array.
     T deserialize(byte[] bytes);
 
-    /**
-     * De-serializes a value from a byte buffer.
-     */
+    /// De-serializes a value from a byte buffer.
     T deserialize(ByteBuffer byteBuffer);
   }
 
@@ -223,26 +215,24 @@ public class CustomSerDeUtils {
 
     @Override
     public byte[] serialize(TDigest tDigest) {
-      byte[] bytes = new byte[tDigest.byteSize()];
-      tDigest.asBytes(ByteBuffer.wrap(bytes));
-      return bytes;
+      return TDigestUtils.serialize(tDigest);
     }
 
     @Override
     public TDigest deserialize(byte[] bytes) {
-      return MergingDigest.fromBytes(ByteBuffer.wrap(bytes));
+      return TDigestUtils.deserialize(bytes);
     }
 
     @Override
     public TDigest deserialize(ByteBuffer byteBuffer) {
-      return MergingDigest.fromBytes(byteBuffer);
+      return TDigestUtils.deserialize(byteBuffer);
     }
   };
 
-  public static final ObjectSerDe<Sketch> DATA_SKETCH_THETA_SER_DE = new ObjectSerDe<Sketch>() {
+  public static final ObjectSerDe<ThetaSketch> DATA_SKETCH_THETA_SER_DE = new ObjectSerDe<ThetaSketch>() {
 
     @Override
-    public byte[] serialize(Sketch value) {
+    public byte[] serialize(ThetaSketch value) {
       // The serializer should respect existing ordering to enable "early stop"
       // optimisations on unions.
       if (!value.isCompact()) {
@@ -252,36 +242,36 @@ public class CustomSerDeUtils {
     }
 
     @Override
-    public Sketch deserialize(byte[] bytes) {
-      return Sketch.wrap(Memory.wrap(bytes));
+    public ThetaSketch deserialize(byte[] bytes) {
+      return ThetaSketch.wrap(MemorySegment.ofArray(bytes).asReadOnly());
     }
 
     @Override
-    public Sketch deserialize(ByteBuffer byteBuffer) {
+    public ThetaSketch deserialize(ByteBuffer byteBuffer) {
       byte[] bytes = new byte[byteBuffer.remaining()];
       byteBuffer.get(bytes);
-      return Sketch.wrap(Memory.wrap(bytes));
+      return ThetaSketch.wrap(MemorySegment.ofArray(bytes).asReadOnly());
     }
   };
 
-  public static final ObjectSerDe<org.apache.datasketches.tuple.Sketch<IntegerSummary>> DATA_SKETCH_INT_TUPLE_SER_DE =
-      new ObjectSerDe<org.apache.datasketches.tuple.Sketch<IntegerSummary>>() {
+  public static final ObjectSerDe<TupleSketch<IntegerSummary>> DATA_SKETCH_INT_TUPLE_SER_DE =
+      new ObjectSerDe<TupleSketch<IntegerSummary>>() {
         @Override
-        public byte[] serialize(org.apache.datasketches.tuple.Sketch<IntegerSummary> value) {
+        public byte[] serialize(TupleSketch<IntegerSummary> value) {
           return value.compact().toByteArray();
         }
 
         @Override
-        public org.apache.datasketches.tuple.Sketch<IntegerSummary> deserialize(byte[] bytes) {
-          return org.apache.datasketches.tuple.Sketches.heapifySketch(Memory.wrap(bytes),
+        public TupleSketch<IntegerSummary> deserialize(byte[] bytes) {
+          return TupleSketch.heapifySketch(MemorySegment.ofArray(bytes),
               new IntegerSummaryDeserializer());
         }
 
         @Override
-        public org.apache.datasketches.tuple.Sketch<IntegerSummary> deserialize(ByteBuffer byteBuffer) {
+        public TupleSketch<IntegerSummary> deserialize(ByteBuffer byteBuffer) {
           byte[] bytes = new byte[byteBuffer.remaining()];
           byteBuffer.get(bytes);
-          return org.apache.datasketches.tuple.Sketches.heapifySketch(Memory.wrap(bytes),
+          return TupleSketch.heapifySketch(MemorySegment.ofArray(bytes),
               new IntegerSummaryDeserializer());
         }
       };
@@ -295,14 +285,14 @@ public class CustomSerDeUtils {
 
     @Override
     public CpcSketch deserialize(byte[] bytes) {
-      return CpcSketch.heapify(Memory.wrap(bytes));
+      return CpcSketch.heapify(MemorySegment.ofArray(bytes));
     }
 
     @Override
     public CpcSketch deserialize(ByteBuffer byteBuffer) {
       byte[] bytes = new byte[byteBuffer.remaining()];
       byteBuffer.get(bytes);
-      return CpcSketch.heapify(Memory.wrap(bytes));
+      return CpcSketch.heapify(MemorySegment.ofArray(bytes));
     }
   };
 

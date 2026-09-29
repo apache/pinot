@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -47,7 +47,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-public class SegmentColumnarIndexCreatorTest {
+public class SegmentColumnarIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentColumnarIndexCreatorTest");
   private static final File CONFIG_FILE = new File(TEMP_DIR, "config");
   private static final String COLUMN_NAME = "testColumn";
@@ -109,20 +109,25 @@ public class SegmentColumnarIndexCreatorTest {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(indexDirPath);
     config.setSegmentName(segmentName);
+    IndexSegment indexSegment = null;
+
     try {
       FileUtils.deleteQuietly(new File(indexDirPath));
 
       GenericRow row = new GenericRow();
       row.putValue(timeColumn, testDateTime);
-      List<GenericRow> rows = ImmutableList.of(row);
+      List<GenericRow> rows = List.of(row);
 
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(config, new GenericRowRecordReader(rows));
       driver.build();
-      IndexSegment indexSegment = ImmutableSegmentLoader.load(new File(indexDirPath, segmentName), ReadMode.heap);
+      indexSegment = ImmutableSegmentLoader.load(new File(indexDirPath, segmentName), ReadMode.heap);
       SegmentMetadata md = indexSegment.getSegmentMetadata();
       return md.getStartTime();
     } finally {
+      if (indexSegment != null) {
+        indexSegment.destroy();
+      }
       FileUtils.deleteQuietly(new File(indexDirPath));
     }
   }

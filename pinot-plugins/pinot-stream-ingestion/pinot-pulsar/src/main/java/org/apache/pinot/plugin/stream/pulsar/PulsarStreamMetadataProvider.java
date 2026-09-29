@@ -34,19 +34,17 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.TransientConsumerException;
+import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.SubscriptionMode;
-import org.apache.pulsar.client.util.ConsumerName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A {@link StreamMetadataProvider} implementation for the Pulsar stream
- */
+/// A [StreamMetadataProvider] implementation for the Pulsar stream
 public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnectionHandler
     implements StreamMetadataProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarStreamMetadataProvider.class);
@@ -85,16 +83,14 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
     return partitionIds;
   }
 
-  /**
-   * Fetch the messageId and use it as offset.
-   * If offset criteria is smallest, the message id of earliest record in the partition is returned.
-   * If offset criteria is largest, the message id of the largest record in the partition is returned.
-   * throws {@link IllegalArgumentException} if the offset criteria is invalid
-   * throws {@link PulsarClientException} if there was an error from pulsar server on requesting message ids.
-   * @param offsetCriteria offset criteria to fetch {@link StreamPartitionMsgOffset}.
-   *                       Depends on the semantics of the stream e.g. smallest, largest for Kafka
-   * @param timeoutMillis fetch timeout
-   */
+  /// Fetch the messageId and use it as offset.
+  /// If offset criteria is smallest, the message id of earliest record in the partition is returned.
+  /// If offset criteria is largest, the message id of the largest record in the partition is returned.
+  /// throws [IllegalArgumentException] if the offset criteria is invalid
+  /// throws [PulsarClientException] if there was an error from pulsar server on requesting message ids.
+  /// @param offsetCriteria offset criteria to fetch [StreamPartitionMsgOffset].
+  ///                       Depends on the semantics of the stream e.g. smallest, largest for Kafka
+  /// @param timeoutMillis fetch timeout
   @Override
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
@@ -119,10 +115,8 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
     }
   }
 
-  /**
-   * We assume 1:1 mapping from partitionGroupId to partitionId in pulsar. This works because pulsar doesn't have
-   * the concept of child partitions as well as reducing the current number of partition.
-   */
+  /// We assume 1:1 mapping from partitionGroupId to partitionId in pulsar. This works because pulsar doesn't have
+  /// the concept of child partitions as well as reducing the current number of partition.
   @Override
   public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis) {
@@ -134,7 +128,7 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
               partitionGroupConsumptionStatus.getStartOffset()));
     }
 
-    String subscription = ConsumerName.generateRandomName();
+    String subscription = UUID.randomUUID().toString();
     try {
       List<String> partitionedTopicNameList = _pulsarClient.getPartitionsForTopic(_topic).get();
 
@@ -176,5 +170,47 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
   public void close()
       throws IOException {
     super.close();
+  }
+
+  @Override
+  public List<TopicMetadata> getTopics() {
+    try (PulsarAdmin pulsarAdmin = createPulsarAdmin()) {
+      // List to store all topics
+      List<TopicMetadata> allTopics = new ArrayList<>();
+
+      for (String tenant : pulsarAdmin.tenants().getTenants()) {
+        for (String namespace : pulsarAdmin.namespaces().getNamespaces(tenant)) {
+          // Fetch all topics for the namespace
+          List<String> topicNames = pulsarAdmin.topics().getList(namespace);
+
+          // Map topics to PulsarTopicMetadata and add to the list
+          topicNames.stream()
+              .map(topicName -> new PulsarTopicMetadata().setName(topicName))
+              .forEach(allTopics::add);
+        }
+      }
+
+      return allTopics;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to list Pulsar topics across all tenants and namespaces", e);
+    }
+  }
+
+  @Override
+  public boolean supportsOffsetLag() {
+    return false;
+  }
+
+  public static class PulsarTopicMetadata implements TopicMetadata {
+    private String _name;
+
+    public String getName() {
+      return _name;
+    }
+
+    public PulsarTopicMetadata setName(String name) {
+      _name = name;
+      return this;
+    }
   }
 }

@@ -53,24 +53,20 @@ public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateE
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Apply a single-value entry to the predicate.
-   *
-   * @param value Raw value
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a single-value entry to the predicate.
+  ///
+  /// @param value Raw value
+  /// @return Whether the entry matches the predicate
   @Override
   public boolean applySV(int value) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Apply a multi-value entry to the predicate.
-   *
-   * @param values Array of raw values
-   * @param length Number of values in the entry
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a multi-value entry to the predicate.
+  ///
+  /// @param values Array of raw values
+  /// @param length Number of values in the entry
+  /// @return Whether the entry matches the predicate
   @SuppressWarnings("Duplicates")
   @Override
   public boolean applyMV(int[] values, int length) {
@@ -169,6 +165,26 @@ public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateE
   @Override
   public boolean applySV(BigDecimal value) {
     throw new UnsupportedOperationException();
+  }
+
+  @SuppressWarnings("Duplicates")
+  @Override
+  public boolean applyMV(BigDecimal[] values, int length) {
+    if (isExclusive()) {
+      for (int i = 0; i < length; i++) {
+        if (!applySV(values[i])) {
+          return false;
+        }
+      }
+      return true;
+    } else {
+      for (int i = 0; i < length; i++) {
+        if (applySV(values[i])) {
+          return true;
+        }
+      }
+      return false;
+    }
   }
 
   @Override

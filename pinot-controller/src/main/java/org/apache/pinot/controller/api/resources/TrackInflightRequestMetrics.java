@@ -24,11 +24,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import javax.ws.rs.NameBinding;
 
-/**
- * JAX-RS annotation used to enable request metrics interceptor {@link InflightRequestMetricsInterceptor}.
- *
- * See {@link PinotSegmentUploadDownloadRestletResource#downloadSegment} for an example of its usage.
- */
+/// JAX-RS annotation used to enable request metrics interceptor [InflightRequestMetricsInterceptor].
+///
+/// See [PinotSegmentUploadDownloadRestletResource#downloadSegment] for an example of its usage.
 @NameBinding
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)

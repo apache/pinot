@@ -29,9 +29,7 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
-/**
- * Record reader for AVRO file.
- */
+/// Record reader for AVRO file.
 public class TestRecordReader implements RecordReader {
 
   List<GenericRow> _rows = new ArrayList<>();

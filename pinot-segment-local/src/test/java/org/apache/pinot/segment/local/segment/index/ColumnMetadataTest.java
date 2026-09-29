@@ -20,8 +20,8 @@ package org.apache.pinot.segment.local.segment.index;
 
 import java.io.File;
 import java.net.URL;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -29,38 +29,49 @@ import java.util.stream.Stream;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.partition.function.BoundedColumnValuePartitionFunction;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
-import org.apache.pinot.segment.local.segment.index.loader.defaultcolumn.DefaultColumnStatistics;
+import org.apache.pinot.segment.local.segment.creator.impl.BaseSegmentCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
+import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.spi.partition.BoundedColumnValuePartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment.SEGMENT_PADDING_CHARACTER;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.*;
 
 
 public class ColumnMetadataTest {
   private static final String AVRO_DATA = "data/test_data-mv.avro";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ColumnMetadataTest");
   private static final String CREATOR_VERSION = "TestHadoopJar.1.1.1";
+  private static final String RAW_TABLE_NAME = "testTable";
 
   @BeforeMethod
   public void setUp()
@@ -73,66 +84,129 @@ public class ColumnMetadataTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  public SegmentGeneratorConfig createSegmentConfigWithoutCreator()
-      throws Exception {
-    final String filePath =
-        TestUtils.getFileFromResourceUrl(ColumnMetadataTest.class.getClassLoader().getResource(AVRO_DATA));
-    // Intentionally changed this to TimeUnit.Hours to make it non-default for testing.
+  public SegmentGeneratorConfig createSegmentConfigWithoutCreator() {
+    URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
+    assertNotNull(resource);
+    String filePath = TestUtils.getFileFromResourceUrl(resource);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(List.of("column4", "column7"))
+        .build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("column3", DataType.STRING)
+        .addSingleValueDimension("column4", DataType.STRING)
+        .addMultiValueDimension("column6", DataType.INT)
+        .addMultiValueDimension("column7", DataType.INT)
+        .addDateTime("daysSinceEpoch", DataType.INT, "EPOCH|HOURS", "1:HOURS")
+        .build();
     SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
-            TimeUnit.HOURS, "testTable");
+        SegmentTestUtils.getSegmentGeneratorConfig(new File(filePath), FileFormat.AVRO, INDEX_DIR, RAW_TABLE_NAME,
+            tableConfig, schema);
     config.setSegmentNamePostfix("1");
     return config;
   }
 
-  public SegmentGeneratorConfig createSegmentConfigWithCreator()
-      throws Exception {
+  public SegmentGeneratorConfig createSegmentConfigWithCreator() {
     SegmentGeneratorConfig config = createSegmentConfigWithoutCreator();
     config.setCreatorVersion(CREATOR_VERSION);
     return config;
   }
 
   public void verifySegmentAfterLoading(SegmentMetadata segmentMetadata) {
-    // Multi-value numeric dimension column.
-    ColumnMetadata col7Meta = segmentMetadata.getColumnMetadataFor("column7");
-    Assert.assertEquals(col7Meta.getFieldSpec(), new DimensionFieldSpec("column7", DataType.INT, false));
-    Assert.assertEquals(col7Meta.getCardinality(), 359);
-    Assert.assertEquals(col7Meta.getTotalDocs(), 100000);
-    Assert.assertEquals(col7Meta.getBitsPerElement(), 9);
-    Assert.assertEquals(col7Meta.getColumnMaxLength(), 0);
-    Assert.assertFalse(col7Meta.isSorted());
-    Assert.assertTrue(col7Meta.hasDictionary());
-    Assert.assertEquals(col7Meta.getMaxNumberOfMultiValues(), 24);
-    Assert.assertEquals(col7Meta.getTotalNumberOfEntries(), 134090);
-    Assert.assertFalse(col7Meta.isAutoGenerated());
-
-    // Single-value string dimension column.
+    // Single-value dictionary-encoded string dimension column
     ColumnMetadata col3Meta = segmentMetadata.getColumnMetadataFor("column3");
-    Assert.assertEquals(col3Meta.getFieldSpec(), new DimensionFieldSpec("column3", DataType.STRING, true));
-    Assert.assertEquals(col3Meta.getCardinality(), 5);
-    Assert.assertEquals(col3Meta.getTotalDocs(), 100000);
-    Assert.assertEquals(col3Meta.getBitsPerElement(), 3);
-    Assert.assertEquals(col3Meta.getColumnMaxLength(), 4);
-    Assert.assertFalse(col3Meta.isSorted());
-    Assert.assertTrue(col3Meta.hasDictionary());
-    Assert.assertEquals(col3Meta.getMaxNumberOfMultiValues(), 0);
-    Assert.assertEquals(col3Meta.getTotalNumberOfEntries(), 100000);
-    Assert.assertFalse(col3Meta.isAutoGenerated());
+    assertEquals(col3Meta.getFieldSpec(), new DimensionFieldSpec("column3", DataType.STRING, true));
+    assertEquals(col3Meta.getTotalDocs(), 100000);
+    assertEquals(col3Meta.getCardinality(), 5);
+    assertTrue(col3Meta.hasDictionary());
+    assertFalse(col3Meta.isSorted());
+    assertEquals(col3Meta.getMinValue(), "");
+    assertEquals(col3Meta.getMaxValue(), "w");
+    assertFalse(col3Meta.isMinMaxValueInvalid());
+    assertEquals(col3Meta.getLengthOfShortestElement(), 0);
+    assertEquals(col3Meta.getLengthOfLongestElement(), 4);
+    assertTrue(col3Meta.isAscii());
+    assertEquals(col3Meta.getTotalNumberOfEntries(), 100000);
+    assertEquals(col3Meta.getMaxNumberOfMultiValues(), 0);
+    assertEquals(col3Meta.getMaxRowLengthInBytes(), 4);
+    assertEquals(col3Meta.getBitsPerElement(), 3);
+    assertFalse(col3Meta.isAutoGenerated());
 
-    // Time column.
-    // FIXME: Currently it is modeled as dimension in the auto-generated schema
+    // Single-value raw string dimension column
+    ColumnMetadata col4Meta = segmentMetadata.getColumnMetadataFor("column4");
+    assertEquals(col4Meta.getFieldSpec(), new DimensionFieldSpec("column4", DataType.STRING, true));
+    assertEquals(col4Meta.getTotalDocs(), 100000);
+    assertEquals(col4Meta.getCardinality(), 5);
+    assertFalse(col4Meta.hasDictionary());
+    assertFalse(col4Meta.isSorted());
+    assertEquals(col4Meta.getMinValue(), "");
+    assertEquals(col4Meta.getMaxValue(), "w");
+    assertFalse(col4Meta.isMinMaxValueInvalid());
+    assertEquals(col4Meta.getLengthOfShortestElement(), 0);
+    assertEquals(col4Meta.getLengthOfLongestElement(), 4);
+    assertTrue(col4Meta.isAscii());
+    assertEquals(col4Meta.getTotalNumberOfEntries(), 100000);
+    assertEquals(col4Meta.getMaxNumberOfMultiValues(), 0);
+    assertEquals(col4Meta.getMaxRowLengthInBytes(), 4);
+    assertEquals(col4Meta.getBitsPerElement(), -1);
+    assertFalse(col4Meta.isAutoGenerated());
+
+    // Multi-value dictionary-encoded int dimension column
+    ColumnMetadata col6Meta = segmentMetadata.getColumnMetadataFor("column6");
+    assertEquals(col6Meta.getFieldSpec(), new DimensionFieldSpec("column6", DataType.INT, false));
+    assertEquals(col6Meta.getTotalDocs(), 100000);
+    assertEquals(col6Meta.getCardinality(), 18499);
+    assertTrue(col6Meta.hasDictionary());
+    assertFalse(col6Meta.isSorted());
+    assertEquals(col6Meta.getMinValue(), 1001);
+    assertEquals(col6Meta.getMaxValue(), 2147483647);
+    assertFalse(col6Meta.isMinMaxValueInvalid());
+    assertEquals(col6Meta.getLengthOfShortestElement(), 4);
+    assertEquals(col6Meta.getLengthOfLongestElement(), 4);
+    assertFalse(col6Meta.isAscii());
+    assertEquals(col6Meta.getTotalNumberOfEntries(), 106688);
+    assertEquals(col6Meta.getMaxNumberOfMultiValues(), 13);
+    assertEquals(col6Meta.getMaxRowLengthInBytes(), 52);
+    assertEquals(col6Meta.getBitsPerElement(), 15);
+    assertFalse(col6Meta.isAutoGenerated());
+
+    // Multi-value raw int dimension column
+    ColumnMetadata col7Meta = segmentMetadata.getColumnMetadataFor("column7");
+    assertEquals(col7Meta.getFieldSpec(), new DimensionFieldSpec("column7", DataType.INT, false));
+    assertEquals(col7Meta.getTotalDocs(), 100000);
+    assertEquals(col7Meta.getCardinality(), 359);
+    assertFalse(col7Meta.hasDictionary());
+    assertFalse(col7Meta.isSorted());
+    assertEquals(col7Meta.getMinValue(), 201);
+    assertEquals(col7Meta.getMaxValue(), 2147483647);
+    assertFalse(col7Meta.isMinMaxValueInvalid());
+    assertEquals(col7Meta.getLengthOfShortestElement(), 4);
+    assertEquals(col7Meta.getLengthOfLongestElement(), 4);
+    assertFalse(col7Meta.isAscii());
+    assertEquals(col7Meta.getTotalNumberOfEntries(), 134090);
+    assertEquals(col7Meta.getMaxNumberOfMultiValues(), 24);
+    assertEquals(col7Meta.getMaxRowLengthInBytes(), 96);
+    assertEquals(col7Meta.getBitsPerElement(), -1);
+    assertFalse(col7Meta.isAutoGenerated());
+
+    // Date-time column
     ColumnMetadata timeColumn = segmentMetadata.getColumnMetadataFor("daysSinceEpoch");
-    Assert.assertEquals(timeColumn.getFieldSpec(), new DimensionFieldSpec("daysSinceEpoch", DataType.INT, true));
-    Assert.assertEquals(timeColumn.getColumnName(), "daysSinceEpoch");
-    Assert.assertEquals(timeColumn.getCardinality(), 1);
-    Assert.assertEquals(timeColumn.getTotalDocs(), 100000);
-    Assert.assertEquals(timeColumn.getBitsPerElement(), 1);
-    Assert.assertEquals(timeColumn.getColumnMaxLength(), 0);
-    Assert.assertTrue(timeColumn.isSorted());
-    Assert.assertTrue(timeColumn.hasDictionary());
-    Assert.assertEquals(timeColumn.getMaxNumberOfMultiValues(), 0);
-    Assert.assertEquals(timeColumn.getTotalNumberOfEntries(), 100000);
-    Assert.assertFalse(timeColumn.isAutoGenerated());
+    assertEquals(timeColumn.getFieldSpec(),
+        new DateTimeFieldSpec("daysSinceEpoch", DataType.INT, "EPOCH|HOURS", "1:HOURS"));
+    assertEquals(timeColumn.getTotalDocs(), 100000);
+    assertEquals(timeColumn.getCardinality(), 1);
+    assertTrue(timeColumn.hasDictionary());
+    assertTrue(timeColumn.isSorted());
+    assertEquals(timeColumn.getMinValue(), 1756015683);
+    assertEquals(timeColumn.getMaxValue(), 1756015683);
+    assertFalse(timeColumn.isMinMaxValueInvalid());
+    assertEquals(timeColumn.getLengthOfShortestElement(), 4);
+    assertEquals(timeColumn.getLengthOfLongestElement(), 4);
+    assertFalse(timeColumn.isAscii());
+    assertEquals(timeColumn.getTotalNumberOfEntries(), 100000);
+    assertEquals(timeColumn.getMaxNumberOfMultiValues(), 0);
+    assertEquals(timeColumn.getMaxRowLengthInBytes(), 4);
+    assertEquals(timeColumn.getBitsPerElement(), 1);
+    assertFalse(timeColumn.isAutoGenerated());
   }
 
   @Test
@@ -140,7 +214,7 @@ public class ColumnMetadataTest {
       throws Exception {
     // Build the Segment metadata.
     SegmentGeneratorConfig config = createSegmentConfigWithCreator();
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
 
@@ -150,7 +224,7 @@ public class ColumnMetadataTest {
 
     // Make sure we got the creator name as well.
     String creatorName = segmentMetadata.getCreatorName();
-    Assert.assertEquals(creatorName, CREATOR_VERSION);
+    assertEquals(creatorName, CREATOR_VERSION);
   }
 
   @Test
@@ -158,7 +232,7 @@ public class ColumnMetadataTest {
       throws Exception {
     // Build the Segment metadata.
     SegmentGeneratorConfig config = createSegmentConfigWithoutCreator();
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
 
@@ -167,7 +241,7 @@ public class ColumnMetadataTest {
     verifySegmentAfterLoading(segmentMetadata);
 
     // Make sure we get null for creator name.
-    Assert.assertNull(segmentMetadata.getCreatorName());
+    assertNull(segmentMetadata.getCreatorName());
   }
 
   @Test
@@ -175,7 +249,7 @@ public class ColumnMetadataTest {
       throws Exception {
     // Build the Segment metadata.
     SegmentGeneratorConfig config = createSegmentConfigWithoutCreator();
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
 
@@ -193,9 +267,9 @@ public class ColumnMetadataTest {
     functionConfig.put("columnValues", "P,w,L");
     functionConfig.put("columnValuesDelimiter", ",");
     SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(
-        Collections.singletonMap("column3", new ColumnPartitionConfig("BoundedColumnValue", 4, functionConfig)));
+        Map.of("column3", new ColumnPartitionConfig("BoundedColumnValue", 4, functionConfig)));
     config.setSegmentPartitionConfig(segmentPartitionConfig);
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
 
@@ -203,15 +277,15 @@ public class ColumnMetadataTest {
     SegmentMetadata segmentMetadata = new SegmentMetadataImpl(INDEX_DIR.listFiles()[0]);
     verifySegmentAfterLoading(segmentMetadata);
     // Make sure we get null for creator name.
-    Assert.assertNull(segmentMetadata.getCreatorName());
+    assertNull(segmentMetadata.getCreatorName());
 
     // Verify segment partitioning metadata.
     ColumnMetadata col3Meta = segmentMetadata.getColumnMetadataFor("column3");
-    Assert.assertNotNull(col3Meta.getPartitionFunction());
-    Assert.assertTrue(col3Meta.getPartitionFunction() instanceof BoundedColumnValuePartitionFunction);
-    Assert.assertEquals(col3Meta.getPartitionFunction().getNumPartitions(), 4);
-    Assert.assertEquals(col3Meta.getPartitionFunction().getFunctionConfig(), functionConfig);
-    Assert.assertEquals(col3Meta.getPartitions(), Stream.of(0, 1, 2, 3).collect(Collectors.toSet()));
+    assertNotNull(col3Meta.getPartitionFunction());
+    assertTrue(col3Meta.getPartitionFunction() instanceof BoundedColumnValuePartitionFunction);
+    assertEquals(col3Meta.getPartitionFunction().getNumPartitions(), 4);
+    assertEquals(col3Meta.getPartitionFunction().getFunctionConfig(), functionConfig);
+    assertEquals(col3Meta.getPartitions(), Stream.of(0, 1, 2, 3).collect(Collectors.toSet()));
   }
 
   @Test
@@ -223,25 +297,165 @@ public class ColumnMetadataTest {
     File metadataFile = new File(resource.getFile());
     PropertiesConfiguration propertiesConfiguration = CommonsConfigurationUtils.fromFile(metadataFile);
     ColumnMetadataImpl installationOutput =
-        ColumnMetadataImpl.fromPropertiesConfiguration("installation_output", propertiesConfiguration);
-    Assert.assertEquals(installationOutput.getMinValue(),
+        ColumnMetadataImpl.fromPropertiesConfiguration(propertiesConfiguration, 6478, "installation_output");
+    assertEquals(installationOutput.getMinValue(),
         "\r\n\r\n  utils   em::C:\\dir\\utils\r\nPSParentPath            : Mi");
   }
 
   @Test
-  public void testComplexFieldSpec() {
-    ComplexFieldSpec intMapFieldSpec = new ComplexFieldSpec("intMap", DataType.MAP, true, Map.of(
-        "key", new DimensionFieldSpec("key", DataType.STRING, true),
-        "value", new DimensionFieldSpec("value", DataType.INT, true)
-    ));
-    ColumnIndexCreationInfo columnIndexCreationInfo =
-        new ColumnIndexCreationInfo(new DefaultColumnStatistics(null, null, null, false, 1, 1), false, false, false,
-            Map.of());
+  public void testMaxRowLengthInBytesPersistedForMvVarLength() {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("mvString", DataType.STRING, false);
+    ColumnStatistics stats = mock(ColumnStatistics.class);
+    when(stats.getLengthOfShortestElement()).thenReturn(2);
+    when(stats.getLengthOfLongestElement()).thenReturn(10);
+    when(stats.getMaxNumberOfMultiValues()).thenReturn(5);
+    // Real per-row max (42) deliberately differs from the naive maxMV * longest (50) so the assertion
+    // fails if the reader silently falls back to the derived formula.
+    when(stats.getMaxRowLengthInBytes()).thenReturn(42);
+    when(stats.getTotalNumberOfEntries()).thenReturn(20);
+
     PropertiesConfiguration config = new PropertiesConfiguration();
-    config.setProperty(SEGMENT_PADDING_CHARACTER, String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR));
-    SegmentColumnarIndexCreator.addColumnMetadataInfo(config, "intMap", columnIndexCreationInfo, 1, intMapFieldSpec,
-        false, -1);
-    ColumnMetadataImpl intMapColumnMetadata = ColumnMetadataImpl.fromPropertiesConfiguration("intMap", config);
-    Assert.assertEquals(intMapColumnMetadata.getFieldSpec(), intMapFieldSpec);
+    BaseSegmentCreator.addColumnMetadataInfo(config, "mvString", stats, 10, fieldSpec, false, -1,
+        FieldConfig.EncodingType.RAW, false);
+    ColumnMetadataImpl meta = ColumnMetadataImpl.fromPropertiesConfiguration(config, 10, "mvString");
+    assertEquals(meta.getMaxRowLengthInBytes(), 42);
+  }
+
+  @Test
+  public void testMaxRowLengthInBytesAbsentForMvVarLengthFallsBackToUnavailable() {
+    // Simulate a pre-1.6.0 segment: MV var-length column whose metadata predates MAX_ROW_LENGTH_IN_BYTES.
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("mvString", DataType.STRING, false);
+    ColumnStatistics stats = mock(ColumnStatistics.class);
+    when(stats.getLengthOfShortestElement()).thenReturn(2);
+    when(stats.getLengthOfLongestElement()).thenReturn(10);
+    when(stats.getMaxNumberOfMultiValues()).thenReturn(5);
+    when(stats.getMaxRowLengthInBytes()).thenReturn(42);
+    when(stats.getTotalNumberOfEntries()).thenReturn(20);
+
+    PropertiesConfiguration config = new PropertiesConfiguration();
+    BaseSegmentCreator.addColumnMetadataInfo(config, "mvString", stats, 10, fieldSpec, false, -1,
+        FieldConfig.EncodingType.RAW, false);
+    config.clearProperty("column.mvString.maxRowLengthInBytes");
+    ColumnMetadataImpl meta = ColumnMetadataImpl.fromPropertiesConfiguration(config, 10, "mvString");
+    assertEquals(meta.getMaxRowLengthInBytes(), ColumnMetadata.UNAVAILABLE);
+  }
+
+  @Test
+  public void testMaxRowLengthInBytesForSvAndFixedMv() {
+    // SV columns derive maxRowLengthInBytes from the longest element regardless of what was persisted.
+    ColumnMetadataImpl svFixed = new ColumnMetadataImpl.Builder()
+        .setFieldSpec(new DimensionFieldSpec("svInt", DataType.INT, true))
+        .build();
+    assertEquals(svFixed.getMaxRowLengthInBytes(), 4);
+
+    ColumnMetadataImpl svVarLength = new ColumnMetadataImpl.Builder()
+        .setFieldSpec(new DimensionFieldSpec("svString", DataType.STRING, true))
+        .setLengthOfLongestElement(7)
+        .build();
+    assertEquals(svVarLength.getMaxRowLengthInBytes(), 7);
+
+    // Fixed-width MV columns derive maxRowLengthInBytes from maxNumberOfMultiValues * storedType.size().
+    ColumnMetadataImpl mvFixed = new ColumnMetadataImpl.Builder()
+        .setFieldSpec(new DimensionFieldSpec("mvInt", DataType.INT, false))
+        .setMaxNumberOfMultiValues(13)
+        .build();
+    assertEquals(mvFixed.getMaxRowLengthInBytes(), 52);
+  }
+
+  @Test
+  public void testComplexFieldSpec() {
+    ComplexFieldSpec intMapFieldSpec = new ComplexFieldSpec("intMap", DataType.MAP, true,
+        Map.of("key", new DimensionFieldSpec("key", DataType.STRING, true), "value",
+            new DimensionFieldSpec("value", DataType.INT, true)));
+    PropertiesConfiguration config = new PropertiesConfiguration();
+    BaseSegmentCreator.addColumnMetadataInfo(config, "intMap", mock(ColumnStatistics.class), 1, intMapFieldSpec, false,
+        -1, FieldConfig.EncodingType.RAW, false);
+    ColumnMetadataImpl intMapColumnMetadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "intMap");
+    assertEquals(intMapColumnMetadata.getFieldSpec(), intMapFieldSpec);
+  }
+
+  @Test
+  public void testColumnMetadataEqualityIncludesForwardIndexEncoding() {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("col", DataType.INT, true);
+    ColumnMetadataImpl dictForwardMetadata = new ColumnMetadataImpl.Builder()
+        .setFieldSpec(fieldSpec)
+        .setHasDictionary(true)
+        .setForwardIndexEncoding(FieldConfig.EncodingType.DICTIONARY)
+        .build();
+    ColumnMetadataImpl rawForwardMetadata = new ColumnMetadataImpl.Builder()
+        .setFieldSpec(fieldSpec)
+        .setHasDictionary(true)
+        .setForwardIndexEncoding(FieldConfig.EncodingType.RAW)
+        .build();
+
+    assertNotEquals(dictForwardMetadata, rawForwardMetadata);
+    assertNotEquals(dictForwardMetadata.hashCode(), rawForwardMetadata.hashCode());
+    assertTrue(dictForwardMetadata.toString().contains("_forwardIndexEncoding=DICTIONARY"));
+  }
+
+  @Test
+  public void testForwardIndexEncodingIsExposedInJson()
+      throws Exception {
+    ColumnMetadataImpl rawMetadata = new ColumnMetadataImpl.Builder()
+        .setFieldSpec(new DimensionFieldSpec("col", DataType.INT, true))
+        .setHasDictionary(false)
+        .setForwardIndexEncoding(FieldConfig.EncodingType.RAW)
+        .build();
+    String json = JsonUtils.objectToString(rawMetadata);
+    assertTrue(json.contains("\"forwardIndexEncoding\":\"RAW\""),
+        "Expected forwardIndexEncoding in JSON output but got: " + json);
+  }
+
+  @Test
+  public void testSetAndCheckIndexSizes() {
+    ColumnMetadataImpl meta =
+        new ColumnMetadataImpl.Builder().setFieldSpec(new DimensionFieldSpec("col", DataType.STRING, true)).build();
+    meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.json()), 12345L);
+    meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.h3()), 0xffffffffffffL);
+    meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.vector()), 0);
+
+    assertEquals(meta.getNumIndexes(), 3);
+    assertEquals(meta.getIndexSizeFor(StandardIndexes.json()), 12345L);
+    assertEquals(meta.getIndexSizeFor(StandardIndexes.h3()), 0xffffffffffffL);
+    assertEquals(meta.getIndexSizeFor(StandardIndexes.vector()), 0);
+    assertEquals(meta.getIndexSizeFor(StandardIndexes.inverted()), ColumnMetadata.UNAVAILABLE);
+
+    try {
+      meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.fst()), -1);
+      fail();
+    } catch (IllegalArgumentException e) {
+      assertEquals(e.getMessage(), "Index size should be a non-negative integer value between 0 and 281474976710655");
+    }
+  }
+
+  @Test
+  public void testBadTimeColumnWithoutContinueOnError()
+      throws Exception {
+    SegmentGeneratorConfig config = createSegmentConfigWithCreator();
+    // column4 is not a time column and should cause an exception to be thrown when the segment is sealed and time
+    // metadata is being parsed and written
+    config.setTimeColumnName("column4");
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config);
+    assertThrows(NumberFormatException.class, driver::build);
+  }
+
+  @Test
+  public void testBadTimeColumnWithContinueOnError()
+      throws Exception {
+    SegmentGeneratorConfig config = createSegmentConfigWithCreator();
+
+    // column4 is not a time column and should cause an exception to be thrown when the segment is sealed and time
+    // metadata is being parsed and written
+    config.setTimeColumnName("column4");
+    config.setContinueOnError(true);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config);
+    driver.build();
+
+    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(INDEX_DIR.listFiles()[0]);
+    assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
+    assertEquals(segmentMetadata.getStartTime(), TimeUtils.getValidMinTimeMillis());
+    assertTrue(System.currentTimeMillis() - segmentMetadata.getEndTime() < 60_000L);
   }
 }

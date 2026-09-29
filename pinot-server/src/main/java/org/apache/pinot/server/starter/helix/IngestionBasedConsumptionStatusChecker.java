@@ -25,10 +25,14 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,10 +45,8 @@ public abstract class IngestionBasedConsumptionStatusChecker {
   private final Map<String, Set<String>> _caughtUpSegmentsByTable = new HashMap<>();
   private final Function<String, Set<String>> _consumingSegmentsSupplier;
 
-  /**
-   * Both consumingSegmentsByTable and consumingSegmentsSupplier are provided as it can be costly to get
-   * consumingSegmentsByTable via the supplier, so only use it when any missing segment is detected.
-   */
+  /// Both consumingSegmentsByTable and consumingSegmentsSupplier are provided as it can be costly to get
+  /// consumingSegmentsByTable via the supplier, so only use it when any missing segment is detected.
   public IngestionBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager,
       Map<String, Set<String>> consumingSegmentsByTable, Function<String, Set<String>> consumingSegmentsSupplier) {
     _instanceDataManager = instanceDataManager;
@@ -70,6 +72,8 @@ public abstract class IngestionBasedConsumptionStatusChecker {
       }
       Set<String> consumingSegments = tableSegments.getValue();
       Set<String> caughtUpSegments = _caughtUpSegmentsByTable.computeIfAbsent(tableNameWithType, k -> new HashSet<>());
+      boolean skippedSegmentsLogged = false;
+
       for (String segName : consumingSegments) {
         if (caughtUpSegments.contains(segName)) {
           continue;
@@ -92,9 +96,27 @@ public abstract class IngestionBasedConsumptionStatusChecker {
             continue;
           }
           RealtimeSegmentDataManager rtSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-          if (isSegmentCaughtUp(segName, rtSegmentDataManager)) {
+          RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
+
+          StreamMetadataProvider streamMetadataProvider =
+              realtimeTableDataManager.getStreamMetadataProvider(rtSegmentDataManager);
+
+          if (!streamMetadataProvider.supportsOffsetLag()) {
+            // Cannot conclude if segment has caught up or not. Skip such segments.
+            if (!skippedSegmentsLogged) {
+              _logger.warn(
+                  "Stream provider for table: {} does not support offset subtraction. Cannot conclude if the segment "
+                      + "has caught up. Skipping the segments.",
+                  realtimeTableDataManager.getTableName());
+              skippedSegmentsLogged = true;
+            }
+            caughtUpSegments.add(segName);
+          } else if (isSegmentCaughtUp(segName, rtSegmentDataManager, realtimeTableDataManager)) {
             caughtUpSegments.add(segName);
           }
+        } catch (Exception e) {
+          _logger.warn("Exception checking consumption status for segment: {} from table: {}. "
+              + "Treating as not caught up.", segName, tableNameWithType, e);
         } finally {
           tableDataManager.releaseSegment(segmentDataManager);
         }
@@ -134,5 +156,28 @@ public abstract class IngestionBasedConsumptionStatusChecker {
     return numLaggingSegments;
   }
 
-  protected abstract boolean isSegmentCaughtUp(String segmentName, RealtimeSegmentDataManager rtSegmentDataManager);
+  protected abstract boolean isSegmentCaughtUp(String segmentName, RealtimeSegmentDataManager rtSegmentDataManager,
+      RealtimeTableDataManager realtimeTableDataManager);
+
+  protected boolean isOffsetCaughtUp(String segmentName, @Nullable StreamPartitionMsgOffset currentOffset,
+      @Nullable StreamPartitionMsgOffset latestOffset) {
+    if (currentOffset != null && latestOffset != null) {
+      // Kafka's "latest" offset is actually the next available offset. Therefore it will be 1 ahead of the
+      // current offset in the case we are caught up.
+      // TODO: implement a way to have this work correctly for kafka consumers
+      try {
+        return currentOffset.compareTo(latestOffset) >= 0;
+      } catch (NullPointerException e) {
+        // This can happen if the offsets are not comparable,
+        // Eg: Sequence number missing for a kinesis shard
+        _logger.info("Unable to compare offsets for segment {} - current offset: {}, latest offset: {}. "
+            + "Will check consumption status later", segmentName, currentOffset, latestOffset);
+      }
+    }
+    _logger.info(
+        "Null offset found for segment: {} - current offset: {}, latest offset: {}. Will check consumption status "
+            + "later",
+        segmentName, currentOffset, latestOffset);
+    return false;
+  }
 }

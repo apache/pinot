@@ -18,23 +18,14 @@
  */
 package org.apache.pinot.spi.utils.retry;
 
-/**
- * The <code>RetriableOperationException</code> indicates that the retriable operation threw an exception.
- */
+/// The `RetriableOperationException` indicates that the retriable operation threw an exception.
 public class RetriableOperationException extends AttemptFailureException {
-
-  private int _attempts = 0;
-
-  public int getAttempts() {
-    return _attempts;
-  }
 
   public RetriableOperationException(Throwable cause) {
     super(cause);
   }
 
   public RetriableOperationException(Throwable cause, int attempts) {
-    super(cause);
-    _attempts = attempts;
+    super(cause, attempts);
   }
 }

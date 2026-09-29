@@ -26,9 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Recommend varied len dictionary on varied len data type (String/Byte type )
- */
+/// Recommend varied len dictionary on varied len data type (String/Byte type )
 public class VariedLengthDictionaryRule extends AbstractRule {
   private static final Logger LOGGER = LoggerFactory.getLogger(VariedLengthDictionaryRule.class);
 

@@ -26,9 +26,7 @@ public class SegmentAssignmentTestUtils {
   private SegmentAssignmentTestUtils() {
   }
 
-  /**
-   * Returns a list of names.
-   */
+  /// Returns a list of names.
   public static List<String> getNameList(String namePrefix, int numNames) {
     List<String> names = new ArrayList<>(numNames);
     for (int nameId = 0; nameId < numNames; nameId++) {

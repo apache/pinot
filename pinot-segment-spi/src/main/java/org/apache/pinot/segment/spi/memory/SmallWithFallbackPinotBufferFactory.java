@@ -23,15 +23,13 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 
 
-/**
- * A factory that receives two delegates, using one when the requested buffer can be indexes with integers and the other
- * in the other case.
- *
- * This is commonly used to use ByteBuffers when possible. The utility of that is questionable, as it can increase the
- * number of megamorphic calls in the hot path and also make errors related with -XX:MaxDirectMemorySize more
- * indeterministic. But it is also the default behavior of Pinot, so it is kept as the default for compatibility
- * reasons.
- */
+/// A factory that receives two delegates, using one when the requested buffer can be indexes with integers and the
+/// other in the other case.
+///
+/// This is commonly used to use ByteBuffers when possible. The utility of that is questionable, as it can increase the
+/// number of megamorphic calls in the hot path and also make errors related with -XX:MaxDirectMemorySize more
+/// indeterministic. But it is also the default behavior of Pinot, so it is kept as the default for compatibility
+/// reasons.
 public class SmallWithFallbackPinotBufferFactory implements PinotBufferFactory {
   private final PinotBufferFactory _small;
   private final PinotBufferFactory _fallback;

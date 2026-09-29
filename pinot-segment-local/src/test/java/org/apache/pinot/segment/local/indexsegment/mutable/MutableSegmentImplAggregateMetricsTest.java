@@ -19,11 +19,11 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -36,6 +36,8 @@ import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+
 
 public class MutableSegmentImplAggregateMetricsTest {
   private static final String DIMENSION_1 = "dim1";
@@ -46,6 +48,7 @@ public class MutableSegmentImplAggregateMetricsTest {
   private static final String TIME_COLUMN2 = "time2";
   private static final String KEY_SEPARATOR = "\t\t";
   private static final int NUM_ROWS = 10001;
+  private static final StreamMessageMetadata METADATA = mock(StreamMessageMetadata.class);
 
   @Test
   public void testAggregateMetrics()
@@ -65,7 +68,7 @@ public class MutableSegmentImplAggregateMetricsTest {
     schema.addField(virtualMetricFieldSpec);
     MutableSegmentImpl mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(METRIC, METRIC_2)),
-            Collections.singleton(DIMENSION_2),
+            Set.of(DIMENSION_2),
             new HashSet<>(Arrays.asList(DIMENSION_1, DIMENSION_2, TIME_COLUMN1, TIME_COLUMN2)), true);
     testAggregateMetrics(mutableSegmentImpl);
     mutableSegmentImpl.destroy();
@@ -81,9 +84,76 @@ public class MutableSegmentImplAggregateMetricsTest {
     schema.addField(virtualMetricFieldSpec);
     mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(METRIC, METRIC_2)),
-            Collections.singleton(DIMENSION_2),
+            Set.of(DIMENSION_2),
             new HashSet<>(Arrays.asList(DIMENSION_1, DIMENSION_2, TIME_COLUMN1, TIME_COLUMN2)), true);
     testAggregateMetrics(mutableSegmentImpl);
+    mutableSegmentImpl.destroy();
+  }
+
+  @Test
+  public void testAggregateMetricsWithNoDictionaryKeyColumns()
+      throws Exception {
+    // The dimension and time columns are marked no-dictionary in the table config. Aggregation keys each row on the
+    // dictionary ids of these columns, so the consuming segment must still create dictionaries for them (the committed
+    // segment is rebuilt from the table config and honors the no-dictionary setting). Metrics stay no-dictionary.
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
+        .addSingleValueDimension(DIMENSION_1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(DIMENSION_2, FieldSpec.DataType.STRING)
+        .addMetric(METRIC, FieldSpec.DataType.LONG)
+        .addMetric(METRIC_2, FieldSpec.DataType.FLOAT)
+        .addDateTime(TIME_COLUMN1, FieldSpec.DataType.INT, "1:DAYS:EPOCH", "1:DAYS")
+        .addDateTime(TIME_COLUMN2, FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS")
+        .build();
+    Set<String> noDictionaryColumns = Set.of(DIMENSION_1, DIMENSION_2, TIME_COLUMN1, TIME_COLUMN2, METRIC, METRIC_2);
+    MutableSegmentImpl mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, noDictionaryColumns, Set.of(), Set.of(), true);
+
+    testAggregateMetrics(mutableSegmentImpl);
+
+    // Key columns must have a dictionary even though they are configured as no-dictionary.
+    Assert.assertNotNull(mutableSegmentImpl.getDataSourceNullable(DIMENSION_1).getDictionary());
+    Assert.assertNotNull(mutableSegmentImpl.getDataSourceNullable(DIMENSION_2).getDictionary());
+    Assert.assertNotNull(mutableSegmentImpl.getDataSourceNullable(TIME_COLUMN1).getDictionary());
+    Assert.assertNotNull(mutableSegmentImpl.getDataSourceNullable(TIME_COLUMN2).getDictionary());
+    // Metrics must stay no-dictionary so their values can be aggregated in place.
+    Assert.assertNull(mutableSegmentImpl.getDataSourceNullable(METRIC).getDictionary());
+    Assert.assertNull(mutableSegmentImpl.getDataSourceNullable(METRIC_2).getDictionary());
+
+    mutableSegmentImpl.destroy();
+  }
+
+  @Test
+  public void testMultiValueDimensionDisablesAggregation()
+      throws Exception {
+    // A multi-value dimension cannot be used as an aggregation key (issue #3867), so aggregation stays disabled and no
+    // rollup happens even though aggregateMetrics is set. This guards against over-broadening the aggregation-enabling
+    // and dictionary-forcing logic to columns that cannot support it.
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
+        .addSingleValueDimension(DIMENSION_1, FieldSpec.DataType.INT)
+        .addMultiValueDimension(DIMENSION_2, FieldSpec.DataType.STRING)
+        .addMetric(METRIC, FieldSpec.DataType.LONG)
+        .addMetric(METRIC_2, FieldSpec.DataType.FLOAT)
+        .addDateTime(TIME_COLUMN1, FieldSpec.DataType.INT, "1:DAYS:EPOCH", "1:DAYS")
+        .addDateTime(TIME_COLUMN2, FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS")
+        .build();
+    MutableSegmentImpl mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(METRIC, METRIC_2), Set.of(), Set.of(),
+            true);
+
+    Random random = new Random();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      GenericRow row = new GenericRow();
+      row.putValue(DIMENSION_1, random.nextInt(10));
+      row.putValue(DIMENSION_2, new Object[]{"a", "b"});
+      row.putValue(TIME_COLUMN1, random.nextInt(5));
+      row.putValue(TIME_COLUMN2, random.nextInt(10));
+      row.putValue(METRIC, (long) random.nextInt());
+      row.putValue(METRIC_2, random.nextFloat());
+      mutableSegmentImpl.index(row, METADATA);
+    }
+
+    // Aggregation is disabled, so every row is stored as its own document (no rollup).
+    Assert.assertEquals(mutableSegmentImpl.getNumDocsIndexed(), NUM_ROWS);
     mutableSegmentImpl.destroy();
   }
 
@@ -93,28 +163,27 @@ public class MutableSegmentImplAggregateMetricsTest {
     Float[] floatValues = new Float[10];
     Random random = new Random();
     for (int i = 0; i < stringValues.length; i++) {
-      stringValues[i] = RandomStringUtils.random(10);
+      stringValues[i] = RandomStringUtils.secure().next(10);
       floatValues[i] = random.nextFloat() * 10f;
     }
 
     Map<String, Long> expectedValues = new HashMap<>();
     Map<String, Float> expectedValuesFloat = new HashMap<>();
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
     for (int i = 0; i < NUM_ROWS; i++) {
       int hoursSinceEpoch = random.nextInt(10);
       int daysSinceEpoch = random.nextInt(5);
       GenericRow row = new GenericRow();
-      row.putField(DIMENSION_1, random.nextInt(10));
-      row.putField(DIMENSION_2, stringValues[random.nextInt(stringValues.length)]);
-      row.putField(TIME_COLUMN1, daysSinceEpoch);
-      row.putField(TIME_COLUMN2, hoursSinceEpoch);
+      row.putValue(DIMENSION_1, random.nextInt(10));
+      row.putValue(DIMENSION_2, stringValues[random.nextInt(stringValues.length)]);
+      row.putValue(TIME_COLUMN1, daysSinceEpoch);
+      row.putValue(TIME_COLUMN2, hoursSinceEpoch);
       // Generate random int to prevent overflow
       long metricValue = random.nextInt();
-      row.putField(METRIC, metricValue);
+      row.putValue(METRIC, metricValue);
       float metricValueFloat = floatValues[random.nextInt(floatValues.length)];
-      row.putField(METRIC_2, metricValueFloat);
+      row.putValue(METRIC_2, metricValueFloat);
 
-      mutableSegmentImpl.index(row, defaultMetadata);
+      mutableSegmentImpl.index(row, METADATA);
 
       // Update expected values
       String key = buildKey(row);

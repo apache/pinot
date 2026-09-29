@@ -22,11 +22,15 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class CastTransformFunction extends BaseTransformFunction {
@@ -62,6 +66,7 @@ public class CastTransformFunction extends BaseTransformFunction {
           _resultMetadata = sourceSV ? INT_SV_NO_DICTIONARY_METADATA : INT_MV_NO_DICTIONARY_METADATA;
           break;
         case "LONG":
+        case "BIGINT":
           _resultMetadata = sourceSV ? LONG_SV_NO_DICTIONARY_METADATA : LONG_MV_NO_DICTIONARY_METADATA;
           break;
         case "FLOAT":
@@ -73,9 +78,7 @@ public class CastTransformFunction extends BaseTransformFunction {
         case "DECIMAL":
         case "BIGDECIMAL":
         case "BIG_DECIMAL":
-          // TODO: Support MV BIG_DECIMAL
-          Preconditions.checkState(sourceSV, "Cannot cast from MV to BIG_DECIMAL");
-          _resultMetadata = BIG_DECIMAL_SV_NO_DICTIONARY_METADATA;
+          _resultMetadata = sourceSV ? BIG_DECIMAL_SV_NO_DICTIONARY_METADATA : BIG_DECIMAL_MV_NO_DICTIONARY_METADATA;
           break;
         case "BOOL":
         case "BOOLEAN":
@@ -87,6 +90,17 @@ public class CastTransformFunction extends BaseTransformFunction {
         case "STRING":
         case "VARCHAR":
           _resultMetadata = sourceSV ? STRING_SV_NO_DICTIONARY_METADATA : STRING_MV_NO_DICTIONARY_METADATA;
+          break;
+        case "JSON":
+          _resultMetadata = sourceSV ? JSON_SV_NO_DICTIONARY_METADATA : JSON_MV_NO_DICTIONARY_METADATA;
+          break;
+        case "BYTES":
+        case "VARBINARY":
+          _resultMetadata = sourceSV ? BYTES_SV_NO_DICTIONARY_METADATA : BYTES_MV_NO_DICTIONARY_METADATA;
+          break;
+        case "UUID":
+          Preconditions.checkState(sourceSV, "Cannot cast from MV to UUID");
+          _resultMetadata = UUID_SV_NO_DICTIONARY_METADATA;
           break;
         case "INT_ARRAY":
         case "INTEGER_ARRAY":
@@ -101,12 +115,21 @@ public class CastTransformFunction extends BaseTransformFunction {
         case "DOUBLE_ARRAY":
           _resultMetadata = DOUBLE_MV_NO_DICTIONARY_METADATA;
           break;
+        case "DECIMAL_ARRAY":
+        case "BIGDECIMAL_ARRAY":
+        case "BIG_DECIMAL_ARRAY":
+          _resultMetadata = BIG_DECIMAL_MV_NO_DICTIONARY_METADATA;
+          break;
         case "STRING_ARRAY":
         case "VARCHAR_ARRAY":
           _resultMetadata = STRING_MV_NO_DICTIONARY_METADATA;
           break;
-        case "JSON":
-          _resultMetadata = sourceSV ? JSON_SV_NO_DICTIONARY_METADATA : JSON_MV_NO_DICTIONARY_METADATA;
+        case "BYTES_ARRAY":
+          _resultMetadata = BYTES_MV_NO_DICTIONARY_METADATA;
+          break;
+        case "UUID_ARRAY":
+          Preconditions.checkState(!sourceSV, "Cannot cast from SV to UUID_ARRAY");
+          _resultMetadata = UUID_MV_NO_DICTIONARY_METADATA;
           break;
         default:
           throw new IllegalArgumentException("Unable to cast expression to type - " + targetType);
@@ -186,7 +209,19 @@ public class CastTransformFunction extends BaseTransformFunction {
       int length = valueBlock.getNumDocs();
       initLongValuesSV(length);
       String[] stringValues = _transformFunction.transformToStringValuesSV(valueBlock);
-      ArrayCopyUtils.copyToTimestamp(stringValues, _longValuesSV, length);
+      RoaringBitmap nullBitmap = _transformFunction.getNullBitmap(valueBlock);
+      if (_nullHandlingEnabled && nullBitmap != null && !nullBitmap.isEmpty()) {
+        // Null string values can't be converted to valid timestamps, so we skip over those values.
+        // Avoid using RoaringBitmap::contains API in a loop due to poor performance.
+        // Avoid cloning + flipping the null bitmap to reduce allocation.
+        RoaringBitmapUtils.forEachUnset(length, nullBitmap.getIntIterator(), (from, to) -> {
+          for (int i = from; i < to; i++) {
+            _longValuesSV[i] = TimestampUtils.toMillisSinceEpoch(stringValues[i]);
+          }
+        });
+      } else {
+        ArrayCopyUtils.copyToTimestamp(stringValues, _longValuesSV, length);
+      }
       return _longValuesSV;
     } else {
       return _transformFunction.transformToLongValuesSV(valueBlock);
@@ -225,18 +260,38 @@ public class CastTransformFunction extends BaseTransformFunction {
     DataType resultDataType = _resultMetadata.getDataType();
     if (resultDataType.getStoredType() == DataType.STRING) {
       switch (_sourceDataType) {
-        case BOOLEAN:
+        case BOOLEAN: {
           int length = valueBlock.getNumDocs();
           initStringValuesSV(length);
           int[] intValues = _transformFunction.transformToIntValuesSV(valueBlock);
           ArrayCopyUtils.copyFromBoolean(intValues, _stringValuesSV, length);
           return _stringValuesSV;
-        case TIMESTAMP:
-          length = valueBlock.getNumDocs();
+        }
+        case TIMESTAMP: {
+          int length = valueBlock.getNumDocs();
           initStringValuesSV(length);
           long[] longValues = _transformFunction.transformToLongValuesSV(valueBlock);
           ArrayCopyUtils.copyFromTimestamp(longValues, _stringValuesSV, length);
           return _stringValuesSV;
+        }
+        case UUID: {
+          int length = valueBlock.getNumDocs();
+          initStringValuesSV(length);
+          byte[][] uuidValues = _transformFunction.transformToBytesValuesSV(valueBlock);
+          RoaringBitmap nullBitmap = _transformFunction.getNullBitmap(valueBlock);
+          if (_nullHandlingEnabled && nullBitmap != null && !nullBitmap.isEmpty()) {
+            RoaringBitmapUtils.forEachUnset(length, nullBitmap.getIntIterator(), (from, to) -> {
+              for (int i = from; i < to; i++) {
+                _stringValuesSV[i] = UuidUtils.toString(uuidValues[i]);
+              }
+            });
+          } else {
+            for (int i = 0; i < length; i++) {
+              _stringValuesSV[i] = UuidUtils.toString(uuidValues[i]);
+            }
+          }
+          return _stringValuesSV;
+        }
         default:
           return _transformFunction.transformToStringValuesSV(valueBlock);
       }
@@ -276,11 +331,79 @@ public class CastTransformFunction extends BaseTransformFunction {
           byte[][] bytesValues = transformToBytesValuesSV(valueBlock);
           ArrayCopyUtils.copy(bytesValues, _stringValuesSV, length);
           break;
+        // Renders a UUID *result* (e.g. CAST(x AS UUID) read as a string). The switch above handles the other
+        // direction, a UUID *source* cast to STRING.
+        case UUID:
+          byte[][] uuidValues = transformToBytesValuesSV(valueBlock);
+          ArrayCopyUtils.copyFromUuid(uuidValues, _stringValuesSV, length);
+          break;
         default:
           throw new IllegalStateException(String.format("Cannot cast from SV %s to STRING", resultDataType));
       }
     }
     return _stringValuesSV;
+  }
+
+  @Override
+  public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
+    switch (_resultMetadata.getDataType()) {
+      case BYTES:
+        return _transformFunction.transformToBytesValuesSV(valueBlock);
+      case UUID:
+        return transformToUuidValuesSV(valueBlock);
+      default:
+        return super.transformToBytesValuesSV(valueBlock);
+    }
+  }
+
+  // TODO: Add it to the interface
+  private byte[][] transformToUuidValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initBytesValuesSV(length);
+    switch (_sourceDataType.getStoredType()) {
+      case STRING:
+        String[] stringValues = _transformFunction.transformToStringValuesSV(valueBlock);
+        ArrayCopyUtils.copyToUuid(stringValues, _bytesValuesSV, length);
+        break;
+      case BYTES:
+        byte[][] bytesValues = _transformFunction.transformToBytesValuesSV(valueBlock);
+        ArrayCopyUtils.copyToUuid(bytesValues, _bytesValuesSV, length);
+        break;
+      default:
+        throw new IllegalStateException(String.format("Cannot cast from SV %s to UUID", _sourceDataType));
+    }
+    return _bytesValuesSV;
+  }
+
+  @Override
+  public byte[][][] transformToBytesValuesMV(ValueBlock valueBlock) {
+    switch (_resultMetadata.getDataType()) {
+      case BYTES:
+        return _transformFunction.transformToBytesValuesMV(valueBlock);
+      case UUID:
+        return transformToUuidValuesMV(valueBlock);
+      default:
+        return super.transformToBytesValuesMV(valueBlock);
+    }
+  }
+
+  // TODO: Add it to the interface
+  private byte[][][] transformToUuidValuesMV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initBytesValuesMV(length);
+    switch (_sourceDataType.getStoredType()) {
+      case STRING:
+        String[][] stringValuesMV = _transformFunction.transformToStringValuesMV(valueBlock);
+        ArrayCopyUtils.copyToUuid(stringValuesMV, _bytesValuesMV, length);
+        break;
+      case BYTES:
+        byte[][][] bytesValuesMV = _transformFunction.transformToBytesValuesMV(valueBlock);
+        ArrayCopyUtils.copyToUuid(bytesValuesMV, _bytesValuesMV, length);
+        break;
+      default:
+        throw new IllegalStateException(String.format("Cannot cast from MV %s to UUID", _sourceDataType));
+    }
+    return _bytesValuesMV;
   }
 
   @Override
@@ -315,6 +438,10 @@ public class CastTransformFunction extends BaseTransformFunction {
       case DOUBLE:
         double[][] doubleValuesMV = _transformFunction.transformToDoubleValuesMV(valueBlock);
         ArrayCopyUtils.copyToBoolean(doubleValuesMV, _intValuesMV, length);
+        break;
+      case BIG_DECIMAL:
+        BigDecimal[][] bigDecimalValuesMV = _transformFunction.transformToBigDecimalValuesMV(valueBlock);
+        ArrayCopyUtils.copyToBoolean(bigDecimalValuesMV, _intValuesMV, length);
         break;
       case STRING:
         String[][] stringValuesMV = _transformFunction.transformToStringValuesMV(valueBlock);
@@ -370,6 +497,15 @@ public class CastTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public BigDecimal[][] transformToBigDecimalValuesMV(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType().getStoredType() == DataType.BIG_DECIMAL) {
+      return _transformFunction.transformToBigDecimalValuesMV(valueBlock);
+    } else {
+      return super.transformToBigDecimalValuesMV(valueBlock);
+    }
+  }
+
+  @Override
   public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
     DataType resultDataType = _resultMetadata.getDataType();
     if (resultDataType.getStoredType() == DataType.STRING) {
@@ -386,6 +522,20 @@ public class CastTransformFunction extends BaseTransformFunction {
           long[][] longValuesMV = _transformFunction.transformToLongValuesMV(valueBlock);
           ArrayCopyUtils.copyFromTimestamp(longValuesMV, _stringValuesMV, length);
           return _stringValuesMV;
+        case UUID: {
+          length = valueBlock.getNumDocs();
+          initStringValuesMV(length);
+          byte[][][] uuidValuesMV = _transformFunction.transformToBytesValuesMV(valueBlock);
+          for (int i = 0; i < length; i++) {
+            int numValues = uuidValuesMV[i].length;
+            String[] stringValues = new String[numValues];
+            for (int j = 0; j < numValues; j++) {
+              stringValues[j] = UuidUtils.toString(uuidValuesMV[i][j]);
+            }
+            _stringValuesMV[i] = stringValues;
+          }
+          return _stringValuesMV;
+        }
         default:
           return _transformFunction.transformToStringValuesMV(valueBlock);
       }
@@ -409,6 +559,10 @@ public class CastTransformFunction extends BaseTransformFunction {
           double[][] doubleValuesMV = _transformFunction.transformToDoubleValuesMV(valueBlock);
           ArrayCopyUtils.copy(doubleValuesMV, _stringValuesMV, length);
           break;
+        case BIG_DECIMAL:
+          BigDecimal[][] bigDecimalValuesMV = _transformFunction.transformToBigDecimalValuesMV(valueBlock);
+          ArrayCopyUtils.copy(bigDecimalValuesMV, _stringValuesMV, length);
+          break;
         case BOOLEAN:
           intValuesMV = transformToBooleanValuesMV(valueBlock);
           ArrayCopyUtils.copyFromBoolean(intValuesMV, _stringValuesMV, length);
@@ -416,6 +570,11 @@ public class CastTransformFunction extends BaseTransformFunction {
         case TIMESTAMP:
           longValuesMV = transformToTimestampValuesMV(valueBlock);
           ArrayCopyUtils.copyFromTimestamp(longValuesMV, _stringValuesMV, length);
+          break;
+        // See the SV variant: this renders a UUID result, not a UUID source.
+        case UUID:
+          byte[][][] uuidValuesMV = transformToBytesValuesMV(valueBlock);
+          ArrayCopyUtils.copyFromUuid(uuidValuesMV, _stringValuesMV, length);
           break;
         default:
           throw new IllegalStateException(String.format("Cannot cast from MV %s to STRING", resultDataType));

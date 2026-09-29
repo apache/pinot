@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -25,19 +26,17 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.FloatLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
-import org.roaringbitmap.IntIterator;
 
 
-/**
- * This function is used for FirstWithTime calculations for data column with float type.
- * <p>The function can be used as FirstWithTime(dataExpression, timeExpression, 'float')
- * <p>Following arguments are supported:
- * <ul>
- *   <li>dataExpression: expression that contains the float data column to be calculated first on</li>
- *   <li>timeExpression: expression that contains the column to be used to decide which data is first, can be any
- *   Numeric column</li>
- * </ul>
- */
+/// This function is used for FirstWithTime calculations for data column with float type.
+///
+/// The function can be used as FirstWithTime(dataExpression, timeExpression, 'float')
+///
+/// Following arguments are supported:
+///
+/// - dataExpression: expression that contains the float data column to be calculated first on
+/// - timeExpression: expression that contains the column to be used to decide which data is first, can be any
+///   Numeric column
 public class FirstFloatValueWithTimeAggregationFunction extends FirstWithTimeAggregationFunction<Float> {
   private final static ValueLongPair<Float> DEFAULT_VALUE_TIME_PAIR = new FloatLongPair(Float.NaN, Long.MAX_VALUE);
 
@@ -67,8 +66,7 @@ public class FirstFloatValueWithTimeAggregationFunction extends FirstWithTimeAgg
     float[] floatValues = blockValSet.getFloatValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
 
-    IntIterator nullIdxIterator = orNullIterator(blockValSet, timeValSet);
-    forEachNotNull(length, nullIdxIterator, (from, to) -> {
+    forEachNotNull(length, blockValSet, timeValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         float data = floatValues[i];
         long time = timeValues[i];
@@ -83,8 +81,7 @@ public class FirstFloatValueWithTimeAggregationFunction extends FirstWithTimeAgg
     float[] floatValues = blockValSet.getFloatValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
 
-    IntIterator nullIdxIterator = orNullIterator(blockValSet, timeValSet);
-    forEachNotNull(length, nullIdxIterator, (from, to) -> {
+    forEachNotNull(length, blockValSet, timeValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         float value = floatValues[i];
         long time = timeValues[i];
@@ -98,6 +95,17 @@ public class FirstFloatValueWithTimeAggregationFunction extends FirstWithTimeAgg
   @Override
   public String getResultColumnName() {
     return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'FLOAT')";
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(ValueLongPair<Float> floatLongPair) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.FloatLongPair.getValue(),
+        ObjectSerDeUtils.FLOAT_LONG_PAIR_SER_DE.serialize((FloatLongPair) floatLongPair));
+  }
+
+  @Override
+  public ValueLongPair<Float> deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.FLOAT_LONG_PAIR_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

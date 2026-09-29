@@ -19,11 +19,15 @@
 
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.queries.FluentQueryTest;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class CountAggregationFunctionTest extends AbstractAggregationFunctionTest {
@@ -32,82 +36,50 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
   public void list() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(false)
-        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[] {1}
-        )
-        .andOnSecondInstance(
-            new Object[] {2},
-            new Object[] {null}
-        )
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{1})
+        .andOnSecondInstance(new Object[]{2}, new Object[]{null})
         .whenQuery("select myField from testTable order by myField")
-        .thenResultIs("INTEGER",
-            "-2147483648",
-            "1",
-            "2"
-        );
+        .thenResultIs("INT", "-2147483648", "1", "2");
   }
 
   @Test
   public void listNullHandlingEnabled() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(true)
-        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[] {1}
-        )
-        .andOnSecondInstance(
-            new Object[] {2},
-            new Object[] {null}
-        )
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{1})
+        .andOnSecondInstance(new Object[]{2}, new Object[]{null})
         .whenQuery("select myField from testTable order by myField")
-        .thenResultIs("INTEGER",
-            "1",
-            "2",
-            "null"
-        );
+        .thenResultIs("INT", "1", "2", "null");
   }
 
   @Test
   public void countNullWhenHandlingDisabled() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(false)
-        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            "myField",
-            "1"
-        )
-        .andOnSecondInstance(
-            "myField",
-            "2",
-            "null"
-        )
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance("myField", "1")
+        .andOnSecondInstance("myField", "2", "null")
         .whenQuery("select myField, COUNT(myField) from testTable group by myField order by myField")
-        .thenResultIs("INTEGER | LONG",
+        .thenResultIs(
+            "INT | LONG",
             "-2147483648 | 1",
             "1           | 1",
             "2           | 1"
         );
   }
 
-
   @Test
   public void countNullWhenHandlingEnabled() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(true)
-        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            "myField",
-            "1"
-        )
-        .andOnSecondInstance(
-            "myField",
-            "2",
-            "null"
-        )
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance("myField", "1")
+        .andOnSecondInstance("myField", "2", "null")
         .whenQuery("select myField, COUNT(myField) from testTable group by myField order by myField")
         .thenResultIs(
-            "INTEGER | LONG",
+            "INT | LONG",
             "1    | 1",
             "2    | 1",
             "null | 0"
@@ -118,18 +90,12 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
   public void countStarNullWhenHandlingDisabled() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(false)
-        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            "myField",
-            "1"
-        )
-        .andOnSecondInstance(
-            "myField",
-            "2",
-            "null"
-        )
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance("myField", "1")
+        .andOnSecondInstance("myField", "2", "null")
         .whenQuery("select myField, COUNT(*) from testTable group by myField order by myField")
-        .thenResultIs("INTEGER | LONG",
+        .thenResultIs(
+            "INT | LONG",
             "-2147483648 | 1",
             "1    | 1",
             "2    | 1"
@@ -140,18 +106,12 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
   public void countStarNullWhenHandlingEnabled() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(true)
-        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            "myField",
-            "1"
-        )
-        .andOnSecondInstance(
-            "myField",
-            "2",
-            "null"
-        )
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance("myField", "1")
+        .andOnSecondInstance("myField", "2", "null")
         .whenQuery("select myField, COUNT(*) from testTable group by myField order by myField")
-        .thenResultIs("INTEGER | LONG",
+        .thenResultIs(
+            "INT | LONG",
             "1    | 1",
             "2    | 1",
             "null | 1"
@@ -162,18 +122,9 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
   public void countStarWithoutGroupBy(boolean nullHandlingEnabled) {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(nullHandlingEnabled)
-        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            "myField",
-            "1",
-            "2",
-            "null"
-        )
-        .andOnSecondInstance(
-            "myField",
-            "null",
-            "null"
-        )
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance("myField", "1", "2", "null")
+        .andOnSecondInstance("myField", "null", "null")
         .whenQuery("select COUNT(*) from testTable")
         // COUNT(*) result should be the same regardless of whether null handling is enabled or not
         .thenResultIs("LONG", "5");
@@ -183,18 +134,9 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
   public void countLiteralWithoutGroupBy(boolean nullHandlingEnabled) {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(nullHandlingEnabled)
-        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            "myField",
-            "1",
-            "2",
-            "null"
-        )
-        .andOnSecondInstance(
-            "myField",
-            "null",
-            "null"
-        )
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance("myField", "1", "2", "null")
+        .andOnSecondInstance("myField", "null", "null")
         .whenQuery("select COUNT('literal') from testTable")
         // COUNT(*) result should be the same regardless of whether null handling is enabled or not
         .thenResultIs("LONG", "5");
@@ -202,22 +144,15 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
 
   @Test
   public void countGroupByMV() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("tags", DataType.STRING)
+        .addMetricField("value", DataType.INT)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
-                .addMetricField("value", FieldSpec.DataType.INT)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"tag1;tag2", 1},
-            new Object[]{"tag2;tag3", null}
-        )
-        .andOnSecondInstance(
-            new Object[]{"tag1;tag2", 1},
-            new Object[]{"tag2;tag3", null}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"tag1;tag2", 1}, new Object[]{"tag2;tag3", null})
+        .andOnSecondInstance(new Object[]{"tag1;tag2", 1}, new Object[]{"tag2;tag3", null})
         .whenQuery("select tags, COUNT(value) from testTable group by tags order by tags")
         .thenResultIs(
             "STRING | LONG",
@@ -232,6 +167,14 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
             "tag2    | 2",
             "tag3    | 0"
         );
+  }
+
+  @Test
+  public void testExtractFinalResultReturnsZeroForNull() {
+    CountAggregationFunction function =
+        new CountAggregationFunction(List.of(ExpressionContext.forIdentifier("col")), false);
+    assertEquals(function.extractFinalResult(null), Long.valueOf(0L));
+    assertEquals(function.extractFinalResult(5L), Long.valueOf(5L));
   }
 
   @DataProvider(name = "nullHandlingEnabled")

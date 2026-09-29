@@ -34,10 +34,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class to implement StartServer command.
- *
- */
+/// Class to implement StartServer command.
 @CommandLine.Command(name = "StartServer", mixinStandardHelpOptions = true)
 public class StartServerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServerCommand.class);
@@ -246,7 +243,7 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
       properties.putAll(PinotConfigUtils.readConfigFromFile(_configFileName));
       // Override the zkAddress and clusterName to ensure ServiceManager is connecting to the right Zookeeper and
       // Cluster.
-      _zkAddress = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+      _zkAddress = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
       _clusterName = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     } else {
       properties.putAll(PinotConfigUtils

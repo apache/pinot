@@ -29,16 +29,23 @@ import SubTaskDetail from './pages/SubTaskDetail';
 import TenantsPage from './pages/Tenants';
 import TenantPageDetails from './pages/TenantDetails';
 import QueryPage from './pages/Query';
+import TimeseriesQueryPageWrapper from './pages/TimeseriesQueryPage';
 import SegmentDetails from './pages/SegmentDetails';
 import InstanceDetails from './pages/InstanceDetails';
 import ZookeeperPage from './pages/ZookeeperPage';
 import SchemaPageDetails from './pages/SchemaPageDetails';
 import LoginPage from './pages/LoginPage';
 import UserPage from "./pages/UserPage";
+import LogicalTableDetails from './pages/LogicalTableDetails';
+import MaterializedViewListingPage from './pages/MaterializedViewListingPage';
+import MaterializedViewDetails from './pages/MaterializedViewDetails';
+import DataSourcesPage from './pages/DataSourcesPage';
 
 export default [
   // TODO: make async
   { path: '/', Component: HomePage },
+  { path: '/data-sources', Component: DataSourcesPage },
+  { path: '/query/timeseries', Component: TimeseriesQueryPageWrapper },
   { path: '/query', Component: QueryPage },
   { path: '/tenants', Component: TenantsListingPage },
   { path: '/controllers', Component: InstanceListingPage },
@@ -46,6 +53,9 @@ export default [
   { path: '/servers', Component: InstanceListingPage },
   { path: '/minions', Component: InstanceListingPage },
   { path: '/tables', Component: TablesListingPage },
+  { path: '/logical-tables/:logicalTableName', Component: LogicalTableDetails },
+  { path: '/materialized-views', Component: MaterializedViewListingPage },
+  { path: '/materialized-views/:materializedViewTableName', Component: MaterializedViewDetails },
   { path: '/minion-task-manager', Component: MinionTaskManager },
   { path: '/task-queue/:taskType', Component: TaskQueue },
   { path: '/task-queue/:taskType/tables/:queueTableName', Component: TaskQueueTable },

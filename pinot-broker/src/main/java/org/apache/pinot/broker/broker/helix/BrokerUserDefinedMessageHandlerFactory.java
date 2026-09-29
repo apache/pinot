@@ -24,9 +24,10 @@ import org.apache.helix.messaging.handling.MessageHandler;
 import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.messages.ApplicationQpsQuotaRefreshMessage;
 import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
+import org.apache.pinot.common.messages.LogicalTableConfigRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
@@ -35,13 +36,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Broker message handler factory for Helix user-define messages.
- * <p>The following message sub-types are supported:
- * <ul>
- *   <li>Refresh segment message: Refresh the routing properties for a given segment</li>
- * </ul>
- */
+/// Broker message handler factory for Helix user-define messages.
+///
+/// The following message sub-types are supported:
+///
+/// - Refresh segment message: Refresh the routing properties for a given segment
 public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerUserDefinedMessageHandlerFactory.class);
 
@@ -62,6 +61,8 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
         return new RefreshSegmentMessageHandler(new SegmentRefreshMessage(message), context);
       case TableConfigRefreshMessage.REFRESH_TABLE_CONFIG_MSG_SUB_TYPE:
         return new RefreshTableConfigMessageHandler(new TableConfigRefreshMessage(message), context);
+      case LogicalTableConfigRefreshMessage.REFRESH_LOGICAL_TABLE_CONFIG_MSG_SUB_TYPE:
+        return new RefreshLogicalTableConfigMessageHandler(new LogicalTableConfigRefreshMessage(message), context);
       case RoutingTableRebuildMessage.REBUILD_ROUTING_TABLE_MSG_SUB_TYPE:
         return new RebuildRoutingTableMessageHandler(new RoutingTableRebuildMessage(message), context);
       case DatabaseConfigRefreshMessage.REFRESH_DATABASE_CONFIG_MSG_SUB_TYPE:
@@ -136,6 +137,31 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
     public void onError(Exception e, ErrorCode code, ErrorType type) {
       LOGGER.error("Got error while refreshing table config for table: {} (error code: {}, error type: {})",
           _tableNameWithType, code, type, e);
+    }
+  }
+
+  private class RefreshLogicalTableConfigMessageHandler extends MessageHandler {
+    final String _logicalTableName;
+
+    RefreshLogicalTableConfigMessageHandler(LogicalTableConfigRefreshMessage refreshMessage,
+        NotificationContext context) {
+      super(refreshMessage, context);
+      _logicalTableName = refreshMessage.getLogicalTableName();
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      _routingManager.buildRoutingForLogicalTable(_logicalTableName);
+      _queryQuotaManager.initOrUpdateLogicalTableQueryQuota(_logicalTableName);
+      HelixTaskResult result = new HelixTaskResult();
+      result.setSuccess(true);
+      return result;
+    }
+
+    @Override
+    public void onError(Exception e, ErrorCode code, ErrorType type) {
+      LOGGER.error("Got error while refreshing logical table config for table: {} (error code: {}, error type: {})",
+          _logicalTableName, code, type, e);
     }
   }
 

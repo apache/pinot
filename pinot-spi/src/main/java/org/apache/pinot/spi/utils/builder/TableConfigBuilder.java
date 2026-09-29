@@ -20,7 +20,7 @@ package org.apache.pinot.spi.utils.builder;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.CompletionConfig;
@@ -28,6 +28,9 @@ import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
+import org.apache.pinot.spi.config.table.PageCacheWarmupConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -48,6 +51,7 @@ import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 
 
 public class TableConfigBuilder {
@@ -55,12 +59,14 @@ public class TableConfigBuilder {
   private static final String REFRESH_SEGMENT_PUSH_TYPE = "REFRESH";
   private static final String DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD = "7d";
   private static final String DEFAULT_NUM_REPLICAS = "1";
-  private static final String DEFAULT_LOAD_MODE = "HEAP";
   private static final String MMAP_LOAD_MODE = "MMAP";
+  private static final String HEAP_LOAD_MODE = "HEAP";
+  private static final String DEFAULT_LOAD_MODE = MMAP_LOAD_MODE;
 
   private final TableType _tableType;
   private String _tableName;
   private boolean _isDimTable;
+  private boolean _isMaterializedView;
 
   // Segments config related
   private String _numReplicas = DEFAULT_NUM_REPLICAS;
@@ -69,15 +75,16 @@ public class TableConfigBuilder {
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
   private String _deletedSegmentsRetentionPeriod = DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD;
+  private String _replacedSegmentsRetentionPeriod;
+  private String _lineageEntryCleanupRetentionPeriod;
   @Deprecated
   private String _segmentPushFrequency;
 
   // TODO: Remove 'DEFAULT_SEGMENT_PUSH_TYPE' in the future major release.
   @Deprecated
   private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
-  @Deprecated
-  private String _segmentAssignmentStrategy;
   private String _peerSegmentDownloadScheme;
+  @Deprecated
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
@@ -92,7 +99,6 @@ public class TableConfigBuilder {
   private String _segmentVersion;
   private String _sortedColumn;
   private List<String> _invertedIndexColumns;
-  private boolean _createInvertedIndexDuringSegmentGeneration;
   private List<String> _noDictionaryColumns;
   private List<String> _onHeapDictionaryColumns;
   private List<String> _bloomFilterColumns;
@@ -101,10 +107,13 @@ public class TableConfigBuilder {
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _nullHandlingEnabled;
   private boolean _columnMajorSegmentBuilderEnabled = true;
+  private boolean _skipSegmentPreprocess;
+  private boolean _optimizeNoDictStatsCollection = false;
   private List<String> _varLengthDictionaryColumns;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private List<String> _jsonIndexColumns;
   private boolean _aggregateMetrics;
+  private boolean _compressionStatsEnabled;
   private boolean _optimizeDictionary;
   private boolean _optimizeDictionaryForMetrics;
   // This threshold determines if dictionary should be enabled or not for a metric column and is relevant
@@ -113,11 +122,16 @@ public class TableConfigBuilder {
   private double _noDictionarySizeRatioThreshold;
   private double _noDictionaryCardinalityRatioThreshold;
 
+  /// @deprecated This flag is ignored. Keep it for backward compatibility during upgrade (especially for JSON ser/de).
+  @Deprecated
+  private boolean _createInvertedIndexDuringSegmentGeneration;
+
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
   private TableTaskConfig _taskConfig;
   private RoutingConfig _routingConfig;
   private QueryConfig _queryConfig;
+  private List<TableSamplerConfig> _tableSamplers;
   private Map<String, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
   private Map<InstancePartitionsType, String> _instancePartitionsMap;
   private Map<String, SegmentAssignmentConfig> _segmentAssignmentConfigMap;
@@ -130,6 +144,11 @@ public class TableConfigBuilder {
   private List<TierConfig> _tierConfigList;
   private List<TunerConfig> _tunerConfigList;
   private JsonNode _tierOverwrites;
+  private Map<String, JsonIndexConfig> _jsonIndexConfigs;
+  private MultiColumnTextIndexConfig _multiColumnTextIndexConfig;
+  private PageCacheWarmupConfig _pageCacheWarmupConfig;
+  private String _description;
+  private List<String> _tags;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -145,10 +164,16 @@ public class TableConfigBuilder {
     return this;
   }
 
-  @Deprecated
-  public TableConfigBuilder setLLC(boolean isLLC) {
-    Preconditions.checkState(_tableType == TableType.REALTIME);
-    Preconditions.checkArgument(isLLC, "Real-time table must use LLC");
+  public TableConfigBuilder setIsMaterializedView(boolean isMaterializedView) {
+    _isMaterializedView = isMaterializedView;
+    return this;
+  }
+
+  public TableConfigBuilder addFieldConfig(FieldConfig config) {
+    if (_fieldConfigList == null) {
+      _fieldConfigList = new ArrayList<>();
+    }
+    _fieldConfigList.add(config);
     return this;
   }
 
@@ -183,9 +208,17 @@ public class TableConfigBuilder {
     return this;
   }
 
-  /**
-   * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
-   */
+  public TableConfigBuilder setReplacedSegmentsRetentionPeriod(String replacedSegmentsRetentionPeriod) {
+    _replacedSegmentsRetentionPeriod = replacedSegmentsRetentionPeriod;
+    return this;
+  }
+
+  public TableConfigBuilder setLineageEntryCleanupRetentionPeriod(String lineageEntryCleanupRetentionPeriod) {
+    _lineageEntryCleanupRetentionPeriod = lineageEntryCleanupRetentionPeriod;
+    return this;
+  }
+
+  /// @deprecated Use `segmentIngestionType` from [IngestionConfig#getBatchIngestionConfig()]
   public TableConfigBuilder setSegmentPushType(String segmentPushType) {
     if (REFRESH_SEGMENT_PUSH_TYPE.equalsIgnoreCase(segmentPushType)) {
       _segmentPushType = REFRESH_SEGMENT_PUSH_TYPE;
@@ -195,16 +228,9 @@ public class TableConfigBuilder {
     return this;
   }
 
-  /**
-   * @deprecated Use {@code segmentIngestionFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
-   */
+  /// @deprecated Use `segmentIngestionFrequency` from [IngestionConfig#getBatchIngestionConfig()]
   public TableConfigBuilder setSegmentPushFrequency(String segmentPushFrequency) {
     _segmentPushFrequency = segmentPushFrequency;
-    return this;
-  }
-
-  public TableConfigBuilder setSegmentAssignmentStrategy(String segmentAssignmentStrategy) {
-    _segmentAssignmentStrategy = segmentAssignmentStrategy;
     return this;
   }
 
@@ -239,8 +265,8 @@ public class TableConfigBuilder {
   }
 
   public TableConfigBuilder setLoadMode(String loadMode) {
-    if (MMAP_LOAD_MODE.equalsIgnoreCase(loadMode)) {
-      _loadMode = MMAP_LOAD_MODE;
+    if (HEAP_LOAD_MODE.equalsIgnoreCase(loadMode)) {
+      _loadMode = HEAP_LOAD_MODE;
     } else {
       _loadMode = DEFAULT_LOAD_MODE;
     }
@@ -287,6 +313,7 @@ public class TableConfigBuilder {
     return this;
   }
 
+  @Deprecated
   public TableConfigBuilder setCreateInvertedIndexDuringSegmentGeneration(
       boolean createInvertedIndexDuringSegmentGeneration) {
     _createInvertedIndexDuringSegmentGeneration = createInvertedIndexDuringSegmentGeneration;
@@ -323,6 +350,12 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setMultiColumnTextIndexConfig(
+      MultiColumnTextIndexConfig multiColumnTextIndexConfig) {
+    _multiColumnTextIndexConfig = multiColumnTextIndexConfig;
+    return this;
+  }
+
   public TableConfigBuilder setJsonIndexColumns(List<String> jsonIndexColumns) {
     _jsonIndexColumns = jsonIndexColumns;
     return this;
@@ -330,6 +363,12 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setAggregateMetrics(boolean aggregateMetrics) {
     _aggregateMetrics = aggregateMetrics;
+    return this;
+  }
+
+  /// Sets whether newly built or rewritten indexes collect compression statistics. Disabled by default.
+  public TableConfigBuilder setCompressionStatsEnabled(boolean compressionStatsEnabled) {
+    _compressionStatsEnabled = compressionStatsEnabled;
     return this;
   }
 
@@ -351,6 +390,16 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setColumnMajorSegmentBuilderEnabled(boolean columnMajorSegmentBuilderEnabled) {
     _columnMajorSegmentBuilderEnabled = columnMajorSegmentBuilderEnabled;
+    return this;
+  }
+
+  public TableConfigBuilder setSkipSegmentPreprocess(boolean skipSegmentPreprocess) {
+    _skipSegmentPreprocess = skipSegmentPreprocess;
+    return this;
+  }
+
+  public TableConfigBuilder setOptimizeNoDictStatsCollection(boolean optimizeNoDictStatsCollection) {
+    _optimizeNoDictStatsCollection = optimizeNoDictStatsCollection;
     return this;
   }
 
@@ -376,6 +425,11 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setQueryConfig(QueryConfig queryConfig) {
     _queryConfig = queryConfig;
+    return this;
+  }
+
+  public TableConfigBuilder setTableSamplers(List<TableSamplerConfig> tableSamplers) {
+    _tableSamplers = tableSamplers;
     return this;
   }
 
@@ -441,6 +495,26 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setJsonIndexConfigs(Map<String, JsonIndexConfig> jsonIndexConfigs) {
+    _jsonIndexConfigs = jsonIndexConfigs;
+    return this;
+  }
+
+  public TableConfigBuilder setPageCacheWarmupConfig(PageCacheWarmupConfig pageCacheWarmupConfig) {
+    _pageCacheWarmupConfig = pageCacheWarmupConfig;
+    return this;
+  }
+
+  public TableConfigBuilder setDescription(String description) {
+    _description = description;
+    return this;
+  }
+
+  public TableConfigBuilder setTags(List<String> tags) {
+    _tags = tags;
+    return this;
+  }
+
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -449,9 +523,10 @@ public class TableConfigBuilder {
     validationConfig.setRetentionTimeUnit(_retentionTimeUnit);
     validationConfig.setRetentionTimeValue(_retentionTimeValue);
     validationConfig.setDeletedSegmentsRetentionPeriod(_deletedSegmentsRetentionPeriod);
+    validationConfig.setReplacedSegmentsRetentionPeriod(_replacedSegmentsRetentionPeriod);
+    validationConfig.setLineageEntryCleanupRetentionPeriod(_lineageEntryCleanupRetentionPeriod);
     validationConfig.setSegmentPushFrequency(_segmentPushFrequency);
     validationConfig.setSegmentPushType(_segmentPushType);
-    validationConfig.setSegmentAssignmentStrategy(_segmentAssignmentStrategy);
     validationConfig.setReplicaGroupStrategyConfig(_replicaGroupStrategyConfig);
     validationConfig.setCompletionConfig(_completionConfig);
     validationConfig.setReplication(_numReplicas);
@@ -466,7 +541,7 @@ public class TableConfigBuilder {
     indexingConfig.setLoadMode(_loadMode);
     indexingConfig.setSegmentFormatVersion(_segmentVersion);
     if (_sortedColumn != null) {
-      indexingConfig.setSortedColumn(Collections.singletonList(_sortedColumn));
+      indexingConfig.setSortedColumn(List.of(_sortedColumn));
     }
     indexingConfig.setInvertedIndexColumns(_invertedIndexColumns);
     indexingConfig.setCreateInvertedIndexDuringSegmentGeneration(_createInvertedIndexDuringSegmentGeneration);
@@ -478,24 +553,34 @@ public class TableConfigBuilder {
     indexingConfig.setSegmentPartitionConfig(_segmentPartitionConfig);
     indexingConfig.setNullHandlingEnabled(_nullHandlingEnabled);
     indexingConfig.setColumnMajorSegmentBuilderEnabled(_columnMajorSegmentBuilderEnabled);
+    indexingConfig.setSkipSegmentPreprocess(_skipSegmentPreprocess);
+    indexingConfig.setOptimizeNoDictStatsCollection(_optimizeNoDictStatsCollection);
     indexingConfig.setVarLengthDictionaryColumns(_varLengthDictionaryColumns);
     indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
+    indexingConfig.setMultiColumnTextIndexConfig(_multiColumnTextIndexConfig);
     indexingConfig.setJsonIndexColumns(_jsonIndexColumns);
     indexingConfig.setAggregateMetrics(_aggregateMetrics);
+    indexingConfig.setCompressionStatsEnabled(_compressionStatsEnabled);
     indexingConfig.setOptimizeDictionary(_optimizeDictionary);
     indexingConfig.setOptimizeDictionaryForMetrics(_optimizeDictionaryForMetrics);
     indexingConfig.setOptimizeDictionaryType(_optimizeDictionaryType);
     indexingConfig.setNoDictionarySizeRatioThreshold(_noDictionarySizeRatioThreshold);
     indexingConfig.setNoDictionaryCardinalityRatioThreshold(_noDictionaryCardinalityRatioThreshold);
     indexingConfig.setTierOverwrites(_tierOverwrites);
+    indexingConfig.setJsonIndexConfigs(_jsonIndexConfigs);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);
     }
 
-    return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
-        _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
-        _fieldConfigList, _upsertConfig, _dedupConfig, _dimensionTableConfig, _ingestionConfig, _tierConfigList,
-        _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap);
+    TableConfig tableConfig =
+        new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
+            _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
+            _fieldConfigList, _upsertConfig, _dedupConfig, _dimensionTableConfig, _ingestionConfig, _tierConfigList,
+            _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap,
+            _tableSamplers, _isMaterializedView, _pageCacheWarmupConfig);
+    tableConfig.setDescription(_description);
+    tableConfig.setTags(_tags);
+    return tableConfig;
   }
 }

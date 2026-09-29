@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.common.utils.regex;
 
-/**
- * Factory class to create Pattern objects based on a configurable regex class
- */
+/// Factory class to create Pattern objects based on a configurable regex class
 public class PatternFactory {
   private static RegexClass _regexClass;
 
@@ -31,24 +29,32 @@ public class PatternFactory {
     _regexClass = RegexClass.valueOf(regexClass);
   }
 
-  /**
-   * Returns a Pattern for the regex class specified in PatternFactory.init(). If pattern factory is not initialized,
-   * then returns a Pattern using the java.util.regex class
-   *
-   * @param regex to compile the Pattern for
-   * @return the compiled Pattern
-   */
-  public static org.apache.pinot.common.utils.regex.Pattern compile(String regex) {
+  /// Returns a Pattern for the regex class specified in PatternFactory.init(). If pattern factory is not initialized,
+  /// then returns a Pattern using the java.util.regex class
+  ///
+  /// @param regex to compile the Pattern for
+  /// @param caseInsensitive whether the pattern should be case-insensitive
+  /// @return the compiled Pattern
+  public static Pattern compile(String regex, boolean caseInsensitive) {
     // un-initialized factory will use java.util.regex to avoid requiring initialization in tests
     if (_regexClass == null) {
-      return new JavaUtilPattern(regex);
+      return new JavaUtilPattern(regex, caseInsensitive);
     }
     switch (_regexClass) {
       case RE2J:
-        return new Re2jPattern(regex);
+        return new Re2jPattern(regex, caseInsensitive);
       case JAVA_UTIL:
       default:
-        return new JavaUtilPattern(regex);
+        return new JavaUtilPattern(regex, caseInsensitive);
     }
+  }
+
+  /// Returns a Pattern for the regex class specified in PatternFactory.init(). If pattern factory is not initialized,
+  /// then returns a Pattern using the java.util.regex class (case-sensitive by default)
+  ///
+  /// @param regex to compile the Pattern for
+  /// @return the compiled Pattern
+  public static Pattern compile(String regex) {
+    return compile(regex, false);
   }
 }

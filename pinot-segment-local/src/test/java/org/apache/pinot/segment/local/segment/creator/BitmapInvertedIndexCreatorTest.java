@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
@@ -39,7 +40,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class BitmapInvertedIndexCreatorTest {
+public class BitmapInvertedIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
   private static final File TEMP_DIR = FileUtils.getTempDirectory();
   private static final File ON_HEAP_INDEX_DIR = new File(TEMP_DIR, "onHeap");
   private static final File OFF_HEAP_INDEX_DIR = new File(TEMP_DIR, "offHeap");
@@ -148,8 +149,9 @@ public class BitmapInvertedIndexCreatorTest {
 
   private void validate(File invertedIndex, Set<Integer>[] postingLists)
       throws IOException {
-    try (BitmapInvertedIndexReader reader = new BitmapInvertedIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(invertedIndex), CARDINALITY)) {
+
+    try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(invertedIndex);
+        BitmapInvertedIndexReader reader = new BitmapInvertedIndexReader(dataBuffer, CARDINALITY)) {
       for (int dictId = 0; dictId < CARDINALITY; dictId++) {
         ImmutableRoaringBitmap bitmap = reader.getDocIds(dictId);
         Set<Integer> expected = postingLists[dictId];

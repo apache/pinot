@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-input-format</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.6.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>pinot-json</artifactId>
@@ -34,6 +34,18 @@
     <pinot.root>${basedir}/../../..</pinot.root>
     <shade.phase.prop>package</shade.phase.prop>
   </properties>
+
+  <dependencies>
+    <!-- Binary JSON encodings supported by the stream decoder. Versions managed by jackson-bom. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.dataformat</groupId>
+      <artifactId>jackson-dataformat-smile</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.dataformat</groupId>
+      <artifactId>jackson-dataformat-cbor</artifactId>
+    </dependency>
+  </dependencies>
 
   <profiles>
     <profile>

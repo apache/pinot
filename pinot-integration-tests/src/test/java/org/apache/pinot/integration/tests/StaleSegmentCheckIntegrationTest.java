@@ -20,10 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -39,7 +36,6 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -59,13 +55,11 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
   private Schema _schema;
   private List<File> _avroFiles;
   private static final String H3_INDEX_COLUMN = "h3Column";
-  private static final Map<String, String> H3_INDEX_PROPERTIES = Collections.singletonMap("resolutions", "5");
+  private static final Map<String, String> H3_INDEX_PROPERTIES = Map.of("resolutions", "5");
   private static final String TEXT_INDEX_COLUMN = "textColumn";
   private static final String NULL_INDEX_COLUMN = "nullField";
 
   private static final String JSON_INDEX_COLUMN = "jsonField";
-  private static final String FST_TEST_COLUMN = "DestCityName";
-
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -73,12 +67,12 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
 
     // Start the Pinot cluster
     startZk();
+    // Start Kafka
+    startKafka();
     startController();
     startBroker();
     startServer();
     startMinion();
-    // Start Kafka
-    startKafka();
 
     _taskManager = _controllerStarter.getTaskManager();
     _taskResourceManager = _controllerStarter.getHelixTaskResourceManager();
@@ -96,7 +90,7 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
     _tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setTimeColumnName(getTimeColumnName())
             .setIngestionConfig(getIngestionConfig()).setNullHandlingEnabled(true)
-            .setNoDictionaryColumns(Collections.singletonList(TEXT_INDEX_COLUMN)).build();
+            .setNoDictionaryColumns(List.of(TEXT_INDEX_COLUMN)).build();
     addTableConfig(_tableConfig);
 
     // Create and upload segments
@@ -108,19 +102,8 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
   }
 
   private FieldConfig getH3FieldConfig() {
-    return new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
-        H3_INDEX_PROPERTIES);
-  }
-
-  private FieldConfig getTextFieldConfig() {
-    return new FieldConfig(TEXT_INDEX_COLUMN, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null);
-  }
-
-  private FieldConfig getFstFieldConfig() {
-    Map<String, String> propertiesMap = new HashMap<>();
-    propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
-    return new FieldConfig(FST_TEST_COLUMN, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null,
-        propertiesMap);
+    return new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3),
+        null, H3_INDEX_PROPERTIES);
   }
 
   @Override
@@ -145,7 +128,7 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
       throws Exception {
     // Add a sorted column to the table
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    indexingConfig.setSortedColumn(Collections.singletonList("Carrier"));
+    indexingConfig.setSortedColumn(List.of("Carrier"));
     updateTableConfig(_tableConfig);
 
     Map<String, TableStaleSegmentResponse> needRefreshResponses = getStaleSegmentsResponse();
@@ -158,7 +141,7 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
       throws Exception {
     // Add a raw index column
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    indexingConfig.setNoDictionaryColumns(Collections.singletonList("ActualElapsedTime"));
+    indexingConfig.setNoDictionaryColumns(List.of("ActualElapsedTime"));
     updateTableConfig(_tableConfig);
 
     Map<String, TableStaleSegmentResponse> needRefreshResponses = getStaleSegmentsResponse();
@@ -170,7 +153,7 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
   public void testH3IndexChange()
       throws Exception {
     // Add a H3 index column
-    _tableConfig.setFieldConfigList(Collections.singletonList(getH3FieldConfig()));
+    _tableConfig.setFieldConfigList(List.of(getH3FieldConfig()));
     updateTableConfig(_tableConfig);
 
     Map<String, TableStaleSegmentResponse> needRefreshResponses = getStaleSegmentsResponse();
@@ -179,10 +162,9 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
   }
 
   private Map<String, TableStaleSegmentResponse> getStaleSegmentsResponse()
-      throws IOException {
-    return JsonUtils.stringToObject(sendGetRequest(
-            _controllerRequestURLBuilder.forStaleSegments(
-                TableNameBuilder.OFFLINE.tableNameWithType(getTableName()))),
+      throws Exception {
+    return getOrCreateAdminClient().getSegmentClient().getStaleSegments(
+        TableNameBuilder.OFFLINE.tableNameWithType(getTableName()),
         new TypeReference<Map<String, TableStaleSegmentResponse>>() { });
   }
 
@@ -193,6 +175,7 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
       stopServer();
       stopBroker();
       stopController();
+      stopKafka();
       stopZk();
     } finally {
       FileUtils.deleteQuietly(_tempDir);

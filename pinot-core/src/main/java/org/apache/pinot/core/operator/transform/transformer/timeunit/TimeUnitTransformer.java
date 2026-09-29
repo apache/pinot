@@ -21,8 +21,6 @@ package org.apache.pinot.core.operator.transform.transformer.timeunit;
 import org.apache.pinot.core.operator.transform.transformer.DataTransformer;
 
 
-/**
- * Interface for time unit transformer to transform time from one time unit to another.
- */
+/// Interface for time unit transformer to transform time from one time unit to another.
 public interface TimeUnitTransformer extends DataTransformer<long[], long[]> {
 }

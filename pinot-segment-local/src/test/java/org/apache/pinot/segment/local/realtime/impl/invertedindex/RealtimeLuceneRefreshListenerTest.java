@@ -131,6 +131,34 @@ public class RealtimeLuceneRefreshListenerTest {
   }
 
   @Test
+  public void testGetLastRefreshNumDocs() {
+    MutableIntSupplier numDocsSupplier = new MutableIntSupplier(0);
+    Clock clock = Clock.fixed(Instant.ofEpochMilli(0), ZoneId.systemDefault());
+    RealtimeLuceneRefreshListener listener =
+        new RealtimeLuceneRefreshListener("table1", "segment1", "column1", 1, numDocsSupplier, clock);
+
+    // Freshly created listener reflects the supplier value at construction (0)
+    assertEquals(listener.getLastRefreshNumDocs(), 0);
+
+    // Successful refresh records the doc count captured in beforeRefresh
+    incrementNumDocs(numDocsSupplier, 5);
+    listener.beforeRefresh();
+    listener.afterRefresh(true);
+    assertEquals(listener.getLastRefreshNumDocs(), 5);
+
+    // didRefresh=false while new docs are pending — count must not advance
+    incrementNumDocs(numDocsSupplier, 3);
+    listener.beforeRefresh();
+    listener.afterRefresh(false);
+    assertEquals(listener.getLastRefreshNumDocs(), 5);
+
+    // Next successful refresh picks up all pending docs
+    listener.beforeRefresh();
+    listener.afterRefresh(true);
+    assertEquals(listener.getLastRefreshNumDocs(), 8);
+  }
+
+  @Test
   public void testFirstRefresh() {
     // index creator is initialized with a pause before docs are indexed, so we must ensure the first refresh
     // does not report an excessive delay

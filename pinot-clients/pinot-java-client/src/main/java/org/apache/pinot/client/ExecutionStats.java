@@ -23,13 +23,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 
-/**
- * Simple POJO to hold query execution statistics for a request. These stats come in every
- * query that's executed and can be used for debugging Pinot slow queries.
- *
- * <p>Please note that objects of this class will hold a reference to the given JsonNode object
- * and that will only be released when the object is GC'ed.</p>
- */
+/// Simple POJO to hold query execution statistics for a request. These stats come in every
+/// query that's executed and can be used for debugging Pinot slow queries.
+///
+/// Please note that objects of this class will hold a reference to the given JsonNode object
+/// and that will only be released when the object is GC'ed.
 public class ExecutionStats {
 
   private static final String NUM_SERVERS_QUERIED = "numServersQueried";
@@ -43,7 +41,9 @@ public class ExecutionStats {
   private static final String NUM_CONSUMING_SEGMENTS_QUERIED = "numConsumingSegmentsQueried";
   private static final String MIN_CONSUMING_FRESHNESS_TIME_MS = "minConsumingFreshnessTimeMs";
   private static final String TOTAL_DOCS = "totalDocs";
+  private static final String GROUPS_TRIMMED = "groupsTrimmed";
   private static final String NUM_GROUPS_LIMIT_REACHED = "numGroupsLimitReached";
+  private static final String NUM_GROUPS_WARNING_LIMIT_REACHED = "numGroupsWarningLimitReached";
   private static final String BROKER_REDUCE_TIME_MS = "brokerReduceTimeMs";
   private static final String TIME_USED_MS = "timeUsedMs";
   private static final String PARTIAL_RESULT = "partialResult";
@@ -111,6 +111,15 @@ public class ExecutionStats {
     return _brokerResponse.has(NUM_GROUPS_LIMIT_REACHED) && _brokerResponse.get(NUM_GROUPS_LIMIT_REACHED).asBoolean();
   }
 
+  public boolean isGroupsTrimmed() {
+    return _brokerResponse.has(GROUPS_TRIMMED) && _brokerResponse.get(GROUPS_TRIMMED).asBoolean();
+  }
+
+  public boolean isNumGroupsWarningLimitReached() {
+    return _brokerResponse.has(NUM_GROUPS_WARNING_LIMIT_REACHED)
+        && _brokerResponse.get(NUM_GROUPS_WARNING_LIMIT_REACHED).asBoolean();
+  }
+
   public boolean isPartialResult() {
     return _brokerResponse.has(PARTIAL_RESULT) && _brokerResponse.get(PARTIAL_RESULT).asBoolean();
   }
@@ -137,7 +146,9 @@ public class ExecutionStats {
     map.put(NUM_CONSUMING_SEGMENTS_QUERIED, getNumConsumingSegmentsQueried());
     map.put(MIN_CONSUMING_FRESHNESS_TIME_MS, getMinConsumingFreshnessTimeMs() + "ms");
     map.put(TOTAL_DOCS, getTotalDocs());
+    map.put(GROUPS_TRIMMED, isGroupsTrimmed());
     map.put(NUM_GROUPS_LIMIT_REACHED, isNumGroupsLimitReached());
+    map.put(NUM_GROUPS_WARNING_LIMIT_REACHED, isNumGroupsWarningLimitReached());
     map.put(BROKER_REDUCE_TIME_MS, getBrokerReduceTimeMs() + "ms");
     map.put(TIME_USED_MS, getTimeUsedMs() + "ms");
     map.put(PARTIAL_RESULT, isPartialResult());

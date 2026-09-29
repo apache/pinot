@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.spi.metrics;
 
-/**
- * A metric which calculates the distribution of a value.
- *
- * @see <a href="http://www.johndcook.com/standard_deviation.html">Accurately computing running
- *      variance</a>
- */
+/// A metric which calculates the distribution of a value.
+///
+/// @see <a href="http://www.johndcook.com/standard_deviation.html">Accurately computing running
+///      variance</a>
 public interface PinotHistogram extends PinotMetric {
 
   Object getHistogram();

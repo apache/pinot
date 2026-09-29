@@ -20,13 +20,16 @@ package org.apache.pinot.core.data.function;
 
 import com.google.common.collect.Lists;
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
+import org.apache.pinot.common.evaluator.InbuiltFunctionEvaluator;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
-import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -36,11 +39,11 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
-/**
- * Tests the Pinot inbuilt transform functions
- */
+/// Tests the Pinot inbuilt transform functions
 public class DateTimeFunctionsTest {
   private static final ZoneOffset WEIRD_ZONE = ZoneOffset.ofHoursMinutes(7, 9);
   private static final DateTimeZone WEIRD_DATE_TIME_ZONE = DateTimeZone.forID(WEIRD_ZONE.getId());
@@ -52,6 +55,13 @@ public class DateTimeFunctionsTest {
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
     assertEquals(evaluator.getArguments(), expectedArguments);
     assertEquals(evaluator.evaluate(row), expectedResult);
+  }
+
+  private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
+      Consumer<Object> assertResult) {
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
+    assertEquals(evaluator.getArguments(), expectedArguments);
+    assertResult.accept(evaluator.evaluate(row));
   }
 
   private void testDateFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
@@ -80,7 +90,6 @@ public class DateTimeFunctionsTest {
       Object expectedResult) {
     testFunction(functionExpression, expectedArguments, row, expectedResult);
   }
-
 
   @DataProvider(name = "dateTimeFunctionsDataProvider")
   public Object[][] dateTimeFunctionsDataProvider() {
@@ -165,8 +174,10 @@ public class DateTimeFunctionsTest {
     // fromEpochDays w/ bucketing
     GenericRow row51 = new GenericRow();
     row51.putValue("sevenDaysSinceEpoch", 2000);
-    inputs.add(new Object[]{"fromEpochDaysBucket(sevenDaysSinceEpoch, 7)", Lists.newArrayList(
-        "sevenDaysSinceEpoch"), row51, 1209600000000L});
+    inputs.add(new Object[]{
+        "fromEpochDaysBucket(sevenDaysSinceEpoch, 7)", Lists.newArrayList(
+        "sevenDaysSinceEpoch"), row51, 1209600000000L
+    });
 
     // fromEpochHours
     GenericRow row60 = new GenericRow();
@@ -177,44 +188,58 @@ public class DateTimeFunctionsTest {
     // fromEpochHours w/ bucketing
     GenericRow row61 = new GenericRow();
     row61.putValue("twoHoursSinceEpoch", 168000);
-    inputs.add(new Object[]{"fromEpochHoursBucket(twoHoursSinceEpoch, 2)", Lists.newArrayList(
-        "twoHoursSinceEpoch"), row61, 1209600000000L});
+    inputs.add(new Object[]{
+        "fromEpochHoursBucket(twoHoursSinceEpoch, 2)", Lists.newArrayList(
+        "twoHoursSinceEpoch"), row61, 1209600000000L
+    });
 
     // fromEpochMinutes
     GenericRow row70 = new GenericRow();
     row70.putValue("minutesSinceEpoch", 20160000);
-    inputs.add(new Object[]{"fromEpochMinutes(minutesSinceEpoch)", Lists.newArrayList(
-        "minutesSinceEpoch"), row70, 1209600000000L});
+    inputs.add(new Object[]{
+        "fromEpochMinutes(minutesSinceEpoch)", Lists.newArrayList(
+        "minutesSinceEpoch"), row70, 1209600000000L
+    });
 
     // fromEpochMinutes w/ bucketing
     GenericRow row71 = new GenericRow();
     row71.putValue("fifteenMinutesSinceEpoch", 1344000);
-    inputs.add(new Object[]{"fromEpochMinutesBucket(fifteenMinutesSinceEpoch, 15)", Lists.newArrayList(
-        "fifteenMinutesSinceEpoch"), row71, 1209600000000L});
+    inputs.add(new Object[]{
+        "fromEpochMinutesBucket(fifteenMinutesSinceEpoch, 15)", Lists.newArrayList(
+        "fifteenMinutesSinceEpoch"), row71, 1209600000000L
+    });
 
     // fromEpochSeconds
     GenericRow row80 = new GenericRow();
     row80.putValue("secondsSinceEpoch", 1209600000L);
-    inputs.add(new Object[]{"fromEpochSeconds(secondsSinceEpoch)", Lists.newArrayList(
-        "secondsSinceEpoch"), row80, 1209600000000L});
+    inputs.add(new Object[]{
+        "fromEpochSeconds(secondsSinceEpoch)", Lists.newArrayList(
+        "secondsSinceEpoch"), row80, 1209600000000L
+    });
 
     // fromEpochSeconds w/ bucketing
     GenericRow row81 = new GenericRow();
     row81.putValue("tenSecondsSinceEpoch", 120960000L);
-    inputs.add(new Object[]{"fromEpochSecondsBucket(tenSecondsSinceEpoch, 10)", Lists.newArrayList(
-        "tenSecondsSinceEpoch"), row81, 1209600000000L});
+    inputs.add(new Object[]{
+        "fromEpochSecondsBucket(tenSecondsSinceEpoch, 10)", Lists.newArrayList(
+        "tenSecondsSinceEpoch"), row81, 1209600000000L
+    });
 
     // nested
     GenericRow row90 = new GenericRow();
     row90.putValue("hoursSinceEpoch", 336000);
-    inputs.add(new Object[]{"toEpochDays(fromEpochHours(hoursSinceEpoch))", Lists.newArrayList(
-        "hoursSinceEpoch"), row90, 14000L});
+    inputs.add(new Object[]{
+        "toEpochDays(fromEpochHours(hoursSinceEpoch))", Lists.newArrayList(
+        "hoursSinceEpoch"), row90, 14000L
+    });
 
     GenericRow row91 = new GenericRow();
     row91.putValue("fifteenSecondsSinceEpoch", 80640000L);
     inputs.add(
-        new Object[]{"toEpochMinutesBucket(fromEpochSecondsBucket(fifteenSecondsSinceEpoch, 15), 10)",
-            Lists.newArrayList("fifteenSecondsSinceEpoch"), row91, 2016000L});
+        new Object[]{
+            "toEpochMinutesBucket(fromEpochSecondsBucket(fifteenSecondsSinceEpoch, 15), 10)",
+            Lists.newArrayList("fifteenSecondsSinceEpoch"), row91, 2016000L
+        });
 
     // toDateTime simple
     GenericRow row100 = new GenericRow();
@@ -224,21 +249,27 @@ public class DateTimeFunctionsTest {
     // toDateTime complex
     GenericRow row101 = new GenericRow();
     row101.putValue("dateTime", 1234567890000L);
-    inputs.add(new Object[]{"toDateTime(dateTime, 'MM/yyyy/dd HH:mm:ss')", Lists.newArrayList(
-        "dateTime"), row101, "02/2009/13 23:31:30"});
+    inputs.add(new Object[]{
+        "toDateTime(dateTime, 'MM/yyyy/dd HH:mm:ss')", Lists.newArrayList(
+        "dateTime"), row101, "02/2009/13 23:31:30"
+    });
 
     // toDateTime with timezone
     GenericRow row102 = new GenericRow();
     row102.putValue("dateTime", 7897897890000L);
-    inputs.add(new Object[]{"toDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList(
-        "dateTime"), row102, "Mon Apr 10 20:31:30 UTC 2220"});
+    inputs.add(new Object[]{
+        "toDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList(
+        "dateTime"), row102, "Mon Apr 10 20:31:30 UTC 2220"
+    });
 
     // toDateTime with timezone conversion
     GenericRow row103 = new GenericRow();
     row103.putValue("dateTime", 1633740369000L);
     row103.putValue("tz", "America/Los_Angeles");
-    inputs.add(new Object[]{"toDateTime(dateTime, 'yyyy-MM-dd ZZZ', tz)", Lists.newArrayList("dateTime",
-        "tz"), row103, "2021-10-08 America/Los_Angeles"});
+    inputs.add(new Object[]{
+        "toDateTime(dateTime, 'yyyy-MM-dd ZZZ', tz)", Lists.newArrayList("dateTime",
+        "tz"), row103, "2021-10-08 America/Los_Angeles"
+    });
 
     // fromDateTime simple
     GenericRow row110 = new GenericRow();
@@ -249,14 +280,18 @@ public class DateTimeFunctionsTest {
     // fromDateTime complex
     GenericRow row111 = new GenericRow();
     row111.putValue("dateTime", "02/2009/13 15:31:30");
-    inputs.add(new Object[]{"fromDateTime(dateTime, 'MM/yyyy/dd HH:mm:ss')", Lists.newArrayList(
-        "dateTime"), row111, 1234539090000L});
+    inputs.add(new Object[]{
+        "fromDateTime(dateTime, 'MM/yyyy/dd HH:mm:ss')", Lists.newArrayList(
+        "dateTime"), row111, 1234539090000L
+    });
 
     // fromDateTime with timezone
     GenericRow row112 = new GenericRow();
     row112.putValue("dateTime", "Mon Aug 24 12:36:46 America/Los_Angeles 2009");
-    inputs.add(new Object[]{"fromDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList(
-        "dateTime"), row112, 1251142606000L});
+    inputs.add(new Object[]{
+        "fromDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList(
+        "dateTime"), row112, 1251142606000L
+    });
 
     // fromDateTime with null
     GenericRow row113 = new GenericRow();
@@ -273,8 +308,30 @@ public class DateTimeFunctionsTest {
         row114, -1L
     });
 
+    // fromDateTime on a DST spring-forward gap: 2010-04-30 00:00 did not exist in Africa/Cairo because the
+    // clock sprang forward to 01:00. Instead of throwing, the scalar should shift forward past the gap and
+    // return the first valid instant (01:00 EEST). Using a historical date keeps this test stable against
+    // future tzdata updates.
+    GenericRow row115 = new GenericRow();
+    row115.putValue("dateTime", "2010-04-30");
+    long cairoDstGapExpected =
+        new DateTime(2010, 4, 30, 1, 0, 0, 0, DateTimeZone.forID("Africa/Cairo")).getMillis();
+    inputs.add(new Object[]{
+        "fromDateTime(dateTime, 'yyyy-MM-dd', 'Africa/Cairo')", Lists.newArrayList("dateTime"), row115,
+        cairoDstGapExpected
+    });
+
+    // Same DST gap through the defaultVal overload: the fix resolves a valid instant rather than silently
+    // falling through to the default sentinel.
+    GenericRow row116 = new GenericRow();
+    row116.putValue("dateTime", "2010-04-30");
+    inputs.add(new Object[]{
+        "fromDateTime(dateTime, 'yyyy-MM-dd', 'Africa/Cairo', -1)", Lists.newArrayList("dateTime"), row116,
+        cairoDstGapExpected
+    });
+
     // timezone_hour and timezone_minute
-    List<String> expectedArguments = Collections.singletonList("tz");
+    List<String> expectedArguments = List.of("tz");
     GenericRow row120 = new GenericRow();
     row120.putValue("tz", "UTC");
     inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row120, 0});
@@ -314,7 +371,7 @@ public class DateTimeFunctionsTest {
     inputs.add(new Object[]{"timezone_minute(tz, 1656685381000)", expectedArguments, row125, 0});
 
     // Convenience extraction functions
-    expectedArguments = Collections.singletonList("millis");
+    expectedArguments = List.of("millis");
     GenericRow row130 = new GenericRow();
     // Sat May 23 2020 22:23:13.123 UTC
     row130.putValue("millis", 1590272593123L);
@@ -693,6 +750,43 @@ public class DateTimeFunctionsTest {
   }
 
   @Test
+  public void testDateTimeConvertRecordExtractorDateTypes() {
+    // The RecordExtractor contract decodes date-related logical types into TIMESTAMP -> java.sql.Timestamp,
+    // DATE -> java.time.LocalDate, TIME -> java.time.LocalTime. These reach dateTimeConvert as the raw object
+    // and are coerced via PinotDataType the same way FunctionInvoker.convertTypes does: EPOCH / TIMESTAMP input
+    // is read as LONG, SIMPLE_DATE_FORMAT input is read as STRING. (The raw-mode Integer / Long forms are already
+    // covered by the numeric cases above.)
+
+    // TIMESTAMP -> epoch millis (Timestamp#getTime)
+    testDateTimeConvert(new Timestamp(1505898960000L), "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS", 1505898960000L);
+    testDateTimeConvert(new Timestamp(1505898960000L), "TIMESTAMP", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS",
+        "20170920");
+
+    // DATE -> days since epoch (LocalDate#toEpochDay)
+    testDateTimeConvert(LocalDate.of(2017, 9, 20), "1:DAYS:EPOCH", "1:MILLISECONDS:EPOCH", "1:DAYS", 1505865600000L);
+    testDateTimeConvert(LocalDate.of(2017, 9, 20), "1:DAYS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS",
+        "20170920");
+
+    // TIME -> millis since midnight (LocalTime#toNanoOfDay / 1_000_000)
+    testDateTimeConvert(LocalTime.of(2, 16, 0), "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS",
+        8160000L);
+  }
+
+  @Test
+  public void testDateTimeConvertNumericStringEpoch() {
+    // EPOCH input arriving as a numeric string is read as LONG via PinotDataType. Decimal and scientific-notation
+    // forms (e.g. a numeric column stringified upstream) must parse rather than throw; the fractional part is
+    // truncated toward zero.
+    testDateTimeConvert("1505898960000", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS",
+        1505898960000L);
+    testDateTimeConvert("1505898960000.0", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS",
+        1505898960000L);
+    testDateTimeConvert("1.50589896E12", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS",
+        1505898960000L);
+  }
+
+  @Test
   private void testTimestampAdd() {
     long currentTimestamp = System.currentTimeMillis();
     long timestampHalfHourBack = currentTimestamp - (30 * 60 * 1000);
@@ -701,7 +795,7 @@ public class DateTimeFunctionsTest {
     GenericRow row = new GenericRow();
     row.putValue("timeCol", timestamp10DaysAgo);
 
-    List<String> arguments = Collections.singletonList("timeCol");
+    List<String> arguments = List.of("timeCol");
 
     testFunction("timestampAdd(DAY, 10, timeCol)", arguments, row, currentTimestamp);
 
@@ -738,7 +832,7 @@ public class DateTimeFunctionsTest {
       String outputGranularityStr, Object expectedResult) {
     GenericRow row = new GenericRow();
     row.putValue("timeCol", timeValue);
-    List<String> arguments = Collections.singletonList("timeCol");
+    List<String> arguments = List.of("timeCol");
     testDateFunction(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
         outputGranularityStr), arguments, row, expectedResult == null ? null : expectedResult);
   }
@@ -747,7 +841,7 @@ public class DateTimeFunctionsTest {
       String outputGranularityStr, String bucketingTz, Object expectedResult) {
     GenericRow row = new GenericRow();
     row.putValue("timeCol", timeValue);
-    List<String> arguments = Collections.singletonList("timeCol");
+    List<String> arguments = List.of("timeCol");
     testDateFunction(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
         outputGranularityStr, bucketingTz), arguments, row, expectedResult == null ? null : expectedResult);
   }
@@ -777,5 +871,51 @@ public class DateTimeFunctionsTest {
     }
     testMultipleInvocations(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
         outputGranularityStr), rows, expectedResults);
+  }
+
+  @Test
+  public void testSleepFunction() {
+    long startTime = System.currentTimeMillis();
+    testFunction("sleep(50)", List.of(), new GenericRow(), result -> {
+      assertTrue((long) result >= 50);
+    });
+    long endTime = System.currentTimeMillis();
+    assertTrue(endTime - startTime >= 50);
+  }
+
+  @Test
+  public void testFromIso8601() {
+    // Valid ISO8601 strings
+    assertEquals(DateTimeFunctions.fromIso8601("2023-10-01T00:00:00Z"), 1696118400000L);
+    assertEquals(DateTimeFunctions.fromIso8601("2023-10-01T00:00:00+01:00"), 1696114800000L);
+    assertEquals(DateTimeFunctions.fromIso8601("2023-10-01T00:00:00-01:00"), 1696122000000L);
+
+    // Invalid ISO8601 strings
+    try {
+      DateTimeFunctions.fromIso8601("invalid-date");
+      fail("Expected DateTimeParseException");
+    } catch (DateTimeParseException e) {
+      // Expected
+    }
+
+    try {
+      DateTimeFunctions.fromIso8601("2023-13-01T00:00:00Z");
+      fail("Expected DateTimeParseException");
+    } catch (DateTimeParseException e) {
+      // Expected
+    }
+  }
+
+  @Test
+  public void testToIso8601() {
+    // Valid millis since epoch
+    assertEquals(DateTimeFunctions.toIso8601(1696118400000L), "2023-10-01T00:00:00Z");
+    assertEquals(DateTimeFunctions.toIso8601(0L), "1970-01-01T00:00:00Z");
+
+    // Large value
+    assertEquals(DateTimeFunctions.toIso8601(Long.MAX_VALUE), "+292278994-08-17T07:12:55.807Z");
+
+    // Negative value
+    assertEquals(DateTimeFunctions.toIso8601(-1L), "1969-12-31T23:59:59.999Z");
   }
 }

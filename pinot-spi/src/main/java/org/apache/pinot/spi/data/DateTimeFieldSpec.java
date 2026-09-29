@@ -32,8 +32,13 @@ public final class DateTimeFieldSpec extends FieldSpec {
   private String _format;
   private String _granularity;
   private Object _sampleValue;
-  private transient DateTimeFormatSpec _formatSpec;
-  private transient DateTimeGranularitySpec _granularitySpec;
+  /// Lazily derived caches of [#getFormatSpec] and [#getGranularitySpec].
+  ///
+  /// `volatile` is required, not just for the null checks in those getters: a field spec belongs to a `Schema`, which
+  /// is cached and read concurrently by query threads. Without it these values are published unsafely, so a racing
+  /// thread can read the non-null reference while the contents are not yet visible to it.
+  private transient volatile DateTimeFormatSpec _formatSpec;
+  private transient volatile DateTimeGranularitySpec _granularitySpec;
 
   public enum TimeFormat {
     EPOCH, TIMESTAMP, SIMPLE_DATE_FORMAT
@@ -44,33 +49,31 @@ public final class DateTimeFieldSpec extends FieldSpec {
     super();
   }
 
-  /**
-   * Constructs a DateTimeFieldSpec with basic fields name, dataType, format and granularity
-   * @param format - defines how to interpret the numeric value in the date time column.
-   * Format has to follow the pattern - size:timeunit:timeformat, where
-   * size and timeUnit together define the granularity of the time column value.
-   * Size is the integer value of the granularity size.
-   * TimeFormat tells us whether the time column value is expressed in epoch or is a simple date format pattern
-   * Consider 2 date time values for example 2017/07/01 00:00:00 and 2017/08/29 05:20:00:
-   * e.g. 1) If the time column value is defined in millisSinceEpoch (1498892400000, 1504009200000)
-   *          this configuration will be 1:MILLISECONDS:EPOCH
-   *      2) If the time column value is defined in 5 minutes since epoch (4996308, 5013364)
-   *         this configuration will be 5:MINUTES:EPOCH
-   *      3) If the time column value is defined in a simple date format of a day (e.g. 20170701, 20170829),
-   *         this configuration will be 1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd (the pattern can be configured as desired)
-   *
-   * @param granularity - defines in what granularity the data is bucketed.
-   * Granularity has to follow pattern- size:timeunit, where
-   * size and timeUnit together define the bucket granularity of the data.
-   * This is independent of the format, which is purely defining how to interpret the numeric value in the date time
-   *                    column.
-   * E.g.
-   *       1) if a time column is defined in millisSinceEpoch (format=1:MILLISECONDS:EPOCH), but the data buckets are
-   *                   5 minutes,
-   *          the granularity will be 5:MINUTES.
-   *       2) if a time column is defined in hoursSinceEpoch (format=1:HOURS:EPOCH), and the data buckets are 1 hours,
-   *          the granularity will be 1:HOURS
-   */
+  /// Constructs a DateTimeFieldSpec with basic fields name, dataType, format and granularity
+  /// @param format - defines how to interpret the numeric value in the date time column.
+  /// Format has to follow the pattern - size:timeunit:timeformat, where
+  /// size and timeUnit together define the granularity of the time column value.
+  /// Size is the integer value of the granularity size.
+  /// TimeFormat tells us whether the time column value is expressed in epoch or is a simple date format pattern
+  /// Consider 2 date time values for example 2017/07/01 00:00:00 and 2017/08/29 05:20:00:
+  /// e.g. 1) If the time column value is defined in millisSinceEpoch (1498892400000, 1504009200000)
+  ///          this configuration will be 1:MILLISECONDS:EPOCH
+  ///      2) If the time column value is defined in 5 minutes since epoch (4996308, 5013364)
+  ///         this configuration will be 5:MINUTES:EPOCH
+  ///      3) If the time column value is defined in a simple date format of a day (e.g. 20170701, 20170829),
+  ///         this configuration will be 1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd (the pattern can be configured as desired)
+  ///
+  /// @param granularity - defines in what granularity the data is bucketed.
+  /// Granularity has to follow pattern- size:timeunit, where
+  /// size and timeUnit together define the bucket granularity of the data.
+  /// This is independent of the format, which is purely defining how to interpret the numeric value in the date time
+  ///                    column.
+  /// E.g.
+  ///       1) if a time column is defined in millisSinceEpoch (format=1:MILLISECONDS:EPOCH), but the data buckets are
+  ///                   5 minutes,
+  ///          the granularity will be 5:MINUTES.
+  ///       2) if a time column is defined in hoursSinceEpoch (format=1:HOURS:EPOCH), and the data buckets are 1 hours,
+  ///          the granularity will be 1:HOURS
   public DateTimeFieldSpec(String name, DataType dataType, String format, String granularity,
       @Nullable Object sampleValue) {
     super(name, dataType, true);
@@ -90,21 +93,17 @@ public final class DateTimeFieldSpec extends FieldSpec {
     this(name, dataType, format, granularity, null);
   }
 
-  /**
-   * Constructs a DateTimeFieldSpec with basic fields - name, dataType, format, granularity - and also with
-   * defaultNullValue and
-   * transformFunction
-   */
+  /// Constructs a DateTimeFieldSpec with basic fields - name, dataType, format, granularity - and also with
+  /// defaultNullValue and
+  /// transformFunction
   public DateTimeFieldSpec(String name, DataType dataType, String format, String granularity,
       @Nullable Object defaultNullValue, @Nullable String transformFunction) {
     this(name, dataType, format, granularity, defaultNullValue, transformFunction, null);
   }
 
-  /**
-   * Constructs a DateTimeFieldSpec with basic fields - name, dataType, format, granularity - and also with
-   * defaultNullValue and
-   * transformFunction
-   */
+  /// Constructs a DateTimeFieldSpec with basic fields - name, dataType, format, granularity - and also with
+  /// defaultNullValue and
+  /// transformFunction
   public DateTimeFieldSpec(String name, DataType dataType, String format, String granularity,
       @Nullable Object defaultNullValue, @Nullable String transformFunction, @Nullable String sampleValue) {
     this(name, dataType, format, granularity, sampleValue);
@@ -191,7 +190,7 @@ public final class DateTimeFieldSpec extends FieldSpec {
 
   @Override
   public String toString() {
-    return "< field type: DATE_TIME, field name: " + _name + ", datatype: " + _dataType + ", time column format: "
+    return "< field type: DATE_TIME, field name: " + _name + ", data type: " + _dataType + ", time column format: "
         + _format + ", time field granularity: " + _granularity + " >";
   }
 

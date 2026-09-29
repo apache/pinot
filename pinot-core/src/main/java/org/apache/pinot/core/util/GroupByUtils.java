@@ -19,16 +19,31 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
+import org.apache.pinot.core.data.table.DeterministicConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
+import org.apache.pinot.core.data.table.IntermediateRecord;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
+import org.apache.pinot.core.data.table.SortedRecords;
+import org.apache.pinot.core.data.table.SortedRecordsMerger;
+import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
+import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 public final class GroupByUtils {
@@ -38,29 +53,57 @@ public final class GroupByUtils {
   public static final int DEFAULT_MIN_NUM_GROUPS = 5000;
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
 
-  /**
-   * Returns the capacity of the table required by the given query.
-   * NOTE: It returns {@code max(limit * 5, 5000)} to ensure the result accuracy.
-   */
+  /// Builds the segment-level [GroupByResultsBlock] for a GROUP BY GROUPING SETS / ROLLUP / CUBE query,
+  /// shared by `GroupByOperator` and `FilteredGroupByOperator`. When the group count exceeds the
+  /// per-set budget (`perSetTrimSize * numGroupingSets`), a per-set bucketed trim (keyed on the
+  /// `$groupingId` discriminator at `discriminatorColumnIndex`) keeps each grouping set's own top
+  /// candidates so a global top-K cannot starve low-magnitude sets such as the grand total; otherwise the full
+  /// segment result is returned. The broker still applies the final ORDER BY + LIMIT across all sets.
+  ///
+  /// @param discriminatorColumnIndex index of the synthetic $groupingId column, i.e. the number of union
+  ///                                 group-by columns
+  public static GroupByResultsBlock buildGroupingSetsResultsBlock(QueryContext queryContext, DataSchema dataSchema,
+      GroupKeyGenerator groupKeyGenerator, GroupByResultHolder[] groupByResultHolders, int numGroups,
+      int discriminatorColumnIndex, boolean numGroupsLimitReached, boolean numGroupsWarningLimitReached) {
+    GroupByResultsBlock resultsBlock;
+    int perSetTrimSize = queryContext.getGroupingSetSegmentTrimSize();
+    int numGroupingSets = queryContext.getGroupingSets().size();
+    if (perSetTrimSize > 0 && numGroups > (long) perSetTrimSize * numGroupingSets) {
+      TableResizer tableResizer = new TableResizer(dataSchema, queryContext);
+      List<IntermediateRecord> intermediateRecords =
+          tableResizer.trimInSegmentResultsByGroupingSet(groupKeyGenerator, groupByResultHolders, perSetTrimSize,
+              discriminatorColumnIndex);
+      groupKeyGenerator.close();
+      ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
+      resultsBlock = new GroupByResultsBlock(dataSchema, intermediateRecords, queryContext);
+      resultsBlock.setGroupsTrimmed(true);
+    } else {
+      AggregationGroupByResult aggregationGroupByResult =
+          new AggregationGroupByResult(groupKeyGenerator, queryContext.getAggregationFunctions(), groupByResultHolders);
+      resultsBlock = new GroupByResultsBlock(dataSchema, aggregationGroupByResult, queryContext);
+    }
+    resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+    resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
+    return resultsBlock;
+  }
+
+  /// Returns the capacity of the table required by the given query. NOTE: It returns `max(limit * 5, 5000)` to
+  /// ensure the result accuracy.
   public static int getTableCapacity(int limit) {
     return getTableCapacity(limit, DEFAULT_MIN_NUM_GROUPS);
   }
 
-  /**
-   * Returns the capacity of the table required by the given query.
-   * NOTE: It returns {@code max(limit * 5, minNumGroups)} where minNumGroups is configurable to tune the table size and
-   *       result accuracy.
-   */
+  /// Returns the capacity of the table required by the given query. NOTE: It returns
+  /// `max(limit * 5, minNumGroups)` where minNumGroups is configurable to tune the table size and result
+  /// accuracy.
   public static int getTableCapacity(int limit, int minNumGroups) {
     long capacityByLimit = limit * 5L;
     return capacityByLimit > Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.max((int) capacityByLimit, minNumGroups);
   }
 
-  /**
-   * Returns the actual trim threshold used for the indexed table. Trim threshold should be at least (2 * trimSize) to
-   * avoid excessive trimming. When trim threshold is non-positive or higher than 10^9, trim is considered disabled,
-   * where {@code Integer.MAX_VALUE} is returned.
-   */
+  /// Returns the actual trim threshold used for the indexed table. Trim threshold should be at least (2 \* trimSize) to
+  /// avoid excessive trimming. When trim threshold is non-positive or higher than 10^9, trim is considered disabled,
+  /// where `Integer.MAX_VALUE` is returned.
   @VisibleForTesting
   static int getIndexedTableTrimThreshold(int trimSize, int trimThreshold) {
     if (trimThreshold <= 0 || trimThreshold > MAX_TRIM_THRESHOLD || trimSize > MAX_TRIM_THRESHOLD / 2) {
@@ -69,9 +112,7 @@ public final class GroupByUtils {
     return Math.max(trimThreshold, 2 * trimSize);
   }
 
-  /**
-   * Returns the initial capacity of the indexed table required by the given query.
-   */
+  /// Returns the initial capacity of the indexed table required by the given query.
   @VisibleForTesting
   static int getIndexedTableInitialCapacity(int maxRowsToKeep, int minNumGroups, int minCapacity) {
     // The upper bound of the initial capacity is the capacity required to hold all the required rows. The indexed table
@@ -89,18 +130,28 @@ public final class GroupByUtils {
     return Math.max(minCapacity, lowerBound);
   }
 
-  /**
-   * Creates an indexed table for the combine operator given a sample results block.
-   */
+  /// Creates an indexed table for the combine operator given a sample results block.
   public static IndexedTable createIndexedTableForCombineOperator(GroupByResultsBlock resultsBlock,
-      QueryContext queryContext, int numThreads) {
+      QueryContext queryContext, int numThreads, ExecutorService executorService) {
     DataSchema dataSchema = resultsBlock.getDataSchema();
     int numGroups = resultsBlock.getNumGroups();
     int limit = queryContext.getLimit();
     boolean hasOrderBy = queryContext.getOrderByExpressions() != null;
     boolean hasHaving = queryContext.getHavingFilter() != null;
-    int minTrimSize = queryContext.getMinServerGroupTrimSize();
+    int minTrimSize =
+        queryContext.getMinServerGroupTrimSize(); // it's minBrokerGroupTrimSize in broker
     int minInitialIndexedTableCapacity = queryContext.getMinInitialIndexedTableCapacity();
+
+    /// Grouping-set queries must not trim per server: a global ORDER BY top-K here would drop a row that ranks
+    /// higher globally once partial aggregates are merged at the broker, and could starve entire grouping sets
+    /// (silently wrong results). Keep all groups (bounded by numGroupsLimit) and defer ORDER BY + LIMIT to the
+    /// broker. Per-set bucketed trim still happens at the segment level.
+    if (queryContext.isGroupingSets()) {
+      int resultSize = queryContext.getNumGroupsLimit();
+      int initialCapacity = getIndexedTableInitialCapacity(resultSize, numGroups, minInitialIndexedTableCapacity);
+      return getTrimDisabledIndexedTable(dataSchema, false, queryContext, resultSize, initialCapacity, numThreads,
+          executorService);
+    }
 
     // Disable trim when min trim size is non-positive
     int trimSize = minTrimSize > 0 ? getTableCapacity(limit, minTrimSize) : Integer.MAX_VALUE;
@@ -118,7 +169,8 @@ public final class GroupByUtils {
         resultSize = limit;
       }
       int initialCapacity = getIndexedTableInitialCapacity(resultSize, numGroups, minInitialIndexedTableCapacity);
-      return getTrimDisabledIndexedTable(dataSchema, false, queryContext, resultSize, initialCapacity, numThreads);
+      return getTrimDisabledIndexedTable(dataSchema, false, queryContext, resultSize, initialCapacity, numThreads,
+          executorService);
     }
 
     int resultSize;
@@ -131,18 +183,17 @@ public final class GroupByUtils {
     int trimThreshold = getIndexedTableTrimThreshold(trimSize, queryContext.getGroupTrimThreshold());
     int initialCapacity = getIndexedTableInitialCapacity(trimThreshold, numGroups, minInitialIndexedTableCapacity);
     if (trimThreshold == Integer.MAX_VALUE) {
-      return getTrimDisabledIndexedTable(dataSchema, false, queryContext, resultSize, initialCapacity, numThreads);
+      return getTrimDisabledIndexedTable(dataSchema, false, queryContext, resultSize, initialCapacity, numThreads,
+          executorService);
     } else {
       return getTrimEnabledIndexedTable(dataSchema, false, queryContext, resultSize, trimSize, trimThreshold,
-          initialCapacity, numThreads);
+          initialCapacity, numThreads, executorService);
     }
   }
 
-  /**
-   * Creates an indexed table for the data table reducer given a sample data table.
-   */
+  /// Creates an indexed table for the data table reducer given a sample data table.
   public static IndexedTable createIndexedTableForDataTableReducer(DataTable dataTable, QueryContext queryContext,
-      DataTableReducerContext reducerContext, int numThreads) {
+      DataTableReducerContext reducerContext, int numThreads, ExecutorService executorService) {
     DataSchema dataSchema = dataTable.getDataSchema();
     int numGroups = dataTable.getNumberOfRows();
     int limit = queryContext.getLimit();
@@ -160,44 +211,77 @@ public final class GroupByUtils {
     // TODO: Resolve the HAVING clause within the IndexedTable before returning the result
     int resultSize = hasHaving ? trimSize : limit;
 
+    /// Grouping-set queries must not incrementally trim while merging server responses (a row could be dropped
+    /// before all its partial aggregates are merged) nor apply a per-server top-K. Force the trim-disabled path
+    /// so all groups are merged first; finish() then keeps the correct global top-K (resultSize) and the broker
+    /// applies the final ORDER BY + LIMIT over the fully-merged table.
+    if (queryContext.isGroupingSets()) {
+      int initialCapacity = getIndexedTableInitialCapacity(resultSize, numGroups, minInitialIndexedTableCapacity);
+      return getTrimDisabledIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, initialCapacity,
+          numThreads, executorService);
+    }
+
     // When there is no ORDER BY, trim is not required because the indexed table stops accepting new groups once the
     // result size is reached
     if (!hasOrderBy) {
       int initialCapacity = getIndexedTableInitialCapacity(resultSize, numGroups, minInitialIndexedTableCapacity);
       return getTrimDisabledIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, initialCapacity,
-          numThreads);
+          numThreads, executorService);
     }
 
     int trimThreshold = getIndexedTableTrimThreshold(trimSize, reducerContext.getGroupByTrimThreshold());
     int initialCapacity = getIndexedTableInitialCapacity(trimThreshold, numGroups, minInitialIndexedTableCapacity);
     if (trimThreshold == Integer.MAX_VALUE) {
       return getTrimDisabledIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, initialCapacity,
-          numThreads);
+          numThreads, executorService);
     } else {
       return getTrimEnabledIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold,
-          initialCapacity, numThreads);
+          initialCapacity, numThreads, executorService);
     }
   }
 
   private static IndexedTable getTrimDisabledIndexedTable(DataSchema dataSchema, boolean hasFinalInput,
-      QueryContext queryContext, int resultSize, int initialCapacity, int numThreads) {
+      QueryContext queryContext, int resultSize, int initialCapacity, int numThreads, ExecutorService executorService) {
+    if (queryContext.isAccurateGroupByWithoutOrderBy() && queryContext.getOrderByExpressions() == null
+        && queryContext.getHavingFilter() == null) {
+      return new DeterministicConcurrentIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize,
+          Integer.MAX_VALUE, Integer.MAX_VALUE, initialCapacity, executorService);
+    }
     if (numThreads == 1) {
       return new SimpleIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, Integer.MAX_VALUE,
-          Integer.MAX_VALUE, initialCapacity);
+          Integer.MAX_VALUE, initialCapacity, executorService);
     } else {
-      return new UnboundedConcurrentIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, initialCapacity);
+      return new UnboundedConcurrentIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, initialCapacity,
+          executorService);
     }
   }
 
   private static IndexedTable getTrimEnabledIndexedTable(DataSchema dataSchema, boolean hasFinalInput,
-      QueryContext queryContext, int resultSize, int trimSize, int trimThreshold, int initialCapacity, int numThreads) {
+      QueryContext queryContext, int resultSize, int trimSize, int trimThreshold, int initialCapacity, int numThreads,
+      ExecutorService executorService) {
     assert trimThreshold != Integer.MAX_VALUE;
     if (numThreads == 1) {
       return new SimpleIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold,
-          initialCapacity);
+          initialCapacity, executorService);
     } else {
       return new ConcurrentIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold,
-          initialCapacity);
+          initialCapacity, executorService);
     }
+  }
+
+  public static SortedRecords getAndPopulateSortedRecords(GroupByResultsBlock block) {
+    List<IntermediateRecord> intermediateRecords = block.getIntermediateRecords();
+    Record[] sortedRecords = new Record[intermediateRecords.size()];
+    int idx = 0;
+    for (IntermediateRecord intermediateRecord : intermediateRecords) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(idx, "GroupByUtils#getAndPopulateSortedRecords");
+      sortedRecords[idx++] = intermediateRecord._record;
+    }
+    return new SortedRecords(sortedRecords, idx);
+  }
+
+  public static SortedRecordsMerger getSortedReduceMerger(QueryContext queryContext,
+      int resultSize, Comparator<Record> comparator) {
+    return new SortedRecordsMerger(queryContext, resultSize, comparator);
   }
 }

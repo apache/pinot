@@ -21,10 +21,8 @@ package org.apache.pinot.core.query.aggregation.groupby;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 
 
-/**
- * Placeholder AggregationResultHolder that does noop
- * This is used for ChildAggregationFunction
- */
+/// Placeholder AggregationResultHolder that does noop
+/// This is used for ChildAggregationFunction
 public class DummyAggregationResultHolder implements AggregationResultHolder {
   @Override
   public void setValue(double value) {
@@ -32,6 +30,10 @@ public class DummyAggregationResultHolder implements AggregationResultHolder {
 
   @Override
   public void setValue(int value) {
+  }
+
+  @Override
+  public void setValue(long value) {
   }
 
   @Override
@@ -45,6 +47,11 @@ public class DummyAggregationResultHolder implements AggregationResultHolder {
 
   @Override
   public int getIntResult() {
+    return 0;
+  }
+
+  @Override
+  public long getLongResult() {
     return 0;
   }
 

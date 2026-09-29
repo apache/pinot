@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -38,7 +37,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
-import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
+import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -50,15 +49,12 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
-import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A {@link SegmentWriter} implementation that uses a local file as a buffer to collect {@link GenericRow}.
- * The {@link GenericRow} are written to the buffer as AVRO records.
- */
+/// A [SegmentWriter] implementation that uses a local file as a buffer to collect [GenericRow].
+/// The [GenericRow] are written to the buffer as AVRO records.
 @NotThreadSafe
 public class FileBasedSegmentWriter implements SegmentWriter {
 
@@ -72,7 +68,7 @@ public class FileBasedSegmentWriter implements SegmentWriter {
   private String _outputDirURI;
   private Schema _schema;
   private Set<String> _fieldsToRead;
-  private RecordTransformer _recordTransformer;
+  private TransformPipeline _transformPipeline;
 
   private File _stagingDir;
   private File _bufferFile;
@@ -83,7 +79,7 @@ public class FileBasedSegmentWriter implements SegmentWriter {
 
   @Override
   public void init(TableConfig tableConfig, Schema schema) throws Exception {
-    init(tableConfig, schema, Collections.emptyMap());
+    init(tableConfig, schema, Map.of());
   }
 
   @Override
@@ -114,13 +110,13 @@ public class FileBasedSegmentWriter implements SegmentWriter {
 
     _schema = schema;
     _fieldsToRead = _schema.getColumnNames();
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
+    _transformPipeline = new TransformPipeline(_tableConfig, _schema);
     _avroSchema = SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(_schema);
     _reusableRecord = new GenericData.Record(_avroSchema);
 
     // Create tmp dir
-    _stagingDir = new File(FileUtils.getTempDirectory(),
-        String.format("segment_writer_staging_%s_%d", _tableNameWithType, System.currentTimeMillis()));
+    _stagingDir = new File(FileUtils.getTempDirectory(), "segment_writer_staging_" + _tableNameWithType + "_"
+        + System.currentTimeMillis());
     Preconditions.checkState(_stagingDir.mkdirs(), "Failed to create staging dir: %s", _stagingDir.getAbsolutePath());
 
     // Create buffer file
@@ -134,36 +130,37 @@ public class FileBasedSegmentWriter implements SegmentWriter {
   private void resetBuffer()
       throws IOException {
     FileUtils.deleteQuietly(_bufferFile);
-    _recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
+    _recordWriter =
+        new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema, SegmentProcessorAvroUtils.getAvroDataModel()));
     _recordWriter.create(_avroSchema, _bufferFile);
   }
 
   @Override
   public void collect(GenericRow row)
-      throws IOException {
+      throws Exception {
     // TODO: Revisit whether we should transform the row
-    GenericRow transform = _recordTransformer.transform(row);
-    SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(transform, _reusableRecord, _fieldsToRead);
-    _recordWriter.append(_reusableRecord);
+    TransformPipeline.Result result = _transformPipeline.processRow(row);
+    for (GenericRow transformedRow : result.getTransformedRows()) {
+      SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(transformedRow, _reusableRecord, _fieldsToRead);
+      _recordWriter.append(_reusableRecord);
+    }
   }
 
-  /**
-   * Creates one Pinot segment using the {@link GenericRow}s collected in the AVRO file buffer,
-   * at the outputDirUri as specified in the tableConfig->batchConfigs.
-   * Successful invocation of this method means that the {@link GenericRow}s collected so far,
-   * are now available in the Pinot segment and not available in the buffer anymore.
-   *
-   * Successful completion of segment will return the segment URI.
-   * The buffer will be reset and ready to accept further records via <code>collect()</code>
-   *
-   * If an exception is thrown, the buffer will not be reset
-   * and so, <code>flush()</code> can be invoked repeatedly in a retry loop.
-   * If a successful invocation is not achieved,<code>close()</code> followed by <code>init</code> will have to be
-   * called in order to reset the buffer and resume record writing.
-   *
-   * @return URI of the generated segment
-   * @throws IOException
-   */
+  /// Creates one Pinot segment using the [GenericRow]s collected in the AVRO file buffer,
+  /// at the outputDirUri as specified in the tableConfig->batchConfigs.
+  /// Successful invocation of this method means that the [GenericRow]s collected so far,
+  /// are now available in the Pinot segment and not available in the buffer anymore.
+  ///
+  /// Successful completion of segment will return the segment URI.
+  /// The buffer will be reset and ready to accept further records via `collect()`
+  ///
+  /// If an exception is thrown, the buffer will not be reset
+  /// and so, `flush()` can be invoked repeatedly in a retry loop.
+  /// If a successful invocation is not achieved,`close()` followed by `init` will have to be
+  /// called in order to reset the buffer and resume record writing.
+  ///
+  /// @return URI of the generated segment
+  /// @throws IOException
   @Override
   public URI flush()
       throws IOException {
@@ -198,14 +195,14 @@ public class FileBasedSegmentWriter implements SegmentWriter {
       File segmentTarFile = new File(_outputDirURI, segmentName + Constants.TAR_GZ_FILE_EXT);
       if (segmentTarFile.exists()) {
         if (!_batchConfig.isOverwriteOutput()) {
-          throw new IllegalArgumentException(String.format("Duplicate segment name generated '%s' in '%s', please "
-              + "adjust segment name generator config to avoid duplicates, or allow batch config overwrite",
-              segmentName, _outputDirURI));
+          throw new IllegalArgumentException("Duplicate segment name generated '" + segmentName + "' in '"
+              + _outputDirURI + "', please adjust segment name generator config to avoid duplicates, or allow batch "
+              + "config overwrite");
         } else {
-          LOGGER.warn(String.format("Duplicate segment name detected '%s' in file '%s', deleting old segment",
-              segmentName, segmentDir));
+          LOGGER.warn("Duplicate segment name detected '" + segmentName + "' in file '" + segmentDir + "', deleting "
+              + "old segment");
           if (segmentTarFile.delete()) {
-            LOGGER.warn(String.format("Segment file deleted: '%s/%s'", _outputDirURI, segmentName));
+            LOGGER.warn("Segment file deleted: '" + _outputDirURI + "/" + segmentName + "'");
           }
         }
       }
@@ -231,5 +228,6 @@ public class FileBasedSegmentWriter implements SegmentWriter {
     LOGGER.info("Closing {} for table: {}", FileBasedSegmentWriter.class.getName(), _tableNameWithType);
     _recordWriter.close();
     FileUtils.deleteQuietly(_stagingDir);
+    _transformPipeline.reportStats();
   }
 }

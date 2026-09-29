@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.common.metadata.segment;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
@@ -33,6 +37,9 @@ import org.slf4j.LoggerFactory;
 
 public class SegmentZKMetadata implements ZKMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentZKMetadata.class);
+  private static final String SEGMENT_NAME_KEY = "segmentName";
+  private static final String SIMPLE_FIELDS_KEY = "simpleFields";
+  private static final String CUSTOM_MAP_KEY = "customMap";
   private static final String NULL = "null";
 
   private final ZNRecord _znRecord;
@@ -56,6 +63,16 @@ public class SegmentZKMetadata implements ZKMetadata {
 
   public String getSegmentName() {
     return _znRecord.getId();
+  }
+
+  public Map<String, String> getSimpleFields() {
+    return _simpleFields;
+  }
+
+  public void setSimpleFields(Map<String, String> simpleFields) {
+    _simpleFields = simpleFields;
+    _startTimeMsCached = false;
+    _endTimeMsCached = false;
   }
 
   public long getStartTimeMs() {
@@ -158,6 +175,30 @@ public class SegmentZKMetadata implements ZKMetadata {
     setNonNegativeValue(Segment.CRC, crc);
   }
 
+  public long getDataCrc() {
+    return _znRecord.getLongField(Segment.DATA_CRC, -1);
+  }
+
+  public void setDataCrc(long dataCrc) {
+    setNonNegativeValue(Segment.DATA_CRC, dataCrc);
+  }
+
+  public boolean isUseDataCrc() {
+    String useDataCrcString = _simpleFields.get(Segment.USE_DATA_CRC);
+    return Boolean.parseBoolean(useDataCrcString);
+  }
+
+  // useDataCrc is set for consuming segments in realtime table
+  // that signal replica server to use Data CRC when available for doing any replacement
+  // of segments
+  public void setUseDataCrc(boolean useDataCrc) {
+    if (useDataCrc) {
+      _simpleFields.put(Segment.USE_DATA_CRC, "true");
+    } else {
+      _simpleFields.remove(Segment.USE_DATA_CRC);
+    }
+  }
+
   public String getTier() {
     return _simpleFields.get(Segment.TIER);
   }
@@ -166,10 +207,8 @@ public class SegmentZKMetadata implements ZKMetadata {
     setValue(Segment.TIER, tier);
   }
 
-  /**
-   * For uploaded segment, this is the time when the segment file is created. For real-time segment, this is the time
-   * when the consuming segment is created.
-   */
+  /// For uploaded segment, this is the time when the segment file is created. For real-time segment, this is the time
+  /// when the consuming segment is created.
   public long getCreationTime() {
     return _znRecord.getLongField(Segment.CREATION_TIME, -1);
   }
@@ -178,10 +217,8 @@ public class SegmentZKMetadata implements ZKMetadata {
     setNonNegativeValue(Segment.CREATION_TIME, creationTime);
   }
 
-  /**
-   * Push time exists only for uploaded segments. It is the time when the segment is first pushed to the cluster (i.e.
-   * when the segment ZK metadata is created).
-   */
+  /// Push time exists only for uploaded segments. It is the time when the segment is first pushed to the cluster (i.e.
+  /// when the segment ZK metadata is created).
   public long getPushTime() {
     String pushTimeString = _simpleFields.get(Segment.PUSH_TIME);
     // Handle legacy push time key
@@ -196,10 +233,8 @@ public class SegmentZKMetadata implements ZKMetadata {
     setNonNegativeValue(Segment.PUSH_TIME, pushTime);
   }
 
-  /**
-   * Refresh time exists only for uploaded segments that have been replaced. It is the time when the segment is last
-   * replaced.
-   */
+  /// Refresh time exists only for uploaded segments that have been replaced. It is the time when the segment is last
+  /// replaced.
   public long getRefreshTime() {
     String refreshTimeString = _simpleFields.get(Segment.REFRESH_TIME);
     // Handle legacy refresh time key
@@ -293,6 +328,8 @@ public class SegmentZKMetadata implements ZKMetadata {
     setNonNegativeValue(Segment.Realtime.FLUSH_THRESHOLD_SIZE, flushThresholdSize);
   }
 
+  // Deprecated because the time threshold is directly read from table config on the server side
+  @Deprecated
   public String getTimeThresholdToFlushSegment() {
     // Check "null" for backward-compatibility
     String flushThresholdTime = _simpleFields.get(Segment.Realtime.FLUSH_THRESHOLD_TIME);
@@ -303,6 +340,8 @@ public class SegmentZKMetadata implements ZKMetadata {
     }
   }
 
+  // Deprecated because the time threshold is directly read from table config on the server side
+  @Deprecated
   public void setTimeThresholdToFlushSegment(String flushThresholdTime) {
     setValue(Segment.Realtime.FLUSH_THRESHOLD_TIME, flushThresholdTime);
   }
@@ -368,6 +407,35 @@ public class SegmentZKMetadata implements ZKMetadata {
       }
     }
     return metadataMap;
+  }
+
+  public String toJsonString() {
+    ObjectNode objectNode = JsonUtils.newObjectNode();
+    objectNode.put(SEGMENT_NAME_KEY, getSegmentName());
+    objectNode.set(SIMPLE_FIELDS_KEY, JsonUtils.objectToJsonNode(_simpleFields));
+    Map<String, String> customMap = getCustomMap();
+    if (MapUtils.isNotEmpty(customMap)) {
+      objectNode.set(CUSTOM_MAP_KEY, JsonUtils.objectToJsonNode(customMap));
+    }
+    return objectNode.toString();
+  }
+
+  public static SegmentZKMetadata fromJsonString(String jsonString)
+      throws IOException {
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonString);
+    String segmentName = jsonNode.get(SEGMENT_NAME_KEY).asText();
+    JsonNode simpleFieldsJsonNode = jsonNode.get(SIMPLE_FIELDS_KEY);
+    Map<String, String> simpleFields = JsonUtils.jsonNodeToObject(simpleFieldsJsonNode, new TypeReference<>() {
+    });
+    ZNRecord znRecord = new ZNRecord(segmentName);
+    znRecord.setSimpleFields(simpleFields);
+    JsonNode customMapJsonNode = jsonNode.get(CUSTOM_MAP_KEY);
+    if (customMapJsonNode != null && !customMapJsonNode.isNull()) {
+      Map<String, String> customMap = JsonUtils.jsonNodeToObject(customMapJsonNode, new TypeReference<>() {
+      });
+      znRecord.setMapField(Segment.CUSTOM_MAP, customMap);
+    }
+    return new SegmentZKMetadata(znRecord);
   }
 
   @Override

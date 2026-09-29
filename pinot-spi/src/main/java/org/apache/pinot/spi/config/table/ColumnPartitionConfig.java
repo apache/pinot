@@ -46,30 +46,24 @@ public class ColumnPartitionConfig extends BaseJsonConfig {
     _functionConfig = functionConfig;
   }
 
-  /**
-   * Returns the partition function name for the column.
-   *
-   * @return Partition function name.
-   */
+  /// Returns the partition function name for the column.
+  ///
+  /// @return Partition function name.
   public String getFunctionName() {
     return _functionName;
   }
 
-  /**
-   * Returns the partition function configuration for the column.
-   *
-   * @return Partition function configuration.
-   */
+  /// Returns the partition function configuration for the column.
+  ///
+  /// @return Partition function configuration.
   @Nullable
   public Map<String, String> getFunctionConfig() {
     return _functionConfig;
   }
 
-  /**
-   * Returns the number of partitions for this column.
-   *
-   * @return Number of partitions.
-   */
+  /// Returns the number of partitions for this column.
+  ///
+  /// @return Number of partitions.
   public int getNumPartitions() {
     return _numPartitions;
   }

@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
@@ -36,10 +35,9 @@ import org.locationtech.jts.geom.Point;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * A H3 index reader for the real-time H3 index values on the fly.
- * <p>This class is thread-safe for single writer multiple readers.
- */
+/// A H3 index reader for the real-time H3 index values on the fly.
+///
+/// This class is thread-safe for single writer multiple readers.
 public class MutableH3Index implements H3IndexReader, MutableIndex {
   private final H3IndexResolution _resolution;
   private final int _lowestResolution;
@@ -54,7 +52,7 @@ public class MutableH3Index implements H3IndexReader, MutableIndex {
   }
 
   @Override
-  public void add(@Nonnull Object value, int dictId, int docId) {
+  public void add(Object value, int dictId, int docId) {
     try {
       Geometry geometry = GeometrySerializer.deserialize((byte[]) value);
       add(geometry);
@@ -64,19 +62,17 @@ public class MutableH3Index implements H3IndexReader, MutableIndex {
   }
 
   @Override
-  public void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId) {
+  public void add(Object[] values, @Nullable int[] dictIds, int docId) {
     throw new UnsupportedOperationException("Mutable H3 indexes are not supported for multi-valued columns");
   }
 
-  /**
-   * Adds the next geospatial value.
-   */
+  /// Adds the next geospatial value.
   public void add(Geometry geometry) {
     Preconditions.checkState(geometry instanceof Point, "H3 index can only be applied to Point, got: %s",
         geometry.getGeometryType());
     Coordinate coordinate = geometry.getCoordinate();
     // TODO: support multiple resolutions
-    long h3Id = H3Utils.H3_CORE.geoToH3(coordinate.y, coordinate.x, _lowestResolution);
+    long h3Id = H3Utils.H3_CORE.latLngToCell(coordinate.y, coordinate.x, _lowestResolution);
     _bitmaps.computeIfAbsent(h3Id, k -> new ThreadSafeMutableRoaringBitmap()).add(_nextDocId);
   }
 

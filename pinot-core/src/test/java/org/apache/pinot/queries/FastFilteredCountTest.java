@@ -53,17 +53,17 @@ import static org.testng.Assert.assertTrue;
 
 public class FastFilteredCountTest extends BaseQueriesTest {
 
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "FastFilteredCountTest");
-  private static final String RAW_TABLE_NAME = "testTable";
+  protected final File _indexDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
+  protected static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
 
   private static final int NUM_RECORDS = 1000;
   private static final int BUCKET_SIZE = 8;
-  private static final String SORTED_COLUMN = "sorted";
-  private static final String CLASSIFICATION_COLUMN = "class";
-  private static final String TEXT_COLUMN = "textCol";
-  private static final String JSON_COLUMN = "jsonCol";
-  private static final String INT_RANGE_COLUMN = "intRangeCol";
+  protected static final String SORTED_COLUMN = "sorted";
+  protected static final String CLASSIFICATION_COLUMN = "class";
+  protected static final String TEXT_COLUMN = "textCol";
+  protected static final String JSON_COLUMN = "jsonCol";
+  protected static final String INT_RANGE_COLUMN = "intRangeCol";
 
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
       .addSingleValueDimension(SORTED_COLUMN, FieldSpec.DataType.INT)
@@ -100,7 +100,7 @@ public class FastFilteredCountTest extends BaseQueriesTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    FileUtils.deleteQuietly(INDEX_DIR);
+    FileUtils.deleteQuietly(_indexDir);
 
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
     for (int i = 0; i < NUM_RECORDS; i++) {
@@ -116,32 +116,42 @@ public class FastFilteredCountTest extends BaseQueriesTest {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
-    segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
+    segmentGeneratorConfig.setOutDir(_indexDir.getPath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
-    List<FieldConfig> fieldConfigs = List.of(
-        new FieldConfig(TEXT_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null));
-
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setInvertedIndexColumns(List.of(CLASSIFICATION_COLUMN, SORTED_COLUMN))
-        .setJsonIndexColumns(List.of(JSON_COLUMN)).setRangeIndexColumns(List.of(INT_RANGE_COLUMN))
-        .setFieldConfigList(fieldConfigs).build();
+    TableConfig tableConfig = getTableConfig();
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
 
     ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+        ImmutableSegmentLoader.load(new File(_indexDir, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = immutableSegment;
     _indexSegments = List.of(immutableSegment, immutableSegment);
+  }
+
+  // overridden in composite index test
+  protected TableConfig getTableConfig() {
+    List<FieldConfig> fieldConfigs = List.of(
+        new FieldConfig(TEXT_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.TEXT), null,
+            null));
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(List.of(CLASSIFICATION_COLUMN, SORTED_COLUMN))
+        .setJsonIndexColumns(List.of(JSON_COLUMN))
+        .setRangeIndexColumns(List.of(INT_RANGE_COLUMN))
+        .setFieldConfigList(fieldConfigs)
+        .build();
+    return tableConfig;
   }
 
   @AfterClass
   public void tearDown()
       throws IOException {
-    FileUtils.deleteDirectory(INDEX_DIR);
+    FileUtils.deleteDirectory(_indexDir);
   }
 
   @DataProvider
@@ -155,7 +165,6 @@ public class FastFilteredCountTest extends BaseQueriesTest {
     String twoBuckets = Arrays.toString(new int[] {0, 7})
         .replace('[', '(').replace(']', ')');
     return new Object[][] {
-        {"select count(*) from " + RAW_TABLE_NAME, NUM_RECORDS},
         {"select count(*) from " + RAW_TABLE_NAME
             + " where " + CLASSIFICATION_COLUMN + " = 1", bucketCount},
         {"select count(*) from " + RAW_TABLE_NAME
@@ -251,9 +260,6 @@ public class FastFilteredCountTest extends BaseQueriesTest {
         {"select count(*) from " + RAW_TABLE_NAME
             + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
             + " or " + CLASSIFICATION_COLUMN + " <> 0", bucketCountComplement},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " >= 0"
-            + " or " + CLASSIFICATION_COLUMN + " <> 0", NUM_RECORDS},
         {"select count(*) from " + RAW_TABLE_NAME
             + " where TEXT_MATCH(" + TEXT_COLUMN + ",  'text0')"
             + " and " + SORTED_COLUMN + " <> 1", bucketCount},

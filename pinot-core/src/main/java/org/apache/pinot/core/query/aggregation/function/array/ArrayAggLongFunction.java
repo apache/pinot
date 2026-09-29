@@ -20,15 +20,17 @@ package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class ArrayAggLongFunction extends BaseArrayAggLongFunction<LongArrayList> {
-  public ArrayAggLongFunction(ExpressionContext expression, FieldSpec.DataType dataType, boolean nullHandlingEnabled) {
+  public ArrayAggLongFunction(ExpressionContext expression, DataType dataType, boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
   }
 
@@ -36,14 +38,26 @@ public class ArrayAggLongFunction extends BaseArrayAggLongFunction<LongArrayList
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    long[] value = blockValSet.getLongValuesSV();
-    LongArrayList valueArray = new LongArrayList(length);
-
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        valueArray.add(value[i]);
-      }
-    });
+    LongArrayList valueArray =
+        aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult() : new LongArrayList(length);
+    if (blockValSet.isSingleValue()) {
+      long[] values = blockValSet.getLongValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueArray.add(values[i]);
+        }
+      });
+    } else {
+      long[][] valuesArray = blockValSet.getLongValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          long[] values = valuesArray[i];
+          for (long v : values) {
+            valueArray.add(v);
+          }
+        }
+      });
+    }
     aggregationResultHolder.setValue(valueArray);
   }
 
@@ -55,5 +69,16 @@ public class ArrayAggLongFunction extends BaseArrayAggLongFunction<LongArrayList
       resultHolder.setValueForKey(groupKey, valueArray);
     }
     valueArray.add(value);
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(LongArrayList longArrayList) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.LongArrayList.getValue(),
+        ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.serialize(longArrayList));
+  }
+
+  @Override
+  public LongArrayList deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
   }
 }

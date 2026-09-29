@@ -29,14 +29,12 @@ import java.util.List;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * A {@link DataBuffer} that is composed of multiple {@link DataBuffer}s that define a single contiguous buffer.
- * <p>
- * While reads and writes can span multiple buffers, there may be a performance impact when doing so.
- * Therefore it is recommended to try to wrap independent buffers.
- * <p>
- * Once this class is built, buffers cannot be added or removed.
- */
+/// A [DataBuffer] that is composed of multiple [DataBuffer]s that define a single contiguous buffer.
+///
+/// While reads and writes can span multiple buffers, there may be a performance impact when doing so.
+/// Therefore it is recommended to try to wrap independent buffers.
+///
+/// Once this class is built, buffers cannot be added or removed.
 public class CompoundDataBuffer implements DataBuffer {
 
   private final DataBuffer[] _buffers;
@@ -46,14 +44,13 @@ public class CompoundDataBuffer implements DataBuffer {
   private final long _size;
   private final boolean _owner;
 
-  /**
-   * Creates a compound buffer from the given buffers.
-   *
-   * @param buffers The buffers that will be concatenated to form the compound buffer.
-   * @param order The byte order of the buffer. Buffers in the array that have a different byte order will be converted.
-   * @param owner Whether this buffer owns the underlying buffers. If true, the underlying buffers will be released when
-   *              this buffer is closed.
-   */
+  /// Creates a compound buffer from the given buffers.
+  ///
+  /// @param buffers The buffers that will be concatenated to form the compound buffer.
+  /// @param order The byte order of the buffer. Buffers in the array that have a different byte order will be
+  ///              converted.
+  /// @param owner Whether this buffer owns the underlying buffers. If true, the underlying buffers will be released
+  ///              when this buffer is closed.
   public CompoundDataBuffer(DataBuffer[] buffers, ByteOrder order, boolean owner) {
     _owner = owner;
     _buffers = buffers;
@@ -80,15 +77,21 @@ public class CompoundDataBuffer implements DataBuffer {
     this(asDataBufferArray(buffers), order, owner);
   }
 
-  /**
-   * Creates a compound buffer from the given buffers.
-   * @param buffers The buffers that will be concatenated to form the compound buffer.
-   * @param order The byte order of the buffer. Buffers in the list that have a different byte order will be converted.
-   * @param owner Whether this buffer owns the underlying buffers. If true, the underlying buffers will be released when
-   *              this buffer is closed.
-   */
+  /// Creates a compound buffer from the given buffers.
+  /// @param buffers The buffers that will be concatenated to form the compound buffer.
+  /// @param order The byte order of the buffer. Buffers in the list that have a different byte order will be converted.
+  /// @param owner Whether this buffer owns the underlying buffers. If true, the underlying buffers will be released
+  ///              when this buffer is closed.
   public CompoundDataBuffer(List<DataBuffer> buffers, ByteOrder order, boolean owner) {
     this(buffers.toArray(new DataBuffer[0]), order, owner);
+  }
+
+  public static CompoundDataBuffer fromByteBuffers(ByteBuffer[] buffers, ByteOrder order, boolean owner) {
+    return new CompoundDataBuffer(asDataBufferArray(buffers), order, owner);
+  }
+
+  public static CompoundDataBuffer fromByteBuffers(List<ByteBuffer> buffers, ByteOrder order, boolean owner) {
+    return new CompoundDataBuffer(asDataBufferArray(buffers), order, owner);
   }
 
   private static DataBuffer[] asDataBufferArray(ByteBuffer[] buffers) {
@@ -97,6 +100,15 @@ public class CompoundDataBuffer implements DataBuffer {
       result[i] = PinotByteBuffer.wrap(buffers[i]);
     }
     return result;
+  }
+
+  private static DataBuffer[] asDataBufferArray(List<ByteBuffer> buffers) {
+    int numBuffers = buffers.size();
+    DataBuffer[] dataBuffers = new DataBuffer[numBuffers];
+    for (int i = 0; i < numBuffers; i++) {
+      dataBuffers[i] = PinotByteBuffer.wrap(buffers.get(i));
+    }
+    return dataBuffers;
   }
 
   private int getBufferIndex(long offset) {

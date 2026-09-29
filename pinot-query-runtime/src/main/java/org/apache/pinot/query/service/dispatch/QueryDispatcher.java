@@ -18,14 +18,16 @@
  */
 package org.apache.pinot.query.service.dispatch;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import io.grpc.ConnectivityState;
 import io.grpc.Deadline;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
+import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -42,23 +44,31 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.calcite.runtime.PairList;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
+import org.apache.pinot.core.instance.context.BrokerContext;
+import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
+import org.apache.pinot.query.grpc.GrpcKeepAliveConfig;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
-import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.serde.PlanNodeDeserializer;
 import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
@@ -66,69 +76,482 @@ import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.service.dispatch.timeseries.AsyncQueryTimeSeriesDispatchResponse;
-import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchClient;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.query.runtime.plan.StageStatsTreeNode;
+import org.apache.pinot.query.service.dispatch.streaming.StreamingQuerySession;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.tsdb.planner.TimeSeriesPlanConstants.WorkerRequestMetadataKeys;
-import org.apache.pinot.tsdb.planner.TimeSeriesPlanConstants.WorkerResponseMetadataKeys;
-import org.apache.pinot.tsdb.planner.physical.TimeSeriesDispatchablePlan;
-import org.apache.pinot.tsdb.planner.physical.TimeSeriesQueryServerInstance;
-import org.apache.pinot.tsdb.spi.TimeBuckets;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.PlanVersions;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Response.ServerResponseStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * {@code QueryDispatcher} dispatch a query to different workers.
- */
-public class QueryDispatcher {
+/// `QueryDispatcher` dispatch a query to different workers.
+public class QueryDispatcher implements PinotClusterConfigChangeListener {
+  private static final String ENABLE_PROTO_SEGMENT_LIST_KEY =
+      CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST;
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
   private static final String PINOT_BROKER_QUERY_DISPATCHER_FORMAT = "multistage-query-dispatch-%d";
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  /// Maximum time (ms) to wait for outstanding `OpChainComplete` stats messages on both the success and error
+  /// paths of a stream-mode query:
+  ///
+  /// - **Success path:** after the broker receiving mailbox has finished (data is already in hand), the broker
+  ///      waits up to this long for remaining stats before returning the result to the client.
+  /// - **Error path:** after a fan-out cancel has been issued, the broker waits up to this long for partial
+  ///      stats before building the error result.
+  ///
+  /// In both cases stats collection is best-effort — a single slow opchain must not hold the client response until
+  /// the full query deadline. The wait window is configurable via
+  /// [CommonConstants.Broker#CONFIG_OF_STREAM_STATS_DRAIN_MS].
+  private final long _statsDrainMs;
 
   private final MailboxService _mailboxService;
   private final ExecutorService _executorService;
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
-  private final Map<String, TimeSeriesDispatchClient> _timeSeriesDispatchClientMap = new ConcurrentHashMap<>();
   @Nullable
   private final TlsConfig _tlsConfig;
+  @Nullable
+  private final SslContext _clientGrpcSslContext;
+  private final GrpcKeepAliveConfig _keepAliveConfig;
+  // maps broker-generated query id to the set of servers that the query was dispatched to
+  private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
+  private final FailureDetector _failureDetector;
+  private final Duration _cancelTimeout;
+  /// Cluster-level default for stream-stats mode. Used as the fallback in [#submitAndReduce] when the query
+  /// does not carry an explicit [QueryOptionKey#STREAM_STATS] override.
+  private final boolean _streamStatsDefault;
+  /// Whether leaf-stage segment lists are shipped as native protobuf fields of the worker metadata instead of the
+  /// legacy JSON custom property. Seeded from the static broker config and then followed live from cluster config on
+  /// [#ENABLE_PROTO_SEGMENT_LIST_KEY], so an operator can turn it on once every server of the cluster has been
+  /// upgraded, and off again, without restarting the brokers. `volatile` because the cluster-config callback and the
+  /// request path race; read once per query so that all servers of one query agree.
+  private volatile boolean _enableProtoSegmentList;
 
-  public QueryDispatcher(MailboxService mailboxService) {
-    this(mailboxService, null);
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
+        GrpcKeepAliveConfig.DISABLED, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS,
+        CommonConstants.Broker.DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST);
   }
 
-  public QueryDispatcher(MailboxService mailboxService, @Nullable TlsConfig tlsConfig) {
+  /// Overload that accepts gRPC keep-alive settings for broker dispatch channels. A non-positive `keepAliveTimeMs`
+  /// disables keep-alive. Kept for callers that predate the proto segment list encoding, which they leave disabled.
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
+      boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout, keepAliveTimeMs,
+        keepAliveTimeoutMs, keepAliveWithoutCalls, streamStatsDefault, statsDrainMs,
+        CommonConstants.Broker.DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST);
+  }
+
+  /// Overload that also takes the static broker config seed for the proto segment list encoding.
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
+      boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs,
+      boolean enableProtoSegmentList) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
+        new GrpcKeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls),
+        streamStatsDefault, statsDrainMs, enableProtoSegmentList);
+  }
+
+  private QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout, GrpcKeepAliveConfig keepAliveConfig,
+      boolean streamStatsDefault, long statsDrainMs, boolean enableProtoSegmentList) {
+    _cancelTimeout = cancelTimeout;
+    _statsDrainMs = statsDrainMs;
     _mailboxService = mailboxService;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
     _tlsConfig = tlsConfig;
+    _clientGrpcSslContext = initClientSslContext(tlsConfig);
+    _keepAliveConfig = keepAliveConfig;
+    _failureDetector = failureDetector;
+    _streamStatsDefault = streamStatsDefault;
+    _enableProtoSegmentList = enableProtoSegmentList;
+
+    if (enableCancellation) {
+      _serversByQuery = new ConcurrentHashMap<>();
+    } else {
+      _serversByQuery = null;
+    }
+  }
+
+  public MailboxService getMailboxService() {
+    return _mailboxService;
   }
 
   public void start() {
     _mailboxService.start();
   }
 
+  /// Submits a query to the server and waits for the result.
+  ///
+  /// This method may throw almost any exception but QueryException or TimeoutException, which are caught and converted
+  /// into a QueryResult with the error code (and stats, if any can be collected).
   public QueryResult submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Map<String, String> queryOptions)
       throws Exception {
+    return submitAndReduce(context, dispatchableSubPlan, timeoutMs, queryOptions, null);
+  }
+
+  /// Same as [#submitAndReduce(RequestContext, DispatchableSubPlan, long, Map)] but records per-server
+  /// in-flight request statistics into `statsManager` for use by the adaptive query router.
+  /// When `statsManager` is non-null:
+  ///
+  /// - Each leaf server is registered as having one more in-flight request via
+  ///      [ServerRoutingStatsManager#recordStatsForQuerySubmission] after the fan-out begins.
+  /// - After the full fan-out completes (or fails), each server is decremented via
+  ///      [ServerRoutingStatsManager#recordStatsUponResponseArrival] with `latency = -1`
+  ///      (no latency is recorded at this stage).
+  ///
+  /// TODO: Replace the coarse end-of-fanout decrement with per-sender arrival once per-sender EOS
+  ///       interception is in place, and record real leaf-stage latency at that point.
+  public QueryResult submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
+      Map<String, String> queryOptions, @Nullable ServerRoutingStatsManager statsManager)
+      throws Exception {
+    if (QueryOptionsUtils.isStreamStats(queryOptions, _streamStatsDefault)) {
+      return submitAndReduceWithStream(context, dispatchableSubPlan, timeoutMs, queryOptions, statsManager);
+    }
     long requestId = context.getRequestId();
-    List<DispatchablePlanFragment> plans = dispatchableSubPlan.getQueryStageList();
+    Set<QueryServerInstance> servers = new HashSet<>();
+    // Tracks servers where recordStatsForQuerySubmission was actually called, so the finally block only
+    // decrements servers that were incremented — guarding against a partial failure in submit().
+    Set<QueryServerInstance> incrementedServers = new HashSet<>();
     try {
-      submit(requestId, dispatchableSubPlan, timeoutMs, queryOptions);
-      return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
+      // The SSE engine increments before `submit`, but here we increment after because `submit` populates
+      // the list of servers. Getting the list of servers before calling `submit` would expose
+      // implementation details of `submit`.
+      if (statsManager != null) {
+        for (QueryServerInstance server : servers) {
+          statsManager.recordStatsForQuerySubmission(requestId, server.getInstanceId());
+          incrementedServers.add(server);
+        }
+      }
+      QueryResult result = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
+      if (result.getProcessingException() != null) {
+        cancel(requestId);
+      }
+      return result;
+    } catch (Exception ex) {
+      return tryRecover(context.getRequestId(), servers, ex);
     } catch (Throwable e) {
       // TODO: Consider always cancel when it returns (early terminate)
-      cancel(requestId, plans);
+      cancel(requestId);
       throw e;
+    } finally {
+      if (statsManager != null) {
+        for (QueryServerInstance server : incrementedServers) {
+          statsManager.recordStatsUponResponseArrival(requestId, server.getInstanceId(), -1);
+        }
+      }
+      if (isQueryCancellationEnabled()) {
+        _serversByQuery.remove(requestId);
+      }
     }
+  }
+
+  /// Streaming variant of [#submitAndReduce]: opens one `SubmitWithStream` bidi RPC per server, runs the
+  /// broker's stage 0 reducer, and once the receiving mailbox finishes awaits the per-stage stats with early
+  /// completion (returns as soon as every expected opchain has reported, or when the wait window fires — whichever
+  /// happens first). Stats from the session accumulator are then merged into the broker's local stage 0 stats to
+  /// build the final [QueryResult].
+  ///
+  /// The wait window is bounded by the query's remaining timeout: if `submitWithStream + runReducer` consumed
+  /// most of the budget, the per-stage stats may end up partial (visible via the per-stage `mergeFailed` /
+  /// `missing` counts the session exposes).
+  ///
+  /// Cancel is handled via [StreamingQuerySession#fanOutCancel()] — no unary Cancel RPCs are issued for this
+  /// query path. On any error, fan-out cancel is broadcast over the open streams, then the broker waits for remaining
+  /// stats before building the final result.
+  ///
+  /// **Mixed-version policy.** No automatic fallback to the unary [#submit] path. Enabling
+  /// [CommonConstants.Broker.Request.QueryOptionKey#STREAM_STATS] requires every server in the
+  /// cluster to implement `SubmitWithStream`; if any server returns `UNIMPLEMENTED` or any other
+  /// transport error during dispatch, [#submitWithStream] surfaces the throwable through the ack queue,
+  /// [#processResults] throws, and this method fans out cancel via the session before propagating the failure.
+  private QueryResult submitAndReduceWithStream(RequestContext context, DispatchableSubPlan dispatchableSubPlan,
+      long timeoutMs, Map<String, String> queryOptions, @Nullable ServerRoutingStatsManager statsManager)
+      throws Exception {
+    long requestId = context.getRequestId();
+    long deadlineMs = System.currentTimeMillis() + timeoutMs;
+    Set<QueryServerInstance> servers = new HashSet<>();
+    // Tracks servers where recordStatsForQuerySubmission was actually called, so the finally block only decrements
+    // servers that were incremented — same contract as the legacy submitAndReduce path, see its Javadoc.
+    Set<QueryServerInstance> incrementedServers = new HashSet<>();
+
+    // The session's expected-opchain count must equal the total number of opchains across every (server, non-root
+    // stage) pair — that's how many OpChainComplete messages we expect to receive.
+    Set<DispatchablePlanFragment> stagePlansWithoutRoot = dispatchableSubPlan.getQueryStagesWithoutRoot();
+    int totalExpected = 0;
+    Map<Integer, Integer> expectedByStage = new HashMap<>();
+    for (DispatchablePlanFragment stagePlan : stagePlansWithoutRoot) {
+      int stageId = stagePlan.getPlanFragment().getFragmentId();
+      int stageCount = 0;
+      for (List<Integer> workerIds : stagePlan.getServerInstanceToWorkerIdMap().values()) {
+        stageCount += workerIds.size();
+      }
+      totalExpected += stageCount;
+      expectedByStage.put(stageId, stageCount);
+    }
+    StreamingQuerySession session = new StreamingQuerySession(requestId, totalExpected);
+
+    try {
+      submitWithStream(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions, session);
+      // Increment after submitWithStream populates the server list, mirroring the legacy path (which increments
+      // after submit for the same reason).
+      if (statsManager != null) {
+        for (QueryServerInstance server : servers) {
+          statsManager.recordStatsForQuerySubmission(requestId, server.getInstanceId());
+          incrementedServers.add(server);
+        }
+      }
+      QueryResult brokerResult = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
+
+      // If the reducer surfaced an error, cancel the still-running opchains BEFORE waiting for stats: they won't
+      // complete (and report) until cancelled, so waiting first would burn the drain window on reports that cannot
+      // arrive and delay the cancel by up to that window. Mirrors the tryRecoverWithStream ordering.
+      if (brokerResult.getProcessingException() != null) {
+        session.fanOutCancel();
+      }
+
+      // Receiving mailbox finished — data is ready. Wait for stats on a best-effort basis; cap at
+      // _statsDrainMs so a single slow opchain cannot delay the client response.
+      long statsWaitMs = Math.min(_statsDrainMs, Math.max(0, deadlineMs - System.currentTimeMillis()));
+      boolean fullCoverage = session.awaitCompletion(statsWaitMs, TimeUnit.MILLISECONDS);
+      if (!fullCoverage) {
+        LOGGER.warn("Stream-mode request {} timed out waiting for stats after mailbox EOS; coverage may be partial",
+            requestId);
+      }
+      return mergeSessionStatsIntoResult(brokerResult, session, expectedByStage);
+    } catch (Exception ex) {
+      return tryRecoverWithStream(session, expectedByStage, deadlineMs, ex);
+    } catch (Throwable e) {
+      session.fanOutCancel();
+      throw e;
+    } finally {
+      if (statsManager != null) {
+        for (QueryServerInstance server : incrementedServers) {
+          statsManager.recordStatsUponResponseArrival(requestId, server.getInstanceId(), -1);
+        }
+      }
+      if (isQueryCancellationEnabled()) {
+        _serversByQuery.remove(requestId);
+      }
+    }
+  }
+
+  /// Streaming variant of [#submit]: opens one `SubmitWithStream` bidi RPC per server, registers each
+  /// open stream with `session` (so cancel fan-out and `OpChainComplete` accumulation work), and waits
+  /// for every server's submit-ack before returning. Errors during ack-await trigger [#cancel] on all peers.
+  @VisibleForTesting
+  void submitWithStream(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
+      Set<QueryServerInstance> serversOut, Map<String, String> queryOptions, StreamingQuerySession session)
+      throws Exception {
+    Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
+
+    Set<DispatchablePlanFragment> plansWithoutRoot = dispatchableSubPlan.getQueryStagesWithoutRoot();
+    Map<DispatchablePlanFragment, StageInfo> stageInfos = serializePlanFragments(plansWithoutRoot, serversOut);
+    if (serversOut.isEmpty()) {
+      return;
+    }
+
+    Map<String, String> requestMetadata =
+        prepareRequestMetadata(QueryThreadContext.get().getExecutionContext(), queryOptions, deadline);
+    ByteString protoRequestMetadata = QueryPlanSerDeUtils.toProtoProperties(requestMetadata);
+
+    // Per-server expected opchain count = sum across the server's non-root stages of (workers on this server in
+    // that stage). The streaming observer uses this to drain the session latch correctly when its stream errors
+    // before all opchains have responded.
+    BlockingQueue<AsyncResponse<Worker.QueryResponse>> ackQueue = new ArrayBlockingQueue<>(serversOut.size());
+    boolean enableProtoSegmentList = _enableProtoSegmentList;
+    for (QueryServerInstance server : serversOut) {
+      Worker.QueryRequest request = createRequest(server, stageInfos, protoRequestMetadata, enableProtoSegmentList);
+      int expectedForServer = 0;
+      for (DispatchablePlanFragment stagePlan : plansWithoutRoot) {
+        List<Integer> workerIds = stagePlan.getServerInstanceToWorkerIdMap().get(server);
+        if (workerIds != null) {
+          expectedForServer += workerIds.size();
+        }
+      }
+      DispatchClient client = getOrCreateDispatchClient(server);
+      try {
+        client.submitWithStream(request, server, deadline, session, expectedForServer,
+            (resp, err) -> ackQueue.offer(new AsyncResponse<>(server, resp, err)));
+      } catch (Throwable t) {
+        // The error ack was already delivered through the observer's onError inside submitWithStream (CAS-deduped
+        // against a later gRPC-initiated onError). Offering another one here could double-fill the ack queue —
+        // it is sized exactly serversOut.size() and offer() drops silently — losing a healthy server's ack and
+        // stalling processResults until the deadline. Only log and mark the server unhealthy.
+        LOGGER.warn("Caught exception while opening stream to server: {}", server, t);
+        _failureDetector.markServerUnhealthy(server.getInstanceId(), server.getHostname());
+      }
+    }
+
+    processResults(requestId, serversOut.size(), (response, server) -> {
+      if (response.containsMetadata(ServerResponseStatus.STATUS_ERROR)) {
+        session.fanOutCancel();
+        throw new RuntimeException(
+            String.format("Unable to execute query plan for request: %d on server: %s, ERROR: %s", requestId, server,
+                response.getMetadataOrDefault(ServerResponseStatus.STATUS_ERROR, "null")));
+      }
+    }, deadline, ackQueue);
+
+    if (isQueryCancellationEnabled()) {
+      _serversByQuery.put(requestId, serversOut);
+    }
+  }
+
+  /// Builds the final [QueryResult] for a stream-mode query: takes the broker's local stage-0 stats from
+  /// `brokerResult` and overlays the per-stage trees from the session accumulator (flattened to
+  /// [MultiStageQueryStats.StageStats.Closed] via inorder traversal so the resulting list shape matches the
+  /// legacy [QueryResult#_queryStats] contract).
+  ///
+  /// In stream mode the broker's local mailbox path is suppressed for stages 1..N, so brokerResult's _queryStats
+  /// list typically only contains stage 0 plus any pipeline-breaker stages. The session's accumulator carries
+  /// stages 1..N. Where both have an entry for the same stage id, the session wins (avoids double-counting
+  /// pipeline-breaker stats that the upstream server also reported).
+  ///
+  /// @param expectedByStage map from stage id to the number of opchain reports expected for that stage (used to
+  ///                        compute the [QueryResult.StageCoverage#getMissing()] count per stage)
+  private QueryResult mergeSessionStatsIntoResult(QueryResult brokerResult, StreamingQuerySession session,
+      Map<Integer, Integer> expectedByStage) {
+    StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
+    Map<Integer, StageStatsTreeNode> accumulator = coverage.getStageAccumulator();
+
+    // Bound the result-array size by the broker's own stage count and the stages the broker actually dispatched
+    // (expectedByStage) only — never by the server-supplied accumulator keys. Otherwise a buggy/mismatched server
+    // reporting a huge currentStageId would force a giant ArrayList allocation here. Accumulator entries beyond this
+    // bound are skipped by the loop below (it only iterates 0..maxStageId).
+    int maxStageId = brokerResult.getQueryStats().size() - 1;
+    for (Integer stageId : expectedByStage.keySet()) {
+      if (stageId > maxStageId) {
+        maxStageId = stageId;
+      }
+    }
+    int maxStageIdBound = maxStageId;
+    long unexpectedStages = accumulator.keySet().stream().filter(id -> id > maxStageIdBound).count();
+    if (unexpectedStages > 0) {
+      LOGGER.warn("Ignoring stream stats for {} unexpected stage id(s) on request {} (max expected stage {})",
+          unexpectedStages, session.getRequestId(), maxStageIdBound);
+    }
+
+    List<MultiStageQueryStats.StageStats.Closed> merged = new ArrayList<>(maxStageId + 1);
+    List<QueryResult.StageCoverage> stageCoverage = new ArrayList<>(maxStageId + 1);
+    for (int i = 0; i <= maxStageId; i++) {
+      StageStatsTreeNode sessionTree = accumulator.get(i);
+      if (sessionTree != null) {
+        merged.add(sessionTree.flattenInorder());
+      } else if (i < brokerResult.getQueryStats().size()) {
+        merged.add(brokerResult.getQueryStats().get(i));
+      } else {
+        merged.add(null);
+      }
+      int responded = coverage.getRespondedByStage().getOrDefault(i, 0);
+      int mergeFailed = coverage.getMergeFailedByStage().getOrDefault(i, 0);
+      int expected = expectedByStage.getOrDefault(i, 0);
+      int missing = Math.max(0, expected - responded - mergeFailed);
+      // Stage 0 is broker-local and not tracked by the session; leave its entry null.
+      stageCoverage.add(expected == 0 ? null : new QueryResult.StageCoverage(responded, mergeFailed, missing));
+    }
+    return new QueryResult(brokerResult.getResultTable(), brokerResult.getProcessingException(), merged,
+        brokerResult.getBrokerReduceTimeMs(), stageCoverage, accumulator);
+  }
+
+  /// Tries to recover from an exception thrown during legacy (non-streaming) query dispatching.
+  ///
+  /// [QueryException] and [TimeoutException] are handled by returning a [QueryResult] with the error code and empty
+  /// stats, while other exceptions are directly rethrown. Stats are not collected on the legacy cancel path.
+  ///
+  /// **Why `cancelWithStats` was removed:** a previous revision of this method called a synchronous
+  /// `cancelWithStats` RPC on every participating server (fan-out) to collect partial per-stage stats on the
+  /// error path. That approach was reverted for two reasons:
+  ///
+  /// 1. **Cascade risk.** At high QPS, every query failure triggered an extra fan-out RPC to every server that
+  ///       already handled the failed query. Servers under stress would receive a second wave of requests just as they
+  ///       were trying to recover, risking a cascading overload.
+  /// 2. **No consumer.** The call site that used the returned `Map<Integer, StageStats.Closed>` was also
+  ///       reverted as part of the same change, leaving the RPC overhead with no benefit.
+  ///
+  /// Stats on the error path are now available only in stream mode (`SubmitWithStream`), where servers push
+  /// `OpChainComplete` messages independently and the broker collects whatever arrives before the drain
+  /// timeout (see [#tryRecoverWithStream]).
+  private QueryResult tryRecover(long requestId, Set<QueryServerInstance> servers, Exception ex)
+      throws Exception {
+    if (servers.isEmpty()) {
+      throw ex;
+    }
+    if (ex instanceof ExecutionException && ex.getCause() instanceof Exception) {
+      ex = (Exception) ex.getCause();
+    }
+    QueryErrorCode errorCode;
+    if (ex instanceof TimeoutException) {
+      errorCode = QueryErrorCode.EXECUTION_TIMEOUT;
+    } else if (ex instanceof QueryException) {
+      errorCode = ((QueryException) ex).getErrorCode();
+    } else {
+      cancel(requestId, servers);
+      throw ex;
+    }
+    LOGGER.warn("Query failed with a known exception. Cancelling remaining opchains.");
+    cancel(requestId, servers);
+    QueryProcessingException processingException = new QueryProcessingException(errorCode, ex.getMessage());
+    return new QueryResult(processingException, MultiStageQueryStats.emptyStats(0), 0L);
+  }
+
+  /// Tries to recover from an exception thrown during stream-mode (`SubmitWithStream`) query dispatching.
+  ///
+  /// Fans out cancel over the open streams, waits briefly for any remaining `OpChainComplete` messages (up to
+  /// the query deadline), and builds a [QueryResult] that includes whatever stats arrived before the deadline.
+  /// Stats from before the error are available because servers push `OpChainComplete` even on failure.
+  ///
+  /// Unknown exceptions (not [TimeoutException] or [QueryException]) are re-thrown after cancel fan-out.
+  private QueryResult tryRecoverWithStream(StreamingQuerySession session, Map<Integer, Integer> expectedByStage,
+      long deadlineMs, Exception ex)
+      throws Exception {
+    if (ex instanceof ExecutionException && ex.getCause() instanceof Exception) {
+      ex = (Exception) ex.getCause();
+    }
+    QueryErrorCode errorCode;
+    if (ex instanceof TimeoutException) {
+      errorCode = QueryErrorCode.EXECUTION_TIMEOUT;
+    } else if (ex instanceof QueryException) {
+      errorCode = ((QueryException) ex).getErrorCode();
+    } else {
+      session.fanOutCancel();
+      throw ex;
+    }
+    LOGGER.warn("Stream-mode query failed with a known exception. Fanning out cancel and waiting for stats.");
+    session.fanOutCancel();
+    // Cap the wait: the query result is already determined, so we collect stats on a best-effort basis only.
+    // Using the full remaining timeout here would regress error-path latency to the query deadline.
+    long statsWaitMs = Math.min(_statsDrainMs, Math.max(0, deadlineMs - System.currentTimeMillis()));
+    try {
+      session.awaitCompletion(statsWaitMs, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException ie) {
+      // Restore the interrupt flag but continue: mergeSessionStatsIntoResult does not block, so the flag will be
+      // observed by the caller rather than firing an unexpected InterruptedException inside this method.
+      Thread.currentThread().interrupt();
+    }
+    QueryProcessingException processingException = new QueryProcessingException(errorCode, ex.getMessage());
+    QueryResult errorResult = new QueryResult(processingException, MultiStageQueryStats.emptyStats(0), 0L);
+    return mergeSessionStatsIntoResult(errorResult, session, expectedByStage);
   }
 
   public List<PlanNode> explain(RequestContext context, DispatchablePlanFragment fragment, long timeoutMs,
@@ -137,17 +560,17 @@ public class QueryDispatcher {
     long requestId = context.getRequestId();
     List<PlanNode> planNodes = new ArrayList<>();
 
-    List<DispatchablePlanFragment> plans = Collections.singletonList(fragment);
+    Set<DispatchablePlanFragment> plans = Set.of(fragment);
+    Set<QueryServerInstance> servers = new HashSet<>();
     try {
-      SendRequest<List<Worker.ExplainResponse>> requestSender = DispatchClient::explain;
-      execute(requestId, plans, timeoutMs, queryOptions, requestSender, (responses, serverInstance) -> {
+      SendRequest<Worker.QueryRequest, List<Worker.ExplainResponse>> requestSender = DispatchClient::explain;
+      execute(requestId, plans, timeoutMs, queryOptions, requestSender, servers, (responses, serverInstance) -> {
         for (Worker.ExplainResponse response : responses) {
-          if (response.containsMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR)) {
+          if (response.containsMetadata(ServerResponseStatus.STATUS_ERROR)) {
+            cancel(requestId, servers);
             throw new RuntimeException(
                 String.format("Unable to explain query plan for request: %d on server: %s, ERROR: %s", requestId,
-                    serverInstance,
-                    response.getMetadataOrDefault(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR,
-                        "null")));
+                    serverInstance, response.getMetadataOrDefault(ServerResponseStatus.STATUS_ERROR, "null")));
           }
           for (Worker.StagePlan stagePlan : response.getStagePlanList()) {
             try {
@@ -155,118 +578,131 @@ public class QueryDispatcher {
               Plan.PlanNode planNode = Plan.PlanNode.parseFrom(rootNode);
               planNodes.add(PlanNodeDeserializer.process(planNode));
             } catch (InvalidProtocolBufferException e) {
-              throw new RuntimeException("Failed to parse explain plan node for request " + requestId + " from server "
-                  + serverInstance, e);
+              cancel(requestId, servers);
+              throw new RuntimeException(
+                  "Failed to parse explain plan node for request " + requestId + " from server " + serverInstance, e);
             }
           }
         }
       });
     } catch (Throwable e) {
       // TODO: Consider always cancel when it returns (early terminate)
-      cancel(requestId, plans);
+      cancel(requestId, servers);
       throw e;
     }
     return planNodes;
   }
 
-  public PinotBrokerTimeSeriesResponse submitAndGet(RequestContext context, TimeSeriesDispatchablePlan plan,
-      long timeoutMs, Map<String, String> queryOptions) {
-    long requestId = context.getRequestId();
-    BlockingQueue<AsyncQueryTimeSeriesDispatchResponse> receiver = new ArrayBlockingQueue<>(10);
-    try {
-      submit(requestId, plan, timeoutMs, queryOptions, context, receiver::offer);
-      AsyncQueryTimeSeriesDispatchResponse received = receiver.poll(timeoutMs, TimeUnit.MILLISECONDS);
-      if (received == null) {
-        return PinotBrokerTimeSeriesResponse.newErrorResponse(
-            "TimeoutException", "Timed out waiting for response");
-      }
-      if (received.getThrowable() != null) {
-        Throwable t = received.getThrowable();
-        return PinotBrokerTimeSeriesResponse.newErrorResponse(t.getClass().getSimpleName(), t.getMessage());
-      }
-      if (received.getQueryResponse() == null) {
-        return PinotBrokerTimeSeriesResponse.newErrorResponse("NullResponse", "Received null response from server");
-      }
-      if (received.getQueryResponse().containsMetadata(
-          WorkerResponseMetadataKeys.ERROR_MESSAGE)) {
-        return PinotBrokerTimeSeriesResponse.newErrorResponse(
-            received.getQueryResponse().getMetadataOrDefault(
-                WorkerResponseMetadataKeys.ERROR_TYPE, "unknown error-type"),
-            received.getQueryResponse().getMetadataOrDefault(
-                WorkerResponseMetadataKeys.ERROR_MESSAGE, "unknown error"));
-      }
-      Worker.TimeSeriesResponse timeSeriesResponse = received.getQueryResponse();
-      Preconditions.checkNotNull(timeSeriesResponse, "time series response is null");
-      return OBJECT_MAPPER.readValue(
-          timeSeriesResponse.getPayload().toStringUtf8(), PinotBrokerTimeSeriesResponse.class);
-    } catch (Throwable t) {
-      return PinotBrokerTimeSeriesResponse.newErrorResponse(t.getClass().getSimpleName(), t.getMessage());
+  @VisibleForTesting
+  void submit(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
+      Set<QueryServerInstance> serversOut, Map<String, String> queryOptions)
+      throws Exception {
+    SendRequest<Worker.QueryRequest, Worker.QueryResponse> requestSender = DispatchClient::submit;
+    Set<DispatchablePlanFragment> plansWithoutRoot = dispatchableSubPlan.getQueryStagesWithoutRoot();
+    execute(requestId, plansWithoutRoot, timeoutMs, queryOptions, requestSender, serversOut,
+        (response, serverInstance) -> {
+          if (response.containsMetadata(ServerResponseStatus.STATUS_ERROR)) {
+            cancel(requestId, serversOut);
+            throw new RuntimeException(
+                String.format("Unable to execute query plan for request: %d on server: %s, ERROR: %s", requestId,
+                    serverInstance, response.getMetadataOrDefault(ServerResponseStatus.STATUS_ERROR, "null")));
+          }
+        });
+    if (isQueryCancellationEnabled()) {
+      _serversByQuery.put(requestId, serversOut);
     }
   }
 
-  @VisibleForTesting
-  void submit(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs, Map<String, String> queryOptions)
-      throws Exception {
-    SendRequest<Worker.QueryResponse> requestSender = DispatchClient::submit;
-    List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
-    List<DispatchablePlanFragment> plansWithoutRoot = stagePlans.subList(1, stagePlans.size());
-    execute(requestId, plansWithoutRoot, timeoutMs, queryOptions, requestSender, (response, serverInstance) -> {
-      if (response.containsMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR)) {
-        throw new RuntimeException(
-            String.format("Unable to execute query plan for request: %d on server: %s, ERROR: %s", requestId,
-                serverInstance,
-                response.getMetadataOrDefault(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR,
-                    "null")));
-      }
-    });
+  public FailureDetector.ServerState checkConnectivityToInstance(ServerInstance serverInstance) {
+    String hostname = serverInstance.getHostname();
+    int port = serverInstance.getQueryServicePort();
+
+    DispatchClient client = _dispatchClientMap.get(toHostnamePortKey(hostname, port));
+    // Could occur if the cluster is only serving single-stage queries
+    if (client == null) {
+      LOGGER.debug("No DispatchClient found for server with instanceId: {}", serverInstance.getInstanceId());
+      return FailureDetector.ServerState.UNKNOWN;
+    }
+
+    ConnectivityState connectivityState = client.getChannel().getState(true);
+    if (connectivityState == ConnectivityState.READY) {
+      LOGGER.info("Successfully connected to server: {}", serverInstance.getInstanceId());
+      return FailureDetector.ServerState.HEALTHY;
+    } else {
+      LOGGER.info("Still can't connect to server: {}, current state: {}", serverInstance.getInstanceId(),
+          connectivityState);
+      return FailureDetector.ServerState.UNHEALTHY;
+    }
   }
 
-  private <E> void execute(long requestId, List<DispatchablePlanFragment> stagePlans, long timeoutMs,
-      Map<String, String> queryOptions, SendRequest<E> sendRequest, BiConsumer<E, QueryServerInstance> resultConsumer)
-      throws ExecutionException, InterruptedException, TimeoutException {
+  private boolean isQueryCancellationEnabled() {
+    return _serversByQuery != null;
+  }
 
+  private <E> void execute(long requestId, Set<DispatchablePlanFragment> stagePlans, long timeoutMs,
+      Map<String, String> queryOptions, SendRequest<Worker.QueryRequest, E> sendRequest,
+      Set<QueryServerInstance> serverInstancesOut, BiConsumer<E, QueryServerInstance> resultConsumer)
+      throws ExecutionException, InterruptedException, TimeoutException {
     Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
 
-    Set<QueryServerInstance> serverInstances = new HashSet<>();
-
-    List<StageInfo> stageInfos = serializePlanFragments(stagePlans, serverInstances, deadline);
-
-    if (serverInstances.isEmpty()) {
-      throw new RuntimeException("No server instances to dispatch query to");
+    Map<DispatchablePlanFragment, StageInfo> stageInfos = serializePlanFragments(stagePlans, serverInstancesOut);
+    if (serverInstancesOut.isEmpty()) {
+      return;
     }
 
-    Map<String, String> requestMetadata = prepareRequestMetadata(requestId, queryOptions, deadline);
+    Map<String, String> requestMetadata =
+        prepareRequestMetadata(QueryThreadContext.get().getExecutionContext(), queryOptions, deadline);
     ByteString protoRequestMetadata = QueryPlanSerDeUtils.toProtoProperties(requestMetadata);
 
     // Submit the query plan to all servers in parallel
-    int numServers = serverInstances.size();
-    BlockingQueue<AsyncResponse<E>> dispatchCallbacks = new ArrayBlockingQueue<>(numServers);
+    boolean enableProtoSegmentList = _enableProtoSegmentList;
+    BlockingQueue<AsyncResponse<E>> dispatchCallbacks = dispatch(sendRequest, serverInstancesOut, deadline,
+        serverInstance -> createRequest(serverInstance, stageInfos, protoRequestMetadata, enableProtoSegmentList));
 
-    for (QueryServerInstance serverInstance : serverInstances) {
+    processResults(requestId, serverInstancesOut.size(), resultConsumer, deadline, dispatchCallbacks);
+  }
+
+  private <R, E> BlockingQueue<AsyncResponse<E>> dispatch(SendRequest<R, E> sendRequest,
+      Set<QueryServerInstance> serverInstancesOut, Deadline deadline, Function<QueryServerInstance, R> requestBuilder) {
+    BlockingQueue<AsyncResponse<E>> dispatchCallbacks = new ArrayBlockingQueue<>(serverInstancesOut.size());
+
+    for (QueryServerInstance serverInstance : serverInstancesOut) {
       Consumer<AsyncResponse<E>> callbackConsumer = response -> {
         if (!dispatchCallbacks.offer(response)) {
-          LOGGER.warn("Failed to offer response to dispatchCallbacks queue for query: {} on server: {}", requestId,
-              serverInstance);
+          LOGGER.warn("Failed to offer response to dispatchCallbacks queue for query on server: {}", serverInstance);
         }
       };
+      R request = requestBuilder.apply(serverInstance);
+      DispatchClient dispatchClient = getOrCreateDispatchClient(serverInstance);
+
       try {
-        Worker.QueryRequest requestBuilder =
-            createRequest(serverInstance, stagePlans, stageInfos, protoRequestMetadata);
-        DispatchClient dispatchClient = getOrCreateDispatchClient(serverInstance);
-        sendRequest.send(dispatchClient, requestBuilder, serverInstance, deadline, callbackConsumer);
+        sendRequest.send(dispatchClient, request, serverInstance, deadline, callbackConsumer);
       } catch (Throwable t) {
-        LOGGER.warn("Caught exception while dispatching query: {} to server: {}", requestId, serverInstance, t);
+        LOGGER.warn("Caught exception while dispatching query to server: {}", serverInstance, t);
         callbackConsumer.accept(new AsyncResponse<>(serverInstance, null, t));
+        _failureDetector.markServerUnhealthy(serverInstance.getInstanceId(), serverInstance.getHostname());
       }
     }
+    return dispatchCallbacks;
+  }
 
+  private <E> void processResults(long requestId, int numServers, BiConsumer<E, QueryServerInstance> resultConsumer,
+      Deadline deadline, BlockingQueue<AsyncResponse<E>> dispatchCallbacks)
+      throws InterruptedException, TimeoutException {
     int numSuccessCalls = 0;
     // TODO: Cancel all dispatched requests if one of the dispatch errors out or deadline is breached.
     while (!deadline.isExpired() && numSuccessCalls < numServers) {
       AsyncResponse<E> resp =
-          dispatchCallbacks.poll(deadline.timeRemaining(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
+          dispatchCallbacks.poll(Math.max(1, deadline.timeRemaining(TimeUnit.MILLISECONDS)), TimeUnit.MILLISECONDS);
       if (resp != null) {
         if (resp.getThrowable() != null) {
+          // If it's a connectivity issue between the broker and the server, mark the server as unhealthy to prevent
+          // subsequent query failures
+          if (getOrCreateDispatchClient(resp.getServerInstance()).getChannel().getState(false)
+              != ConnectivityState.READY) {
+            _failureDetector.markServerUnhealthy(resp.getServerInstance().getInstanceId(),
+                resp.getServerInstance().getHostname());
+          }
           throw new RuntimeException(
               String.format("Error dispatching query: %d to server: %s", requestId, resp.getServerInstance()),
               resp.getThrowable());
@@ -276,6 +712,8 @@ public class QueryDispatcher {
           resultConsumer.accept(response, resp.getServerInstance());
           numSuccessCalls++;
         }
+      } else {
+        LOGGER.info("No response from server for query");
       }
     }
     if (deadline.isExpired()) {
@@ -283,46 +721,44 @@ public class QueryDispatcher {
     }
   }
 
-  void submit(long requestId, TimeSeriesDispatchablePlan plan, long timeoutMs, Map<String, String> queryOptions,
-      RequestContext requestContext, Consumer<AsyncQueryTimeSeriesDispatchResponse> receiver)
-      throws Exception {
-    Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
-    long deadlineMs = System.currentTimeMillis() + timeoutMs;
-    String serializedPlan = plan.getSerializedPlan();
-    Worker.TimeSeriesQueryRequest request = Worker.TimeSeriesQueryRequest.newBuilder()
-        .addDispatchPlan(serializedPlan)
-        .putAllMetadata(initializeTimeSeriesMetadataMap(plan, deadlineMs, requestContext))
-        .putMetadata(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestId))
-        .build();
-    getOrCreateTimeSeriesDispatchClient(plan.getQueryServerInstance()).submit(request,
-        new QueryServerInstance(plan.getQueryServerInstance().getHostname(),
-            plan.getQueryServerInstance().getQueryServicePort(), plan.getQueryServerInstance().getQueryMailboxPort()),
-        deadline, receiver::accept);
-  };
-
-  Map<String, String> initializeTimeSeriesMetadataMap(TimeSeriesDispatchablePlan dispatchablePlan, long deadlineMs,
-      RequestContext requestContext) {
-    Map<String, String> result = new HashMap<>();
-    TimeBuckets timeBuckets = dispatchablePlan.getTimeBuckets();
-    result.put(WorkerRequestMetadataKeys.LANGUAGE, dispatchablePlan.getLanguage());
-    result.put(WorkerRequestMetadataKeys.START_TIME_SECONDS, Long.toString(timeBuckets.getTimeBuckets()[0]));
-    result.put(WorkerRequestMetadataKeys.WINDOW_SECONDS, Long.toString(timeBuckets.getBucketSize().getSeconds()));
-    result.put(WorkerRequestMetadataKeys.NUM_ELEMENTS, Long.toString(timeBuckets.getTimeBuckets().length));
-    result.put(WorkerRequestMetadataKeys.DEADLINE_MS, Long.toString(deadlineMs));
-    for (Map.Entry<String, List<String>> entry : dispatchablePlan.getPlanIdToSegments().entrySet()) {
-      result.put(WorkerRequestMetadataKeys.encodeSegmentListKey(entry.getKey()), String.join(",", entry.getValue()));
+  /// Applies the proto segment list encoding set in cluster config, which takes effect on the next query. Anything
+  /// other than `true` — the key cleared, or a value that is not a boolean — reads as disabled, which is the legacy
+  /// encoding every server understands.
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (!changedConfigs.contains(ENABLE_PROTO_SEGMENT_LIST_KEY)) {
+      return;
     }
-    result.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestContext.getRequestId()));
-    result.put(CommonConstants.Query.Request.MetadataKeys.BROKER_ID, requestContext.getBrokerId());
-    return result;
+    String value = clusterConfigs.get(ENABLE_PROTO_SEGMENT_LIST_KEY);
+    boolean enableProtoSegmentList = value != null && Boolean.parseBoolean(value.trim());
+    if (enableProtoSegmentList == _enableProtoSegmentList) {
+      return;
+    }
+    _enableProtoSegmentList = enableProtoSegmentList;
+    LOGGER.info("Updated {} from: {} to: {}", ENABLE_PROTO_SEGMENT_LIST_KEY, !enableProtoSegmentList,
+        enableProtoSegmentList);
+    if (enableProtoSegmentList) {
+      LOGGER.warn("The proto segment list encoding is now enabled. Every server this broker dispatches to, including "
+          + "the servers of remote clusters when multi-cluster routing is used, must already run a version that "
+          + "understands it; leaf stages routed to an older server will fail. Set it back to false to revert.");
+    }
   }
 
+  @VisibleForTesting
+  public boolean isEnableProtoSegmentList() {
+    return _enableProtoSegmentList;
+  }
+
+  /// Builds the request for one server: the plans of the stages it takes part in, with only its own workers'
+  /// metadata. The leaf-stage segment lists are encoded here, once per worker, rather than at plan time.
   private static Worker.QueryRequest createRequest(QueryServerInstance serverInstance,
-      List<DispatchablePlanFragment> stagePlans, List<StageInfo> stageInfos, ByteString protoRequestMetadata) {
+      Map<DispatchablePlanFragment, StageInfo> stageInfos, ByteString protoRequestMetadata,
+      boolean enableProtoSegmentList) {
     Worker.QueryRequest.Builder requestBuilder = Worker.QueryRequest.newBuilder();
-    requestBuilder.setVersion(CommonConstants.MultiStageQueryRunner.PlanVersions.V1);
-    for (int i = 0; i < stagePlans.size(); i++) {
-      DispatchablePlanFragment stagePlan = stagePlans.get(i);
+    requestBuilder.setVersion(PlanVersions.V1);
+
+    for (Map.Entry<DispatchablePlanFragment, StageInfo> entry : stageInfos.entrySet()) {
+      DispatchablePlanFragment stagePlan = entry.getKey();
       List<Integer> workerIds = stagePlan.getServerInstanceToWorkerIdMap().get(serverInstance);
       if (workerIds != null) { // otherwise this server doesn't need to execute this stage
         List<WorkerMetadata> stageWorkerMetadataList = stagePlan.getWorkerMetadataList();
@@ -331,22 +767,17 @@ public class QueryDispatcher {
           workerMetadataList.add(stageWorkerMetadataList.get(workerId));
         }
         List<Worker.WorkerMetadata> protoWorkerMetadataList =
-            QueryPlanSerDeUtils.toProtoWorkerMetadataList(workerMetadataList);
-        StageInfo stageInfo = stageInfos.get(i);
+            QueryPlanSerDeUtils.toProtoWorkerMetadataList(workerMetadataList, enableProtoSegmentList);
+        StageInfo stageInfo = entry.getValue();
 
-        //@formatter:off
         Worker.StagePlan requestStagePlan = Worker.StagePlan.newBuilder()
             .setRootNode(stageInfo._rootNode)
-            .setStageMetadata(
-                Worker.StageMetadata.newBuilder()
-                    // this is a leak from submitAndReduce (id may be different in explain), but it's fine for now
-                    .setStageId(i + 1)
-                    .addAllWorkerMetadata(protoWorkerMetadataList)
-                    .setCustomProperty(stageInfo._customProperty)
-                    .build()
-            )
+            .setStageMetadata(Worker.StageMetadata.newBuilder()
+                .setStageId(stagePlan.getPlanFragment().getFragmentId())
+                .addAllWorkerMetadata(protoWorkerMetadataList)
+                .setCustomProperty(stageInfo._customProperty)
+                .build())
             .build();
-        //@formatter:on
         requestBuilder.addStagePlan(requestStagePlan);
       }
     }
@@ -354,28 +785,32 @@ public class QueryDispatcher {
     return requestBuilder.build();
   }
 
-  private static Map<String, String> prepareRequestMetadata(long requestId, Map<String, String> queryOptions,
-      Deadline deadline) {
-    Map<String, String> requestMetadata = new HashMap<>();
-    requestMetadata.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestId));
-    requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
-        Long.toString(deadline.timeRemaining(TimeUnit.MILLISECONDS)));
-    requestMetadata.putAll(queryOptions);
+  private static Map<String, String> prepareRequestMetadata(QueryExecutionContext executionContext,
+      Map<String, String> queryOptions, Deadline deadline) {
+    Map<String, String> requestMetadata = new HashMap<>(queryOptions);
+    requestMetadata.put(MetadataKeys.REQUEST_ID, Long.toString(executionContext.getRequestId()));
+    requestMetadata.put(MetadataKeys.CORRELATION_ID, executionContext.getCid());
+    requestMetadata.put(QueryOptionKey.TIMEOUT_MS, Long.toString(deadline.timeRemaining(TimeUnit.MILLISECONDS)));
+    requestMetadata.put(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS,
+        Long.toString(executionContext.getPassiveDeadlineMs() - executionContext.getActiveDeadlineMs()));
     return requestMetadata;
   }
 
-  private List<StageInfo> serializePlanFragments(List<DispatchablePlanFragment> stagePlans,
-      Set<QueryServerInstance> serverInstances, Deadline deadline)
-      throws InterruptedException, ExecutionException, TimeoutException {
-    List<CompletableFuture<StageInfo>> stageInfoFutures = new ArrayList<>(stagePlans.size());
+  private Map<DispatchablePlanFragment, StageInfo> serializePlanFragments(Set<DispatchablePlanFragment> stagePlans,
+      Set<QueryServerInstance> serverInstances)
+      throws InterruptedException, ExecutionException {
+    List<CompletableFuture<Pair<DispatchablePlanFragment, StageInfo>>> stageInfoFutures =
+        new ArrayList<>(stagePlans.size());
     for (DispatchablePlanFragment stagePlan : stagePlans) {
       serverInstances.addAll(stagePlan.getServerInstanceToWorkerIdMap().keySet());
-      stageInfoFutures.add(CompletableFuture.supplyAsync(() -> serializePlanFragment(stagePlan), _executorService));
+      stageInfoFutures.add(
+          CompletableFuture.supplyAsync(() -> Pair.of(stagePlan, serializePlanFragment(stagePlan)), _executorService));
     }
-    List<StageInfo> stageInfos = new ArrayList<>(stagePlans.size());
+    Map<DispatchablePlanFragment, StageInfo> stageInfos = Maps.newHashMapWithExpectedSize(stagePlans.size());
     try {
-      for (CompletableFuture<StageInfo> future : stageInfoFutures) {
-        stageInfos.add(future.get(deadline.timeRemaining(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS));
+      for (CompletableFuture<Pair<DispatchablePlanFragment, StageInfo>> future : stageInfoFutures) {
+        Pair<DispatchablePlanFragment, StageInfo> pair = future.get();
+        stageInfos.put(pair.getKey(), pair.getValue());
       }
     } finally {
       for (CompletableFuture<?> future : stageInfoFutures) {
@@ -403,105 +838,196 @@ public class QueryDispatcher {
     }
   }
 
-  private void cancel(long requestId, List<DispatchablePlanFragment> stagePlans) {
-    int numStages = stagePlans.size();
-    // Skip the reduce stage (stage 0)
-    Set<QueryServerInstance> serversToCancel = new HashSet<>();
-    for (int stageId = 1; stageId < numStages; stageId++) {
-      serversToCancel.addAll(stagePlans.get(stageId).getServerInstanceToWorkerIdMap().keySet());
+  public boolean cancel(long requestId) {
+    if (isQueryCancellationEnabled()) {
+      return cancel(requestId, _serversByQuery.remove(requestId));
+    } else {
+      return false;
     }
-    for (QueryServerInstance queryServerInstance : serversToCancel) {
+  }
+
+  /// Cancels a request without waiting for the stats in the response.
+  private boolean cancel(long requestId, @Nullable Set<QueryServerInstance> servers) {
+    if (servers == null) {
+      return false;
+    }
+    for (QueryServerInstance queryServerInstance : servers) {
       try {
-        getOrCreateDispatchClient(queryServerInstance).cancel(requestId);
+        getOrCreateDispatchClient(queryServerInstance).cancelAsync(requestId);
       } catch (Throwable t) {
         LOGGER.warn("Caught exception while cancelling query: {} on server: {}", requestId, queryServerInstance, t);
       }
     }
+    if (isQueryCancellationEnabled()) {
+      _serversByQuery.remove(requestId);
+    }
+    return true;
   }
 
   private DispatchClient getOrCreateDispatchClient(QueryServerInstance queryServerInstance) {
     String hostname = queryServerInstance.getHostname();
     int port = queryServerInstance.getQueryServicePort();
-    String key = String.format("%s_%d", hostname, port);
-    return _dispatchClientMap.computeIfAbsent(key, k -> new DispatchClient(hostname, port, _tlsConfig));
+    return _dispatchClientMap.computeIfAbsent(toHostnamePortKey(hostname, port),
+        k -> new DispatchClient(hostname, port, _tlsConfig, _clientGrpcSslContext, _keepAliveConfig));
   }
 
-  private TimeSeriesDispatchClient getOrCreateTimeSeriesDispatchClient(
-      TimeSeriesQueryServerInstance queryServerInstance) {
-    String hostname = queryServerInstance.getHostname();
-    int port = queryServerInstance.getQueryServicePort();
-    String key = String.format("%s_%d", hostname, port);
-    return _timeSeriesDispatchClientMap.computeIfAbsent(key, k -> new TimeSeriesDispatchClient(hostname, port));
+  /// Reset the connection backoff for a server. When the GRPC channel enters a TRANSIENT_FAILURE state from
+  /// connection failures, it will fast fail requests and reconnect with exponential backoff. This method
+  /// resets the backoff so servers that have recovered can be reconnected to immediately.
+  public void resetClientConnectionBackoff(ServerInstance serverInstance) {
+    String hostname = serverInstance.getHostname();
+    int port = serverInstance.getQueryServicePort();
+    DispatchClient dispatchClient = _dispatchClientMap.get(toHostnamePortKey(hostname, port));
+    if (dispatchClient != null) {
+      LOGGER.info("Resetting connection backoff for server: {}", serverInstance.getInstanceId());
+      dispatchClient.getChannel().resetConnectBackoff();
+    }
   }
 
+  private static String toHostnamePortKey(String hostname, int port) {
+    return String.format("%s_%d", hostname, port);
+  }
+
+  @Nullable
+  private static SslContext initClientSslContext(@Nullable TlsConfig tlsConfig) {
+    if (tlsConfig == null) {
+      return null;
+    }
+    BrokerContext brokerContext = BrokerContext.getInstance();
+    SslContext sslContext = brokerContext.getClientGrpcSslContext();
+    if (sslContext != null) {
+      return sslContext;
+    }
+    SslContext built = ServerGrpcQueryClient.buildSslContext(tlsConfig);
+    brokerContext.setClientGrpcSslContext(built);
+    return built;
+  }
+  /// Concatenates the results of the sub-plan and returns a [QueryResult] with the concatenated result.
+  /// [QueryThreadContext] must already be set up before calling this method.
   @VisibleForTesting
-  public static QueryResult runReducer(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
-      Map<String, String> queryOptions, MailboxService mailboxService) {
+  public static QueryResult runReducer(DispatchableSubPlan subPlan, Map<String, String> queryOptions,
+      MailboxService mailboxService) {
     long startTimeMs = System.currentTimeMillis();
-    long deadlineMs = startTimeMs + timeoutMs;
-
     // NOTE: Reduce stage is always stage 0
-    DispatchablePlanFragment dispatchableStagePlan = dispatchableSubPlan.getQueryStageList().get(0);
-    PlanFragment planFragment = dispatchableStagePlan.getPlanFragment();
+    DispatchablePlanFragment stagePlan = subPlan.getQueryStageMap().get(0);
+    PlanFragment planFragment = stagePlan.getPlanFragment();
     PlanNode rootNode = planFragment.getFragmentRoot();
-    Preconditions.checkState(rootNode instanceof MailboxReceiveNode,
-        "Expecting mailbox receive node as root of reduce stage, got: %s", rootNode.getClass().getSimpleName());
-    MailboxReceiveNode receiveNode = (MailboxReceiveNode) rootNode;
-    List<WorkerMetadata> workerMetadataList = dispatchableStagePlan.getWorkerMetadataList();
-    Preconditions.checkState(workerMetadataList.size() == 1, "Expecting single worker for reduce stage, got: %s",
-        workerMetadataList.size());
-    StageMetadata stageMetadata = new StageMetadata(0, workerMetadataList, dispatchableStagePlan.getCustomProperties());
-    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
-    OpChainExecutionContext opChainExecutionContext =
-        new OpChainExecutionContext(mailboxService, requestId, deadlineMs, queryOptions, stageMetadata,
-            workerMetadataList.get(0), null, parentContext);
+    List<WorkerMetadata> workerMetadata = stagePlan.getWorkerMetadataList();
+    Preconditions.checkState(workerMetadata.size() == 1, "Expecting single worker for reduce stage, got: %s",
+        workerMetadata.size());
 
-    PairList<Integer, String> resultFields = dispatchableSubPlan.getQueryResultFields();
-    DataSchema sourceDataSchema = receiveNode.getDataSchema();
+    StageMetadata stageMetadata = new StageMetadata(0, workerMetadata, stagePlan.getCustomProperties());
+    OpChainExecutionContext opChainExecutionContext =
+        OpChainExecutionContext.fromQueryContext(mailboxService, queryOptions, stageMetadata, workerMetadata.get(0),
+            null, true, true);
+
+    PairList<Integer, String> resultFields = subPlan.getQueryResultFields();
+    DataSchema sourceSchema = rootNode.getDataSchema();
     int numColumns = resultFields.size();
     String[] columnNames = new String[numColumns];
     ColumnDataType[] columnTypes = new ColumnDataType[numColumns];
     for (int i = 0; i < numColumns; i++) {
       Map.Entry<Integer, String> field = resultFields.get(i);
       columnNames[i] = field.getValue();
-      columnTypes[i] = sourceDataSchema.getColumnDataType(field.getKey());
+      columnTypes[i] = sourceSchema.getColumnDataType(field.getKey());
     }
-    DataSchema resultDataSchema = new DataSchema(columnNames, columnTypes);
+    DataSchema resultSchema = new DataSchema(columnNames, columnTypes);
 
     ArrayList<Object[]> resultRows = new ArrayList<>();
-    TransferableBlock block;
-    try (MailboxReceiveOperator receiveOperator = new MailboxReceiveOperator(opChainExecutionContext, receiveNode)) {
-      block = receiveOperator.nextBlock();
-      while (!TransferableBlockUtils.isEndOfStream(block)) {
-        DataBlock dataBlock = block.getDataBlock();
-        int numRows = dataBlock.getNumberOfRows();
-        if (numRows > 0) {
-          resultRows.ensureCapacity(resultRows.size() + numRows);
-          List<Object[]> rawRows = DataBlockExtractUtils.extractRows(dataBlock);
-          for (Object[] rawRow : rawRows) {
-            Object[] row = new Object[numColumns];
-            for (int i = 0; i < numColumns; i++) {
-              Object rawValue = rawRow[resultFields.get(i).getKey()];
-              if (rawValue != null) {
-                ColumnDataType dataType = columnTypes[i];
-                row[i] = dataType.format(dataType.toExternal(rawValue));
-              }
-            }
-            resultRows.add(row);
-          }
+    MseBlock block;
+    MultiStageQueryStats queryStats;
+    try (OpChain opChain = OpChainConverterDispatcher.convert(rootNode, opChainExecutionContext, (a, b) -> {
+    })) {
+      MultiStageOperator rootOperator = opChain.getRoot();
+      block = rootOperator.nextBlock();
+      while (block.isData()) {
+        MseBlock.Data dataBlock = (MseBlock.Data) block;
+        if (dataBlock.isSerialized()) {
+          reduceSerialized(dataBlock.asSerialized(), resultRows, numColumns, resultFields, columnTypes);
+        } else {
+          reduceRowHeap(dataBlock.asRowHeap(), resultRows, numColumns, resultFields, columnTypes);
         }
-        block = receiveOperator.nextBlock();
+        block = rootOperator.nextBlock();
       }
+      queryStats = rootOperator.calculateStats();
     }
     // TODO: Improve the error handling, e.g. return partial response
-    if (block.isErrorBlock()) {
-      throw new RuntimeException("Received error query execution result block: " + block.getExceptions());
+    if (block.isError()) {
+      ErrorMseBlock errorBlock = (ErrorMseBlock) block;
+      Map<QueryErrorCode, String> queryExceptions = errorBlock.getErrorMessages();
+
+      String errorMessage;
+      Map.Entry<QueryErrorCode, String> error;
+      String from;
+      if (errorBlock.getStageId() >= 0) {
+        from = " from stage " + errorBlock.getStageId();
+        if (errorBlock.getServerId() != null) {
+          from += " on " + errorBlock.getServerId();
+        }
+      } else {
+        from = "";
+      }
+      if (queryExceptions.size() == 1) {
+        error = queryExceptions.entrySet().iterator().next();
+        errorMessage = "Received 1 error" + from + ": " + error.getValue();
+      } else {
+        error = queryExceptions.entrySet().stream().max(QueryDispatcher::compareErrors).orElseThrow();
+        errorMessage =
+            "Received " + queryExceptions.size() + " errors" + from + ". " + "The one with highest priority is: "
+                + error.getValue();
+      }
+      QueryProcessingException processingEx = new QueryProcessingException(error.getKey().getId(), errorMessage);
+      return new QueryResult(processingEx, queryStats, System.currentTimeMillis() - startTimeMs);
     }
-    assert block.isSuccessfulEndOfStreamBlock();
-    MultiStageQueryStats queryStats = block.getQueryStats();
-    assert queryStats != null;
-    return new QueryResult(new ResultTable(resultDataSchema, resultRows), queryStats,
+    assert block.isSuccess();
+    return new QueryResult(new ResultTable(resultSchema, resultRows), queryStats,
         System.currentTimeMillis() - startTimeMs);
+  }
+
+  private static void reduceSerialized(SerializedDataBlock block, ArrayList<Object[]> resultRows, int numColumns,
+      PairList<Integer, String> resultFields, ColumnDataType[] columnTypes) {
+    DataBlock dataBlock = block.getDataBlock();
+    if (dataBlock.getNumberOfRows() > 0) {
+      List<Object[]> rawRows = DataBlockExtractUtils.extractRows(dataBlock);
+      toExternalList(resultRows, numColumns, resultFields, columnTypes, rawRows);
+    }
+  }
+
+  private static void reduceRowHeap(RowHeapDataBlock block, ArrayList<Object[]> resultRows, int numColumns,
+      PairList<Integer, String> resultFields, ColumnDataType[] columnTypes) {
+    List<Object[]> rows = block.getRows();
+    if (!rows.isEmpty()) {
+      toExternalList(resultRows, numColumns, resultFields, columnTypes, rows);
+    }
+  }
+
+  private static void toExternalList(ArrayList<Object[]> resultRows, int numColumns,
+      PairList<Integer, String> resultFields, ColumnDataType[] columnTypes, List<Object[]> rows) {
+    resultRows.ensureCapacity(resultRows.size() + rows.size());
+    for (Object[] rawRow : rows) {
+      Object[] row = new Object[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        Object rawValue = rawRow[resultFields.get(i).getKey()];
+        if (rawValue != null) {
+          ColumnDataType dataType = columnTypes[i];
+          row[i] = dataType.format(dataType.toExternal(rawValue));
+        }
+      }
+      resultRows.add(row);
+    }
+  }
+
+  // TODO: Improve the way the errors are compared
+  private static int compareErrors(Map.Entry<QueryErrorCode, String> entry1, Map.Entry<QueryErrorCode, String> entry2) {
+    QueryErrorCode errorCode1 = entry1.getKey();
+    QueryErrorCode errorCode2 = entry2.getKey();
+    if (errorCode1 == QueryErrorCode.QUERY_VALIDATION) {
+      return 1;
+    }
+    if (errorCode2 == QueryErrorCode.QUERY_VALIDATION) {
+      return -1;
+    }
+    return Integer.compare(errorCode1.getId(), errorCode2.getId());
   }
 
   public void shutdown() {
@@ -514,10 +1040,24 @@ public class QueryDispatcher {
   }
 
   public static class QueryResult {
+    @Nullable
     private final ResultTable _resultTable;
+    @Nullable
+    private final QueryProcessingException _processingException;
     private final List<MultiStageQueryStats.StageStats.Closed> _queryStats;
     private final long _brokerReduceTimeMs;
+    /// Non-null only in stream-mode queries. Indexed by stage id; entries may be null for stages with no coverage data
+    /// (e.g. stage 0 which runs broker-local and is not tracked by the session).
+    @Nullable
+    private final List<StageCoverage> _stageCoverage;
+    /// Non-null only in stream-mode queries: the explicit per-stage stats trees decoded from the
+    /// `SubmitWithStream` reports, keyed by stage id. Carries the exact tree shape (including plugin-defined
+    /// operator types), which the flat [#_queryStats] list cannot represent. Stage 0 (broker-local) and stages
+    /// that never reported are absent.
+    @Nullable
+    private final Map<Integer, StageStatsTreeNode> _stageStatsTrees;
 
+    /// Creates a successful query result.
     public QueryResult(ResultTable resultTable, MultiStageQueryStats queryStats, long brokerReduceTimeMs) {
       _resultTable = resultTable;
       Preconditions.checkArgument(queryStats.getCurrentStageId() == 0, "Expecting query stats for stage 0, got: %s",
@@ -529,10 +1069,53 @@ public class QueryDispatcher {
         _queryStats.add(queryStats.getUpstreamStageStats(i));
       }
       _brokerReduceTimeMs = brokerReduceTimeMs;
+      _processingException = null;
+      _stageCoverage = null;
+      _stageStatsTrees = null;
     }
 
+    /// Creates a failed query result.
+    /// @param processingException the exception that occurred during query processing
+    /// @param queryStats the query stats, which may be empty
+    public QueryResult(QueryProcessingException processingException, MultiStageQueryStats queryStats,
+        long brokerReduceTimeMs) {
+      _processingException = processingException;
+      _resultTable = null;
+      _brokerReduceTimeMs = brokerReduceTimeMs;
+      Preconditions.checkArgument(queryStats.getCurrentStageId() == 0, "Expecting query stats for stage 0, got: %s",
+          queryStats.getCurrentStageId());
+      int numStages = queryStats.getMaxStageId() + 1;
+      _queryStats = new ArrayList<>(numStages);
+      _queryStats.add(queryStats.getCurrentStats().close());
+      for (int i = 1; i < numStages; i++) {
+        _queryStats.add(queryStats.getUpstreamStageStats(i));
+      }
+      _stageCoverage = null;
+      _stageStatsTrees = null;
+    }
+
+    /// Creates a query result from a pre-built per-stage stats list. Used by the `SubmitWithStream` path so
+    /// the caller can merge the broker's local stage-0 stats with the session accumulator's stages 1..N before
+    /// constructing the result.
+    public QueryResult(@Nullable ResultTable resultTable, @Nullable QueryProcessingException processingException,
+        List<MultiStageQueryStats.StageStats.Closed> queryStats, long brokerReduceTimeMs,
+        @Nullable List<StageCoverage> stageCoverage, @Nullable Map<Integer, StageStatsTreeNode> stageStatsTrees) {
+      _resultTable = resultTable;
+      _processingException = processingException;
+      _queryStats = queryStats;
+      _brokerReduceTimeMs = brokerReduceTimeMs;
+      _stageCoverage = stageCoverage;
+      _stageStatsTrees = stageStatsTrees;
+    }
+
+    @Nullable
     public ResultTable getResultTable() {
       return _resultTable;
+    }
+
+    @Nullable
+    public QueryProcessingException getProcessingException() {
+      return _processingException;
     }
 
     public List<MultiStageQueryStats.StageStats.Closed> getQueryStats() {
@@ -542,10 +1125,53 @@ public class QueryDispatcher {
     public long getBrokerReduceTimeMs() {
       return _brokerReduceTimeMs;
     }
+
+    /// Returns per-stage coverage data from the stream-mode session, or `null` when the query ran in legacy mode.
+    /// The list is indexed by stage id; entries may be `null` for stages with no coverage info (e.g. stage 0).
+    @Nullable
+    public List<StageCoverage> getStageCoverage() {
+      return _stageCoverage;
+    }
+
+    /// Returns the explicit per-stage stats trees decoded from stream-mode reports, keyed by stage id, or `null`
+    /// when the query ran in legacy mode. Stages that never reported are absent from the map.
+    @Nullable
+    public Map<Integer, StageStatsTreeNode> getStageStatsTrees() {
+      return _stageStatsTrees;
+    }
+
+    /// Per-stage stats coverage for a stream-mode query. Captures how many opchain reports the broker received vs.
+    /// expected, and how many it couldn't merge (version-skew or shape mismatch).
+    public static final class StageCoverage {
+      private final int _responded;
+      private final int _mergeFailed;
+      private final int _missing;
+
+      public StageCoverage(int responded, int mergeFailed, int missing) {
+        _responded = responded;
+        _mergeFailed = mergeFailed;
+        _missing = missing;
+      }
+
+      /// Opchains that reported and whose stats were merged successfully.
+      public int getResponded() {
+        return _responded;
+      }
+
+      /// Opchains that reported but whose stats the broker could not merge (shape mismatch / decode error).
+      public int getMergeFailed() {
+        return _mergeFailed;
+      }
+
+      /// Opchains that were expected but never reported (timed out or stream error before reporting).
+      public int getMissing() {
+        return _missing;
+      }
+    }
   }
 
-  private interface SendRequest<E> {
-    void send(DispatchClient dispatchClient, Worker.QueryRequest request, QueryServerInstance serverInstance,
-        Deadline deadline, Consumer<AsyncResponse<E>> callbackConsumer);
+  private interface SendRequest<R, E> {
+    void send(DispatchClient dispatchClient, R request, QueryServerInstance serverInstance, Deadline deadline,
+        Consumer<AsyncResponse<E>> callbackConsumer);
   }
 }

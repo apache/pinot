@@ -29,9 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * DedupReducer deduplicates the GenericRows with the same values.
- */
+/// DedupReducer deduplicates the GenericRows with the same values.
 public class DedupReducer implements Reducer {
   private static final Logger LOGGER = LoggerFactory.getLogger(DedupReducer.class);
 

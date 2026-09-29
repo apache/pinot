@@ -18,11 +18,21 @@
  */
 
 import React from 'react';
-import { DialogContent, DialogContentText, FormControl, FormControlLabel, Grid, Input, InputLabel, Switch, Tooltip} from '@material-ui/core';
+import {
+  Grid, Box, Typography, Divider, Button, CircularProgress
+} from '@material-ui/core';
 import Dialog from '../../CustomDialog';
 import PinotMethodUtils from '../../../utils/PinotMethodUtils';
-import CustomCodemirror from '../../CustomCodemirror';
-import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
+import {RebalanceServerDialogHeader} from "./RebalanceServer/RebalanceServerDialogHeader";
+import {
+  RebalanceServerSection
+} from "./RebalanceServer/RebalanceServerSection";
+import Alert from "@material-ui/lab/Alert";
+import InfoOutlinedIcon from "@material-ui/icons/InfoOutlined";
+import {rebalanceServerOptions} from "./RebalanceServer/RebalanceServerOptions";
+import {RebalanceServerConfigurationOption} from "./RebalanceServer/RebalanceServerConfigurationOption";
+import {RebalanceResponse} from "./RebalanceServer/RebalanceResponse";
+import {RebalanceServerStatusOp} from "./RebalanceServerStatusOp";
 
 type Props = {
   tableType: string,
@@ -30,151 +40,216 @@ type Props = {
   hideModal: (event: React.MouseEvent<HTMLElement, MouseEvent>) => void
 };
 
+const DryRunAction = ({ handleOnRun, disabled }: { handleOnRun: () => void, disabled?: boolean }) => {
+  return (
+      <Button disabled={disabled} onClick={handleOnRun} variant="contained" style={{ textTransform: 'none' }} color="primary">
+        Dry Run
+      </Button>
+  );
+}
+
+const RebalanceAction = ({ handleOnRun, disabled }: { handleOnRun: () => void, disabled?: boolean }) => {
+  return (
+      <Button disabled={disabled} onClick={handleOnRun} variant="contained" style={{ textTransform: 'none' }} color="primary">
+        Rebalance
+      </Button>
+  );
+}
+
+const BackAction = ({ onClick }: { onClick: () => void }) => {
+  return (
+      <Button onClick={onClick} variant="outlined" color="primary">
+        Back
+      </Button>
+  );
+}
+
+
+
 export default function RebalanceServerTableOp({
   hideModal,
   tableName,
   tableType
 }: Props) {
+  const [pending, setPending] = React.useState(false);
   const [rebalanceResponse, setRebalanceResponse] = React.useState(null)
-  const [dryRun, setDryRun] = React.useState(false);
-  const [reassignInstances, setReassignInstances] = React.useState(false);
-  const [includeConsuming, setIncludeConsuming] = React.useState(false);
-  const [bootstrap, setBootstrap] = React.useState(false);
-  const [downtime, setDowntime] = React.useState(false);
-  const [minAvailableReplicas, setMinAvailableReplicas] = React.useState("1");
-  const [bestEfforts, setBestEfforts] = React.useState(false);
-  const [lowDiskMode, setLowDiskMode] = React.useState(false);
+  const [rebalanceConfig, setRebalanceConfig] = React.useState(
+      rebalanceServerOptions.reduce((config, option) => ({ ...config, [option.name]: option.defaultValue }), {})
+  );
+  const [isDryRun, setIsDryRun] = React.useState(false);
+  const [dryRunCompleted, setDryRunCompleted] = React.useState(false);
+  const [dryRunResponse, setDryRunResponse] = React.useState(null);
+  const [showingDryRunResults, setShowingDryRunResults] = React.useState(false);
+  const [showJobStatusDialog, setShowJobStatusDialog] = React.useState(false);
+  const [selectedJobId, setSelectedJobId] = React.useState<string | null>(null);
 
   const getData = () => {
     return {
       type: tableType,
-      dryRun, reassignInstances, includeConsuming, bootstrap, downtime, bestEfforts, lowDiskMode,
-      minAvailableReplicas: parseInt(minAvailableReplicas, 10)
+      ...rebalanceConfig,
     }
   };
 
-  const handleSave = async (event) => {
+  const handleSave = async () => {
     const data = getData();
+    setPending(true);
     const response = await PinotMethodUtils.rebalanceServersForTableOp(tableName, data);
-    setRebalanceResponse(response);
+
+    if (response.error) {
+      setRebalanceResponse({
+        description: response.error,
+        jobId: "NA",
+        status: response.code
+      })
+    } else {
+      setRebalanceResponse(response);
+    }
+
+    setShowingDryRunResults(false);
+    setIsDryRun(false);
+    setPending(false);
+  };
+
+    const handleDryRun = async () => {
+    setIsDryRun(true);
+    const data = getData();
+    setPending(true);
+    const response = await PinotMethodUtils.rebalanceServersForTableOp(tableName, {
+      ...data,
+      dryRun: true,
+      preChecks: true
+    });
+    if (response.error) {
+      setRebalanceResponse({
+        description: response.error,
+        jobId: "NA",
+        status: response.code
+      })
+    } else {
+      setRebalanceResponse(response);
+      setDryRunResponse(response);
+      setDryRunCompleted(true);
+    }
+    setShowingDryRunResults(true);
+    setPending(false);
+  };
+
+  const handleConfigChange = (config: { [key: string]: string | number | boolean }) => {
+    setRebalanceConfig({
+      ...rebalanceConfig,
+      ...config
+    });
+  }
+
+  if (pending) {
+    return (
+        <Dialog
+            showTitleDivider
+            showFooterDivider
+            size='md'
+            open={true}
+            handleClose={hideModal}
+            title={<RebalanceServerDialogHeader />}
+            showOkBtn={false}
+        >
+          <Box alignItems='center' display='flex' justifyContent='center'>
+            <CircularProgress />
+          </Box>
+        </Dialog>
+    )
+  }
+
+  const handleBackBtnOnClick = () => {
+    setRebalanceResponse(null);
+    setShowingDryRunResults(false);
+    setIsDryRun(false);
+  }
+
+  const handleJobIdClick = (jobId: string) => {
+    setSelectedJobId(jobId);
+    setShowJobStatusDialog(true);
+  }
+
+  const handleCloseJobStatusDialog = () => {
+    setShowJobStatusDialog(false);
+    setSelectedJobId(null);
+  }
+
+  const getDialogActions = () => {
+    if (!showingDryRunResults && !rebalanceResponse) {
+      return <DryRunAction disabled={pending} handleOnRun={handleDryRun} />;
+    }
+    
+    if (showingDryRunResults) {
+      return (
+        <Box display="flex">
+          <BackAction onClick={handleBackBtnOnClick} />
+          <Box ml={1}>
+            <RebalanceAction disabled={pending} handleOnRun={handleSave} />
+          </Box>
+        </Box>
+      );
+    }
+    
+    return <BackAction onClick={handleBackBtnOnClick} />;
   };
 
   return (
-    <Dialog
-      open={true}
-      handleClose={hideModal}
-      title={(<>Rebalance Server <Tooltip interactive title={(<a className={"tooltip-link"} target="_blank" href="https://docs.pinot.apache.org/operators/operating-pinot/rebalance/rebalance-servers">Click here for more details</a>)} arrow placement="top"><InfoOutlinedIcon/></Tooltip></>)}
-      handleSave={handleSave}
-      showOkBtn={!rebalanceResponse}
-    >
-      <DialogContent>
-        {!rebalanceResponse ?
-          <Grid container spacing={2}>
-            <Grid item xs={6}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={dryRun}
-                    onChange={() => setDryRun(!dryRun)}
-                    name="dryRun"
-                    color="primary"
-                  />
-                }
-                label="Dry Run"
-              />
-              <br/>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={includeConsuming}
-                    onChange={() => setIncludeConsuming(!includeConsuming)} 
-                    name="includeConsuming"
-                    color="primary"
-                  />
-                }
-                label="Include Consuming"
-              />
-              <br/>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={downtime}
-                    onChange={() => setDowntime(!downtime)} 
-                    name="downtime"
-                    color="primary"
-                  />
-                }
-                label="Downtime"
-              />
-              <br />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={lowDiskMode}
-                    onChange={() => setLowDiskMode(!lowDiskMode)} 
-                    name="lowDiskMode"
-                    color="primary"
-                  />
-                }
-                label="Low Disk Mode"
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={reassignInstances}
-                    onChange={() => setReassignInstances(!reassignInstances)} 
-                    name="reassignInstances"
-                    color="primary"
-                  />
-                }
-                label="Reassign Instances"
-              />
-              <br/>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={bootstrap}
-                    onChange={() => setBootstrap(!bootstrap)}
-                    name="bootstrap"
-                    color="primary"
-                  />
-                }
-                label="Bootstrap"
-              />
-              <br/>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={bestEfforts}
-                    onChange={() => setBestEfforts(!bestEfforts)} 
-                    name="bestEfforts"
-                    color="primary"
-                  />
-                }
-                label="Best Efforts"
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <FormControl fullWidth={true}>
-                <InputLabel htmlFor="my-input">Minimum Available Replicas</InputLabel>
-                <Input id="my-input" type="number" value={minAvailableReplicas} onChange={(e)=> setMinAvailableReplicas(e.target.value)}/>
-              </FormControl>
-            </Grid>
-          </Grid>
-        : 
-          <React.Fragment>
-            <DialogContentText>
-              Operation Status:
-            </DialogContentText>
-            <CustomCodemirror
-              data={rebalanceResponse}
-              isEditable={false}
-            />
-          </React.Fragment>
-        }
-      </DialogContent>
-    </Dialog>
+    <React.Fragment>
+      <Dialog
+        showTitleDivider
+        showFooterDivider
+        size='md'
+        okBtnDisabled={pending}
+        open={true}
+        handleClose={hideModal}
+        title={<RebalanceServerDialogHeader />}
+        showOkBtn={false}
+        moreActions={getDialogActions()}
+      >
+          {!showingDryRunResults && !rebalanceResponse && (
+            <Box flexDirection="column">
+              <RebalanceServerSection sectionTitle='Basic Options'>
+                <Grid container spacing={2}>
+                  {rebalanceServerOptions.filter(option => !option.isAdvancedConfig && !option.isStatsGatheringConfig).map((option) => (
+                      <Grid item xs={12} key={`basic-options-${option.name}`}>
+                        <RebalanceServerConfigurationOption rebalanceConfig={rebalanceConfig} option={option} handleConfigChange={handleConfigChange} />
+                      </Grid>
+                  ))}
+                </Grid>
+              </RebalanceServerSection>
+              <Divider style={{ marginBottom: 20 }}/>
+              <RebalanceServerSection sectionTitle='Advanced Options' canHideSection showSectionByDefault={false}>
+                <Grid container spacing={2}>
+                  {rebalanceServerOptions.filter(option => option.isAdvancedConfig).map((option) => (
+                      <Grid item xs={12} key={`advanced-options-${option.name}`}>
+                        <RebalanceServerConfigurationOption rebalanceConfig={rebalanceConfig} option={option} handleConfigChange={handleConfigChange} />
+                      </Grid>
+                  ))}
+                </Grid>
+              </RebalanceServerSection>
+            </Box>
+          )}
+
+          {showingDryRunResults && dryRunResponse && (
+            <React.Fragment>
+              <RebalanceResponse response={dryRunResponse} onJobIdClick={handleJobIdClick} />
+            </React.Fragment>
+          )}
+
+          {rebalanceResponse && !showingDryRunResults && (
+            <React.Fragment>
+              <RebalanceResponse response={rebalanceResponse} onJobIdClick={handleJobIdClick} />
+            </React.Fragment>
+          )}
+      </Dialog>
+      {showJobStatusDialog && (
+        <RebalanceServerStatusOp
+          tableName={tableName}
+          hideModal={handleCloseJobStatusDialog}
+          initialJobId={selectedJobId}
+        />
+      )}
+    </React.Fragment>
   );
 }

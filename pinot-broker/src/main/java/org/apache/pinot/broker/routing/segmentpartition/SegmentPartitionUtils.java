@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.routing.segmentpartition;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -37,17 +36,15 @@ public class SegmentPartitionUtils {
   }
 
   public static final SegmentPartitionInfo INVALID_PARTITION_INFO = new SegmentPartitionInfo(null, null, null);
-  public static final Map<String, SegmentPartitionInfo> INVALID_COLUMN_PARTITION_INFO_MAP = Collections.emptyMap();
+  public static final Map<String, SegmentPartitionInfo> INVALID_COLUMN_PARTITION_INFO_MAP = Map.of();
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPartitionUtils.class);
 
-  /**
-   * Returns the partition info for a given segment with single partition column.
-   *
-   * NOTE: Returns {@code null} when the ZNRecord is missing (could be transient Helix issue). Returns
-   *       {@link #INVALID_PARTITION_INFO} when the segment does not have valid partition metadata in its ZK metadata,
-   *       in which case we won't retry later.
-   */
+  /// Returns the partition info for a given segment with single partition column.
+  ///
+  /// NOTE: Returns `null` when the ZNRecord is missing (could be transient Helix issue). Returns
+  ///       [#INVALID_PARTITION_INFO] when the segment does not have valid partition metadata in its ZK metadata,
+  ///       in which case we won't retry later.
   @Nullable
   public static SegmentPartitionInfo extractPartitionInfo(String tableNameWithType, String partitionColumn,
       String segment, @Nullable ZNRecord znRecord) {
@@ -80,18 +77,15 @@ public class SegmentPartitionUtils {
     }
 
     return new SegmentPartitionInfo(partitionColumn,
-        PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata.getFunctionName(),
-            columnPartitionMetadata.getNumPartitions(), columnPartitionMetadata.getFunctionConfig()),
+        PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata),
         columnPartitionMetadata.getPartitions());
   }
 
-  /**
-   * Returns a map from partition column name to partition info for a given segment with multiple partition columns.
-   *
-   * NOTE: Returns {@code null} when the ZNRecord is missing (could be transient Helix issue). Returns
-   *       {@link #INVALID_COLUMN_PARTITION_INFO_MAP} when the segment does not have valid partition metadata in its ZK
-   *       metadata, in which case we won't retry later.
-   */
+  /// Returns a map from partition column name to partition info for a given segment with multiple partition columns.
+  ///
+  /// NOTE: Returns `null` when the ZNRecord is missing (could be transient Helix issue). Returns
+  ///       [#INVALID_COLUMN_PARTITION_INFO_MAP] when the segment does not have valid partition metadata in its ZK
+  ///       metadata, in which case we won't retry later.
   @Nullable
   public static Map<String, SegmentPartitionInfo> extractPartitionInfoMap(String tableNameWithType,
       Set<String> partitionColumns, String segment, @Nullable ZNRecord znRecord) {
@@ -125,14 +119,13 @@ public class SegmentPartitionUtils {
         continue;
       }
       SegmentPartitionInfo segmentPartitionInfo = new SegmentPartitionInfo(partitionColumn,
-          PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata.getFunctionName(),
-              columnPartitionMetadata.getNumPartitions(), columnPartitionMetadata.getFunctionConfig()),
+          PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata),
           columnPartitionMetadata.getPartitions());
       columnSegmentPartitionInfoMap.put(partitionColumn, segmentPartitionInfo);
     }
     if (columnSegmentPartitionInfoMap.size() == 1) {
       String partitionColumn = columnSegmentPartitionInfoMap.keySet().iterator().next();
-      return Collections.singletonMap(partitionColumn, columnSegmentPartitionInfoMap.get(partitionColumn));
+      return Map.of(partitionColumn, columnSegmentPartitionInfoMap.get(partitionColumn));
     }
     return columnSegmentPartitionInfoMap.isEmpty() ? INVALID_COLUMN_PARTITION_INFO_MAP : columnSegmentPartitionInfoMap;
   }

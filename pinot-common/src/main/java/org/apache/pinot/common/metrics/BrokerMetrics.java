@@ -19,45 +19,46 @@
 package org.apache.pinot.common.metrics;
 
 import java.util.Collection;
-import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS;
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX;
 
 
-/**
- * Broker metrics utility class, which provides facilities to log the execution performance of queries.
- *
- */
+/// Broker metrics utility class, which provides facilities to log the execution performance of queries.
 public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter, BrokerGauge, BrokerTimer> {
-
   private static final BrokerMetrics NOOP = new BrokerMetrics(new NoopPinotMetricsRegistry());
   private static final AtomicReference<BrokerMetrics> BROKER_METRICS_INSTANCE = new AtomicReference<>(NOOP);
+  private static final String PREFERRED_POOL_SET_TAG = "preferredPoolOptSet";
+  private static final String PREFERRED_POOL_UNSET_TAG = "preferredPoolOptUnset";
 
-  /**
-   * register the brokerMetrics onto this class, so that we don't need to pass it down as a parameter
-   */
+  /// register the brokerMetrics onto this class, so that we don't need to pass it down as a parameter
   public static boolean register(BrokerMetrics brokerMetrics) {
     return BROKER_METRICS_INSTANCE.compareAndSet(NOOP, brokerMetrics);
   }
 
-  /**
-   * should always call after registration
-   */
+  /// should always call after registration
   public static BrokerMetrics get() {
     return BROKER_METRICS_INSTANCE.get();
   }
 
-  /**
-   * Constructs the broker metrics.
-   *
-   * @param metricsRegistry The metric registry used to register timers and meters.
-   */
+  /// A shared no-op instance backed by a [org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry]: every
+  /// record is discarded. For paths that must supply a [BrokerMetrics] but must not pollute the real
+  /// counters -- e.g. startup warmup priming the reduce path with synthetic queries.
+  public static BrokerMetrics noop() {
+    return NOOP;
+  }
+
+  /// Constructs the broker metrics.
+  ///
+  /// @param metricsRegistry The metric registry used to register timers and meters.
   public BrokerMetrics(PinotMetricsRegistry metricsRegistry) {
-    this(metricsRegistry, DEFAULT_ENABLE_TABLE_LEVEL_METRICS, Collections.emptySet());
+    this(metricsRegistry, DEFAULT_ENABLE_TABLE_LEVEL_METRICS, Set.of());
   }
 
   public BrokerMetrics(PinotMetricsRegistry metricsRegistry, boolean isTableLevelMetricsEnabled,
@@ -83,5 +84,13 @@ public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter
   @Override
   protected BrokerGauge[] getGauges() {
     return BrokerGauge.values();
+  }
+
+  public static String getTagForPreferredPool(Map<String, String> queryOption) {
+    if (queryOption == null) {
+      return PREFERRED_POOL_UNSET_TAG;
+    }
+    return queryOption.containsKey(CommonConstants.Broker.Request.QueryOptionKey.ORDERED_PREFERRED_POOLS)
+        ? PREFERRED_POOL_SET_TAG : PREFERRED_POOL_UNSET_TAG;
   }
 }

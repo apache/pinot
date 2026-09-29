@@ -26,9 +26,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 
 
-/**
- * Loads all series builder providers for all configured time-series query languages.
- */
+/// Loads all series builder providers for all configured time-series query languages.
 public class TimeSeriesBuilderFactoryProvider {
   private static final Map<String, TimeSeriesBuilderFactory> FACTORY_MAP = new HashMap<>();
 
@@ -51,7 +49,7 @@ public class TimeSeriesBuilderFactoryProvider {
         TimeSeriesBuilderFactory seriesBuilderFactory = (TimeSeriesBuilderFactory) untypedSeriesBuilderFactory;
         seriesBuilderFactory.init(pinotConfiguration.subset(
             PinotTimeSeriesConfiguration.CONFIG_PREFIX + "." + language));
-        FACTORY_MAP.put(language, seriesBuilderFactory);
+        FACTORY_MAP.putIfAbsent(language, seriesBuilderFactory);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

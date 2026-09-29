@@ -37,13 +37,12 @@ public class ControllerFilePathProvider {
   private static final String FILE_UPLOAD_TEMP_DIR = "fileUploadTemp";
   private static final String UNTARRED_FILE_TEMP_DIR = "untarredFileTemp";
   private static final String FILE_DOWNLOAD_TEMP_DIR = "fileDownloadTemp";
+  private static final String MULTIPART_TEMP_DIR = "multipartTemp";
 
   private static ControllerFilePathProvider _instance;
 
-  /**
-   * NOTE: this should be called only once when starting the controller. We don't check whether _instance is null
-   * because we might start multiple controllers in the same JVM for testing.
-   */
+  /// NOTE: this should be called only once when starting the controller. We don't check whether \_instance is null
+  /// because we might start multiple controllers in the same JVM for testing.
   public static void init(ControllerConf controllerConf)
       throws InvalidControllerConfigException {
     _instance = new ControllerFilePathProvider(controllerConf);
@@ -58,21 +57,29 @@ public class ControllerFilePathProvider {
   private final File _fileUploadTempDir;
   private final File _untarredFileTempDir;
   private final File _fileDownloadTempDir;
+  private final File _multiPartTempDir;
   private final String _vip;
 
   private ControllerFilePathProvider(ControllerConf controllerConf)
       throws InvalidControllerConfigException {
     String dataDir = controllerConf.getDataDir();
+    _dataDirURI = URIUtils.getUri(dataDir);
+    LOGGER.info("Initializing data directory: {}", _dataDirURI);
     try {
-      _dataDirURI = URIUtils.getUri(dataDir);
-      LOGGER.info("Data directory: {}", _dataDirURI);
-
-      PinotFS pinotFS = PinotFSFactory.create(_dataDirURI.getScheme());
-      if (pinotFS.exists(_dataDirURI)) {
-        Preconditions
-            .checkState(pinotFS.isDirectory(_dataDirURI), "Data directory: %s must be a directory", _dataDirURI);
-      } else {
-        Preconditions.checkState(pinotFS.mkdir(_dataDirURI), "Failed to create data directory: %s", _dataDirURI);
+      try {
+        PinotFS pinotFS = PinotFSFactory.create(_dataDirURI.getScheme());
+        if (pinotFS.exists(_dataDirURI)) {
+          Preconditions.checkState(pinotFS.isDirectory(_dataDirURI), "Data directory: %s must be a directory",
+              _dataDirURI);
+        } else {
+          Preconditions.checkState(pinotFS.mkdir(_dataDirURI), "Failed to create data directory: %s", _dataDirURI);
+        }
+      } catch (Exception e) {
+        if (controllerConf.isContinueWithoutDeepStore()) {
+          LOGGER.error("Failed to access data directory: {}. Controller will continue without deep store.", dataDir, e);
+        } else {
+          throw e;
+        }
       }
 
       String localTempDirPath = controllerConf.getLocalTempDir();
@@ -101,6 +108,11 @@ public class ControllerFilePathProvider {
       _fileDownloadTempDir = new File(localTempDir, FILE_DOWNLOAD_TEMP_DIR);
       LOGGER.info("File download temporary directory: {}", _fileDownloadTempDir);
       initDir(_fileDownloadTempDir);
+
+      // Backing store for the multipart parts that Jersey buffers to disk.
+      _multiPartTempDir = new File(localTempDir, MULTIPART_TEMP_DIR);
+      LOGGER.info("Multipart temporary directory: {}", _multiPartTempDir);
+      initDir(_multiPartTempDir);
 
       _vip = controllerConf.generateVipUrl();
     } catch (Exception e) {
@@ -138,5 +150,10 @@ public class ControllerFilePathProvider {
   public File getFileDownloadTempDir() {
     org.apache.pinot.common.utils.FileUtils.ensureDirectoryExists(_fileDownloadTempDir.toPath());
     return _fileDownloadTempDir;
+  }
+
+  public File getMultiPartTempDir() {
+    org.apache.pinot.common.utils.FileUtils.ensureDirectoryExists(_multiPartTempDir.toPath());
+    return _multiPartTempDir;
   }
 }

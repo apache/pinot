@@ -21,22 +21,21 @@ package org.apache.pinot.core.data.table;
 import java.util.Arrays;
 
 
-/**
- * Defines the key component of the record.
- * <p>Key can be used as the key in a map, and may only contain single-value columns.
- * <p>For each data type, the value should be stored as:
- * <ul>
- *   <li>INT: Integer</li>
- *   <li>LONG: Long</li>
- *   <li>FLOAT: Float</li>
- *   <li>DOUBLE: Double</li>
- *   <li>STRING: String</li>
- *   <li>BYTES: ByteArray</li>
- * </ul>
- *
- * TODO: Consider replacing Key with Record as the concept is very close and the implementation is the same
- */
-public class Key {
+/// Defines the key component of the record.
+///
+/// Key can be used as the key in a map, and may only contain single-value columns.
+///
+/// For each data type, the value should be stored as:
+///
+/// - INT: Integer
+/// - LONG: Long
+/// - FLOAT: Float
+/// - DOUBLE: Double
+/// - STRING: String
+/// - BYTES: ByteArray
+///
+/// TODO: Consider replacing Key with Record as the concept is very close and the implementation is the same
+public class Key implements Comparable<Key> {
   private final Object[] _values;
 
   public Key(Object[] values) {
@@ -62,5 +61,25 @@ public class Key {
   @Override
   public String toString() {
     return Arrays.toString(_values);
+  }
+
+  @Override
+  public int compareTo(Key other) {
+    for (int i = 0; i < _values.length; i++) {
+      Object a = _values[i];
+      Object b = other._values[i];
+      if (a == null && b == null) {
+        continue;
+      } else if (a == null) {
+        return 1;   // null > non-null
+      } else if (b == null) {
+        return -1;  // non-null < null
+      }
+      int cmp = ((Comparable<Object>) a).compareTo(b);
+      if (cmp != 0) {
+        return cmp;
+      }
+    }
+    return 0;
   }
 }

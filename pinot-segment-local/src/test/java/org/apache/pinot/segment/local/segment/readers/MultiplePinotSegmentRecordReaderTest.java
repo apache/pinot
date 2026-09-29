@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.readers;
 
-import com.google.common.io.Files;
 import java.io.File;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
@@ -36,9 +36,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests the MultiplePinotSegmentRecordReader to check that the records being merged correctly
- */
+/// Tests the MultiplePinotSegmentRecordReader to check that the records being merged correctly
 public class MultiplePinotSegmentRecordReaderTest {
   private static final int NUM_ROWS = 10000;
   private static final int NUM_SEGMENTS = 5;
@@ -60,7 +58,7 @@ public class MultiplePinotSegmentRecordReaderTest {
       throws Exception {
     Schema schema = createPinotSchema();
     TableConfig tableConfig = createTableConfig();
-    _segmentOutputDir = Files.createTempDir().toString();
+    _segmentOutputDir = Files.createTempDirectory("pinot-test-").toFile().toString();
     _rowsList = new ArrayList<>(NUM_SEGMENTS);
     _segmentIndexDirList = new ArrayList<>(NUM_SEGMENTS);
 

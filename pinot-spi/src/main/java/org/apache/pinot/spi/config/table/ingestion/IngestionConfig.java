@@ -22,12 +22,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * Class representing table ingestion configuration i.e. all configs related to the data source and the ingestion
- * properties and operations
- */
+/// Class representing table ingestion configuration i.e. all configs related to the data source and the ingestion
+/// properties and operations
 public class IngestionConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Config related to the batch data sources")
@@ -35,6 +34,9 @@ public class IngestionConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Config related to the stream data sources")
   private StreamIngestionConfig _streamIngestionConfig;
+
+  @JsonPropertyDescription("Configs to fix the data types of the source fields before applying other transforms")
+  private List<SourceFieldConfig> _sourceFieldConfigs;
 
   @JsonPropertyDescription("Config related to filtering records during ingestion")
   private FilterConfig _filterConfig;
@@ -51,14 +53,18 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Config related to the SchemaConformingTransformer")
   private SchemaConformingTransformerConfig _schemaConformingTransformerConfig;
 
-  @JsonPropertyDescription("Config related to the SchemaConformingTransformerV2")
-  private SchemaConformingTransformerV2Config _schemaConformingTransformerV2Config;
-
   @JsonPropertyDescription("Configs related to record aggregation function applied during ingestion")
   private List<AggregationConfig> _aggregationConfigs;
 
   @JsonPropertyDescription("Configs related to skip any row which has error and continue during ingestion")
   private boolean _continueOnError;
+
+  @JsonPropertyDescription("Max consecutive failures allowed while fetching record from source.")
+  private int _maxConsecutiveRecordFetchFailuresAllowed;
+
+  @JsonPropertyDescription(
+      "Configs related to retry segment build on reduced size when previous build fails on Preconditions check")
+  private boolean _retryOnSegmentBuildPrecheckFailure;
 
   @JsonPropertyDescription("Configs related to validate time value for each record during ingestion")
   private boolean _rowTimeValueCheck;
@@ -66,27 +72,9 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configs related to check time value for segment")
   private boolean _segmentTimeValueCheck = true;
 
-  @Deprecated
-  public IngestionConfig(@Nullable BatchIngestionConfig batchIngestionConfig,
-      @Nullable StreamIngestionConfig streamIngestionConfig, @Nullable FilterConfig filterConfig,
-      @Nullable List<EnrichmentConfig> enrichmentConfigs,
-      @Nullable List<TransformConfig> transformConfigs, @Nullable ComplexTypeConfig complexTypeConfig,
-      @Nullable SchemaConformingTransformerConfig schemaConformingTransformerConfig,
-      @Nullable SchemaConformingTransformerV2Config schemaConformingTransformerV2Config,
-      @Nullable List<AggregationConfig> aggregationConfigs) {
-    _batchIngestionConfig = batchIngestionConfig;
-    _streamIngestionConfig = streamIngestionConfig;
-    _filterConfig = filterConfig;
-    _enrichmentConfigs = enrichmentConfigs;
-    _transformConfigs = transformConfigs;
-    _complexTypeConfig = complexTypeConfig;
-    _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
-    _schemaConformingTransformerV2Config = schemaConformingTransformerV2Config;
-    _aggregationConfigs = aggregationConfigs;
-  }
-
-  public IngestionConfig() {
-  }
+  @JsonPropertyDescription("Max exception logs per minute per exception class (0 to disable)")
+  private int _ingestionExceptionLogRateLimitPerMin =
+      CommonConstants.IngestionConfigs.DEFAULT_INGESTION_EXCEPTION_LOG_RATE_LIMIT_PER_MIN;
 
   @Nullable
   public BatchIngestionConfig getBatchIngestionConfig() {
@@ -96,6 +84,11 @@ public class IngestionConfig extends BaseJsonConfig {
   @Nullable
   public StreamIngestionConfig getStreamIngestionConfig() {
     return _streamIngestionConfig;
+  }
+
+  @Nullable
+  public List<SourceFieldConfig> getSourceFieldConfigs() {
+    return _sourceFieldConfigs;
   }
 
   @Nullable
@@ -124,17 +117,16 @@ public class IngestionConfig extends BaseJsonConfig {
   }
 
   @Nullable
-  public SchemaConformingTransformerV2Config getSchemaConformingTransformerV2Config() {
-    return _schemaConformingTransformerV2Config;
-  }
-
-  @Nullable
   public List<AggregationConfig> getAggregationConfigs() {
     return _aggregationConfigs;
   }
 
   public boolean isContinueOnError() {
     return _continueOnError;
+  }
+
+  public boolean isRetryOnSegmentBuildPrecheckFailure() {
+    return _retryOnSegmentBuildPrecheckFailure;
   }
 
   public boolean isRowTimeValueCheck() {
@@ -145,12 +137,24 @@ public class IngestionConfig extends BaseJsonConfig {
     return _segmentTimeValueCheck;
   }
 
+  public int getIngestionExceptionLogRateLimitPerMin() {
+    return _ingestionExceptionLogRateLimitPerMin;
+  }
+
+  public int getMaxConsecutiveRecordFetchFailuresAllowed() {
+    return _maxConsecutiveRecordFetchFailuresAllowed;
+  }
+
   public void setBatchIngestionConfig(BatchIngestionConfig batchIngestionConfig) {
     _batchIngestionConfig = batchIngestionConfig;
   }
 
   public void setStreamIngestionConfig(StreamIngestionConfig streamIngestionConfig) {
     _streamIngestionConfig = streamIngestionConfig;
+  }
+
+  public void setSourceFieldConfigs(List<SourceFieldConfig> sourceFieldConfigs) {
+    _sourceFieldConfigs = sourceFieldConfigs;
   }
 
   public void setFilterConfig(FilterConfig filterConfig) {
@@ -174,9 +178,11 @@ public class IngestionConfig extends BaseJsonConfig {
     _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
   }
 
+  /// For backward compatibility.
+  @SuppressWarnings("unused")
   public void setSchemaConformingTransformerV2Config(
-      SchemaConformingTransformerV2Config schemaConformingTransformerV2Config) {
-    _schemaConformingTransformerV2Config = schemaConformingTransformerV2Config;
+      SchemaConformingTransformerConfig schemaConformingTransformerConfig) {
+    _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
   }
 
   public void setAggregationConfigs(List<AggregationConfig> aggregationConfigs) {
@@ -187,11 +193,23 @@ public class IngestionConfig extends BaseJsonConfig {
     _continueOnError = continueOnError;
   }
 
+  public void setRetryOnSegmentBuildPrecheckFailure(boolean retryOnSegmentBuildPrecheckFailure) {
+    _retryOnSegmentBuildPrecheckFailure = retryOnSegmentBuildPrecheckFailure;
+  }
+
   public void setRowTimeValueCheck(boolean rowTimeValueCheck) {
     _rowTimeValueCheck = rowTimeValueCheck;
   }
 
   public void setSegmentTimeValueCheck(boolean segmentTimeValueCheck) {
     _segmentTimeValueCheck = segmentTimeValueCheck;
+  }
+
+  public void setIngestionExceptionLogRateLimitPerMin(int ingestionExceptionLogRateLimitPerMin) {
+    _ingestionExceptionLogRateLimitPerMin = ingestionExceptionLogRateLimitPerMin;
+  }
+
+  public void setMaxConsecutiveRecordFetchFailuresAllowed(int maxConsecutiveRecordFetchFailuresAllowed) {
+    _maxConsecutiveRecordFetchFailuresAllowed = maxConsecutiveRecordFetchFailuresAllowed;
   }
 }

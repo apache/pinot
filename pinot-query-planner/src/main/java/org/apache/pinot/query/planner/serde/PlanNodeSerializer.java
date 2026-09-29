@@ -31,6 +31,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -44,6 +45,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
@@ -92,14 +94,18 @@ public class PlanNodeSerializer {
 
     @Override
     public Void visitAggregate(AggregateNode node, Plan.PlanNode.Builder builder) {
-      Plan.AggregateNode aggregateNode = Plan.AggregateNode.newBuilder()
+      Plan.AggregateNode.Builder aggregateNodeBuilder = Plan.AggregateNode.newBuilder()
           .addAllAggCalls(convertFunctionCalls(node.getAggCalls()))
           .addAllFilterArgs(node.getFilterArgs())
           .addAllGroupKeys(node.getGroupKeys())
           .setAggType(convertAggType(node.getAggType()))
           .setLeafReturnFinalResult(node.isLeafReturnFinalResult())
-          .build();
-      builder.setAggregateNode(aggregateNode);
+          .addAllCollations(convertCollations(node.getCollations()))
+          .setLimit(node.getLimit());
+      for (List<Integer> groupingSet : node.getGroupingSets()) {
+        aggregateNodeBuilder.addGroupingSets(Plan.GroupingSet.newBuilder().addAllGroupKeyIndexes(groupingSet).build());
+      }
+      builder.setAggregateNode(aggregateNodeBuilder.build());
       return null;
     }
 
@@ -114,14 +120,56 @@ public class PlanNodeSerializer {
 
     @Override
     public Void visitJoin(JoinNode node, Plan.PlanNode.Builder builder) {
-      Plan.JoinNode joinNode = Plan.JoinNode.newBuilder()
+      Plan.JoinNode.Builder joinNode = Plan.JoinNode.newBuilder()
+          .setJoinType(convertJoinType(node.getJoinType()))
+          .addAllLeftKeys(node.getLeftKeys())
+          .addAllRightKeys(node.getRightKeys())
+          .addAllNonEquiConditions(convertExpressions(node.getNonEquiConditions()))
+          .setJoinStrategy(convertJoinStrategy(node.getJoinStrategy()));
+
+      if (node.getMatchCondition() != null) {
+        joinNode.setMatchCondition(RexExpressionToProtoExpression.convertExpression(node.getMatchCondition()));
+      }
+      builder.setJoinNode(joinNode.build());
+      return null;
+    }
+
+    @Deprecated(forRemoval = true, since = "1.6.0")
+    @Override
+    public Void visitEnrichedJoin(EnrichedJoinNode node, Plan.PlanNode.Builder builder) {
+      Plan.EnrichedJoinNode.Builder enrichedJoinNode = Plan.EnrichedJoinNode.newBuilder()
           .setJoinType(convertJoinType(node.getJoinType()))
           .addAllLeftKeys(node.getLeftKeys())
           .addAllRightKeys(node.getRightKeys())
           .addAllNonEquiConditions(convertExpressions(node.getNonEquiConditions()))
           .setJoinStrategy(convertJoinStrategy(node.getJoinStrategy()))
-          .build();
-      builder.setJoinNode(joinNode);
+          .setJoinResultDataSchema(convertDataSchema(node.getJoinResultSchema()));
+
+      for (EnrichedJoinNode.FilterProjectRex rex : node.getFilterProjectRexes()) {
+        Plan.FilterProjectRex.Builder rexBuilder = Plan.FilterProjectRex.newBuilder();
+        if (rex.getType() == EnrichedJoinNode.FilterProjectRexType.FILTER) {
+          rexBuilder
+              .setFilter(RexExpressionToProtoExpression.convertExpression(rex.getFilter()))
+              .setType(Plan.FilterProjectRexType.FILTER);
+        } else {
+          rexBuilder
+              .setProjectAndResultSchema(
+                  Plan.ProjectAndResultSchema.newBuilder()
+                      .addAllProject(convertExpressions(rex.getProjectAndResultSchema().getProject()))
+                      .setSchema(convertDataSchema(rex.getProjectAndResultSchema().getSchema()))
+                      .build())
+              .setType(Plan.FilterProjectRexType.PROJECT);
+        }
+        enrichedJoinNode.addFilterProjectRex(rexBuilder.build());
+      }
+
+      enrichedJoinNode.setFetch(node.getFetch());
+      enrichedJoinNode.setOffset(node.getOffset());
+
+      if (node.getMatchCondition() != null) {
+        enrichedJoinNode.setMatchCondition(RexExpressionToProtoExpression.convertExpression(node.getMatchCondition()));
+      }
+      builder.setEnrichedJoinNode(enrichedJoinNode.build());
       return null;
     }
 
@@ -142,12 +190,21 @@ public class PlanNodeSerializer {
 
     @Override
     public Void visitMailboxSend(MailboxSendNode node, Plan.PlanNode.Builder builder) {
-      Plan.MailboxSendNode mailboxSendNode = Plan.MailboxSendNode.newBuilder()
-          .setReceiverStageId(node.getReceiverStageId())
+      List<Integer> receiverStageIds = new ArrayList<>();
+      for (Integer receiverStageId : node.getReceiverStageIds()) {
+        receiverStageIds.add(receiverStageId);
+      }
+      assert !receiverStageIds.isEmpty() : "Receiver stage IDs should not be empty";
+
+      Plan.MailboxSendNode mailboxSendNode =
+          Plan.MailboxSendNode.newBuilder()
+              .setReceiverStageId(receiverStageIds.get(0)) // to keep backward compatibility
+              .addAllReceiverStageIds(receiverStageIds)
           .setExchangeType(convertExchangeType(node.getExchangeType()))
           .setDistributionType(convertDistributionType(node.getDistributionType()))
           .addAllKeys(node.getKeys())
           .setPrePartitioned(node.isPrePartitioned())
+          .setHashFunction(node.getHashFunction())
           .addAllCollations(convertCollations(node.getCollations()))
           .setSort(node.isSort())
           .build();
@@ -207,6 +264,7 @@ public class PlanNodeSerializer {
           .setWindowFrameType(convertWindowFrameType(node.getWindowFrameType()))
           .setLowerBound(node.getLowerBound())
           .setUpperBound(node.getUpperBound())
+          .setExclude(convertWindowExclusion(node.getExclude()))
           .addAllConstants(convertLiterals(node.getConstants()))
           .build();
       builder.setWindowNode(windowNode);
@@ -223,6 +281,20 @@ public class PlanNodeSerializer {
       Plan.ExplainNode explainNode =
           Plan.ExplainNode.newBuilder().setTitle(node.getTitle()).putAllAttributes(node.getAttributes()).build();
       builder.setExplainNode(explainNode);
+      return null;
+    }
+
+    @Override
+    public Void visitUnnest(UnnestNode node, Plan.PlanNode.Builder builder) {
+      UnnestNode.TableFunctionContext context = node.getTableFunctionContext();
+      Plan.UnnestNode.Builder unnestNodeBuilder = Plan.UnnestNode.newBuilder()
+          .addAllArrayExprs(convertExpressions(node.getArrayExprs()))
+          .setWithOrdinality(context.isWithOrdinality())
+          .addAllElementIndexes(context.getElementIndexes())
+          .setOrdinalityIndex(context.getOrdinalityIndex())
+          .addAllPassthroughInputIndexes(context.getPassthroughInputIndexes())
+          .setPrunedPassthrough(context.isPrunedPassthrough());
+      builder.setUnnestNode(unnestNodeBuilder.build());
       return null;
     }
 
@@ -279,6 +351,10 @@ public class PlanNodeSerializer {
           return Plan.JoinType.SEMI;
         case ANTI:
           return Plan.JoinType.ANTI;
+        case ASOF:
+          return Plan.JoinType.ASOF;
+        case LEFT_ASOF:
+          return Plan.JoinType.LEFT_ASOF;
         default:
           throw new IllegalStateException("Unsupported JoinRelType: " + joinType);
       }
@@ -290,6 +366,8 @@ public class PlanNodeSerializer {
           return Plan.JoinStrategy.HASH;
         case LOOKUP:
           return Plan.JoinStrategy.LOOKUP;
+        case ASOF:
+          return Plan.JoinStrategy.AS_OF;
         default:
           throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
       }
@@ -403,6 +481,21 @@ public class PlanNodeSerializer {
           return Plan.WindowFrameType.RANGE;
         default:
           throw new IllegalStateException("Unsupported WindowFrameType: " + windowFrameType);
+      }
+    }
+
+    private static Plan.WindowExclusion convertWindowExclusion(WindowNode.WindowExclusion exclude) {
+      switch (exclude) {
+        case NO_OTHERS:
+          return Plan.WindowExclusion.EXCLUDE_NO_OTHERS;
+        case CURRENT_ROW:
+          return Plan.WindowExclusion.EXCLUDE_CURRENT_ROW;
+        case GROUP:
+          return Plan.WindowExclusion.EXCLUDE_GROUP;
+        case TIES:
+          return Plan.WindowExclusion.EXCLUDE_TIES;
+        default:
+          throw new IllegalStateException("Unsupported WindowExclusion: " + exclude);
       }
     }
   }

@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.readerwriter;
 import java.io.IOException;
 import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.io.readerwriter.impl.FixedByteSingleValueMultiColumnReaderWriter;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
@@ -30,10 +31,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit test for {@link FixedByteSingleValueMultiColumnReaderWriter}
- */
-public class FixedByteSingleValueMultiColumnReaderWriterTest {
+/// Unit test for [FixedByteSingleValueMultiColumnReaderWriter]
+public class FixedByteSingleValueMultiColumnReaderWriterTest implements PinotBuffersAfterClassCheckRule {
   private static final int NUM_ROWS = 1001;
   private static final int NUM_ROWS_PER_CHUNK = 23;
 
@@ -94,7 +93,7 @@ public class FixedByteSingleValueMultiColumnReaderWriterTest {
       _readerWriter.setDouble(row, 3, doubleValue);
       Assert.assertEquals(_readerWriter.getDouble(row, 3), doubleValue);
 
-      String stringValue = RandomStringUtils.randomAlphabetic(STRING_LENGTH);
+      String stringValue = RandomStringUtils.secure().nextAlphabetic(STRING_LENGTH);
       _readerWriter.setString(row, 4, stringValue);
       Assert.assertEquals(_readerWriter.getString(row, 4), stringValue);
     }
@@ -121,7 +120,7 @@ public class FixedByteSingleValueMultiColumnReaderWriterTest {
       doubleValues[i] = _random.nextDouble();
       _readerWriter.setDouble(row, 3, doubleValues[i]);
 
-      stringValues[i] = RandomStringUtils.randomAlphanumeric(STRING_LENGTH);
+      stringValues[i] = RandomStringUtils.secure().nextAlphanumeric(STRING_LENGTH);
       _readerWriter.setString(row, 4, stringValues[i]);
     }
 

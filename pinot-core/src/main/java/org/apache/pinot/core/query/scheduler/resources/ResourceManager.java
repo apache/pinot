@@ -21,9 +21,13 @@ package org.apache.pinot.core.query.scheduler.resources;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import org.apache.pinot.core.executor.ThrottleOnCriticalHeapUsageExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
@@ -33,13 +37,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Abstract class to manage all the server resources for query execution.
- * Currently this manages the threadpool for query execution.
- *
- * This class supports soft and hard limits on the number of threads. A
- * scheduler group will not get more than the hard_limit number of threads.
- */
+/// Abstract class to manage all the server resources for query execution.
+/// Currently this manages the threadpool for query execution.
+///
+/// This class supports soft and hard limits on the number of threads. A
+/// scheduler group will not get more than the hard_limit number of threads.
 // TODO: This class supports hard and soft thread limits. Potentially, we can make
 // these limits dynamic - SchedulerGroups with low latency can have higher hard limit
 // than the groups with high latency. That requires more experimentation and tuning
@@ -51,13 +53,17 @@ public abstract class ResourceManager {
   public static final int DEFAULT_QUERY_RUNNER_THREADS;
   public static final int DEFAULT_QUERY_WORKER_THREADS;
 
-
-
   static {
     int numCores = Runtime.getRuntime().availableProcessors();
     // arbitrary...but not completely arbitrary
     DEFAULT_QUERY_RUNNER_THREADS = numCores;
     DEFAULT_QUERY_WORKER_THREADS = 2 * numCores;
+  }
+
+  /// Listener notified after thread pools have been resized.
+  @FunctionalInterface
+  public interface ThreadPoolResizeListener {
+    void onThreadPoolsResized(int newRunnerThreads, int newWorkerThreads);
   }
 
   // set the main query runner priority higher than NORM but lower than MAX
@@ -68,15 +74,19 @@ public abstract class ResourceManager {
   // including planning, distributing operators across threads, waiting and
   // reducing the results from the parallel set of operators (CombineOperator)
   //
+  protected final PinotConfiguration _config;
   protected final ListeningExecutorService _queryRunners;
   protected final ListeningExecutorService _queryWorkers;
-  protected final int _numQueryRunnerThreads;
-  protected final int _numQueryWorkerThreads;
+  protected final ThreadPoolExecutor _queryRunnerPool;
+  protected final ThreadPoolExecutor _queryWorkerPool;
+  protected volatile int _numQueryRunnerThreads;
+  protected volatile int _numQueryWorkerThreads;
 
-  /**
-   * @param config configuration for initializing resource manager
-   */
+  private final List<ThreadPoolResizeListener> _resizeListeners = new CopyOnWriteArrayList<>();
+
+  /// @param config configuration for initializing resource manager
   public ResourceManager(PinotConfiguration config) {
+    _config = config;
     _numQueryRunnerThreads = config.getProperty(QUERY_RUNNER_CONFIG_KEY, DEFAULT_QUERY_RUNNER_THREADS);
     _numQueryWorkerThreads = config.getProperty(QUERY_WORKER_CONFIG_KEY, DEFAULT_QUERY_WORKER_THREADS);
 
@@ -85,14 +95,87 @@ public abstract class ResourceManager {
     // pqr -> pinot query runner (to give short names)
     ThreadFactory queryRunnerFactory = new TracedThreadFactory(QUERY_RUNNER_THREAD_PRIORITY, false,
         CommonConstants.ExecutorService.PINOT_QUERY_RUNNER_NAME_FORMAT);
-    _queryRunners =
-        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(_numQueryRunnerThreads, queryRunnerFactory));
+
+    _queryRunnerPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(_numQueryRunnerThreads, queryRunnerFactory);
+    ExecutorService runnerService = ThrottleOnCriticalHeapUsageExecutor.maybeWrap(
+        _queryRunnerPool, config, "query runner");
+    _queryRunners = MoreExecutors.listeningDecorator(runnerService);
 
     // pqw -> pinot query workers
     ThreadFactory queryWorkersFactory = new TracedThreadFactory(Thread.NORM_PRIORITY, false,
         CommonConstants.ExecutorService.PINOT_QUERY_WORKER_NAME_FORMAT);
-    _queryWorkers =
-        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(_numQueryWorkerThreads, queryWorkersFactory));
+    _queryWorkerPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(_numQueryWorkerThreads, queryWorkersFactory);
+    ExecutorService workerService = ThrottleOnCriticalHeapUsageExecutor.maybeWrap(
+        _queryWorkerPool, config, "query worker");
+    _queryWorkers = MoreExecutors.listeningDecorator(workerService);
+  }
+
+  /// Dynamically resizes the query runner and worker thread pools. Resizing is performed on the underlying
+  /// [ThreadPoolExecutor] instances, which is transparent to any decorator wrappers.
+  ///
+  /// @param newRunnerThreads desired number of query runner threads (must be &gt; 0)
+  /// @param newWorkerThreads desired number of query worker threads (must be &gt; 0)
+  public synchronized void resizeThreadPools(int newRunnerThreads, int newWorkerThreads) {
+    if (newRunnerThreads <= 0 || newWorkerThreads <= 0) {
+      LOGGER.warn("Invalid thread pool sizes: runnerThreads={}, workerThreads={}. Sizes must be > 0. Skipping resize.",
+          newRunnerThreads, newWorkerThreads);
+      return;
+    }
+
+    int oldRunnerThreads = _numQueryRunnerThreads;
+    int oldWorkerThreads = _numQueryWorkerThreads;
+
+    if (oldRunnerThreads == newRunnerThreads && oldWorkerThreads == newWorkerThreads) {
+      LOGGER.debug("Thread pool sizes unchanged (runner={}, worker={}). Skipping resize.",
+          newRunnerThreads, newWorkerThreads);
+      return;
+    }
+
+    resizePool(_queryRunnerPool, oldRunnerThreads, newRunnerThreads, "queryRunner");
+    _numQueryRunnerThreads = newRunnerThreads;
+
+    resizePool(_queryWorkerPool, oldWorkerThreads, newWorkerThreads, "queryWorker");
+    _numQueryWorkerThreads = newWorkerThreads;
+
+    LOGGER.info("Resized thread pools: runner {} -> {}, worker {} -> {}",
+        oldRunnerThreads, newRunnerThreads, oldWorkerThreads, newWorkerThreads);
+
+    onThreadPoolsResized(newRunnerThreads, newWorkerThreads);
+    for (ThreadPoolResizeListener listener : _resizeListeners) {
+      listener.onThreadPoolsResized(newRunnerThreads, newWorkerThreads);
+    }
+  }
+
+  /// Registers a listener to be notified after thread pools are resized.
+  public void addThreadPoolResizeListener(ThreadPoolResizeListener listener) {
+    _resizeListeners.add(listener);
+  }
+
+  /// Hook for subclasses to update dependent state (e.g. resource limit policies) after thread pools are resized.
+  /// Called before external listeners are notified.
+  protected void onThreadPoolsResized(int newRunnerThreads, int newWorkerThreads) {
+  }
+
+  private synchronized void resizePool(ThreadPoolExecutor pool, int oldSize, int newSize, String poolName) {
+    if (oldSize == newSize) {
+      return;
+    }
+    // Scale up:
+    // Increase maximumPoolSize first, then corePoolSize.
+    // If corePoolSize is increased first, it may temporarily exceed maximumPoolSize,
+    // which would cause an IllegalArgumentException.
+    if (newSize > oldSize) {
+      pool.setMaximumPoolSize(newSize);
+      pool.setCorePoolSize(newSize);
+    } else {
+      // Scale down:
+      // Decrease corePoolSize first, then maximumPoolSize.
+      // If maximumPoolSize is decreased first, it may become smaller than corePoolSize,
+      // which would also cause an IllegalArgumentException.
+      pool.setCorePoolSize(newSize);
+      pool.setMaximumPoolSize(newSize);
+    }
+    LOGGER.info("Resized {} pool: {} -> {}", poolName, oldSize, newSize);
   }
 
   public void stop() {
@@ -100,28 +183,22 @@ public abstract class ResourceManager {
     _queryRunners.shutdownNow();
   }
 
-  /**
-   * Total number of query runner threads. Query runner threads are 'main'
-   * threads executing the query.
-   * @return
-   */
+  /// Total number of query runner threads. Query runner threads are 'main'
+  /// threads executing the query.
+  /// @return
   final public int getNumQueryRunnerThreads() {
     return _numQueryRunnerThreads;
   }
 
-  /**
-   * Total number of query worker threads. Query worker threads are a pool of threads
-   * for parallel processing of a query.
-   * @return
-   */
+  /// Total number of query worker threads. Query worker threads are a pool of threads
+  /// for parallel processing of a query.
+  /// @return
   final public int getNumQueryWorkerThreads() {
     return _numQueryWorkerThreads;
   }
 
-  /**
-   * Returns executor service for running queries.
-   * @return
-   */
+  /// Returns executor service for running queries.
+  /// @return
   final public ListeningExecutorService getQueryRunners() {
     return _queryRunners;
   }
@@ -131,37 +208,29 @@ public abstract class ResourceManager {
     return _queryWorkers;
   }
 
-  /**
-   * Get the executor service for running the query. The provided executor
-   * service limits the number of resources available for executing query
-   * as per the configured policy
-   * @param query
-   * @param accountant Accountant for a scheduler group
-   * @return
-   */
+  /// Get the executor service for running the query. The provided executor
+  /// service limits the number of resources available for executing query
+  /// as per the configured policy
+  /// @param query
+  /// @param accountant Accountant for a scheduler group
+  /// @return
   public abstract QueryExecutorService getExecutorService(ServerQueryRequest query,
       SchedulerGroupAccountant accountant);
 
-  /**
-   * Hard limit on number of threads for a scheduler group.
-   * A group may not be allotted threads more than this for query execution.
-   * @return number of threads
-   */
+  /// Hard limit on number of threads for a scheduler group.
+  /// A group may not be allotted threads more than this for query execution.
+  /// @return number of threads
   public abstract int getTableThreadsHardLimit();
 
-  /**
-   * Soft limit on the number of threads for a scheduler group.
-   * Queries from a scheduler group will be de-prioritized if the group
-   * is using more than the soft limit.
-   * @return number of threads
-   */
+  /// Soft limit on the number of threads for a scheduler group.
+  /// Queries from a scheduler group will be de-prioritized if the group
+  /// is using more than the soft limit.
+  /// @return number of threads
   public abstract int getTableThreadsSoftLimit();
 
-  /**
-   * Check if the query for a scheduler group can get required resources for scheduling
-   * @param accountant resource accounting information for a group
-   * @return
-   */
+  /// Check if the query for a scheduler group can get required resources for scheduling
+  /// @param accountant resource accounting information for a group
+  /// @return
   public boolean canSchedule(SchedulerGroupAccountant accountant) {
     return accountant.totalReservedThreads() < getTableThreadsHardLimit();
   }

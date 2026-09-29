@@ -51,6 +51,14 @@ public interface InstanceDataManagerConfig {
 
   boolean isDirectRealtimeOffHeapAllocation();
 
+  boolean shouldReloadConsumingSegment();
+
+  int getMaxParallelRefreshThreads();
+
+  boolean isAsyncSegmentRefreshEnabled();
+
+  int getMaxSegmentPreloadThreads();
+
   int getMaxParallelSegmentBuilds();
 
   int getMaxParallelSegmentDownloads();
@@ -73,9 +81,15 @@ public interface InstanceDataManagerConfig {
 
   PinotConfiguration getUpsertConfig();
 
+  PinotConfiguration getDedupConfig();
+
   PinotConfiguration getAuthConfig();
 
   Map<String, Map<String, String>> getTierConfigs();
 
   boolean isUploadSegmentToDeepStore();
+
+  boolean shouldCheckCRCOnSegmentLoad();
+
+  boolean isDimensionTablePreloadDisabled();
 }

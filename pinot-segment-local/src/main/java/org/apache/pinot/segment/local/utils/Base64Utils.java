@@ -20,9 +20,7 @@ package org.apache.pinot.segment.local.utils;
 
 import org.apache.commons.codec.binary.Base64;
 
-/**
- * Simple wrapper class over codec's Base64 implementation to handle Pinot-specific Base64 encoded binary data.
- */
+/// Simple wrapper class over codec's Base64 implementation to handle Pinot-specific Base64 encoded binary data.
 public class Base64Utils extends Base64 {
   public static boolean isBase64IgnoreWhiteSpace(byte[] arrayOctet) {
     return isBase64(arrayOctet);

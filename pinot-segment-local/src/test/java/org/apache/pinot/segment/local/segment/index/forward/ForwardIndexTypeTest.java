@@ -25,20 +25,30 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class ForwardIndexTypeTest {
@@ -92,7 +102,7 @@ public class ForwardIndexTypeTest {
           JsonUtils.stringToObject("[]", _fieldConfigListTypeRef)
       );
 
-      assertEquals(ForwardIndexConfig.DEFAULT);
+      assertEquals(ForwardIndexConfig.getDefault(FieldConfig.EncodingType.DICTIONARY));
     }
 
     @Test
@@ -108,7 +118,7 @@ public class ForwardIndexTypeTest {
                   + " }]", _fieldConfigListTypeRef)
       );
 
-      assertEquals(ForwardIndexConfig.DISABLED);
+      assertEquals(ForwardIndexConfig.getDisabled());
     }
 
     @Test
@@ -120,7 +130,7 @@ public class ForwardIndexTypeTest {
           + " }"
       );
 
-      assertEquals(ForwardIndexConfig.DEFAULT);
+      assertEquals(ForwardIndexConfig.getDefault(FieldConfig.EncodingType.DICTIONARY));
     }
 
     @Test
@@ -139,10 +149,9 @@ public class ForwardIndexTypeTest {
       );
 
       assertEquals(
-          new ForwardIndexConfig.Builder()
+          new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
               .withCompressionType(ChunkCompressionType.SNAPPY)
               .withDeriveNumDocsPerChunk(false)
-              .withRawIndexWriterVersion(2)
               .build()
       );
     }
@@ -160,10 +169,9 @@ public class ForwardIndexTypeTest {
       );
 
       assertEquals(
-          new ForwardIndexConfig.Builder()
+          new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
               .withCompressionType(ChunkCompressionType.SNAPPY)
               .withDeriveNumDocsPerChunk(false)
-              .withRawIndexWriterVersion(2)
               .build()
       );
     }
@@ -177,7 +185,7 @@ public class ForwardIndexTypeTest {
           + "    \"encodingType\": \"DICTIONARY\"\n"
           + " }"
       );
-      assertEquals(ForwardIndexConfig.DEFAULT);
+      assertEquals(ForwardIndexConfig.getDefault(FieldConfig.EncodingType.DICTIONARY));
     }
 
     @Test
@@ -191,7 +199,8 @@ public class ForwardIndexTypeTest {
           + "}"
       );
       assertEquals(
-          new ForwardIndexConfig.Builder().withDictIdCompressionType(DictIdCompressionType.MV_ENTRY_DICT).build());
+          new ForwardIndexConfig.Builder(FieldConfig.EncodingType.DICTIONARY)
+              .withDictIdCompressionType(DictIdCompressionType.MV_ENTRY_DICT).build());
     }
 
     @Test
@@ -204,7 +213,7 @@ public class ForwardIndexTypeTest {
                   + " }"
       );
 
-      assertEquals(ForwardIndexConfig.DEFAULT);
+      assertEquals(ForwardIndexConfig.getDefault(FieldConfig.EncodingType.RAW));
     }
 
     @Test(dataProvider = "allCompressionCodec", dataProviderClass = ForwardIndexTypeTest.class)
@@ -222,12 +231,12 @@ public class ForwardIndexTypeTest {
       );
 
       assertEquals(
-            new ForwardIndexConfig.Builder()
+            new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
                 .withCompressionCodec(compression == null ? null : FieldConfig.CompressionCodec.valueOf(compression))
                 .withCompressionType(expectedChunkCompression)
                 .withDictIdCompressionType(expectedDictCompression)
                 .withDeriveNumDocsPerChunk(false)
-                .withRawIndexWriterVersion(ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION)
+                .withRawIndexWriterVersion(ForwardIndexConfig.getDefaultRawWriterVersion())
                 .build()
       );
     }
@@ -245,10 +254,10 @@ public class ForwardIndexTypeTest {
                   + " }"
       );
 
-      assertEquals(new ForwardIndexConfig.Builder()
+      assertEquals(new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
           .withCompressionType(null)
           .withDeriveNumDocsPerChunk(true)
-          .withRawIndexWriterVersion(ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION)
+          .withRawIndexWriterVersion(ForwardIndexConfig.getDefaultRawWriterVersion())
           .build());
     }
 
@@ -265,7 +274,7 @@ public class ForwardIndexTypeTest {
                   + " }"
       );
 
-      assertEquals(new ForwardIndexConfig.Builder()
+      assertEquals(new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
           .withCompressionType(null)
           .withDeriveNumDocsPerChunk(false)
           .withRawIndexWriterVersion(3)
@@ -284,7 +293,8 @@ public class ForwardIndexTypeTest {
               + "    }\n"
               + "  }"
       );
-      assertEquals(ForwardIndexConfig.DISABLED);
+
+      assertEquals(ForwardIndexConfig.getDisabled());
     }
 
     @Test
@@ -297,7 +307,7 @@ public class ForwardIndexTypeTest {
                   + " }"
       );
 
-      assertEquals(ForwardIndexConfig.DEFAULT);
+      assertEquals(ForwardIndexConfig.getDefault(FieldConfig.EncodingType.DICTIONARY));
     }
 
     @Test
@@ -314,7 +324,8 @@ public class ForwardIndexTypeTest {
           + "}"
       );
       assertEquals(
-          new ForwardIndexConfig.Builder().withDictIdCompressionType(DictIdCompressionType.MV_ENTRY_DICT).build());
+          new ForwardIndexConfig.Builder(FieldConfig.EncodingType.DICTIONARY)
+              .withDictIdCompressionType(DictIdCompressionType.MV_ENTRY_DICT).build());
     }
 
     @Test(dataProvider = "allChunkCompression", dataProviderClass = ForwardIndexTypeTest.class)
@@ -338,7 +349,7 @@ public class ForwardIndexTypeTest {
       );
 
       assertEquals(
-          new ForwardIndexConfig.Builder()
+          new ForwardIndexConfig.Builder(FieldConfig.EncodingType.DICTIONARY)
               .withCompressionType(expectedChunkCompression)
               .withDictIdCompressionType(expectedDictCompression)
               .withDeriveNumDocsPerChunk(true)
@@ -368,7 +379,7 @@ public class ForwardIndexTypeTest {
       );
 
       assertEquals(
-          new ForwardIndexConfig.Builder()
+          new ForwardIndexConfig.Builder(FieldConfig.EncodingType.DICTIONARY)
               .withCompressionCodec(compression == null ? null : FieldConfig.CompressionCodec.valueOf(compression))
               .withCompressionType(expectedChunkCompression)
               .withDictIdCompressionType(expectedDictCompression)
@@ -399,7 +410,7 @@ public class ForwardIndexTypeTest {
       );
 
       assertEquals(
-          new ForwardIndexConfig.Builder()
+          new ForwardIndexConfig.Builder(FieldConfig.EncodingType.DICTIONARY)
               .withCompressionType(expectedChunkCompression)
               .withDictIdCompressionType(expectedDictCompression)
               .withDeriveNumDocsPerChunk(true)
@@ -426,11 +437,97 @@ public class ForwardIndexTypeTest {
           .collect(Collectors.toList()).get(0);
       assertNotNull(fieldConfig.getIndexes().get(ForwardIndexType.INDEX_DISPLAY_NAME));
     }
+
+    @Test
+    public void noDictionaryColumnsOverridesFieldConfigDictEncodingForForwardIndex()
+        throws IOException {
+      // Legacy pattern: column listed in noDictionaryColumns alongside a FieldConfig with the default DICTIONARY
+      // encoding (e.g. for a TEXT index that uses the dictionary internally). The forward index resolves to RAW.
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
+      addFieldIndexConfig("{\"name\": \"dimInt\", \"encodingType\": \"DICTIONARY\"}");
+      assertEquals(ForwardIndexConfig.getDefault(FieldConfig.EncodingType.RAW));
+    }
+
+    @Test
+    public void noDictionaryConfigOverridesFieldConfigDictEncodingForForwardIndex()
+        throws IOException {
+      _tableConfig.getIndexingConfig().setNoDictionaryConfig(
+          JsonUtils.stringToObject("{\"dimInt\": \"RAW\"}",
+              new TypeReference<Map<String, String>>() {
+              }));
+      addFieldIndexConfig("{\"name\": \"dimInt\", \"encodingType\": \"DICTIONARY\"}");
+      assertEquals(ForwardIndexConfig.getDefault(FieldConfig.EncodingType.RAW));
+    }
+
+    @Test
+    public void conflictingFieldConfigEncodingVsIndexesForward()
+        throws IOException {
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"encodingType\": \"RAW\","
+          + "    \"indexes\" : {"
+          + "      \"forward\": { \"encodingType\": \"DICTIONARY\" }"
+          + "    }\n"
+          + " }");
+      IllegalStateException ex = expectThrows(IllegalStateException.class,
+          () -> getActualConfig("dimInt", StandardIndexes.forward()));
+      assertTrue(ex.getMessage().contains("dimInt"), "message must name the column: " + ex.getMessage());
+      assertTrue(ex.getMessage().contains("encoding"),
+          "message must identify encoding as the conflicting field: " + ex.getMessage());
+    }
+
+    @Test
+    public void conflictingFieldConfigCompressionVsIndexesForward()
+        throws IOException {
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"encodingType\": \"RAW\","
+          + "    \"compressionCodec\": \"SNAPPY\","
+          + "    \"indexes\" : {"
+          + "      \"forward\": { \"compressionCodec\": \"LZ4\" }"
+          + "    }\n"
+          + " }");
+      IllegalStateException ex = expectThrows(IllegalStateException.class,
+          () -> getActualConfig("dimInt", StandardIndexes.forward()));
+      assertTrue(ex.getMessage().contains("dimInt"), "message must name the column: " + ex.getMessage());
+      assertTrue(ex.getMessage().contains("compressionCodec"),
+          "message must identify compressionCodec as the conflicting field: " + ex.getMessage());
+    }
   }
 
   @Test
   public void testStandardIndex() {
     assertSame(StandardIndexes.forward(), StandardIndexes.forward(), "Standard index should use the same as "
         + "the ForwardIndexType static instance");
+  }
+
+  /// codecSpec applies only at immutable segment creation/conversion time. The mutable (consuming)
+  /// forward index must build the standard in-memory format, ignoring the configured codecSpec, so
+  /// realtime tables with a codecSpec keep consuming normally.
+  @Test
+  public void testCodecSpecBuildsStandardMutableIndexForRealtime()
+      throws Exception {
+    MutableIndexContext context = mock(MutableIndexContext.class);
+    when(context.getFieldSpec()).thenReturn(new DimensionFieldSpec("dimInt", DataType.INT, true));
+    when(context.getSegmentName()).thenReturn("testSegment");
+    when(context.getCapacity()).thenReturn(16);
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("DELTA,LZ4")
+        .build();
+
+    try (DirectMemoryManager memoryManager = new DirectMemoryManager("testSegment")) {
+      when(context.getMemoryManager()).thenReturn(memoryManager);
+      MutableIndex mutableIndex = StandardIndexes.forward().createMutableIndex(context, config);
+      assertNotNull(mutableIndex);
+      try {
+        assertTrue(mutableIndex instanceof FixedByteSVMutableForwardIndex,
+            "Expected the standard SV mutable forward index, got: " + mutableIndex.getClass());
+      } finally {
+        mutableIndex.close();
+      }
+    }
   }
 }

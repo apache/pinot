@@ -23,39 +23,40 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Instance partitions for the table.
- *
- * <p>The instance partitions is stored as a map from partition of the format: {@code <partitionId>_<replicaGroupId>} to
- * list of instances, and is persisted under the ZK path: {@code <cluster>/PROPERTYSTORE/INSTANCE_PARTITIONS}.
- * <ul>
- *   <li>
- *     Partition: a set of instances that contains the segments of the same partition (value partition for offline
- *     table, or stream partition for real-time table)
- *     <p>NOTE: For real-time table CONSUMING instance partitions, partition cannot be explicitly configured (number of
- *     partitions must be 1), but has to be derived from the index of the instance. Each instance will contain all the
- *     segments from a stream partition before them getting relocated to the COMPLETED instance partitions. The stream
- *     partitions will be evenly spread over all instances (within each replica-group if replica-group is configured).
- *     <p>TODO: Support explicit partition configuration for CONSUMING instance partitions
- *   </li>
- *   <li>
- *     Replica-group: a set of instances that contains one replica of all the segments
- *   </li>
- * </ul>
- * <p>The instance partitions name is of the format {@code <rawTableName>_<instancePartitionsType>}, e.g.
- * {@code table_OFFLINE}, {@code table_CONSUMING}, {@code table_COMPLETED}.
- * <p>When partition is not enabled, all instances will be stored as partition 0.
- * <p>When replica-group is not enabled, all instances will be stored as replica-group 0.
- * <p>The segment assignment will be based on the instance partitions of the table.
- */
+/// Instance partitions for the table.
+///
+/// The instance partitions is stored as a map from partition of the format: `<partitionId>_<replicaGroupId>` to
+/// list of instances, and is persisted under the ZK path: `<cluster>/PROPERTYSTORE/INSTANCE_PARTITIONS`.
+///
+/// - Partition: a set of instances that contains the segments of the same partition (value partition for offline
+///   table, or stream partition for real-time table)
+///
+///   NOTE: For real-time table CONSUMING instance partitions, partition cannot be explicitly configured (number of
+///   partitions must be 1), but has to be derived from the index of the instance. Each instance will contain all the
+///   segments from a stream partition before them getting relocated to the COMPLETED instance partitions. The stream
+///   partitions will be evenly spread over all instances (within each replica-group if replica-group is configured).
+///
+///   TODO: Support explicit partition configuration for CONSUMING instance partitions
+/// - Replica-group: a set of instances that contains one replica of all the segments
+///
+/// The instance partitions name is of the format `<rawTableName>_<instancePartitionsType>`, e.g.
+/// `table_OFFLINE`, `table_CONSUMING`, `table_COMPLETED`.
+///
+/// When partition is not enabled, all instances will be stored as partition 0.
+///
+/// When replica-group is not enabled, all instances will be stored as replica-group 0.
+///
+/// The segment assignment will be based on the instance partitions of the table.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class InstancePartitions {
   private static final char PARTITION_REPLICA_GROUP_SEPARATOR = '_';
@@ -78,9 +79,9 @@ public class InstancePartitions {
     _instancePartitionsName = instancePartitionsName;
     _partitionToInstancesMap = partitionToInstancesMap;
     for (String key : partitionToInstancesMap.keySet()) {
-      int separatorIndex = key.indexOf(PARTITION_REPLICA_GROUP_SEPARATOR);
-      int partitionId = Integer.parseInt(key.substring(0, separatorIndex));
-      int replicaGroupId = Integer.parseInt(key.substring(separatorIndex + 1));
+      Pair<Integer, Integer> partitionIdAndReplicaGroupId = getPartitionIdAndReplicaGroupId(key);
+      int partitionId = partitionIdAndReplicaGroupId.getLeft();
+      int replicaGroupId = partitionIdAndReplicaGroupId.getRight();
       _numPartitions = Integer.max(_numPartitions, partitionId + 1);
       _numReplicaGroups = Integer.max(_numReplicaGroups, replicaGroupId + 1);
     }
@@ -111,6 +112,25 @@ public class InstancePartitions {
         .get(Integer.toString(partitionId) + PARTITION_REPLICA_GROUP_SEPARATOR + replicaGroupId);
   }
 
+  /// Generates a mapping from instance names to their corresponding partition IDs.
+  /// This method iterates over the `\_partitionToInstancesMap`, which maps partition-replica group keys
+  /// (e.g., "0_0", "1_1") to lists of instances. For each entry, it extracts the partition ID from the key
+  /// and associates each instance in the list with that partition ID in the resulting map.
+  ///
+  /// @return A mapping from instance names to the corresponding partition ID they belong to.
+  public Map<String, Integer> getInstanceToPartitionIdMap() {
+    Map<String, Integer> instanceToPartitionIdMap = new HashMap<>();
+    for (Map.Entry<String, List<String>> entry : _partitionToInstancesMap.entrySet()) {
+      Pair<Integer, Integer> partitionIdAndReplicaGroupId = getPartitionIdAndReplicaGroupId(entry.getKey());
+      int partitionId = partitionIdAndReplicaGroupId.getLeft();
+      List<String> instances = entry.getValue();
+      for (String instance : instances) {
+        instanceToPartitionIdMap.put(instance, partitionId);
+      }
+    }
+    return instanceToPartitionIdMap;
+  }
+
   public void setInstances(int partitionId, int replicaGroupId, List<String> instances) {
     String key = Integer.toString(partitionId) + PARTITION_REPLICA_GROUP_SEPARATOR + replicaGroupId;
     _partitionToInstancesMap.put(key, instances);
@@ -128,9 +148,7 @@ public class InstancePartitions {
     return znRecord;
   }
 
-  /**
-   * Returns a new instance of InstancePartitions with the given name
-   */
+  /// Returns a new instance of InstancePartitions with the given name
   public InstancePartitions withName(String newName) {
     return new InstancePartitions(newName, getPartitionToInstancesMap());
   }
@@ -164,5 +182,12 @@ public class InstancePartitions {
   @Override
   public int hashCode() {
     return Objects.hash(_instancePartitionsName, _partitionToInstancesMap);
+  }
+
+  private Pair<Integer, Integer> getPartitionIdAndReplicaGroupId(String key) {
+    int separatorIndex = key.indexOf(PARTITION_REPLICA_GROUP_SEPARATOR);
+    int partitionId = Integer.parseInt(key.substring(0, separatorIndex));
+    int replicaGroupId = Integer.parseInt(key.substring(separatorIndex + 1));
+    return Pair.of(partitionId, replicaGroupId);
   }
 }

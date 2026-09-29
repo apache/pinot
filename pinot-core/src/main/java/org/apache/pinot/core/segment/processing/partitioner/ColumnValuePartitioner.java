@@ -21,9 +21,7 @@ package org.apache.pinot.core.segment.processing.partitioner;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * Partitioner which extracts a column value as the partition
- */
+/// Partitioner which extracts a column value as the partition
 public class ColumnValuePartitioner implements Partitioner {
 
   private final String _columnName;
@@ -35,5 +33,19 @@ public class ColumnValuePartitioner implements Partitioner {
   @Override
   public String getPartition(GenericRow genericRow) {
     return String.valueOf(genericRow.getValue(_columnName));
+  }
+
+  @Override
+  public String[] getPartitionColumns() {
+    return new String[]{_columnName};
+  }
+
+  @Override
+  public String getPartitionFromColumns(Object[] columnValues) {
+    if (columnValues.length != 1) {
+      throw new IllegalArgumentException(
+          "ColumnValuePartitioner expects exactly 1 column value, got " + columnValues.length);
+    }
+    return String.valueOf(columnValues[0]);
   }
 }

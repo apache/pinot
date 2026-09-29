@@ -22,12 +22,9 @@ import java.util.Properties;
 import org.apache.pinot.spi.plugin.PluginManager;
 
 
-/**
- * StreamDataProvider provides StreamDataServerStartable and StreamDataProducer based on
- * given implementation class name.
- * E.g. KafkaDataServerStartable, KafkaDataProducer.
- *
- */
+/// StreamDataProvider provides StreamDataServerStartable and StreamDataProducer based on
+/// given implementation class name.
+/// E.g. KafkaDataServerStartable, KafkaDataProducer.
 public class StreamDataProvider {
   private StreamDataProvider() {
   }

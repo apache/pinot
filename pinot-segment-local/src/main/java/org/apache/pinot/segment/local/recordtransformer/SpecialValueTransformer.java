@@ -18,112 +18,64 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
-import com.google.common.annotations.VisibleForTesting;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
+import java.util.Set;
+import org.apache.pinot.segment.local.utils.SpecialValueTransformerUtils;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code SpecialValueTransformer} class will transform special values according to the following rules:
- * <ul>
- *   <li>Negative zero (-0.0) should be converted to 0.0</li>
- *   <li>NaN should be converted to default null</li>
- * </ul>
- * <p>NOTE: should put this after the {@link DataTypeTransformer} so that we already have the values complying
- * with the schema before handling special values and before {@link NullValueTransformer} so that it transforms
- * all the null values properly.
- */
+/// The `SpecialValueTransformer` class will transform special values according to the following rules:
+///
+/// - For FLOAT and DOUBLE:
+///   - Negative zero (-0.0) should be converted to 0.0
+///   - NaN should be converted to default null
+/// - For BIG_DECIMAL:
+///   - Strip trailing zeros
+///
+/// This transformation is required to ensure that the value is equal to itself, and the ordering of the values is
+/// consistent with equals. This is required for certain data structures (e.g. sorted map) and algorithm (e.g. binary
+/// search) to work correctly. Read more about it in [Comparable].
+///
+/// NOTE: should put this after the [DataTypeTransformer] so that we already have the values complying
+/// with the schema before handling special values and before [NullValueTransformer] so that it transforms
+/// all the null values properly.
 public class SpecialValueTransformer implements RecordTransformer {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SpecialValueTransformer.class);
-  private final HashSet<String> _specialValuesKeySet = new HashSet<>();
-  private int _negativeZeroConversionCount = 0;
-  private int _nanConversionCount = 0;
+  private final Set<String> _columnsToCheck = new HashSet<>();
 
   public SpecialValueTransformer(Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn() && (fieldSpec.getDataType() == DataType.FLOAT
-          || fieldSpec.getDataType() == DataType.DOUBLE)) {
-        _specialValuesKeySet.add(fieldSpec.getName());
+      if (!fieldSpec.isVirtualColumn() && SpecialValueTransformerUtils.needsTransformation(fieldSpec)) {
+        _columnsToCheck.add(fieldSpec.getName());
       }
     }
-  }
-
-  private Object transformNegativeZero(Object value) {
-    if ((value instanceof Float) && (Float.floatToRawIntBits((float) value) == Float.floatToRawIntBits(-0.0f))) {
-      value = 0.0f;
-      _negativeZeroConversionCount++;
-    } else if ((value instanceof Double) && (Double.doubleToLongBits((double) value) == Double.doubleToLongBits(
-        -0.0d))) {
-      value = 0.0d;
-      _negativeZeroConversionCount++;
-    }
-    return value;
-  }
-
-  private Object transformNaN(Object value) {
-    if ((value instanceof Float) && ((Float) value).isNaN()) {
-      value = null;
-      _nanConversionCount++;
-    } else if ((value instanceof Double) && ((Double) value).isNaN()) {
-      _nanConversionCount++;
-      value = null;
-    }
-    return value;
   }
 
   @Override
   public boolean isNoOp() {
-    return _specialValuesKeySet.isEmpty();
+    return _columnsToCheck.isEmpty();
   }
 
   @Override
-  public GenericRow transform(GenericRow record) {
-    for (String element : _specialValuesKeySet) {
-      Object value = record.getValue(element);
+  public void transform(GenericRow record) {
+    for (String column : _columnsToCheck) {
+      Object value = record.getValue(column);
       if (value instanceof Object[]) {
         // Multi-valued column.
-        Object[] values = (Object[]) value;
-        int numValues = values.length;
-        List<Object> negativeZeroNanSanitizedValues = new ArrayList<>(numValues);
-        for (Object o : values) {
-          Object zeroTransformedValue = transformNegativeZero(o);
-          Object nanTransformedValue = transformNaN(zeroTransformedValue);
-          if (nanTransformedValue != null) {
-            negativeZeroNanSanitizedValues.add(nanTransformedValue);
-          }
+        Object[] transformedValues = SpecialValueTransformerUtils.transformValues((Object[]) value);
+        if (transformedValues != value) {
+          record.putValue(column, transformedValues);
         }
-        record.putValue(element, negativeZeroNanSanitizedValues.toArray());
-      } else {
+      } else if (value != null) {
         // Single-valued column.
-        Object zeroTransformedValue = transformNegativeZero(value);
-        Object nanTransformedValue = transformNaN(zeroTransformedValue);
-        if (nanTransformedValue != value) {
-          record.putValue(element, nanTransformedValue);
+        Object transformedValue = SpecialValueTransformerUtils.transformValue(value);
+        if (transformedValue != value) {
+          record.putValue(column, transformedValue);
         }
       }
     }
-    if (_negativeZeroConversionCount > 0 || _nanConversionCount > 0) {
-      LOGGER.debug("Converted {} -0.0s to 0.0 and {} NaNs to null", _negativeZeroConversionCount, _nanConversionCount);
-    }
-    return record;
-  }
-
-  @VisibleForTesting
-  int getNegativeZeroConversionCount() {
-    return _negativeZeroConversionCount;
-  }
-
-  @VisibleForTesting
-  int getNanConversionCount() {
-    return _nanConversionCount;
   }
 }

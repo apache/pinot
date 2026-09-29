@@ -28,9 +28,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Polymorphic 'between' scalar function implementation.
- */
+/// Polymorphic 'between' scalar function implementation.
 @ScalarFunction
 public class BetweenScalarFunction implements PinotScalarFunction {
 

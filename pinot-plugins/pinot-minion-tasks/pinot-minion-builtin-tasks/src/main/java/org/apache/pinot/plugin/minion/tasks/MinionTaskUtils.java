@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
@@ -27,18 +29,34 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import javax.ws.rs.NotFoundException;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.auth.NullAuthProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
+import org.apache.pinot.common.utils.RetentionUtils;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.MinionContext;
+import org.apache.pinot.spi.auth.AuthProvider;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -46,7 +64,9 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
@@ -56,12 +76,98 @@ import org.slf4j.LoggerFactory;
 public class MinionTaskUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionTaskUtils.class);
 
+  /// Parses the validDocIdsConsensusMode config string. Blank/null defaults to `EQUAL`.
+  public static MinionConstants.ValidDocIdsConsensusMode parseValidDocIdsConsensusMode(String value) {
+    if (StringUtils.isBlank(value)) {
+      return MinionConstants.ValidDocIdsConsensusMode.EQUAL;
+    }
+    return MinionConstants.ValidDocIdsConsensusMode.valueOf(value.toUpperCase().trim());
+  }
+
+  /// Parses the validDocIdsValidationMode config string. Blank/null defaults to `STRICT`.
+  public static MinionConstants.ValidDocIdsValidationMode parseValidDocIdsValidationMode(String value) {
+    if (StringUtils.isBlank(value)) {
+      return MinionConstants.ValidDocIdsValidationMode.STRICT;
+    }
+    return MinionConstants.ValidDocIdsValidationMode.valueOf(value.toUpperCase().trim());
+  }
+
+  /// Resolves the consensus mode the generator should apply, given the configured consensus mode and validation
+  /// mode. EXECUTOR_ONLY downgrades the generator to UNSAFE (lenient pick, no bitmaps, no cross-replica enforcement)
+  /// so the executor stays the sole gate; STRICT keeps the configured mode.
+  public static MinionConstants.ValidDocIdsConsensusMode resolveGeneratorConsensusMode(
+      MinionConstants.ValidDocIdsConsensusMode consensusMode,
+      MinionConstants.ValidDocIdsValidationMode validationMode) {
+    return validationMode == MinionConstants.ValidDocIdsValidationMode.EXECUTOR_ONLY
+        ? MinionConstants.ValidDocIdsConsensusMode.UNSAFE : consensusMode;
+  }
+
   private static final String DEFAULT_DIR_PATH_TERMINATOR = "/";
 
   public static final String DATETIME_PATTERN = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
   public static final String UTC = "UTC";
 
+  /// When true, allows METADATA push mode with local FS output dir. Intended for integration tests only.
+  /// Production should leave this unset (defaults to false); local FS then always uses TAR push.
+  public static final String ALLOW_METADATA_PUSH_WITH_LOCAL_FS = "allowMetadataPushWithLocalFs";
+
+  /// Task config key for an optional safety margin subtracted from retention when filtering segments.
+  /// Value is a period string (e.g. "1h", "30m"). Segments within `(now - endTime) > (retention - buffer)`
+  /// are excluded from task generation. This is a table-level config — not per-merge-level — because retention
+  /// itself is table-level.
+  ///
+  /// Currently used by `MergeRollupTask` and `UpsertCompactMergeTask`. Not applied to
+  /// `UpsertCompactionTask` (legacy single-segment compaction, being superseded by UpsertCompactMergeTask).
+  public static final String RETENTION_EXPIRY_BUFFER_PERIOD_KEY = "retentionExpiryBufferPeriod";
+
   private MinionTaskUtils() {
+  }
+
+  /// Reads the creation-time fallback flag from Helix cluster config. This is the same config that
+  /// `RetentionManager` reacts to via `onChange()`, so the filter stays aligned with what
+  /// RetentionManager will actually delete.
+  public static boolean isCreationTimeFallbackEnabled(ClusterInfoAccessor clusterInfoAccessor) {
+    String raw = clusterInfoAccessor.getClusterConfig(
+        ControllerConf.ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK);
+    return raw != null
+        ? Boolean.parseBoolean(raw)
+        : ControllerConf.ControllerPeriodicTasksConf.DEFAULT_ENABLE_RETENTION_CREATION_TIME_FALLBACK;
+  }
+
+  /// Resolves the AuthProvider to use for Minion tasks.
+  /// Priority order:
+  /// 1. If AUTH_TOKEN is explicitly provided in task configs (by Controller), use it for this specific task
+  /// 2. Otherwise, fall back to the runtime AuthProvider from MinionContext (enables per-request token rotation)
+  ///
+  /// This allows any minion task or util to resolve auth from task configs without requiring callers to pass
+  /// AuthProvider explicitly.
+  public static AuthProvider resolveAuthProvider(Map<String, String> taskConfigs) {
+    String explicitToken = taskConfigs.get(MinionConstants.AUTH_TOKEN);
+    if (StringUtils.isNotBlank(explicitToken)) {
+      return AuthProviderUtils.makeAuthProvider(explicitToken);
+    }
+
+    AuthProvider runtimeProvider = MinionContext.getInstance().getTaskAuthProvider();
+    if (runtimeProvider == null || runtimeProvider instanceof NullAuthProvider) {
+      return new NullAuthProvider();
+    }
+
+    return runtimeProvider;
+  }
+
+  /// Resolves the auth token string to use for Minion tasks (e.g. for specs that accept a token string).
+  /// If AUTH_TOKEN is already present in task configs, returns it without creating an AuthProvider.
+  /// Otherwise resolves via [#resolveAuthProvider] and returns its static token.
+  ///
+  /// @param taskConfigs task config map (may contain MinionConstants.AUTH_TOKEN)
+  /// @return auth token string, or null if none
+  @Nullable
+  public static String resolveAuthToken(Map<String, String> taskConfigs) {
+    String explicitToken = taskConfigs.get(MinionConstants.AUTH_TOKEN);
+    if (StringUtils.isNotBlank(explicitToken)) {
+      return explicitToken;
+    }
+    return AuthProviderUtils.toStaticToken(resolveAuthProvider(taskConfigs));
   }
 
   public static PinotFS getInputPinotFS(Map<String, String> taskConfigs, URI fileURI)
@@ -98,39 +204,71 @@ public class MinionTaskUtils {
     return PinotFSFactory.create(fileURIScheme);
   }
 
+  public static URI getOutputSegmentDirURI(Map<String, String> taskConfigs, ClusterInfoAccessor clusterInfoAccessor,
+      String tableName) {
+    // taskConfigs has priority over clusterInfo configs for output.segment.dir.uri
+    String outputDir = taskConfigs.getOrDefault(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI,
+        normalizeDirectoryURI(clusterInfoAccessor.getDataDir()) + TableNameBuilder.extractRawTableName(tableName));
+    return URI.create(outputDir);
+  }
+
   public static Map<String, String> getPushTaskConfig(String tableName, Map<String, String> taskConfigs,
       ClusterInfoAccessor clusterInfoAccessor) {
+    Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(taskConfigs);
     try {
       String pushMode = IngestionConfigUtils.getPushMode(taskConfigs);
 
-      Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(taskConfigs);
-      if (pushMode == null || pushMode.toUpperCase()
-          .contentEquals(BatchConfigProperties.SegmentPushType.TAR.toString())) {
-        singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
-            BatchConfigProperties.SegmentPushType.TAR.toString());
+      // Default value for Segment Push Type is TAR.
+      BatchConfigProperties.SegmentPushType segmentPushType;
+      if (pushMode == null) {
+        segmentPushType = BatchConfigProperties.SegmentPushType.TAR;
       } else {
-        URI outputDirURI = URI.create(
-            normalizeDirectoryURI(clusterInfoAccessor.getDataDir()) + TableNameBuilder.extractRawTableName(tableName));
-        String outputDirURIScheme = outputDirURI.getScheme();
+        segmentPushType = BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase());
+      }
 
-        if (!isLocalOutputDir(outputDirURIScheme)) {
-          singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputDirURI.toString());
-          if (pushMode.toUpperCase().contentEquals(BatchConfigProperties.SegmentPushType.URI.toString())) {
+      URI outputSegmentDirURI = getOutputSegmentDirURI(taskConfigs, clusterInfoAccessor, tableName);
+      if (!isLocalOutputDir(outputSegmentDirURI.getScheme())) {
+        switch (segmentPushType) {
+          case URI:
+            singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI,
+                outputSegmentDirURI.toString());
             LOGGER.warn("URI push type is not supported in this task. Switching to METADATA push");
-            pushMode = BatchConfigProperties.SegmentPushType.METADATA.toString();
-          }
-          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
+            singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+                BatchConfigProperties.SegmentPushType.METADATA.toString());
+            break;
+          case METADATA:
+            singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI,
+                outputSegmentDirURI.toString());
+            break;
+          default:
+            singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+                BatchConfigProperties.SegmentPushType.TAR.toString());
+            break;
+        }
+      } else {
+        boolean allowMetadataPushWithLocalFs = Boolean.parseBoolean(
+            taskConfigs.getOrDefault(ALLOW_METADATA_PUSH_WITH_LOCAL_FS, "false"));
+        if (allowMetadataPushWithLocalFs && pushMode != null) {
+          // Override for integration tests: respect explicit push mode with local FS
+          singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI,
+              outputSegmentDirURI.toString());
+          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+              segmentPushType.toString());
         } else {
-          LOGGER.warn("segment upload with METADATA push is not supported with local output dir: {}."
-              + " Switching to TAR push.", outputDirURI);
+          // Production: default to TAR for local output dir
+          LOGGER.warn("Local output dir found, defaulting to TAR: {}.", outputSegmentDirURI);
           singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
               BatchConfigProperties.SegmentPushType.TAR.toString());
         }
       }
-      singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, clusterInfoAccessor.getVipUrl());
+
+      singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI,
+          clusterInfoAccessor.getVipUrlForLeadController(tableName));
       return singleFileGenerationTaskConfig;
     } catch (Exception e) {
-      return taskConfigs;
+      singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+          BatchConfigProperties.SegmentPushType.TAR.toString());
+      return singleFileGenerationTaskConfig;
     }
   }
 
@@ -175,9 +313,7 @@ public class MinionTaskUtils {
     return servers;
   }
 
-  /**
-   * Extract allowDownloadFromServer config from table task config
-   */
+  /// Extract allowDownloadFromServer config from table task config
   public static boolean extractMinionAllowDownloadFromServer(TableConfig tableConfig, String taskType,
       boolean defaultValue) {
     TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
@@ -191,23 +327,31 @@ public class MinionTaskUtils {
     return defaultValue;
   }
 
-  /**
-   * Returns the validDocID bitmap from the server whose local segment crc matches both crc of ZK metadata and
-   * deepstore copy (expectedCrc).
-   */
+  /// Returns the validDocIds bitmap for the segment, resolved across the servers hosting it. A server contributes
+  /// its bitmap only when its CRC matches `expectedCrc`, or - when segment CRCs differ - when `expectedDataCrc`
+  /// matches (see [#crcMatches]). A negative `expectedDataCrc` means the data CRC is unavailable and cannot
+  /// resolve a mismatch. `comparisonModeStr` selects the resolution mode:
+  /// - `UNSAFE`: first usable bitmap; failing / mismatched / non-READY servers are skipped.
+  /// - `EQUAL` (default): the bitmap every server agrees on.
+  /// - `MOST_VALID_DOCS`: the bitmap with the highest valid-doc count.
+  ///
+  /// Returns null if no server produced a usable bitmap. Non-`UNSAFE` modes throw instead of skipping:
+  /// [NotFoundException] when a server has no validDocIds (e.g. snapshot not yet written); [IllegalStateException]
+  /// for other fetch failures, CRC mismatches, non-GOOD status, or `EQUAL`-mode consensus failures.
   @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
-      String validDocIdsType, MinionContext minionContext, String expectedCrc) {
+      String validDocIdsType, MinionContext minionContext, long expectedCrc, long expectedDataCrc,
+      String comparisonModeStr) {
+    MinionConstants.ValidDocIdsConsensusMode consensusMode = parseValidDocIdsConsensusMode(comparisonModeStr);
     String clusterName = minionContext.getHelixManager().getClusterName();
     HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
-    RoaringBitmap validDocIds = null;
     List<String> servers = getServers(segmentName, tableNameWithType, helixAdmin, clusterName);
+    List<RoaringBitmap> matchingBitmaps = new ArrayList<>();
+
     for (String server : servers) {
       InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, server);
       String endpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig);
 
-      // We only need aggregated table size and the total number of docs/rows. Skipping column related stats, by
-      // passing an empty list.
       ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
       ValidDocIdsBitmapResponse validDocIdsBitmapResponse;
       try {
@@ -215,32 +359,212 @@ public class MinionTaskUtils {
             serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
                 validDocIdsType, 60_000);
       } catch (Exception e) {
-        LOGGER.warn(
-            String.format("Unable to retrieve validDocIds bitmap for segment: %s from endpoint: %s", segmentName,
-                endpoint), e);
-        continue;
+        String errorMessage =
+            "Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: " + endpoint;
+        if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+          LOGGER.warn(errorMessage, e);
+          continue;
+        }
+        if (e instanceof NotFoundException) {
+          // Preserve the type: a 404 means the server has no validDocIds for the segment (e.g. a not-yet-written
+          // snapshot), which callers may handle with a documented fallback, unlike infrastructure failures.
+          throw new NotFoundException(errorMessage, e);
+        }
+        throw new IllegalStateException(errorMessage, e);
       }
 
+      String crcFromValidDocIdsBitmap = validDocIdsBitmapResponse.getSegmentCrc();
+      long serverDataCrc = parseCrc(validDocIdsBitmapResponse.getSegmentDataCrc());
       // Check crc from the downloaded segment against the crc returned from the server along with the valid doc id
       // bitmap. If this doesn't match, this means that we are hitting the race condition where the segment has been
       // uploaded successfully while the server is still reloading the segment. Reloading can take a while when the
       // offheap upsert is used because we will need to delete & add all primary keys.
       // `BaseSingleSegmentConversionExecutor.executeTask()` already checks for the crc from the task generator
       // against the crc from the current segment zk metadata, so we don't need to check that here.
-      String crcFromValidDocIdsBitmap = validDocIdsBitmapResponse.getSegmentCrc();
-      if (!expectedCrc.equals(crcFromValidDocIdsBitmap)) {
-        // In this scenario, we are hitting the other replica of the segment which did not commit to ZK or deepstore.
-        // We will skip processing this bitmap to query other server to confirm if there is a valid matching CRC.
-        String message = String.format("CRC mismatch for segment: %s, expected value based on task generator: %s, "
-                + "actual crc from validDocIdsBitmapResponse from endpoint %s: %s", segmentName, expectedCrc, endpoint,
-            crcFromValidDocIdsBitmap);
-        LOGGER.warn(message);
-        continue;
+      if (!crcMatches(expectedCrc, expectedDataCrc, parseCrc(crcFromValidDocIdsBitmap), serverDataCrc)) {
+        if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+          LOGGER.warn("CRC mismatch for segment: {} from endpoint {}, skipping", segmentName, endpoint);
+          continue;
+        } else {
+          throw new IllegalStateException(
+              "CRC mismatch for segment: " + segmentName + ", expected: " + expectedCrc + ", actual from endpoint "
+                  + endpoint + ": " + crcFromValidDocIdsBitmap);
+        }
       }
-      validDocIds = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
-      break;
+
+      if (validDocIdsBitmapResponse.getServerStatus() != null && !validDocIdsBitmapResponse.getServerStatus()
+          .equals(ServiceStatus.Status.GOOD)) {
+        if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+          LOGGER.warn("Server {} not READY for segment {}, skipping", validDocIdsBitmapResponse.getInstanceId(),
+              segmentName);
+          continue;
+        } else {
+          throw new IllegalStateException("Server " + validDocIdsBitmapResponse.getInstanceId() + " is in "
+              + validDocIdsBitmapResponse.getServerStatus() + " state for segment: " + segmentName
+              + ". Failing task to avoid inconsistency among replicas.");
+        }
+      }
+
+      RoaringBitmap bitmap = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
+      int cardinality = bitmap.getCardinality();
+
+      if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+        LOGGER.info("Using server {} with {} valid docs for segment {} (mode=UNSAFE)", server, cardinality,
+            segmentName);
+        return bitmap;
+      }
+
+      matchingBitmaps.add(bitmap);
     }
-    return validDocIds;
+
+    if (matchingBitmaps.isEmpty()) {
+      return null;
+    }
+
+    if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.EQUAL) {
+      RoaringBitmap consensusBitMap = matchingBitmaps.get(0);
+      for (RoaringBitmap b : matchingBitmaps) {
+        if (!b.equals(consensusBitMap)) {
+          throw new IllegalStateException("No consensus on validDocs across replicas for segment: " + segmentName
+              + ". Failing task to avoid replica inconsistency.");
+        }
+      }
+      LOGGER.info("All {} servers have {} valid docs for segment {}", servers.size(), consensusBitMap.getCardinality(),
+          segmentName);
+      return consensusBitMap;
+    }
+
+    // MOST_VALID_DOCS: explicitly pick the bitmap with the maximum valid doc count
+    RoaringBitmap maxCardinalityMap = null;
+    int maxCard = -1;
+    for (RoaringBitmap b : matchingBitmaps) {
+      int card = b.getCardinality();
+      if (card > maxCard) {
+        maxCard = card;
+        maxCardinalityMap = b;
+      }
+    }
+    if (maxCardinalityMap != null) {
+      LOGGER.info("Selected server with {} valid docs for segment {} (mode=MOST_VALID_DOCS, checked {} servers)",
+          maxCard, segmentName, servers.size());
+    }
+    return maxCardinalityMap;
+  }
+
+  /// Picks the replica whose validDocIds the generator should use, or null to skip the segment, applying the same
+  /// checks the executor would so bad segments aren't scheduled: the replica must match CRC (via [#crcMatches]) and
+  /// be on a healthy server. UNSAFE uses the first such replica, EQUAL requires all to report the same valid doc
+  /// count, and MOST_VALID_DOCS picks the highest.
+  @Nullable
+  public static ValidDocIdsMetadataInfo selectValidDocIdsMetadataForConsensus(String taskType,
+      SegmentZKMetadata segmentZKMetadata, @Nullable List<ValidDocIdsMetadataInfo> replicas, int expectedReplicaCount,
+      MinionConstants.ValidDocIdsConsensusMode consensusMode) {
+    String segmentName = segmentZKMetadata.getSegmentName();
+    if (CollectionUtils.isEmpty(replicas)) {
+      return null;
+    }
+    boolean unsafe = consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE;
+    List<ValidDocIdsMetadataInfo> usableReplicas = new ArrayList<>();
+    for (ValidDocIdsMetadataInfo replica : replicas) {
+      // A CRC mismatch usually means the server is still reloading the segment, so its valid doc set can't be
+      // trusted. UNSAFE skips just this replica; stricter modes skip the whole segment.
+      long replicaCrc = parseCrc(replica.getSegmentCrc());
+      if (replicaCrc < 0) {
+        LOGGER.warn("Unparseable CRC '{}' for segment: {} from server: {}, skipping {} (mode={}) for {}",
+            replica.getSegmentCrc(), segmentName, replica.getInstanceId(), unsafe ? "replica" : "segment",
+            consensusMode, taskType);
+        if (unsafe) {
+          continue;
+        }
+        return null;
+      }
+      // -1 when this table doesn't use data CRC, so crcMatches falls back to the segment CRC.
+      long zkDataCrc = segmentZKMetadata.isUseDataCrc() ? segmentZKMetadata.getDataCrc() : -1;
+      if (!crcMatches(segmentZKMetadata.getCrc(), zkDataCrc, replicaCrc, parseCrc(replica.getSegmentDataCrc()))) {
+        LOGGER.warn("CRC mismatch for segment: {} (zkCrc={}, zkDataCrc={}, server={} reported crc={} dataCrc={}), "
+                + "skipping {} (mode={}) for {}", segmentName, segmentZKMetadata.getCrc(),
+            segmentZKMetadata.getDataCrc(), replica.getInstanceId(), replicaCrc, replica.getSegmentDataCrc(),
+            unsafe ? "replica" : "segment", consensusMode, taskType);
+        if (unsafe) {
+          continue;
+        }
+        return null;
+      }
+      // A non-GOOD server may still be mutating the segment, so its valid doc set is unreliable.
+      if (replica.getServerStatus() != null && replica.getServerStatus() != ServiceStatus.Status.GOOD) {
+        LOGGER.warn("Server {} is in {} state for segment: {}, skipping {} (mode={}) for {}", replica.getInstanceId(),
+            replica.getServerStatus(), segmentName, unsafe ? "replica" : "segment", consensusMode, taskType);
+        if (unsafe) {
+          continue;
+        }
+        return null;
+      }
+      if (unsafe) {
+        return replica;
+      }
+      usableReplicas.add(replica);
+    }
+
+    if (usableReplicas.isEmpty()) {
+      return null;
+    }
+
+    // Strict modes need every assigned replica to have responded; a short responder list means a server dropped out
+    // (network error, parse failure, or it no longer has the segment), so we can't confirm consensus across the full
+    // replica set and skip the segment.
+    if (usableReplicas.size() < expectedReplicaCount) {
+      LOGGER.warn("Only {} of {} replicas responded for segment: {}, cannot confirm consensus, skipping for {}",
+          usableReplicas.size(), expectedReplicaCount, segmentName, taskType);
+      return null;
+    }
+
+    if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.EQUAL) {
+      // Require every replica to report the same valid doc count. Comparing counts (rather than the full bitmaps)
+      // keeps the generator cheap - it avoids serializing a bitmap per replica back to the controller.
+      ValidDocIdsMetadataInfo first = usableReplicas.get(0);
+      for (int i = 1; i < usableReplicas.size(); i++) {
+        if (usableReplicas.get(i).getTotalValidDocs() != first.getTotalValidDocs()) {
+          LOGGER.warn("Replicas disagree on valid doc count for segment: {}, skipping segment for {}", segmentName,
+              taskType);
+          return null;
+        }
+      }
+      return first;
+    }
+
+    // MOST_VALID_DOCS: pick the replica reporting the most valid docs.
+    ValidDocIdsMetadataInfo chosen = usableReplicas.get(0);
+    for (ValidDocIdsMetadataInfo replica : usableReplicas) {
+      if (replica.getTotalValidDocs() > chosen.getTotalValidDocs()) {
+        chosen = replica;
+      }
+    }
+    return chosen;
+  }
+
+  /// Whether two segment copies hold the same data. Matches on the full segment CRC, or - when those differ - on the
+  /// data CRC (a checksum over only the forward index and dictionary, so index/metadata-only changes don't affect
+  /// it) when both copies report one (`>= 0`). A negative data CRC means "not reported". Mirrors the logic of
+  /// `BaseTableDataManager.hasSameCRC` and is used by both the generator's pre-scheduling check and the executor's
+  /// per-server check.
+  @VisibleForTesting
+  static boolean crcMatches(long segmentCrc, long dataCrc, long otherSegmentCrc, long otherDataCrc) {
+    if (segmentCrc == otherSegmentCrc) {
+      return true;
+    }
+    return dataCrc >= 0 && otherDataCrc >= 0 && dataCrc == otherDataCrc;
+  }
+
+  /// Parses a CRC string, returning `-1` ("unavailable") when it is null or unparseable.
+  private static long parseCrc(@Nullable String crc) {
+    if (crc == null) {
+      return -1;
+    }
+    try {
+      return Long.parseLong(crc);
+    } catch (NumberFormatException e) {
+      return -1;
+    }
   }
 
   public static String toUTCString(long epochMillis) {
@@ -252,5 +576,141 @@ public class MinionTaskUtils {
 
   public static long fromUTCString(String utcString) {
     return Instant.parse(utcString).toEpochMilli();
+  }
+
+  /// Get the validDocIdsType based on the upsertConfig and taskConfigs.
+  /// The default value is 'snapshot' It validates the combination of validDocIdsType, snapshot and
+  /// deleteRecordColumn:
+  ///
+  /// - 'snapshot' and 'snapshot_with_delete' require upsert snapshots to be enabled.
+  /// - 'snapshot_with_delete' and 'in_memory_with_delete' require a deleteRecordColumn to be configured.
+  ///
+  /// @param upsertConfig upsertConfig of the table
+  /// @param taskConfigs taskConfigs of the task
+  /// @param validDocIdsTypeKey the key to get validDocIdsType from taskConfigs
+  /// @return the validDocIdsType
+  public static ValidDocIdsType getValidDocIdsType(UpsertConfig upsertConfig, Map<String, String> taskConfigs,
+      String validDocIdsTypeKey) {
+    String validDocIdsTypeStr = taskConfigs.getOrDefault(validDocIdsTypeKey,
+        ValidDocIdsType.SNAPSHOT.name()).toUpperCase();
+    ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr);
+
+    if (validDocIdsType == ValidDocIdsType.SNAPSHOT || validDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
+      Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
+          "'snapshot' must not be 'DISABLE' with validDocIdsType: %s", validDocIdsType);
+    }
+
+    if (validDocIdsType == ValidDocIdsType.IN_MEMORY_WITH_DELETE
+        || validDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
+      Preconditions.checkState(StringUtils.isNotEmpty(upsertConfig.getDeleteRecordColumn()),
+          "'deleteRecordColumn' must be provided with validDocIdsType: %s", validDocIdsType);
+    }
+    return validDocIdsType;
+  }
+
+  /// Filters out segments that are past (or near) the table's retention period. This prevents task generators from
+  /// selecting segments that RetentionManager may delete before the task executor downloads them.
+  ///
+  /// Uses the same retention logic as `TimeRetentionStrategy`: a segment is considered expired if
+  /// `currentTimeMs - endTimeMs > effectiveRetentionMs`, where effectiveRetentionMs is
+  /// `retentionMs - bufferMs`.
+  ///
+  /// If [#RETENTION_EXPIRY_BUFFER_PERIOD_KEY] is set in `taskConfigs`, the effective retention is reduced
+  /// by that amount, excluding segments earlier — before RetentionManager actually deletes them. This is a table-level
+  /// config, not a per-merge-level config, because retention itself is table-level.
+  ///
+  /// **Note on hybrid tables:** This method reads only the table-level retention config
+  /// (`segmentsConfig.retentionTimeUnit/Value`). It does not account for hybrid retention strategies that use
+  /// the offline table's time boundary. If hybrid retention is enabled (off by default), RetentionManager may use a
+  /// different deletion boundary than what this method computes, so the filter may not perfectly match the controller's
+  /// deletion decisions for hybrid tables.
+  ///
+  /// **Watermark impact (MergeRollupTask):** This filter runs before watermark advancement. If all segments in an
+  /// early time bucket are filtered out, the watermark will advance past them permanently. This is a one-way door but
+  /// is expected: those segments would be purged by RetentionManager regardless. If this is caused by a misconfigured
+  /// `retentionExpiryBufferPeriod`, correcting the config will not recover already-skipped buckets.
+  ///
+  /// @apiNote Callers are expected to pass only completed segments (status DONE or UPLOADED). This method does not
+  /// check segment status, unlike `TimeRetentionStrategy.isPurgeable()` which skips incomplete segments. All
+  /// current callers (`UpsertCompactMergeTaskGenerator.getCandidateSegments`,
+  /// `MergeRollupTaskGenerator.getNonConsumingSegmentsZKMetadataForRealtimeTable`) already guarantee this.
+  ///
+  /// @param segments                    the candidate segments to filter (must not be null)
+  /// @param tableConfig                 the table config containing retention settings
+  /// @param taskConfigs                 task-level configs; may contain [#RETENTION_EXPIRY_BUFFER_PERIOD_KEY].
+  ///                                    Null if unavailable.
+  /// @param currentTimeMs               the current time in milliseconds (pass `System.currentTimeMillis()`)
+  /// @param useCreationTimeFallback     when true, segments with invalid end times are evaluated against their
+  ///                                    creation time; must match
+  ///                                    `controller.retentionManager.enableCreationTimeFallback` so this
+  ///                                    filter stays aligned with what RetentionManager will actually delete
+  /// @return filtered list excluding segments past effective retention; returns the original list if retention is not
+  ///         configured or cannot be parsed
+  public static List<SegmentZKMetadata> filterSegmentsPastRetention(List<SegmentZKMetadata> segments,
+      TableConfig tableConfig, @Nullable Map<String, String> taskConfigs, long currentTimeMs,
+      boolean useCreationTimeFallback) {
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
+    String retentionTimeValue = validationConfig.getRetentionTimeValue();
+    if (retentionTimeUnit == null || retentionTimeValue == null) {
+      return segments;
+    }
+
+    long retentionMs;
+    try {
+      retentionMs = TimeUnit.valueOf(retentionTimeUnit.toUpperCase()).toMillis(Long.parseLong(retentionTimeValue));
+    } catch (Exception e) {
+      LOGGER.warn("Failed to parse retention config for table: {}, skipping retention filter",
+          tableConfig.getTableName(), e);
+      return segments;
+    }
+
+    if (retentionMs <= 0) {
+      LOGGER.warn("Retention is non-positive ({}ms) for table: {}, skipping retention filter",
+          retentionMs, tableConfig.getTableName());
+      return segments;
+    }
+
+    long bufferMs = 0;
+    if (taskConfigs != null) {
+      String bufferPeriod = taskConfigs.get(RETENTION_EXPIRY_BUFFER_PERIOD_KEY);
+      if (bufferPeriod != null) {
+        try {
+          bufferMs = TimeUtils.convertPeriodToMillis(bufferPeriod);
+          if (bufferMs < 0) {
+            LOGGER.warn("Invalid retentionExpiryBufferPeriod '{}' for table: {}, using 0",
+                bufferPeriod, tableConfig.getTableName());
+            bufferMs = 0;
+          }
+        } catch (Exception e) {
+          LOGGER.warn("Failed to parse retentionExpiryBufferPeriod '{}' for table: {}, using 0",
+              bufferPeriod, tableConfig.getTableName(), e);
+        }
+      }
+    }
+
+    long effectiveRetentionMs = retentionMs - bufferMs;
+    if (effectiveRetentionMs <= 0) {
+      LOGGER.warn("retentionExpiryBufferPeriod ({}) >= retention ({}ms) for table: {}, skipping retention filter",
+          bufferMs, retentionMs, tableConfig.getTableName());
+      return segments;
+    }
+
+    String tableNameWithType = tableConfig.getTableName();
+    List<SegmentZKMetadata> filtered = new ArrayList<>();
+    int excludedCount = 0;
+    for (SegmentZKMetadata segment : segments) {
+      if (RetentionUtils.isPurgeable(tableNameWithType, segment, effectiveRetentionMs, currentTimeMs,
+          useCreationTimeFallback)) {
+        excludedCount++;
+      } else {
+        filtered.add(segment);
+      }
+    }
+    if (excludedCount > 0) {
+      LOGGER.info("Excluded {} segments past retention for table: {} (retentionMs={}, bufferMs={}, effectiveMs={})",
+          excludedCount, tableNameWithType, retentionMs, bufferMs, effectiveRetentionMs);
+    }
+    return filtered;
   }
 }

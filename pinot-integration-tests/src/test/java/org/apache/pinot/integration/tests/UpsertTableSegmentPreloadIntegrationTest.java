@@ -28,17 +28,15 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.client.ExecutionStats;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
-import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -104,14 +102,14 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
 
   @Override
   protected void overrideServerConf(PinotConfiguration serverConf) {
-    serverConf.setProperty(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + ".max.segment.preload.threads",
+    serverConf.setProperty(Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + ".max.segment.preload.threads",
         "1");
-    serverConf.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
-        HelixInstanceDataManagerConfig.UPSERT_CONFIG_PREFIX,
-        TableUpsertMetadataManagerFactory.UPSERT_DEFAULT_ENABLE_SNAPSHOT), "true");
-    serverConf.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
-        HelixInstanceDataManagerConfig.UPSERT_CONFIG_PREFIX,
-        TableUpsertMetadataManagerFactory.UPSERT_DEFAULT_ENABLE_PRELOAD), "true");
+    serverConf.setProperty(Joiner.on(".")
+        .join(Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX, Server.Upsert.CONFIG_PREFIX,
+            Server.Upsert.DEFAULT_ENABLE_SNAPSHOT), "true");
+    serverConf.setProperty(Joiner.on(".")
+        .join(Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX, Server.Upsert.CONFIG_PREFIX,
+            Server.Upsert.DEFAULT_ENABLE_PRELOAD), "true");
   }
 
   @AfterClass
@@ -210,22 +208,28 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
       throws Exception {
     // Pause consumption and wait until all consuming segments are committed and loaded as immutable segment
     String rawTableName = getTableName();
-    sendPostRequest(_controllerRequestURLBuilder.forPauseConsumption(rawTableName));
+    getOrCreateAdminClient().getTableClient().pauseConsumption(rawTableName);
     TestUtils.waitForCondition(aVoid -> {
       ExecutionStats executionStats =
           getPinotConnection().execute("SELECT COUNT(*) FROM " + rawTableName).getExecutionStats();
       return executionStats.getNumSegmentsQueried() == 5 && executionStats.getNumConsumingSegmentsQueried() == 0;
     }, 600_000L, "Failed to pause consumption");
     // Resume consumption to trigger snapshot
-    sendPostRequest(_controllerRequestURLBuilder.forResumeConsumption(rawTableName));
+    getOrCreateAdminClient().getTableClient().resumeConsumption(rawTableName, null);
 
-    // All the immutable (committed and uploaded) segments should have snapshots generated
+    // All the uploaded segments should have snapshots generated. Snapshots for the just committed segments are best
+    // effort: the snapshot round triggered by the new consuming segment skips a segment without retry when its
+    // segmentLock is still held, e.g. by the committing thread or the CONSUMING -> ONLINE state transition. Only the
+    // latest committed segment of each partition is best effort, but this test has a single commit cycle, so every
+    // LLC segment is a just committed one, and all of them are excluded from the check.
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     TestUtils.waitForCondition(aVoid -> {
       for (BaseServerStarter serverStarter : _serverStarters) {
-        String segmentDir = serverStarter.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR);
-        File[] files = new File(segmentDir, realtimeTableName).listFiles((dir, name) -> name.startsWith(rawTableName));
+        String segmentDir = serverStarter.getConfig().getProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR);
+        File[] files = new File(segmentDir, realtimeTableName).listFiles(
+            (dir, name) -> name.startsWith(rawTableName) && LLCSegmentName.of(name) == null);
         assertNotNull(files);
+        assertEquals(files.length, 3);
         for (File file : files) {
           if (!new File(new File(file, "v3"), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).exists()) {
             return false;

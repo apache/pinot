@@ -18,43 +18,27 @@
  */
 package org.apache.pinot.spi.trace;
 
-/**
- * Tracer responsible for trace state management. Users can implement this to filter
- * what data is recorded, choose what format it is reported in (e.g. logs, JFR events, in-memory)
- * and where it goes.
- */
+/// Tracer responsible for trace state management. Users can implement this to filter
+/// what data is recorded, choose what format it is reported in (e.g. logs, JFR events, in-memory)
+/// and where it goes.
 public interface Tracer {
 
-  /**
-   * Registers the requestId on the current thread. This means the request will be traced.
-   * TODO: Consider using string id or random id. Currently different broker might send query with the same request id.
-   *
-   * @param requestId the requestId
-   */
-  void register(long requestId);
+  /// Registers the current thread for tracing.
+  void register();
 
-  /**
-   * Detach a trace from the current thread.
-   */
+  /// Detach a trace from the current thread.
   void unregister();
 
-  /**
-   *
-   * @param clazz the enclosing context, e.g. Operator, PlanNode, BlockValSet...
-   * @return a new scope which MUST be closed on the current thread.
-   */
+  /// @param clazz the enclosing context, e.g. Operator, PlanNode, BlockValSet...
+  /// @return a new scope which MUST be closed on the current thread.
   InvocationScope createScope(Class<?> clazz);
 
-  /**
-   * Starts
-   * @return the request record
-   */
+  /// Starts
+  /// @return the request record
   default RequestScope createRequestScope() {
     return new DefaultRequestContext();
   }
 
-  /**
-   * @return the active recording
-   */
+  /// @return the active recording
   InvocationRecording activeRecording();
 }

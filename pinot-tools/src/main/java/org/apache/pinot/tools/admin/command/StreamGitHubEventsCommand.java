@@ -27,9 +27,7 @@ import org.apache.pinot.tools.utils.StreamSourceType;
 import picocli.CommandLine;
 
 
-/**
- * Command to stream GitHub events into a kafka topic or kinesis stream
- */
+/// Command to stream GitHub events into a kafka topic or kinesis stream
 @CommandLine.Command(name = "StreamGitHubEvents", mixinStandardHelpOptions = true)
 public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implements Command {
 

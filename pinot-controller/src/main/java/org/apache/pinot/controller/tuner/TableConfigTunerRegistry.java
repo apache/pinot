@@ -28,9 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Helper class to dynamically register all annotated {@link Tuner} classes.
- */
+/// Helper class to dynamically register all annotated [Tuner] classes.
 public class TableConfigTunerRegistry {
   private TableConfigTunerRegistry() {
   }
@@ -39,15 +37,13 @@ public class TableConfigTunerRegistry {
   private static final Map<String, TableConfigTuner> CONFIG_TUNER_MAP = new ConcurrentHashMap<>();
   private static boolean _init = false;
 
-  /**
-   * Init method that initializes the _configTunerMap with all available tuners.
-   * <ul>
-   *   <li>Scans all packages specified, for class paths that have 'tuner' in path.</li>
-   *   <li>Looks for {@link Tuner} annotation for classes and adds them to the map. </li>
-   *   <li>Also, asserts that init was not already called before.</li>
-   * </ul>
-   * @param packages Packages to scan.
-   */
+  /// Init method that initializes the \_configTunerMap with all available tuners.
+  ///
+  /// - Scans all packages specified, for class paths that have 'tuner' in path.
+  /// - Looks for [Tuner] annotation for classes and adds them to the map.
+  /// - Also, asserts that init was not already called before.
+  ///
+  /// @param packages Packages to scan.
   public static void init(List<String> packages) {
     if (_init) {
       LOGGER.info("TableConfigTunerRegistry already initialized, skipping.");
@@ -66,7 +62,7 @@ public class TableConfigTunerRegistry {
           String tunerName = tunerAnnotation.name();
           TableConfigTuner tuner;
           try {
-            tuner = (TableConfigTuner) tunerClass.newInstance();
+            tuner = (TableConfigTuner) tunerClass.getDeclaredConstructor().newInstance();
             CONFIG_TUNER_MAP.putIfAbsent(tunerName, tuner);
           } catch (Exception e) {
             LOGGER.error(String.format("Unable to register tuner %s . Cannot instantiate.", tunerName), e);

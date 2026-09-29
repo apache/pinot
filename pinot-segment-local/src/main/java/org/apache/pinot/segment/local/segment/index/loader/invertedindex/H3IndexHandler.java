@@ -20,30 +20,33 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
-import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.segment.index.readers.geospatial.ImmutableH3IndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.locationtech.jts.geom.Geometry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,8 +58,8 @@ public class H3IndexHandler extends BaseIndexHandler {
   private final Map<String, H3IndexConfig> _h3Configs;
 
   public H3IndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> fieldIndexConfigs,
-      @Nullable TableConfig tableConfig) {
-    super(segmentDirectory, fieldIndexConfigs, tableConfig);
+      TableConfig tableConfig, Schema schema) {
+    super(segmentDirectory, fieldIndexConfigs, tableConfig, schema);
     _h3Configs = FieldIndexConfigsUtil.enableConfigByColumn(StandardIndexes.h3(), _fieldIndexConfigs);
   }
 
@@ -70,6 +73,23 @@ public class H3IndexHandler extends BaseIndexHandler {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Need to remove existing H3 index from segment: {}, column: {}", segmentName, column);
         return true;
+      } else {
+        // Index already exists, check for change in resolution config
+        short newResolution = _h3Configs.get(column).getResolution().serialize();
+        short oldResolution;
+        try (H3IndexReader indexReader = new ImmutableH3IndexReader(
+            segmentReader.getIndexFor(column, StandardIndexes.h3()))) {
+          oldResolution = indexReader.getH3IndexResolution().serialize();
+        } catch (IOException e) {
+          LOGGER.warn("Failed to read existing H3 index for segment: {}, column: {}", segmentName, column, e);
+          continue;
+        }
+        if (newResolution != oldResolution) {
+          LOGGER.info(
+              "H3 index resolution changed for segment: {}, column: {}, old resolution: {}, new resolution: {}."
+                  + " Index needs to be rebuilt.", segmentName, column, oldResolution, newResolution);
+          return true;
+        }
       }
     }
     // Check if any new index need to be added.
@@ -95,6 +115,30 @@ public class H3IndexHandler extends BaseIndexHandler {
         LOGGER.info("Removing existing H3 index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, StandardIndexes.h3());
         LOGGER.info("Removed existing H3 index from segment: {}, column: {}", segmentName, column);
+      } else {
+        // Index already exists, check for change in resolution config
+        short newResolution = _h3Configs.get(column).getResolution().serialize();
+        short oldResolution;
+
+        try (H3IndexReader indexReader = new ImmutableH3IndexReader(
+            segmentWriter.getIndexFor(column, StandardIndexes.h3()))) {
+          oldResolution = indexReader.getH3IndexResolution().serialize();
+        } catch (IOException e) {
+          LOGGER.warn("Failed to read existing H3 index for segment: {}, column: {}", segmentName, column, e);
+          segmentWriter.removeIndex(column, StandardIndexes.h3());
+          columnsToAddIdx.add(column);
+          continue;
+        }
+
+        if (newResolution != oldResolution) {
+          LOGGER.info(
+              "H3 index resolution changed for segment: {}, column: {}, old resolution: {}, new resolution: {}. "
+                  + "Deleting existing H3 index before rebuilding a new one.",
+              segmentName, column, oldResolution, newResolution);
+          segmentWriter.removeIndex(column, StandardIndexes.h3());
+          LOGGER.info("Removed existing H3 index from segment: {}, column: {}", segmentName, column);
+          columnsToAddIdx.add(column);
+        }
       }
     }
     for (String column : columnsToAddIdx) {
@@ -159,10 +203,7 @@ public class H3IndexHandler extends BaseIndexHandler {
 
     FieldIndexConfigs colIndexConf = _fieldIndexConfigs.get(columnName);
 
-    IndexCreationContext context = IndexCreationContext.builder()
-        .withIndexDir(indexDir)
-        .withColumnMetadata(columnMetadata)
-        .build();
+    IndexCreationContext context = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata).build();
     H3IndexConfig config = colIndexConf.getConfig(StandardIndexes.h3());
 
     try (ForwardIndexReader forwardIndexReader = StandardIndexes.forward().getReaderFactory()
@@ -172,9 +213,23 @@ public class H3IndexHandler extends BaseIndexHandler {
             .createIndexReader(segmentWriter, colIndexConf, columnMetadata);
         GeoSpatialIndexCreator h3IndexCreator = StandardIndexes.h3().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();
-      for (int i = 0; i < numDocs; i++) {
-        int dictId = forwardIndexReader.getDictId(i, readerContext);
-        h3IndexCreator.add(GeometrySerializer.deserialize(dictionary.getBytesValue(dictId)));
+      // Old segments reloaded after a geo column was added hold a single empty default value (cardinality 1). Decode
+      // that one value once and reuse it for every doc, so the empty default is decoded a single time rather than per
+      // doc. Decoding through the creator's toGeometry() fast-paths the empty default value to null instead of failing
+      // the whole reload with a BufferUnderflowException, tolerating it the same way the segment-creation path does.
+      // For higher-cardinality columns, decode per doc instead of retaining one Geometry per dict id (which for a
+      // high-cardinality geo column would be roughly one per doc and risk a large heap during reload); the per-doc
+      // path still goes through toGeometry(), so the empty default value never throws.
+      if (dictionary.length() == 1) {
+        Geometry geometry = h3IndexCreator.toGeometry(dictionary.getBytesValue(0));
+        for (int i = 0; i < numDocs; i++) {
+          h3IndexCreator.add(geometry);
+        }
+      } else {
+        for (int i = 0; i < numDocs; i++) {
+          int dictId = forwardIndexReader.getDictId(i, readerContext);
+          h3IndexCreator.add(h3IndexCreator.toGeometry(dictionary.getBytesValue(dictId)));
+        }
       }
       h3IndexCreator.seal();
     }
@@ -184,17 +239,19 @@ public class H3IndexHandler extends BaseIndexHandler {
       throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     String columnName = columnMetadata.getColumnName();
-    IndexCreationContext context = IndexCreationContext.builder()
-        .withIndexDir(indexDir)
-        .withColumnMetadata(columnMetadata)
-        .build();
+    IndexCreationContext context = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata).build();
     H3IndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.h3());
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
+    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+    try (ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
+        _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         GeoSpatialIndexCreator h3IndexCreator = StandardIndexes.h3().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();
       for (int i = 0; i < numDocs; i++) {
-        h3IndexCreator.add(GeometrySerializer.deserialize(forwardIndexReader.getBytes(i, readerContext)));
+        // See handleDictionaryBasedColumn: toGeometry() fast-paths empty/default geometry values to null (no
+        // per-row exception) and add(Geometry) tolerates them on reload the same way segment creation does. The raw
+        // path has no dictionary, so values cannot be cached across docs.
+        h3IndexCreator.add(h3IndexCreator.toGeometry(forwardIndexReader.getBytes(i, readerContext)));
       }
       h3IndexCreator.seal();
     }

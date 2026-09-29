@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -34,6 +33,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexWindowBounds;
+import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.fun.SqlSumAggFunction;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
@@ -97,11 +97,12 @@ public class PinotWindowExchangeNodeInsertRuleTest {
     Mockito.when(upperBoundInputRef.getIndex()).thenReturn(4);
     Mockito.when(upperBoundInputRef.getType()).thenReturn(intType);
 
-    List<Window.Group> groups = Collections.singletonList(
+    List<Window.Group> groups = List.of(
         new Window.Group(ImmutableBitSet.of(List.of(1)), true, RexWindowBounds.preceding(lowerBoundInputRef),
-            RexWindowBounds.following(upperBoundInputRef), RelCollations.of(2), List.of(
-            new Window.RexWinAggCall(new SqlSumAggFunction(intType), intType, List.of(windowFunctionInputRef), 0, false,
-                false))));
+            RexWindowBounds.following(upperBoundInputRef), RexWindowExclusion.EXCLUDE_NO_OTHER, RelCollations.of(2),
+            List.of(
+                new Window.RexWinAggCall(new SqlSumAggFunction(intType), intType, List.of(windowFunctionInputRef), 0,
+                    false, false))));
 
     List<RexLiteral> literals = List.of(REX_BUILDER.makeLiteral(5, intType), REX_BUILDER.makeLiteral(10, intType));
     LogicalWindow originalWindow = LogicalWindow.create(RelTraitSet.createEmpty(), _input, literals, intType, groups);

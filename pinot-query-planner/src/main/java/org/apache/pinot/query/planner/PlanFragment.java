@@ -18,15 +18,13 @@
  */
 package org.apache.pinot.query.planner;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 
 
-/**
- * The {@code PlanFragment} is the logical sub query plan that should be scheduled together from the result of
- * {@link org.apache.pinot.query.planner.logical.PlanFragmenter}.
- *
- */
+/// The `PlanFragment` is the logical sub query plan that should be scheduled together from the result of
+/// [org.apache.pinot.query.planner.logical.PlanFragmenter].
 public class PlanFragment {
 
   private final int _fragmentId;
@@ -37,9 +35,14 @@ public class PlanFragment {
   public PlanFragment(int fragmentId, PlanNode fragmentRoot, List<PlanFragment> children) {
     _fragmentId = fragmentId;
     _fragmentRoot = fragmentRoot;
+    Preconditions.checkArgument(fragmentRoot.getStageId() == fragmentId,
+        "Fragment root stageId: %s does not match fragmentId: %s", fragmentRoot.getStageId(), fragmentId);
     _children = children;
   }
 
+  /// Returns the fragment id
+  ///
+  /// Fragment id is the stage id of the fragment root.
   public int getFragmentId() {
     return _fragmentId;
   }

@@ -18,54 +18,52 @@
  */
 package org.apache.pinot.core.common.datablock;
 
-import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datablock.RowDataBlock;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
 public class DataBlockTest {
-  private static final List<ColumnDataType> EXCLUDE_DATA_TYPES =
-      ImmutableList.of(ColumnDataType.OBJECT, ColumnDataType.JSON, ColumnDataType.BYTES, ColumnDataType.BYTES_ARRAY);
+  private static final List<ColumnDataType> EXCLUDE_DATA_TYPES = List.of(ColumnDataType.JSON, ColumnDataType.OBJECT);
   private static final int TEST_ROW_COUNT = 5;
 
   @Test
-  public void testException()
-      throws IOException {
+  public void testException() {
     Exception originalException = new UnsupportedOperationException("Expected test exception.");
-    ProcessingException processingException =
-        QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, originalException);
-    String expected = processingException.getMessage();
+    String expected = "Expected test error";
 
-    DataBlock dataBlock = DataBlockUtils.getErrorDataBlock(originalException);
-    dataBlock.addException(processingException);
+    String ex = DataBlockUtils.extractErrorMsg(originalException);
+    DataBlock dataBlock = MetadataBlock.newError(-1, -1, null, Map.of(QueryErrorCode.UNKNOWN.getId(), ex));
+    dataBlock.addException(QueryErrorCode.QUERY_EXECUTION, expected);
     Assert.assertEquals(dataBlock.getNumberOfRows(), 0);
 
     // Assert processing exception and original exception both matches.
-    String actual = dataBlock.getExceptions().get(QueryException.QUERY_EXECUTION_ERROR.getErrorCode());
+    String actual = dataBlock.getExceptions().get(QueryErrorCode.QUERY_EXECUTION.getId());
     Assert.assertEquals(actual, expected);
     Assert.assertTrue(
-        dataBlock.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(originalException.getMessage()));
+        dataBlock.getExceptions().get(QueryErrorCode.UNKNOWN.getId()).contains(originalException.getMessage()));
   }
 
   @Test(dataProvider = "testTypeNullPercentile")
   public void testAllDataTypes(int nullPercentile)
-      throws Exception {
+      throws IOException {
     ColumnDataType[] allDataTypes = ColumnDataType.values();
-    List<ColumnDataType> columnDataTypes = new ArrayList<ColumnDataType>();
-    List<String> columnNames = new ArrayList<String>();
+    List<ColumnDataType> columnDataTypes = new ArrayList<>();
+    List<String> columnNames = new ArrayList<>();
     for (int i = 0; i < allDataTypes.length; i++) {
       if (!EXCLUDE_DATA_TYPES.contains(allDataTypes[i])) {
         columnNames.add(allDataTypes[i].name());
@@ -116,33 +114,31 @@ public class DataBlockTest {
     return new Object[][]{new Object[]{0}, new Object[]{10}, new Object[]{100}};
   }
 
-  /**
-   * TODO: bytes array serialization probably needs fixing.
-   */
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Unsupported stored type:"
-      + " BYTES_ARRAY.*")
-  public void bytesArraySerDe()
-      throws Exception {
-    Object[] row = new Object[1];
-    row[0] = new byte[][]{new byte[]{0xD, 0xA}, new byte[]{0xD, 0xA}};
-    List<Object[]> rows = new ArrayList<>();
-    rows.add(row);
-    DataSchema dataSchema = new DataSchema(new String[]{"byteArray"}, new ColumnDataType[]{ColumnDataType.BYTES_ARRAY});
-    DataBlockBuilder.buildFromRows(rows, dataSchema);
-  }
-
   @Test
   public void intArraySerDe()
       throws IOException {
-    Object[] row = new Object[1];
-    row[0] = new int[0];
+    Object[] row = new Object[]{new int[0]};
     List<Object[]> rows = new ArrayList<>();
     rows.add(row);
     DataSchema dataSchema = new DataSchema(new String[]{"intArray"}, new ColumnDataType[]{ColumnDataType.INT_ARRAY});
     DataBlock dataBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
-    List<ByteBuffer> serialize = dataBlock.serialize();
-    DataBlock deserialized = DataBlockUtils.deserialize(serialize);
+    List<ByteBuffer> serialized = dataBlock.serialize();
+    DataBlock deserialized = DataBlockUtils.deserialize(serialized);
     int[] intArray = deserialized.getIntArray(0, 0);
     Assert.assertEquals(intArray.length, 0);
+  }
+
+  @Test
+  public void bytesArraySerDe()
+      throws IOException {
+    ByteArray[] expected = new ByteArray[]{new ByteArray(new byte[]{0xD, 0xA}), new ByteArray(new byte[]{0xB, 0xE})};
+    Object[] row = new Object[]{expected};
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(row);
+    DataSchema dataSchema = new DataSchema(new String[]{"byteArray"}, new ColumnDataType[]{ColumnDataType.BYTES_ARRAY});
+    DataBlock dataBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
+    List<ByteBuffer> serialized = dataBlock.serialize();
+    DataBlock deserialized = DataBlockUtils.deserialize(serialized);
+    Assert.assertEquals(deserialized.getBytesArray(0, 0), expected);
   }
 }

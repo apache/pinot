@@ -21,21 +21,17 @@ package org.apache.pinot.core.query.aggregation.groupby;
 import com.google.common.base.Preconditions;
 
 
-/**
- * Result Holder implemented using ObjectArray.
- */
+/// Result Holder implemented using ObjectArray.
 public class ObjectGroupByResultHolder implements GroupByResultHolder {
   private final int _maxCapacity;
 
   private int _resultHolderCapacity;
   private Object[] _resultArray;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param initialCapacity Initial capacity of the result holder
-   * @param maxCapacity Maximum capacity of the result holder
-   */
+  /// Constructor for the class.
+  ///
+  /// @param initialCapacity Initial capacity of the result holder
+  /// @param maxCapacity Maximum capacity of the result holder
   public ObjectGroupByResultHolder(int initialCapacity, int maxCapacity) {
     _maxCapacity = maxCapacity;
 
@@ -71,6 +67,11 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
   }
 
   @Override
+  public long getLongResult(int groupKey) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   @SuppressWarnings("unchecked")
   public <T> T getResult(int groupKey) {
     if (groupKey == GroupKeyGenerator.INVALID_ID) {
@@ -89,6 +90,13 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
 
   @Override
   public void setValueForKey(int groupKey, int newValue) {
+    if (groupKey != GroupKeyGenerator.INVALID_ID) {
+      _resultArray[groupKey] = newValue;
+    }
+  }
+
+  @Override
+  public void setValueForKey(int groupKey, long newValue) {
     if (groupKey != GroupKeyGenerator.INVALID_ID) {
       _resultArray[groupKey] = newValue;
     }

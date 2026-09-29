@@ -29,20 +29,20 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 
 
-/**
- * The REGEXP_EXTRACT transform function takes maximum 4 arguments:
- * {@code REGEXP_EXTRACT(`value`, `regexp`[, `pos`, `group`])}
- * <ul>
- *   <li>value: a string used to match the regular expression.</li>
- *   <li>regex: the regular expression.</li>
- *   <li>group: the regular expression match group to extract.</li>
- *   <li>default_value: value when no match found, default to empty String.</li>
- * </ul>
- * Returns the first substring in `value` that matches the `regexp`.
- * <p>Returns empty String or the default_value if there is no match.
- * <p>If `group` is specified, the search returns a specific group of
- * the regexp in `value`, otherwise it returns the entire match.
- */
+/// The REGEXP_EXTRACT transform function takes maximum 4 arguments:
+/// ``REGEXP_EXTRACT(`value`, `regexp`[, `pos`, `group`])``
+///
+/// - value: a string used to match the regular expression.
+/// - regex: the regular expression.
+/// - group: the regular expression match group to extract.
+/// - default_value: value when no match found, default to empty String.
+///
+/// Returns the first substring in `value` that matches the `regexp`.
+///
+/// Returns empty String or the default_value if there is no match.
+///
+/// If `group` is specified, the search returns a specific group of
+/// the regexp in `value`, otherwise it returns the entire match.
 public class RegexpExtractTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "REGEXP_EXTRACT";
 

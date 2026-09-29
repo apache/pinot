@@ -40,6 +40,10 @@ message PlanNode {
     ValueNode valueNode = 14;
     WindowNode windowNode = 15;
     ExplainNode explainNode = 16;
+    // Deprecated: enriched joins have been removed. Field 17 is retained (never reused) so that plans
+    // serialized by an older-version broker can still be deserialized. No current broker sets this field.
+    EnrichedJoinNode enrichedJoinNode = 17 [deprecated = true];
+    UnnestNode unnestNode = 18;
   }
 }
 
@@ -63,12 +67,30 @@ enum AggType {
   FINAL = 3;
 }
 
+// One grouping set of a GROUP BY GROUPING SETS / ROLLUP / CUBE aggregate: the indexes into
+// AggregateNode.groupKeys (the union of all grouping columns) that participate in (are grouped by) the set.
+// An empty list is the grand-total set ().
+message GroupingSet {
+  repeated int32 groupKeyIndexes = 1;
+}
+
 message AggregateNode {
   repeated FunctionCall aggCalls = 1;
   repeated int32 filterArgs = 2;
   repeated int32 groupKeys = 3;
   AggType aggType = 4;
   bool leafReturnFinalResult = 5;
+  repeated Collation collations = 6;
+  int32 limit = 7;
+  // GROUP BY GROUPING SETS / ROLLUP / CUBE: one entry per grouping set, in plan order; a set's position in
+  // this list is its ordinal, carried as the synthetic $groupingId discriminator, so the number of grouping
+  // columns is unlimited (mirroring Calcite's per-set column bitset). Empty for a plain GROUP BY.
+  // Rolling upgrade: a server that predates this field ignores it and runs a plain GROUP BY, returning results
+  // without the $groupingId column the final stage expects. The leaf-to-final reconciliation is positional (by
+  // column type, not name), so this is NOT rejected cleanly — it surfaces as an opaque error or as silently
+  // collapsed/wrong results (missing subtotal/grand-total rows). Upgrade all servers before issuing grouping-set
+  // queries.
+  repeated GroupingSet groupingSets = 8;
 }
 
 message FilterNode {
@@ -82,11 +104,14 @@ enum JoinType {
   FULL = 3;
   SEMI = 4;
   ANTI = 5;
+  ASOF = 6;
+  LEFT_ASOF = 7;
 }
 
 enum JoinStrategy {
   HASH = 0;
   LOOKUP = 1;
+  AS_OF = 2;
 }
 
 message JoinNode {
@@ -95,6 +120,39 @@ message JoinNode {
   repeated int32 rightKeys = 3;
   repeated Expression nonEquiConditions = 4;
   JoinStrategy joinStrategy = 5;
+  Expression matchCondition = 6;
+}
+
+enum FilterProjectRexType {
+  FILTER = 0;
+  PROJECT = 1;
+}
+
+message ProjectAndResultSchema {
+  repeated Expression project = 1;
+  DataSchema schema = 2;
+}
+
+message FilterProjectRex {
+  FilterProjectRexType type = 1;
+  optional Expression filter = 2;
+  optional ProjectAndResultSchema projectAndResultSchema = 3;
+}
+
+// Deprecated: enriched joins have been removed. Retained only so plans from an older-version broker
+// can still be deserialized. No current broker produces this message.
+message EnrichedJoinNode {
+  option deprecated = true;
+  JoinType joinType = 1;
+  repeated int32 leftKeys = 2;
+  repeated int32 rightKeys = 3;
+  repeated Expression nonEquiConditions = 4;
+  JoinStrategy joinStrategy = 5;
+  Expression matchCondition = 6;
+  repeated FilterProjectRex filterProjectRex = 7;
+  DataSchema joinResultDataSchema = 8;
+  int32 fetch = 9;
+  int32 offset = 10;
 }
 
 enum ExchangeType {
@@ -144,13 +202,16 @@ message MailboxReceiveNode {
 }
 
 message MailboxSendNode {
-  int32 receiverStageId = 1;
+  // kept for backward compatibility. Brokers populate it, but servers should prioritize receiverStageIds
+  int32 receiverStageId = 1  [deprecated = true];
   ExchangeType exchangeType = 2;
   DistributionType distributionType = 3;
   repeated int32 keys = 4;
   bool prePartitioned = 5;
   repeated Collation collations = 6;
   bool sort = 7;
+  repeated int32 receiverStageIds = 8;
+  string hashFunction = 9;
 }
 
 message ProjectNode {
@@ -187,9 +248,34 @@ message ValueNode {
   repeated LiteralRow literalRows = 1;
 }
 
+message UnnestNode {
+  // Expressions that evaluate to arrays/multi-values to be unnested
+  repeated Expression arrayExprs = 1;
+  // Whether the table function emits a 1-based ordinality column.
+  bool withOrdinality = 2;
+  // Optional absolute output indexes for each result column in the stage schema.
+  repeated int32 elementIndexes = 3;
+  // Optional absolute output index of the ordinality column in the stage schema.
+  optional int32 ordinalityIndex = 4;
+  // When prunedPassthrough is true, the input-row column indexes copied into the output, in output order.
+  // When absent/empty (old brokers), the operator copies the whole input row (legacy behavior).
+  repeated int32 passthroughInputIndexes = 5;
+  // Whether the output schema was pruned to only the input columns referenced downstream. Absent => false => legacy.
+  bool prunedPassthrough = 6;
+}
+
 enum WindowFrameType {
   ROWS = 0;
   RANGE = 1;
+}
+
+// SQL standard `<window exclusion>` clause. Names are wire-stable; renumbering breaks mixed-version brokers/servers.
+// `EXCLUDE_NO_OTHERS = 0` so that nodes serialized before this field existed deserialize to the default behavior.
+enum WindowExclusion {
+  EXCLUDE_NO_OTHERS = 0;
+  EXCLUDE_CURRENT_ROW = 1;
+  EXCLUDE_GROUP = 2;
+  EXCLUDE_TIES = 3;
 }
 
 message WindowNode {
@@ -200,6 +286,7 @@ message WindowNode {
   int32 lowerBound = 5;
   int32 upperBound = 6;
   repeated Literal constants = 7;
+  WindowExclusion exclude = 8;
 }
 
 // A node that doesn't carry semantic information.

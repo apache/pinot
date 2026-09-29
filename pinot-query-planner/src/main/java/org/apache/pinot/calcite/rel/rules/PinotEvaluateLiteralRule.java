@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -44,24 +45,26 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.NlsString;
 import org.apache.pinot.common.function.FunctionInfo;
-import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
-/**
- * PinotEvaluateLiteralRule that matches the literal only function calls and evaluates them.
- */
+/// PinotEvaluateLiteralRule that matches the literal only function calls and evaluates them.
 public class PinotEvaluateLiteralRule {
 
   public static class Project extends RelOptRule {
-    public static final Project INSTANCE = new Project(PinotRuleUtils.PINOT_REL_FACTORY);
+    public static final Project INSTANCE = new Project(PinotRuleUtils.PINOT_REL_FACTORY, null);
 
-    private Project(RelBuilderFactory factory) {
-      super(operand(LogicalProject.class, any()), factory, null);
+    public static Project instanceWithDescription(String description) {
+      return new Project(PinotRuleUtils.PINOT_REL_FACTORY, description);
+    }
+
+    private Project(RelBuilderFactory factory, @Nullable String description) {
+      super(operand(LogicalProject.class, any()), factory, description);
     }
 
     @Override
@@ -75,9 +78,7 @@ public class PinotEvaluateLiteralRule {
     }
   }
 
-  /**
-   * Constructs a new LogicalProject that matches the type of the old LogicalProject.
-   */
+  /// Constructs a new LogicalProject that matches the type of the old LogicalProject.
   private static LogicalProject constructNewProject(LogicalProject oldProject, LogicalProject newProject,
       RexBuilder rexBuilder) {
     List<RexNode> oldProjects = oldProject.getProjects();
@@ -102,10 +103,14 @@ public class PinotEvaluateLiteralRule {
   }
 
   public static class Filter extends RelOptRule {
-    public static final Filter INSTANCE = new Filter(PinotRuleUtils.PINOT_REL_FACTORY);
+    public static final Filter INSTANCE = new Filter(PinotRuleUtils.PINOT_REL_FACTORY, null);
 
-    private Filter(RelBuilderFactory factory) {
-      super(operand(LogicalFilter.class, any()), factory, null);
+    public static Filter instanceWithDescription(String description) {
+      return new Filter(PinotRuleUtils.PINOT_REL_FACTORY, description);
+    }
+
+    private Filter(RelBuilderFactory factory, @Nullable String description) {
+      super(operand(LogicalFilter.class, any()), factory, description);
     }
 
     @Override
@@ -119,9 +124,7 @@ public class PinotEvaluateLiteralRule {
     }
   }
 
-  /**
-   * A RexShuttle that recursively evaluates all the calls with literal only operands.
-   */
+  /// A RexShuttle that recursively evaluates all the calls with literal only operands.
   private static class EvaluateLiteralShuttle extends RexShuttle {
     final RexBuilder _rexBuilder;
 
@@ -143,24 +146,21 @@ public class PinotEvaluateLiteralRule {
     }
   }
 
-  /**
-   * Evaluates the literal only function and returns the result as a RexLiteral if it can be evaluated, or the function
-   * itself (RexCall) if it cannot be evaluated.
-   */
+  /// Evaluates the literal only function and returns the result as a RexLiteral if it can be evaluated, or the function
+  /// itself (RexCall) if it cannot be evaluated.
   private static RexNode evaluateLiteralOnlyFunction(RexCall rexCall, RexBuilder rexBuilder) {
     List<RexNode> operands = rexCall.getOperands();
     assert operands.stream().allMatch(
         operand -> operand instanceof RexLiteral || (operand instanceof RexCall && ((RexCall) operand).getOperands()
             .stream().allMatch(op -> op instanceof RexLiteral)));
+
     int numArguments = operands.size();
     ColumnDataType[] argumentTypes = new ColumnDataType[numArguments];
     Object[] arguments = new Object[numArguments];
     for (int i = 0; i < numArguments; i++) {
       RexNode rexNode = operands.get(i);
       RexLiteral rexLiteral;
-      if (rexNode instanceof RexCall && ((RexCall) rexNode).getOperator().getKind() == SqlKind.CAST) {
-        rexLiteral = (RexLiteral) ((RexCall) rexNode).getOperands().get(0);
-      } else if (rexNode instanceof RexLiteral) {
+      if (rexNode instanceof RexLiteral) {
         rexLiteral = (RexLiteral) rexNode;
       } else {
         // Function operands cannot be evaluated, skip
@@ -169,16 +169,35 @@ public class PinotEvaluateLiteralRule {
       argumentTypes[i] = RelToPlanNodeConverter.convertToColumnDataType(rexLiteral.getType());
       arguments[i] = getLiteralValue(rexLiteral);
     }
+
+    if (rexCall.getKind() == SqlKind.CAST) {
+      // Handle separately because the CAST operator only has one operand (the value to be cast) and the type to be cast
+      // to is determined by the operator's return type. Pinot's CAST function implementation requires two arguments:
+      // the value to be cast and the target type.
+      argumentTypes = new ColumnDataType[]{argumentTypes[0], ColumnDataType.STRING};
+      arguments = new Object[]{arguments[0], RelToPlanNodeConverter.convertToColumnDataType(rexCall.getType()).name()};
+    }
     String canonicalName = FunctionRegistry.canonicalize(PinotRuleUtils.extractFunctionName(rexCall));
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
-    if (functionInfo == null) {
+    if (functionInfo == null || !functionInfo.isDeterministic()) {
       // Function cannot be evaluated
       return rexCall;
     }
     RelDataType rexNodeType = rexCall.getType();
+    if (rexNodeType.getSqlTypeName() == SqlTypeName.DECIMAL) {
+      rexNodeType = convertDecimalType(rexNodeType, rexBuilder);
+    } else if (isUnsignedIntegerType(rexNodeType.getSqlTypeName())) {
+      // Pinot has no unsigned storage and Calcite cannot build a RexLiteral of an unsigned type (CALCITE-1466), so
+      // fold the constant into its signed-equivalent type. Mirrors the unsigned->signed mapping that
+      // RelToPlanNodeConverter#convertToColumnDataType applies everywhere else -- which also means an unsupported
+      // UBIGINT literal cast is rejected here too, since that method throws for UBIGINT.
+      RelDataType signedType =
+          RelToPlanNodeConverter.convertToColumnDataType(rexNodeType).toType(rexBuilder.getTypeFactory());
+      rexNodeType = rexBuilder.getTypeFactory().createTypeWithNullability(signedType, rexNodeType.isNullable());
+    }
     Object resultValue;
     try {
-      FunctionInvoker invoker = new FunctionInvoker(functionInfo);
+      QueryFunctionInvoker invoker = new QueryFunctionInvoker(functionInfo);
       if (functionInfo.getMethod().isVarArgs()) {
         resultValue = invoker.invoke(new Object[]{arguments});
       } else {
@@ -197,8 +216,8 @@ public class PinotEvaluateLiteralRule {
       }
     } catch (Exception e) {
       throw new SqlCompilationException(
-          "Caught exception while invoking method: " + functionInfo.getMethod() + " with arguments: " + Arrays.toString(
-              arguments), e);
+          "Caught exception while invoking method: " + functionInfo.getMethod().getName() + " with arguments: "
+              + Arrays.toString(arguments) + ": " + e.getMessage(), e);
     }
     try {
       resultValue = convertResultValue(resultValue, rexNodeType);
@@ -212,8 +231,16 @@ public class PinotEvaluateLiteralRule {
     try {
       if (rexNodeType instanceof ArraySqlType) {
         List<Object> resultValues = new ArrayList<>();
-        for (Object value : (Object[]) resultValue) {
-          resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
+
+        // SQL FLOAT and DOUBLE literals are represented as Java double
+        if (resultValue instanceof double[]) {
+          for (double value: (double[]) resultValue) {
+            resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
+          }
+        } else {
+          for (Object value : (Object[]) resultValue) {
+            resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
+          }
         }
         return rexBuilder.makeLiteral(resultValues, rexNodeType, false);
       }
@@ -221,6 +248,23 @@ public class PinotEvaluateLiteralRule {
     } catch (Exception e) {
       throw new SqlCompilationException(
           "Caught exception while making literal with value: " + resultValue + " and type: " + rexNodeType, e);
+    }
+  }
+
+  private static RelDataType convertDecimalType(RelDataType relDataType, RexBuilder rexBuilder) {
+    Preconditions.checkArgument(relDataType.getSqlTypeName() == SqlTypeName.DECIMAL);
+    return RelToPlanNodeConverter.convertToColumnDataType(relDataType).toType(rexBuilder.getTypeFactory());
+  }
+
+  private static boolean isUnsignedIntegerType(SqlTypeName sqlTypeName) {
+    switch (sqlTypeName) {
+      case UTINYINT:
+      case USMALLINT:
+      case UINTEGER:
+      case UBIGINT:
+        return true;
+      default:
+        return false;
     }
   }
 
@@ -258,12 +302,18 @@ public class PinotEvaluateLiteralRule {
         return TimestampUtils.toMillisSinceEpoch(resultValue.toString());
       }
     }
-    // Return BigDecimal for numbers
-    if (resultValue instanceof Integer || resultValue instanceof Long) {
+    // Use BigDecimal for INTEGER / BIGINT literals. (Unsigned integer types are normalized to their signed-equivalent
+    // type earlier in convertRexCall, so they never reach here as an unsigned SqlTypeName.)
+    if (relDataType.getSqlTypeName() == SqlTypeName.INTEGER || relDataType.getSqlTypeName() == SqlTypeName.BIGINT) {
       return new BigDecimal(((Number) resultValue).longValue());
     }
-    if (resultValue instanceof Float || resultValue instanceof Double) {
+    if (relDataType.getSqlTypeName() == SqlTypeName.DECIMAL) {
       return new BigDecimal(resultValue.toString());
+    }
+    // Use double for FLOAT / DOUBLE literals
+    if (relDataType.getSqlTypeName() == SqlTypeName.FLOAT || relDataType.getSqlTypeName() == SqlTypeName.DOUBLE
+        || relDataType.getSqlTypeName() == SqlTypeName.REAL) {
+      return ((Number) resultValue).doubleValue();
     }
     // Return ByteString for byte[]
     if (resultValue instanceof byte[]) {

@@ -46,10 +46,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class to implement LaunchDataIngestionJob command.
- *
- */
+/// Class to implement LaunchDataIngestionJob command.
 @CommandLine.Command(name = "LaunchSparkDataIngestionJob", mixinStandardHelpOptions = true)
 public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(LaunchSparkDataIngestionJobCommand.class);
@@ -74,7 +71,7 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   // Kafka plugins need to be excluded as they contain scala dependencies which cause
   // NoSuchMethodErrors with runtime spark.
   // It is also fine to exclude Kafka plugins as they are not going to be used in batch ingestion in any case
-  @CommandLine.Option(names = {"-pluginsToExclude"}, defaultValue = "pinot-kafka-0.9:pinot-kafka-2.0", required =
+  @CommandLine.Option(names = {"-pluginsToExclude"}, defaultValue = "pinot-kafka-3.0", required =
       false, arity = "1..*", split = ":", description =
       "List " + "of plugin name separated by : to not load at runtime. e.g. pinto-s3:pinot-parquet")
   private List<String> _pluginsToExclude;
@@ -330,8 +327,12 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   }
 
   enum SparkType {
-    SPARK_2("2.4.0", "pinot-batch-ingestion-spark-2.4", JavaVersion.JAVA_1_8),
-    SPARK_3("3.2.1", "pinot-batch-ingestion-spark-3.2", JavaVersion.JAVA_11);
+    // The plugin name must match the directory the plugin ships in, which is what
+    // shouldLoadPlugin() compares it against. It read "pinot-batch-ingestion-spark-3.2" while the
+    // module has always been pinot-batch-ingestion-spark-3, so the comparison never matched and
+    // the ingestion plugin was never selected: because its directory name contains "spark" it is
+    // first excluded, and this is the clause meant to bring it back.
+    SPARK_3("3.2.1", "pinot-batch-ingestion-spark-3", JavaVersion.JAVA_11);
 
     private final String _sparkVersion;
     private final String _pluginName;

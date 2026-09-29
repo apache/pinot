@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.query;
 import com.google.common.base.CaseFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -52,27 +51,23 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Operator for selection order-by queries.
- * <p>The operator uses a priority queue to sort the rows and return the top rows based on the order-by expressions.
- * <p>It is optimized to fetch only the values needed for the ordering purpose and the final result:
- * <ul>
- *   <li>
- *     When all the output expressions are ordered, the operator fetches all the output expressions and insert them into
- *     the priority queue because all the values are needed for ordering.
- *   </li>
- *   <li>
- *     Otherwise, the operator fetches only the order-by expressions and the virtual document id column and insert them
- *     into the priority queue. After getting the top rows, the operator does a second round scan only on the document
- *     ids for the top rows for the non-order-by output expressions. This optimization can significantly reduce the
- *     scanning and improve the query performance when most/all of the output expressions are not ordered (e.g. SELECT *
- *     FROM table ORDER BY col).
- *   </li>
- * </ul>
- */
+/// Operator for selection order-by queries.
+///
+/// The operator uses a priority queue to sort the rows and return the top rows based on the order-by expressions.
+///
+/// It is optimized to fetch only the values needed for the ordering purpose and the final result:
+///
+/// - When all the output expressions are ordered, the operator fetches all the output expressions and insert them
+///   into the priority queue because all the values are needed for ordering.
+/// - Otherwise, the operator fetches only the order-by expressions and the virtual document id column and insert
+///   them into the priority queue. After getting the top rows, the operator does a second round scan only on the
+///   document ids for the top rows for the non-order-by output expressions. This optimization can significantly
+///   reduce the scanning and improve the query performance when most/all of the output expressions are not ordered
+///   (e.g. SELECT \* FROM table ORDER BY col).
 public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock> {
   private static final String EXPLAIN_NAME = "SELECT_ORDERBY";
 
@@ -151,9 +146,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     }
   }
 
-  /**
-   * Helper method to compute the result when all the output expressions are ordered.
-   */
+  /// Helper method to compute the result when all the output expressions are ordered.
   private SelectionResultsBlock computeAllOrdered() {
     int numExpressions = _expressions.size();
 
@@ -189,6 +182,11 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
         }
       }
       _numDocsScanned += numDocsFetched;
+      QueryScanCostContext scanCost = getScanCostContext();
+      if (scanCost != null) {
+        scanCost.addDocsScanned(numDocsFetched);
+        scanCost.addEntriesScannedPostFilter((long) numDocsFetched * numColumnsProjected);
+      }
     }
     _numEntriesScannedPostFilter = (long) _numDocsScanned * numColumnsProjected;
 
@@ -205,9 +203,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator, _queryContext);
   }
 
-  /**
-   * Helper method to compute the result when not all the output expressions are ordered.
-   */
+  /// Helper method to compute the result when not all the output expressions are ordered.
   private SelectionResultsBlock computePartiallyOrdered() {
     int numExpressions = _expressions.size();
     int numOrderByExpressions = _orderByExpressions.size();
@@ -253,6 +249,11 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
         }
       }
       _numDocsScanned += numDocsFetched;
+      QueryScanCostContext scanCost2 = getScanCostContext();
+      if (scanCost2 != null) {
+        scanCost2.addDocsScanned(numDocsFetched);
+        scanCost2.addEntriesScannedPostFilter((long) numDocsFetched * numColumnsProjected);
+      }
     }
     _numEntriesScannedPostFilter = (long) _numDocsScanned * numColumnsProjected;
 
@@ -279,64 +280,67 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     int numColumns = columns.size();
     Map<String, DataSource> dataSourceMap = new HashMap<>();
     for (String column : columns) {
-      dataSourceMap.put(column, _indexSegment.getDataSource(column));
+      dataSourceMap.put(column, _indexSegment.getDataSource(column, _queryContext.getSchema()));
     }
-    ProjectionOperator projectionOperator =
-        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, new BitmapDocIdSetOperator(docIds, numRows));
-    TransformOperator transformOperator =
-        new TransformOperator(_queryContext, projectionOperator, nonOrderByExpressions);
 
-    // Fill the non-order-by expression values
-    int numNonOrderByExpressions = nonOrderByExpressions.size();
-    blockValSets = new BlockValSet[numNonOrderByExpressions];
-    int rowBaseId = 0;
-    while ((valueBlock = transformOperator.nextBlock()) != null) {
-      for (int i = 0; i < numNonOrderByExpressions; i++) {
-        ExpressionContext expression = nonOrderByExpressions.get(i);
-        blockValSets[i] = valueBlock.getBlockValueSet(expression);
-      }
-      RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
-      int numDocsFetched = valueBlock.getNumDocs();
-      for (int i = 0; i < numDocsFetched; i++) {
-        blockValueFetcher.getRow(i, rowList.get(rowBaseId + i), numOrderByExpressions);
-      }
-      if (_nullHandlingEnabled) {
-        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numNonOrderByExpressions];
+    BitmapDocIdSetOperator docIdOperator = BitmapDocIdSetOperator.ascending(docIds, numRows);
+    try (ProjectionOperator projectionOperator =
+        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdOperator, _queryContext)) {
+      TransformOperator transformOperator =
+          new TransformOperator(_queryContext, projectionOperator, nonOrderByExpressions);
+
+      // Fill the non-order-by expression values
+      int numNonOrderByExpressions = nonOrderByExpressions.size();
+      blockValSets = new BlockValSet[numNonOrderByExpressions];
+      int rowBaseId = 0;
+      while ((valueBlock = transformOperator.nextBlock()) != null) {
         for (int i = 0; i < numNonOrderByExpressions; i++) {
-          nullBitmaps[i] = blockValSets[i].getNullBitmap();
+          ExpressionContext expression = nonOrderByExpressions.get(i);
+          blockValSets[i] = valueBlock.getBlockValueSet(expression);
         }
+        RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
+        int numDocsFetched = valueBlock.getNumDocs();
         for (int i = 0; i < numDocsFetched; i++) {
-          Object[] values = rowList.get(rowBaseId + i);
-          for (int colId = 0; colId < numNonOrderByExpressions; colId++) {
-            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(i)) {
-              int valueColId = numOrderByExpressions + colId;
-              values[valueColId] = null;
+          blockValueFetcher.getRow(i, rowList.get(rowBaseId + i), numOrderByExpressions);
+        }
+        if (_nullHandlingEnabled) {
+          RoaringBitmap[] nullBitmaps = new RoaringBitmap[numNonOrderByExpressions];
+          for (int i = 0; i < numNonOrderByExpressions; i++) {
+            nullBitmaps[i] = blockValSets[i].getNullBitmap();
+          }
+          for (int i = 0; i < numDocsFetched; i++) {
+            Object[] values = rowList.get(rowBaseId + i);
+            for (int colId = 0; colId < numNonOrderByExpressions; colId++) {
+              if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(i)) {
+                int valueColId = numOrderByExpressions + colId;
+                values[valueColId] = null;
+              }
             }
           }
         }
+        _numEntriesScannedPostFilter += (long) numDocsFetched * numColumns;
+        rowBaseId += numDocsFetched;
       }
-      _numEntriesScannedPostFilter += (long) numDocsFetched * numColumns;
-      rowBaseId += numDocsFetched;
-    }
 
-    // Create the data schema
-    String[] columnNames = new String[numExpressions];
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
-    for (int i = 0; i < numExpressions; i++) {
-      columnNames[i] = _expressions.get(i).toString();
-    }
-    for (int i = 0; i < numOrderByExpressions; i++) {
-      columnDataTypes[i] = DataSchema.ColumnDataType.fromDataType(_orderByColumnContexts[i].getDataType(),
-          _orderByColumnContexts[i].isSingleValue());
-    }
-    for (int i = 0; i < numNonOrderByExpressions; i++) {
-      ColumnContext columnContext = transformOperator.getResultColumnContext(nonOrderByExpressions.get(i));
-      columnDataTypes[numOrderByExpressions + i] =
-          DataSchema.ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
-    }
-    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+      // Create the data schema
+      String[] columnNames = new String[numExpressions];
+      DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
+      for (int i = 0; i < numExpressions; i++) {
+        columnNames[i] = _expressions.get(i).toString();
+      }
+      for (int i = 0; i < numOrderByExpressions; i++) {
+        columnDataTypes[i] = DataSchema.ColumnDataType.fromDataType(_orderByColumnContexts[i].getDataType(),
+            _orderByColumnContexts[i].isSingleValue());
+      }
+      for (int i = 0; i < numNonOrderByExpressions; i++) {
+        ColumnContext columnContext = transformOperator.getResultColumnContext(nonOrderByExpressions.get(i));
+        columnDataTypes[numOrderByExpressions + i] =
+            DataSchema.ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
+      }
+      DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator, _queryContext);
+      return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator, _queryContext);
+    }
   }
 
   private List<Object[]> getSortedRows() {
@@ -350,7 +354,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.singletonList(_projectOperator);
+    return List.of(_projectOperator);
   }
 
   @Override

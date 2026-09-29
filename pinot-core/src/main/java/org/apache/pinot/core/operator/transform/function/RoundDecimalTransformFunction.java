@@ -88,20 +88,43 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
     int length = valueBlock.getNumDocs();
     initDoubleValuesSV(length);
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(valueBlock);
+    // Follow standard PostgreSQL behavior where NaN and +/- Inf are returned as is
     if (_fixedScale) {
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
-            .setScale(_scale, RoundingMode.HALF_UP).doubleValue();
+        double value = leftValues[i];
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+          _doubleValuesSV[i] = value;
+          continue;
+        }
+        try {
+          _doubleValuesSV[i] = BigDecimal.valueOf(value).setScale(_scale, RoundingMode.HALF_UP).doubleValue();
+        } catch (Exception e) {
+          _doubleValuesSV[i] = value;
+        }
       }
     } else if (_rightTransformFunction != null) {
       int[] rightValues = _rightTransformFunction.transformToIntValuesSV(valueBlock);
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
-            .setScale(rightValues[i], RoundingMode.HALF_UP).doubleValue();
+        double value = leftValues[i];
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+          _doubleValuesSV[i] = value;
+          continue;
+        }
+        int scale = rightValues[i];
+        try {
+          _doubleValuesSV[i] = BigDecimal.valueOf(value).setScale(scale, RoundingMode.HALF_UP).doubleValue();
+        } catch (Exception e) {
+          _doubleValuesSV[i] = value;
+        }
       }
     } else {
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = (double) Math.round(leftValues[i]);
+        double value = leftValues[i];
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+          _doubleValuesSV[i] = value;
+          continue;
+        }
+        _doubleValuesSV[i] = Math.round(value);
       }
     }
     return _doubleValuesSV;

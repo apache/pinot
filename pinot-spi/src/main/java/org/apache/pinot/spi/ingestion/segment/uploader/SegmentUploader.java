@@ -26,40 +26,30 @@ import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 
 
-/**
- * Interface for uploading segments to Pinot
- */
+/// Interface for uploading segments to Pinot
 @InterfaceStability.Evolving
 public interface SegmentUploader {
 
-  /**
-   * @see #init(TableConfig, Map)
-   */
+  /// @see #init(TableConfig, Map)
   void init(TableConfig tableConfig)
       throws Exception;
 
-  /**
-   * Initializes the {@link SegmentUploader}
-   * @param tableConfig The table config for the segment upload
-   * @param batchConfigOverride The config override on top of tableConfig
-   */
+  /// Initializes the [SegmentUploader]
+  /// @param tableConfig The table config for the segment upload
+  /// @param batchConfigOverride The config override on top of tableConfig
   void init(TableConfig tableConfig, Map<String, String> batchConfigOverride)
       throws Exception;
 
-  /**
-   * Uploads the segment tar file to the cluster
-   * @param segmentTarFile URI of segment tar file
-   * @param authProvider auth provider
-   */
+  /// Uploads the segment tar file to the cluster
+  /// @param segmentTarFile URI of segment tar file
+  /// @param authProvider auth provider
   void uploadSegment(URI segmentTarFile, @Nullable AuthProvider authProvider)
       throws Exception;
 
-  /**
-   * Uploads the segments from the segmentDir to the cluster.
-   * Looks for segmentTar files recursively, with suffix .tar.gz
-   * @param segmentDir URI of directory containing segment tar files
-   * @param authProvider auth auth provider
-   */
+  /// Uploads the segments from the segmentDir to the cluster.
+  /// Looks for segmentTar files recursively, with suffix .tar.gz
+  /// @param segmentDir URI of directory containing segment tar files
+  /// @param authProvider auth auth provider
   void uploadSegmentsFromDir(URI segmentDir, @Nullable AuthProvider authProvider)
       throws Exception;
 }

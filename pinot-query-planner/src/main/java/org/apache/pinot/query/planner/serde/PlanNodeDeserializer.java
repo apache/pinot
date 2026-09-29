@@ -32,7 +32,9 @@ import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
@@ -43,6 +45,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
@@ -51,6 +54,9 @@ public class PlanNodeDeserializer {
   private PlanNodeDeserializer() {
   }
 
+  // ENRICHEDJOINNODE is a deprecated node case retained for backward-compatible deserialization of plans from
+  // older-version brokers.
+  @SuppressWarnings({"deprecation", "removal"})
   public static PlanNode process(Plan.PlanNode protoNode) {
     switch (protoNode.getNodeCase()) {
       case AGGREGATENODE:
@@ -77,6 +83,10 @@ public class PlanNodeDeserializer {
         return deserializeWindowNode(protoNode);
       case EXPLAINNODE:
         return deserializeExplainedNode(protoNode);
+      case ENRICHEDJOINNODE:
+        return deserializeEnrichedJoinNode(protoNode);
+      case UNNESTNODE:
+        return deserializeUnnestNode(protoNode);
       default:
         throw new IllegalStateException("Unsupported PlanNode type: " + protoNode.getNodeCase());
     }
@@ -84,10 +94,15 @@ public class PlanNodeDeserializer {
 
   private static AggregateNode deserializeAggregateNode(Plan.PlanNode protoNode) {
     Plan.AggregateNode protoAggregateNode = protoNode.getAggregateNode();
+    List<List<Integer>> groupingSets = new ArrayList<>(protoAggregateNode.getGroupingSetsCount());
+    for (Plan.GroupingSet protoGroupingSet : protoAggregateNode.getGroupingSetsList()) {
+      groupingSets.add(protoGroupingSet.getGroupKeyIndexesList());
+    }
     return new AggregateNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), convertFunctionCalls(protoAggregateNode.getAggCallsList()),
         protoAggregateNode.getFilterArgsList(), protoAggregateNode.getGroupKeysList(),
-        convertAggType(protoAggregateNode.getAggType()), protoAggregateNode.getLeafReturnFinalResult());
+        convertAggType(protoAggregateNode.getAggType()), protoAggregateNode.getLeafReturnFinalResult(),
+        convertCollations(protoAggregateNode.getCollationsList()), protoAggregateNode.getLimit(), groupingSets);
   }
 
   private static FilterNode deserializeFilterNode(Plan.PlanNode protoNode) {
@@ -101,7 +116,38 @@ public class PlanNodeDeserializer {
     return new JoinNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), convertJoinType(protoJoinNode.getJoinType()), protoJoinNode.getLeftKeysList(),
         protoJoinNode.getRightKeysList(), convertExpressions(protoJoinNode.getNonEquiConditionsList()),
-        convertJoinStrategy(protoJoinNode.getJoinStrategy()));
+        convertJoinStrategy(protoJoinNode.getJoinStrategy()),
+        protoJoinNode.hasMatchCondition() ? ProtoExpressionToRexExpression.convertExpression(
+            protoJoinNode.getMatchCondition()) : null);
+  }
+
+  @Deprecated(forRemoval = true, since = "1.6.0")
+  private static EnrichedJoinNode deserializeEnrichedJoinNode(Plan.PlanNode protoNode) {
+    Plan.EnrichedJoinNode protoEnrichedJoinNode = protoNode.getEnrichedJoinNode();
+    // reconstruct filterProjectRex
+    List<EnrichedJoinNode.FilterProjectRex> filterProjectRexes = new ArrayList<>();
+    for (Plan.FilterProjectRex rex : protoEnrichedJoinNode.getFilterProjectRexList()) {
+      if (rex.getType() == Plan.FilterProjectRexType.FILTER) {
+        filterProjectRexes.add(
+            new EnrichedJoinNode.FilterProjectRex(ProtoExpressionToRexExpression.convertExpression(rex.getFilter())));
+      } else {
+        filterProjectRexes.add(
+            new EnrichedJoinNode.FilterProjectRex(convertExpressions(rex.getProjectAndResultSchema().getProjectList()),
+                extractDataSchema(rex.getProjectAndResultSchema().getSchema())));
+      }
+    }
+    return new EnrichedJoinNode(protoNode.getStageId(),
+        extractDataSchema(protoEnrichedJoinNode.getJoinResultDataSchema()), extractDataSchema(protoNode),
+        extractNodeHint(protoNode), extractInputs(protoNode), convertJoinType(protoEnrichedJoinNode.getJoinType()),
+        protoEnrichedJoinNode.getLeftKeysList(),
+        protoEnrichedJoinNode.getRightKeysList(), convertExpressions(protoEnrichedJoinNode.getNonEquiConditionsList()),
+        convertJoinStrategy(protoEnrichedJoinNode.getJoinStrategy()),
+        protoEnrichedJoinNode.hasMatchCondition()
+            ? ProtoExpressionToRexExpression.convertExpression(protoEnrichedJoinNode.getMatchCondition()) : null,
+        filterProjectRexes,
+        protoEnrichedJoinNode.getFetch(),
+        protoEnrichedJoinNode.getOffset()
+    );
   }
 
   private static MailboxReceiveNode deserializeMailboxReceiveNode(Plan.PlanNode protoNode) {
@@ -117,11 +163,25 @@ public class PlanNodeDeserializer {
 
   private static MailboxSendNode deserializeMailboxSendNode(Plan.PlanNode protoNode) {
     Plan.MailboxSendNode protoMailboxSendNode = protoNode.getMailboxSendNode();
+
+    List<Integer> receiverIds;
+    List<Integer> protoReceiverIds = protoMailboxSendNode.getReceiverStageIdsList();
+    if (protoReceiverIds == null || protoReceiverIds.isEmpty()) {
+      // This should only happen if a not updated broker sends the request
+      receiverIds = List.of(protoMailboxSendNode.getReceiverStageId());
+    } else {
+      receiverIds = protoReceiverIds;
+    }
+    String hashFunction = protoMailboxSendNode.getHashFunction();
+    if (hashFunction == null || hashFunction.isEmpty()) {
+      hashFunction = KeySelector.DEFAULT_HASH_ALGORITHM;
+    }
+
     return new MailboxSendNode(protoNode.getStageId(), extractDataSchema(protoNode), extractInputs(protoNode),
-        protoMailboxSendNode.getReceiverStageId(), convertExchangeType(protoMailboxSendNode.getExchangeType()),
+        receiverIds, convertExchangeType(protoMailboxSendNode.getExchangeType()),
         convertDistributionType(protoMailboxSendNode.getDistributionType()), protoMailboxSendNode.getKeysList(),
         protoMailboxSendNode.getPrePartitioned(), convertCollations(protoMailboxSendNode.getCollationsList()),
-        protoMailboxSendNode.getSort());
+        protoMailboxSendNode.getSort(), hashFunction);
   }
 
   private static ProjectNode deserializeProjectNode(Plan.PlanNode protoNode) {
@@ -161,13 +221,58 @@ public class PlanNodeDeserializer {
         extractInputs(protoNode), protoWindowNode.getKeysList(), convertCollations(protoWindowNode.getCollationsList()),
         convertFunctionCalls(protoWindowNode.getAggCallsList()),
         convertWindowFrameType(protoWindowNode.getWindowFrameType()), protoWindowNode.getLowerBound(),
-        protoWindowNode.getUpperBound(), convertLiterals(protoWindowNode.getConstantsList()));
+        protoWindowNode.getUpperBound(), convertWindowExclusion(protoWindowNode.getExclude()),
+        convertLiterals(protoWindowNode.getConstantsList()));
   }
 
   private static ExplainedNode deserializeExplainedNode(Plan.PlanNode protoNode) {
     Plan.ExplainNode protoExplainNode = protoNode.getExplainNode();
     return new ExplainedNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), protoExplainNode.getTitle(), protoExplainNode.getAttributesMap());
+  }
+
+  private static UnnestNode deserializeUnnestNode(Plan.PlanNode protoNode) {
+    Plan.UnnestNode protoUnnestNode = protoNode.getUnnestNode();
+
+    // Convert array expressions
+    List<RexExpression> arrayExprs = new ArrayList<>();
+    for (Expressions.Expression expr : protoUnnestNode.getArrayExprsList()) {
+      arrayExprs.add(ProtoExpressionToRexExpression.convertExpression(expr));
+    }
+
+    // Convert element indexes
+    List<Integer> elementIndexes = new ArrayList<>();
+    for (int idx : protoUnnestNode.getElementIndexesList()) {
+      elementIndexes.add(idx);
+    }
+
+    int ordIdx = protoUnnestNode.hasOrdinalityIndex() ? protoUnnestNode.getOrdinalityIndex()
+        : UnnestNode.UNSPECIFIED_INDEX;
+
+    // Passthrough pruning metadata. Absent on plans produced by older brokers, in which case prunedPassthrough is
+    // false and the operator copies the whole input row (legacy behavior).
+    List<Integer> passthroughInputIndexes = new ArrayList<>();
+    for (int idx : protoUnnestNode.getPassthroughInputIndexesList()) {
+      passthroughInputIndexes.add(idx);
+    }
+
+    UnnestNode.TableFunctionContext context =
+        new UnnestNode.TableFunctionContext(protoUnnestNode.getWithOrdinality(), elementIndexes, ordIdx,
+            passthroughInputIndexes, protoUnnestNode.getPrunedPassthrough());
+
+    return new UnnestNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
+        extractInputs(protoNode), arrayExprs, context);
+  }
+
+  private static DataSchema extractDataSchema(Plan.DataSchema protoDataSchema) {
+    String[] columnNames = protoDataSchema.getColumnNamesList().toArray(new String[0]);
+    int numColumns = columnNames.length;
+    List<Expressions.ColumnDataType> protoColumnDataTypes = protoDataSchema.getColumnDataTypesList();
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      columnDataTypes[i] = ProtoExpressionToRexExpression.convertColumnDataType(protoColumnDataTypes.get(i));
+    }
+    return new DataSchema(columnNames, columnDataTypes);
   }
 
   private static DataSchema extractDataSchema(Plan.PlanNode protoNode) {
@@ -273,6 +378,10 @@ public class PlanNodeDeserializer {
         return JoinRelType.SEMI;
       case ANTI:
         return JoinRelType.ANTI;
+      case ASOF:
+        return JoinRelType.ASOF;
+      case LEFT_ASOF:
+        return JoinRelType.LEFT_ASOF;
       default:
         throw new IllegalStateException("Unsupported JoinType: " + joinType);
     }
@@ -284,6 +393,8 @@ public class PlanNodeDeserializer {
         return JoinNode.JoinStrategy.HASH;
       case LOOKUP:
         return JoinNode.JoinStrategy.LOOKUP;
+      case AS_OF:
+        return JoinNode.JoinStrategy.ASOF;
       default:
         throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
     }
@@ -400,6 +511,21 @@ public class PlanNodeDeserializer {
         return WindowNode.WindowFrameType.RANGE;
       default:
         throw new IllegalStateException("Unsupported WindowFrameType: " + windowFrameType);
+    }
+  }
+
+  private static WindowNode.WindowExclusion convertWindowExclusion(Plan.WindowExclusion exclude) {
+    switch (exclude) {
+      case EXCLUDE_NO_OTHERS:
+        return WindowNode.WindowExclusion.NO_OTHERS;
+      case EXCLUDE_CURRENT_ROW:
+        return WindowNode.WindowExclusion.CURRENT_ROW;
+      case EXCLUDE_GROUP:
+        return WindowNode.WindowExclusion.GROUP;
+      case EXCLUDE_TIES:
+        return WindowNode.WindowExclusion.TIES;
+      default:
+        throw new IllegalStateException("Unsupported WindowExclusion: " + exclude);
     }
   }
 }

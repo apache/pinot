@@ -18,66 +18,37 @@
  */
 package org.apache.pinot.query.runtime.operator.window.value;
 
-import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 
 
-/**
- * The LAG window function doesn't allow custom window frames (and this is enforced by Calcite).
- */
-public class LagValueWindowFunction extends ValueWindowFunction {
-  private final int _offset;
-  private final Object _defaultValue;
+/// Window function that returns the value of a column from a preceding row within the partition. Supports an optional
+/// offset (default 1), an optional default value for when no row exists at that offset, and IGNORE NULLS mode which
+/// skips null values when scanning backward. Custom window frames are not allowed (enforced by Calcite).
+public class LagValueWindowFunction extends OffsetValueWindowFunction {
 
   public LagValueWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
       List<RelFieldCollation> collations, WindowFrame windowFrame) {
     super(aggCall, inputSchema, collations, windowFrame);
-    int offset = 1;
-    Object defaultValue = null;
-    List<RexExpression> operands = aggCall.getFunctionOperands();
-    int numOperands = operands.size();
-    if (numOperands > 1) {
-      RexExpression secondOperand = operands.get(1);
-      Preconditions.checkArgument(secondOperand instanceof RexExpression.Literal,
-          "Second operand (offset) of LAG function must be a literal");
-      Object offsetValue = ((RexExpression.Literal) secondOperand).getValue();
-      if (offsetValue instanceof Number) {
-        offset = ((Number) offsetValue).intValue();
-      }
-    }
-    if (numOperands == 3) {
-      RexExpression thirdOperand = operands.get(2);
-      Preconditions.checkArgument(thirdOperand instanceof RexExpression.Literal,
-          "Third operand (default value) of LAG function must be a literal");
-      RexExpression.Literal defaultValueLiteral = (RexExpression.Literal) thirdOperand;
-      defaultValue = defaultValueLiteral.getValue();
-      if (defaultValue != null) {
-        DataSchema.ColumnDataType srcDataType = defaultValueLiteral.getDataType();
-        DataSchema.ColumnDataType destDataType = inputSchema.getColumnDataType(0);
-        if (srcDataType != destDataType) {
-          // Convert the default value to the same data type as the input column
-          // (e.g. convert INT to LONG, FLOAT to DOUBLE, etc.
-          defaultValue = PinotDataType.getPinotDataTypeForExecution(destDataType)
-              .convert(defaultValue, PinotDataType.getPinotDataTypeForExecution(srcDataType));
-        }
-      }
-    }
-    _offset = offset;
-    _defaultValue = defaultValue;
   }
 
   @Override
   public List<Object> processRows(List<Object[]> rows) {
+    if (_ignoreNulls && _offset > 0) {
+      // Iterate front-to-back so the sliding window holds the preceding non-null values.
+      return processRowsIgnoreNulls(rows, true);
+    }
     int numRows = rows.size();
     Object[] result = new Object[numRows];
     if (_defaultValue != null) {
-      Arrays.fill(result, 0, _offset, _defaultValue);
+      // We only fill up to the minimum of _offset and numRows to handle the case
+      // where the offset is larger than the result size.
+      int fillTo = Math.min(_offset, numRows);
+      Arrays.fill(result, 0, fillTo, _defaultValue);
     }
     for (int i = _offset; i < numRows; i++) {
       result[i] = extractValueFromRow(rows.get(i - _offset));

@@ -25,18 +25,17 @@ import org.apache.pinot.core.query.aggregation.utils.ParentAggregationFunctionRe
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * Base class for parent aggregation functions. A parent aggregation function is an aggregation function
- * whose result is a nested data block containing multiple columns, each of which corresponds to a child
- * aggregation function's result.
- */
+/// Base class for parent aggregation functions. A parent aggregation function is an aggregation function
+/// whose result is a nested data block containing multiple columns, each of which corresponds to a child
+/// aggregation function's result.
 public abstract class ParentAggregationFunction<I, F extends ParentAggregationFunctionResultObject>
-    implements AggregationFunction<I, F> {
+    extends BaseAggregationFunction<I, F> {
 
   protected static final int PARENT_AGGREGATION_FUNCTION_ID_OFFSET = 0;
   protected List<ExpressionContext> _arguments;
 
-  ParentAggregationFunction(List<ExpressionContext> arguments) {
+  ParentAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(nullHandlingEnabled);
     _arguments = arguments;
   }
 

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.perf.aggregation;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -27,12 +26,12 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.VarianceAggregationFunction;
 import org.apache.pinot.core.query.aggregation.utils.StatisticalAggregationFunctionUtils;
-import org.apache.pinot.perf.SyntheticBlockValSets;
 import org.apache.pinot.perf.SyntheticNullBitmapFactories;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -73,7 +72,7 @@ public class BenchmarkVarianceAggregation extends AbstractAggregationFunctionBen
 
   @Override
   protected AggregationFunction<?, ?> createAggregationFunction() {
-    return new VarianceAggregationFunction(Collections.singletonList(EXPR), true, false, _nullHandlingEnabled);
+    return new VarianceAggregationFunction(List.of(EXPR), true, false, _nullHandlingEnabled);
   }
 
   @Override

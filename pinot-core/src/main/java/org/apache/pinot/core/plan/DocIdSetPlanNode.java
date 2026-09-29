@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.plan;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -33,7 +32,7 @@ public class DocIdSetPlanNode implements PlanNode {
   private final BaseFilterOperator _filterOperator;
 
   public DocIdSetPlanNode(SegmentContext segmentContext, QueryContext queryContext, int maxDocPerCall,
-      @Nullable BaseFilterOperator filterOperator) {
+      BaseFilterOperator filterOperator) {
     assert maxDocPerCall > 0 && maxDocPerCall <= MAX_DOC_PER_CALL;
 
     _segmentContext = segmentContext;
@@ -44,8 +43,6 @@ public class DocIdSetPlanNode implements PlanNode {
 
   @Override
   public DocIdSetOperator run() {
-    return new DocIdSetOperator(
-        _filterOperator != null ? _filterOperator : new FilterPlanNode(_segmentContext, _queryContext).run(),
-        _maxDocPerCall);
+    return new DocIdSetOperator(_filterOperator, _maxDocPerCall);
   }
 }

@@ -20,31 +20,31 @@ package org.apache.pinot.core.common.datatable;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.datatable.DataTableFactory;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
-import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.*;
 
-/**
- * Unit test for {@link DataTable} serialization/de-serialization.
- */
+
+/// Unit test for [DataTable] serialization/de-serialization.
 public class DataTableSerDeTest {
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
@@ -62,6 +62,7 @@ public class DataTableSerDeTest {
   private static final String[] STRINGS = new String[NUM_ROWS];
   private static final String[] JSONS = new String[NUM_ROWS];
   private static final byte[][] BYTES = new byte[NUM_ROWS][];
+  private static final byte[][] UUIDS = new byte[NUM_ROWS][];
   private static final Object[] OBJECTS = new Object[NUM_ROWS];
   private static final int[][] INT_ARRAYS = new int[NUM_ROWS][];
   private static final long[][] LONG_ARRAYS = new long[NUM_ROWS][];
@@ -70,25 +71,90 @@ public class DataTableSerDeTest {
   private static final int[][] BOOLEAN_ARRAYS = new int[NUM_ROWS][];
   private static final long[][] TIMESTAMP_ARRAYS = new long[NUM_ROWS][];
   private static final String[][] STRING_ARRAYS = new String[NUM_ROWS][];
+  private static final ByteArray[][] BYTES_ARRAYS = new ByteArray[NUM_ROWS][];
+  private static final ByteArray[][] UUID_ARRAYS = new ByteArray[NUM_ROWS][];
+  private static final BigDecimal[][] BIG_DECIMAL_ARRAYS = new BigDecimal[NUM_ROWS][];
   private static final Map<String, Object>[] MAPS = new Map[NUM_ROWS];
+
+  @Test
+  public void testRowBufferReuse()
+      throws IOException {
+    DataSchema schema = new DataSchema(new String[]{"int", "long", "float", "double", "string", "bytes", "array"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
+            ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.INT_ARRAY});
+    DataTableBuilder builder = new DataTableBuilderV4(schema);
+    builder.startRow();
+    builder.setColumn(0, Integer.MIN_VALUE);
+    builder.setColumn(1, Long.MAX_VALUE);
+    builder.setColumn(2, Float.intBitsToFloat(0x7fc00042));
+    builder.setColumn(3, -0.0d);
+    builder.setColumn(4, "first");
+    builder.setColumn(5, new ByteArray(new byte[]{1, 2, 3}));
+    builder.setColumn(6, new int[]{17, -23});
+    builder.finishRow();
+
+    // Populate every column in reverse order, overwriting both fixed values and variable-data offset/length slots.
+    builder.startRow();
+    builder.setColumn(6, new int[0]);
+    builder.setColumn(5, new ByteArray(new byte[0]));
+    builder.setColumn(4, "second");
+    builder.setColumn(3, 0.0d);
+    builder.setColumn(2, 0.0f);
+    builder.setColumn(1, 0L);
+    builder.setColumn(0, 0);
+    builder.finishRow();
+
+    builder.startRow();
+    builder.setNull(0);
+    builder.setColumn(1, -11L);
+    builder.setColumn(2, -0.0f);
+    builder.setColumn(3, Double.longBitsToDouble(0x7ff8000000000042L));
+    builder.setNull(4);
+    builder.setColumn(5, new ByteArray(new byte[]{4}));
+    builder.setColumn(6, new int[]{5});
+    builder.finishRow();
+
+    DataTable result = DataTableFactory.getDataTable(builder.build().toBytes());
+    assertEquals(result.getNumberOfRows(), 3);
+    assertEquals(result.getInt(0, 0), Integer.MIN_VALUE);
+    assertEquals(result.getLong(0, 1), Long.MAX_VALUE);
+    assertEquals(Float.floatToRawIntBits(result.getFloat(0, 2)), 0x7fc00042);
+    assertEquals(Double.doubleToRawLongBits(result.getDouble(0, 3)), Double.doubleToRawLongBits(-0.0d));
+    assertEquals(result.getString(0, 4), "first");
+    assertEquals(result.getBytes(0, 5), new ByteArray(new byte[]{1, 2, 3}));
+    assertEquals(result.getIntArray(0, 6), new int[]{17, -23});
+
+    assertEquals(result.getInt(1, 0), 0);
+    assertEquals(result.getLong(1, 1), 0L);
+    assertEquals(Float.floatToRawIntBits(result.getFloat(1, 2)), 0);
+    assertEquals(Double.doubleToRawLongBits(result.getDouble(1, 3)), 0L);
+    assertEquals(result.getString(1, 4), "second");
+    assertEquals(result.getBytes(1, 5).getBytes(), new byte[0]);
+    assertEquals(result.getIntArray(1, 6), new int[0]);
+
+    assertEquals(result.getNullRowIds(0), RoaringBitmap.bitmapOf(2));
+    assertEquals(result.getLong(2, 1), -11L);
+    assertEquals(Float.floatToRawIntBits(result.getFloat(2, 2)), Float.floatToRawIntBits(-0.0f));
+    assertEquals(Double.doubleToRawLongBits(result.getDouble(2, 3)), 0x7ff8000000000042L);
+    assertEquals(result.getNullRowIds(4), RoaringBitmap.bitmapOf(2));
+    assertEquals(result.getBytes(2, 5), new ByteArray(new byte[]{4}));
+    assertEquals(result.getIntArray(2, 6), new int[]{5});
+  }
 
   @Test(dataProvider = "versionProvider")
   public void testException(int dataTableVersion)
       throws IOException {
     DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
-    Exception exception = new UnsupportedOperationException("Caught exception.");
-    ProcessingException processingException =
-        QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, exception);
-    String expected = processingException.getMessage();
+    String expected = "Caught exception.";
 
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
-    dataTable.addException(processingException);
+    dataTable.addException(QueryErrorCode.QUERY_EXECUTION, expected);
     DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
-    Assert.assertNull(newDataTable.getDataSchema());
-    Assert.assertEquals(newDataTable.getNumberOfRows(), 0);
+    assertNull(newDataTable.getDataSchema());
+    assertEquals(newDataTable.getNumberOfRows(), 0);
 
-    String actual = newDataTable.getExceptions().get(QueryException.QUERY_EXECUTION_ERROR.getErrorCode());
-    Assert.assertEquals(actual, expected);
+    String actual = newDataTable.getExceptions().get(QueryErrorCode.QUERY_EXECUTION.getId());
+    assertEquals(actual, expected);
   }
 
   @Test(dataProvider = "versionProvider")
@@ -157,7 +223,6 @@ public class DataTableSerDeTest {
 
   private void testEmptyValues(DataSchema dataSchema, int numRows, Object[] emptyValues)
       throws IOException {
-
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     for (int rowId = 0; rowId < numRows; rowId++) {
       dataTableBuilder.startRow();
@@ -178,7 +243,7 @@ public class DataTableSerDeTest {
         } else if (emptyValue instanceof ByteArray) {
           dataTableBuilder.setColumn(columnId, (ByteArray) emptyValue);
         } else {
-          dataTableBuilder.setColumn(columnId, emptyValue);
+          fail();
         }
       }
       dataTableBuilder.finishRow();
@@ -186,8 +251,8 @@ public class DataTableSerDeTest {
 
     DataTable dataTable = dataTableBuilder.build();
     DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
-    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema);
-    Assert.assertEquals(newDataTable.getNumberOfRows(), numRows);
+    assertEquals(newDataTable.getDataSchema(), dataSchema);
+    assertEquals(newDataTable.getNumberOfRows(), numRows);
 
     for (int rowId = 0; rowId < numRows; rowId++) {
       for (int columnId = 0; columnId < dataSchema.size(); columnId++) {
@@ -219,7 +284,7 @@ public class DataTableSerDeTest {
             entry = newDataTable.getCustomObject(rowId, columnId);
             break;
         }
-        Assert.assertEquals(entry, emptyValues[columnId]);
+        assertEquals(entry, emptyValues[columnId]);
       }
     }
   }
@@ -241,8 +306,8 @@ public class DataTableSerDeTest {
 
     DataTable dataTable = dataTableBuilder.build();
     DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
-    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
-    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
+    assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
     verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
   }
 
@@ -261,15 +326,135 @@ public class DataTableSerDeTest {
         fillDataTableWithRandomData(dataTableBuilder, columnDataType, 1, numRows);
         DataTable dataTable = dataTableBuilder.build();
         DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
-        Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
-        Assert.assertEquals(newDataTable.getNumberOfRows(), numRows, ERROR_MESSAGE);
+        assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+        assertEquals(newDataTable.getNumberOfRows(), numRows, ERROR_MESSAGE);
         verifyDataIsSame(newDataTable, columnDataType, 1, numRows);
       }
     }
   }
 
+  /// [DataTableBuilder#setNull] must round-trip a null for every column type, not just the ones that can encode a
+  /// null in-band. A type stored in a 4-byte slot (`INT` / `FLOAT` / `STRING` / `BOOLEAN`) is the sharpest case:
+  /// writing the 8-byte custom-object encoding into it overflows the row buffer when the column is last, and
+  /// silently overwrites the following column otherwise.
   @Test(dataProvider = "versionProvider")
-  public void testExecutionThreadCpuTimeNs(int dataTableVersion)
+  public void testSetNullForAllDataTypes(int dataTableVersion)
+      throws IOException {
+    DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
+    for (DataSchema.ColumnDataType columnDataType : DataSchema.ColumnDataType.values()) {
+      DataSchema dataSchema =
+          new DataSchema(new String[]{columnDataType.name()}, new DataSchema.ColumnDataType[]{columnDataType});
+      DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+      dataTableBuilder.startRow();
+      dataTableBuilder.setNull(0);
+      dataTableBuilder.finishRow();
+      DataTable dataTable = DataTableFactory.getDataTable(dataTableBuilder.build().toBytes());
+
+      String message = ERROR_MESSAGE + ", type: " + columnDataType;
+      assertEquals(dataTable.getNumberOfRows(), 1, message);
+      switch (columnDataType.getStoredType()) {
+        // Types that carry their own in-band null encoding need no bitmap entry.
+        case OBJECT:
+        case UNKNOWN:
+          assertNull(dataTable.getCustomObject(0, 0), message);
+          assertNull(dataTable.getNullRowIds(0), message);
+          break;
+        case MAP:
+          assertNull(dataTable.getMap(0, 0), message);
+          assertNull(dataTable.getNullRowIds(0), message);
+          break;
+        default:
+          RoaringBitmap nullRowIds = dataTable.getNullRowIds(0);
+          assertNotNull(nullRowIds, message);
+          assertTrue(nullRowIds.contains(0), message);
+          break;
+      }
+    }
+  }
+
+  /// A null in a 4-byte column must not bleed into the column that follows it.
+  @Test(dataProvider = "versionProvider")
+  public void testSetNullDoesNotCorruptAdjacentColumn(int dataTableVersion)
+      throws IOException {
+    DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
+    DataSchema dataSchema = new DataSchema(new String[]{"str", "dbl", "int"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.INT
+    });
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    dataTableBuilder.startRow();
+    dataTableBuilder.setNull(0);
+    dataTableBuilder.setColumn(1, 3.5d);
+    dataTableBuilder.setColumn(2, 42);
+    dataTableBuilder.finishRow();
+    DataTable dataTable = DataTableFactory.getDataTable(dataTableBuilder.build().toBytes());
+
+    assertEquals(dataTable.getDouble(0, 1), 3.5d, ERROR_MESSAGE);
+    assertEquals(dataTable.getInt(0, 2), 42, ERROR_MESSAGE);
+    assertEquals(dataTable.getNullRowIds(0), RoaringBitmap.bitmapOf(0), ERROR_MESSAGE);
+    assertNull(dataTable.getNullRowIds(1), ERROR_MESSAGE);
+    assertNull(dataTable.getNullRowIds(2), ERROR_MESSAGE);
+  }
+
+  /// A table without nulls must not grow a null bitmap section, so that its bytes stay identical to what a writer
+  /// that predates always-on null support would have produced.
+  @Test(dataProvider = "versionProvider")
+  public void testNoNullBitmapSectionWithoutNulls(int dataTableVersion)
+      throws IOException {
+    DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
+    DataSchema dataSchema = new DataSchema(new String[]{"str", "int"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    dataTableBuilder.startRow();
+    dataTableBuilder.setColumn(0, "foo");
+    dataTableBuilder.setColumn(1, 42);
+    dataTableBuilder.finishRow();
+    // An all-empty bitmap carries no information and must not force the section to be emitted either.
+    dataTableBuilder.setNullRowIds(new RoaringBitmap());
+    dataTableBuilder.setNullRowIds(null);
+    byte[] bytes = dataTableBuilder.build().toBytes();
+
+    DataTableBuilder controlBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    controlBuilder.startRow();
+    controlBuilder.setColumn(0, "foo");
+    controlBuilder.setColumn(1, 42);
+    controlBuilder.finishRow();
+    assertEquals(bytes, controlBuilder.build().toBytes(), ERROR_MESSAGE);
+
+    DataTable dataTable = DataTableFactory.getDataTable(bytes);
+    assertNull(dataTable.getNullRowIds(0), ERROR_MESSAGE);
+    assertNull(dataTable.getNullRowIds(1), ERROR_MESSAGE);
+  }
+
+  /// A pre-computed bitmap handed to [DataTableBuilder#setNullRowIds] must merge with the per-cell nulls recorded
+  /// by [DataTableBuilder#setNull] for the same column rather than replacing them.
+  @Test(dataProvider = "versionProvider")
+  public void testSetNullRowIdsMergesWithSetNull(int dataTableVersion)
+      throws IOException {
+    DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"int"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    for (int rowId = 0; rowId < 3; rowId++) {
+      dataTableBuilder.startRow();
+      if (rowId == 0) {
+        dataTableBuilder.setNull(0);
+      } else {
+        dataTableBuilder.setColumn(0, rowId);
+      }
+      dataTableBuilder.finishRow();
+    }
+    RoaringBitmap preComputed = RoaringBitmap.bitmapOf(2);
+    dataTableBuilder.setNullRowIds(preComputed);
+    DataTable dataTable = DataTableFactory.getDataTable(dataTableBuilder.build().toBytes());
+
+    assertEquals(dataTable.getNullRowIds(0), RoaringBitmap.bitmapOf(0, 2), ERROR_MESSAGE);
+    assertEquals(dataTable.getInt(1, 0), 1, ERROR_MESSAGE);
+    // The builder must not take ownership of the caller's bitmap.
+    assertEquals(preComputed, RoaringBitmap.bitmapOf(2), ERROR_MESSAGE);
+  }
+
+  @Test(dataProvider = "versionProvider")
+  public void testThreadCPUMemMeasurement(int dataTableVersion)
       throws IOException {
     DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
     DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
@@ -283,25 +468,30 @@ public class DataTableSerDeTest {
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns);
 
+    // Enable ThreadCpuTimeMeasurement, serialize/de-serialize data table.
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
     DataTable dataTable = dataTableBuilder.build();
+    DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
+    // When ThreadCpuTimeMeasurement is enabled, responseSerializationCpuTimeNs should be positive.
+    assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
+    assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
+    assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_MEM_ALLOCATED_BYTES.getName()));
+    assertTrue(Integer.parseInt(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName())) > 0);
+    assertTrue(
+        Integer.parseInt(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName())) > 0);
 
     // Disable ThreadCpuTimeMeasurement, serialize/de-serialize data table.
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(false);
-    DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
-    // When ThreadCpuTimeMeasurement is disabled, no value for
-    // threadCpuTimeNs/systemActivitiesCpuTimeNs/responseSerializationCpuTimeNs.
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
-
-    // Enable ThreadCpuTimeMeasurement, serialize/de-serialize data table.
-    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(false);
+    dataTable = dataTableBuilder.build();
     newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
-    // When ThreadCpuTimeMeasurement is enabled, value of responseSerializationCpuTimeNs is not 0.
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
-    Assert.assertTrue(
-        Integer.parseInt(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName())) > 0);
+    // When measurement is disabled, response serialization metadata is absent.
+    assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
+    assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
+    assertNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
+    assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_MEM_ALLOCATED_BYTES.getName()));
+    assertNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName()));
   }
 
   private void fillDataTableWithRandomData(DataTableBuilder dataTableBuilder,
@@ -355,21 +545,21 @@ public class DataTableSerDeTest {
             dataTableBuilder.setColumn(colId, BOOLEANS[rowId]);
             break;
           case STRING:
-            STRINGS[rowId] = isNull ? "" : RandomStringUtils.random(RANDOM.nextInt(20));
+            STRINGS[rowId] = isNull ? "" : RandomStringUtils.secure().next(RANDOM.nextInt(20));
             dataTableBuilder.setColumn(colId, STRINGS[rowId]);
             break;
           case JSON:
-            JSONS[rowId] = isNull ? "" : "{\"key\": \"" + RandomStringUtils.random(RANDOM.nextInt(20)) + "\"}";
+            JSONS[rowId] = isNull ? "" : "{\"key\": \"" + RandomStringUtils.secure().next(RANDOM.nextInt(20)) + "\"}";
             dataTableBuilder.setColumn(colId, JSONS[rowId]);
             break;
           case BYTES:
-            BYTES[rowId] = isNull ? new byte[0] : RandomStringUtils.random(RANDOM.nextInt(20)).getBytes();
+            BYTES[rowId] = isNull ? new byte[0] : RandomStringUtils.secure().next(RANDOM.nextInt(20)).getBytes();
             dataTableBuilder.setColumn(colId, new ByteArray(BYTES[rowId]));
             break;
-          // Just test Double here, all object types will be covered in ObjectCustomSerDeTest.
-          case OBJECT:
-            OBJECTS[rowId] = isNull ? null : RANDOM.nextDouble();
-            dataTableBuilder.setColumn(colId, OBJECTS[rowId]);
+          case UUID:
+            UUIDS[rowId] =
+                isNull ? UuidUtils.nullUuidBytes() : UuidUtils.toBytes(new UUID(RANDOM.nextLong(), RANDOM.nextLong()));
+            dataTableBuilder.setColumn(colId, new ByteArray(UUIDS[rowId]));
             break;
           case INT_ARRAY:
             int length = RANDOM.nextInt(20);
@@ -407,6 +597,15 @@ public class DataTableSerDeTest {
             DOUBLE_ARRAYS[rowId] = doubleArray;
             dataTableBuilder.setColumn(colId, doubleArray);
             break;
+          case BIG_DECIMAL_ARRAY:
+            length = RANDOM.nextInt(20);
+            BigDecimal[] bigDecimalArray = new BigDecimal[length];
+            for (int i = 0; i < length; i++) {
+              bigDecimalArray[i] = BigDecimal.valueOf(RANDOM.nextDouble());
+            }
+            BIG_DECIMAL_ARRAYS[rowId] = bigDecimalArray;
+            dataTableBuilder.setColumn(colId, bigDecimalArray);
+            break;
           case BOOLEAN_ARRAY:
             length = RANDOM.nextInt(2);
             int[] booleanArray = new int[length];
@@ -426,13 +625,29 @@ public class DataTableSerDeTest {
             dataTableBuilder.setColumn(colId, timestampArray);
             break;
           case BYTES_ARRAY:
-            // TODO: add once implementation of datatable bytes array support is added
+            length = RANDOM.nextInt(20);
+            ByteArray[] bytesArray = new ByteArray[length];
+            for (int i = 0; i < length; i++) {
+              bytesArray[i] =
+                  new ByteArray(RandomStringUtils.secure().next(RANDOM.nextInt(20)).getBytes(StandardCharsets.UTF_8));
+            }
+            BYTES_ARRAYS[rowId] = bytesArray;
+            dataTableBuilder.setColumn(colId, bytesArray);
+            break;
+          case UUID_ARRAY:
+            length = RANDOM.nextInt(20);
+            ByteArray[] uuidArray = new ByteArray[length];
+            for (int i = 0; i < length; i++) {
+              uuidArray[i] = new ByteArray(UuidUtils.toBytes(new UUID(RANDOM.nextLong(), RANDOM.nextLong())));
+            }
+            UUID_ARRAYS[rowId] = uuidArray;
+            dataTableBuilder.setColumn(colId, uuidArray);
             break;
           case STRING_ARRAY:
             length = RANDOM.nextInt(20);
             String[] stringArray = new String[length];
             for (int i = 0; i < length; i++) {
-              stringArray[i] = RandomStringUtils.random(RANDOM.nextInt(20));
+              stringArray[i] = RandomStringUtils.secure().next(RANDOM.nextInt(20));
             }
             STRING_ARRAYS[rowId] = stringArray;
             dataTableBuilder.setColumn(colId, stringArray);
@@ -440,13 +655,14 @@ public class DataTableSerDeTest {
           case MAP:
             Map<String, Object> map = new HashMap<>();
             for (int j = 0; j < 1 + RANDOM.nextInt(20); j++) {
-              map.put("k" + j, RandomStringUtils.random(RANDOM.nextInt(20)));
+              map.put("k" + j, RandomStringUtils.secure().next(RANDOM.nextInt(20)));
             }
             MAPS[rowId] = map;
             dataTableBuilder.setColumn(colId, map);
             break;
+          case OBJECT:
           case UNKNOWN:
-            dataTableBuilder.setColumn(colId, (Object) null);
+            dataTableBuilder.setNull(colId);
             break;
           default:
             throw new UnsupportedOperationException("Unable to generate random data for: " + columnDataTypes[colId]);
@@ -476,82 +692,79 @@ public class DataTableSerDeTest {
         boolean isNull = nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId);
         switch (columnDataTypes[colId]) {
           case INT:
-            Assert.assertEquals(newDataTable.getInt(rowId, colId), isNull ? 0 : INTS[rowId], ERROR_MESSAGE);
+            assertEquals(newDataTable.getInt(rowId, colId), isNull ? 0 : INTS[rowId], ERROR_MESSAGE);
             break;
           case LONG:
-            Assert.assertEquals(newDataTable.getLong(rowId, colId), isNull ? 0 : LONGS[rowId], ERROR_MESSAGE);
+            assertEquals(newDataTable.getLong(rowId, colId), isNull ? 0 : LONGS[rowId], ERROR_MESSAGE);
             break;
           case FLOAT:
-            Assert.assertEquals(newDataTable.getFloat(rowId, colId), isNull ? 0 : FLOATS[rowId], ERROR_MESSAGE);
+            assertEquals(newDataTable.getFloat(rowId, colId), isNull ? 0 : FLOATS[rowId], ERROR_MESSAGE);
             break;
           case DOUBLE:
-            Assert.assertEquals(newDataTable.getDouble(rowId, colId), isNull ? 0.0 : DOUBLES[rowId], ERROR_MESSAGE);
+            assertEquals(newDataTable.getDouble(rowId, colId), isNull ? 0.0 : DOUBLES[rowId], ERROR_MESSAGE);
             break;
           case BIG_DECIMAL:
-            Assert.assertEquals(newDataTable.getBigDecimal(rowId, colId),
-                isNull ? BigDecimal.ZERO : BIG_DECIMALS[rowId], ERROR_MESSAGE);
+            assertEquals(newDataTable.getBigDecimal(rowId, colId), isNull ? BigDecimal.ZERO : BIG_DECIMALS[rowId],
+                ERROR_MESSAGE);
             break;
           case BOOLEAN:
-            Assert.assertEquals(newDataTable.getInt(rowId, colId), isNull ? 0 : BOOLEANS[rowId], ERROR_MESSAGE);
+            assertEquals(newDataTable.getInt(rowId, colId), isNull ? 0 : BOOLEANS[rowId], ERROR_MESSAGE);
             break;
           case TIMESTAMP:
-            Assert.assertEquals(newDataTable.getLong(rowId, colId), isNull ? 0 : TIMESTAMPS[rowId], ERROR_MESSAGE);
+            assertEquals(newDataTable.getLong(rowId, colId), isNull ? 0 : TIMESTAMPS[rowId], ERROR_MESSAGE);
             break;
           case STRING:
-            Assert.assertEquals(newDataTable.getString(rowId, colId), isNull ? "" : STRINGS[rowId], ERROR_MESSAGE);
+            assertEquals(newDataTable.getString(rowId, colId), isNull ? "" : STRINGS[rowId], ERROR_MESSAGE);
             break;
           case JSON:
-            Assert.assertEquals(newDataTable.getString(rowId, colId), isNull ? "" : JSONS[rowId], ERROR_MESSAGE);
+            assertEquals(newDataTable.getString(rowId, colId), isNull ? "" : JSONS[rowId], ERROR_MESSAGE);
             break;
           case BYTES:
-            Assert.assertEquals(newDataTable.getBytes(rowId, colId).getBytes(), isNull ? new byte[0] : BYTES[rowId],
+            assertEquals(newDataTable.getBytes(rowId, colId).getBytes(), isNull ? new byte[0] : BYTES[rowId],
                 ERROR_MESSAGE);
             break;
-          case OBJECT:
-            CustomObject customObject = newDataTable.getCustomObject(rowId, colId);
-            if (isNull) {
-              Assert.assertNull(customObject, ERROR_MESSAGE);
-            } else {
-              Assert.assertNotNull(customObject);
-              Assert.assertEquals(ObjectSerDeUtils.deserialize(customObject), OBJECTS[rowId], ERROR_MESSAGE);
-            }
+          case UUID:
+            assertEquals(newDataTable.getBytes(rowId, colId).getBytes(),
+                isNull ? UuidUtils.nullUuidBytes() : UUIDS[rowId], ERROR_MESSAGE);
             break;
           case INT_ARRAY:
-            Assert.assertTrue(Arrays.equals(newDataTable.getIntArray(rowId, colId), INT_ARRAYS[rowId]), ERROR_MESSAGE);
+            assertTrue(Arrays.equals(newDataTable.getIntArray(rowId, colId), INT_ARRAYS[rowId]), ERROR_MESSAGE);
             break;
           case LONG_ARRAY:
-            Assert.assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), LONG_ARRAYS[rowId]),
-                ERROR_MESSAGE);
+            assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), LONG_ARRAYS[rowId]), ERROR_MESSAGE);
             break;
           case FLOAT_ARRAY:
-            Assert.assertTrue(Arrays.equals(newDataTable.getFloatArray(rowId, colId), FLOAT_ARRAYS[rowId]),
-                ERROR_MESSAGE);
+            assertTrue(Arrays.equals(newDataTable.getFloatArray(rowId, colId), FLOAT_ARRAYS[rowId]), ERROR_MESSAGE);
             break;
           case DOUBLE_ARRAY:
-            Assert.assertTrue(Arrays.equals(newDataTable.getDoubleArray(rowId, colId), DOUBLE_ARRAYS[rowId]),
+            assertTrue(Arrays.equals(newDataTable.getDoubleArray(rowId, colId), DOUBLE_ARRAYS[rowId]), ERROR_MESSAGE);
+            break;
+          case BIG_DECIMAL_ARRAY:
+            assertTrue(Arrays.equals(newDataTable.getBigDecimalArray(rowId, colId), BIG_DECIMAL_ARRAYS[rowId]),
                 ERROR_MESSAGE);
             break;
           case BOOLEAN_ARRAY:
-            Assert.assertTrue(Arrays.equals(newDataTable.getIntArray(rowId, colId), BOOLEAN_ARRAYS[rowId]),
-                ERROR_MESSAGE);
+            assertTrue(Arrays.equals(newDataTable.getIntArray(rowId, colId), BOOLEAN_ARRAYS[rowId]), ERROR_MESSAGE);
             break;
           case TIMESTAMP_ARRAY:
-            Assert.assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), TIMESTAMP_ARRAYS[rowId]),
-                ERROR_MESSAGE);
+            assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), TIMESTAMP_ARRAYS[rowId]), ERROR_MESSAGE);
             break;
           case BYTES_ARRAY:
-            // TODO: add once implementation of datatable bytes array support is added
+            assertTrue(Arrays.equals(newDataTable.getBytesArray(rowId, colId), BYTES_ARRAYS[rowId]), ERROR_MESSAGE);
+            break;
+          case UUID_ARRAY:
+            assertTrue(Arrays.equals(newDataTable.getBytesArray(rowId, colId), UUID_ARRAYS[rowId]), ERROR_MESSAGE);
             break;
           case STRING_ARRAY:
-            Assert.assertTrue(Arrays.equals(newDataTable.getStringArray(rowId, colId), STRING_ARRAYS[rowId]),
-                ERROR_MESSAGE);
+            assertTrue(Arrays.equals(newDataTable.getStringArray(rowId, colId), STRING_ARRAYS[rowId]), ERROR_MESSAGE);
             break;
           case MAP:
-            Assert.assertEquals(newDataTable.getMap(rowId, colId), MAPS[rowId], ERROR_MESSAGE);
+            assertEquals(newDataTable.getMap(rowId, colId), MAPS[rowId], ERROR_MESSAGE);
             break;
+          case OBJECT:
           case UNKNOWN:
             Object nulValue = newDataTable.getCustomObject(rowId, colId);
-            Assert.assertNull(nulValue, ERROR_MESSAGE);
+            assertNull(nulValue, ERROR_MESSAGE);
             break;
           default:
             throw new UnsupportedOperationException("Unable to generate random data for: " + columnDataTypes[colId]);

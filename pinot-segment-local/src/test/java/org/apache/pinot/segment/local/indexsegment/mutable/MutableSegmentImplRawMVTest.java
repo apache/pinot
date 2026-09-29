@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -49,6 +50,7 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -56,13 +58,23 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 
 
-public class MutableSegmentImplRawMVTest {
+public class MutableSegmentImplRawMVTest implements PinotBuffersAfterClassCheckRule {
   private static final String AVRO_FILE = "data/test_data-mv.avro";
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "MutableSegmentImplRawMVTest");
+  /// Virtual columns describing the segment itself, which are expected to differ between a mutable segment and an
+  /// immutable segment built from the same records.
+  private static final Set<String> SEGMENT_LEVEL_VIRTUAL_COLUMNS =
+      Set.of(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME,
+          CommonConstants.Segment.BuiltInVirtualColumn.CREATIONTIME,
+          CommonConstants.Segment.BuiltInVirtualColumn.STARTTIME,
+          CommonConstants.Segment.BuiltInVirtualColumn.ENDTIME,
+          CommonConstants.Segment.BuiltInVirtualColumn.CRC);
 
   private Schema _schema;
   private MutableSegmentImpl _mutableSegmentImpl;
@@ -103,15 +115,16 @@ public class MutableSegmentImplRawMVTest {
     _mutableSegmentImpl =
         MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema, new HashSet<>(noDictionaryColumns), Set.of(),
             Set.of(), false);
-    _lastIngestionTimeMs = System.currentTimeMillis();
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(_lastIngestionTimeMs, new GenericRow());
-    _startTimeMs = System.currentTimeMillis();
-
+    long currentTimeMs = System.currentTimeMillis();
+    StreamMessageMetadata metadata = mock(StreamMessageMetadata.class);
+    when(metadata.getRecordIngestionTimeMs()).thenReturn(currentTimeMs);
+    _lastIngestionTimeMs = currentTimeMs;
+    _startTimeMs = currentTimeMs;
     try (RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.AVRO, avroFile,
         _schema.getColumnNames(), null)) {
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
-        _mutableSegmentImpl.index(recordReader.next(reuse), defaultMetadata);
+        _mutableSegmentImpl.index(recordReader.next(reuse), metadata);
         _lastIndexedTs = System.currentTimeMillis();
       }
     }
@@ -161,8 +174,9 @@ public class MutableSegmentImplRawMVTest {
         Dictionary expectedDictionary = expectedDataSource.getDictionary();
         assertEquals(actualDictionary.length(), expectedDictionary.length());
 
-        // Allow the segment name to be different
-        if (column.equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME)) {
+        // Allow the segment level metadata to be different between the mutable segment and the immutable segment
+        // built from the same records
+        if (SEGMENT_LEVEL_VIRTUAL_COLUMNS.contains(column)) {
           continue;
         }
 
@@ -186,6 +200,13 @@ public class MutableSegmentImplRawMVTest {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       if (!fieldSpec.isSingleValueField()) {
         String column = fieldSpec.getName();
+        // Skip $partitionId virtual column because this test is specifically for "raw MV" columns
+        // (MV columns with NO dictionary). $partitionId always has a dictionary
+        // (MultiValueConstantStringDictionary), so it doesn't fit the "raw MV" test pattern
+        // where getDictionary() is expected to return null.
+        if (BuiltInVirtualColumn.PARTITIONID.equals(column)) {
+          continue;
+        }
         DataSource actualDataSource = _mutableSegmentImpl.getDataSource(column);
         DataSource expectedDataSource = _immutableSegment.getDataSource(column);
 
@@ -262,6 +283,8 @@ public class MutableSegmentImplRawMVTest {
 
   @AfterClass
   public void tearDown() {
+    _mutableSegmentImpl.destroy();
+    _immutableSegment.destroy();
     FileUtils.deleteQuietly(TEMP_DIR);
   }
 }

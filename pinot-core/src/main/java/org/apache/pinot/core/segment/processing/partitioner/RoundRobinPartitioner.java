@@ -21,9 +21,7 @@ package org.apache.pinot.core.segment.processing.partitioner;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * Partitioner which creates a partition value between [0-numPartitions) in a round-robin manner
- */
+/// Partitioner which creates a partition value between \[0-numPartitions) in a round-robin manner
 public class RoundRobinPartitioner implements Partitioner {
   private final int _numPartitions;
   private transient int _nextPartition = 0;
@@ -34,6 +32,20 @@ public class RoundRobinPartitioner implements Partitioner {
 
   @Override
   public String getPartition(GenericRow genericRow) {
+    return getPartition();
+  }
+
+  @Override
+  public String[] getPartitionColumns() {
+    return new String[0]; // No columns needed
+  }
+
+  @Override
+  public String getPartitionFromColumns(Object[] columnValues) {
+    return getPartition();
+  }
+
+  private String getPartition() {
     int currentPartition = _nextPartition;
     _nextPartition = (_nextPartition + 1) % _numPartitions;
     return String.valueOf(currentPartition);

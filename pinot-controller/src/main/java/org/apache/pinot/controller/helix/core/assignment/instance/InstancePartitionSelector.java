@@ -43,10 +43,8 @@ abstract class InstancePartitionSelector {
         && existingInstancePartitions != null;
   }
 
-  /**
-   * Selects instances based on the replica-group/partition config, and stores the result into the given instance
-   * partitions.
-   */
+  /// Selects instances based on the replica-group/partition config, and stores the result into the given instance
+  /// partitions.
   abstract void selectInstances(Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap,
       InstancePartitions instancePartitions);
 }

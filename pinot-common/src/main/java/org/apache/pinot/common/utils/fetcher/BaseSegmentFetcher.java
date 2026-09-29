@@ -22,6 +22,7 @@ import java.io.File;
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.RoundRobinURIProvider;
@@ -33,9 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base implementation of segment fetcher with the retry logic embedded.
- */
+/// Base implementation of segment fetcher with the retry logic embedded.
 public abstract class BaseSegmentFetcher implements SegmentFetcher {
   public static final String RETRY_COUNT_CONFIG_KEY = "retry.count";
   public static final String RETRY_WAIT_MS_CONFIG_KEY = "retry.wait.ms";
@@ -62,9 +61,7 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
         _retryWaitMs, _retryDelayScaleFactor);
   }
 
-  /**
-   * Override this for custom initialization.
-   */
+  /// Override this for custom initialization.
   protected void doInit(PinotConfiguration config) {
   }
 
@@ -109,15 +106,12 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * @param segmentName the name of the segment to fetch.
-   * @param uriSupplier the supplier to the list of segment download uris.
-   * @param dest        The destination to put the downloaded segment.
-   * @throws Exception when the segment fetch fails after all attempts are exhausted or other runtime exceptions occur.
-   * This method keeps retrying (with exponential backoff) to go through the list download uris to fetch the segment
-   * until the retry limit is reached.
-   *
-   */
+  /// @param segmentName the name of the segment to fetch.
+  /// @param uriSupplier the supplier to the list of segment download uris.
+  /// @param dest        The destination to put the downloaded segment.
+  /// @throws Exception when the segment fetch fails after all attempts are exhausted or other runtime exceptions occur.
+  /// This method keeps retrying (with exponential backoff) to go through the list download uris to fetch the segment
+  /// until the retry limit is reached.
   @Override
   public void fetchSegmentToLocal(String segmentName, Supplier<List<URI>> uriSupplier, File dest) throws Exception {
     try {
@@ -143,11 +137,45 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
     }
   }
 
-  /**
-   * Fetches a segment from URI location to local without retry. Sub-class should override this or
-   * {@link #fetchSegmentToLocal(URI, File)}.
-   */
+  /// Fetches a segment from URI location to local without retry. Sub-class should override this or
+  /// [#fetchSegmentToLocal(URI, File)].
   protected void fetchSegmentToLocalWithoutRetry(URI uri, File dest)
+      throws Exception {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public File fetchUntarSegmentToLocalStreamed(String segmentName, Supplier<List<URI>> uriSupplier, File dest,
+      long maxStreamRateInByte) throws Exception {
+    AtomicReference<File> ret = new AtomicReference<>();
+    try {
+      int attempt =
+          RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+            List<URI> suppliedURIs = uriSupplier.get();
+            // Go through the list of URIs to fetch and untar the segment until success.
+            for (URI uri : suppliedURIs) {
+              try {
+                ret.set(fetchUntarSegmentToLocalWithoutRetry(uri, dest, maxStreamRateInByte));
+                return true;
+              } catch (Exception e) {
+                _logger.warn("Stream download-untar segment {} from peer {} failed.", segmentName, uri, e);
+              }
+            }
+            // None of the URI works. Return false for retry.
+            return false;
+          });
+      _logger.info("Stream downloaded and untarred segment {} successfully with {} attempts.", segmentName,
+          attempt + 1);
+      return ret.get();
+    } catch (Exception e) {
+      _logger.error("Failed to stream download-untar segment {} after retries.", segmentName, e);
+      throw e;
+    }
+  }
+
+  /// Fetches a segment from URI location and untars it to local in a streamed manner, without retry. Sub-class
+  /// should override this to support [#fetchUntarSegmentToLocalStreamed(String, Supplier, File, long)].
+  protected File fetchUntarSegmentToLocalWithoutRetry(URI uri, File dest, long maxStreamRateInByte)
       throws Exception {
     throw new UnsupportedOperationException();
   }

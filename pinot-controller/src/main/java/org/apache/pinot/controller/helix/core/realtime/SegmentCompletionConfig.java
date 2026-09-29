@@ -29,9 +29,11 @@ public class SegmentCompletionConfig {
       CommonConstants.Controller.PREFIX_OF_PINOT_CONTROLLER_SEGMENT_COMPLETION + ".fsm.scheme.";
   public static final String DEFAULT_FSM_SCHEME_KEY =
       CommonConstants.Controller.PREFIX_OF_PINOT_CONTROLLER_SEGMENT_COMPLETION + ".fsm.scheme.default";
+  public static final String DEFAULT_PAUSELESS_FSM_SCHEME_KEY =
+      CommonConstants.Controller.PREFIX_OF_PINOT_CONTROLLER_SEGMENT_COMPLETION + ".fsm.scheme.pauseless";
   public static final String DEFAULT_FSM_SCHEME = "default";
+  public static final String DEFAULT_PAUSELESS_FSM_SCHEME = "pauseless";
   private final Map<String, String> _fsmSchemes = new HashMap<>();
-  private final String _defaultFsmScheme;
 
   public SegmentCompletionConfig(PinotConfiguration configuration) {
     // Parse properties to extract FSM schemes
@@ -43,9 +45,6 @@ public class SegmentCompletionConfig {
         _fsmSchemes.put(scheme, className);
       }
     }
-
-    // Get the default FSM scheme
-    _defaultFsmScheme = configuration.getProperty(DEFAULT_FSM_SCHEME_KEY, DEFAULT_FSM_SCHEME);
   }
 
   public Map<String, String> getFsmSchemes() {
@@ -53,6 +52,10 @@ public class SegmentCompletionConfig {
   }
 
   public String getDefaultFsmScheme() {
-    return _defaultFsmScheme;
+    return DEFAULT_FSM_SCHEME;
+  }
+
+  public String getDefaultPauselessFsmScheme() {
+    return DEFAULT_PAUSELESS_FSM_SCHEME;
   }
 }

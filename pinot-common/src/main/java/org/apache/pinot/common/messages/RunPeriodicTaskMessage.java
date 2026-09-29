@@ -24,10 +24,8 @@ import org.apache.helix.model.Message;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
-/**
- * Upon receiving this message, Controller will execute the specified PeriodicTask against the tables for which it is
- * the lead controller. The message is sent whenever API call for executing a PeriodicTask is invoked.
- */
+/// Upon receiving this message, Controller will execute the specified PeriodicTask against the tables for which it is
+/// the lead controller. The message is sent whenever API call for executing a PeriodicTask is invoked.
 public class RunPeriodicTaskMessage extends Message {
   public static final String RUN_PERIODIC_TASK_MSG_SUB_TYPE = "RUN_PERIODIC_TASK";
   private static final String PERIODIC_TASK_REQUEST_ID = "requestId";
@@ -35,11 +33,9 @@ public class RunPeriodicTaskMessage extends Message {
   private static final String TABLE_NAME_WITH_TYPE_KEY = "tableNameWithType";
   private static final String TASK_PROPERTIES = "taskProperties";
 
-  /**
-   * @param taskRequestId Request Id that will be appended to log messages.
-   * @param periodicTaskName Name of the task that will be run.
-   * @param tableNameWithType Table (names with type suffix) on which task will run.
-   */
+  /// @param taskRequestId Request Id that will be appended to log messages.
+  /// @param periodicTaskName Name of the task that will be run.
+  /// @param tableNameWithType Table (names with type suffix) on which task will run.
   public RunPeriodicTaskMessage(String taskRequestId, String periodicTaskName, String tableNameWithType,
       Map<String, String> taskProperties) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());

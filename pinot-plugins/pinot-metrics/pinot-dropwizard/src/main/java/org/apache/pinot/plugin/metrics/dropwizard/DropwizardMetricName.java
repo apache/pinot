@@ -38,9 +38,7 @@ public final class DropwizardMetricName implements PinotMetricName {
     return _metricName;
   }
 
-  /**
-   * Overrides equals method by calling the equals from the actual metric name.
-   */
+  /// Overrides equals method by calling the equals from the actual metric name.
   @Override
   public boolean equals(Object obj) {
     if (this == obj) {
@@ -53,9 +51,7 @@ public final class DropwizardMetricName implements PinotMetricName {
     return Objects.equals(_metricName, that._metricName);
   }
 
-  /**
-   * Overrides hashCode method by calling the hashCode method from the actual metric name.
-   */
+  /// Overrides hashCode method by calling the hashCode method from the actual metric name.
   @Override
   public int hashCode() {
     return Objects.hashCode(_metricName);

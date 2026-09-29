@@ -25,13 +25,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
-import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
-import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -52,25 +51,23 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * The <code>FastHllQueriesTest</code> class sets up the index segment and create fastHll on 'column17' and 'column18'.
- * <p>There are totally 18 columns, 30000 records inside the original Avro file where 11 columns are selected to build
- * the index segment. Selected columns information are as following:
- * <ul>
- *   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex
- *   <li>column1, METRIC, INT, 6582, F, F</li>
- *   <li>column3, METRIC, INT, 21910, F, F</li>
- *   <li>column5, DIMENSION, STRING, 1, T, F</li>
- *   <li>column6, DIMENSION, INT, 608, F, T</li>
- *   <li>column7, DIMENSION, INT, 146, F, T</li>
- *   <li>column9, DIMENSION, INT, 1737, F, F</li>
- *   <li>column11, DIMENSION, STRING, 5, F, T</li>
- *   <li>column12, DIMENSION, STRING, 5, F, F</li>
- *   <li>column17, METRIC, INT, 24, F, T</li>
- *   <li>column18, METRIC, INT, 1440, F, T</li>
- *   <li>daysSinceEpoch, TIME, INT, 2, T, F</li>
- * </ul>
- */
+/// The `FastHllQueriesTest` class sets up the index segment and create fastHll on 'column17' and 'column18'.
+///
+/// There are totally 18 columns, 30000 records inside the original Avro file where 11 columns are selected to build
+/// the index segment. Selected columns information are as following:
+///
+///   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex
+/// - column1, METRIC, INT, 6582, F, F
+/// - column3, METRIC, INT, 21910, F, F
+/// - column5, DIMENSION, STRING, 1, T, F
+/// - column6, DIMENSION, INT, 608, F, T
+/// - column7, DIMENSION, INT, 146, F, T
+/// - column9, DIMENSION, INT, 1737, F, F
+/// - column11, DIMENSION, STRING, 5, F, T
+/// - column12, DIMENSION, STRING, 5, F, F
+/// - column17, METRIC, INT, 24, F, T
+/// - column18, METRIC, INT, 1440, F, T
+/// - daysSinceEpoch, TIME, INT, 2, T, F
 @SuppressWarnings("ConstantConditions")
 public class FastHllQueriesTest extends BaseQueriesTest {
   private static final String AVRO_DATA_WITH_PRE_GENERATED_HLL_COLUMNS =
@@ -130,12 +127,11 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     GroupByResultsBlock groupByResultsBlock = groupByOperator.nextBlock();
     executionStatistics = groupByOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 30000L, 0L, 90000L, 30000L);
-    AggregationGroupByResult aggregationGroupByResult = groupByResultsBlock.getAggregationGroupByResult();
-    GroupKeyGenerator.GroupKey firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
-    assertEquals(firstGroupKey._keys[0], "");
-    assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForGroupId(0, firstGroupKey._groupId)).cardinality(),
+    IntermediateRecord firstRecord = groupByResultsBlock.getIntermediateRecords().get(0);
+    assertEquals(firstRecord._key.getValues()[0], "");
+    assertEquals(((HyperLogLog) firstRecord._record.getValues()[1]).cardinality(),
         21L);
-    assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForGroupId(1, firstGroupKey._groupId)).cardinality(),
+    assertEquals(((HyperLogLog) firstRecord._record.getValues()[2]).cardinality(),
         691L);
 
     // Test inter segments base query

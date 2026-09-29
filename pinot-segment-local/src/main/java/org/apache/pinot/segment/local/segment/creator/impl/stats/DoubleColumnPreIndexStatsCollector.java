@@ -21,7 +21,11 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.doubles.DoubleSet;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
@@ -34,38 +38,51 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
     super(column, statsCollectorConfig);
   }
 
+  public DoubleColumnPreIndexStatsCollector(FieldSpec fieldSpec, @Nullable FieldConfig fieldConfig,
+      @Nullable PartitionFunction partitionFunction) {
+    super(fieldSpec, fieldConfig, partitionFunction);
+  }
+
   @Override
   public void collect(Object entry) {
     assert !_sealed;
 
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;
-      for (Object obj : values) {
-        double value = (double) obj;
-        _values.add(value);
-      }
-
-      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
-      updateTotalNumberOfEntries(values);
+      collectMultiValue(values.length, i -> (double) values[i]);
     } else if (entry instanceof double[]) {
-      double[] values = (double[]) entry;
-      for (double value : values) {
-        _values.add(value);
-      }
-
-      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
-      updateTotalNumberOfEntries(values.length);
+      collect((double[]) entry);
     } else {
-      double value = (double) entry;
-      addressSorted(value);
-      if (_values.add(value)) {
-        if (isPartitionEnabled()) {
-          updatePartition(Double.toString(value));
-        }
-      }
-
-      _totalNumberOfEntries++;
+      collect((double) entry);
     }
+  }
+
+  @Override
+  public void collect(double value) {
+    assert !_sealed;
+    addressSorted(value);
+    if (_values.add(value)) {
+      if (isPartitionEnabled()) {
+        updatePartition(Double.toString(value));
+      }
+    }
+    _totalDocs++;
+    _totalNumberOfEntries++;
+  }
+
+  @Override
+  public void collect(double[] values) {
+    assert !_sealed;
+    collectMultiValue(values.length, i -> values[i]);
+  }
+
+  private void collectMultiValue(int length, java.util.function.IntFunction<Double> valueGetter) {
+    for (int i = 0; i < length; i++) {
+      _values.add(valueGetter.apply(i));
+    }
+    _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, length);
+    _totalDocs++;
+    updateTotalNumberOfEntries(length);
   }
 
   private void addressSorted(double entry) {
@@ -102,6 +119,10 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
   @Override
   public int getCardinality() {
     return _sealed ? _sortedValues.length : _values.size();
+  }
+
+  double[] getValues() {
+    return _values.toDoubleArray();
   }
 
   @Override

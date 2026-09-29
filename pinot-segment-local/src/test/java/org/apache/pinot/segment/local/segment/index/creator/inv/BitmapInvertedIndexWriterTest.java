@@ -27,6 +27,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -43,7 +44,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-public class BitmapInvertedIndexWriterTest {
+public class BitmapInvertedIndexWriterTest implements PinotBuffersAfterMethodCheckRule {
 
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "BitmapInvertedIndexWriterTest");
 

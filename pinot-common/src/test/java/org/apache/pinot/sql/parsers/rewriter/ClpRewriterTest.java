@@ -186,14 +186,12 @@ public class ClpRewriterTest {
     }
   }
 
-  /**
-   * Flattens an AND expression such that any of its children that are AND ops are elided by adding their operands to
-   * the given expression.
-   * <p>
-   * Ex: "x = '1' AND ('y' = 2 AND NOT 'z' = 3)" would be flattened to
-   * "x '1' AND 'y' = 2 AND NOT 'z' = 3"
-   * @param expr
-   */
+  /// Flattens an AND expression such that any of its children that are AND ops are elided by adding their operands to
+  /// the given expression.
+  ///
+  /// Ex: "x = '1' AND ('y' = 2 AND NOT 'z' = 3)" would be flattened to
+  /// "x '1' AND 'y' = 2 AND NOT 'z' = 3"
+  /// @param expr
   private void flattenAndExpression(Expression expr) {
     List<Expression> newOperands = new ArrayList<>();
     Function func = expr.getFunctionCall();
@@ -215,13 +213,11 @@ public class ClpRewriterTest {
     func.setOperands(newOperands);
   }
 
-  /**
-   * Flattens all AND expressions in a given expression.
-   * <p>
-   * Ex: "a = 0 OR (x = '1' AND ('y' = 2 AND NOT 'z' = 3))" would be flattened to
-   * "a = 0 OR (x '1' AND 'y' = 2 AND NOT 'z' = 3)"
-   * @param expr
-   */
+  /// Flattens all AND expressions in a given expression.
+  ///
+  /// Ex: "a = 0 OR (x = '1' AND ('y' = 2 AND NOT 'z' = 3))" would be flattened to
+  /// "a = 0 OR (x '1' AND 'y' = 2 AND NOT 'z' = 3)"
+  /// @param expr
   private void flattenAllAndExpressions(Expression expr) {
     if (!expr.isSetFunctionCall()) {
       return;

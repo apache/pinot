@@ -47,7 +47,7 @@ public class InnerSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     AggregationOperator aggregationOperator = getOperator(AGGREGATION_QUERY);
     AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 100000L, 0L,
-        400000L, 100000L);
+        200000L, 100000L);
     QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getResults(), 100000L, 100991525475000L, 2147434110,
         1182655, 83439903673981L, 100000L);
 

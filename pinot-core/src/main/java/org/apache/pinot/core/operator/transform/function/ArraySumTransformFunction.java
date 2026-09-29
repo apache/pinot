@@ -25,14 +25,12 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 
 
-/**
- * The ArraySumTransformFunction class implements arraySum function for multi-valued columns
- *
- * Sample queries:
- * SELECT COUNT(*) FROM table WHERE arraySum(mvColumn) > 2
- * SELECT COUNT(*) FROM table GROUP BY arraySum(mvColumn)
- * SELECT SUM(arraySum(mvColumn)) FROM table
- */
+/// The ArraySumTransformFunction class implements arraySum function for multi-valued columns
+///
+/// Sample queries:
+/// SELECT COUNT(\*) FROM table WHERE arraySum(mvColumn) > 2
+/// SELECT COUNT(\*) FROM table GROUP BY arraySum(mvColumn)
+/// SELECT SUM(arraySum(mvColumn)) FROM table
 public class ArraySumTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "arraySum";
 

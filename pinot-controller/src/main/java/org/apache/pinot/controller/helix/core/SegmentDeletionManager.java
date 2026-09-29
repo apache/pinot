@@ -26,14 +26,18 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
@@ -43,13 +47,17 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
 import org.apache.pinot.core.segment.processing.lifecycle.impl.SegmentDeletionEventDetails;
+import org.apache.pinot.materializedview.consistency.MaterializedViewConsistencyManager;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -67,10 +75,15 @@ public class SegmentDeletionManager {
   // Retention date format will be written as suffix to deleted segments under `Deleted_Segments` folder. for example:
   // `Deleted_Segments/myTable/myTable_mySegment_0__RETENTION_UNTIL__202202021200` to indicate that this segment
   // file will be permanently deleted after Feb 2nd 2022 12PM.
-  private static final String DELETED_SEGMENTS = "Deleted_Segments";
+  public static final String DELETED_SEGMENTS = "Deleted_Segments";
   private static final String RETENTION_UNTIL_SEPARATOR = "__RETENTION_UNTIL__";
   private static final String RETENTION_DATE_FORMAT_STR = "yyyyMMddHHmm";
   private static final SimpleDateFormat RETENTION_DATE_FORMAT;
+  private static final String DELIMITER = "/";
+
+  public static final int NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT = 1000;
+  private static final int OBJECT_DELETION_TIMEOUT = 5;
+  private static final int MAX_BATCH_DELETION_TIMEOUT_SECONDS = 600; // 10 minutes
 
   static {
     RETENTION_DATE_FORMAT = new SimpleDateFormat(RETENTION_DATE_FORMAT_STR);
@@ -83,6 +96,7 @@ public class SegmentDeletionManager {
   private final HelixAdmin _helixAdmin;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final long _defaultDeletedSegmentsRetentionMs;
+  private volatile MaterializedViewConsistencyManager _materializedViewConsistencyManager;
 
   public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
       ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
@@ -104,6 +118,49 @@ public class SegmentDeletionManager {
 
   public void stop() {
     _executorService.shutdownNow();
+  }
+
+  public void registerMaterializedViewConsistencyManager(
+      MaterializedViewConsistencyManager materializedViewConsistencyManager) {
+    _materializedViewConsistencyManager = materializedViewConsistencyManager;
+  }
+
+  protected void notifyMaterializedViewConsistencyManager(String tableName, List<String> segmentsToDelete) {
+    MaterializedViewConsistencyManager mgr = _materializedViewConsistencyManager;
+    if (mgr == null || segmentsToDelete.isEmpty()) {
+      return;
+    }
+    try {
+      long minStart = Long.MAX_VALUE;
+      long maxEnd = Long.MIN_VALUE;
+      boolean sawSegmentWithoutTime = false;
+      for (String segmentId : segmentsToDelete) {
+        SegmentZKMetadata meta = ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableName, segmentId);
+        if (meta != null) {
+          long startMs = meta.getStartTimeMs();
+          long endMs = meta.getEndTimeMs();
+          if (startMs >= 0 && endMs >= 0) {
+            minStart = Math.min(minStart, startMs);
+            maxEnd = Math.max(maxEnd, endMs);
+          } else {
+            sawSegmentWithoutTime = true;
+          }
+        }
+      }
+      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+      if (sawSegmentWithoutTime) {
+        // At least one deleted segment lacked time-range metadata. To avoid leaking stale
+        // VALID partitions in any dependent MV, signal a full-range invalidation. The
+        // consistency manager's BUCKET_MISSING_MARK_CAP bounds blast radius for long-history MVs.
+        LOGGER.warn("Base table {} segment deletion includes segments without startTime/endTime; "
+            + "treating as full-range MV invalidation.", tableName);
+        mgr.onBaseTableFullInvalidation(rawTableName);
+      } else if (minStart != Long.MAX_VALUE && maxEnd != Long.MIN_VALUE) {
+        mgr.onBaseTableDataChange(rawTableName, minStart, maxEnd);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Failed to notify MV consistency manager for segment deletion on table: {}", tableName, e);
+    }
   }
 
   public void deleteSegments(String tableName, Collection<String> segmentIds) {
@@ -131,17 +188,51 @@ public class SegmentDeletionManager {
 
   protected synchronized void deleteSegmentFromPropertyStoreAndLocal(String tableName, Collection<String> segmentIds,
       Long deletedSegmentsRetentionMs, long deletionDelay) {
-    // Check if segment got removed from ExternalView or IdealState
+    List<String> segmentsToDelete = filterSegmentsToDelete(tableName, segmentIds);
+    if (segmentsToDelete == null) {
+      // ExternalView or IdealState was unavailable; skip the whole batch
+      return;
+    }
+
+    Set<String> deletedSegments = new HashSet<>();
+    if (!segmentsToDelete.isEmpty()) {
+      // Capture segment time ranges before ZK metadata is removed (for MV dirty marking)
+      notifyMaterializedViewConsistencyManager(tableName, segmentsToDelete);
+
+      // Notify all active listeners here
+      PinotSegmentLifecycleEventListenerManager.getInstance()
+          .notifyListeners(new SegmentDeletionEventDetails(tableName, segmentsToDelete));
+
+      deletedSegments = deleteSegmentsFromPropertyStore(tableName, segmentsToDelete);
+
+      // Best effort remove segments from deep store.
+      // If this fails (e.g. controller crashes, deep store unavailable), future runs of RetentionManager
+      // will attempt to delete orphan deep store entries. Check getSegmentsToDeleteFromDeepstore()
+      removeSegmentsFromStoreInBatch(tableName, deletedSegments, deletedSegmentsRetentionMs);
+    }
+
+    Set<String> segmentsToRetryLater = new HashSet<>(segmentIds);
+    segmentsToRetryLater.removeAll(deletedSegments);
+
+    LOGGER.info("Deleted {} segments from table {}:{}", deletedSegments.size(), tableName,
+        deletedSegments.size() <= 5 ? deletedSegments : "");
+
+    if (!segmentsToRetryLater.isEmpty()) {
+      rescheduleRetry(tableName, segmentsToRetryLater, deletedSegmentsRetentionMs, deletionDelay);
+    }
+  }
+
+  /// Check if segment got removed from ExternalView or IdealState
+  /// Returns `null` when the ExternalView or IdealState is unavailable
+  protected List<String> filterSegmentsToDelete(String tableName, Collection<String> segmentIds) {
     ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableName);
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
     if (externalView == null || idealState == null) {
       LOGGER.warn("Resource: {} is not set up in idealState or ExternalView, won't do anything", tableName);
-      return;
+      return null;
     }
 
-    List<String> segmentsToDelete = new ArrayList<>(segmentIds.size()); // Has the segments that will be deleted
-    Set<String> segmentsToRetryLater = new HashSet<>(segmentIds.size());  // List of segments that we need to retry
-
+    List<String> segmentsToDelete = new ArrayList<>(segmentIds.size());
     try {
       for (String segmentId : segmentIds) {
         Map<String, String> segmentToInstancesMapFromExternalView = externalView.getStateMap(segmentId);
@@ -149,143 +240,188 @@ public class SegmentDeletionManager {
         if ((segmentToInstancesMapFromExternalView == null || segmentToInstancesMapFromExternalView.isEmpty()) && (
             segmentToInstancesMapFromIdealStates == null || segmentToInstancesMapFromIdealStates.isEmpty())) {
           segmentsToDelete.add(segmentId);
-        } else {
-          segmentsToRetryLater.add(segmentId);
         }
       }
     } catch (Exception e) {
       LOGGER.warn("Caught exception while checking helix states for table: {}", tableName, e);
       segmentsToDelete.clear();
       segmentsToDelete.addAll(segmentIds);
-      segmentsToRetryLater.clear();
+    }
+    return segmentsToDelete;
+  }
+
+  /// Removes the property-store znodes for the given segments
+  /// Returns the set of segments that were successfully deleted.
+  protected Set<String> deleteSegmentsFromPropertyStore(String tableName, List<String> segmentsToDelete) {
+    // Use a LinkedHashSet so deep-store deletion preserves the input order (deterministic) rather
+    // than HashSet bucket order, while keeping the Set semantics callers rely on.
+    Set<String> deletedSegments = new LinkedHashSet<>(segmentsToDelete.size());
+    List<String> propStorePathList = new ArrayList<>(segmentsToDelete.size());
+    for (String segmentId : segmentsToDelete) {
+      String segmentPropertyStorePath = ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segmentId);
+      propStorePathList.add(segmentPropertyStorePath);
     }
 
-    if (!segmentsToDelete.isEmpty()) {
-      List<String> propStorePathList = new ArrayList<>(segmentsToDelete.size());
-      for (String segmentId : segmentsToDelete) {
-        String segmentPropertyStorePath = ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segmentId);
-        propStorePathList.add(segmentPropertyStorePath);
-      }
-
-      // Notify all active listeners here
-      PinotSegmentLifecycleEventListenerManager.getInstance()
-          .notifyListeners(new SegmentDeletionEventDetails(tableName, segmentsToDelete));
-
-      boolean[] deleteSuccessful = _propertyStore.remove(propStorePathList, AccessOption.PERSISTENT);
-      List<String> propStoreFailedSegs = new ArrayList<>(segmentsToDelete.size());
-      for (int i = 0; i < deleteSuccessful.length; i++) {
-        final String segmentId = segmentsToDelete.get(i);
-        if (!deleteSuccessful[i]) {
-          // remove API can fail because the prop store entry did not exist, so check first.
-          if (_propertyStore.exists(propStorePathList.get(i), AccessOption.PERSISTENT)) {
-            LOGGER.info("Could not delete {} from propertystore", propStorePathList.get(i));
-            segmentsToRetryLater.add(segmentId);
-            propStoreFailedSegs.add(segmentId);
-          }
+    boolean[] deleteSuccessful = _propertyStore.remove(propStorePathList, AccessOption.PERSISTENT);
+    for (int i = 0; i < deleteSuccessful.length; i++) {
+      final String segmentId = segmentsToDelete.get(i);
+      if (deleteSuccessful[i]) {
+        deletedSegments.add(segmentId);
+      } else {
+        // The batch remove API takes a non-recursive ZK path: it cannot delete a znode that has
+        // accumulated children. Fall back to the single-path remove API, which falls back to a
+        // recursive delete on the same NotEmpty failure. Skip when the znode is already gone
+        // (the batch call may have failed simply because the entry did not exist).
+        String segmentPath = propStorePathList.get(i);
+        if (_propertyStore.exists(segmentPath, AccessOption.PERSISTENT)
+            && !_propertyStore.remove(segmentPath, AccessOption.PERSISTENT)) {
+          LOGGER.info("Could not delete {} from propertystore", segmentPath);
+        } else {
+          deletedSegments.add(segmentId);
         }
       }
-      segmentsToDelete.removeAll(propStoreFailedSegs);
-
-      // TODO: If removing segments from deep store fails (e.g. controller crashes, deep store unavailable), these
-      //       segments will become orphans and not easy to track because their ZK metadata are already deleted.
-      //       Consider removing segments from deep store before cleaning up the ZK metadata.
-      removeSegmentsFromStore(tableName, segmentsToDelete, deletedSegmentsRetentionMs);
     }
-
-    LOGGER.info("Deleted {} segments from table {}:{}", segmentsToDelete.size(), tableName,
-        segmentsToDelete.size() <= 5 ? segmentsToDelete : "");
-
-    if (!segmentsToRetryLater.isEmpty()) {
-      long effectiveDeletionDelay = Math.min(deletionDelay * 2, MAX_DELETION_DELAY_SECONDS);
-      LOGGER.info("Postponing deletion of {} segments from table {}", segmentsToRetryLater.size(), tableName);
-      deleteSegmentsWithDelay(tableName, segmentsToRetryLater, deletedSegmentsRetentionMs, effectiveDeletionDelay);
-    }
+    return deletedSegments;
   }
 
-  public void removeSegmentsFromStore(String tableNameWithType, List<String> segments) {
-    removeSegmentsFromStore(tableNameWithType, segments, null);
+  /// Reschedules the segments that could not be deleted this pass, applying the exponential back-off
+  /// (capped at [#MAX_DELETION_DELAY_SECONDS]). No-op when there is nothing to retry.
+  protected void rescheduleRetry(String tableName, Collection<String> segmentsToRetryLater,
+      Long deletedSegmentsRetentionMs, long deletionDelay) {
+    long effectiveDeletionDelay = Math.min(deletionDelay * 2, MAX_DELETION_DELAY_SECONDS);
+    LOGGER.info("Postponing deletion of {} segments from table {}", segmentsToRetryLater.size(), tableName);
+    deleteSegmentsWithDelay(tableName, segmentsToRetryLater, deletedSegmentsRetentionMs, effectiveDeletionDelay);
   }
 
-  public void removeSegmentsFromStore(String tableNameWithType, List<String> segments,
+  public void removeSegmentsFromStoreInBatch(String tableNameWithType, Collection<String> segments,
       @Nullable Long deletedSegmentsRetentionMs) {
-    for (String segment : segments) {
-      removeSegmentFromStore(tableNameWithType, segment, deletedSegmentsRetentionMs);
+    if (_dataDir == null) {
+      LOGGER.info("dataDir is not configured, won't delete segment from disk for table: {}", tableNameWithType);
+      return;
     }
-  }
 
-  private void deleteSegmentMetadataFromStore(PinotFS pinotFS, URI segmentFileUri, String segmentId) {
-    // Check if segment metadata exists in remote store and delete it.
-    // URI is generated from segment's location and segment name
+    long retentionMs =
+        (deletedSegmentsRetentionMs == null) ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+
+    List<URI> filesToDelete = new ArrayList<>();
+    List<URI> metadataFilesToDelete = new ArrayList<>();
+
+    PinotFS pinotFS = PinotFSFactory.create(URIUtils.getUri(_dataDir).getScheme());
+
+    for (String segmentId : segments) {
+      URI fileToDeleteURI = getFileToDeleteURI(rawTableName, segmentId);
+      if (fileToDeleteURI == null) {
+        continue;
+      }
+      try {
+        URI segmentMetadataUri = SegmentPushUtils.generateSegmentMetadataURI(fileToDeleteURI.toString(), segmentId);
+        metadataFilesToDelete.add(segmentMetadataUri);
+      } catch (URISyntaxException e) {
+        LOGGER.warn("Could not generate segment metadata URI for segment: {}", segmentId, e);
+      }
+
+      if (retentionMs <= 0) {
+        filesToDelete.add(fileToDeleteURI);
+      } else {
+        moveSegmentsToDeletedDir(segmentId, deletedSegmentsRetentionMs, rawTableName, pinotFS, fileToDeleteURI);
+      }
+    }
+
     try {
-      URI segmentMetadataUri = SegmentPushUtils.generateSegmentMetadataURI(segmentFileUri.toString(), segmentId);
-      if (pinotFS.exists(segmentMetadataUri)) {
-        LOGGER.info("Deleting segment metadata {} from {}", segmentId, segmentMetadataUri);
-        pinotFS.delete(segmentMetadataUri, true);
+      if (!filesToDelete.isEmpty()) {
+        LOGGER.info("Deleting {} segment files", filesToDelete.size());
+        pinotFS.deleteBatch(filesToDelete, true);
+      }
+      if (!metadataFilesToDelete.isEmpty()) {
+        LOGGER.info("Deleting {} segment metadata files", metadataFilesToDelete.size());
+        pinotFS.deleteBatch(metadataFilesToDelete, true);
       }
     } catch (IOException e) {
-      LOGGER.warn("Could not delete segment metadata {} from {}", segmentId, segmentFileUri, e);
-    } catch (URISyntaxException e) {
-      LOGGER.warn("Could not parse segment uri {}", segmentFileUri, e);
+      LOGGER.warn("Could not delete segment/metadata files", e);
     }
   }
 
-  protected void removeSegmentFromStore(String tableNameWithType, String segmentId,
-      @Nullable Long deletedSegmentsRetentionMs) {
-    if (_dataDir != null) {
-      long retentionMs = deletedSegmentsRetentionMs == null
-          ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;
-      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      URI fileToDeleteURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
-      PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
-      // Segment metadata in remote store is an optimization, to avoid downloading segment to parse metadata.
-      // This is catch all clean up to ensure that metadata is removed from deep store.
-      deleteSegmentMetadataFromStore(pinotFS, fileToDeleteURI, segmentId);
-      if (retentionMs <= 0) {
-        // delete the segment file instantly if retention is set to zero
-        try {
-          if (pinotFS.delete(fileToDeleteURI, true)) {
-            LOGGER.info("Deleted segment {} from {}", segmentId, fileToDeleteURI.toString());
-          } else {
-            LOGGER.warn("Failed to delete segment {} from {}", segmentId, fileToDeleteURI.toString());
-          }
-        } catch (IOException e) {
-          LOGGER.warn("Could not delete segment {} from {}", segmentId, fileToDeleteURI.toString(), e);
+  private void moveSegmentsToDeletedDir(String segmentId, Long deletedSegmentsRetentionMs, String rawTableName,
+      PinotFS pinotFS,
+      URI fileToDeleteURI) {
+    // move the segment file to deleted segments first and let retention manager handler the deletion
+    String deletedFileName = deletedSegmentsRetentionMs == null ? URIUtils.encode(segmentId)
+        : getDeletedSegmentFileName(URIUtils.encode(segmentId), deletedSegmentsRetentionMs);
+    URI deletedSegmentMoveDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName, deletedFileName);
+    try {
+      if (pinotFS.exists(fileToDeleteURI)) {
+        // Overwrites the file if it already exists in the target directory.
+        if (pinotFS.move(fileToDeleteURI, deletedSegmentMoveDestURI, true)) {
+          // Updates last modified.
+          // Touch is needed here so that removeAgedDeletedSegments() works correctly.
+          pinotFS.touch(deletedSegmentMoveDestURI);
+          LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
+              deletedSegmentMoveDestURI.toString());
+        } else {
+          LOGGER.warn("Failed to move segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
+              deletedSegmentMoveDestURI.toString());
         }
       } else {
-        // move the segment file to deleted segments first and let retention manager handler the deletion
-        String deletedFileName = deletedSegmentsRetentionMs == null ? URIUtils.encode(segmentId)
-            : getDeletedSegmentFileName(URIUtils.encode(segmentId), deletedSegmentsRetentionMs);
-        URI deletedSegmentMoveDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName, deletedFileName);
-        try {
-          if (pinotFS.exists(fileToDeleteURI)) {
-            // Overwrites the file if it already exists in the target directory.
-            if (pinotFS.move(fileToDeleteURI, deletedSegmentMoveDestURI, true)) {
-              // Updates last modified.
-              // Touch is needed here so that removeAgedDeletedSegments() works correctly.
-              pinotFS.touch(deletedSegmentMoveDestURI);
-              LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
-                  deletedSegmentMoveDestURI.toString());
-            } else {
-              LOGGER.warn("Failed to move segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
-                  deletedSegmentMoveDestURI.toString());
-            }
-          } else {
-            LOGGER.warn("Failed to find local segment file for segment {}", fileToDeleteURI.toString());
-          }
-        } catch (IOException e) {
-          LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
-              deletedSegmentMoveDestURI.toString(), e);
-        }
+        LOGGER.warn("Failed to find local segment file for segment {}", fileToDeleteURI.toString());
       }
-    } else {
-      LOGGER.info("dataDir is not configured, won't delete segment {} from disk", segmentId);
+    } catch (IOException e) {
+      LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
+          deletedSegmentMoveDestURI.toString(), e);
     }
   }
 
-  /**
-   * Removes aged deleted segments from the deleted directory
-   */
+
+  /// Retrieves the URI for segment deletion by checking two possible segment file variants in deep store.
+  /// Looks for the segment file in two formats:
+  /// - Without extension (conventional naming)
+  /// - With .tar.gz extension (used by minions in BaseMultipleSegmentsConversionExecutor)
+  ///
+  /// @param rawTableName name of the table containing the segment
+  /// @param segmentId name of the segment
+  /// @return URI of the existing segment file if found in either format, null if segment doesn't exist in either format
+  ///         or if there are filesystem access errors
+  @Nullable
+  private URI getFileToDeleteURI(String rawTableName, String segmentId) {
+    try {
+      URI plainFileUri = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
+      PinotFS pinotFS = PinotFSFactory.create(plainFileUri.getScheme());
+
+      // Check for plain segment file first
+      if (pinotFS.exists(plainFileUri)) {
+        return plainFileUri;
+      }
+
+      URI tarGzFileUri = URIUtils.getUri(_dataDir, rawTableName,
+          URIUtils.encode(segmentId + TarCompressionUtils.TAR_GZ_FILE_EXTENSION));
+
+      // Check for .tar.gz segment file
+      if (pinotFS.exists(tarGzFileUri)) {
+        return tarGzFileUri;
+      }
+      LOGGER.error("No file found for segment: {} in deep store", segmentId);
+      return null;
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while trying to find file for segment: {} in deep store", segmentId);
+      return null;
+    }
+  }
+  /// Removes aged deleted segments from the deleted directory using the default batch size.
+  /// This method processes aged segments in batches to avoid overwhelming the system.
+  ///
+  /// @param leadControllerManager the lead controller manager to check if this controller is the leader for tables
   public void removeAgedDeletedSegments(LeadControllerManager leadControllerManager) {
+    removeAgedDeletedSegments(leadControllerManager, NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT);
+  }
+
+  /// Removes aged deleted segments from the deleted directory with a custom batch size.
+  /// This method asynchronously deletes segments that have exceeded their retention period.
+  /// Only the leader controller for each table will perform the deletion to avoid conflicts.
+  ///
+  /// @param leadControllerManager the lead controller manager to check if this controller is the leader for tables
+  /// @param agedSegmentsDeletionBatchSize the maximum number of aged segments to process in a single batch
+  public void removeAgedDeletedSegments(LeadControllerManager leadControllerManager,
+      int agedSegmentsDeletionBatchSize) {
     if (_dataDir != null) {
       URI deletedDirURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS);
       PinotFS pinotFS = PinotFSFactory.create(deletedDirURI.getScheme());
@@ -307,31 +443,86 @@ public class SegmentDeletionManager {
           return;
         }
 
+        // Clean the array of tableNameDirs by removing trailing slashes
+        // This is crucial to fetch the right tableName from the uri
+        for (int i = 0; i < tableNameDirs.length; i++) {
+          if (tableNameDirs[i].endsWith(DELIMITER)) {
+            tableNameDirs[i] = tableNameDirs[i].substring(0, tableNameDirs[i].length() - 1);
+          }
+        }
+
         for (String tableNameDir : tableNameDirs) {
           String tableName = URIUtils.getLastPart(tableNameDir);
           if (leadControllerManager.isLeaderForTable(tableName)) {
             URI tableNameURI = URIUtils.getUri(deletedDirURI.toString(), URIUtils.encode(tableName));
             // Get files that are aged
-            final String[] targetFiles = pinotFS.listFiles(tableNameURI, false);
-            int numFilesDeleted = 0;
-            for (String targetFile : targetFiles) {
-              URI targetURI =
-                  URIUtils.getUri(tableNameURI.toString(), URIUtils.encode(URIUtils.getLastPart(targetFile)));
-              long deletionTimeMs = getDeletionTimeMsFromFile(targetURI.toString(), pinotFS.lastModified(targetURI));
-              if (System.currentTimeMillis() >= deletionTimeMs) {
-                if (!pinotFS.delete(targetURI, true)) {
-                  LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI);
+            final List<FileMetadata> targetFiles = pinotFS.listFilesWithMetadata(tableNameURI, false);
+
+            if (targetFiles.isEmpty()) {
+              LOGGER.info("Deleting empty deleted segments directory: {} for table: {}", tableNameURI, tableName);
+              try {
+                if (!pinotFS.delete(tableNameURI, false)) {
+                  LOGGER.info("Could not delete deleted segments directory: {} for table: {}", tableNameURI, tableName);
                 } else {
-                  numFilesDeleted++;
+                  LOGGER.info("Successfully deleted deleted segments directory: {} for table: {}", tableNameURI,
+                      tableName);
+                }
+              } catch (Exception e) {
+                LOGGER.error("Exception occurred while deleting deleted segments directory: {} for table: {}",
+                    tableNameURI, tableName, e);
+              }
+              continue;
+            }
+            int numFilesScheduledForDeletion = 0;
+            URI targetURI = null;
+            List<URI> targetURIs = new ArrayList<>();
+            for (FileMetadata targetFile : targetFiles) {
+              // Some file system implementations also return the current table directory
+              // we do not want to delete the table directory
+              if (targetFile.isDirectory()) {
+                continue;
+              }
+
+              targetURI =
+                  URIUtils.getUri(tableNameURI.toString(),
+                      URIUtils.encode(URIUtils.getLastPart(targetFile.getFilePath())));
+              long deletionTimeMs = getDeletionTimeMsFromFile(targetURI.toString(), targetFile.getLastModifiedTime());
+              if (System.currentTimeMillis() >= deletionTimeMs) {
+                numFilesScheduledForDeletion++;
+                targetURIs.add(targetURI);
+                if (numFilesScheduledForDeletion == agedSegmentsDeletionBatchSize) {
+                  LOGGER.info(
+                      "Reached threshold of max aged segments to schedule for deletion per attempt. Scheduling "
+                          + "deletion of: {} segment files "
+                          + "from directory: {}", numFilesScheduledForDeletion, tableNameDir);
+                  break;
                 }
               }
             }
-
-            if (numFilesDeleted == targetFiles.length) {
-              // Delete directory if it's empty
-              if (!pinotFS.delete(tableNameURI, false)) {
-                LOGGER.warn("The directory {} cannot be removed.", tableNameDir);
+            try {
+              if (numFilesScheduledForDeletion > 0) {
+                LOGGER.info("Submitting request to delete: {} segment files from directory: {}",
+                    numFilesScheduledForDeletion, tableNameDir);
+                _executorService.submit(() -> {
+                  try {
+                    long timeoutSeconds = Math.min(MAX_BATCH_DELETION_TIMEOUT_SECONDS,
+                        (long) OBJECT_DELETION_TIMEOUT * targetURIs.size());
+                    if (!deleteBatchWithTimeout(pinotFS, targetURIs, false, timeoutSeconds, TimeUnit.SECONDS)) {
+                      LOGGER.warn("Failed to delete aged segment files from table: {}", tableName);
+                    } else {
+                      LOGGER.info("Successfully deleted {} aged segment files from table: {}",
+                          targetURIs.size(),
+                          tableName);
+                    }
+                  } catch (Exception e) {
+                    LOGGER.error("Exception occurred while deleting aged segments for table: {} from path: {}",
+                        tableName, tableNameURI, e);
+                  }
+                });
               }
+            } catch (Exception e) {
+              LOGGER.warn("Failed to submit deletion task for segments in table: {} from path: {}", tableName,
+                  tableNameURI, e);
             }
           }
         }
@@ -342,6 +533,33 @@ public class SegmentDeletionManager {
       LOGGER.info("dataDir is not configured, won't delete any expired segments from deleted directory.");
     }
   }
+
+  private static boolean deleteBatchWithTimeout(PinotFS pinotFS, List<URI> targetURIs, boolean forceDelete,
+      long timeout, TimeUnit timeUnit) {
+    CompletableFuture<Boolean> deleteFuture = CompletableFuture.supplyAsync(() -> {
+          try {
+            return pinotFS.deleteBatch(targetURIs, forceDelete);
+          } catch (Exception e) {
+            LOGGER.warn("Failed to batch delete segments files", e);
+            return false;
+          }
+        }
+    );
+    try {
+      return deleteFuture.get(timeout, timeUnit);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOGGER.warn("Thread was interrupted while deleting resources", e);
+      return false;
+    } catch (TimeoutException e) {
+      LOGGER.warn("Timeout occurred while deleting resource", e);
+      return false;
+    } catch (ExecutionException e) {
+      LOGGER.warn("Exception occurred while deleting resource", e);
+      return false;
+    }
+  }
+
 
   private String getDeletedSegmentFileName(String fileName, long deletedSegmentsRetentionMs) {
     return fileName + RETENTION_UNTIL_SEPARATOR + RETENTION_DATE_FORMAT.format(new Date(

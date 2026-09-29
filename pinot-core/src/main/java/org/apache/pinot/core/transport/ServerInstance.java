@@ -20,15 +20,24 @@ package org.apache.pinot.core.transport;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID;
 
 
 public final class ServerInstance {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
 
   public enum RoutingType {
     NETTY, GRPC, NETTY_TLS
@@ -46,32 +55,19 @@ public final class ServerInstance {
   private final int _queryServicePort;
   private final int _queryMailboxPort;
   private final String _adminEndpoint;
+  private final int _pool;
 
-  /**
-   * By default (auto joined instances), server instance name is of format: {@code Server_<hostname>_<port>}, e.g.
-   * {@code Server_localhost_12345}, hostname is of format: {@code Server_<hostname>}, e.g. {@code Server_localhost}.
-   */
+  /// By default (auto joined instances), server instance name is of format: `Server_<hostname>_<port>`, e.g.
+  /// `Server_localhost_12345`, hostname is of format: `Server_<hostname>`, e.g. `Server_localhost`.
+  ///
+  /// The instance id is interned. The same id is repeated as a key across many long-lived routing structures, and
+  /// Jackson already interns it when decoding the map fields of `IdealState` / `ExternalView`, so joining the JVM pool
+  /// lets all of them share one `String` and lets hash lookups hit the identity fast path. It also keeps the instances
+  /// rebuilt on every instance config refresh from each retaining a separate copy of the id.
   public ServerInstance(InstanceConfig instanceConfig) {
-    _instanceId = instanceConfig.getInstanceName();
-    String hostname = instanceConfig.getHostName();
-    if (hostname != null) {
-      if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        _hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
-      } else {
-        _hostname = hostname;
-      }
-      _port = Integer.parseInt(instanceConfig.getPort());
-    } else {
-      // Hostname might be null in some tests (InstanceConfig created by calling the constructor instead of fetching
-      // from ZK), directly parse the instance name
-      String instanceName = instanceConfig.getInstanceName();
-      if (instanceName.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        instanceName = instanceName.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
-      }
-      String[] hostnameAndPort = StringUtils.split(instanceName, HOSTNAME_PORT_DELIMITER);
-      _hostname = hostnameAndPort[0];
-      _port = Integer.parseInt(hostnameAndPort[1]);
-    }
+    _instanceId = instanceConfig.getInstanceName().intern();
+    _hostname = extractHostnameFromConfig(instanceConfig);
+    _port = extractPortFromConfig(instanceConfig);
     _grpcPort = instanceConfig.getRecord().getIntField(Helix.Instance.GRPC_PORT_KEY, INVALID_PORT);
     _nettyTlsPort = instanceConfig.getRecord().getIntField(Helix.Instance.NETTY_TLS_PORT_KEY, INVALID_PORT);
     _queryServicePort = instanceConfig.getRecord().getIntField(Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY,
@@ -79,11 +75,50 @@ public final class ServerInstance {
     _queryMailboxPort = instanceConfig.getRecord().getIntField(Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY,
         INVALID_PORT);
     _adminEndpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig, _hostname, CommonConstants.HTTP_PROTOCOL);
+    _pool = extractPool(instanceConfig);
+  }
+
+  /// Extracts the raw hostname from an InstanceConfig, stripping the "Server\_" prefix if present.
+  ///
+  /// By default (auto joined instances), server instance name is of format:
+  /// `Server_<hostname>_<port>`, e.g. `Server_localhost_12345`, hostname is of format:
+  /// `Server_<hostname>`, e.g. `Server_localhost`.
+  public static String extractHostnameFromConfig(InstanceConfig instanceConfig) {
+    String hostname = instanceConfig.getHostName();
+    if (hostname != null) {
+      if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+        return hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+      }
+      return hostname;
+    }
+    return parseInstanceNameParts(instanceConfig)[0];
+  }
+
+  /// Extracts the port from an InstanceConfig. When `instanceConfig.getPort()` is not null, uses it directly.
+  /// Otherwise, parses the last segment of the instance name.
+  public static int extractPortFromConfig(InstanceConfig instanceConfig) {
+    String port = instanceConfig.getPort();
+    if (port != null) {
+      return Integer.parseInt(port);
+    }
+    String[] parts = parseInstanceNameParts(instanceConfig);
+    return Integer.parseInt(parts[1]);
+  }
+
+  /// Parses the instance name into parts split by `_`, stripping the "Server\_" prefix if present.
+  /// This is a fallback for when hostname/port are null (e.g. in tests where InstanceConfig is constructed
+  /// directly instead of fetched from ZK).
+  private static String[] parseInstanceNameParts(InstanceConfig instanceConfig) {
+    String instanceName = instanceConfig.getInstanceName();
+    if (instanceName.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+      instanceName = instanceName.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+    }
+    return StringUtils.split(instanceName, HOSTNAME_PORT_DELIMITER);
   }
 
   @VisibleForTesting
   ServerInstance(String hostname, int port) {
-    _instanceId = Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port;
+    _instanceId = (Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port).intern();
     _hostname = hostname;
     _port = port;
     _grpcPort = INVALID_PORT;
@@ -91,8 +126,10 @@ public final class ServerInstance {
     _queryServicePort = INVALID_PORT;
     _queryMailboxPort = INVALID_PORT;
     _adminEndpoint = null;
+    _pool = FALLBACK_POOL_ID;
   }
 
+  /// Returns the interned instance id.
   public String getInstanceId() {
     return _instanceId;
   }
@@ -124,14 +161,8 @@ public final class ServerInstance {
     return _nettyTlsPort;
   }
 
-  // Does not require TLS until all servers guaranteed to be on TLS
-  @Deprecated
-  public ServerRoutingInstance toServerRoutingInstance(TableType tableType, boolean preferNettyTls) {
-    if (preferNettyTls && _nettyTlsPort > 0) {
-      return new ServerRoutingInstance(_instanceId, _hostname, _nettyTlsPort, tableType, true);
-    } else {
-      return new ServerRoutingInstance(_instanceId, _hostname, _port, tableType);
-    }
+  public int getPool() {
+    return _pool;
   }
 
   public ServerRoutingInstance toServerRoutingInstance(TableType tableType, RoutingType routingType) {
@@ -172,5 +203,21 @@ public final class ServerInstance {
   @Override
   public String toString() {
     return _instanceId;
+  }
+
+  @VisibleForTesting
+  int extractPool(InstanceConfig instanceConfig) {
+    Map<String, String> pools = instanceConfig.getRecord().getMapField(InstanceUtils.POOL_KEY);
+    if (pools == null || pools.isEmpty()) {
+      return FALLBACK_POOL_ID;
+    }
+    Set<String> groups = new HashSet<>(pools.values());
+    if (groups.size() != 1) {
+      LOGGER.warn("Instance: {} belongs to multiple groups: {}", _instanceId, groups);
+      return FALLBACK_POOL_ID;
+    }
+    // The type of the field pools of org.apache.pinot.spi.config.instance.Instance uses Map<String, Integer>.
+    // Thus it is safe to directly use Integer.parseInt without checking the parsing exception
+    return Integer.parseInt(groups.iterator().next());
   }
 }

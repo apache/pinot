@@ -26,10 +26,10 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
 
 
 public class TraceContextTest {
@@ -43,24 +43,21 @@ public class TraceContextTest {
     ExecutorService executorService = Executors.newCachedThreadPool();
     testSingleRequest(executorService, 0);
     executorService.shutdown();
-    Assert.assertTrue(TraceContext.REQUEST_TO_TRACES_MAP.isEmpty());
+    assertTrue(TraceContext.REQUEST_TO_TRACES_MAP.isEmpty());
   }
 
   @Test
   public void testMultipleRequests()
       throws Exception {
-    final ExecutorService executorService = Executors.newCachedThreadPool();
+    ExecutorService executorService = Executors.newCachedThreadPool();
     Future[] futures = new Future[NUM_REQUESTS];
     for (int i = 0; i < NUM_REQUESTS; i++) {
-      final int requestId = i;
-      futures[i] = executorService.submit(new Runnable() {
-        @Override
-        public void run() {
-          try {
-            testSingleRequest(executorService, requestId);
-          } catch (Exception e) {
-            Assert.fail();
-          }
+      int numLogs = i + 1;
+      futures[i] = executorService.submit(() -> {
+        try {
+          testSingleRequest(executorService, numLogs);
+        } catch (Exception e) {
+          fail();
         }
       });
     }
@@ -68,33 +65,32 @@ public class TraceContextTest {
       future.get();
     }
     executorService.shutdown();
-    Assert.assertTrue(TraceContext.REQUEST_TO_TRACES_MAP.isEmpty());
+    assertTrue(TraceContext.REQUEST_TO_TRACES_MAP.isEmpty());
   }
 
-  private void testSingleRequest(ExecutorService executorService, final long requestId)
+  private void testSingleRequest(ExecutorService executorService, int numLogs)
       throws Exception {
-    Set<String> expectedTraces = new HashSet<>(NUM_CHILDREN_PER_REQUEST + 1);
-    Tracing.getTracer().register(requestId);
+    assertNull(TraceContext.getTraceEntry());
+    TraceContext.register();
     String key = Integer.toString(RANDOM.nextInt());
     int value = RANDOM.nextInt();
+    Set<String> expectedTraces = new HashSet<>();
     expectedTraces.add(getTraceString(key, value));
 
-    // Add (requestId + 1) logs
-    for (int i = 0; i <= requestId; i++) {
+    for (int i = 0; i < numLogs; i++) {
       TraceContext.logInfo(key, value);
     }
 
     Future[] futures = new Future[NUM_CHILDREN_PER_REQUEST];
     for (int i = 0; i < NUM_CHILDREN_PER_REQUEST; i++) {
-      final String chileKey = Integer.toString(RANDOM.nextInt());
-      final int childValue = RANDOM.nextInt();
+      String chileKey = Integer.toString(RANDOM.nextInt());
+      int childValue = RANDOM.nextInt();
       expectedTraces.add(getTraceString(chileKey, childValue));
 
       futures[i] = executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
-          // Add (requestId + 1) logs
-          for (int j = 0; j <= requestId; j++) {
+          for (int j = 0; j < numLogs; j++) {
             TraceContext.logInfo(chileKey, childValue);
           }
         }
@@ -105,20 +101,23 @@ public class TraceContextTest {
     }
     // to check uniqueness of traceIds
     Set<String> traceIds = new HashSet<>();
-    Queue<TraceContext.Trace> traces = TraceContext.REQUEST_TO_TRACES_MAP.get(requestId);
-    Assert.assertNotNull(traces);
-    Assert.assertEquals(traces.size(), NUM_CHILDREN_PER_REQUEST + 1);
+    TraceContext.TraceEntry traceEntry = TraceContext.getTraceEntry();
+    assertNotNull(traceEntry);
+    Queue<TraceContext.Trace> traces = TraceContext.REQUEST_TO_TRACES_MAP.get(traceEntry._id);
+    assertNotNull(traces);
+    assertEquals(traces.size(), NUM_CHILDREN_PER_REQUEST + 1);
     for (TraceContext.Trace trace : traces) {
       // Trace Id is not deterministic because it relies on the order of runJob() getting called
       List<TraceContext.Trace.LogEntry> logs = trace._logs;
       traceIds.add(trace._traceId);
-      Assert.assertEquals(logs.size(), requestId + 1);
+      assertEquals(logs.size(), numLogs);
       for (TraceContext.Trace.LogEntry log : logs) {
-        Assert.assertTrue(expectedTraces.contains(log.toJson().toString()));
+        assertTrue(expectedTraces.contains(log.toJson().toString()));
       }
     }
-    Assert.assertEquals(traceIds.size(), NUM_CHILDREN_PER_REQUEST + 1);
+    assertEquals(traceIds.size(), NUM_CHILDREN_PER_REQUEST + 1);
     TraceContext.unregister();
+    assertNull(TraceContext.getTraceEntry());
   }
 
   private static String getTraceString(String key, Object value) {

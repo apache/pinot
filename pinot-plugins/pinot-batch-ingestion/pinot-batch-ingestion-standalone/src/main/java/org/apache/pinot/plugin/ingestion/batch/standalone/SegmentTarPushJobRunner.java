@@ -37,11 +37,9 @@ public class SegmentTarPushJobRunner extends BaseSegmentPushJobRunner {
     init(spec);
   }
 
-  /**
-   * Initialize SegmentTarPushJobRunner with SegmentGenerationJobSpec
-   * Checks for required parameters in the spec and enablement of consistent data push.
-   * This overrides the init method in BaseSegmentPushJobRunner as the push job spec is required in the base class.
-   */
+  /// Initialize SegmentTarPushJobRunner with SegmentGenerationJobSpec
+  /// Checks for required parameters in the spec and enablement of consistent data push.
+  /// This overrides the init method in BaseSegmentPushJobRunner as the push job spec is required in the base class.
   @Override
   public void init(SegmentGenerationJobSpec spec) {
     _spec = spec;

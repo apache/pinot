@@ -21,18 +21,17 @@ package org.apache.pinot.spi.stream;
 import javax.annotation.Nullable;
 
 
-/**
- * Container for holding the current consumption state at a per-partition level
- */
+/// Container for holding the current consumption state at a per-partition level
 public class ConsumerPartitionState {
   private final String _partitionId;
   private final StreamPartitionMsgOffset _currentOffset;
   private final long _lastProcessedTimeMs;
   private final StreamPartitionMsgOffset _upstreamLatestOffset;
-  private final RowMetadata _lastProcessedRowMetadata;
+  private final StreamMessageMetadata _lastProcessedRowMetadata;
 
   public ConsumerPartitionState(String partitionId, StreamPartitionMsgOffset currentOffset, long lastProcessedTimeMs,
-      @Nullable StreamPartitionMsgOffset upstreamLatestOffset, @Nullable RowMetadata lastProcessedRowMetadata) {
+      @Nullable StreamPartitionMsgOffset upstreamLatestOffset,
+      @Nullable StreamMessageMetadata lastProcessedRowMetadata) {
     _partitionId = partitionId;
     _currentOffset = currentOffset;
     _lastProcessedTimeMs = lastProcessedTimeMs;
@@ -56,7 +55,7 @@ public class ConsumerPartitionState {
     return _upstreamLatestOffset;
   }
 
-  public RowMetadata getLastProcessedRowMetadata() {
+  public StreamMessageMetadata getLastProcessedRowMetadata() {
     return _lastProcessedRowMetadata;
   }
 }

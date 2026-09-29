@@ -26,10 +26,8 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Bit-compressed dictionary-encoded forward index reader for single-value columns. The values returned are dictionary
- * ids.
- */
+/// Bit-compressed dictionary-encoded forward index reader for single-value columns. The values returned are dictionary
+/// ids.
 public final class FixedBitSVForwardIndexReader implements ForwardIndexReader<ForwardIndexReaderContext> {
   private final FixedBitIntReaderWriter _reader;
   private final int _numBitsPerValue;

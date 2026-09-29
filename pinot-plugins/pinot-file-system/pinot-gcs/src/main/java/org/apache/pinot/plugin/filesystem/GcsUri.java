@@ -57,13 +57,11 @@ public class GcsUri {
     return _uri.getAuthority();
   }
 
-  /**
-   * Get gcs path.
-   * The gcs path must not be absolute.
-   *
-   * Example: bucket.create(path)
-   * @return gcs path
-   */
+  /// Get gcs path.
+  /// The gcs path must not be absolute.
+  ///
+  /// Example: bucket.create(path)
+  /// @return gcs path
   public String getPath() {
     return _path.get();
   }
@@ -79,24 +77,22 @@ public class GcsUri {
     return _uri;
   }
 
-  /**
-   * Get gcs search prefix.
-   *
-   * The prefix should not be the delimiter alone if there is no directory;
-   * otherwise, listFiles will return no matches.
-   * The prefix should end with the delimiter if there are directories, which
-   * ensures searches do not return false positive matches.
-   * Prefixes must not be absolute.
-   *
-   * Examples:
-   * gs://bucket/ should have a prefix of "" but not "/",
-   * otherwise listFiles will return no matches.
-   * gs://bucket/dir/subdir should have a prefix of
-   * dir/subdir/, otherwise listFiles will return matches for
-   * objects with paths like dir/subdirA/file1, file2, etc.
-   *
-   * @return the path as a prefix
-   */
+  /// Get gcs search prefix.
+  ///
+  /// The prefix should not be the delimiter alone if there is no directory;
+  /// otherwise, listFiles will return no matches.
+  /// The prefix should end with the delimiter if there are directories, which
+  /// ensures searches do not return false positive matches.
+  /// Prefixes must not be absolute.
+  ///
+  /// Examples:
+  /// gs://bucket/ should have a prefix of "" but not "/",
+  /// otherwise listFiles will return no matches.
+  /// gs://bucket/dir/subdir should have a prefix of
+  /// dir/subdir/, otherwise listFiles will return matches for
+  /// objects with paths like dir/subdirA/file1, file2, etc.
+  ///
+  /// @return the path as a prefix
   public String getPrefix() {
     return _prefix.get();
   }
@@ -142,28 +138,24 @@ public class GcsUri {
     return createGcsUri(getBucketName(), resolvedPath);
   }
 
-  /**
-   * Returns true if this path contains the given subpath.
-   *
-   * @param subPath
-   * @return
-   */
+  /// Returns true if this path contains the given subpath.
+  ///
+  /// @param subPath
+  /// @return
   public boolean hasSubpath(GcsUri subPath) {
     Path relativePath = _absolutePath.get().relativize(subPath._absolutePath.get());
     return !relativePath.isAbsolute() && !relativePath.startsWith("..");
   }
 
-  /**
-   * Relativize a subdirectory.
-   * The subPath must be a subdirectory of this path
-   *
-   * @param subPath The subpath of this path
-   * @return Relativized path of this subdirectory
-   *
-   * Example:
-   * The relativized path of /dir/subdir/subsubdir/subfile to gs://bucket/dir/subdir
-   * would return subsubdir/subfile.
-   */
+  /// Relativize a subdirectory.
+  /// The subPath must be a subdirectory of this path
+  ///
+  /// @param subPath The subpath of this path
+  /// @return Relativized path of this subdirectory
+  ///
+  /// Example:
+  /// The relativized path of /dir/subdir/subsubdir/subfile to gs://bucket/dir/subdir
+  /// would return subsubdir/subfile.
   public String relativize(GcsUri subPath) {
     Path relativePath = _absolutePath.get().relativize(subPath._absolutePath.get());
     checkState(!relativePath.isAbsolute() && !relativePath.startsWith(".."), "Path '%s' is not a subdirectory of '%s'",

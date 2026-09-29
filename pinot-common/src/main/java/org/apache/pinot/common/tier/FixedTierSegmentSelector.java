@@ -18,26 +18,19 @@
  */
 package org.apache.pinot.common.tier;
 
-import com.google.common.base.Preconditions;
 import java.util.Set;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.helix.HelixManager;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-/**
- * A {@link TierSegmentSelector} strategy which selects segments for a tier based on a fixed list
- */
+/// A [TierSegmentSelector] strategy which selects segments for a tier based on a fixed list
 public class FixedTierSegmentSelector implements TierSegmentSelector {
   private final Set<String> _segmentsToSelect;
-  private final HelixManager _helixManager;
+  // ["*"] means select all completed segments
+  private final boolean _selectAllSegments;
 
-  public FixedTierSegmentSelector(HelixManager helixManager, Set<String> segmentsToSelect) {
+  public FixedTierSegmentSelector(Set<String> segmentsToSelect) {
     _segmentsToSelect = segmentsToSelect;
-    _helixManager = helixManager;
+    _selectAllSegments = segmentsToSelect.contains("*");
   }
 
   @Override
@@ -45,27 +38,13 @@ public class FixedTierSegmentSelector implements TierSegmentSelector {
     return TierFactory.FIXED_SEGMENT_SELECTOR_TYPE;
   }
 
-  /**
-   * Checks if a segment is eligible for the tier based on fixed list
-   * @param tableNameWithType Name of the table
-   * @param segmentName Name of the segment
-   * @return true if eligible
-   */
   @Override
-  public boolean selectSegment(String tableNameWithType, String segmentName) {
-    if (CollectionUtils.isNotEmpty(_segmentsToSelect) && _segmentsToSelect.contains(segmentName)) {
-      if (TableType.OFFLINE == TableNameBuilder.getTableTypeFromTableName(tableNameWithType)) {
-        return true;
-      }
-
-      SegmentZKMetadata segmentZKMetadata =
-          ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType,
-              segmentName);
-      Preconditions.checkNotNull(segmentZKMetadata, "Could not find zk metadata for segment: %s of table: %s",
-          segmentName, tableNameWithType);
+  public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
+    if (_selectAllSegments) {
       return segmentZKMetadata.getStatus().isCompleted();
     }
-    return false;
+    return _segmentsToSelect.contains(segmentZKMetadata.getSegmentName())
+        && segmentZKMetadata.getStatus().isCompleted();
   }
 
   public Set<String> getSegmentsToSelect() {

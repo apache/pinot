@@ -23,17 +23,14 @@ import org.apache.helix.model.Message;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
-/**
- * This (Helix) message is sent from the controller to brokers when a request is received to update the database config.
- */
+/// This (Helix) message is sent from the controller to brokers when a request is received to update the database
+/// config.
 public class DatabaseConfigRefreshMessage extends Message {
   public static final String REFRESH_DATABASE_CONFIG_MSG_SUB_TYPE = "REFRESH_DATABASE_CONFIG";
 
   private static final String DATABASE_NAME_KEY = "databaseName";
 
-  /**
-   * Constructor for the sender.
-   */
+  /// Constructor for the sender.
   public DatabaseConfigRefreshMessage(String databaseName) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setMsgSubType(REFRESH_DATABASE_CONFIG_MSG_SUB_TYPE);
@@ -44,9 +41,7 @@ public class DatabaseConfigRefreshMessage extends Message {
     znRecord.setSimpleField(DATABASE_NAME_KEY, databaseName);
   }
 
-  /**
-   * Constructor for the receiver.
-   */
+  /// Constructor for the receiver.
   public DatabaseConfigRefreshMessage(Message message) {
     super(message.getRecord());
     if (!message.getMsgSubType().equals(REFRESH_DATABASE_CONFIG_MSG_SUB_TYPE)) {

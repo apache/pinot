@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
@@ -33,6 +36,7 @@ import org.apache.pinot.common.messages.ForceCommitMessage;
 import org.apache.pinot.common.messages.IngestionMetricsRemoveMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
+import org.apache.pinot.common.messages.TableConfigSchemaRefreshMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -41,8 +45,14 @@ import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
-import org.apache.pinot.core.util.SegmentRefreshSemaphore;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.OpenStructNaming;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,14 +62,12 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
 
   // We only allow limited number of segments refresh/reload happen at the same time
   // The reason for that is segment refresh/reload will temporarily use double-sized memory
-  private final InstanceDataManager _instanceDataManager;
-  private final ServerMetrics _metrics;
-  private final SegmentRefreshSemaphore _segmentRefreshSemaphore;
+  protected final InstanceDataManager _instanceDataManager;
+  protected final ServerMetrics _metrics;
 
   public SegmentMessageHandlerFactory(InstanceDataManager instanceDataManager, ServerMetrics metrics) {
     _instanceDataManager = instanceDataManager;
     _metrics = metrics;
-    _segmentRefreshSemaphore = new SegmentRefreshSemaphore(instanceDataManager.getMaxParallelRefreshThreads(), true);
   }
 
   // Called each time a message is received.
@@ -77,6 +85,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         return new ForceCommitMessageHandler(new ForceCommitMessage(message), _metrics, context);
       case IngestionMetricsRemoveMessage.INGESTION_METRICS_REMOVE_MSG_SUB_TYPE:
         return new IngestionMetricsRemoveMessageHandler(new IngestionMetricsRemoveMessage(message), _metrics, context);
+      case TableConfigSchemaRefreshMessage.REFRESH_TABLE_CONFIG_AND_SCHEMA:
+        return new TableSchemaRefreshMessageHandler(new TableConfigSchemaRefreshMessage(message), _metrics, context);
       default:
         LOGGER.warn("Unsupported user defined message sub type: {} for segment: {}", msgSubType,
             message.getPartitionName());
@@ -102,11 +112,9 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     }
 
     @Override
-    public HelixTaskResult handleMessage()
-        throws InterruptedException {
+    public HelixTaskResult handleMessage() {
       HelixTaskResult result = new HelixTaskResult();
       _logger.info("Handling message: {}", _message);
-      _segmentRefreshSemaphore.acquireSema(_segmentName, _logger);
       try {
         // The number of retry times depends on the retry count in Constants.
         _instanceDataManager.replaceSegment(_tableNameWithType, _segmentName);
@@ -114,8 +122,6 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       } catch (Exception e) {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);
         Utils.rethrowException(e);
-      } finally {
-        _segmentRefreshSemaphore.releaseSema();
       }
       return result;
     }
@@ -124,37 +130,32 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
   private class SegmentReloadMessageHandler extends DefaultMessageHandler {
     private final boolean _forceDownload;
     private final List<String> _segmentList;
+    private final String _reloadJobId;
 
     SegmentReloadMessageHandler(SegmentReloadMessage segmentReloadMessage, ServerMetrics metrics,
         NotificationContext context) {
       super(segmentReloadMessage, metrics, context);
       _forceDownload = segmentReloadMessage.shouldForceDownload();
       _segmentList = segmentReloadMessage.getSegmentList();
+      _reloadJobId = segmentReloadMessage.getReloadJobId();
     }
 
     @Override
-    public HelixTaskResult handleMessage()
-        throws InterruptedException {
+    public HelixTaskResult handleMessage() {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       _logger.info("Handling message: {}", _message);
       try {
         if (CollectionUtils.isNotEmpty(_segmentList)) {
-          _instanceDataManager.reloadSegments(_tableNameWithType, _segmentList, _forceDownload,
-              _segmentRefreshSemaphore);
+          _instanceDataManager.reloadSegments(_tableNameWithType, _segmentList, _forceDownload, _reloadJobId);
         } else if (StringUtils.isNotEmpty(_segmentName)) {
           // TODO: check _segmentName to be backward compatible. Moving forward, we just need to check the list to
           //       reload one or more segments. If the list or the segment name is empty, all segments are reloaded.
-          _segmentRefreshSemaphore.acquireSema(_segmentName, _logger);
-          try {
-            _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload);
-          } finally {
-            _segmentRefreshSemaphore.releaseSema();
-          }
+          _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload, _reloadJobId);
         } else {
           // NOTE: the method continues if any segment reload encounters an unhandled exception,
           // and failed segments are logged out in the end. We don't acquire any permit here as they'll be acquired
           // by worked threads later.
-          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload, _segmentRefreshSemaphore);
+          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload, _reloadJobId);
         }
         helixTaskResult.setSuccess(true);
       } catch (Throwable e) {
@@ -175,10 +176,12 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     }
 
     @Override
-    public HelixTaskResult handleMessage()
-        throws InterruptedException {
+    public HelixTaskResult handleMessage() {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       _logger.info("Handling table deletion message: {}", _message);
+      // Resolved before the table goes away: these gauge keys come from the table config, and the only
+      // in-memory copy of it lives on the table data manager that deleteTable is about to discard.
+      List<String> openStructMetricKeys = resolveOpenStructMetricKeys();
       try {
         long deletionTimeMs = _message.getCreateTimeStamp();
         if (deletionTimeMs <= 0) {
@@ -198,23 +201,63 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         Arrays.stream(ServerGauge.values())
             .filter(g -> !g.isGlobal())
             .forEach(g -> _metrics.removeTableGauge(_tableNameWithType, g));
+        // OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT registers as <gauge>.<table>.<column>$<key>, so the sweep above --
+        // which composes only the unkeyed <gauge>.<table> -- cannot reach it. Only the configured keys are
+        // recoverable here; see openStructMetricKeys for the keys this misses.
+        openStructMetricKeys.forEach(
+            metricKey -> _metrics.removeTableGauge(_tableNameWithType, metricKey,
+                ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT));
         Arrays.stream(ServerTimer.values())
             .filter(t -> !t.isGlobal())
             .forEach(t -> _metrics.removeTableTimer(_tableNameWithType, t));
-        Arrays.stream(ServerQueryPhase.values())
-            .forEach(p -> _metrics.removePhaseTiming(_tableNameWithType, p));
+        Arrays.stream(ServerQueryPhase.values()).forEach(p -> _metrics.removePhaseTiming(_tableNameWithType, p));
       } catch (Exception e) {
-        LOGGER.warn("Error while removing metrics of removed table {}. "
-            + "Some metrics may survive until the next restart.", _tableNameWithType);
+        LOGGER.warn(
+            "Error while removing metrics of removed table {}. " + "Some metrics may survive until the next restart.",
+            _tableNameWithType);
       }
       return helixTaskResult;
     }
+
+    private List<String> resolveOpenStructMetricKeys() {
+      try {
+        TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(_tableNameWithType);
+        if (tableDataManager == null) {
+          return List.of();
+        }
+        Pair<TableConfig, Schema> configAndSchema = tableDataManager.getCachedTableConfigAndSchema();
+        return configAndSchema == null ? List.of()
+            : openStructMetricKeys(configAndSchema.getLeft(), configAndSchema.getRight());
+      } catch (Exception e) {
+        // Metric bookkeeping must never block table deletion.
+        _logger.warn("Could not resolve OPEN_STRUCT gauge keys for table: {}; its per-key gauges may survive until "
+            + "the next restart", _tableNameWithType, e);
+        return List.of();
+      }
+    }
+  }
+
+  /// The `<column>$<key>` metric keys of the per-key OPEN_STRUCT gauges recoverable from the given
+  /// table's config — one per configured `denseKeys` entry. Complete when `perKeyMetricsEnabled` is
+  /// off; a subset when on, since discovered keys exist only in ingested data and cannot be named at
+  /// deletion time. Gauges for discovered keys survive until the server restarts.
+  @VisibleForTesting
+  static List<String> openStructMetricKeys(TableConfig tableConfig, Schema schema) {
+    List<String> metricKeys = new ArrayList<>();
+    FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema).forEach((column, indexConfigs) -> {
+      IndexConfig openStructConfig = indexConfigs.getConfig(StandardIndexes.openStruct());
+      if (openStructConfig instanceof OpenStructIndexConfig) {
+        for (String key : ((OpenStructIndexConfig) openStructConfig).getDenseKeys()) {
+          metricKeys.add(OpenStructNaming.metricKey(column, key));
+        }
+      }
+    });
+    return metricKeys;
   }
 
   private class ForceCommitMessageHandler extends DefaultMessageHandler {
-
-    private String _tableName;
-    private Set<String> _segmentNames;
+    private final String _tableName;
+    private final Set<String> _segmentNames;
 
     public ForceCommitMessageHandler(ForceCommitMessage forceCommitMessage, ServerMetrics metrics,
         NotificationContext ctx) {
@@ -224,8 +267,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     }
 
     @Override
-    public HelixTaskResult handleMessage()
-        throws InterruptedException {
+    public HelixTaskResult handleMessage() {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       _logger.info("Handling force commit message for table {} segments {}", _tableName, _segmentNames);
       try {
@@ -260,6 +302,34 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     }
   }
 
+  private class TableSchemaRefreshMessageHandler extends DefaultMessageHandler {
+    TableSchemaRefreshMessageHandler(TableConfigSchemaRefreshMessage message, ServerMetrics metrics,
+                                     NotificationContext context) {
+      super(message, metrics, context);
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      _logger.info("Handling table schema refresh message for table: {}", _tableNameWithType);
+      try {
+        TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(_tableNameWithType);
+        if (tableDataManager != null) {
+          // A genuine table config / schema change: notify the table data manager so it can refresh the cached config
+          // and schema (and react to the change) without going through the incidental index-loading-config fetch.
+          tableDataManager.onTableConfigOrSchemaRefresh();
+        } else {
+          _logger.warn("No data manager found for table: {}", _tableNameWithType);
+        }
+      } catch (Exception e) {
+        _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.TABLE_CONFIG_AND_SCHEMA_REFRESH_FAILURES, 1);
+        Utils.rethrowException(e);
+      }
+      HelixTaskResult helixTaskResult = new HelixTaskResult();
+      helixTaskResult.setSuccess(true);
+      return helixTaskResult;
+    }
+  }
+
   private static class DefaultMessageHandler extends MessageHandler {
     final String _segmentName;
     final String _tableNameWithType;
@@ -275,8 +345,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     }
 
     @Override
-    public HelixTaskResult handleMessage()
-        throws InterruptedException {
+    public HelixTaskResult handleMessage() {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       helixTaskResult.setSuccess(true);
       return helixTaskResult;

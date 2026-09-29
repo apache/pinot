@@ -19,10 +19,8 @@
 
 package org.apache.pinot.core.auth;
 
-/**
- * Different action types used in finer grain access control of the rest endpoints
- * Action names are in <verb><noun> format, e.g. GetSchema, ListTables, etc.
- */
+/// Different action types used in finer grain access control of the rest endpoints
+/// Action names are in <verb><noun> format, e.g. GetSchema, ListTables, etc.
 public class Actions {
   // Action names for cluster
   public static class Cluster {
@@ -97,6 +95,14 @@ public class Actions {
     public static final String UPLOAD_SEGMENT = "UploadSegment";
     public static final String GET_INSTANCE_PARTITIONS = "GetInstancePartitions";
     public static final String UPDATE_INSTANCE_PARTITIONS = "UpdateInstancePartitions";
+    public static final String GET_RESPONSE_STORE = "GetResponseStore";
+    public static final String DELETE_RESPONSE_STORE = "DeleteResponseStore";
+    public static final String GET_QUERY_WORKLOAD_CONFIG = "GetQueryWorkloadConfig";
+    public static final String GET_INSTANCE_QUERY_WORKLOAD_CONFIG = "GetInstanceQueryWorkloadConfig";
+    public static final String UPDATE_QUERY_WORKLOAD_CONFIG = "UpdateQueryWorkloadConfig";
+    public static final String DELETE_QUERY_WORKLOAD_CONFIG = "DeleteQueryWorkloadConfig";
+    public static final String GET_GROOVY_STATIC_ANALYZER_CONFIG = "GetGroovyStaticAnalyzerConfig";
+    public static final String UPDATE_GROOVY_STATIC_ANALYZER_CONFIG = "UpdateGroovyStaticAnalyzerConfig";
   }
 
   // Action names for table
@@ -112,6 +118,7 @@ public class Actions {
     public static final String DELETE_SEGMENT = "DeleteSegment";
     public static final String DELETE_TABLE = "DeleteTable";
     public static final String DELETE_TIME_BOUNDARY = "DeleteTimeBoundary";
+    public static final String DELETE_INGESTION_METRICS = "DeleteIngestionMetrics";
     public static final String DISABLE_TABLE = "DisableTable";
     public static final String DOWNLOAD_SEGMENT = "DownloadSegment";
     public static final String ENABLE_TABLE = "EnableTable";
@@ -157,5 +164,6 @@ public class Actions {
     public static final String UPLOAD_SEGMENT = "UploadSegment";
     public static final String VALIDATE_SCHEMA = "ValidateSchema";
     public static final String VALIDATE_TABLE_CONFIGS = "ValidateTableConfigs";
+    public static final String FORCE_RELEASE_TASK_GENERATION_LOCK = "ForceReleaseTaskGenerationLock";
   }
 }

@@ -25,16 +25,14 @@ import com.tdunning.math.stats.TDigest;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
-import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
-import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
@@ -60,18 +58,15 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * Tests for serialized bytes values.
- *
- * <p>Aggregation function that supports serialized bytes values:
- * <ul>
- *   <li>AVG</li>
- *   <li>DISTINCTCOUNTHLL</li>
- *   <li>MINMAXRANGE</li>
- *   <li>PERCENTILEEST</li>
- *   <li>PERCENTILETDIGEST</li>
- * </ul>
- */
+/// Tests for serialized bytes values.
+///
+/// Aggregation function that supports serialized bytes values:
+///
+/// - AVG
+/// - DISTINCTCOUNTHLL
+/// - MINMAXRANGE
+/// - PERCENTILEEST
+/// - PERCENTILETDIGEST
 public class SerializedBytesQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SerializedBytesQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
@@ -142,6 +137,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       throws Exception {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
+      GenericRow row = new GenericRow();
+
       int numValues = RANDOM.nextInt(MAX_NUM_VALUES_TO_PRE_AGGREGATE) + 1;
       int[] values = new int[numValues];
       for (int j = 0; j < numValues; j++) {
@@ -150,9 +147,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       _valuesArray[i] = values;
       int groupId = i % NUM_GROUPS;
 
-      HashMap<String, Object> valueMap = new HashMap<>();
-      valueMap.put(GROUP_BY_SV_COLUMN, GROUPS[groupId]);
-      valueMap.put(GROUP_BY_MV_COLUMN, GROUPS);
+      row.putValue(GROUP_BY_SV_COLUMN, GROUPS[groupId]);
+      row.putValue(GROUP_BY_MV_COLUMN, GROUPS);
 
       double sum = 0.0;
       for (int value : values) {
@@ -160,14 +156,14 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       }
       AvgPair avgPair = new AvgPair(sum, numValues);
       _avgPairs[i] = avgPair;
-      valueMap.put(AVG_COLUMN, ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair));
+      row.putValue(AVG_COLUMN, ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair));
 
       HyperLogLog hyperLogLog = new HyperLogLog(DISTINCT_COUNT_HLL_LOG2M);
       for (int value : values) {
         hyperLogLog.offer(value);
       }
       _hyperLogLogs[i] = hyperLogLog;
-      valueMap.put(DISTINCT_COUNT_HLL_COLUMN, ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog));
+      row.putValue(DISTINCT_COUNT_HLL_COLUMN, ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog));
 
       double min = Double.POSITIVE_INFINITY;
       double max = Double.NEGATIVE_INFINITY;
@@ -181,33 +177,31 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       }
       MinMaxRangePair minMaxRangePair = new MinMaxRangePair(min, max);
       _minMaxRangePairs[i] = minMaxRangePair;
-      valueMap.put(MIN_MAX_RANGE_COLUMN, ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair));
+      row.putValue(MIN_MAX_RANGE_COLUMN, ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair));
 
       QuantileDigest quantileDigest = new QuantileDigest(PERCENTILE_EST_MAX_ERROR);
       for (int value : values) {
         quantileDigest.add(value);
       }
       _quantileDigests[i] = quantileDigest;
-      valueMap.put(PERCENTILE_EST_COLUMN, ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest));
+      row.putValue(PERCENTILE_EST_COLUMN, ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest));
 
       TDigest tDigest = MergingDigest.createDigest(PERCENTILE_TDIGEST_COMPRESSION);
       for (int value : values) {
         tDigest.add(value);
       }
       _tDigests[i] = tDigest;
-      valueMap.put(PERCENTILE_TDIGEST_COLUMN, ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest));
+      row.putValue(PERCENTILE_TDIGEST_COLUMN, ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest));
 
       HyperLogLogPlus hyperLogLogPlus = new HyperLogLogPlus(DISTINCT_COUNT_HLL_PLUS_P);
       for (int value : values) {
         hyperLogLogPlus.offer(value);
       }
       _hyperLogLogPluses[i] = hyperLogLogPlus;
-      valueMap.put(DISTINCT_COUNT_HLL_PLUS_COLUMN,
+      row.putValue(DISTINCT_COUNT_HLL_PLUS_COLUMN,
           ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(hyperLogLogPlus));
 
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(valueMap);
-      rows.add(genericRow);
+      rows.add(row);
     }
 
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
@@ -427,16 +421,16 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   public void testInnerSegmentGroupBySV()
       throws Exception {
     GroupByOperator groupByOperator = getOperator(getGroupBySVQuery());
-    AggregationGroupByResult groupByResult = groupByOperator.nextBlock().getAggregationGroupByResult();
+    List<IntermediateRecord> groupByResult = groupByOperator.nextBlock().getIntermediateRecords();
     assertNotNull(groupByResult);
 
-    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
+    Iterator<IntermediateRecord> groupKeyIterator = groupByResult.iterator();
     while (groupKeyIterator.hasNext()) {
-      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-      int groupId = Integer.parseInt(((String) groupKey._keys[0]).substring(1));
+      IntermediateRecord groupKey = groupKeyIterator.next();
+      int groupId = Integer.parseInt(((String) groupKey._key.getValues()[0]).substring(1));
 
       // Avg
-      AvgPair avgPair = (AvgPair) groupByResult.getResultForGroupId(0, groupKey._groupId);
+      AvgPair avgPair = (AvgPair) groupByResult.get(groupId)._record.getValues()[1];
       AvgPair expectedAvgPair = new AvgPair(_avgPairs[groupId].getSum(), _avgPairs[groupId].getCount());
       for (int i = groupId + NUM_GROUPS; i < NUM_ROWS; i += NUM_GROUPS) {
         expectedAvgPair.apply(_avgPairs[i]);
@@ -445,7 +439,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       assertEquals(avgPair.getCount(), expectedAvgPair.getCount());
 
       // DistinctCountHLL
-      HyperLogLog hyperLogLog = (HyperLogLog) groupByResult.getResultForGroupId(1, groupKey._groupId);
+      HyperLogLog hyperLogLog = (HyperLogLog) groupByResult.get(groupId)._record.getValues()[2];
       HyperLogLog expectedHyperLogLog = new HyperLogLog(DISTINCT_COUNT_HLL_LOG2M);
       for (int value : _valuesArray[groupId]) {
         expectedHyperLogLog.offer(value);
@@ -456,7 +450,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       assertEquals(hyperLogLog.cardinality(), expectedHyperLogLog.cardinality());
 
       // MinMaxRange
-      MinMaxRangePair minMaxRangePair = (MinMaxRangePair) groupByResult.getResultForGroupId(2, groupKey._groupId);
+      MinMaxRangePair minMaxRangePair = (MinMaxRangePair) groupByResult.get(groupId)._record.getValues()[3];
       MinMaxRangePair expectedMinMaxRangePair =
           new MinMaxRangePair(_minMaxRangePairs[groupId].getMin(), _minMaxRangePairs[groupId].getMax());
       for (int i = groupId + NUM_GROUPS; i < NUM_ROWS; i += NUM_GROUPS) {
@@ -466,7 +460,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       assertEquals(minMaxRangePair.getMax(), expectedMinMaxRangePair.getMax());
 
       // PercentileEst
-      QuantileDigest quantileDigest = (QuantileDigest) groupByResult.getResultForGroupId(3, groupKey._groupId);
+      QuantileDigest quantileDigest = (QuantileDigest) groupByResult.get(groupId)._record.getValues()[4];
       QuantileDigest expectedQuantileDigest = new QuantileDigest(PERCENTILE_EST_MAX_ERROR);
       for (int value : _valuesArray[groupId]) {
         expectedQuantileDigest.add(value);
@@ -477,7 +471,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       assertEquals(quantileDigest.getQuantile(0.5), expectedQuantileDigest.getQuantile(0.5));
 
       // PercentileTDigest
-      TDigest tDigest = (TDigest) groupByResult.getResultForGroupId(4, groupKey._groupId);
+      TDigest tDigest = (TDigest) groupByResult.get(groupId)._record.getValues()[5];
       TDigest expectedTDigest = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
       for (int value : _valuesArray[groupId]) {
         expectedTDigest.add(value);
@@ -488,7 +482,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       assertEquals(tDigest.quantile(0.5), expectedTDigest.quantile(0.5), PERCENTILE_TDIGEST_DELTA);
 
       // DistinctCountHLLPlus
-      HyperLogLogPlus hyperLogLogPlus = (HyperLogLogPlus) groupByResult.getResultForGroupId(5, groupKey._groupId);
+      HyperLogLogPlus hyperLogLogPlus = (HyperLogLogPlus) groupByResult.get(groupId)._record.getValues()[6];
       HyperLogLogPlus expectedHyperLogLogPlus = new HyperLogLogPlus(DISTINCT_COUNT_HLL_PLUS_P);
       for (int value : _valuesArray[groupId]) {
         expectedHyperLogLogPlus.offer(value);
@@ -627,7 +621,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   public void testInnerSegmentGroupByMV()
       throws Exception {
     GroupByOperator groupByOperator = getOperator(getGroupByMVQuery());
-    AggregationGroupByResult groupByResult = groupByOperator.nextBlock().getAggregationGroupByResult();
+    List<IntermediateRecord> groupByResult = groupByOperator.nextBlock().getIntermediateRecords();
     assertNotNull(groupByResult);
 
     // Avg
@@ -679,34 +673,35 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       expectedHyperLogLogPlus.addAll(_hyperLogLogPluses[i]);
     }
 
-    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
+    Iterator<IntermediateRecord> groupKeyIterator = groupByResult.iterator();
     while (groupKeyIterator.hasNext()) {
-      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+      IntermediateRecord groupKey = groupKeyIterator.next();
 
       // Avg
-      AvgPair avgPair = (AvgPair) groupByResult.getResultForGroupId(0, groupKey._groupId);
+      int groupId = Integer.parseInt(((String) groupKey._key.getValues()[0]).substring(1));
+      AvgPair avgPair = (AvgPair) groupByResult.get(groupId)._record.getValues()[1];
       assertEquals(avgPair.getSum(), expectedAvgPair.getSum());
       assertEquals(avgPair.getCount(), expectedAvgPair.getCount());
 
       // DistinctCountHLL
-      HyperLogLog hyperLogLog = (HyperLogLog) groupByResult.getResultForGroupId(1, groupKey._groupId);
+      HyperLogLog hyperLogLog = (HyperLogLog) groupByResult.get(groupId)._record.getValues()[2];
       assertEquals(hyperLogLog.cardinality(), expectedHyperLogLog.cardinality());
 
       // MinMaxRange
-      MinMaxRangePair minMaxRangePair = (MinMaxRangePair) groupByResult.getResultForGroupId(2, groupKey._groupId);
+      MinMaxRangePair minMaxRangePair = (MinMaxRangePair) groupByResult.get(groupId)._record.getValues()[3];
       assertEquals(minMaxRangePair.getMin(), expectedMinMaxRangePair.getMin());
       assertEquals(minMaxRangePair.getMax(), expectedMinMaxRangePair.getMax());
 
       // PercentileEst
-      QuantileDigest quantileDigest = (QuantileDigest) groupByResult.getResultForGroupId(3, groupKey._groupId);
+      QuantileDigest quantileDigest = (QuantileDigest) groupByResult.get(groupId)._record.getValues()[4];
       assertEquals(quantileDigest.getQuantile(0.5), expectedQuantileDigest.getQuantile(0.5));
 
       // PercentileTDigest
-      TDigest tDigest = (TDigest) groupByResult.getResultForGroupId(4, groupKey._groupId);
+      TDigest tDigest = (TDigest) groupByResult.get(groupId)._record.getValues()[5];
       assertEquals(tDigest.quantile(0.5), expectedTDigest.quantile(0.5), PERCENTILE_TDIGEST_DELTA);
 
       // DistinctCountHLLPlus
-      HyperLogLogPlus hyperLogLogPlus = (HyperLogLogPlus) groupByResult.getResultForGroupId(5, groupKey._groupId);
+      HyperLogLogPlus hyperLogLogPlus = (HyperLogLogPlus) groupByResult.get(groupId)._record.getValues()[6];
       assertEquals(hyperLogLogPlus.cardinality(), expectedHyperLogLogPlus.cardinality());
     }
   }

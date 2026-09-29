@@ -38,9 +38,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
-/**
- * Helper class to make http calls to GitHub API
- */
+/// Helper class to make http calls to GitHub API
 public class GitHubAPICaller {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GitHubAPICaller.class);
@@ -66,18 +64,14 @@ public class GitHubAPICaller {
     _closeableHttpClient = HttpClients.custom().setDefaultRequestConfig(REQUEST_CONFIG).build();
   }
 
-  /**
-   * Calls the events API
-   */
+  /// Calls the events API
   public GitHubAPIResponse callEventsAPI(String etag)
       throws IOException {
     ClassicHttpRequest request = buildRequest(EVENTS_API_URL, etag);
     return executeEventsRequest(request);
   }
 
-  /**
-   * Calls the given url
-   */
+  /// Calls the given url
   public GitHubAPIResponse callAPI(String url)
       throws IOException {
     ClassicHttpRequest request = buildRequest(url, null);
@@ -93,9 +87,7 @@ public class GitHubAPICaller {
     return requestBuilder.build();
   }
 
-  /**
-   * Make an Http GET call to the /events API
-   */
+  /// Make an Http GET call to the /events API
   private GitHubAPIResponse executeEventsRequest(ClassicHttpRequest request)
       throws IOException {
     GitHubAPIResponse githubAPIResponse = new GitHubAPIResponse();
@@ -133,9 +125,7 @@ public class GitHubAPICaller {
     return githubAPIResponse;
   }
 
-  /**
-   * Makes an Http GET call to the provided URL
-   */
+  /// Makes an Http GET call to the provided URL
   private GitHubAPIResponse executeGet(ClassicHttpRequest request)
       throws IOException {
     GitHubAPIResponse githubAPIResponse = new GitHubAPIResponse();
@@ -171,9 +161,7 @@ public class GitHubAPICaller {
     _closeableHttpClient.close();
   }
 
-  /**
-   * Represents a response from the GitHub API
-   */
+  /// Represents a response from the GitHub API
   static class GitHubAPIResponse {
     String _responseString = null;
     int _statusCode = 0;

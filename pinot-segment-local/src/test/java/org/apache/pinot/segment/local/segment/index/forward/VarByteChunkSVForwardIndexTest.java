@@ -23,10 +23,15 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
@@ -35,17 +40,18 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.MapUtils.PreparedMapKey;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.fail;
 
 
-/**
- * Unit test for {@link VarByteChunkSVForwardIndexReader} and {@link VarByteChunkForwardIndexWriter} classes.
- */
-public class VarByteChunkSVForwardIndexTest {
+/// Unit test for [VarByteChunkSVForwardIndexReader] and [VarByteChunkForwardIndexWriter] classes.
+public class VarByteChunkSVForwardIndexTest implements PinotBuffersAfterMethodCheckRule {
   private static final int NUM_ENTRIES = 5003;
   private static final int NUM_DOCS_PER_CHUNK = 1009;
   private static final int MAX_STRING_LENGTH = 101;
@@ -81,17 +87,86 @@ public class VarByteChunkSVForwardIndexTest {
     test(ChunkCompressionType.GZIP);
   }
 
-  /**
-   * This test writes {@link #NUM_ENTRIES} using {@link VarByteChunkForwardIndexWriter}. It then reads
-   * the strings & bytes using {@link VarByteChunkSVForwardIndexReader}, and asserts that what was written is the
-   * same as
-   * what was read in.
-   *
-   * Number of docs and docs per chunk are chosen to generate complete as well partial chunks.
-   *
-   * @param compressionType Compression type
-   * @throws Exception
-   */
+  /// Covers selective MAP reads through the legacy V2/V3 reader for both compressed and pass-through chunks. These
+  /// formats are still selected for existing segments and do not share the V4/V5/V6 reader implementation.
+  @Test
+  public void testMapSelectiveRead()
+      throws Exception {
+    for (ChunkCompressionType compressionType
+        : new ChunkCompressionType[]{ChunkCompressionType.SNAPPY, ChunkCompressionType.PASS_THROUGH}) {
+      for (int writerVersion : new int[]{2, 3}) {
+        testMapSelectiveRead(compressionType, writerVersion);
+      }
+    }
+  }
+
+  private void testMapSelectiveRead(ChunkCompressionType compressionType, int writerVersion)
+      throws Exception {
+    int numDocs = 5;
+    List<Map<String, Object>> maps = new ArrayList<>(numDocs);
+    byte[][] frames = new byte[numDocs][];
+    int longestEntry = 0;
+    for (int i = 0; i < numDocs; i++) {
+      Map<String, Object> map = new LinkedHashMap<>();
+      map.put("k8s.workload.name", "workload-" + i);
+      map.put("k8s.workload.kind", "Deployment");
+      map.put("host_logical_cpus", i);
+      maps.add(map);
+      frames[i] = MapUtils.serializeMap(map);
+      longestEntry = Math.max(longestEntry, frames[i].length);
+    }
+
+    File outFile = Files.createTempFile(getClass().getSimpleName() + "-map-v" + writerVersion, ".fwd").toFile();
+    try {
+      try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(outFile, compressionType,
+          numDocs, 2, longestEntry, writerVersion)) {
+        for (byte[] frame : frames) {
+          writer.putBytes(frame);
+        }
+      }
+
+      try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(outFile);
+          VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.MAP);
+          ChunkReaderContext context = reader.createContext()) {
+        // The inherited fallback returns the same values after materializing the whole map, so also pin the methods
+        // that must own the selective implementation.
+        assertSame(reader.getClass()
+                .getMethod("getMapEntryValue", int.class, ChunkReaderContext.class, PreparedMapKey.class)
+                .getDeclaringClass(),
+            VarByteChunkSVForwardIndexReader.class);
+        assertSame(reader.getClass()
+                .getMethod("getMapEntryValueAsString", int.class, ChunkReaderContext.class, PreparedMapKey.class)
+                .getDeclaringClass(),
+            VarByteChunkSVForwardIndexReader.class);
+        PreparedMapKey workloadName = new PreparedMapKey("k8s.workload.name");
+        PreparedMapKey cpus = new PreparedMapKey("host_logical_cpus");
+        PreparedMapKey absent = new PreparedMapKey("k8s.workload.namf");
+        for (int i = 0; i < numDocs; i++) {
+          Map<String, Object> expected = maps.get(i);
+          Assert.assertEquals(reader.getMap(i, context), expected);
+          Assert.assertEquals(reader.getMapEntryValue(i, context, workloadName), expected.get("k8s.workload.name"));
+          Assert.assertEquals(reader.getMapEntryValueAsString(i, context, workloadName),
+              expected.get("k8s.workload.name"));
+          Assert.assertEquals(reader.getMapEntryValue(i, context, cpus), expected.get("host_logical_cpus"));
+          Assert.assertEquals(reader.getMapEntryValueAsString(i, context, cpus), String.valueOf(i));
+          Assert.assertNull(reader.getMapEntryValue(i, context, absent));
+          Assert.assertNull(reader.getMapEntryValueAsString(i, context, absent));
+        }
+      }
+    } finally {
+      FileUtils.deleteQuietly(outFile);
+    }
+  }
+
+  /// This test writes [#NUM_ENTRIES] using [VarByteChunkForwardIndexWriter]. It then reads
+  /// the strings & bytes using [VarByteChunkSVForwardIndexReader], and asserts that what was written is the
+  /// same as
+  /// what was read in.
+  ///
+  /// Number of docs and docs per chunk are chosen to generate complete as well partial chunks.
+  ///
+  /// @param compressionType Compression type
+  /// @throws Exception
   public void test(ChunkCompressionType compressionType)
       throws Exception {
     String[] expected = new String[NUM_ENTRIES];
@@ -104,7 +179,7 @@ public class VarByteChunkSVForwardIndexTest {
 
     int maxStringLengthInBytes = 0;
     for (int i = 0; i < NUM_ENTRIES; i++) {
-      String value = RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH));
+      String value = RandomStringUtils.secure().next(random.nextInt(MAX_STRING_LENGTH));
       expected[i] = value;
       maxStringLengthInBytes = Math.max(maxStringLengthInBytes, value.getBytes(UTF_8).length);
     }
@@ -121,11 +196,13 @@ public class VarByteChunkSVForwardIndexTest {
       }
     }
 
-    try (VarByteChunkSVForwardIndexReader fourByteOffsetReader = new VarByteChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.STRING);
+    try (PinotDataBuffer buffer1 = PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte);
+        VarByteChunkSVForwardIndexReader fourByteOffsetReader = new VarByteChunkSVForwardIndexReader(
+            buffer1, DataType.STRING);
         ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader.createContext();
+        PinotDataBuffer buffer2 = PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte);
         VarByteChunkSVForwardIndexReader eightByteOffsetReader = new VarByteChunkSVForwardIndexReader(
-            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.STRING);
+            buffer2, DataType.STRING);
         ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader.createContext()) {
       for (int i = 0; i < NUM_ENTRIES; i++) {
         Assert.assertEquals(fourByteOffsetReader.getString(i, fourByteOffsetReaderContext), expected[i]);
@@ -137,9 +214,7 @@ public class VarByteChunkSVForwardIndexTest {
     FileUtils.deleteQuietly(outFileEightByte);
   }
 
-  /**
-   * This test ensures that the reader can read in an data file from version 1.
-   */
+  /// This test ensures that the reader can read in an data file from version 1.
   @Test
   public void testBackwardCompatibilityV1()
       throws Exception {
@@ -147,9 +222,7 @@ public class VarByteChunkSVForwardIndexTest {
     testBackwardCompatibilityHelper("data/varByteStrings.v1", expected, 1009);
   }
 
-  /**
-   * This test ensures that the reader can read in an data file from version 2.
-   */
+  /// This test ensures that the reader can read in an data file from version 2.
   @Test
   public void testBackwardCompatibilityV2()
       throws Exception {
@@ -166,8 +239,8 @@ public class VarByteChunkSVForwardIndexTest {
       throw new RuntimeException("Input file not found: " + fileName);
     }
     File file = new File(resource.getFile());
-    try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(file), DataType.STRING);
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file);
+        VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
         ChunkReaderContext readerContext = reader.createContext()) {
       for (int i = 0; i < numDocs; i++) {
         String actual = reader.getString(i, readerContext);
@@ -232,7 +305,7 @@ public class VarByteChunkSVForwardIndexTest {
 
     int maxStringLengthInBytes = 0;
     for (int i = 0; i < numDocs; i++) {
-      String value = RandomStringUtils.random(random.nextInt(numChars));
+      String value = RandomStringUtils.secure().next(random.nextInt(numChars));
       expected[i] = value;
       maxStringLengthInBytes = Math.max(maxStringLengthInBytes, value.getBytes(UTF_8).length);
     }
@@ -246,8 +319,8 @@ public class VarByteChunkSVForwardIndexTest {
       }
     }
 
-    PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(outFile);
-    try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(outFile);
+        VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
         ChunkReaderContext readerContext = reader.createContext()) {
       for (int i = 0; i < numDocs; i++) {
         Assert.assertEquals(reader.getString(i, readerContext), expected[i]);
@@ -261,18 +334,52 @@ public class VarByteChunkSVForwardIndexTest {
     // (75000 characters in each row and 10000 rows will hit this scenario).
     // So we specifically test for mapping the index file using the default factory
     // trying to exercise the buffer used in larger cases
-    buffer = PinotDataBuffer.createDefaultFactory(false)
-        .mapFile(outFile, outFile.canRead(), 0, outFile.length(), ByteOrder.BIG_ENDIAN);
-    assert !(buffer instanceof PinotByteBuffer) : "This test tries to exercise the long buffer algorithm";
+    try (PinotDataBuffer buffer = PinotDataBuffer.createDefaultFactory(false)
+        .mapFile(outFile, outFile.canRead(), 0, outFile.length(), ByteOrder.BIG_ENDIAN)) {
 
-    try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
-        ChunkReaderContext readerContext = reader.createContext()) {
-      for (int i = 0; i < numDocs; i++) {
-        Assert.assertEquals(reader.getString(i, readerContext), expected[i]);
+      assert !(buffer instanceof PinotByteBuffer) : "This test tries to exercise the long buffer algorithm";
+
+      try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
+          ChunkReaderContext readerContext = reader.createContext()) {
+        for (int i = 0; i < numDocs; i++) {
+          Assert.assertEquals(reader.getString(i, readerContext), expected[i]);
+        }
       }
-    }
 
-    FileUtils.deleteQuietly(outFile);
+      FileUtils.deleteQuietly(outFile);
+    }
+  }
+
+  @Test
+  public void testSingleValueVarByteRawIndexCreatorTrackingEnabled()
+      throws IOException {
+    File file = Files.createTempFile(getClass().getSimpleName(), "svVarTrackEnabled").toFile();
+    file.deleteOnExit();
+    try (SingleValueVarByteRawIndexCreator creator = new SingleValueVarByteRawIndexCreator(
+        file.getParentFile(), ChunkCompressionType.LZ4, file.getName(), 100, DataType.STRING, 20)) {
+      creator.enableRawForwardIndexUncompressedValueSizeTracking();
+      for (int i = 0; i < 100; i++) {
+        creator.putString("value_" + i);
+      }
+      Assert.assertTrue(creator.getRawForwardIndexUncompressedValueSizeInBytes() > 0,
+          "SV var-byte creator should track > 0 uncompressed size when enabled");
+    }
+  }
+
+  @Test
+  public void testSingleValueVarByteRawIndexCreatorTrackingDisabled()
+      throws IOException {
+    File file = Files.createTempFile(getClass().getSimpleName(), "svVarTrackDisabled").toFile();
+    file.deleteOnExit();
+    try (SingleValueVarByteRawIndexCreator creator = new SingleValueVarByteRawIndexCreator(
+        file.getParentFile(), ChunkCompressionType.LZ4, file.getName(), 100, DataType.STRING, 20)) {
+      // tracking disabled by default
+      for (int i = 0; i < 100; i++) {
+        creator.putString("value_" + i);
+      }
+      Assert.assertEquals(creator.getRawForwardIndexUncompressedValueSizeInBytes(), -1L,
+          "SV var-byte creator should return unavailable when tracking is disabled");
+    }
   }
 
   @Test(expectedExceptions = IllegalStateException.class)

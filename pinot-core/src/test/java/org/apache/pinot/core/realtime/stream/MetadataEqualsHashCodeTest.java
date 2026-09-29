@@ -24,10 +24,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.annotations.Test;
 
 
-/**
- * Test for equals and hashCode for the various ZK metadata classes
- *
- */
+/// Test for equals and hashCode for the various ZK metadata classes
 public class MetadataEqualsHashCodeTest {
   @Test
   public void testEqualsAndHashCode() {

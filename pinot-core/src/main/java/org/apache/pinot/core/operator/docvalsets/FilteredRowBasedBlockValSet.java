@@ -34,11 +34,9 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * A {@link BlockValSet} implementation backed by row major data with a filter column (BOOLEAN type).
- *
- * TODO: Support MV
- */
+/// A [BlockValSet] implementation backed by row major data with a filter column (BOOLEAN type).
+///
+/// TODO: Support MV
 public class FilteredRowBasedBlockValSet implements BlockValSet {
   private final DataType _dataType;
   private final DataType _storedType;
@@ -92,6 +90,12 @@ public class FilteredRowBasedBlockValSet implements BlockValSet {
   @Override
   public Dictionary getDictionary() {
     return null;
+  }
+
+  /// Row-based value sets never carry a dictionary; the dict-id read methods below always throw.
+  @Override
+  public boolean isDictionaryEncoded() {
+    return false;
   }
 
   @Override
@@ -291,6 +295,11 @@ public class FilteredRowBasedBlockValSet implements BlockValSet {
 
   @Override
   public double[][] getDoubleValuesMV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public BigDecimal[][] getBigDecimalValuesMV() {
     throw new UnsupportedOperationException();
   }
 

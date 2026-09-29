@@ -18,29 +18,29 @@
  */
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
-import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import org.apache.pinot.common.request.Literal;
-import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.segment.local.aggregator.DistinctCountHLLValueAggregator;
+import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.mock;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 public class MutableSegmentImplIngestionAggregationTest {
@@ -55,20 +55,21 @@ public class MutableSegmentImplIngestionAggregationTest {
   private static final String KEY_SEPARATOR = "\t\t";
   private static final int NUM_ROWS = 10001;
 
+  private static final StreamMessageMetadata METADATA = mock(StreamMessageMetadata.class);
+
   private static Schema.SchemaBuilder getSchemaBuilder() {
     return new Schema.SchemaBuilder().setSchemaName("testSchema")
-        .addSingleValueDimension(DIMENSION_1, FieldSpec.DataType.INT)
-        .addSingleValueDimension(DIMENSION_2, FieldSpec.DataType.STRING)
-        .addDateTime(TIME_COLUMN1, FieldSpec.DataType.INT, "1:DAYS:EPOCH", "1:DAYS")
-        .addDateTime(TIME_COLUMN2, FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS");
+        .addSingleValueDimension(DIMENSION_1, DataType.INT)
+        .addSingleValueDimension(DIMENSION_2, DataType.STRING)
+        .addDateTime(TIME_COLUMN1, DataType.INT, "1:DAYS:EPOCH", "1:DAYS")
+        .addDateTime(TIME_COLUMN2, DataType.INT, "1:HOURS:EPOCH", "1:HOURS");
   }
 
-  private static final Set<String> VAR_LENGTH_SET = Collections.singleton(DIMENSION_2);
-  private static final Set<String> INVERTED_INDEX_SET =
-      new HashSet<>(Arrays.asList(DIMENSION_1, DIMENSION_2, TIME_COLUMN1, TIME_COLUMN2));
+  private static final Set<String> VAR_LENGTH_SET = Set.of(DIMENSION_2);
+  private static final Set<String> INVERTED_INDEX_SET = Set.of(DIMENSION_1, DIMENSION_2, TIME_COLUMN1, TIME_COLUMN2);
 
   private static final List<String> STRING_VALUES =
-      Collections.unmodifiableList(Arrays.asList("aa", "bbb", "cc", "ddd", "ee", "fff", "gg", "hhh", "ii", "jjj"));
+      List.of("aa", "bbb", "cc", "ddd", "ee", "fff", "gg", "hhh", "ii", "jjj");
 
   @Test
   public void testSameSrcDifferentAggregations()
@@ -76,12 +77,10 @@ public class MutableSegmentImplIngestionAggregationTest {
     String m1 = "metric_MAX";
     String m2 = "metric_MIN";
 
-    Schema schema =
-        getSchemaBuilder().addMetric(m2, FieldSpec.DataType.DOUBLE).addMetric(m1, FieldSpec.DataType.DOUBLE).build();
+    Schema schema = getSchemaBuilder().addMetric(m2, DataType.DOUBLE).addMetric(m1, DataType.DOUBLE).build();
     MutableSegmentImpl mutableSegmentImpl =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(m2, m1)),
-            VAR_LENGTH_SET, INVERTED_INDEX_SET,
-            Arrays.asList(new AggregationConfig(m1, "MAX(metric)"), new AggregationConfig(m2, "MIN(metric)")));
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1, m2), VAR_LENGTH_SET, INVERTED_INDEX_SET,
+            List.of(new AggregationConfig(m1, "MAX(metric)"), new AggregationConfig(m2, "MIN(metric)")));
 
     Map<String, Double> expectedMin = new HashMap<>();
     Map<String, Double> expectedMax = new HashMap<>();
@@ -94,12 +93,13 @@ public class MutableSegmentImplIngestionAggregationTest {
               (Integer) metrics.get(0).getValue()));
     }
 
+    int numDocsIndexed = mutableSegmentImpl.getNumDocsIndexed();
     GenericRow reuse = new GenericRow();
-    for (int docId = 0; docId < expectedMax.size(); docId++) {
+    for (int docId = 0; docId < numDocsIndexed; docId++) {
       GenericRow row = mutableSegmentImpl.getRecord(docId, reuse);
       String key = buildKey(row);
-      Assert.assertEquals(row.getValue(m2), expectedMin.get(key), key);
-      Assert.assertEquals(row.getValue(m1), expectedMax.get(key), key);
+      assertEquals(row.getValue(m2), expectedMin.get(key), key);
+      assertEquals(row.getValue(m1), expectedMax.get(key), key);
     }
 
     mutableSegmentImpl.destroy();
@@ -111,12 +111,10 @@ public class MutableSegmentImplIngestionAggregationTest {
     String m1 = "sum1";
     String m2 = "sum2";
 
-    Schema schema =
-        getSchemaBuilder().addMetric(m1, FieldSpec.DataType.INT).addMetric(m2, FieldSpec.DataType.LONG).build();
+    Schema schema = getSchemaBuilder().addMetric(m1, DataType.INT).addMetric(m2, DataType.LONG).build();
     MutableSegmentImpl mutableSegmentImpl =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(m2, m1)),
-            VAR_LENGTH_SET, INVERTED_INDEX_SET,
-            Arrays.asList(new AggregationConfig(m1, "SUM(metric)"), new AggregationConfig(m2, "SUM(metric_2)")));
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1, m2), VAR_LENGTH_SET, INVERTED_INDEX_SET,
+            List.of(new AggregationConfig(m1, "SUM(metric)"), new AggregationConfig(m2, "SUM(metric_2)")));
 
     Map<String, Integer> expectedSum1 = new HashMap<>();
     Map<String, Long> expectedSum2 = new HashMap<>();
@@ -127,39 +125,44 @@ public class MutableSegmentImplIngestionAggregationTest {
           expectedSum2.getOrDefault(metrics.get(1).getKey(), 0L) + ((Integer) metrics.get(1).getValue()).longValue());
     }
 
+    int numDocsIndexed = mutableSegmentImpl.getNumDocsIndexed();
     GenericRow reuse = new GenericRow();
-    for (int docId = 0; docId < expectedSum1.size(); docId++) {
+    for (int docId = 0; docId < numDocsIndexed; docId++) {
       GenericRow row = mutableSegmentImpl.getRecord(docId, reuse);
       String key = buildKey(row);
-      Assert.assertEquals(row.getValue(m1), expectedSum1.get(key), key);
-      Assert.assertEquals(row.getValue(m2), expectedSum2.get(key), key);
+      assertEquals(row.getValue(m1), expectedSum1.get(key), key);
+      assertEquals(row.getValue(m2), expectedSum2.get(key), key);
     }
 
     mutableSegmentImpl.destroy();
   }
 
   @Test
-  public void testValuesAreNullThrowsException()
+  public void testNullValues()
       throws Exception {
     String m1 = "sum1";
 
-    Schema schema = getSchemaBuilder().addMetric(m1, FieldSpec.DataType.INT).build();
+    Schema schema = getSchemaBuilder().addMetric(m1, DataType.INT).build();
     MutableSegmentImpl mutableSegmentImpl =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.singleton(m1), VAR_LENGTH_SET,
-            INVERTED_INDEX_SET, Collections.singletonList(new AggregationConfig(m1, "SUM(metric)")));
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1), VAR_LENGTH_SET, INVERTED_INDEX_SET,
+            List.of(new AggregationConfig(m1, "SUM(metric)")));
 
     long seed = 2;
     Random random = new Random(seed);
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), null);
 
-    // Generate random int to prevent overflow
-    GenericRow row = getRow(random, 1);
-    row.putValue(METRIC, null);
-    try {
-      mutableSegmentImpl.index(row, defaultMetadata);
-      Assert.fail();
-    } catch (NullPointerException e) {
-      // expected
+    for (int i = 0; i < NUM_ROWS; i++) {
+      GenericRow row = getRow(random, 1);
+      mutableSegmentImpl.index(row, METADATA);
+    }
+
+    int numDocsIndexed = mutableSegmentImpl.getNumDocsIndexed();
+    assertTrue(numDocsIndexed < NUM_ROWS);
+
+    GenericRow reuse = new GenericRow();
+    for (int i = 0; i < numDocsIndexed; i++) {
+      GenericRow row = mutableSegmentImpl.getRecord(i, reuse);
+      String key = buildKey(row);
+      assertEquals(row.getValue(m1), 0, key);
     }
 
     mutableSegmentImpl.destroy();
@@ -170,58 +173,25 @@ public class MutableSegmentImplIngestionAggregationTest {
       throws Exception {
     String m1 = "hll1";
 
-    Schema schema = getSchemaBuilder().addMetric(m1, FieldSpec.DataType.BYTES).build();
+    Schema schema = getSchemaBuilder().addMetric(m1, DataType.BYTES).build();
     MutableSegmentImpl mutableSegmentImpl =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.singleton(m1), VAR_LENGTH_SET,
-            INVERTED_INDEX_SET, Collections.singletonList(new AggregationConfig(m1, "distinctCountHLL(metric, 12)")));
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1), VAR_LENGTH_SET, INVERTED_INDEX_SET,
+            List.of(new AggregationConfig(m1, "distinctCountHLL(metric, 12)")));
 
-    Map<String, HLLTestData> expected = new HashMap<>();
-    List<Metric> metrics = addRowsDistinctCountHLL(998, mutableSegmentImpl);
-    for (Metric metric : metrics) {
-      expected.put(metric.getKey(), (HLLTestData) metric.getValue());
-    }
+    Map<String, HyperLogLog> expectedValues = addRowsDistinctCountHLL(998, mutableSegmentImpl);
 
-    List<ExpressionContext> arguments = List.of(ExpressionContext.forLiteral(Literal.stringValue("12")));
-    DistinctCountHLLValueAggregator valueAggregator = new DistinctCountHLLValueAggregator(arguments);
+    int numDocsIndexed = mutableSegmentImpl.getNumDocsIndexed();
+    assertTrue(numDocsIndexed < NUM_ROWS);
+    assertEquals(numDocsIndexed, expectedValues.size());
 
-    Set<Integer> integers = new HashSet<>();
-
-    // Assert that the distinct count is within an error margin. We assert on the cardinality of the HLL in the docID
-    // and the HLL we made, but also on the cardinality of the HLL in the docID and the actual cardinality from the set
-    // of integers.
     GenericRow reuse = new GenericRow();
-    for (int docId = 0; docId < expected.size(); docId++) {
+    for (int docId = 0; docId < numDocsIndexed; docId++) {
       GenericRow row = mutableSegmentImpl.getRecord(docId, reuse);
-      String key = buildKey(row);
-
-      integers.addAll(expected.get(key)._integers);
-
-      HyperLogLog expectedHLL = expected.get(key)._hll;
-      HyperLogLog actualHLL = valueAggregator.deserializeAggregatedValue((byte[]) row.getValue(m1));
-
-      Assert.assertEquals(actualHLL.cardinality(), expectedHLL.cardinality(), (int) (expectedHLL.cardinality() * 0.04),
-          "The HLL cardinality from the index is within a tolerable error margin (4%) of the cardinality of the "
-              + "expected HLL.");
-      Assert.assertEquals(actualHLL.cardinality(), expected.get(key)._integers.size(),
-          expected.get(key)._integers.size() * 0.04,
-          "The HLL cardinality from the index is within a tolerable error margin (4%) of the actual cardinality of "
-              + "the integers.");
+      HyperLogLog actualHLL = CustomSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize((byte[]) row.getValue(m1));
+      HyperLogLog expectedHLL = expectedValues.get(buildKey(row));
+      assertEquals(actualHLL.cardinality(), expectedHLL.cardinality());
     }
 
-    // Assert that the aggregated HyperLogLog is also within the error margin
-    HyperLogLog togetherHLL = new HyperLogLog(12);
-    expected.forEach((key, value) -> {
-      try {
-        togetherHLL.addAll(value._hll);
-      } catch (CardinalityMergeException e) {
-        e.printStackTrace();
-        throw new RuntimeException(e);
-      }
-    });
-
-    Assert.assertEquals(togetherHLL.cardinality(), integers.size(), (int) (integers.size() * 0.04),
-        "The aggregated HLL cardinality is within a tolerable error margin (4%) of the actual cardinality of the "
-            + "integers.");
     mutableSegmentImpl.destroy();
   }
 
@@ -231,24 +201,23 @@ public class MutableSegmentImplIngestionAggregationTest {
     String m1 = "count1";
     String m2 = "count2";
 
-    Schema schema =
-        getSchemaBuilder().addMetric(m1, FieldSpec.DataType.LONG).addMetric(m2, FieldSpec.DataType.LONG).build();
+    Schema schema = getSchemaBuilder().addMetric(m1, DataType.LONG).addMetric(m2, DataType.LONG).build();
     MutableSegmentImpl mutableSegmentImpl =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(m1, m2)),
-            VAR_LENGTH_SET, INVERTED_INDEX_SET,
-            Arrays.asList(new AggregationConfig(m1, "COUNT(metric)"), new AggregationConfig(m2, "COUNT(*)")));
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1, m2), VAR_LENGTH_SET, INVERTED_INDEX_SET,
+            List.of(new AggregationConfig(m1, "COUNT(metric)"), new AggregationConfig(m2, "COUNT(*)")));
 
     Map<String, Long> expectedCount = new HashMap<>();
     for (List<Metric> metrics : addRows(3, mutableSegmentImpl)) {
       expectedCount.put(metrics.get(0).getKey(), expectedCount.getOrDefault(metrics.get(0).getKey(), 0L) + 1L);
     }
 
+    int numDocsIndexed = mutableSegmentImpl.getNumDocsIndexed();
     GenericRow reuse = new GenericRow();
-    for (int docId = 0; docId < expectedCount.size(); docId++) {
+    for (int docId = 0; docId < numDocsIndexed; docId++) {
       GenericRow row = mutableSegmentImpl.getRecord(docId, reuse);
       String key = buildKey(row);
-      Assert.assertEquals(row.getValue(m1), expectedCount.get(key), key);
-      Assert.assertEquals(row.getValue(m2), expectedCount.get(key), key);
+      assertEquals(row.getValue(m1), expectedCount.get(key), key);
+      assertEquals(row.getValue(m2), expectedCount.get(key), key);
     }
 
     mutableSegmentImpl.destroy();
@@ -259,7 +228,7 @@ public class MutableSegmentImplIngestionAggregationTest {
         TIME_COLUMN1) + KEY_SEPARATOR + row.getValue(TIME_COLUMN2);
   }
 
-  private GenericRow getRow(Random random, Integer multiplicationFactor) {
+  private GenericRow getRow(Random random, int multiplicationFactor) {
     GenericRow row = new GenericRow();
 
     row.putValue(DIMENSION_1, random.nextInt(2 * multiplicationFactor));
@@ -270,128 +239,66 @@ public class MutableSegmentImplIngestionAggregationTest {
     return row;
   }
 
-  private class HLLTestData {
-    private HyperLogLog _hll;
-    private Set<Integer> _integers;
-
-    public HLLTestData(HyperLogLog hll, Set<Integer> integers) {
-      _hll = hll;
-      _integers = integers;
-    }
-
-    public HyperLogLog getHll() {
-      return _hll;
-    }
-
-    public Set<Integer> getIntegers() {
-      return _integers;
-    }
-  }
-
-  private class Metric {
-    private final String _key;
-    private final Object _value;
+  private static class Metric {
+    final String _key;
+    final Object _value;
 
     Metric(String key, Object value) {
       _key = key;
       _value = value;
     }
 
-    public String getKey() {
+    String getKey() {
       return _key;
     }
 
-    public Object getValue() {
+    Object getValue() {
       return _value;
     }
   }
 
-  private List<Metric> addRowsDistinctCountHLL(long seed, MutableSegmentImpl mutableSegmentImpl)
+  private Map<String, HyperLogLog> addRowsDistinctCountHLL(long seed, MutableSegmentImpl mutableSegmentImpl)
       throws Exception {
-    List<Metric> metrics = new ArrayList<>();
+    Map<String, HyperLogLog> valueMap = new HashMap<>();
 
     Random random = new Random(seed);
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), null);
-
-    HashMap<String, HyperLogLog> hllMap = new HashMap<>();
-    HashMap<String, Set<Integer>> distinctMap = new HashMap<>();
-
-    Integer rows = 500000;
-
-    for (int i = 0; i < (rows); i++) {
+    for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow row = getRow(random, 1);
       String key = buildKey(row);
 
       int metricValue = random.nextInt(5000000);
       row.putValue(METRIC, metricValue);
+      mutableSegmentImpl.index(row, METADATA);
 
-      if (hllMap.containsKey(key)) {
-        hllMap.get(key).offer(row.getValue(METRIC));
-        distinctMap.get(key).add(metricValue);
-      } else {
-        HyperLogLog hll = new HyperLogLog(12);
-        hll.offer(row.getValue(METRIC));
-        hllMap.put(key, hll);
-        distinctMap.put(key, new HashSet<>(metricValue));
-      }
-
-      mutableSegmentImpl.index(row, defaultMetadata);
+      valueMap.computeIfAbsent(key, k -> new HyperLogLog(12)).offer(metricValue);
     }
 
-    distinctMap.forEach(
-        (key, value) -> metrics.add(new Metric(key, new HLLTestData(hllMap.get(key), distinctMap.get(key)))));
-
-    int numDocsIndexed = mutableSegmentImpl.getNumDocsIndexed();
-    Assert.assertEquals(numDocsIndexed, hllMap.keySet().size());
-
-    // Assert that aggregation happened.
-    Assert.assertTrue(numDocsIndexed < NUM_ROWS);
-
-    return metrics;
+    return valueMap;
   }
 
-  private List<Metric> addRowsSumPrecision(long seed, MutableSegmentImpl mutableSegmentImpl)
+  private Map<String, BigDecimal> addRowsSumPrecision(long seed, MutableSegmentImpl mutableSegmentImpl)
       throws Exception {
-    List<Metric> metrics = new ArrayList<>();
+    Map<String, BigDecimal> valueMap = new HashMap<>();
 
     Random random = new Random(seed);
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), null);
-
-    HashMap<String, BigDecimal> bdMap = new HashMap<>();
-    HashMap<String, ArrayList<BigDecimal>> bdIndividualMap = new HashMap<>();
-
-    int numRows = 50000;
-    for (int i = 0; i < numRows; i++) {
+    for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow row = getRow(random, 1);
       String key = buildKey(row);
 
       BigDecimal metricValue = generateRandomBigDecimal(random, 5, 6);
-      row.putValue(METRIC, metricValue.toString());
+      row.putValue(METRIC, metricValue);
+      mutableSegmentImpl.index(row, METADATA);
 
-      if (bdMap.containsKey(key)) {
-        bdMap.put(key, bdMap.get(key).add(metricValue));
-        bdIndividualMap.get(key).add(metricValue);
-      } else {
-        bdMap.put(key, metricValue);
-        ArrayList<BigDecimal> bdList = new ArrayList<>();
-        bdList.add(metricValue);
-        bdIndividualMap.put(key, bdList);
-      }
-
-      mutableSegmentImpl.index(row, defaultMetadata);
+      valueMap.compute(key, (k, v) -> {
+        if (v == null) {
+          return metricValue;
+        } else {
+          return v.add(metricValue);
+        }
+      });
     }
 
-    for (String key : bdMap.keySet()) {
-      metrics.add(new Metric(key, bdMap.get(key)));
-    }
-
-    int numDocsIndexed = mutableSegmentImpl.getNumDocsIndexed();
-    Assert.assertEquals(numDocsIndexed, bdMap.keySet().size());
-
-    // Assert that aggregation happened.
-    Assert.assertTrue(numDocsIndexed < NUM_ROWS);
-
-    return metrics;
+    return valueMap;
   }
 
   private List<List<Metric>> addRows(long seed, MutableSegmentImpl mutableSegmentImpl)
@@ -400,28 +307,26 @@ public class MutableSegmentImplIngestionAggregationTest {
     Set<String> keys = new HashSet<>();
 
     Random random = new Random(seed);
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
 
     for (int i = 0; i < NUM_ROWS; i++) {
-      // Generate random int to prevent overflow
       GenericRow row = getRow(random, 1);
       Integer metricValue = random.nextInt(10000);
       Integer metric2Value = random.nextInt();
       row.putValue(METRIC, metricValue);
       row.putValue(METRIC_2, metric2Value);
 
-      mutableSegmentImpl.index(row, defaultMetadata);
+      mutableSegmentImpl.index(row, METADATA);
 
       String key = buildKey(row);
-      metrics.add(Arrays.asList(new Metric(key, metricValue), new Metric(key, metric2Value)));
+      metrics.add(List.of(new Metric(key, metricValue), new Metric(key, metric2Value)));
       keys.add(key);
     }
 
     int numDocsIndexed = mutableSegmentImpl.getNumDocsIndexed();
-    Assert.assertEquals(numDocsIndexed, keys.size());
+    assertEquals(numDocsIndexed, keys.size());
 
     // Assert that aggregation happened.
-    Assert.assertTrue(numDocsIndexed < NUM_ROWS);
+    assertTrue(numDocsIndexed < NUM_ROWS);
 
     return metrics;
   }
@@ -430,71 +335,61 @@ public class MutableSegmentImplIngestionAggregationTest {
   public void testSumPrecision()
       throws Exception {
     String m1 = "sumPrecision1";
-    Schema schema = getSchemaBuilder().addMetric(m1, FieldSpec.DataType.BIG_DECIMAL).build();
+    Schema schema = getSchemaBuilder().addMetric(m1, DataType.BIG_DECIMAL).build();
 
     MutableSegmentImpl mutableSegmentImpl =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.singleton(m1), VAR_LENGTH_SET,
-            INVERTED_INDEX_SET,
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1), VAR_LENGTH_SET, INVERTED_INDEX_SET,
             // Setting precision to 38 in the arguments for SUM_PRECISION
-            Collections.singletonList(new AggregationConfig(m1, "SUM_PRECISION(metric, 38)")));
+            List.of(new AggregationConfig(m1, "SUM_PRECISION(metric, 38)")));
 
-    Map<String, BigDecimal> expected = new HashMap<>();
-    List<Metric> metrics = addRowsSumPrecision(998, mutableSegmentImpl);
-    for (Metric metric : metrics) {
-      expected.put(metric.getKey(), (BigDecimal) metric.getValue());
-    }
+    Map<String, BigDecimal> expectedValues = addRowsSumPrecision(998, mutableSegmentImpl);
 
-    // Assert that the aggregated values are correct
+    int numDocsIndexed = mutableSegmentImpl.getNumDocsIndexed();
+    assertTrue(numDocsIndexed < NUM_ROWS);
+    assertEquals(numDocsIndexed, expectedValues.size());
+
     GenericRow reuse = new GenericRow();
-    for (int docId = 0; docId < expected.size(); docId++) {
+    for (int docId = 0; docId < numDocsIndexed; docId++) {
       GenericRow row = mutableSegmentImpl.getRecord(docId, reuse);
-      String key = buildKey(row);
-
-      BigDecimal expectedBigDecimal = expected.get(key);
       BigDecimal actualBigDecimal = (BigDecimal) row.getValue(m1);
-
-      Assert.assertEquals(actualBigDecimal, expectedBigDecimal, "The aggregated SUM does not match the expected SUM");
+      BigDecimal expectedBigDecimal = expectedValues.get(buildKey(row));
+      assertEquals(actualBigDecimal, expectedBigDecimal);
     }
+
     mutableSegmentImpl.destroy();
   }
 
   @Test
   public void testBigDecimalTooBig() {
     String m1 = "sumPrecision1";
-    Schema schema = getSchemaBuilder().addMetric(m1, FieldSpec.DataType.BIG_DECIMAL).build();
+    Schema schema = getSchemaBuilder().addMetric(m1, DataType.BIG_DECIMAL).build();
 
     int seed = 1;
     Random random = new Random(seed);
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), null);
 
     MutableSegmentImpl mutableSegmentImpl =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.singleton(m1), VAR_LENGTH_SET,
-            INVERTED_INDEX_SET, Collections.singletonList(new AggregationConfig(m1, "SUM_PRECISION(metric, 3)")));
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1), VAR_LENGTH_SET, INVERTED_INDEX_SET,
+            List.of(new AggregationConfig(m1, "SUM_PRECISION(metric, 3)")));
 
     // Make a big decimal larger than 3 precision and try to index it
     BigDecimal large = BigDecimalUtils.generateMaximumNumberWithPrecision(5);
     GenericRow row = getRow(random, 1);
 
     row.putValue("metric", large);
-    Assert.assertThrows(IllegalArgumentException.class, () -> {
-      mutableSegmentImpl.index(row, defaultMetadata);
+    assertThrows(IllegalArgumentException.class, () -> {
+      mutableSegmentImpl.index(row, METADATA);
     });
 
     mutableSegmentImpl.destroy();
   }
 
-  private BigDecimal generateRandomBigDecimal(Random random, int maxPrecision, int scale) {
+  private static BigDecimal generateRandomBigDecimal(Random random, int maxPrecision, int scale) {
     int precision = 1 + random.nextInt(maxPrecision);
-
-    String s = "";
+    StringBuilder stringBuilder = new StringBuilder();
     for (int i = 0; i < precision; i++) {
-      s = s + (1 + random.nextInt(9));
+      stringBuilder.append(1 + random.nextInt(9));
     }
-
-    if ((1 + random.nextInt(2)) == 1) {
-      return (new BigDecimal(s).setScale(scale)).negate();
-    } else {
-      return new BigDecimal(s).setScale(scale);
-    }
+    BigDecimal bigDecimal = new BigDecimal(stringBuilder.toString()).setScale(scale, RoundingMode.UNNECESSARY);
+    return random.nextBoolean() ? bigDecimal : bigDecimal.negate();
   }
 }

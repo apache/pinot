@@ -32,48 +32,49 @@ public class DateTimeUtils {
 
   private static final String TIMESTAMP_FORMAT_STR = "yyyy-MM-dd HH:mm:ss";
   private static final String DATE_FORMAT_STR = "yyyy-MM-dd";
-  private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat(DATE_FORMAT_STR);
-  private static final SimpleDateFormat TIMESTAMP_FORMAT = new SimpleDateFormat(TIMESTAMP_FORMAT_STR);
+  private static final ThreadLocal<SimpleDateFormat> DATE_FORMAT =
+      ThreadLocal.withInitial(() -> new SimpleDateFormat(DATE_FORMAT_STR));
+  private static final ThreadLocal<SimpleDateFormat> TIMESTAMP_FORMAT =
+      ThreadLocal.withInitial(() -> new SimpleDateFormat(TIMESTAMP_FORMAT_STR));
 
   public static Date getDateFromString(String value, Calendar cal)
       throws ParseException {
-    DATE_FORMAT.setTimeZone(cal.getTimeZone());
-    java.util.Date date = DATE_FORMAT.parse(value);
-    Date sqlDate = new Date(date.getTime());
-    return sqlDate;
+    SimpleDateFormat dateFormat = DATE_FORMAT.get();
+    dateFormat.setTimeZone(cal.getTimeZone());
+    java.util.Date date = dateFormat.parse(value);
+    return new Date(date.getTime());
   }
 
   public static Time getTimeFromString(String value, Calendar cal)
       throws ParseException {
-    TIMESTAMP_FORMAT.setTimeZone(cal.getTimeZone());
-    java.util.Date date = TIMESTAMP_FORMAT.parse(value);
-    Time sqlTime = new Time(date.getTime());
-    return sqlTime;
+    SimpleDateFormat timestampFormat = TIMESTAMP_FORMAT.get();
+    timestampFormat.setTimeZone(cal.getTimeZone());
+    java.util.Date date = timestampFormat.parse(value);
+    return new Time(date.getTime());
   }
 
   public static Timestamp getTimestampFromString(String value, Calendar cal)
       throws ParseException {
-    TIMESTAMP_FORMAT.setTimeZone(cal.getTimeZone());
-    java.util.Date date = TIMESTAMP_FORMAT.parse(value);
-    Timestamp sqlTime = new Timestamp(date.getTime());
-    return sqlTime;
+    SimpleDateFormat timestampFormat = TIMESTAMP_FORMAT.get();
+    timestampFormat.setTimeZone(cal.getTimeZone());
+    java.util.Date date = timestampFormat.parse(value);
+    return new Timestamp(date.getTime());
   }
 
   public static Timestamp getTimestampFromLong(Long value) {
-    Timestamp sqlTime = new Timestamp(value);
-    return sqlTime;
+    return new Timestamp(value);
   }
 
   public static String dateToString(Date date) {
-    return DATE_FORMAT.format(date.getTime());
+    return DATE_FORMAT.get().format(date.getTime());
   }
 
   public static String timeToString(Time time) {
-    return TIMESTAMP_FORMAT.format(time.getTime());
+    return TIMESTAMP_FORMAT.get().format(time.getTime());
   }
 
   public static String timeStampToString(Timestamp timestamp) {
-    return TIMESTAMP_FORMAT.format(timestamp.getTime());
+    return TIMESTAMP_FORMAT.get().format(timestamp.getTime());
   }
 
   public static long timeStampToLong(Timestamp timestamp) {

@@ -21,6 +21,7 @@ package org.apache.pinot.query.type;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.function.Predicate;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -29,16 +30,14 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * Extends Java-base TypeFactory from Calcite.
- *
- * <p>{@link JavaTypeFactoryImpl} is used here because we are not overriding much of the TypeFactory methods
- * required by Calcite. We will start extending {@link org.apache.calcite.sql.type.SqlTypeFactoryImpl} or even
- * {@link org.apache.calcite.rel.type.RelDataTypeFactory} when necessary for Pinot to override such mechanism.
- *
- * <p>Noted that {@link JavaTypeFactoryImpl} is subject to change. Please pay extra attention to this class when
- * upgrading Calcite versions.
- */
+/// Extends Java-base TypeFactory from Calcite.
+///
+/// [JavaTypeFactoryImpl] is used here because we are not overriding much of the TypeFactory methods
+/// required by Calcite. We will start extending [org.apache.calcite.sql.type.SqlTypeFactoryImpl] or even
+/// [org.apache.calcite.rel.type.RelDataTypeFactory] when necessary for Pinot to override such mechanism.
+///
+/// Noted that [JavaTypeFactoryImpl] is subject to change. Please pay extra attention to this class when
+/// upgrading Calcite versions.
 public class TypeFactory extends JavaTypeFactoryImpl {
 
   public static final TypeFactory INSTANCE = new TypeFactory();
@@ -53,10 +52,17 @@ public class TypeFactory extends JavaTypeFactoryImpl {
   }
 
   public RelDataType createRelDataTypeFromSchema(Schema schema) {
+    return createRelDataTypeFromSchema(schema, column -> false);
+  }
+
+  public RelDataType createRelDataTypeFromSchema(Schema schema, Predicate<String> shouldExclude) {
     Builder builder = new Builder(this);
     boolean enableNullHandling = schema.isEnableColumnBasedNullHandling();
     for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
-      builder.add(entry.getKey(), toRelDataType(entry.getValue(), enableNullHandling));
+      String columnName = entry.getKey();
+      if (!shouldExclude.test(columnName)) {
+        builder.add(columnName, toRelDataType(entry.getValue(), enableNullHandling));
+      }
     }
     return builder.build();
   }
@@ -94,6 +100,8 @@ public class TypeFactory extends JavaTypeFactoryImpl {
       case STRING:
       case JSON:
         return SqlTypeName.VARCHAR;
+      case UUID:
+        return SqlTypeName.UUID;
       case BYTES:
         return SqlTypeName.VARBINARY;
       case BIG_DECIMAL:

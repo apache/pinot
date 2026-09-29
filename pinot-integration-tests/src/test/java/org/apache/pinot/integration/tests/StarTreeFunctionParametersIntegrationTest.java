@@ -21,17 +21,20 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.integration.tests.custom.StarTreeTest;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -53,6 +56,17 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
     // Start the Pinot cluster
     startZk();
     startController();
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    // Set max segment startree preprocess parallelism to 6
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM, Integer.toString(8));
+    // Set max segment download parallelism to 6 to test that all segments can be processed
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM, Integer.toString(6
+
+        ));
     startBroker();
     startServer();
 
@@ -121,7 +135,7 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
     StarTreeAggregationConfig aggregationConfig = new StarTreeAggregationConfig("OriginAirportSeqID",
         "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 4), null, null, null, null, null);
 
-    starTreeIndexConfigs.add(new StarTreeIndexConfig(Collections.singletonList("DistanceGroup"), null,
+    starTreeIndexConfigs.add(new StarTreeIndexConfig(List.of("DistanceGroup"), null,
         null, List.of(aggregationConfig), 1));
     updateTableConfig(_tableConfig);
     waitForTableConfigUpdate(tableConfig -> tableConfig.getIndexingConfig().getStarTreeIndexConfigs().size() == 1);
@@ -139,7 +153,7 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
     aggregationConfig = new StarTreeAggregationConfig("OriginAirportSeqID", "DISTINCTCOUNTHLL",
         null, null, null, null, null, null);
     starTreeIndexConfigs.remove(starTreeIndexConfigs.size() - 1);
-    starTreeIndexConfigs.add(new StarTreeIndexConfig(Collections.singletonList("DistanceGroup"), null,
+    starTreeIndexConfigs.add(new StarTreeIndexConfig(List.of("DistanceGroup"), null,
         null, List.of(aggregationConfig), 1));
 
     updateTableConfig(_tableConfig);
@@ -159,7 +173,7 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
 
     aggregationConfig = new StarTreeAggregationConfig("OriginAirportSeqID", "DISTINCTCOUNTHLL",
         Map.of(Constants.HLL_LOG2M_KEY, "4"), null, null, null, null, null);
-    starTreeIndexConfigs.add(new StarTreeIndexConfig(Collections.singletonList("DistanceGroup"), null,
+    starTreeIndexConfigs.add(new StarTreeIndexConfig(List.of("DistanceGroup"), null,
         null, List.of(aggregationConfig), 1));
     updateTableConfig(_tableConfig);
     waitForTableConfigUpdate(tableConfig -> tableConfig.getIndexingConfig().getStarTreeIndexConfigs().size() == 2);
@@ -175,7 +189,7 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
     aggregationConfig = new StarTreeAggregationConfig("OriginAirportSeqID", "DISTINCTCOUNTHLL",
         Map.of(Constants.HLL_LOG2M_KEY, "6"), null, null, null, null, null);
     starTreeIndexConfigs.remove(starTreeIndexConfigs.size() - 1);
-    starTreeIndexConfigs.add(new StarTreeIndexConfig(Collections.singletonList("DistanceGroup"), null,
+    starTreeIndexConfigs.add(new StarTreeIndexConfig(List.of("DistanceGroup"), null,
         null, List.of(aggregationConfig), 1));
     updateTableConfig(_tableConfig);
     waitForTableConfigUpdate(tableConfig -> tableConfig.getIndexingConfig().getStarTreeIndexConfigs()
@@ -193,10 +207,8 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
             + "WHERE DistanceGroup > 1", distinctCountHllLog2m8);
   }
 
-  /**
-   * Helper method to wait for a table config to be updated. The provided condition is used to check if the table config
-   * has been updated.
-   */
+  /// Helper method to wait for a table config to be updated. The provided condition is used to check if the table
+  /// config has been updated.
   private void waitForTableConfigUpdate(Function<TableConfig, Boolean> condition) {
     // Wait for table config to be updated
     TestUtils.waitForCondition(
@@ -207,19 +219,15 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
     );
   }
 
-  /**
-   * Helper method to assert that a query does not use a star-tree index.
-   */
+  /// Helper method to assert that a query does not use a star-tree index.
   private void checkQueryDoesNotUseStarTreeIndex(String query, int expectedResult) throws Exception {
     JsonNode explainPlan = postQuery("EXPLAIN PLAN FOR " + query);
-    assertFalse(explainPlan.toString().contains(StarTreeClusterIntegrationTest.FILTER_STARTREE_INDEX));
+    assertFalse(explainPlan.toString().contains(StarTreeTest.FILTER_STARTREE_INDEX));
     assertEquals(getDistinctCountResult(query), expectedResult);
   }
 
-  /**
-   * Helper method to assert that a query uses a star-tree index. Waits if necessary for the star-tree index to be
-   * built.
-   */
+  /// Helper method to assert that a query uses a star-tree index. Waits if necessary for the star-tree index to be
+  /// built.
   private void checkQueryUsesStarTreeIndex(String query, int expectedResult) throws Exception {
     // Wait for the star-tree indexes to be built if needed
     TestUtils.waitForCondition(
@@ -230,15 +238,13 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
-          return result.toString().contains(StarTreeClusterIntegrationTest.FILTER_STARTREE_INDEX);
+          return result.toString().contains(StarTreeTest.FILTER_STARTREE_INDEX);
         }, 1000L, 10_000L, "Failed to use star-tree index for query: " + query
     );
     assertEquals(getDistinctCountResult(query), expectedResult);
   }
 
-  /**
-   * Helper method to return the int result of a distinct count query.
-   */
+  /// Helper method to return the int result of a distinct count query.
   private int getDistinctCountResult(String query) throws Exception {
     JsonNode result = postQuery(query);
     return result.get("resultTable").get("rows").get(0).get(0).asInt();

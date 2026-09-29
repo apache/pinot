@@ -18,22 +18,23 @@
  */
 package org.apache.pinot.core.segment.processing.genericrow;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.MapUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * Utility class to deserialize the {@link GenericRow}.
- * The bytes are read in NATIVE order. The data should be serialized by the {@link GenericRowSerializer} on the same
- * host to ensure that both of them are using the same byte order.
- */
+/// Utility class to deserialize the [GenericRow].
+/// The bytes are read in NATIVE order. The data should be serialized by the [GenericRowSerializer] on the same
+/// host to ensure that both of them are using the same byte order.
 public class GenericRowDeserializer {
   private final PinotDataBuffer _dataBuffer;
   private final int _numFields;
@@ -57,9 +58,7 @@ public class GenericRowDeserializer {
     _includeNullFields = includeNullFields;
   }
 
-  /**
-   * Deserializes the {@link GenericRow} at the given offset.
-   */
+  /// Deserializes the [GenericRow] at the given offset.
   public void deserialize(long offset, GenericRow buffer) {
     for (int i = 0; i < _numFields; i++) {
       String fieldName = _fieldNames[i];
@@ -109,6 +108,16 @@ public class GenericRowDeserializer {
             buffer.putValue(fieldName, bytes);
             break;
           }
+          case MAP: {
+            int numBytes = _dataBuffer.getInt(offset);
+            offset += Integer.BYTES;
+            byte[] mapBytes = new byte[numBytes];
+            _dataBuffer.copyTo(offset, mapBytes);
+            offset += numBytes;
+            Map<String, Object> map = MapUtils.deserializeMap(mapBytes);
+            buffer.putValue(fieldName, map);
+            break;
+          }
           default:
             throw new IllegalStateException("Unsupported SV stored type: " + _storedTypes[i]);
         }
@@ -152,6 +161,26 @@ public class GenericRowDeserializer {
               multiValue[j] = new String(stringBytes, UTF_8);
             }
             break;
+          case BYTES:
+            for (int j = 0; j < numValues; j++) {
+              int numBytes = _dataBuffer.getInt(offset);
+              offset += Integer.BYTES;
+              byte[] bytes = new byte[numBytes];
+              _dataBuffer.copyTo(offset, bytes);
+              offset += numBytes;
+              multiValue[j] = bytes;
+            }
+            break;
+          case BIG_DECIMAL:
+            for (int j = 0; j < numValues; j++) {
+              int numBytes = _dataBuffer.getInt(offset);
+              offset += Integer.BYTES;
+              byte[] bigDecimalBytes = new byte[numBytes];
+              _dataBuffer.copyTo(offset, bigDecimalBytes);
+              offset += numBytes;
+              multiValue[j] = BigDecimalUtils.deserialize(bigDecimalBytes);
+            }
+            break;
           default:
             throw new IllegalStateException("Unsupported MV stored type: " + _storedTypes[i]);
         }
@@ -171,9 +200,7 @@ public class GenericRowDeserializer {
     }
   }
 
-  /**
-   * Compares the rows at the given offsets.
-   */
+  /// Compares the rows at the given offsets.
   public int compare(long offset1, long offset2, int numFieldsToCompare) {
     for (int i = 0; i < numFieldsToCompare; i++) {
       if (_isSingleValueFields[i]) {
@@ -266,6 +293,23 @@ public class GenericRowDeserializer {
             offset2 += numBytes2;
             break;
           }
+          case MAP: {
+            int numBytes1 = _dataBuffer.getInt(offset1);
+            offset1 += Integer.BYTES;
+            byte[] mapBytes1 = new byte[numBytes1];
+            _dataBuffer.copyTo(offset1, mapBytes1);
+            int numBytes2 = _dataBuffer.getInt(offset2);
+            offset2 += Integer.BYTES;
+            byte[] mapBytes2 = new byte[numBytes2];
+            _dataBuffer.copyTo(offset2, mapBytes2);
+            int result = ByteArray.compare(mapBytes1, mapBytes2);
+            if (result != 0) {
+              return result;
+            }
+            offset1 += numBytes1;
+            offset2 += numBytes2;
+            break;
+          }
           default:
             throw new IllegalStateException("Unsupported SV stored type: " + _storedTypes[i]);
         }
@@ -330,6 +374,44 @@ public class GenericRowDeserializer {
               byte[] stringBytes2 = new byte[numBytes2];
               _dataBuffer.copyTo(offset2, stringBytes2);
               int result = new String(stringBytes1, UTF_8).compareTo(new String(stringBytes2, UTF_8));
+              if (result != 0) {
+                return result;
+              }
+              offset1 += numBytes1;
+              offset2 += numBytes2;
+            }
+            break;
+          case BYTES:
+            for (int j = 0; j < numValues; j++) {
+              int numBytes1 = _dataBuffer.getInt(offset1);
+              offset1 += Integer.BYTES;
+              byte[] bytes1 = new byte[numBytes1];
+              _dataBuffer.copyTo(offset1, bytes1);
+              int numBytes2 = _dataBuffer.getInt(offset2);
+              offset2 += Integer.BYTES;
+              byte[] bytes2 = new byte[numBytes2];
+              _dataBuffer.copyTo(offset2, bytes2);
+              int result = ByteArray.compare(bytes1, bytes2);
+              if (result != 0) {
+                return result;
+              }
+              offset1 += numBytes1;
+              offset2 += numBytes2;
+            }
+            break;
+          case BIG_DECIMAL:
+            for (int j = 0; j < numValues; j++) {
+              int numBytes1 = _dataBuffer.getInt(offset1);
+              offset1 += Integer.BYTES;
+              byte[] bigDecimalBytes1 = new byte[numBytes1];
+              _dataBuffer.copyTo(offset1, bigDecimalBytes1);
+              int numBytes2 = _dataBuffer.getInt(offset2);
+              offset2 += Integer.BYTES;
+              byte[] bigDecimalBytes2 = new byte[numBytes2];
+              _dataBuffer.copyTo(offset2, bigDecimalBytes2);
+              BigDecimal bigDecimal1 = BigDecimalUtils.deserialize(bigDecimalBytes1);
+              BigDecimal bigDecimal2 = BigDecimalUtils.deserialize(bigDecimalBytes2);
+              int result = bigDecimal1.compareTo(bigDecimal2);
               if (result != 0) {
                 return result;
               }

@@ -23,11 +23,12 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -49,7 +50,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-public class StarTreeIndexReaderTest {
+public class StarTreeIndexReaderTest implements PinotBuffersAfterMethodCheckRule {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), StarTreeIndexReaderTest.class.toString());
 
   private SegmentMetadataImpl _segmentMetadata;
@@ -81,11 +82,11 @@ public class StarTreeIndexReaderTest {
     StarTreeV2Metadata stMeta1 = mock(StarTreeV2Metadata.class);
     when(stMeta1.getDimensionsSplitOrder()).thenReturn(Arrays.asList("dim0", "dim1"));
     when(stMeta1.getFunctionColumnPairs()).thenReturn(
-        Collections.singleton(new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "*")));
+        Set.of(new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "*")));
     StarTreeV2Metadata stMeta2 = mock(StarTreeV2Metadata.class);
     when(stMeta2.getDimensionsSplitOrder()).thenReturn(Arrays.asList("dimX", "dimY"));
     when(stMeta2.getFunctionColumnPairs()).thenReturn(
-        Collections.singleton(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "dimX")));
+        Set.of(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "dimX")));
     when(_segmentMetadata.getStarTreeV2MetadataList()).thenReturn(Arrays.asList(stMeta1, stMeta2));
     // Mock the offset/sizes for the index buffers.
     List<List<Pair<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue>>> indexMaps = new ArrayList<>();

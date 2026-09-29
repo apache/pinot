@@ -18,13 +18,9 @@
  */
 package org.apache.pinot.spi.metrics;
 
-/**
- * A tag interface to indicate that a class is a metric in Pinot.
- */
+/// A tag interface to indicate that a class is a metric in Pinot.
 public interface PinotMetric {
 
-  /**
-   * Return the actual object
-   */
+  /// Return the actual object
   Object getMetric();
 }

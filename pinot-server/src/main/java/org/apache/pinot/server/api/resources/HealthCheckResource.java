@@ -45,11 +45,10 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.server.api.AdminApiApplication;
+import org.apache.pinot.server.api.ServerPublicAccess;
 
 
-/**
- * REST API to do health check through ServiceStatus.
- */
+/// REST API to do health check through ServiceStatus.
 @Api(tags = "Health")
 @Path("/")
 public class HealthCheckResource {
@@ -70,6 +69,7 @@ public class HealthCheckResource {
 
   @GET
   @Path("/health")
+  @ServerPublicAccess
   @Produces(MediaType.TEXT_PLAIN)
   @ApiOperation(value = "Checking server health")
   @ApiResponses(value = {
@@ -88,6 +88,7 @@ public class HealthCheckResource {
 
   @GET
   @Path("/health/liveness")
+  @ServerPublicAccess
   @Produces(MediaType.TEXT_PLAIN)
   @ApiOperation(value = "Checking server liveness status.")
   @ApiResponses(value = {
@@ -101,6 +102,7 @@ public class HealthCheckResource {
 
   @GET
   @Path("/health/readiness")
+  @ServerPublicAccess
   @Produces(MediaType.TEXT_PLAIN)
   @ApiOperation(value = "Checking server readiness status")
   @ApiResponses(value = {

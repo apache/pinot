@@ -19,10 +19,11 @@
 package org.apache.pinot.tools.admin.command;
 
 import com.google.common.base.Preconditions;
-import com.google.common.io.Files;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.IOUtils;
@@ -39,10 +40,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Given a set of input params, output a table of num hosts to num hours and the memory required per host
- *
- */
+/// Given a set of input params, output a table of num hosts to num hours and the memory required per host
 @CommandLine.Command(name = "RealtimeProvisioningHelper", mixinStandardHelpOptions = true)
 public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand implements Command {
 
@@ -216,7 +214,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
     TableConfig tableConfig;
     try (FileInputStream fis = new FileInputStream(_tableConfigFile)) {
-      String tableConfigString = IOUtils.toString(fis);
+      String tableConfigString = IOUtils.toString(fis, StandardCharsets.UTF_8);
       tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
     } catch (IOException e) {
       throw new RuntimeException("Exception in reading table config from file " + _tableConfigFile, e);
@@ -264,7 +262,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
     long maxUsableHostMemBytes = DataSizeUtils.toBytes(_maxUsableHostMemory);
 
-    File workingDir = Files.createTempDir();
+    File workingDir = Files.createTempDirectory("pinot-provisioning-").toFile();
     Schema schema = extractSchema();
     MemoryEstimator memoryEstimator;
     if (segmentProvided) {
@@ -304,7 +302,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   private Schema extractSchema() {
     if (_schemaFile != null) {
       try (FileInputStream fis = new FileInputStream(_schemaFile)) {
-        String schemaString = IOUtils.toString(fis);
+        String schemaString = IOUtils.toString(fis, StandardCharsets.UTF_8);
         return Schema.fromString(schemaString);
       } catch (IOException e) {
         throw new RuntimeException("Exception in reading schema from file " + _schemaFile, e);
@@ -322,12 +320,10 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     System.out.println(note.toString());
   }
 
-  /**
-   * Displays the output values as a grid of numHoursToConsume vs numHostsToProvision
-   * @param outputValues
-   * @param numHosts
-   * @param numHours
-   */
+  /// Displays the output values as a grid of numHoursToConsume vs numHostsToProvision
+  /// @param outputValues
+  /// @param numHosts
+  /// @param numHours
   private void displayResults(String[][] outputValues, int[] numHosts, int[] numHours) {
     System.out.println();
     System.out.print("numHosts --> ");

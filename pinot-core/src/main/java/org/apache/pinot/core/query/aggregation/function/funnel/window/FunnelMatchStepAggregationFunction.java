@@ -22,16 +22,18 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.PriorityQueue;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 public class FunnelMatchStepAggregationFunction extends FunnelBaseAggregationFunction<IntArrayList> {
 
-  public FunnelMatchStepAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments);
+  public FunnelMatchStepAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments, nullHandlingEnabled);
   }
 
   @Override
@@ -45,7 +47,7 @@ public class FunnelMatchStepAggregationFunction extends FunnelBaseAggregationFun
   }
 
   @Override
-  public IntArrayList extractFinalResult(PriorityQueue<FunnelStepEvent> stepEvents) {
+  public IntArrayList extractFinalResult(@Nullable PriorityQueue<FunnelStepEvent> stepEvents) {
     int finalMaxStep = 0;
     IntArrayList result = new IntArrayList(_numSteps);
     for (int i = 0; i < _numSteps; i++) {
@@ -78,7 +80,10 @@ public class FunnelMatchStepAggregationFunction extends FunnelBaseAggregationFun
   protected Integer processWindow(ArrayDeque<FunnelStepEvent> slidingWindow) {
     int maxStep = 0;
     long previousTimestamp = -1;
+    int numEventsProcessed = 0;
     for (FunnelStepEvent event : slidingWindow) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numEventsProcessed++,
+          "FunnelMatchStepAggregationFunction#processWindow");
       int currentEventStep = event.getStep();
       // If the same condition holds for the sequence of events, then such repeating event interrupts further
       // processing.

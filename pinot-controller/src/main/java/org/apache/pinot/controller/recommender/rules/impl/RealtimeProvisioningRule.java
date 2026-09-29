@@ -19,8 +19,9 @@
 
 package org.apache.pinot.controller.recommender.rules.impl;
 
-import com.google.common.io.Files;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -46,11 +47,9 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import static org.apache.pinot.controller.recommender.realtime.provisioning.MemoryEstimator.NOT_APPLICABLE;
 
 
-/**
- * This rule gives some recommendations useful for provisioning real time tables. Specifically it provides some
- * recommendations for optimal segments size, total memory used per host, and consuming memory used per host based
- * on the provided characteristics of the data.
- */
+/// This rule gives some recommendations useful for provisioning real time tables. Specifically it provides some
+/// recommendations for optimal segments size, total memory used per host, and consuming memory used per host based
+/// on the provided characteristics of the data.
 public class RealtimeProvisioningRule extends AbstractRule {
   public static final String OPTIMAL_SEGMENT_SIZE = "Optimal Segment Size";
   public static final String NUM_ROWS_IN_SEGMENT = "Number of Rows in Segment";
@@ -84,7 +83,12 @@ public class RealtimeProvisioningRule extends AbstractRule {
     int[] numHosts = _params.getNumHosts();
     int[] numHours = _params.getNumHours();
 
-    File workingDir = Files.createTempDir();
+    File workingDir;
+    try {
+      workingDir = Files.createTempDirectory("pinot-recommender-").toFile();
+    } catch (IOException e) {
+      throw new InvalidInputException("Failed to create temp directory for recommender", e);
+    }
     MemoryEstimator memoryEstimator =
         new MemoryEstimator(tableConfig, _input.getSchema(), _input.getSchemaWithMetadata(),
             _params.getNumRowsInGeneratedSegment(), ingestionRatePerPartition, maxUsableHostMemoryByte, retentionHours,
@@ -153,16 +157,14 @@ public class RealtimeProvisioningRule extends AbstractRule {
     return makeMatrix(elements, numHosts, numHours, Function.identity());
   }
 
-  /**
-   * This functions creates a matrix (of type map) for the elements. For example:
-   * {
-   *   "numHosts -   ": "2         4         6         ",
-   *   "numHours -  2": "2.55G     1.36G     869.19M   ",
-   *   "numHours -  3": "3.74G     2G        1.25G     ",
-   *   "numHours -  4": "4.94G     2.63G     1.65G     ",
-   *   "numHours -  5": "6.14G     3.27G     2.05G     "
-   * }
-   */
+  /// This functions creates a matrix (of type map) for the elements. For example:
+  /// {
+  ///   "numHosts -   ": "2         4         6         ",
+  ///   "numHours -  2": "2.55G     1.36G     869.19M   ",
+  ///   "numHours -  3": "3.74G     2G        1.25G     ",
+  ///   "numHours -  4": "4.94G     2.63G     1.65G     ",
+  ///   "numHours -  5": "6.14G     3.27G     2.05G     "
+  /// }
   private Map<String, String> makeMatrix(String[][] elements, int[] numHosts, int[] numHours,
       Function<String, String> elementTrimmingFunc) {
     Map<String, String> output = new LinkedHashMap<>();

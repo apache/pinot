@@ -21,16 +21,18 @@ package org.apache.pinot.core.query.aggregation.function.funnel.window;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.PriorityQueue;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 public class FunnelCompleteCountAggregationFunction extends FunnelBaseAggregationFunction<Integer> {
 
-  public FunnelCompleteCountAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments);
+  public FunnelCompleteCountAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments, nullHandlingEnabled);
   }
 
   @Override
@@ -44,7 +46,7 @@ public class FunnelCompleteCountAggregationFunction extends FunnelBaseAggregatio
   }
 
   @Override
-  public Integer extractFinalResult(PriorityQueue<FunnelStepEvent> stepEvents) {
+  public Integer extractFinalResult(@Nullable PriorityQueue<FunnelStepEvent> stepEvents) {
     int totalCompletedRounds = 0;
     if (stepEvents == null || stepEvents.isEmpty()) {
       return totalCompletedRounds;
@@ -60,7 +62,10 @@ public class FunnelCompleteCountAggregationFunction extends FunnelBaseAggregatio
 
       int maxStep = 0;
       long previousTimestamp = -1;
+      int numEventsProcessed = 0;
       for (FunnelStepEvent event : slidingWindow) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numEventsProcessed++,
+            "FunnelCompleteCountAggregationFunction#extractFinalResult");
         int currentEventStep = event.getStep();
         // If the same condition holds for the sequence of events, then such repeating event interrupts further
         // processing.

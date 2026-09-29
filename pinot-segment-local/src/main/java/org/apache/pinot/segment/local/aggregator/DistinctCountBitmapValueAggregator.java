@@ -41,6 +41,10 @@ public class DistinctCountBitmapValueAggregator implements ValueAggregator<Objec
 
   @Override
   public RoaringBitmap getInitialAggregatedValue(Object rawValue) {
+    // NOTE: rawValue cannot be null because this aggregator can only be used for star-tree index, and the builder
+    //   never passes a null raw value: a null-aware star-tree leaves the aggregated value null until the group sees
+    //   its first non-null input.
+    assert rawValue != null;
     RoaringBitmap initialValue;
     if (rawValue instanceof byte[]) {
       byte[] bytes = (byte[]) rawValue;
@@ -48,7 +52,7 @@ public class DistinctCountBitmapValueAggregator implements ValueAggregator<Objec
       _maxByteSize = Math.max(_maxByteSize, bytes.length);
     } else {
       initialValue = new RoaringBitmap();
-      initialValue.add(rawValue.hashCode());
+      addToValue(initialValue, rawValue);
       _maxByteSize = Math.max(_maxByteSize, initialValue.serializedSizeInBytes());
     }
     return initialValue;
@@ -59,10 +63,22 @@ public class DistinctCountBitmapValueAggregator implements ValueAggregator<Objec
     if (rawValue instanceof byte[]) {
       value.or(deserializeAggregatedValue((byte[]) rawValue));
     } else {
-      value.add(rawValue.hashCode());
+      addToValue(value, rawValue);
     }
     _maxByteSize = Math.max(_maxByteSize, value.serializedSizeInBytes());
     return value;
+  }
+
+  /// Adds a raw value (single value or multi-value array) to the RoaringBitmap.
+  protected void addToValue(RoaringBitmap bitmap, Object rawValue) {
+    if (rawValue instanceof Object[]) {
+      Object[] values = (Object[]) rawValue;
+      for (Object value : values) {
+        bitmap.add(value.hashCode());
+      }
+    } else {
+      bitmap.add(rawValue.hashCode());
+    }
   }
 
   @Override
@@ -75,6 +91,11 @@ public class DistinctCountBitmapValueAggregator implements ValueAggregator<Objec
   @Override
   public RoaringBitmap cloneAggregatedValue(RoaringBitmap value) {
     return value.clone();
+  }
+
+  @Override
+  public boolean isAggregatedValueFixedSize() {
+    return false;
   }
 
   @Override

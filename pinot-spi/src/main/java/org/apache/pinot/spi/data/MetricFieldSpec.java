@@ -24,9 +24,7 @@ import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 
 
-/**
- * The <code>MetricFieldSpec</code> class contains all specs related to any metric field (column) in {@link Schema}.\
- */
+/// The `MetricFieldSpec` class contains all specs related to any metric field (column) in [Schema].\
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class MetricFieldSpec extends FieldSpec {
 
@@ -43,7 +41,7 @@ public final class MetricFieldSpec extends FieldSpec {
     super(name, dataType, true, defaultNullValue);
   }
 
-  public MetricFieldSpec(String name, DataType dataType, @Nullable Object defaultNullValue, int maxLength,
+  public MetricFieldSpec(String name, DataType dataType, @Nullable Object defaultNullValue, @Nullable Integer maxLength,
       @Nullable MaxLengthExceedStrategy maxLengthExceedStrategy) {
     super(name, dataType, true, maxLength, defaultNullValue, maxLengthExceedStrategy);
   }

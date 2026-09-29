@@ -139,7 +139,7 @@ Identify a list of tests for the changes you have made. Depending on the scope o
 All source code files should have license headers. To automatically add the header for any new file you plan to checkin, run in `pinot` top-level folder:
 
 ```text
-mvn license:format
+./mvnw license:format
 ```
 
 Note
@@ -165,12 +165,12 @@ If attention to the licensing terms in not paid early on, they will be caught mu
   Run the following command to verify the code-style before posting a PR
 
 ```text
-mvn checkstyle:check
+./mvnw checkstyle:check
 ```
 
 * **Run tests**
 
-  Before you create a review request for the changes, make sure you have run the corresponding unit tests for your changes. You can run individual tests via the IDE or via maven command-line. Finally run all tests locally by running `mvn clean install -Pbin-dist`.
+  Before you create a review request for the changes, make sure you have run the corresponding unit tests for your changes. You can run individual tests via the IDE or via maven command-line. Finally run all tests locally by running `./mvnw clean install -Pbin-dist`.
 
   For changes that are related to performance issues or race conditions, it is hard to write reliable tests, so we recommend running manual stress tests to validate the changes. You `MUST` note the manual tests done in the PR description.
 

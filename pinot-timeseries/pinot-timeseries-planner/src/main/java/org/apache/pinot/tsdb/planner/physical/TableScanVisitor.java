@@ -19,9 +19,13 @@
 package org.apache.pinot.tsdb.planner.physical;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -29,6 +33,10 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.TableRouteInfo;
+import org.apache.pinot.core.routing.TableRouteProvider;
+import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
@@ -38,32 +46,79 @@ import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 public class TableScanVisitor {
   public static final TableScanVisitor INSTANCE = new TableScanVisitor();
   private RoutingManager _routingManager;
+  private TableRouteProvider _tableRouteProvider;
+  private TableCache _tableCache;
 
   private TableScanVisitor() {
   }
 
-  public void init(RoutingManager routingManager) {
+  public void init(RoutingManager routingManager, TableRouteProvider tableRouteProvider, TableCache tableCache) {
     _routingManager = routingManager;
+    _tableRouteProvider = tableRouteProvider;
+    _tableCache = tableCache;
   }
 
   public void assignSegmentsToPlan(BaseTimeSeriesPlanNode planNode, TimeBuckets timeBuckets, Context context) {
     if (planNode instanceof LeafTimeSeriesPlanNode) {
       LeafTimeSeriesPlanNode sfpNode = (LeafTimeSeriesPlanNode) planNode;
       Expression filterExpression = CalciteSqlParser.compileToExpression(sfpNode.getEffectiveFilter(timeBuckets));
+      context.addTableName(sfpNode.getTableName());
       RoutingTable routingTable = _routingManager.getRoutingTable(
           compileBrokerRequest(sfpNode.getTableName(), filterExpression),
           context._requestId);
       Preconditions.checkNotNull(routingTable, "Failed to get routing table for table: " + sfpNode.getTableName());
-      Preconditions.checkState(routingTable.getServerInstanceToSegmentsMap().size() == 1,
-          "Only support routing to a single server. Computed: %s",
-          routingTable.getServerInstanceToSegmentsMap().size());
-      var entry = routingTable.getServerInstanceToSegmentsMap().entrySet().iterator().next();
-      List<String> segments = entry.getValue().getLeft();
-      context.getPlanIdToSegmentMap().put(sfpNode.getId(), segments);
+      for (var entry : routingTable.getServerInstanceToSegmentsMap().entrySet()) {
+        ServerInstance serverInstance = entry.getKey();
+        List<String> segments = entry.getValue().getSegments();
+        context.getLeafIdToSegmentsByServer().computeIfAbsent(serverInstance, (x) -> new HashMap<>())
+            .put(sfpNode.getId(), segments);
+      }
     }
     for (BaseTimeSeriesPlanNode childNode : planNode.getInputs()) {
       assignSegmentsToPlan(childNode, timeBuckets, context);
     }
+  }
+
+  /// Adds table type information (offline/realtime) to the plan node.
+  /// If the plan node is a leaf node, it retrieves the table route info and updates the table name with type.
+  /// If the plan node has child nodes, it recursively processes each child node.
+  ///
+  /// @param planNode The [BaseTimeSeriesPlanNode] to process.
+  /// @return The updated [BaseTimeSeriesPlanNode] with table type information.
+  public BaseTimeSeriesPlanNode addTableTypeInfoToPlan(BaseTimeSeriesPlanNode planNode, RequestContext requestContext) {
+    if (planNode instanceof LeafTimeSeriesPlanNode) {
+      LeafTimeSeriesPlanNode sfpNode = (LeafTimeSeriesPlanNode) planNode;
+      TableRouteInfo routeInfo = _tableRouteProvider.getTableRouteInfo(sfpNode.getTableName(), _tableCache,
+          _routingManager);
+      String tableNameWithType = getTableNameWithType(routeInfo);
+      Preconditions.checkNotNull(tableNameWithType, "Table not found for table name: " + sfpNode.getTableName());
+      requestContext.setTableName(tableNameWithType);
+      return sfpNode.withTableName(tableNameWithType);
+    }
+
+    List<BaseTimeSeriesPlanNode> newInputs = new ArrayList<>();
+    for (BaseTimeSeriesPlanNode childNode : planNode.getInputs()) {
+      newInputs.add(addTableTypeInfoToPlan(childNode, requestContext));
+    }
+    return planNode.withInputs(newInputs);
+  }
+
+
+  /// Returns the table name with type (offline/realtime) if the table exists, otherwise returns null.
+  ///
+  /// @param routeInfo The [TableRouteInfo] for the table.
+  /// @return The table name with type, or null if the table does not exist.
+  @Nullable
+  private String getTableNameWithType(TableRouteInfo routeInfo) {
+    Preconditions.checkState(!routeInfo.isHybrid(),
+        "Hybrid tables are not supported yet for timeseries queries");
+    if (routeInfo.isOffline()) {
+      return routeInfo.getOfflineTableName();
+    }
+    if (routeInfo.isRealtime()) {
+      return routeInfo.getRealtimeTableName();
+    }
+    return null;
   }
 
   public static Context createContext(Long requestId) {
@@ -71,15 +126,37 @@ public class TableScanVisitor {
   }
 
   public static class Context {
-    private final Map<String, List<String>> _planIdToSegmentMap = new HashMap<>();
+    private final Map<ServerInstance, Map<String, List<String>>> _leafIdToSegmentsByServer = new HashMap<>();
     private final Long _requestId;
+    private final List<String> _tableNames = new ArrayList<>();
 
     public Context(Long requestId) {
       _requestId = requestId;
     }
 
-    public Map<String, List<String>> getPlanIdToSegmentMap() {
-      return _planIdToSegmentMap;
+    public List<TimeSeriesQueryServerInstance> getQueryServers() {
+      return _leafIdToSegmentsByServer.keySet().stream().map(TimeSeriesQueryServerInstance::new).collect(
+          Collectors.toList());
+    }
+
+    public Map<String, Map<String, List<String>>> getLeafIdToSegmentsByInstanceId() {
+      Map<String, Map<String, List<String>>> result = new HashMap<>();
+      for (var entry : _leafIdToSegmentsByServer.entrySet()) {
+        result.put(entry.getKey().getInstanceId(), entry.getValue());
+      }
+      return result;
+    }
+
+    Map<ServerInstance, Map<String, List<String>>> getLeafIdToSegmentsByServer() {
+      return _leafIdToSegmentsByServer;
+    }
+
+    public List<String> getTableNames() {
+      return _tableNames;
+    }
+
+    public void addTableName(String tableName) {
+      _tableNames.add(tableName);
     }
   }
 

@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -34,12 +35,11 @@ public class ReducerDataSchemaUtils {
   private ReducerDataSchemaUtils() {
   }
 
-  /**
-   * Returns the canonical data schema of the aggregation result based on the query and the data schema returned from
-   * the server.
-   * <p>Column names are re-generated in the canonical data schema to avoid the backward incompatibility caused by
-   * changing the string representation of the expression.
-   */
+  /// Returns the canonical data schema of the aggregation result based on the query and the data schema returned from
+  /// the server.
+  ///
+  /// Column names are re-generated in the canonical data schema to avoid the backward incompatibility caused by
+  /// changing the string representation of the expression.
   public static DataSchema canonicalizeDataSchemaForAggregation(QueryContext queryContext, DataSchema dataSchema) {
     List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
         queryContext.getFilteredAggregationFunctions();
@@ -57,42 +57,57 @@ public class ReducerDataSchemaUtils {
     return new DataSchema(columnNames, dataSchema.getColumnDataTypes());
   }
 
-  /**
-   * Returns the canonical data schema of the group-by result based on the query and the data schema returned from the
-   * server. Group-by expressions are always at the beginning of the data schema, followed by the aggregations.
-   * <p>Column names are re-generated in the canonical data schema to avoid the backward incompatibility caused by
-   * changing the string representation of the expression.
-   */
+  /// Returns the canonical data schema of the group-by result based on the query and the data schema returned from the
+  /// server. Group-by expressions are always at the beginning of the data schema, followed by the aggregations.
+  ///
+  /// Column names are re-generated in the canonical data schema to avoid the backward incompatibility caused by
+  /// changing the string representation of the expression.
   public static DataSchema canonicalizeDataSchemaForGroupBy(QueryContext queryContext, DataSchema dataSchema) {
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
         queryContext.getFilteredAggregationFunctions();
     assert groupByExpressions != null && filteredAggregationFunctions != null;
     int numGroupByExpression = groupByExpressions.size();
+    /// Grouping-set queries carry an extra synthetic $groupingId key column after the union group-by columns.
+    int numExtraKeyColumns = queryContext.getNumExtraGroupByKeyColumns();
+    int numKeyColumns = numGroupByExpression + numExtraKeyColumns;
     int numAggregations = filteredAggregationFunctions.size();
-    int numColumns = numGroupByExpression + numAggregations;
+    int numColumns = numKeyColumns + numAggregations;
     String[] columnNames = new String[numColumns];
+    /// Rolling-upgrade safety: an older server (without grouping-set support) silently ignores the
+    /// groupingSets wire field and returns a plain GROUP BY result missing the synthetic $groupingId column.
+    /// Detect that specific shape and fail with an actionable message instead of an opaque column-count BUG.
+    /// NOTE: this is a column-count heuristic, not a version handshake; it should be replaced by a
+    /// server-reported capability signal once Pinot supports per-query capability negotiation.
+    if (numExtraKeyColumns > 0 && dataSchema.size() == numGroupByExpression + numAggregations) {
+      throw new IllegalStateException(
+          "GROUP BY GROUPING SETS / ROLLUP / CUBE requires all servers to support grouping sets, but a server "
+              + "returned a result without the grouping-id column. Upgrade all servers before issuing grouping-set "
+              + "queries.");
+    }
     Preconditions.checkState(dataSchema.size() == numColumns,
-        "BUG: Expect same number of group-by expressions, aggregations and columns in data schema, got %s group-by "
-            + "expressions, %s aggregations, %s columns in data schema", numGroupByExpression, numAggregations,
+        "BUG: Expect same number of group-by key columns, aggregations and columns in data schema, got %s group-by "
+            + "key columns, %s aggregations, %s columns in data schema", numKeyColumns, numAggregations,
         dataSchema.size());
     for (int i = 0; i < numGroupByExpression; i++) {
       columnNames[i] = groupByExpressions.get(i).toString();
     }
+    if (numExtraKeyColumns > 0) {
+      columnNames[numGroupByExpression] = GroupingSets.GROUPING_ID_COLUMN;
+    }
     for (int i = 0; i < numAggregations; i++) {
       Pair<AggregationFunction, FilterContext> pair = filteredAggregationFunctions.get(i);
-      columnNames[numGroupByExpression + i] =
+      columnNames[numKeyColumns + i] =
           AggregationFunctionUtils.getResultColumnName(pair.getLeft(), pair.getRight());
     }
     return new DataSchema(columnNames, dataSchema.getColumnDataTypes());
   }
 
-  /**
-   * Returns the canonical data schema of the distinct result based on the query and the data schema returned from the
-   * server.
-   * <p>Column names are re-generated in the canonical data schema to avoid the backward incompatibility caused by
-   * changing the string representation of the expression.
-   */
+  /// Returns the canonical data schema of the distinct result based on the query and the data schema returned from the
+  /// server.
+  ///
+  /// Column names are re-generated in the canonical data schema to avoid the backward incompatibility caused by
+  /// changing the string representation of the expression.
   public static DataSchema canonicalizeDataSchemaForDistinct(QueryContext queryContext, DataSchema dataSchema) {
     List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
     int numSelectExpressions = selectExpressions.size();

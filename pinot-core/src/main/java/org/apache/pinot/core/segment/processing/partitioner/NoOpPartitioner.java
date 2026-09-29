@@ -21,12 +21,20 @@ package org.apache.pinot.core.segment.processing.partitioner;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * Partitioner implementation which always returns constant partition value "0"
- */
+/// Partitioner implementation which always returns constant partition value "0"
 public class NoOpPartitioner implements Partitioner {
   @Override
   public String getPartition(GenericRow genericRow) {
+    return "0";
+  }
+
+  @Override
+  public String[] getPartitionColumns() {
+    return new String[0]; // No columns needed
+  }
+
+  @Override
+  public String getPartitionFromColumns(Object[] columnValues) {
     return "0";
   }
 }

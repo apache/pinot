@@ -25,41 +25,35 @@ import javax.annotation.Nullable;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.minion.MinionClient;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatement;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
 
 
-/**
- * SqlQueryExecutor executes all SQL queries including DQL, DML, DCL, DDL.
- *
- */
+/// SqlQueryExecutor executes all SQL queries including DQL, DML, DCL, DDL.
 public class SqlQueryExecutor {
   private final String _controllerUrl;
   private final HelixManager _helixManager;
 
-  /**
-   * Fetch the lead controller from helix, HA is not guaranteed.
-   * @param helixManager is used to query leader controller from helix.
-   */
+  /// Fetch the lead controller from helix, HA is not guaranteed.
+  /// @param helixManager is used to query leader controller from helix.
   public SqlQueryExecutor(HelixManager helixManager) {
     _helixManager = helixManager;
     _controllerUrl = null;
   }
 
-  /**
-   * Recommended to provide the controller vip or service name for access.
-   * @param controllerUrl controller service name for sending minion task requests
-   */
+  /// Recommended to provide the controller vip or service name for access.
+  /// @param controllerUrl controller service name for sending minion task requests
   public SqlQueryExecutor(String controllerUrl) {
     _controllerUrl = controllerUrl;
     _helixManager = null;
@@ -82,13 +76,11 @@ public class SqlQueryExecutor {
     return controllerBaseUrl;
   }
 
-  /**
-   * Execute DML Statement
-   *
-   * @param sqlNodeAndOptions Parsed DML object
-   * @param headers extra headers map for minion task submission
-   * @return BrokerResponse is the DML executed response
-   */
+  /// Execute DML Statement
+  ///
+  /// @param sqlNodeAndOptions Parsed DML object
+  /// @param headers extra headers map for minion task submission
+  /// @return BrokerResponse is the DML executed response
   public BrokerResponse executeDMLStatement(SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable Map<String, String> headers) {
     DataManipulationStatement statement = DataManipulationStatementParser.parse(sqlNodeAndOptions);
@@ -102,19 +94,19 @@ public class SqlQueryExecutor {
           tableToTaskIdMap.forEach((key, value) -> rows.add(new Object[]{key, value}));
           result.setResultTable(new ResultTable(statement.getResultSchema(), rows));
         } catch (Exception e) {
-          result.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+          result.addException(new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, e.getMessage()));
         }
         break;
       case HTTP:
         try {
           result.setResultTable(new ResultTable(statement.getResultSchema(), statement.execute()));
         } catch (Exception e) {
-          result.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+          result.addException(new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, e.getMessage()));
         }
         break;
       default:
         result.addException(
-            QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, "Unsupported statement: " + statement));
+            new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, "Unsupported statement: " + statement));
         break;
     }
     return result;

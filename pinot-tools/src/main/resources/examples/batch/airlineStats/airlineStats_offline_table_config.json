@@ -5,7 +5,6 @@
     "timeColumnName": "DaysSinceEpoch",
     "timeType": "DAYS",
     "segmentPushType": "APPEND",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "replication": "1"
   },
   "tenants": {},
@@ -66,6 +65,17 @@
           "MAX__ArrDelay"
         ],
         "maxLeafRecords": 10
+      },
+      {
+        "dimensionsSplitOrder": [
+          "AirlineID"
+        ],
+        "functionColumnPairs": [
+          "AVGMV__DivLongestGTimes",
+          "COUNTMV__DivLongestGTimes",
+          "SUMMV__DivLongestGTimes"
+        ],
+        "maxLeafRecords": 10
       }
     ],
     "enableDynamicStarTreeCreation": true,
@@ -97,6 +107,15 @@
   "metadata": {
     "customConfigs": {}
   },
+  "tableSamplers": [
+    {
+      "name": "small",
+      "type": "firstN",
+      "properties": {
+        "numSegments": "1"
+      }
+    }
+  ],
   "ingestionConfig": {
     "transformConfigs": [
       {

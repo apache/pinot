@@ -21,11 +21,10 @@ package org.apache.pinot.common.request.context.predicate;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
-/**
- * The {@code Predicate} class represents the predicate in the filter.
- * <p>Currently the query engine only accepts string literals as the right-hand side of the predicate, so we store the
- * right-hand side of the predicate as string or list of strings.
- */
+/// The {@code Predicate} class represents the predicate in the filter.
+///
+/// Currently the query engine only accepts string literals as the right-hand side of the predicate, so we store the
+/// right-hand side of the predicate as string or list of strings.
 public interface Predicate {
   enum Type {
     EQ,
@@ -34,12 +33,12 @@ public interface Predicate {
     NOT_IN(true),
     RANGE,
     REGEXP_LIKE,
-    TEXT_CONTAINS,
     TEXT_MATCH,
     JSON_MATCH,
     IS_NULL,
     IS_NOT_NULL(true),
-    VECTOR_SIMILARITY;
+    VECTOR_SIMILARITY,
+    VECTOR_SIMILARITY_RADIUS;
 
     private final boolean _exclusive;
 
@@ -56,18 +55,12 @@ public interface Predicate {
     }
   }
 
-  /**
-   * Returns the type of the predicate.
-   */
+  /// Returns the type of the predicate.
   Type getType();
 
-  /**
-   * Returns the left-hand side expression of the predicate.
-   */
+  /// Returns the left-hand side expression of the predicate.
   ExpressionContext getLhs();
 
-  /**
-   * Sets the left-hand side expression of the predicate.
-   */
+  /// Sets the left-hand side expression of the predicate.
   void setLhs(ExpressionContext lhs);
 }

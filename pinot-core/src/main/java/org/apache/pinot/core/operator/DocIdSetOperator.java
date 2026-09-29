@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
@@ -28,15 +27,20 @@ import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryScanCostContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
-/**
- * The <code>DocIdSetOperator</code> takes a filter operator and returns blocks with set of the matched document Ids.
- * <p>Should call {@link #nextBlock()} multiple times until it returns <code>null</code> (already exhausts all the
- * matched documents) or already gathered enough documents (for selection queries).
- */
-public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
+/// The `AscendingDocIdSetOperator` takes a filter operator and returns blocks with set of the matched
+/// document Ids.
+///
+/// Should call [#nextBlock()] multiple times until it returns `null` (already exhausts all the
+/// matched documents) or already gathered enough documents (for selection queries).
+///
+/// The returned [org.apache.pinot.core.operator.blocks.DocIdSetBlock] wraps a thread-local scratch buffer shared by
+/// all `DocIdSetOperator` instances on the same thread: its contents are invalidated by the next [#nextBlock()] call
+/// on any instance on this thread. Consumers that hold on to a block across pulls must copy the array.
+public class DocIdSetOperator extends BaseDocIdSetOperator {
   private static final String EXPLAIN_NAME = "DOC_ID_SET";
 
   private static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS =
@@ -48,6 +52,7 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   private BlockDocIdSet _blockDocIdSet;
   private BlockDocIdIterator _blockDocIdIterator;
   private int _currentDocId = 0;
+  private long _lastReportedEntriesScanned = 0;
 
   public DocIdSetOperator(BaseFilterOperator filterOperator, int maxSizeOfDocIdSet) {
     Preconditions.checkArgument(maxSizeOfDocIdSet > 0 && maxSizeOfDocIdSet <= DocIdSetPlanNode.MAX_DOC_PER_CALL);
@@ -67,7 +72,7 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
       _blockDocIdIterator = _blockDocIdSet.iterator();
     }
 
-    Tracing.ThreadAccountantOps.sample();
+    QueryThreadContext.sampleUsage();
 
     int pos = 0;
     int[] docIds = THREAD_LOCAL_DOC_IDS.get();
@@ -79,6 +84,16 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
       docIds[pos++] = _currentDocId;
     }
     if (pos > 0) {
+      // Push scan cost delta for proactive query killing
+      QueryScanCostContext scanCost = getScanCostContext();
+      if (scanCost != null) {
+        long currentTotal = _blockDocIdSet.getNumEntriesScannedInFilter();
+        long delta = currentTotal - _lastReportedEntriesScanned;
+        if (delta > 0) {
+          scanCost.addEntriesScannedInFilter(delta);
+          _lastReportedEntriesScanned = currentTotal;
+        }
+      }
       return new DocIdSetBlock(docIds, pos);
     } else {
       return null;
@@ -92,7 +107,7 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.singletonList(_filterOperator);
+    return List.of(_filterOperator);
   }
 
   @Override
@@ -105,5 +120,18 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _blockDocIdSet != null ? _blockDocIdSet.getNumEntriesScannedInFilter() : 0;
     return new ExecutionStatistics(0, numEntriesScannedInFilter, 0, 0);
+  }
+
+  @Override
+  public boolean isCompatibleWith(DocIdOrder order) {
+    return order == DocIdOrder.ASC;
+  }
+
+  @Override
+  public BaseDocIdSetOperator withOrder(DocIdOrder order) {
+    if (isCompatibleWith(order)) {
+      return this;
+    }
+    return new ReverseDocIdSetOperator(_filterOperator, _maxSizeOfDocIdSet);
   }
 }

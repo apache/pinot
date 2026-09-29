@@ -24,56 +24,42 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Synthetic null bitmap suppliers for testing and benchmarking.
- */
+/// Synthetic null bitmap suppliers for testing and benchmarking.
 public class SyntheticNullBitmapFactories {
   private SyntheticNullBitmapFactories() {
   }
 
-  /**
-   * Null bitmap factories that generate null bitmaps with periodic patterns.
-   */
+  /// Null bitmap factories that generate null bitmaps with periodic patterns.
   public static class Periodic {
     private Periodic() {
     }
 
-    /**
-     * Returns a null bitmap with the first doc in each period set as null.
-     */
+    /// Returns a null bitmap with the first doc in each period set as null.
     public static RoaringBitmap firstInPeriod(int numDocs, int period) {
       return periodic(numDocs, period, () -> 0);
     }
 
-    /**
-     * Returns a null bitmap with the last doc in each period set as null.
-     */
+    /// Returns a null bitmap with the last doc in each period set as null.
     public static RoaringBitmap lastInPeriod(int numDocs, int period) {
       return periodic(numDocs, period, () -> period - 1);
     }
 
-    /**
-     * Returns a null bitmap with a random doc in each period set as null.
-     */
+    /// Returns a null bitmap with a random doc in each period set as null.
     public static RoaringBitmap randomInPeriod(int numDocs, int period) {
       Random random = new Random(42);
       return randomInPeriod(numDocs, period, random);
     }
 
-    /**
-     * Returns a null bitmap with a random doc in each period set as null.
-     */
+    /// Returns a null bitmap with a random doc in each period set as null.
     public static RoaringBitmap randomInPeriod(int numDocs, int period, Random random) {
       return periodic(numDocs, period, () -> random.nextInt(period));
     }
 
-    /**
-     * Returns a null bitmap with a doc in each period set as null, with the doc position in the period determined by
-     * the given supplier.
-     *
-     * @param inIntervalSupplier Supplier for the position of the doc in the period.
-     *                           The supplier should return a value in the range {@code [0, period)}.
-     */
+    /// Returns a null bitmap with a doc in each period set as null, with the doc position in the period determined by
+    /// the given supplier.
+    ///
+    /// @param inIntervalSupplier Supplier for the position of the doc in the period.
+    ///                           The supplier should return a value in the range `[0, period)`.
     public static RoaringBitmap periodic(int numDocs, int period, IntSupplier inIntervalSupplier) {
       RoaringBitmap nullBitmap = new RoaringBitmap();
       for (int i = 0; i < DocIdSetPlanNode.MAX_DOC_PER_CALL; i += period) {

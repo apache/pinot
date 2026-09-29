@@ -40,32 +40,45 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.segment.spi.memory.PinotInputStream;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * The <code>DataSchema</code> class describes the schema of {@link DataTable}.
- */
+/// Describes the schema of a [org.apache.pinot.common.datatable.DataTable].
+///
+/// Fields are never reassigned after construction, but [#getColumnNames] and [#getColumnDataTypes] hand out the
+/// internal arrays without copying, so instances are not immutable: `BaseGapfillProcessor` rewrites column names in
+/// place.
+///
+/// Read-only sharing across threads is common and must stay safe: in the multi-stage engine a stage plan is
+/// deserialized once per stage and then handed to every worker of that stage, so the `DataSchema` of each plan node is
+/// read concurrently by all worker threads on the server.
 @JsonPropertyOrder({"columnNames", "columnDataTypes"})
 public class DataSchema {
   private final String[] _columnNames;
   private final ColumnDataType[] _columnDataTypes;
-  private ColumnDataType[] _storedColumnDataTypes;
 
-  /**
-   * Used by both Broker and Server to generate results for EXPLAIN PLAN queries.
-   */
+  /// Lazily computed cache of [#getStoredColumnDataTypes].
+  ///
+  /// `volatile` is required, not just for the null check in [#getStoredColumnDataTypes]: without it the array
+  /// contents are published unsafely, and a racing thread can read the non-null array reference while still seeing
+  /// `null` for its elements. Downstream code (e.g. `TypeUtils.convert`, `DataBlockExtractUtils.extractValue`) then
+  /// switches on a `null` stored type and fails with a `NullPointerException`.
+  private volatile ColumnDataType[] _storedColumnDataTypes;
+
+  /// Used by both Broker and Server to generate results for EXPLAIN PLAN queries.
   public static final DataSchema EXPLAIN_RESULT_SCHEMA =
       new DataSchema(new String[]{"Operator", "Operator_Id", "Parent_Id"}, new ColumnDataType[]{
           ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.INT
@@ -98,9 +111,11 @@ public class DataSchema {
     return _columnDataTypes;
   }
 
-  /**
-   * Lazy compute the _storeColumnDataTypes field.
-   */
+  /// Returns the stored type of each column, lazily computing and caching it on first access.
+  ///
+  /// Uses the racy-single-check idiom: two threads may each compute the array, but both compute the same values, so
+  /// the duplicate work is harmless. Correctness relies on `_storedColumnDataTypes` being `volatile`; see the field
+  /// for why.
   @JsonIgnore
   public ColumnDataType[] getStoredColumnDataTypes() {
     ColumnDataType[] storedColumnDataTypes = _storedColumnDataTypes;
@@ -134,7 +149,7 @@ public class DataSchema {
     // Write the column types.
     for (ColumnDataType columnDataType : _columnDataTypes) {
       // We don't want to use ordinal of the enum since adding a new data type will break things if server and broker
-      // use different versions of DataType class.
+      // use different versions of DataType class. See parseColumnDataType() for the mixed-version read side.
       byte[] bytes = columnDataType.name().getBytes(UTF_8);
       dataOutputStream.writeInt(bytes.length);
       dataOutputStream.write(bytes);
@@ -142,9 +157,7 @@ public class DataSchema {
     return byteArrayOutputStream.toByteArray();
   }
 
-  /**
-   * This method use relative operations on the ByteBuffer and expects the buffer's position to be set correctly.
-   */
+  /// This method use relative operations on the ByteBuffer and expects the buffer's position to be set correctly.
   public static DataSchema fromBytes(ByteBuffer buffer)
       throws IOException {
     // Read the number of columns.
@@ -163,7 +176,7 @@ public class DataSchema {
       int length = buffer.getInt();
       byte[] bytes = new byte[length];
       buffer.get(bytes);
-      columnDataTypes[i] = ColumnDataType.valueOf(new String(bytes, UTF_8));
+      columnDataTypes[i] = parseColumnDataType(new String(bytes, UTF_8));
     }
     return new DataSchema(columnNames, columnDataTypes);
   }
@@ -186,9 +199,29 @@ public class DataSchema {
       int length = buffer.readInt();
       byte[] bytes = new byte[length];
       buffer.readFully(bytes);
-      columnDataTypes[i] = ColumnDataType.valueOf(new String(bytes, UTF_8));
+      columnDataTypes[i] = parseColumnDataType(new String(bytes, UTF_8));
     }
     return new DataSchema(columnNames, columnDataTypes);
+  }
+
+  /// Resolves a [ColumnDataType] token read off the wire, turning the raw [IllegalArgumentException] from
+  /// [ColumnDataType#valueOf] into a message that names the mixed-version cause.
+  ///
+  /// Rolling-upgrade limitation: once a node on this build emits a `UUID` token, an older peer that does not know
+  /// the [ColumnDataType#UUID] constant fails here. There is no version-negotiation shim or fallback to `BYTES`
+  /// today, so brokers and servers must be upgraded atomically (or UUID columns kept out of queries) until the
+  /// whole cluster is on this build. Rolling back to a pre-UUID build is likewise unsafe while UUID-typed query
+  /// results are in flight. No existing (non-UUID) column is affected.
+  private static ColumnDataType parseColumnDataType(String name) {
+    try {
+      return ColumnDataType.valueOf(name);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          "Unrecognized ColumnDataType '" + name + "' received from a peer node. This typically means the peer is "
+              + "running a newer build that introduced a data type not yet known to this node. Upgrade all brokers "
+              + "and servers to the same build before querying columns of that type, or keep those columns out of "
+              + "queries until the rolling upgrade is complete.", e);
+    }
   }
 
   @SuppressWarnings("MethodDoesntCallSuperMethod")
@@ -290,16 +323,35 @@ public class DataSchema {
         return typeFactory.createSqlType(SqlTypeName.VARCHAR);
       }
     },
-    MAP(NullValuePlaceHolder.MAP) {
-      @Override
-      public RelDataType toType(RelDataTypeFactory typeFactory) {
-        return typeFactory.createSqlType(SqlTypeName.MAP);
-      }
-    },
     BYTES(NullValuePlaceHolder.INTERNAL_BYTES) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.VARBINARY);
+      }
+    },
+    // UUID is a logical type backed by BYTES; keep it directly after BYTES. ColumnDataType is serialized by name (not
+    // ordinal) via name()/valueOf(), so enum order does not affect wire compatibility.
+    UUID(BYTES, null) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.UUID);
+      }
+
+      /// Returns the nil UUID, matching the default null sentinel that [FieldSpec#getDefaultNullValue] uses for
+      /// UUID columns. This is the one type whose placeholder differs from its stored type's: `BYTES` uses a shared
+      /// zero-length [ByteArray], which is not a valid 16-byte UUID and would fail to render.
+      ///
+      /// A fresh instance is returned per call because, unlike every other placeholder (all empty or immutable),
+      /// this one wraps a mutable 16-byte array that callers hand out as a column fill value.
+      @Override
+      public Object getNullPlaceholder() {
+        return new ByteArray(UuidUtils.nullUuidBytes());
+      }
+    },
+    MAP(NullValuePlaceHolder.MAP) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.MAP);
       }
     },
     OBJECT(null) {
@@ -332,6 +384,12 @@ public class DataSchema {
         return typeFactory.createArrayType(DOUBLE.toType(typeFactory), -1);
       }
     },
+    BIG_DECIMAL_ARRAY(NullValuePlaceHolder.BIG_DECIMAL_ARRAY) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createArrayType(BIG_DECIMAL.toType(typeFactory), -1);
+      }
+    },
     BOOLEAN_ARRAY(INT_ARRAY, NullValuePlaceHolder.INT_ARRAY) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
@@ -350,10 +408,16 @@ public class DataSchema {
         return typeFactory.createArrayType(STRING.toType(typeFactory), -1);
       }
     },
-    BYTES_ARRAY(NullValuePlaceHolder.BYTES_ARRAY) {
+    BYTES_ARRAY(NullValuePlaceHolder.INTERNAL_BYTES_ARRAY) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createArrayType(BYTES.toType(typeFactory), -1);
+      }
+    },
+    UUID_ARRAY(BYTES_ARRAY, NullValuePlaceHolder.INTERNAL_BYTES_ARRAY) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createArrayType(UUID.toType(typeFactory), -1);
       }
     },
     UNKNOWN(null) {
@@ -366,10 +430,10 @@ public class DataSchema {
     private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL);
     private static final EnumSet<ColumnDataType> INTEGRAL_TYPES = EnumSet.of(INT, LONG);
     private static final EnumSet<ColumnDataType> ARRAY_TYPES =
-        EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY,
-            BYTES_ARRAY);
+        EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, BIG_DECIMAL_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY,
+            STRING_ARRAY, BYTES_ARRAY, UUID_ARRAY);
     private static final EnumSet<ColumnDataType> NUMERIC_ARRAY_TYPES =
-        EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY);
+        EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, BIG_DECIMAL_ARRAY);
     private static final EnumSet<ColumnDataType> INTEGRAL_ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY);
 
     // stored data type.
@@ -388,13 +452,15 @@ public class DataSchema {
       _nullPlaceholder = nullPlaceHolder;
     }
 
+    /// Returns the value used to fill null entries in the serialized column, masked on read by the null bitmap.
+    ///
+    /// Callers must resolve this on the *logical* type, not on [#getStoredType], because [#UUID] overrides it (see
+    /// that constant). For every other logical type the two agree, an invariant pinned by `DataSchemaTest`.
     public Object getNullPlaceholder() {
       return _nullPlaceholder;
     }
 
-    /**
-     * Returns the data type stored in Pinot.
-     */
+    /// Returns the data type stored in Pinot.
     public ColumnDataType getStoredType() {
       return _storedColumnDataType;
     }
@@ -440,6 +506,7 @@ public class DataSchema {
         case DOUBLE_ARRAY:
           return DataType.DOUBLE;
         case BIG_DECIMAL:
+        case BIG_DECIMAL_ARRAY:
           return DataType.BIG_DECIMAL;
         case BOOLEAN:
         case BOOLEAN_ARRAY:
@@ -455,6 +522,9 @@ public class DataSchema {
         case BYTES:
         case BYTES_ARRAY:
           return DataType.BYTES;
+        case UUID:
+        case UUID_ARRAY:
+          return DataType.UUID;
         case UNKNOWN:
           return DataType.UNKNOWN;
         default:
@@ -462,28 +532,26 @@ public class DataSchema {
       }
     }
 
-    /**
-     * Converts the value from external value type to the internal value type.
-     *
-     * <p>External value type is used in the following places:
-     * <ul>
-     *   <li>Data ingestion</li>
-     *   <li>Scalar function arguments (UDF)</li>
-     *   <li>Query response</li>
-     * </ul>
-     *
-     * <p>Internal value type is used within the storage and query engine, where value is always of the stored type. For
-     * BYTES type, we use a wrapper class {@link ByteArray} to make it comparable.
-     *
-     * <p>The conversion applies to the following types:
-     * <ul>
-     *   <li>BOOLEAN: boolean -> int</li>
-     *   <li>TIMESTAMP: Timestamp -> long</li>
-     *   <li>BYTES: byte[] -> ByteArray</li>
-     *   <li>BOOLEAN_ARRAY: boolean[] -> int[]</li>
-     *   <li>TIMESTAMP_ARRAY: Timestamp[] -> long[]</li>
-     * </ul>
-     */
+    /// Converts the value from external value type to the internal value type.
+    ///
+    /// External value type is used in the following places:
+    ///
+    /// - Data ingestion
+    /// - Scalar function arguments (UDF)
+    /// - Query response
+    ///
+    /// Internal value type is used within the storage and query engine, where value is always of the stored type. For
+    /// BYTES type, we use a wrapper class [ByteArray] to make it comparable.
+    ///
+    /// The conversion applies to the following types:
+    ///
+    /// - BOOLEAN: boolean -> int
+    /// - TIMESTAMP: Timestamp -> long
+    /// - BYTES: byte\[\] -> ByteArray
+    /// - BOOLEAN_ARRAY: boolean\[\] -> int\[\]
+    /// - TIMESTAMP_ARRAY: Timestamp\[\] -> long\[\]
+    /// - UUID: UUID/String/byte\[\]/ByteArray -> ByteArray
+    /// - UUID_ARRAY: UUID\[\]/String\[\]/byte\[\]\[\]/ByteArray\[\] -> ByteArray\[\]
     public Object toInternal(Object value) {
       switch (this) {
         case BOOLEAN:
@@ -492,10 +560,14 @@ public class DataSchema {
           return ((Timestamp) value).getTime();
         case BYTES:
           return new ByteArray((byte[]) value);
+        case UUID:
+          return new ByteArray(UuidUtils.toBytes(value));
         case BOOLEAN_ARRAY:
           return fromBooleanArray((boolean[]) value);
         case TIMESTAMP_ARRAY:
           return fromTimestampArray((Timestamp[]) value);
+        case UUID_ARRAY:
+          return fromUuidArray(value);
         case OBJECT:
           // For OBJECT type, we need to convert based on the actual type of the value. This can happen when the scalar
           // function returns Object type, e.g. cast function.
@@ -508,11 +580,25 @@ public class DataSchema {
           if (value instanceof byte[]) {
             return new ByteArray((byte[]) value);
           }
+          if (value instanceof UUID) {
+            return new ByteArray(UuidUtils.toBytes((UUID) value));
+          }
           if (value instanceof boolean[]) {
             return fromBooleanArray((boolean[]) value);
           }
           if (value instanceof Timestamp[]) {
             return fromTimestampArray((Timestamp[]) value);
+          }
+          if (value instanceof byte[][]) {
+            byte[][] bytesArray = (byte[][]) value;
+            ByteArray[] internalBytesArray = new ByteArray[bytesArray.length];
+            for (int i = 0; i < bytesArray.length; i++) {
+              internalBytesArray[i] = new ByteArray(bytesArray[i]);
+            }
+            return internalBytesArray;
+          }
+          if (value instanceof UUID[]) {
+            return fromUuidArray(value);
           }
           return value;
         default:
@@ -520,18 +606,18 @@ public class DataSchema {
       }
     }
 
-    /**
-     * Converts the value from internal value type to the external value type.
-     *
-     * <p>The conversion applies to the following types:
-     * <ul>
-     *   <li>BOOLEAN: int -> boolean</li>
-     *   <li>TIMESTAMP: long -> Timestamp</li>
-     *   <li>BYTES: ByteArray -> byte[]</li>
-     *   <li>BOOLEAN_ARRAY: int[] -> boolean[]</li>
-     *   <li>TIMESTAMP_ARRAY: long[] -> Timestamp[]</li>
-     * </ul>
-     */
+    /// Converts the value from internal value type to the external value type.
+    ///
+    /// The conversion applies to the following types:
+    ///
+    /// - BOOLEAN: int -> boolean
+    /// - TIMESTAMP: long -> Timestamp
+    /// - BYTES: ByteArray -> byte\[\]
+    /// - BOOLEAN_ARRAY: int\[\] -> boolean\[\]
+    /// - TIMESTAMP_ARRAY: long\[\] -> Timestamp\[\]
+    /// - BYTES_ARRAY: ByteArray\[\] -> byte\[\]\[\]
+    /// - UUID: ByteArray -> UUID
+    /// - UUID_ARRAY: ByteArray\[\] -> UUID\[\]
     public Object toExternal(Object value) {
       switch (this) {
         case BOOLEAN:
@@ -540,19 +626,23 @@ public class DataSchema {
           return new Timestamp((long) value);
         case BYTES:
           return ((ByteArray) value).getBytes();
+        case UUID:
+          return UuidUtils.toUUID((ByteArray) value);
         case BOOLEAN_ARRAY:
           return toBooleanArray((int[]) value);
         case TIMESTAMP_ARRAY:
           return toTimestampArray((long[]) value);
+        case BYTES_ARRAY:
+          return toBytesArray(value);
+        case UUID_ARRAY:
+          return toUuidArray(value);
         default:
           return value;
       }
     }
 
-    /**
-     * Converts the given internal value to the type for external use (e.g. as UDF argument). The given value should be
-     * compatible with the type. This method should be used on the reducer side of the single-stage engine.
-     */
+    /// Converts the given internal value to the type for external use (e.g. as UDF argument). The given value should be
+    /// compatible with the type. This method should be used on the reducer side of the single-stage engine.
     public Serializable convert(Object value) {
       switch (this) {
         case INT:
@@ -574,6 +664,8 @@ public class DataSchema {
           return value.toString();
         case BYTES:
           return ((ByteArray) value).getBytes();
+        case UUID:
+          return UuidUtils.toUUID((ByteArray) value);
         case INT_ARRAY:
           return toIntArray(value);
         case LONG_ARRAY:
@@ -582,14 +674,18 @@ public class DataSchema {
           return toFloatArray(value);
         case DOUBLE_ARRAY:
           return toDoubleArray(value);
-        case STRING_ARRAY:
-          return toStringArray(value);
+        case BIG_DECIMAL_ARRAY:
+          return toBigDecimalArray(value);
         case BOOLEAN_ARRAY:
           return toBooleanArray(toIntArray(value));
         case TIMESTAMP_ARRAY:
           return toTimestampArray(toLongArray(value));
+        case STRING_ARRAY:
+          return toStringArray(value);
         case BYTES_ARRAY:
-          return (byte[][]) value;
+          return toBytesArray(value);
+        case UUID_ARRAY:
+          return toUuidArray(value);
         case UNKNOWN: // fall through
         case OBJECT:
           return (Serializable) value;
@@ -598,10 +694,9 @@ public class DataSchema {
       }
     }
 
-    /**
-     * Formats the value based on the type to be used in the JSON query response. For BIG_DECIMAL, even though JSON can
-     * serialize BigDecimal, it is best practice to convert it to String to avoid precision loss during deserialization.
-     */
+    /// Formats the value based on the type to be used in the JSON query response. For BIG_DECIMAL, even though JSON can
+    /// serialize BigDecimal, it is best practice to convert it to String to avoid precision loss during
+    /// deserialization.
     public Serializable format(Object value) {
       switch (this) {
         case BIG_DECIMAL:
@@ -611,16 +706,22 @@ public class DataSchema {
           return value.toString();
         case BYTES:
           return BytesUtils.toHexString((byte[]) value);
+        case UUID:
+          return formatUuid(value);
+        case BIG_DECIMAL_ARRAY:
+          return formatBigDecimalArray((BigDecimal[]) value);
         case TIMESTAMP_ARRAY:
           return formatTimestampArray((Timestamp[]) value);
+        case BYTES_ARRAY:
+          return formatBytesArray((byte[][]) value);
+        case UUID_ARRAY:
+          return formatUuidArray(value);
         default:
           return (Serializable) value;
       }
     }
 
-    /**
-     * Equivalent to {@link #convert(Object)} and {@link #format(Object)} with a single switch statement.
-     */
+    /// Equivalent to [#convert(Object)] and [#format(Object)] with a single switch statement.
     public Serializable convertAndFormat(Object value) {
       switch (this) {
         case INT:
@@ -642,6 +743,8 @@ public class DataSchema {
           return value.toString();
         case BYTES:
           return ((ByteArray) value).toHexString();
+        case UUID:
+          return UuidUtils.toString((ByteArray) value);
         case MAP:
           return toMap(value);
         case INT_ARRAY:
@@ -652,14 +755,18 @@ public class DataSchema {
           return (float[]) value;
         case DOUBLE_ARRAY:
           return toDoubleArray(value);
-        case STRING_ARRAY:
-          return (String[]) value;
+        case BIG_DECIMAL_ARRAY:
+          return formatBigDecimalArray((BigDecimal[]) value);
         case BOOLEAN_ARRAY:
           return toBooleanArray((int[]) value);
         case TIMESTAMP_ARRAY:
           return formatTimestampArray((long[]) value);
+        case STRING_ARRAY:
+          return (String[]) value;
         case BYTES_ARRAY:
-          return (byte[][]) value;
+          return formatBytesArray((ByteArray[]) value);
+        case UUID_ARRAY:
+          return formatUuidArray(value);
         default:
           throw new IllegalStateException(String.format("Cannot convert and format: '%s' to type: %s", value, this));
       }
@@ -683,6 +790,23 @@ public class DataSchema {
         return ArrayListUtils.toIntArray((IntArrayList) value);
       }
       throw new IllegalStateException(String.format("Cannot convert: '%s' to int[]", value));
+    }
+
+    private static long[] toLongArray(Object value) {
+      if (value instanceof long[]) {
+        return (long[]) value;
+      } else if (value instanceof LongArrayList) {
+        // For FunnelCountAggregationFunction and ArrayAggregationFunction
+        return ArrayListUtils.toLongArray((LongArrayList) value);
+      } else {
+        int[] intValues = (int[]) value;
+        int length = intValues.length;
+        long[] longValues = new long[length];
+        for (int i = 0; i < length; i++) {
+          longValues[i] = intValues[i];
+        }
+        return longValues;
+      }
     }
 
     private static float[] toFloatArray(Object value) {
@@ -728,31 +852,23 @@ public class DataSchema {
       }
     }
 
-    private static long[] toLongArray(Object value) {
-      if (value instanceof long[]) {
-        return (long[]) value;
-      } else if (value instanceof LongArrayList) {
-        // For FunnelCountAggregationFunction and ArrayAggregationFunction
-        return ArrayListUtils.toLongArray((LongArrayList) value);
-      } else {
-        int[] intValues = (int[]) value;
-        int length = intValues.length;
-        long[] longValues = new long[length];
-        for (int i = 0; i < length; i++) {
-          longValues[i] = intValues[i];
-        }
-        return longValues;
-      }
-    }
-
-    private static String[] toStringArray(Object value) {
-      if (value instanceof String[]) {
-        return (String[]) value;
+    private static BigDecimal[] toBigDecimalArray(Object value) {
+      if (value instanceof BigDecimal[]) {
+        return (BigDecimal[]) value;
       } else if (value instanceof ObjectArrayList) {
         // For ArrayAggregationFunction
-        return ArrayListUtils.toStringArray((ObjectArrayList<String>) value);
+        return ArrayListUtils.toBigDecimalArray((ObjectArrayList<BigDecimal>) value);
       }
-      throw new IllegalStateException(String.format("Cannot convert: '%s' to String[]", value));
+      throw new IllegalStateException(String.format("Cannot convert: '%s' to BigDecimal[]", value));
+    }
+
+    private static String[] formatBigDecimalArray(BigDecimal[] bigDecimalArray) {
+      int length = bigDecimalArray.length;
+      String[] formattedBigDecimalArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedBigDecimalArray[i] = bigDecimalArray[i].toPlainString();
+      }
+      return formattedBigDecimalArray;
     }
 
     private static boolean[] toBooleanArray(int[] intArray) {
@@ -809,6 +925,126 @@ public class DataSchema {
       return formattedTimestampArray;
     }
 
+    private static String[] toStringArray(Object value) {
+      if (value instanceof String[]) {
+        return (String[]) value;
+      } else if (value instanceof ObjectArrayList) {
+        // For ArrayAggregationFunction
+        return ArrayListUtils.toStringArray((ObjectArrayList<String>) value);
+      }
+      throw new IllegalStateException(String.format("Cannot convert: '%s' to String[]", value));
+    }
+
+    private static byte[][] toBytesArray(Object value) {
+      if (value instanceof ByteArray[]) {
+        ByteArray[] wrapped = (ByteArray[]) value;
+        byte[][] raw = new byte[wrapped.length][];
+        for (int i = 0; i < wrapped.length; i++) {
+          raw[i] = wrapped[i].getBytes();
+        }
+        return raw;
+      }
+      if (value instanceof ObjectArrayList) {
+        // For ArrayAggregationFunction
+        ObjectArrayList<ByteArray> list = (ObjectArrayList<ByteArray>) value;
+        int size = list.size();
+        byte[][] raw = new byte[size][];
+        for (int i = 0; i < size; i++) {
+          raw[i] = list.get(i).getBytes();
+        }
+        return raw;
+      }
+      throw new IllegalStateException(String.format("Cannot convert: '%s' to byte[][]", value));
+    }
+
+    /// Converts any supported UUID array representation to `UUID[]`. Elements may be `UUID`, `byte[]`, [ByteArray]
+    /// or `CharSequence`; per-element dispatch is delegated to [UuidUtils#toUUID(Object)]. Note that `byte[][]`,
+    /// [ByteArray]`[]`, `String[]` and `UUID[]` are all `Object[]`, so one branch covers every array form.
+    private static UUID[] toUuidArray(Object value) {
+      if (value instanceof UUID[]) {
+        return (UUID[]) value;
+      }
+      if (value instanceof ObjectArrayList) {
+        ObjectArrayList<?> list = (ObjectArrayList<?>) value;
+        int size = list.size();
+        UUID[] uuidArray = new UUID[size];
+        for (int i = 0; i < size; i++) {
+          uuidArray[i] = UuidUtils.toUUID(list.get(i));
+        }
+        return uuidArray;
+      }
+      Object[] valueArray = (Object[]) value;
+      int length = valueArray.length;
+      UUID[] uuidArray = new UUID[length];
+      for (int i = 0; i < length; i++) {
+        uuidArray[i] = UuidUtils.toUUID(valueArray[i]);
+      }
+      return uuidArray;
+    }
+
+    /// Inverse of [#toUuidArray]: converts any supported UUID array representation to the internal [ByteArray]`[]`.
+    private static ByteArray[] fromUuidArray(Object value) {
+      if (value instanceof ByteArray[]) {
+        return (ByteArray[]) value;
+      }
+      if (value instanceof ObjectArrayList) {
+        ObjectArrayList<?> list = (ObjectArrayList<?>) value;
+        int size = list.size();
+        ByteArray[] wrapped = new ByteArray[size];
+        for (int i = 0; i < size; i++) {
+          wrapped[i] = new ByteArray(UuidUtils.toBytes(list.get(i)));
+        }
+        return wrapped;
+      }
+      Object[] valueArray = (Object[]) value;
+      int length = valueArray.length;
+      ByteArray[] wrapped = new ByteArray[length];
+      for (int i = 0; i < length; i++) {
+        wrapped[i] = new ByteArray(UuidUtils.toBytes(valueArray[i]));
+      }
+      return wrapped;
+    }
+
+    private static String[] formatBytesArray(byte[][] bytesArray) {
+      int length = bytesArray.length;
+      String[] formattedBytesArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedBytesArray[i] = BytesUtils.toHexString(bytesArray[i]);
+      }
+      return formattedBytesArray;
+    }
+
+    private static String[] formatBytesArray(ByteArray[] byteArray) {
+      int length = byteArray.length;
+      String[] formattedBytesArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedBytesArray[i] = byteArray[i].toHexString();
+      }
+      return formattedBytesArray;
+    }
+
+    /// Renders any supported UUID array representation as canonical lowercase RFC 4122 strings. Per-element
+    /// dispatch is delegated to [#formatUuid], so `byte[][]`, [ByteArray]`[]`, `UUID[]` and `String[]` are all
+    /// handled by the single `Object[]` branch.
+    private static String[] formatUuidArray(Object value) {
+      if (value instanceof ObjectArrayList) {
+        ObjectArrayList<?> list = (ObjectArrayList<?>) value;
+        int size = list.size();
+        String[] formattedUuidArray = new String[size];
+        for (int i = 0; i < size; i++) {
+          formattedUuidArray[i] = formatUuid(list.get(i));
+        }
+        return formattedUuidArray;
+      }
+      Object[] valueArray = (Object[]) value;
+      int length = valueArray.length;
+      String[] formattedUuidArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedUuidArray[i] = formatUuid(valueArray[i]);
+      }
+      return formattedUuidArray;
+    }
+
     public static ColumnDataType fromDataType(DataType dataType, boolean isSingleValue) {
       return isSingleValue ? fromDataTypeSV(dataType) : fromDataTypeMV(dataType);
     }
@@ -835,8 +1071,15 @@ public class DataSchema {
           return JSON;
         case BYTES:
           return BYTES;
+        case UUID:
+          return UUID;
         case MAP:
           return MAP;
+        case OPEN_STRUCT:
+          // Selecting the column itself reads the whole struct back as its JSON document, so JSON is both what the
+          // value is and a type the wire format can carry. OBJECT has no serializer, which made `SELECT *` on any
+          // table with an OPEN_STRUCT column fail with "Error serializing response".
+          return JSON;
         case UNKNOWN:
           return UNKNOWN;
         default:
@@ -854,6 +1097,8 @@ public class DataSchema {
           return FLOAT_ARRAY;
         case DOUBLE:
           return DOUBLE_ARRAY;
+        case BIG_DECIMAL:
+          return BIG_DECIMAL_ARRAY;
         case BOOLEAN:
           return BOOLEAN_ARRAY;
         case TIMESTAMP:
@@ -862,9 +1107,71 @@ public class DataSchema {
           return STRING_ARRAY;
         case BYTES:
           return BYTES_ARRAY;
+        case UUID:
+          return UUID_ARRAY;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType);
       }
+    }
+
+    /// Returns the [PinotDataType] for this [ColumnDataType] for query execution purpose. Returns primitive array
+    /// type for multi-valued types.
+    public PinotDataType toPinotDataType() {
+      switch (this) {
+        case INT:
+          return PinotDataType.INT;
+        case LONG:
+          return PinotDataType.LONG;
+        case FLOAT:
+          return PinotDataType.FLOAT;
+        case DOUBLE:
+          return PinotDataType.DOUBLE;
+        case BIG_DECIMAL:
+          return PinotDataType.BIG_DECIMAL;
+        case BOOLEAN:
+          return PinotDataType.BOOLEAN;
+        case TIMESTAMP:
+          return PinotDataType.TIMESTAMP;
+        case STRING:
+          return PinotDataType.STRING;
+        case JSON:
+          return PinotDataType.JSON;
+        case BYTES:
+          return PinotDataType.BYTES;
+        case UUID:
+          return PinotDataType.UUID;
+        case MAP:
+          return PinotDataType.MAP;
+        case OBJECT:
+          return PinotDataType.OBJECT;
+        case INT_ARRAY:
+          return PinotDataType.PRIMITIVE_INT_ARRAY;
+        case LONG_ARRAY:
+          return PinotDataType.PRIMITIVE_LONG_ARRAY;
+        case FLOAT_ARRAY:
+          return PinotDataType.PRIMITIVE_FLOAT_ARRAY;
+        case DOUBLE_ARRAY:
+          return PinotDataType.PRIMITIVE_DOUBLE_ARRAY;
+        case BIG_DECIMAL_ARRAY:
+          return PinotDataType.BIG_DECIMAL_ARRAY;
+        case BOOLEAN_ARRAY:
+          return PinotDataType.PRIMITIVE_BOOLEAN_ARRAY;
+        case TIMESTAMP_ARRAY:
+          return PinotDataType.TIMESTAMP_ARRAY;
+        case STRING_ARRAY:
+          return PinotDataType.STRING_ARRAY;
+        case BYTES_ARRAY:
+          return PinotDataType.BYTES_ARRAY;
+        default:
+          throw new IllegalStateException("Cannot convert ColumnDataType: " + this + " to PinotDataType");
+      }
+    }
+
+    /// Renders a single UUID as its canonical lowercase RFC 4122 string. Accepts every representation
+    /// [UuidUtils#toUUID(Object)] does: `UUID`, `byte[]`, [ByteArray] and `CharSequence`. A non-canonical (e.g.
+    /// upper-case) string input is re-canonicalized rather than passed through.
+    private static String formatUuid(Object value) {
+      return UuidUtils.toUUID(value).toString();
     }
 
     public abstract RelDataType toType(RelDataTypeFactory typeFactory);

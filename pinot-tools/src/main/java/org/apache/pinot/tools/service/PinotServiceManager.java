@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.tools.service;
 
-import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,10 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * PinotServiceManager is a user entry point to start Pinot instances in one process.
- *
- */
+/// PinotServiceManager is a user entry point to start Pinot instances in one process.
 public class PinotServiceManager {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotServiceManager.class);
@@ -110,8 +106,8 @@ public class PinotServiceManager {
     if (!controllerConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
       controllerConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     }
-    if (!controllerConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER)) {
-      controllerConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+    if (!controllerConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER)) {
+      controllerConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
     }
     ServiceStartable controllerStarter = getServiceStartable(controllerStarterClassName);
     controllerStarter.init(controllerConf);
@@ -128,8 +124,8 @@ public class PinotServiceManager {
     if (!brokerConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
       brokerConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     }
-    if (!brokerConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER)) {
-      brokerConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+    if (!brokerConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER)) {
+      brokerConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
     }
     ServiceStartable brokerStarter;
     try {
@@ -159,8 +155,8 @@ public class PinotServiceManager {
       serverConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     }
 
-    if (!serverConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER)) {
-      serverConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+    if (!serverConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER)) {
+      serverConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
     }
     ServiceStartable serverStarter = getServiceStartable(serverStarterClassName);
     serverStarter.init(serverConf);
@@ -178,8 +174,8 @@ public class PinotServiceManager {
     if (!minionConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
       minionConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     }
-    if (!minionConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER)) {
-      minionConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+    if (!minionConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER)) {
+      minionConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
     }
     ServiceStartable minionStarter = getServiceStartable(minionStarterClassName);
     minionStarter.init(minionConf);
@@ -268,7 +264,7 @@ public class PinotServiceManager {
   }
 
   public List<String> getRunningInstanceIds() {
-    return ImmutableList.copyOf(_runningInstanceMap.keySet());
+    return List.copyOf(_runningInstanceMap.keySet());
   }
 
   public String getZkAddress() {

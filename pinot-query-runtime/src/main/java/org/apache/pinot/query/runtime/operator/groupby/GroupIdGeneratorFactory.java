@@ -25,24 +25,26 @@ public class GroupIdGeneratorFactory {
   private GroupIdGeneratorFactory() {
   }
 
-  public static GroupIdGenerator getGroupIdGenerator(ColumnDataType[] keyTypes, int numKeyColumns, int numGroupsLimit) {
+  public static GroupIdGenerator getGroupIdGenerator(ColumnDataType[] keyTypes, int numKeyColumns,
+      int numGroupsLimit, int maxInitialResultHolderCapacity) {
+    int initialCapacity = Math.min(maxInitialResultHolderCapacity, numGroupsLimit);
     if (numKeyColumns == 1) {
       switch (keyTypes[0]) {
         case INT:
-          return new OneIntKeyGroupIdGenerator(numGroupsLimit);
+          return new OneIntKeyGroupIdGenerator(numGroupsLimit, initialCapacity);
         case LONG:
-          return new OneLongKeyGroupIdGenerator(numGroupsLimit);
+          return new OneLongKeyGroupIdGenerator(numGroupsLimit, initialCapacity);
         case FLOAT:
-          return new OneFloatKeyGroupIdGenerator(numGroupsLimit);
+          return new OneFloatKeyGroupIdGenerator(numGroupsLimit, initialCapacity);
         case DOUBLE:
-          return new OneDoubleKeyGroupIdGenerator(numGroupsLimit);
+          return new OneDoubleKeyGroupIdGenerator(numGroupsLimit, initialCapacity);
         default:
-          return new OneObjectKeyGroupIdGenerator(numGroupsLimit);
+          return new OneObjectKeyGroupIdGenerator(numGroupsLimit, initialCapacity);
       }
     } else if (numKeyColumns == 2) {
-      return new TwoKeysGroupIdGenerator(keyTypes[0], keyTypes[1], numGroupsLimit);
+      return new TwoKeysGroupIdGenerator(keyTypes[0], keyTypes[1], numGroupsLimit, initialCapacity);
     } else {
-      return new MultiKeysGroupIdGenerator(keyTypes, numKeyColumns, numGroupsLimit);
+      return new MultiKeysGroupIdGenerator(keyTypes, numKeyColumns, numGroupsLimit, initialCapacity);
     }
   }
 }

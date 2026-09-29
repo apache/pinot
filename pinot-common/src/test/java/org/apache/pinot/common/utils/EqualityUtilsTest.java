@@ -20,7 +20,6 @@ package org.apache.pinot.common.utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,9 +60,9 @@ public class EqualityUtilsTest {
 
   @Test
   public void testSetObject() {
-    Set<Integer> set1 = Collections.singleton(1);
-    Set<Integer> set1Copy = Collections.singleton(1);
-    Set<Long> set2 = Collections.singleton(1L);
+    Set<Integer> set1 = Set.of(1);
+    Set<Integer> set1Copy = Set.of(1);
+    Set<Long> set2 = Set.of(1L);
     Assert.assertFalse(EqualityUtils.isSameReference(set1, set1Copy));
     Assert.assertTrue(EqualityUtils.isEqual(set1, set1Copy));
     Assert.assertFalse(EqualityUtils.isEqual(set1, set2));

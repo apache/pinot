@@ -22,10 +22,8 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * A container class for holding the result of a decoder
- * At any point in time, only one of Result or exception is set as null.
- */
+/// A container class for holding the result of a decoder
+/// At any point in time, only one of Result or exception is set as null.
 public final class StreamDataDecoderResult {
   private final GenericRow _result;
   private final Exception _exception;

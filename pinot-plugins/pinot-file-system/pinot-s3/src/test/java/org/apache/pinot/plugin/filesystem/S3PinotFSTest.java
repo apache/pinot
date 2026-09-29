@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
-import com.adobe.testing.s3mock.testcontainers.S3MockContainer;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -33,6 +32,8 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.spi.filesystem.FileMetadata;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -41,6 +42,8 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
+import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -54,7 +57,8 @@ import software.amazon.awssdk.services.s3.model.StorageClass;
 
 @Test
 public class S3PinotFSTest {
-  private static final String S3MOCK_VERSION = System.getProperty("s3mock.version", "2.12.2");
+  private static final String S3MOCK_VERSION = System.getProperty("s3mock.version", "3.12.0");
+  private static final int S3MOCK_HTTP_PORT = 9090;
   private static final File TEMP_FILE = new File(FileUtils.getTempDirectory(), "S3PinotFSTest");
 
   private static final String S3_SCHEME = "s3";
@@ -64,20 +68,23 @@ public class S3PinotFSTest {
   private static final String FILE_FORMAT = "%s://%s/%s";
   private static final String DIR_FORMAT = "%s://%s";
 
-  private S3MockContainer _s3MockContainer;
+  private GenericContainer<?> _s3MockContainer;
   private S3PinotFS _s3PinotFS;
   private S3Client _s3Client;
 
   @DataProvider(name = "scheme")
   public static Object[][] schemes() {
-    return new Object[][] { { S3_SCHEME }, { S3A_SCHEME } };
+    return new Object[][]{{S3_SCHEME}, {S3A_SCHEME}};
   }
 
   @BeforeClass
   public void setUp() {
-    _s3MockContainer = new S3MockContainer(S3MOCK_VERSION);
+    _s3MockContainer = new GenericContainer<>("adobe/s3mock:" + S3MOCK_VERSION)
+        .withExposedPorts(S3MOCK_HTTP_PORT)
+        .waitingFor(Wait.forHttp("/favicon.ico").forPort(S3MOCK_HTTP_PORT).forStatusCode(200));
     _s3MockContainer.start();
-    String endpoint = _s3MockContainer.getHttpEndpoint();
+    String endpoint = "http://" + _s3MockContainer.getHost() + ":"
+        + _s3MockContainer.getMappedPort(S3MOCK_HTTP_PORT);
     _s3Client = createS3ClientV2(endpoint);
     _s3PinotFS = new S3PinotFS();
     _s3PinotFS.init(_s3Client);
@@ -500,15 +507,48 @@ public class S3PinotFSTest {
     }
   }
 
+  public void testDeleteBatch()
+      throws IOException {
+    String[] originalFiles = new String[]{"a-delete-batch.txt", "b-delete-batch.txt", "c-delete-batch.txt"};
+    String folderName = "my-files-batch";
+
+    for (String fileName : originalFiles) {
+      createEmptyFile(folderName, fileName);
+    }
+    // Create a sub folder to delete
+    String subFolderName = folderName + DELIMITER + "subfolder";
+    for (String fileName : new String[] {"subfolder-a-delete-batch.txt", "subfolder-b-delete-batch.txt"}) {
+      createEmptyFile(subFolderName, fileName);
+    }
+
+    // Create a list of URIs to delete
+    List<URI> filesToDelete = Arrays.stream(originalFiles)
+        .map(fileName -> URI.create(String.format(FILE_FORMAT, S3_SCHEME, BUCKET, folderName + DELIMITER + fileName)))
+        .collect(Collectors.toList());
+    filesToDelete.add(URI.create(String.format(FILE_FORMAT, S3_SCHEME, BUCKET, subFolderName)));
+
+    boolean deleteResult = _s3PinotFS.deleteBatch(filesToDelete, true);
+
+    Assert.assertTrue(deleteResult);
+
+    ListObjectsV2Response listObjectsV2Response =
+        _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, "", true));
+    String[] actualResponse =
+        listObjectsV2Response.contents().stream().map(S3Object::key).filter(x -> x.contains("delete-batch"))
+            .toArray(String[]::new);
+
+    Assert.assertEquals(actualResponse.length, 0);
+  }
+
   @DataProvider(name = "storageClasses")
   public Object[][] createStorageClasses() {
-    return new Object[][] {
-      { null, S3_SCHEME },
-      { StorageClass.STANDARD, S3_SCHEME },
-      { StorageClass.INTELLIGENT_TIERING, S3_SCHEME },
-      { null, S3A_SCHEME },
-      { StorageClass.STANDARD, S3A_SCHEME },
-      { StorageClass.INTELLIGENT_TIERING, S3A_SCHEME },
+    return new Object[][]{
+        {null, S3_SCHEME},
+        {StorageClass.STANDARD, S3_SCHEME},
+        {StorageClass.INTELLIGENT_TIERING, S3_SCHEME},
+        {null, S3A_SCHEME},
+        {StorageClass.STANDARD, S3A_SCHEME},
+        {StorageClass.INTELLIGENT_TIERING, S3A_SCHEME},
     };
   }
 
@@ -527,6 +567,9 @@ public class S3PinotFSTest {
     return S3Client.builder().region(Region.of("us-east-1"))
         .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("foo", "bar")))
         .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-        .endpointOverride(URI.create(endpoint)).build();
+        .endpointOverride(URI.create(endpoint))
+        .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
+        .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
+        .build();
   }
 }

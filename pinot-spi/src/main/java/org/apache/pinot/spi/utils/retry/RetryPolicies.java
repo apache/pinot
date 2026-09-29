@@ -18,55 +18,45 @@
  */
 package org.apache.pinot.spi.utils.retry;
 
-/**
- * Factory for retry policies.
- */
+/// Factory for retry policies.
 public class RetryPolicies {
   private RetryPolicies() {
   }
 
-  /**
-   * Creates an {@link ExponentialBackoffRetryPolicy}.
-   *
-   * @param maxNumAttempts The maximum number of attempts to try
-   * @param initialDelayMs The initial delay in milliseconds between attempts
-   * @param delayScaleFactor The factor used for exponential scaling of delay
-   * @return The retry policy
-   */
+  /// Creates an [ExponentialBackoffRetryPolicy].
+  ///
+  /// @param maxNumAttempts The maximum number of attempts to try
+  /// @param initialDelayMs The initial delay in milliseconds between attempts
+  /// @param delayScaleFactor The factor used for exponential scaling of delay
+  /// @return The retry policy
   public static ExponentialBackoffRetryPolicy exponentialBackoffRetryPolicy(int maxNumAttempts, long initialDelayMs,
       double delayScaleFactor) {
     return new ExponentialBackoffRetryPolicy(maxNumAttempts, initialDelayMs, delayScaleFactor);
   }
 
-  /**
-   * Creates a {@link FixedDelayRetryPolicy}.
-   *
-   * @param maxNumAttempts The maximum number of attempts to try
-   * @param delayMs The delay in milliseconds between attempts
-   * @return The retry policy
-   */
+  /// Creates a [FixedDelayRetryPolicy].
+  ///
+  /// @param maxNumAttempts The maximum number of attempts to try
+  /// @param delayMs The delay in milliseconds between attempts
+  /// @return The retry policy
   public static FixedDelayRetryPolicy fixedDelayRetryPolicy(int maxNumAttempts, long delayMs) {
     return new FixedDelayRetryPolicy(maxNumAttempts, delayMs);
   }
 
-  /**
-   * Creates a {@link RandomDelayRetryPolicy}.
-   *
-   * @param maxNumAttempts The maximum number of attempts to try
-   * @param minDelayMs The min delay in milliseconds between attempts (inclusive)
-   * @param maxDelayMs The max delay in milliseconds between attempts (exclusive)
-   * @return The retry policy
-   */
+  /// Creates a [RandomDelayRetryPolicy].
+  ///
+  /// @param maxNumAttempts The maximum number of attempts to try
+  /// @param minDelayMs The min delay in milliseconds between attempts (inclusive)
+  /// @param maxDelayMs The max delay in milliseconds between attempts (exclusive)
+  /// @return The retry policy
   public static RandomDelayRetryPolicy randomDelayRetryPolicy(int maxNumAttempts, long minDelayMs, long maxDelayMs) {
     return new RandomDelayRetryPolicy(maxNumAttempts, minDelayMs, maxDelayMs);
   }
 
-  /**
-   * Creates a {@link NoDelayRetryPolicy}.
-   *
-   * @param maxNumAttempts The maximum number of attempts to try
-   * @return The retry policy
-   */
+  /// Creates a [NoDelayRetryPolicy].
+  ///
+  /// @param maxNumAttempts The maximum number of attempts to try
+  /// @return The retry policy
   public static NoDelayRetryPolicy noDelayRetryPolicy(int maxNumAttempts) {
     return new NoDelayRetryPolicy(maxNumAttempts);
   }

@@ -22,9 +22,7 @@ package org.apache.pinot.controller.recommender.data.generator;
 import org.apache.commons.codec.binary.Hex;
 
 
-/**
- * A class to generating data for a column with type BYTES
- */
+/// A class to generating data for a column with type BYTES
 public class BytesGenerator implements Generator {
   private static final double DEFAULT_NUMBER_OF_VALUES_PER_ENTRY = 1;
 

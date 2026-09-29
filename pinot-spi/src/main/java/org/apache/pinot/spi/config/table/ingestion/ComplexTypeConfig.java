@@ -27,9 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/**
- * Config related to handling complex type
- */
+/// Config related to handling complex type
 public class ComplexTypeConfig extends BaseJsonConfig {
 
   public enum CollectionNotUnnestedToJson {

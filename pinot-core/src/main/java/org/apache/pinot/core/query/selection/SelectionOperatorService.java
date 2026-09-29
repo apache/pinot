@@ -18,50 +18,51 @@
  */
 package org.apache.pinot.core.query.selection;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.PriorityQueue;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The <code>SelectionOperatorService</code> class provides the services for selection queries with
- * <code>ORDER BY</code>.
- * <p>Expected behavior:
- * <ul>
- *   <li>
- *     Return selection results with the same order of columns as user passed in.
- *     <ul>
- *       <li>Eg. SELECT colB, colA, colC FROM table -> [valB, valA, valC]</li>
- *     </ul>
- *   </li>
- *   <li>
- *     For 'SELECT *', return columns with alphabetically order.
- *     <ul>
- *       <li>Eg. SELECT * FROM table -> [valA, valB, valC]</li>
- *     </ul>
- *   </li>
- *   <li>
- *     Order by does not change the order of columns in selection results.
- *     <ul>
- *       <li>Eg. SELECT colB, colA, colC FROM table ORDER BY calC -> [valB, valA, valC]</li>
- *     </ul>
- *   </li>
- * </ul>
- */
+/// The `SelectionOperatorService` class provides the services for selection queries with
+/// `ORDER BY`.
+///
+/// Expected behavior:
+///
+/// - Return selection results with the same order of columns as user passed in.
+///   - Eg. SELECT colB, colA, colC FROM table -> \[valB, valA, valC\]
+/// - For 'SELECT \*', return columns with alphabetically order.
+///   - Eg. SELECT \* FROM table -> \[valA, valB, valC\]
+/// - Order by does not change the order of columns in selection results.
+///   - Eg. SELECT colB, colA, colC FROM table ORDER BY calC -> \[valB, valA, valC\]
 public class SelectionOperatorService {
   private final QueryContext _queryContext;
   private final DataSchema _dataSchema;
   private final int[] _columnIndices;
   private final int _offset;
+  private final int _limit;
   private final int _numRowsToKeep;
-  private final PriorityQueue<Object[]> _rows;
+  // TODO: consider moving this to a util class
+
+  /// Util class used for n-way merge
+  private static class MergeItem {
+    final Object[] _row;
+    final int _dataTableId;
+
+    MergeItem(Object[] row, int dataTableId) {
+      _row = row;
+      _dataTableId = dataTableId;
+    }
+  }
 
   public SelectionOperatorService(QueryContext queryContext, DataSchema dataSchema, int[] columnIndices) {
     _queryContext = queryContext;
@@ -69,65 +70,164 @@ public class SelectionOperatorService {
     _columnIndices = columnIndices;
     // Select rows from offset to offset + limit.
     _offset = queryContext.getOffset();
-    _numRowsToKeep = _offset + queryContext.getLimit();
+    _limit = queryContext.getLimit();
+    _numRowsToKeep = _offset + _limit;
     assert queryContext.getOrderByExpressions() != null;
-    _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        OrderByComparatorFactory.getComparator(queryContext.getOrderByExpressions(),
-            _queryContext.isNullHandlingEnabled()).reversed());
   }
 
-  /**
-   * Reduces a collection of {@link DataTable}s to selection rows for selection queries with <code>ORDER BY</code>.
-   * TODO: Do merge sort after releasing 0.13.0 when server side results are sorted
-   *       Can also consider adding a data table metadata to indicate whether the server side results are sorted
-   */
-  public void reduceWithOrdering(Collection<DataTable> dataTables) {
-    for (DataTable dataTable : dataTables) {
-      int numRows = dataTable.getNumberOfRows();
-      if (_queryContext.isNullHandlingEnabled()) {
-        RoaringBitmap[] nullBitmaps = new RoaringBitmap[dataTable.getDataSchema().size()];
-        for (int colId = 0; colId < nullBitmaps.length; colId++) {
-          nullBitmaps[colId] = dataTable.getNullRowIds(colId);
-        }
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-          for (int colId = 0; colId < nullBitmaps.length; colId++) {
-            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
-              row[colId] = null;
-            }
-          }
-          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
-        }
-      } else {
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
-        }
+  /// Reduce multiple sorted dataTables into a single resultTable, ordered, limited, and offset
+  /// @param dataTables dataTables to be reduced
+  /// @return resultTable
+  public ResultTable reduceWithOrdering(Collection<DataTable> dataTables) {
+    if (dataTables.size() == 1) {
+      // short circuit single table case
+      DataTable dataTable = dataTables.iterator().next();
+      List<Object[]> resultRows = processSingleDataTable(dataTable);
+      return new ResultTable(_dataSchema, resultRows);
+    }
+
+    // n-way merge sorted dataTable, we need to access dataTable by index
+    List<DataTable> dataTableList = new ArrayList<>(dataTables);
+    List<Object[]> mergedRows = nWayMergeDataTables(dataTableList);
+    return new ResultTable(_dataSchema, mergedRows);
+  }
+
+  /// Merge sorted dataTables using N-way merge
+  /// @param dataTables sorted dataTables
+  /// @return sorted rows
+  private List<Object[]> nWayMergeDataTables(List<DataTable> dataTables) {
+    Comparator<Object[]> comparator = OrderByComparatorFactory.getComparator(_queryContext.getOrderByExpressions(),
+        _queryContext.isNullHandlingEnabled());
+    Comparator<MergeItem> mergeItemComparator = (MergeItem o1, MergeItem o2) -> comparator.compare(o1._row, o2._row);
+    PriorityQueue<MergeItem> mergeSortRows =
+        new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
+            mergeItemComparator);
+
+    // populate pq
+    int numDataTables = dataTables.size();
+    int[] nextRowIds = new int[numDataTables];
+    int[] numRows = new int[numDataTables];
+    RoaringBitmap[][] dataTableNullBitmaps = getdataTableNullBitmaps(dataTables);
+    for (int i = 0; i < numDataTables; i++) {
+      DataTable dataTable = dataTables.get(i);
+      numRows[i] = dataTable.getNumberOfRows();
+      if (numRows[i] > 0) {
+        Object[] row = getDataTableRow(dataTable, 0, dataTableNullBitmaps[i]);
+        MergeItem mergeItem = new MergeItem(row, i);
+        mergeSortRows.add(mergeItem);
+        nextRowIds[i] = 1;
       }
     }
-  }
 
-  /**
-   * Renders the selection rows to a {@link ResultTable} object for selection queries with <code>ORDER BY</code>.
-   */
-  public ResultTable renderResultTableWithOrdering() {
-    LinkedList<Object[]> resultRows = new LinkedList<>();
+    // merge
+    List<Object[]> resultRows = new ArrayList<>();
     DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
     int numColumns = columnDataTypes.length;
-    while (_rows.size() > _offset) {
-      Object[] row = _rows.poll();
-      assert row != null;
-      Object[] resultRow = new Object[numColumns];
-      for (int i = 0; i < numColumns; i++) {
-        Object value = row[_columnIndices[i]];
-        if (value != null) {
-          resultRow[i] = columnDataTypes[i].convertAndFormat(value);
-        }
+    int offsetCounter = _offset;
+    while (resultRows.size() < _limit && !mergeSortRows.isEmpty()) {
+      MergeItem item = mergeSortRows.poll();
+      if (offsetCounter > 0) {
+        offsetCounter--;
+      } else {
+        Object[] row = item._row;
+        Object[] resultRow = formatRow(numColumns, row, columnDataTypes);
+        resultRows.add(resultRow);
       }
-      resultRows.addFirst(resultRow);
+      int dataTableId = item._dataTableId;
+      int nextRowId = nextRowIds[dataTableId]++;
+      if (nextRowId >= numRows[dataTableId]) {
+        continue;
+      }
+      DataTable dataTable = dataTables.get(dataTableId);
+      Object[] row = getDataTableRow(dataTable, nextRowId, dataTableNullBitmaps[dataTableId]);
+      MergeItem mergeItem = new MergeItem(row, dataTableId);
+      mergeSortRows.add(mergeItem);
     }
-    return new ResultTable(_dataSchema, resultRows);
+    return resultRows;
+  }
+
+  private List<Object[]> processSingleDataTable(DataTable dataTable) {
+    List<Object[]> resultRows = new ArrayList<>();
+    DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
+    int numColumns = _dataSchema.size();
+    int numRows = dataTable.getNumberOfRows();
+
+    if (numRows <= _offset) {
+      return List.of();
+    }
+
+    int start = _offset;
+    int end = Math.min(numRows, _offset + _limit);
+
+    if (_queryContext.isNullHandlingEnabled()) {
+      RoaringBitmap[] nullBitmaps = getNullBitmap(dataTable);
+      for (int rowId = start; rowId < end; rowId++) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId,
+            "SelectionOperatorService#processSingleDataTable");
+        Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+        setNullsForRow(nullBitmaps, rowId, row);
+        Object[] resultRow = formatRow(numColumns, row, columnDataTypes);
+        resultRows.add(resultRow);
+      }
+    } else {
+      for (int rowId = start; rowId < end; rowId++) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId,
+            "SelectionOperatorService#processSingleDataTable");
+        Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+        Object[] resultRow = formatRow(numColumns, row, columnDataTypes);
+        resultRows.add(resultRow);
+      }
+    }
+    return resultRows;
+  }
+
+  /// get nullBitmaps for dataTables
+  private RoaringBitmap[][] getdataTableNullBitmaps(List<DataTable> dataTables) {
+    RoaringBitmap[][] dataTableNullBitmaps = new RoaringBitmap[dataTables.size()][];
+    if (!_queryContext.isNullHandlingEnabled()) {
+      return dataTableNullBitmaps;
+    }
+    int idx = 0;
+    for (DataTable dataTable : dataTables) {
+      dataTableNullBitmaps[idx++] = getNullBitmap(dataTable);
+    }
+    return dataTableNullBitmaps;
+  }
+
+  /// get a single row from dataTable with null handling if nullBitmaps provided
+  private Object[] getDataTableRow(DataTable dataTable, int rowId, @Nullable RoaringBitmap[] nullBitmaps) {
+    QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId, "SelectionOperatorService#getDataTableRow");
+    Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+    if (nullBitmaps != null) {
+      setNullsForRow(nullBitmaps, rowId, row);
+    }
+    return row;
+  }
+
+  private static void setNullsForRow(RoaringBitmap[] nullBitmaps, int rowId, Object[] row) {
+    for (int colId = 0; colId < nullBitmaps.length; colId++) {
+      if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+        row[colId] = null;
+      }
+    }
+  }
+
+  private static RoaringBitmap[] getNullBitmap(DataTable dataTable) {
+    RoaringBitmap[] nullBitmaps = new RoaringBitmap[dataTable.getDataSchema().size()];
+    for (int colId = 0; colId < nullBitmaps.length; colId++) {
+      nullBitmaps[colId] = dataTable.getNullRowIds(colId);
+    }
+    return nullBitmaps;
+  }
+
+  private Object[] formatRow(int numColumns, Object[] row, DataSchema.ColumnDataType[] columnDataTypes) {
+    Object[] resultRow = new Object[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      Object value = row[_columnIndices[i]];
+      if (value != null) {
+        resultRow[i] = columnDataTypes[i].convertAndFormat(value);
+      }
+    }
+    return resultRow;
   }
 }

@@ -24,7 +24,7 @@ import java.net.URL;
 import java.sql.ResultSet;
 import java.sql.SQLTimeoutException;
 import java.sql.Statement;
-import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
@@ -46,12 +46,10 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * Integration test that tests Pinot using TPCH data.
- * Data is loaded into Pinot and H2 from /resources/examples/batch/tpch. The dataset size is very small, please follow
- * REAME.md to generate a larger dataset for better testing.
- * Queries are executed against Pinot and H2, and the results are compared.
- */
+/// Integration test that tests Pinot using TPCH data.
+/// Data is loaded into Pinot and H2 from /resources/examples/batch/tpch. The dataset size is very small, please follow
+/// REAME.md to generate a larger dataset for better testing.
+/// Queries are executed against Pinot and H2, and the results are compared.
 public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_TPCH_QUERIES = 1000;
   private static TPCHQueryGeneratorV2 _tpchQueryGeneratorV2;
@@ -98,11 +96,11 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
       addSchema(schema);
       TableConfig tableConfig = createTableConfig(tableFile);
       addTableConfig(tableConfig);
-      ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(dataFile), tableConfig, schema, 0,
+      ClusterIntegrationTestUtils.buildSegmentsFromAvro(List.of(dataFile), tableConfig, schema, 0,
           tableSegmentDir, tarDir);
       uploadSegments(tableName, tarDir);
       // H2
-      ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection);
+      ClusterIntegrationTestUtils.setUpH2TableWithAvro(List.of(dataFile), tableName, _h2Connection);
     }
 
     SampleColumnDataProvider sampleColumnDataProvider =

@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial;
 
 import com.google.common.base.Preconditions;
+import com.uber.h3core.exceptions.H3Exception;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -29,9 +30,12 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Map;
 import java.util.TreeMap;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.index.h3.H3IndexType;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
+import org.apache.pinot.segment.local.utils.MetricUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
@@ -44,20 +48,16 @@ import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
 
 
-/**
- * Base implementation of the H3 index creator.
- * <p>Index file layout:
- * <ul>
- *   <li>Header</li>
- *   <ul>
- *     <li>Version (int)</li>
- *     <li>Number of unique H3 ids (int)</li>
- *     <li>Resolutions (short)</li>
- *   </ul>
- *   <li>Long dictionary</li>
- *   <li>Bitmap inverted index</li>
- * </ul>
- */
+/// Base implementation of the H3 index creator.
+///
+/// Index file layout:
+///
+/// - Header
+///   - Version (int)
+///   - Number of unique H3 ids (int)
+///   - Resolutions (short)
+/// - Long dictionary
+/// - Bitmap inverted index
 public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   public static final int VERSION = 1;
   public static final int HEADER_LENGTH = 10;
@@ -67,6 +67,8 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   static final String BITMAP_OFFSET_FILE_NAME = "bitmap.offset.buf";
   static final String BITMAP_VALUE_FILE_NAME = "bitmap.value.buf";
 
+  final String _tableNameWithType;
+  final boolean _continueOnError;
   final File _indexFile;
   final File _tempDir;
   final File _dictionaryFile;
@@ -83,8 +85,11 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
 
   int _nextDocId;
 
-  BaseH3IndexCreator(File indexDir, String columnName, H3IndexResolution resolution)
+  BaseH3IndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
+      H3IndexResolution resolution)
       throws IOException {
+    _tableNameWithType = tableNameWithType;
+    _continueOnError = continueOnError;
     _indexFile = new File(indexDir, columnName + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
     _tempDir = new File(indexDir, columnName + TEMP_DIR_SUFFIX);
     if (_tempDir.exists()) {
@@ -108,13 +113,40 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   }
 
   @Override
-  public void add(Geometry geometry)
+  public void add(@Nullable Geometry geometry)
       throws IOException {
+    if (_continueOnError && !(geometry instanceof Point)) {
+      skipInvalidGeometry();
+      return;
+    }
+    Preconditions.checkState(geometry != null, "Null geometry record found and continueOnError is disabled");
     Preconditions.checkState(geometry instanceof Point, "H3 index can only be applied to Point, got: %s",
         geometry.getGeometryType());
     Coordinate coordinate = geometry.getCoordinate();
+    if (_continueOnError && coordinate == null) {
+      skipInvalidGeometry();
+      return;
+    }
+    Preconditions.checkState(coordinate != null, "Point has null coordinate and continueOnError is disabled");
+    try {
+      addCoordinate(coordinate);
+    } catch (H3Exception e) {
+      if (_continueOnError) {
+        skipInvalidGeometry();
+        return;
+      }
+      throw e;
+    }
+  }
+
+  private void skipInvalidGeometry() {
+    MetricUtils.updateIndexingErrorMetric(_tableNameWithType, H3IndexType.INDEX_DISPLAY_NAME);
+    _nextDocId++;
+  }
+
+  private void addCoordinate(Coordinate coordinate) {
     // TODO: support multiple resolutions
-    long h3Id = H3Utils.H3_CORE.geoToH3(coordinate.y, coordinate.x, _lowestResolution);
+    long h3Id = H3Utils.H3_CORE.latLngToCell(coordinate.y, coordinate.x, _lowestResolution);
     RoaringBitmapWriter<RoaringBitmap> bitmapWriter = _postingListMap.get(h3Id);
     if (bitmapWriter == null) {
       bitmapWriter = _bitmapWriterWizard.get();
@@ -123,9 +155,7 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
     bitmapWriter.add(_nextDocId++);
   }
 
-  /**
-   * Writes the bitmap to the temporary index files for the given H3 id.
-   */
+  /// Writes the bitmap to the temporary index files for the given H3 id.
   void add(long h3Id, BitmapDataProvider bitmap)
       throws IOException {
     _dictionaryStream.writeLong(h3Id);
@@ -133,10 +163,8 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
     bitmap.serialize(_bitmapValueStream);
   }
 
-  /**
-   * Generates the final index file from the temporary index files. Should be called after all the bitmaps are added to
-   * the temporary index files.
-   */
+  /// Generates the final index file from the temporary index files. Should be called after all the bitmaps are added to
+  /// the temporary index files.
   void generateIndexFile()
       throws IOException {
     // Write the end offset of the last bitmap

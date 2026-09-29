@@ -27,31 +27,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.core.routing.LogicalTableRouteInfo;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.routing.QueryServerInstance;
 
 
-/**
- * The {@code DispatchablePlanMetadata} info contains the information for dispatching a particular plan fragment.
- *
- * <p>It contains information
- * <ul>
- *   <li>extracted from {@link org.apache.pinot.query.planner.physical.DispatchablePlanVisitor}</li>
- *   <li>extracted from {@link org.apache.pinot.query.planner.physical.PinotDispatchPlanner}</li>
- * </ul>
- */
+/// The `DispatchablePlanMetadata` info contains the information for dispatching a particular plan fragment.
+///
+/// It contains information
+///
+/// - extracted from [org.apache.pinot.query.planner.physical.DispatchablePlanVisitor]
+/// - extracted from [org.apache.pinot.query.planner.physical.PinotDispatchPlanner]
 public class DispatchablePlanMetadata implements Serializable {
 
   // --------------------------------------------------------------------------
   // Fields extracted with {@link DispatchablePlanVisitor}
   // --------------------------------------------------------------------------
-  // info from TableNode
-  private final List<String> _scannedTables;
+
+  // Info from TableNode
+  private final List<String> _scannedTables = new ArrayList<>();
   private Map<String, String> _tableOptions;
-  // info from MailboxSendNode - whether a stage is pre-partitioned by the same way the sending exchange desires
+
+  // Info from MailboxSendNode - whether a stage is pre-partitioned by the same way the sending exchange desires
   private boolean _isPrePartitioned;
-  // info from PlanNode that requires singleton (e.g. SortNode/AggregateNode)
+
+  // Info from PlanNode that requires singleton (e.g. SortNode/AggregateNode)
   private boolean _requiresSingletonInstance;
 
   // TODO: Change the following maps to lists
@@ -59,33 +60,31 @@ public class DispatchablePlanMetadata implements Serializable {
   // --------------------------------------------------------------------------
   // Fields extracted with {@link PinotDispatchPlanner}
   // --------------------------------------------------------------------------
-  // used for assigning server/worker nodes.
+
+  // The following fields are calculated in {@link WorkerManager}
+  // Available for both leaf and intermediate stage
   private Map<Integer, QueryServerInstance> _workerIdToServerInstanceMap;
-
-  // used for table scan stage - we use ServerInstance instead of VirtualServer
-  // here because all virtual servers that share a server instance will have the
-  // same segments on them
-  private Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
-
-  // used for build mailboxes between workers.
-  // workerId -> {planFragmentId -> mailbox list}
-  private final Map<Integer, Map<Integer, MailboxInfos>> _workerIdToMailboxesMap;
-
-  // used for tracking unavailable segments from routing table, then assemble missing segments exception.
-  private final Map<String, Set<String>> _tableToUnavailableSegmentsMap;
-
-  // time boundary info
-  private TimeBoundaryInfo _timeBoundaryInfo;
-
-  // physical partition info
   private String _partitionFunction;
-  private int _partitionParallelism;
+  // Available for leaf stage only
+  // Map from workerId -> {tableType -> segments}
+  private Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
+  // Map from tableType -> segments, available when 'is_replicated' hint is set to true
+  private Map<String, List<String>> _replicatedSegments;
+  private TimeBoundaryInfo _timeBoundaryInfo;
+  private int _partitionParallelism = 1;
+  private final Map<String, Set<String>> _tableToUnavailableSegmentsMap = new HashMap<>();
+  // Broker-local, never serialized: see getPartitionClassIds()
+  private transient int[] _partitionClassIds;
+  // Broker-local, never serialized: see getPaddedClassCandidates()
+  private transient Map<Integer, Set<String>> _paddedClassCandidates;
 
-  public DispatchablePlanMetadata() {
-    _scannedTables = new ArrayList<>();
-    _workerIdToMailboxesMap = new HashMap<>();
-    _tableToUnavailableSegmentsMap = new HashMap<>();
-  }
+  // Calculated in {@link MailboxAssignmentVisitor}
+  // Map from workerId -> {planFragmentId -> mailboxes}
+  private final Map<Integer, Map<Integer, MailboxInfos>> _workerIdToMailboxesMap = new HashMap<>();
+
+  /// Map from workerId -> {physicalTableName -> segments} is required for logical tables.
+  private Map<Integer, Map<String, List<String>>> _workerIdToTableSegmentsMap;
+  private LogicalTableRouteInfo _logicalTableRouteInfo;
 
   public List<String> getScannedTables() {
     return _scannedTables;
@@ -123,6 +122,15 @@ public class DispatchablePlanMetadata implements Serializable {
 
   public void setWorkerIdToSegmentsMap(Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
     _workerIdToSegmentsMap = workerIdToSegmentsMap;
+  }
+
+  @Nullable
+  public Map<String, List<String>> getReplicatedSegments() {
+    return _replicatedSegments;
+  }
+
+  public void setReplicatedSegments(Map<String, List<String>> replicatedSegments) {
+    _replicatedSegments = replicatedSegments;
   }
 
   public Map<Integer, Map<Integer, MailboxInfos>> getWorkerIdToMailboxesMap() {
@@ -169,11 +177,75 @@ public class DispatchablePlanMetadata implements Serializable {
     _partitionParallelism = partitionParallelism;
   }
 
+  /// Returns the partition classes this stage's worker ids stand for, in worker-id order, or `null` when the worker ids
+  /// are not in partition-class space.
+  ///
+  /// A partition class is the set of partitions that share one worker: with a hinted partition size of `w`, class `j`
+  /// holds every partition `p` where `p % w == j`. Across a direct (1-to-1) exchange the worker id is the only carrier
+  /// of partition identity -- the wiring pairs sender worker `k` with receiver worker `k` and checks nothing about the
+  /// data behind them -- so equal worker counts are no evidence that two stages agree: had one dropped its empty class
+  /// 1 and the other its empty class 2, both would still have `w - 1` workers, and worker 1 would pair class 2 with
+  /// class 1, losing rows with no error. `WorkerManager` therefore computes one class list per colocated group,
+  /// dropping only the classes no member of the group holds data in, and shares that same array with every stage of it.
+  /// A leaf stage gets one worker per entry, i.e. worker `k` handles class `[k]`; an intermediate stage with a
+  /// partition parallelism of `p` gets `p` workers per entry, i.e. worker `k` handles class `[k / p]`, the same fan-out
+  /// the exchange performs.
+  ///
+  /// `null` means the worker ids are not partition classes (e.g. a stage assigned over candidate servers, or a
+  /// singleton reducer), or that the stage's group was not reduced, in which case worker `k` maps to class `k` as
+  /// before.
+  ///
+  /// Broker-local planning state: not serialized to the servers, and must not be mutated (the same array instance is
+  /// shared by every stage of the group).
+  @Nullable
+  public int[] getPartitionClassIds() {
+    return _partitionClassIds;
+  }
+
+  public void setPartitionClassIds(@Nullable int[] partitionClassIds) {
+    _partitionClassIds = partitionClassIds;
+  }
+
+  /// Returns the partition classes of [#getPartitionClassIds()] that this stage holds no data in, mapped to the servers
+  /// its colocated group expects the (empty) worker of that class to be picked from, or `null` when this stage has
+  /// nothing to pad. Only ever set together with [#getPartitionClassIds()], by the same producer; see
+  /// `WorkerManager#assignPaddedWorker`, which is where such a worker and its candidate servers are used.
+  ///
+  /// Broker-local planning state, like [#getPartitionClassIds()]: neither the map nor the server sets in it must be
+  /// mutated (the sets may be the ones the broker publishes its partition metadata with).
+  @Nullable
+  public Map<Integer, Set<String>> getPaddedClassCandidates() {
+    return _paddedClassCandidates;
+  }
+
+  public void setPaddedClassCandidates(@Nullable Map<Integer, Set<String>> paddedClassCandidates) {
+    _paddedClassCandidates = paddedClassCandidates;
+  }
+
   public Map<String, Set<String>> getTableToUnavailableSegmentsMap() {
     return _tableToUnavailableSegmentsMap;
   }
 
   public void addUnavailableSegments(String tableName, Collection<String> unavailableSegments) {
     _tableToUnavailableSegmentsMap.computeIfAbsent(tableName, k -> new HashSet<>()).addAll(unavailableSegments);
+  }
+
+  @Nullable
+  public LogicalTableRouteInfo getLogicalTableRouteInfo() {
+    return _logicalTableRouteInfo;
+  }
+
+  public void setLogicalTableRouteInfo(LogicalTableRouteInfo logicalTableRouteInfo) {
+    _logicalTableRouteInfo = logicalTableRouteInfo;
+  }
+
+  @Nullable
+  public Map<Integer, Map<String, List<String>>> getWorkerIdToTableSegmentsMap() {
+    return _workerIdToTableSegmentsMap;
+  }
+
+  public void setWorkerIdToTableSegmentsMap(
+      Map<Integer, Map<String, List<String>>> workerIdToTableSegmentsMap) {
+    _workerIdToTableSegmentsMap = workerIdToTableSegmentsMap;
   }
 }

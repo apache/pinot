@@ -22,10 +22,11 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -35,25 +36,56 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
+import org.apache.lucene.search.IndexSearcher;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader;
+import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
-import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
-import org.apache.pinot.spi.config.table.FSTType;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class TextIndexUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexUtils.class);
+
   private TextIndexUtils() {
   }
 
-  static void cleanupTextIndex(File segDir, String column) {
+  /// Configuration change listener for Lucene max clause count.
+  /// This allows updating the max clause count dynamically without server restart.
+  public static class LuceneMaxClauseCountConfigChangeListener implements PinotClusterConfigChangeListener {
+    @Override
+    public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+      if (!changedConfigs.contains(CommonConstants.Lucene.CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT)) {
+        return;
+      }
+      String maxClauseCountStr = clusterConfigs.get(CommonConstants.Lucene.CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT);
+      if (maxClauseCountStr != null) {
+        try {
+          int newMaxClauseCount = Integer.parseInt(maxClauseCountStr);
+          // Update the static default for all new IndexSearcher instances
+          IndexSearcher.setMaxClauseCount(newMaxClauseCount);
+          LOGGER.info("Updated Lucene max clause count to: {} from cluster config", newMaxClauseCount);
+        } catch (NumberFormatException e) {
+          LOGGER.warn("Invalid max clause count value in cluster config: {}, keeping current value", maxClauseCountStr);
+        }
+      } else {
+        // Reset to default if config is removed
+        int defaultMaxClauseCount = CommonConstants.Lucene.DEFAULT_LUCENE_MAX_CLAUSE_COUNT;
+        IndexSearcher.setMaxClauseCount(defaultMaxClauseCount);
+        LOGGER.info("Reset Lucene max clause count to default: {} from cluster config", defaultMaxClauseCount);
+      }
+    }
+  }
+
+  public static void cleanupTextIndex(File segDir, String column) {
     // Remove the lucene index file and potentially the docId mapping file.
     File luceneIndexFile = new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(luceneIndexFile);
@@ -69,34 +101,70 @@ public class TextIndexUtils {
     FileUtils.deleteQuietly(luceneV9MappingFile);
 
     // Remove the native index file
-    File nativeIndexFile = new File(segDir, column + Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION);
+    File nativeIndexFile = new File(segDir, column + Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(nativeIndexFile);
   }
 
-  static boolean hasTextIndex(File segDir, String column) {
+  public static boolean hasTextIndex(File segDir, String column) {
     //@formatter:off
     return new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION).exists()
-        || new File(segDir, column + Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION).exists();
     //@formatter:on
   }
 
-  public static boolean isFstTypeNative(@Nullable Map<String, String> textIndexProperties) {
-    if (textIndexProperties == null) {
-      return false;
+  /// Bulk form of [#hasTextIndex]: which of `columns` have a Lucene text index in `segDir`.
+  ///
+  /// Prefer this over calling [#hasTextIndex] in a loop over a segment's columns. It lists the
+  /// directory once rather than performing `columns × extensions` existence probes. Finding
+  /// `<column><extension>` in the listing is equivalent to that path existing, so the answer is the
+  /// same.
+  ///
+  /// A null `segDir` means the segment is not backed by a local directory and therefore not supports sidecar index.
+  public static Set<String> getColumnsWithTextIndex(@Nullable File segDir, Collection<String> columns) {
+    if (segDir == null) {
+      return Set.of();
     }
-    for (Map.Entry<String, String> entry : textIndexProperties.entrySet()) {
-      if (entry.getKey().equalsIgnoreCase(FieldConfig.TEXT_FST_TYPE)) {
-        return entry.getValue().equalsIgnoreCase(FieldConfig.TEXT_NATIVE_FST_LITERAL);
+    Set<String> entries = listEntryNames(segDir);
+    Set<String> columnsWithIndex = new HashSet<>();
+    for (String column : columns) {
+      if (entries.contains(column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION)) {
+        columnsWithIndex.add(column);
       }
     }
-    return false;
+    return columnsWithIndex;
   }
 
-  public static FSTType getFSTTypeOfIndex(File indexDir, String column) {
-    return SegmentDirectoryPaths.findTextIndexIndexFile(indexDir, column) != null ? FSTType.LUCENE : FSTType.NATIVE;
+  /// Which of `columns` still have a deprecated native text index file in `segDir`.
+  ///
+  /// Listing-based for the same reason as [#getColumnsWithTextIndex]: the caller asks this for every
+  /// column of a segment on every reload check, including the overwhelmingly common case where no
+  /// column has ever had a native text index.
+  ///
+  /// A null `segDir` means the segment is not backed by a local directory and therefore not supports sidecar index.
+  public static Set<String> getColumnsWithLegacyNativeTextIndex(@Nullable File segDir, Collection<String> columns) {
+    if (segDir == null) {
+      return Set.of();
+    }
+    Set<String> entries = listEntryNames(segDir);
+    Set<String> columnsWithIndex = new HashSet<>();
+    for (String column : columns) {
+      if (entries.contains(column + Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION)) {
+        columnsWithIndex.add(column);
+      }
+    }
+    return columnsWithIndex;
+  }
+
+  /// Names of the entries directly inside `dir`, files and directories alike (a Lucene text index is
+  /// a directory), or empty when it cannot be listed.
+  private static Set<String> listEntryNames(File dir) {
+    String[] names = dir.list();
+    return names == null ? Set.of() : new HashSet<>(Arrays.asList(names));
   }
 
   public static List<String> extractStopWordsInclude(String colName,
@@ -117,37 +185,81 @@ public class TextIndexUtils {
     return parseEntryAsString(columnProperty, FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY);
   }
 
-  private static List<String> parseEntryAsString(@Nullable Map<String, String> columnProperties, String stopWordKey) {
+  public static List<String> parseEntryAsString(@Nullable Map<String, String> columnProperties, String stopWordKey) {
     if (columnProperties == null) {
-      return Collections.emptyList();
+      return List.of();
     }
-    String includeWords = columnProperties.getOrDefault(stopWordKey, "");
-    return Arrays.stream(includeWords.split(FieldConfig.TEXT_INDEX_STOP_WORD_SEPERATOR)).map(String::trim)
+    String includeWords = columnProperties.get(stopWordKey);
+    if (includeWords == null) {
+      includeWords = "";
+    }
+    return Arrays.stream(includeWords.split(FieldConfig.TEXT_INDEX_STOP_WORD_SEPERATOR))
+        .map(String::trim)
         .collect(Collectors.toList());
   }
 
-  /**
-   * Retrieves the Lucene Analyzer class instance via reflection from the fully qualified class name of the text config.
-   * If the class name is not specified in the config, the default StandardAnalyzer is instantiated.
-   *
-   * @param config Pinot TextIndexConfig to fetch the configuration from
-   * @return Lucene Analyzer class instance
-   * @throws ReflectiveOperationException if instantiation via reflection fails
-   */
-  public static Analyzer getAnalyzer(TextIndexConfig config) throws ReflectiveOperationException {
-    String luceneAnalyzerClassName = config.getLuceneAnalyzerClass();
-    List<String> luceneAnalyzerClassArgs = config.getLuceneAnalyzerClassArgs();
-    List<String> luceneAnalyzerClassArgTypes = config.getLuceneAnalyzerClassArgTypes();
+  /// Retrieves the Lucene Analyzer class instance via reflection from the fully qualified class name of the text
+  /// config.
+  /// If the class name is not specified in the config, the default StandardAnalyzer is instantiated.
+  ///
+  /// @param config Pinot TextIndexConfig to fetch the configuration from
+  /// @return Lucene Analyzer class instance
+  /// @throws ReflectiveOperationException if instantiation via reflection fails
+  public static Analyzer getAnalyzer(TextIndexConfig config)
+      throws ReflectiveOperationException {
+    String analyzerClassName = config.getLuceneAnalyzerClass();
+    List<String> analyzerClassArgs = config.getLuceneAnalyzerClassArgs();
+    List<String> analyzerClassArgTypes = config.getLuceneAnalyzerClassArgTypes();
 
-    if (null == luceneAnalyzerClassName || luceneAnalyzerClassName.isEmpty()
-            || (luceneAnalyzerClassName.equals(StandardAnalyzer.class.getName())
-                    && luceneAnalyzerClassArgs.isEmpty() && luceneAnalyzerClassArgTypes.isEmpty())) {
+    if (null == analyzerClassName || analyzerClassName.isEmpty()
+        || ((analyzerClassName.equals(CaseAwareStandardAnalyzer.class.getName())
+        || analyzerClassName.equals(StandardAnalyzer.class.getName()))
+        && analyzerClassArgs.isEmpty() && analyzerClassArgTypes.isEmpty())) {
       // When there is no analyzer defined, or when StandardAnalyzer (default) is used without arguments,
       // use existing logic to obtain an instance of StandardAnalyzer with customized stop words
       return TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(
-              config.getStopWordsInclude(), config.getStopWordsExclude());
+          config.getStopWordsInclude(), config.getStopWordsExclude(), config.isCaseSensitive());
     }
 
+    return getCustomAnalyzer(analyzerClassArgs, analyzerClassArgTypes, analyzerClassName);
+  }
+
+  /// Retrieves the Lucene Analyzer class instance via reflection from the fully qualified class name of the text
+  /// config.
+  /// If the class name is not specified in the config, the default StandardAnalyzer is instantiated.
+  ///
+  /// @param config Pinot TextIndexConfig to fetch the configuration from
+  /// @param override column-specific configuration that overrides the shared configuration
+  /// @return Lucene Analyzer class instance
+  /// @throws ReflectiveOperationException if instantiation via reflection fails
+  public static Analyzer getAnalyzer(TextIndexConfig config, MultiColumnLuceneTextIndexReader.ColumnConfig override)
+      throws ReflectiveOperationException {
+    String luceneAnalyzerClassName = firstNotNull(override.getLuceneAnalyzerClass(), config.getLuceneAnalyzerClass());
+    List<String> luceneAnalyzerClassArgs =
+        firstNotNull(override.getLuceneAnalyzerClassArgs(), config.getLuceneAnalyzerClassArgs());
+    List<String> luceneAnalyzerClassArgTypes =
+        firstNotNull(override.getLuceneAnalyzerClassArgTypes(), config.getLuceneAnalyzerClassArgTypes());
+
+    if (null == luceneAnalyzerClassName || luceneAnalyzerClassName.isEmpty()
+        || ((luceneAnalyzerClassName.equals(CaseAwareStandardAnalyzer.class.getName())
+        || luceneAnalyzerClassName.equals(StandardAnalyzer.class.getName()))
+        && luceneAnalyzerClassArgs.isEmpty() && luceneAnalyzerClassArgTypes.isEmpty())) {
+      // When there is no analyzer defined, or when StandardAnalyzer (default) is used without arguments,
+      // use existing logic to obtain an instance of StandardAnalyzer with customized stop words
+      List<String> stopWordsInclude = firstNotNull(override.getStopWordsInclude(), config.getStopWordsInclude());
+      List<String> stopWordsExclude = firstNotNull(override.getStopWordsExclude(), config.getStopWordsExclude());
+      Boolean isCaseSensitive = firstNotNull(override.isCaseSensitive(), config.isCaseSensitive());
+      return TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(
+          stopWordsInclude, stopWordsExclude, isCaseSensitive);
+    }
+
+    return getCustomAnalyzer(luceneAnalyzerClassArgs, luceneAnalyzerClassArgTypes, luceneAnalyzerClassName);
+  }
+
+  private static Analyzer getCustomAnalyzer(List<String> luceneAnalyzerClassArgs,
+      List<String> luceneAnalyzerClassArgTypes,
+      String luceneAnalyzerClassName)
+      throws ReflectiveOperationException {
     // Custom analyzer + custom configs via reflection
     if (luceneAnalyzerClassArgs.size() != luceneAnalyzerClassArgTypes.size()) {
       throw new ReflectiveOperationException("Mismatch of the number of analyzer arguments and arguments types.");
@@ -176,16 +288,23 @@ public class TextIndexUtils {
 
     // Return a new instance of custom lucene analyzer class
     return (Analyzer) luceneAnalyzerClass.getConstructor(argClasses.toArray(new Class<?>[0]))
-            .newInstance(argValues.toArray(new Object[0]));
+        .newInstance(argValues.toArray(new Object[0]));
   }
 
-  /**
-   * Parse the Java value type specified in the type string
-   * @param valueTypeString FQCN of the value type class or the name of the primitive value type
-   * @return Class object of the value type
-   * @throws ClassNotFoundException when the value type is not supported
-   */
-  public static Class<?> parseSupportedTypes(String valueTypeString) throws ClassNotFoundException {
+  private static <T> T firstNotNull(T v1, T v2) {
+    if (v1 != null) {
+      return v1;
+    }
+
+    return v2;
+  }
+
+  /// Parse the Java value type specified in the type string
+  /// @param valueTypeString FQCN of the value type class or the name of the primitive value type
+  /// @return Class object of the value type
+  /// @throws ClassNotFoundException when the value type is not supported
+  public static Class<?> parseSupportedTypes(String valueTypeString)
+      throws ClassNotFoundException {
     try {
       // Support both primitive types + class
       switch (valueTypeString) {
@@ -214,15 +333,13 @@ public class TextIndexUtils {
     }
   }
 
-  /**
-   * Attempt to coerce string into supported value type
-   * @param stringValue string representation of the value
-   * @param clazz of the value
-   * @return class object of the value, auto-boxed if it is a primitive type
-   * @throws ReflectiveOperationException if value cannot be coerced without ambiguity or encountered unsupported type
-   */
+  /// Attempt to coerce string into supported value type
+  /// @param stringValue string representation of the value
+  /// @param clazz of the value
+  /// @return class object of the value, auto-boxed if it is a primitive type
+  /// @throws ReflectiveOperationException if value cannot be coerced without ambiguity or encountered unsupported type
   public static Object parseSupportedTypeValues(String stringValue, Class<?> clazz)
-          throws ReflectiveOperationException {
+      throws ReflectiveOperationException {
     try {
       if (clazz.equals(String.class)) {
         return stringValue;
@@ -259,7 +376,7 @@ public class TextIndexUtils {
       }
     } catch (NumberFormatException | ReflectiveOperationException ex) {
       String exceptionMessage = "Custom analyzer argument cannot be coerced from "
-              + stringValue + " to " + clazz.getName() + " type";
+          + stringValue + " to " + clazz.getName() + " type";
       LOGGER.error(exceptionMessage);
       throw new ReflectiveOperationException(exceptionMessage);
     } catch (UnsupportedOperationException ex) {
@@ -270,8 +387,8 @@ public class TextIndexUtils {
     }
   }
 
-  public static StandardAnalyzer getStandardAnalyzerWithCustomizedStopWords(@Nullable List<String> stopWordsInclude,
-      @Nullable List<String> stopWordsExclude) {
+  public static Analyzer getStandardAnalyzerWithCustomizedStopWords(@Nullable List<String> stopWordsInclude,
+      @Nullable List<String> stopWordsExclude, boolean isCaseSensitive) {
     HashSet<String> stopWordSet = LuceneTextIndexCreator.getDefaultEnglishStopWordsSet();
     if (stopWordsInclude != null) {
       stopWordSet.addAll(stopWordsInclude);
@@ -279,11 +396,12 @@ public class TextIndexUtils {
     if (stopWordsExclude != null) {
       stopWordsExclude.forEach(stopWordSet::remove);
     }
-    return new StandardAnalyzer(new CharArraySet(stopWordSet, true));
+    return new CaseAwareStandardAnalyzer(new CharArraySet(stopWordSet, !isCaseSensitive), isCaseSensitive);
   }
 
   public static Constructor<QueryParserBase> getQueryParserWithStringAndAnalyzerTypeConstructor(
-          String queryParserClassName) throws ReflectiveOperationException {
+      String queryParserClassName)
+      throws ReflectiveOperationException {
     // Fail-fast if the query parser is specified class is not QueryParseBase class
     final Class<?> queryParserClass = Class.forName(queryParserClassName);
     if (!QueryParserBase.class.isAssignableFrom(queryParserClass)) {
@@ -303,38 +421,39 @@ public class TextIndexUtils {
     return (Constructor<QueryParserBase>) queryParserClass.getConstructor(String.class, Analyzer.class);
   }
 
-  /**
-   * Writes the config to the properties file. Configs saved include luceneAnalyzerClass, luceneAnalyzerClassArgs,
-   * luceneAnalyzerClassArgTypes, and luceneQueryParserClass.
-   *
-   * @param indexDir directory where the properties file is saved
-   * @param config config to write to the properties file
-   */
+  /// Writes the config to the properties file. Configs saved include luceneAnalyzerClass, luceneAnalyzerClassArgs,
+  /// luceneAnalyzerClassArgTypes, and luceneQueryParserClass.
+  ///
+  /// @param indexDir directory where the properties file is saved
+  /// @param config config to write to the properties file
   public static void writeConfigToPropertiesFile(File indexDir, TextIndexConfig config) {
     PropertiesConfiguration properties = new PropertiesConfiguration();
-    List<String> escapedLuceneAnalyzerClassArgs = config.getLuceneAnalyzerClassArgs().stream()
-        .map(CommonsConfigurationUtils::replaceSpecialCharacterInPropertyValue).collect(Collectors.toList());
-    List<String> escapedLuceneAnalyzerClassArgTypes = config.getLuceneAnalyzerClassArgTypes().stream()
-        .map(CommonsConfigurationUtils::replaceSpecialCharacterInPropertyValue).collect(Collectors.toList());
+    List<String> escapedLuceneAnalyzerClassArgs = config.getLuceneAnalyzerClassArgs()
+        .stream()
+        .map(CommonsConfigurationUtils::replaceSpecialCharacterInPropertyValue)
+        .collect(Collectors.toList());
+    List<String> escapedLuceneAnalyzerClassArgTypes = config.getLuceneAnalyzerClassArgTypes()
+        .stream()
+        .map(CommonsConfigurationUtils::replaceSpecialCharacterInPropertyValue)
+        .collect(Collectors.toList());
 
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS, config.getLuceneAnalyzerClass());
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS, escapedLuceneAnalyzerClassArgs);
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES, escapedLuceneAnalyzerClassArgTypes);
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS, config.getLuceneQueryParserClass());
+    properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE, config.getDocIdTranslatorMode());
 
     File propertiesFile = new File(indexDir, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE);
     CommonsConfigurationUtils.saveToFile(properties, propertiesFile);
   }
 
-  /**
-   * Returns an updated TextIndexConfig, overriding the values in the config with the values in the properties file.
-   * The configs overwritten include luceneAnalyzerClass, luceneAnalyzerClassArgs, luceneAnalyzerClassArgTypes,
-   * and luceneQueryParserClass.
-   *
-   * @param file properties file to read from
-   * @param config config to update
-   * @return updated TextIndexConfig
-   */
+  /// Returns an updated TextIndexConfig, overriding the values in the config with the values in the properties file.
+  /// The configs overwritten include luceneAnalyzerClass, luceneAnalyzerClassArgs, luceneAnalyzerClassArgTypes,
+  /// and luceneQueryParserClass.
+  ///
+  /// @param file properties file to read from
+  /// @param config config to update
+  /// @return updated TextIndexConfig
   public static TextIndexConfig getUpdatedConfigFromPropertiesFile(File file, TextIndexConfig config)
       throws ConfigurationException {
     PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(file);
@@ -342,17 +461,23 @@ public class TextIndexUtils {
         properties.getList(String.class, FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS);
     List<String> luceneAnalyzerClassArgTypes =
         properties.getList(String.class, FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES);
+
     List<String> recoveredLuceneAnalyzerClassArgs = luceneAnalyzerClassArgs == null ? new ArrayList<>()
-        : luceneAnalyzerClassArgs.stream().map(CommonsConfigurationUtils::recoverSpecialCharacterInPropertyValue)
-            .collect(Collectors.toList());
-    List<String> recoveredLuceneAnalyzerClassArgTypes = luceneAnalyzerClassArgTypes == null ? new ArrayList<>()
-        : luceneAnalyzerClassArgTypes.stream().map(CommonsConfigurationUtils::recoverSpecialCharacterInPropertyValue)
+        : luceneAnalyzerClassArgs.stream()
+            .map(CommonsConfigurationUtils::recoverSpecialCharacterInPropertyValue)
             .collect(Collectors.toList());
 
-    return new TextIndexConfigBuilder(config).withLuceneAnalyzerClass(
-            properties.getString(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS))
+    List<String> recoveredLuceneAnalyzerClassArgTypes = luceneAnalyzerClassArgTypes == null ? new ArrayList<>()
+        : luceneAnalyzerClassArgTypes.stream()
+            .map(CommonsConfigurationUtils::recoverSpecialCharacterInPropertyValue)
+            .collect(Collectors.toList());
+
+    return new TextIndexConfigBuilder(config)
+        .withLuceneAnalyzerClass(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS))
         .withLuceneAnalyzerClassArgs(recoveredLuceneAnalyzerClassArgs)
         .withLuceneAnalyzerClassArgTypes(recoveredLuceneAnalyzerClassArgTypes)
-        .withLuceneQueryParserClass(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS)).build();
+        .withLuceneQueryParserClass(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS))
+        .withDocIdTranslatorMode(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE))
+        .build();
   }
 }

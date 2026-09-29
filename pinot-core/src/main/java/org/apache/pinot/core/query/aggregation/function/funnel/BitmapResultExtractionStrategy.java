@@ -21,11 +21,16 @@ package org.apache.pinot.core.query.aggregation.function.funnel;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
+/// Extracts intermediate bitmap results for cross-segment merging.
+///
+/// The bitmap strategy stores entities as 32-bit hash codes in a [RoaringBitmap]. For single-key INT
+/// columns, the actual int values are stored directly (exact). For other single-key types and all multi-key
+/// composites, hash codes are used (approximate — hash collisions can cause under-counting).
 class BitmapResultExtractionStrategy implements ResultExtractionStrategy<DictIdsWrapper, List<RoaringBitmap>> {
   protected final int _numSteps;
 
@@ -35,22 +40,72 @@ class BitmapResultExtractionStrategy implements ResultExtractionStrategy<DictIds
 
   @Override
   public List<RoaringBitmap> extractIntermediateResult(DictIdsWrapper dictIdsWrapper) {
-    Dictionary dictionary = dictIdsWrapper._dictionary;
+    if (dictIdsWrapper == null) {
+      List<RoaringBitmap> result = new ArrayList<>(_numSteps);
+      for (int i = 0; i < _numSteps; i++) {
+        result.add(new RoaringBitmap());
+      }
+      return result;
+    }
     List<RoaringBitmap> result = new ArrayList<>(_numSteps);
-    for (RoaringBitmap dictIdBitmap : dictIdsWrapper._stepsBitmaps) {
-      result.add(convertToValueBitmap(dictionary, dictIdBitmap));
+    if (dictIdsWrapper.isMultiKey()) {
+      for (RoaringBitmap compositeIdBitmap : dictIdsWrapper._stepsBitmaps) {
+        result.add(convertCompositeToValueBitmap(dictIdsWrapper, compositeIdBitmap));
+      }
+    } else {
+      Dictionary dictionary = dictIdsWrapper._dictionaries[0];
+      for (RoaringBitmap dictIdBitmap : dictIdsWrapper._stepsBitmaps) {
+        result.add(convertToValueBitmap(dictionary, dictIdBitmap));
+      }
     }
     return result;
   }
 
-  /**
-   * Helper method to read dictionary and convert dictionary ids to hash code of the values for dictionary-encoded
-   * expression.
-   */
+  /// Converts segment-local composite dictionary IDs to hash-coded value bitmaps for cross-segment merging.
+  /// Combines per-column value hashes directly — no string allocation. Same approximation as the
+  /// single-key non-INT path in [#convertToValueBitmap]: hash collisions may cause under-counting.
+  private RoaringBitmap convertCompositeToValueBitmap(DictIdsWrapper wrapper, RoaringBitmap compositeIdBitmap) {
+    RoaringBitmap valueBitmap = new RoaringBitmap();
+    PeekableIntIterator iterator = compositeIdBitmap.getIntIterator();
+    int numKeys = wrapper._dictionaries.length;
+    int[] dictIds = new int[numKeys];
+    while (iterator.hasNext()) {
+      wrapper.reverseCompositeId(iterator.next(), dictIds);
+      int hash = 1;
+      for (int k = 0; k < numKeys; k++) {
+        hash = 31 * hash + valueHashCode(wrapper._dictionaries[k], dictIds[k]);
+      }
+      valueBitmap.add(hash);
+    }
+    return valueBitmap;
+  }
+
+  /// Returns the hash code of a dictionary value using its native type, avoiding string conversion
+  /// for numeric types.
+  private static int valueHashCode(Dictionary dictionary, int dictId) {
+    switch (dictionary.getValueType()) {
+      case INT:
+        return Integer.hashCode(dictionary.getIntValue(dictId));
+      case LONG:
+        return Long.hashCode(dictionary.getLongValue(dictId));
+      case FLOAT:
+        return Float.hashCode(dictionary.getFloatValue(dictId));
+      case DOUBLE:
+        return Double.hashCode(dictionary.getDoubleValue(dictId));
+      case STRING:
+        return dictionary.getStringValue(dictId).hashCode();
+      default:
+        throw new IllegalArgumentException("Illegal data type for FUNNEL_COUNT aggregation function: "
+            + dictionary.getValueType());
+    }
+  }
+
+  /// Helper method to read dictionary and convert dictionary ids to hash code of the values for dictionary-encoded
+  /// expression.
   private RoaringBitmap convertToValueBitmap(Dictionary dictionary, RoaringBitmap dictIdBitmap) {
     RoaringBitmap valueBitmap = new RoaringBitmap();
     PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
-    FieldSpec.DataType storedType = dictionary.getValueType();
+    DataType storedType = dictionary.getValueType();
     switch (storedType) {
       case INT:
         while (iterator.hasNext()) {

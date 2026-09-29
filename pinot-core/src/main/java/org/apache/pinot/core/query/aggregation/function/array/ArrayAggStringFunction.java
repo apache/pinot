@@ -19,10 +19,11 @@
 package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import java.util.Arrays;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
@@ -36,9 +37,27 @@ public class ArrayAggStringFunction extends BaseArrayAggStringFunction<ObjectArr
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    String[] value = blockValSet.getStringValuesSV();
-    ObjectArrayList<String> valueArray = new ObjectArrayList<>(length);
-    forEachNotNull(length, blockValSet, (from, to) -> valueArray.addAll(Arrays.asList(value).subList(from, to)));
+    ObjectArrayList<String> valueArray =
+        aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult()
+            : new ObjectArrayList<>(length);
+    if (blockValSet.isSingleValue()) {
+      String[] values = blockValSet.getStringValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueArray.add(values[i]);
+        }
+      });
+    } else {
+      String[][] valuesArray = blockValSet.getStringValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          String[] values = valuesArray[i];
+          for (String v : values) {
+            valueArray.add(v);
+          }
+        }
+      });
+    }
     aggregationResultHolder.setValue(valueArray);
   }
 
@@ -50,5 +69,17 @@ public class ArrayAggStringFunction extends BaseArrayAggStringFunction<ObjectArr
       resultHolder.setValueForKey(groupKey, valueArray);
     }
     valueArray.add(value);
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(ObjectArrayList<String> stringArrayList) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.StringArrayList.getValue(),
+        ObjectSerDeUtils.STRING_ARRAY_LIST_SER_DE.serialize(stringArrayList));
+  }
+
+  @Override
+  public ObjectArrayList<String> deserializeIntermediateResult(CustomObject customObject) {
+    //noinspection unchecked
+    return ObjectSerDeUtils.STRING_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
   }
 }

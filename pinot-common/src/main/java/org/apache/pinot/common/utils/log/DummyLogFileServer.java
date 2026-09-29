@@ -23,9 +23,7 @@ import java.util.Set;
 import javax.ws.rs.core.Response;
 
 
-/**
- * A dummy log file server.
- */
+/// A dummy log file server.
 public class DummyLogFileServer implements LogFileServer {
   @Override
   public Set<String> getAllLogFilePaths()

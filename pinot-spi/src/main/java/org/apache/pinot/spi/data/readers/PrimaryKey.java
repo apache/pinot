@@ -26,9 +26,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * The primary key of a record. Note that the value used in the primary key must be single-value.
- */
+/// The primary key of a record. Note that the value used in the primary key must be single-value.
 public final class PrimaryKey {
   private final Object[] _values;
 

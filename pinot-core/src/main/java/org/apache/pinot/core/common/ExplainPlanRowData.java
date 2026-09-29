@@ -20,9 +20,7 @@ package org.apache.pinot.core.common;
 
 import java.util.Objects;
 
-/**
- * Class to hold the data for a single Explain plan row
- */
+/// Class to hold the data for a single Explain plan row
 public class ExplainPlanRowData {
   private final String _explainPlanString;
   private final int _operatorId;

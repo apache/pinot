@@ -25,9 +25,7 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 
 
-/**
- * Class that holds the configurations regarding interning.
- */
+/// Class that holds the configurations regarding interning.
 public class Intern {
   public static final Intern DISABLED = new Intern(true, 0);
 

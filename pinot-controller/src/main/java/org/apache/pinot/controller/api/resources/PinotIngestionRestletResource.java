@@ -49,6 +49,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException.ExceptionLogMode;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.FileIngestionHelper;
 import org.apache.pinot.controller.util.FileIngestionHelper.DataPayload;
@@ -71,28 +72,25 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/**
- * APIs related to ingestion
- *
- * Ingest data into the tableNameWithType using the form multipart file
- * /ingestFromFile?tableNameWithType=foo_OFFLINE
- * &batchConfigMapStr={
- *   "inputFormat":"csv",
- *   "recordReader.prop.delimiter":"|"
- * }
- *
- * Ingest data into the tableNameWithType using the source file URI
- * /ingestFromURI?tableNameWithType=foo_OFFLINE
- * &batchConfigMapStr={
- *   "inputFormat":"json",
- *   "input.fs.className":"org.apache.pinot.plugin.filesystem.S3PinotFS",
- *   "input.fs.prop.region":"us-central",
- *   "input.fs.prop.accessKey":"foo",
- *   "input.fs.prop.secretKey":"bar"
- * }
- * &sourceURIStr=s3://test.bucket/path/to/json/data/data.json
- *
- */
+/// APIs related to ingestion
+///
+/// Ingest data into the tableNameWithType using the form multipart file
+/// /ingestFromFile?tableNameWithType=foo_OFFLINE
+/// &batchConfigMapStr={
+///   "inputFormat":"csv",
+///   "recordReader.prop.delimiter":"|"
+/// }
+///
+/// Ingest data into the tableNameWithType using the source file URI
+/// /ingestFromURI?tableNameWithType=foo_OFFLINE
+/// &batchConfigMapStr={
+///   "inputFormat":"json",
+///   "input.fs.className":"org.apache.pinot.plugin.filesystem.S3PinotFS",
+///   "input.fs.prop.region":"us-central",
+///   "input.fs.prop.accessKey":"foo",
+///   "input.fs.prop.secretKey":"bar"
+/// }
+/// &sourceURIStr=s3://test.bucket/path/to/json/data/data.json
 @Api(tags = Constants.TABLE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
@@ -114,22 +112,20 @@ public class PinotIngestionRestletResource {
   @Inject
   ControllerConf _controllerConf;
 
-  /**
-   * API to upload a file and ingest it into a Pinot table.
-   * This call will copy the file locally, create a segment and push the segment to Pinot.
-   * A response will be returned after the completion of all of the above steps.
-   * All steps happen on the controller. This API is NOT meant for production environments/large input files.
-   * For Production setup, use the minion batch ingestion mechanism
-   *
-   * @param tableNameWithType Name of the table to upload to, with type suffix
-   * @param batchConfigMapStr Batch config Map as a string. Provide the
-   *                          input format (inputFormat)
-   *                          record reader configs (recordReader.prop.<property>),
-   *                          fs class name (input.fs.className)
-   *                          fs configs (input.fs.prop.<property>)
-   * @param fileUpload file to upload as a multipart
-   * @param asyncResponse injected async response to return result
-   */
+  /// API to upload a file and ingest it into a Pinot table.
+  /// This call will copy the file locally, create a segment and push the segment to Pinot.
+  /// A response will be returned after the completion of all of the above steps.
+  /// All steps happen on the controller. This API is NOT meant for production environments/large input files.
+  /// For Production setup, use the minion batch ingestion mechanism
+  ///
+  /// @param tableNameWithType Name of the table to upload to, with type suffix
+  /// @param batchConfigMapStr Batch config Map as a string. Provide the
+  ///                          input format (inputFormat)
+  ///                          record reader configs (recordReader.prop.<property>),
+  ///                          fs class name (input.fs.className)
+  ///                          fs configs (input.fs.prop.<property>)
+  /// @param fileUpload file to upload as a multipart
+  /// @param asyncResponse injected async response to return result
   @POST
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
@@ -163,20 +159,18 @@ public class PinotIngestionRestletResource {
     }
   }
 
-  /**
-   * API to ingest a file into Pinot from a URI.
-   * This call will copy the file locally, create a segment and push the segment to Pinot.
-   * A response will be returned after the completion of all of the above steps.
-   *
-   * @param tableNameWithType Name of the table to upload to, with type suffix
-   * @param batchConfigMapStr Batch config Map as a string. Provide the
-   *                          input format (inputFormat)
-   *                          record reader configs (recordReader.prop.<property>),
-   *                          fs class name (input.fs.className)
-   *                          fs configs (input.fs.prop.<property>)
-   * @param sourceURIStr URI for input file to ingest
-   * @param asyncResponse injected async response to return result
-   */
+  /// API to ingest a file into Pinot from a URI.
+  /// This call will copy the file locally, create a segment and push the segment to Pinot.
+  /// A response will be returned after the completion of all of the above steps.
+  ///
+  /// @param tableNameWithType Name of the table to upload to, with type suffix
+  /// @param batchConfigMapStr Batch config Map as a string. Provide the
+  ///                          input format (inputFormat)
+  ///                          record reader configs (recordReader.prop.<property>),
+  ///                          fs class name (input.fs.className)
+  ///                          fs configs (input.fs.prop.<property>)
+  /// @param sourceURIStr URI for input file to ingest
+  /// @param asyncResponse injected async response to return result
   @POST
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
@@ -187,7 +181,10 @@ public class PinotIngestionRestletResource {
   @ApiOperation(value = "Ingest from the given URI", notes =
       "Creates a segment using file at the given URI and pushes it to Pinot. "
           + "\n All steps happen on the controller. This API is NOT meant for production environments/large input "
-          + "files. " + "\nExample usage (query params need encoding):" + "\n```"
+          + "files. Local filesystem sources are disabled by default. The compatibility setting "
+          + "controller.ingestFromURI.allowLocalFileSystem permits callers with access to this endpoint to read "
+          + "files visible to the controller process and should only be enabled for trusted callers and paths. "
+          + "\nExample usage (query params need encoding):" + "\n```"
           + "\ncurl -X POST \"http://localhost:9000/ingestFromURI?tableNameWithType=foo_OFFLINE"
           + "\n&batchConfigMapStr={" + "\n  \"inputFormat\":\"json\","
           + "\n  \"input.fs.className\":\"org.apache.pinot.plugin.filesystem.S3PinotFS\","
@@ -204,14 +201,12 @@ public class PinotIngestionRestletResource {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     try {
       asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, new DataPayload(new URI(sourceURIStr))));
-    } catch (IllegalArgumentException e) {
-      asyncResponse.resume(new ControllerApplicationException(LOGGER, String
-          .format("Got illegal argument when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
-          Response.Status.BAD_REQUEST, e));
-    } catch (Exception e) {
-      asyncResponse.resume(new ControllerApplicationException(LOGGER,
-          String.format("Caught exception when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
-          Response.Status.INTERNAL_SERVER_ERROR, e));
+    } catch (IllegalArgumentException | URISyntaxException e) {
+      asyncResponse.resume(new ControllerApplicationException(LOGGER, "Invalid ingestFromURI request",
+          Response.Status.BAD_REQUEST, e, ExceptionLogMode.TYPE_ONLY));
+    } catch (Exception | LinkageError e) {
+      asyncResponse.resume(new ControllerApplicationException(LOGGER, "Failed to ingest from URI",
+          Response.Status.INTERNAL_SERVER_ERROR, e, ExceptionLogMode.TYPE_ONLY));
     }
   }
 
@@ -234,7 +229,8 @@ public class PinotIngestionRestletResource {
 
     FileIngestionHelper fileIngestionHelper =
         new FileIngestionHelper(tableConfig, schema, batchConfigMap, getControllerUri(),
-            new File(_controllerConf.getLocalTempDir(), INGESTION_DIR), authProvider);
+            new File(_controllerConf.getLocalTempDir(), INGESTION_DIR), authProvider,
+            _controllerConf.isIngestFromUriLocalFileSystemAllowed());
     return fileIngestionHelper.buildSegmentAndPush(payload);
   }
 

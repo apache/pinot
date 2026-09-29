@@ -32,9 +32,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit test for {@link FixedIntArrayOffHeapIdMap}
- */
+/// Unit test for [FixedIntArrayOffHeapIdMap]
 public class FixedIntArrayIdMapTest {
   private static final int NUM_ROWS = 10001;
   private static final int NUM_COLUMNS = 3;
@@ -59,15 +57,12 @@ public class FixedIntArrayIdMapTest {
     _memoryManager.close();
   }
 
-  /**
-   * This test indexes a specified number of values in the class being tested and checks correctness by
-   * comparing results against {@link BiMap} for the same input.
-   * <ul>
-   *   <li> Size of the map (cardinality) should be as expected. </li>
-   *   <li> For each value, id should be as expected. </li>
-   *   <li> For each id, should return the expected value back. </li>
-   * </ul>
-   */
+  /// This test indexes a specified number of values in the class being tested and checks correctness by
+  /// comparing results against [BiMap] for the same input.
+  ///
+  /// - Size of the map (cardinality) should be as expected.
+  /// - For each value, id should be as expected.
+  /// - For each id, should return the expected value back.
   @Test
   public void test() {
     BiMap<FixedIntArray, Integer> expectedMap = addValues(_idMap);

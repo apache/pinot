@@ -22,18 +22,14 @@ import java.io.File;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 
 
-/**
- * The metadata extractor will take an input zipped .tar.gz file and extract and return the pinot segment metadata.
- * This class is used during segment upload to get the metadata we need to store in zk.
- */
+/// The metadata extractor will take an input zipped .tar.gz file and extract and return the pinot segment metadata.
+/// This class is used during segment upload to get the metadata we need to store in zk.
 public interface MetadataExtractor {
-  /**
-   * Returns a SegmentMetadata object from a tarred file
-   * @param tarFile
-   * @param workingDir
-   * @return
-   * @throws Exception
-   */
+  /// Returns a SegmentMetadata object from a tarred file
+  /// @param tarFile
+  /// @param workingDir
+  /// @return
+  /// @throws Exception
   SegmentMetadata extractMetadata(File tarFile, File workingDir)
       throws Exception;
 }

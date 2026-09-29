@@ -19,10 +19,12 @@
 package org.apache.pinot.segment.local.segment.index.creator;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.readers.forward.CLPForwardIndexReaderV1;
@@ -45,7 +47,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-public class CLPForwardIndexCreatorTest {
+
+public class CLPForwardIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "CLPForwardIndexCreatorTest");
 
   @BeforeClass
@@ -71,18 +74,60 @@ public class CLPForwardIndexCreatorTest {
         "2023/10/27 16:35:10.607 INFO [ControllerResponseFilter] [grizzly-http-server-6] Handled request from 0.0"
             + ".0.0 GET https://pinot-pinot-broker-headless.managed.svc.cluster.local:8093/tables, content-type "
             + "application/json status code 200 OK");
+    logLines.add("2023/10/27 16:35:11.001 INFO Received caf\u00e9 event from \u6771\u4eac");
     logLines.add("null");
 
+    StringColumnPreIndexStatsCollector statsCollector = createStatsCollector(logLines);
+    long expectedRawBytes = logLines.stream()
+        .mapToLong(logLine -> logLine.getBytes(StandardCharsets.UTF_8).length)
+        .sum();
+
+    File indexFile = new File(TEMP_DIR, "column1" + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+    try (CLPForwardIndexCreatorV1 clpForwardIndexCreatorV1 =
+        new CLPForwardIndexCreatorV1(TEMP_DIR, "column1", logLines.size(), statsCollector)) {
+      clpForwardIndexCreatorV1.enableRawForwardIndexUncompressedValueSizeTracking();
+      for (String logLine : logLines) {
+        clpForwardIndexCreatorV1.putString(logLine);
+      }
+      Assert.assertEquals(clpForwardIndexCreatorV1.getRawForwardIndexUncompressedValueSizeInBytes(), expectedRawBytes,
+          "CLP V1 should report the exact original UTF-8 message bytes");
+      clpForwardIndexCreatorV1.seal();
+    }
+
+    try (PinotDataBuffer pinotDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile)) {
+      CLPForwardIndexReaderV1 clpForwardIndexReaderV1 = new CLPForwardIndexReaderV1(pinotDataBuffer, logLines.size());
+      for (int i = 0; i < logLines.size(); i++) {
+        Assert.assertEquals(clpForwardIndexReaderV1.getString(i, clpForwardIndexReaderV1.createContext()),
+            logLines.get(i));
+      }
+    }
+  }
+
+  @Test
+  public void testCompressionStatsDisabledReturnsUnavailable()
+      throws Exception {
+    List<String> logLines = List.of("plain message", "caf\u00e9 event from \u6771\u4eac");
+    StringColumnPreIndexStatsCollector statsCollector = createStatsCollector(logLines);
+    try (CLPForwardIndexCreatorV1 creator =
+        new CLPForwardIndexCreatorV1(TEMP_DIR, "column1", logLines.size(), statsCollector)) {
+      for (String logLine : logLines) {
+        creator.putString(logLine);
+      }
+      Assert.assertEquals(creator.getRawForwardIndexUncompressedValueSizeInBytes(), -1L,
+          "CLP V1 should return the unavailable sentinel when tracking is disabled");
+      creator.seal();
+    }
+  }
+
+  private static StringColumnPreIndexStatsCollector createStatsCollector(List<String> logLines) {
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec("column1", FieldSpec.DataType.STRING, true));
     TableConfig tableConfig =
         new TableConfig("mytable", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig(null, null, null), new IndexingConfig(), new TableCustomConfig(null), null, null, null,
-            null, null, null, null, null, null, null, null, false, null, null, null);
-    List<FieldConfig> fieldConfigList = new ArrayList<>();
-    fieldConfigList.add(new FieldConfig("column1", FieldConfig.EncodingType.RAW, Collections.EMPTY_LIST,
-        FieldConfig.CompressionCodec.CLP, Collections.EMPTY_MAP));
-    tableConfig.setFieldConfigList(fieldConfigList);
+            null, null, null, null, null, null, null, null, false, null, null, null, null);
+    tableConfig.setFieldConfigList(List.of(new FieldConfig("column1", FieldConfig.EncodingType.RAW, List.of(),
+        FieldConfig.CompressionCodec.CLP, Map.of())));
     StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(tableConfig, schema, null);
     StringColumnPreIndexStatsCollector statsCollector =
         new StringColumnPreIndexStatsCollector("column1", statsCollectorConfig);
@@ -90,23 +135,7 @@ public class CLPForwardIndexCreatorTest {
       statsCollector.collect(logLine);
     }
     statsCollector.seal();
-
-    File indexFile = new File(TEMP_DIR, "column1" + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-    CLPForwardIndexCreatorV1 clpForwardIndexCreatorV1 =
-        new CLPForwardIndexCreatorV1(TEMP_DIR, "column1", logLines.size(), statsCollector);
-
-    for (String logLine : logLines) {
-      clpForwardIndexCreatorV1.putString(logLine);
-    }
-    clpForwardIndexCreatorV1.seal();
-    clpForwardIndexCreatorV1.close();
-
-    PinotDataBuffer pinotDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
-    CLPForwardIndexReaderV1 clpForwardIndexReaderV1 = new CLPForwardIndexReaderV1(pinotDataBuffer, logLines.size());
-    for (int i = 0; i < logLines.size(); i++) {
-      Assert.assertEquals(clpForwardIndexReaderV1.getString(i, clpForwardIndexReaderV1.createContext()),
-          logLines.get(i));
-    }
+    return statsCollector;
   }
 
   @AfterClass

@@ -21,12 +21,12 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.plannode.FilterNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -68,9 +68,11 @@ public class FilterOperator extends MultiStageOperator {
   }
 
   @Override
-  public void registerExecution(long time, int numRows) {
+  public void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+    _statMap.merge(StatKey.ALLOCATED_MEMORY_BYTES, memoryUsedBytes);
+    _statMap.merge(StatKey.GC_TIME_MS, gcTimeMs);
   }
 
   @Override
@@ -94,33 +96,34 @@ public class FilterOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
+  protected MseBlock getNextBlock() {
     // Keep reading the input blocks until we find a match row or all blocks are processed.
     // TODO: Consider batching the rows to improve performance.
     while (true) {
-      TransferableBlock block = _input.nextBlock();
-      if (block.isErrorBlock()) {
+      MseBlock block = _input.nextBlock();
+      if (block.isEos()) {
         return block;
       }
-      if (block.isSuccessfulEndOfStreamBlock()) {
-        return updateEosBlock(block, _statMap);
-      }
-      assert block.isDataBlock();
+      MseBlock.Data dataBlock = (MseBlock.Data) block;
       List<Object[]> rows = new ArrayList<>();
-      for (Object[] row : block.getContainer()) {
+      for (Object[] row : dataBlock.asRowHeap().getRows()) {
         Object filterResult = _filterOperand.apply(row);
         if (BooleanUtils.isTrueInternalValue(filterResult)) {
           rows.add(row);
         }
       }
       if (!rows.isEmpty()) {
-        return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
+        return new RowHeapDataBlock(rows, _dataSchema);
       }
     }
   }
 
+  @Override
+  public StatMap<StatKey> copyStatMaps() {
+    return new StatMap<>(_statMap);
+  }
+
   public enum StatKey implements StatMap.Key {
-    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
@@ -132,8 +135,11 @@ public class FilterOperator extends MultiStageOperator {
       public boolean includeDefaultInJson() {
         return true;
       }
-    };
-    //@formatter:on
+    },
+    /// Allocated memory in bytes for this operator or its children in the same stage.
+    ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
+    /// Time spent on GC while this operator or its children in the same stage were running.
+    GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;
 

@@ -23,13 +23,16 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
+import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.BeforeClass;
@@ -75,6 +78,75 @@ public class LiteralOnlyBrokerRequestTest {
     assertTrue(isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery("SELECT 1, '2', 3")));
     assertTrue(isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery("SELECT 1 FROM myTable")));
     assertTrue(isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery("SELECT 1, '2', 3 FROM myTable")));
+  }
+
+  @Test
+  public void testArrayLiteralBrokerRequestFromSQL()
+      throws Exception {
+    SingleConnectionBrokerRequestHandler requestHandler =
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, null, null, null,
+            mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
+            ThreadAccountantUtils.getNoOpAccountant(), null, null);
+
+    BrokerResponse brokerResponse = requestHandler.handleRequest(
+        "SELECT ARRAY[1, 2] AS ints, ARRAY['one', 'two'] AS strings");
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT_ARRAY);
+    assertEquals(resultTable.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING_ARRAY);
+    assertEquals((int[]) resultTable.getRows().get(0)[0], new int[]{1, 2});
+    assertEquals((String[]) resultTable.getRows().get(0)[1], new String[]{"one", "two"});
+
+    // The SQL-standard and PostgreSQL spellings must produce the same BYTES_ARRAY response.
+    for (String arrayLiteral : List.of("ARRAY[X'00', X'0102']", "ARRAY['\\x00'::bytea, '\\x0102'::bytea]",
+        "ARRAY[CAST('\\x00' AS BYTEA), CAST('\\x0102' AS BYTEA)]")) {
+      brokerResponse = requestHandler.handleRequest("SELECT " + arrayLiteral + " AS bytes");
+      resultTable = brokerResponse.getResultTable();
+      assertEquals(resultTable.getDataSchema().getColumnName(0), "bytes");
+      assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.BYTES_ARRAY);
+      assertEquals(resultTable.getRows().size(), 1);
+      assertEquals(resultTable.getRows().get(0), new Object[]{new String[]{"00", "0102"}});
+    }
+
+    brokerResponse = requestHandler.handleRequest(
+        "SELECT ARRAYS_OVERLAP(ARRAY[X'00', X'0102'], ARRAY[X'03', X'0102']) AS overlaps");
+    resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.BOOLEAN);
+    assertEquals(resultTable.getRows().get(0)[0], true);
+  }
+
+  /// A scalar bytea constant must be answered by the literal-only path exactly like `X'...'`, in both spellings.
+  @Test
+  public void testScalarBytesLiteralBrokerRequestFromSQL()
+      throws Exception {
+    SingleConnectionBrokerRequestHandler requestHandler =
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, null, null, null,
+            mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
+            ThreadAccountantUtils.getNoOpAccountant(), null, null);
+
+    for (String literal : List.of("X'0102'", "'\\x0102'::bytea", "CAST('\\x0102' AS BYTEA)")) {
+      assertTrue(isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery("SELECT " + literal)));
+      BrokerResponse brokerResponse = requestHandler.handleRequest("SELECT " + literal + " AS b");
+      ResultTable resultTable = brokerResponse.getResultTable();
+      assertTrue(brokerResponse.getExceptions().isEmpty(), literal);
+      assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.BYTES, literal);
+      assertEquals(resultTable.getRows().get(0)[0], "0102", literal);
+    }
+
+    // An empty bytea constant is legal in PostgreSQL and yields zero-length BYTES.
+    BrokerResponse brokerResponse = requestHandler.handleRequest("SELECT '\\x'::bytea AS b");
+    assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
+        DataSchema.ColumnDataType.BYTES);
+    assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], "");
+
+    // Constant folding over bytea elements still happens at parse time, so the query stays literal-only.
+    String folded = "SELECT ARRAY_LENGTH(ARRAY['\\x00'::bytea, '\\x0102'::bytea]) AS n";
+    assertTrue(isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(folded)));
+    brokerResponse = requestHandler.handleRequest(folded);
+    assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
+        DataSchema.ColumnDataType.INT);
+    assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], 2);
   }
 
   @Test
@@ -168,8 +240,10 @@ public class LiteralOnlyBrokerRequestTest {
   public void testBrokerRequestHandler()
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
-        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId", null, ACCESS_CONTROL_FACTORY,
-            null, null, null, null, mock(ServerRoutingStatsManager.class));
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, null, null, null,
+            mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
+            ThreadAccountantUtils.getNoOpAccountant(), null, null);
 
     long randNum = RANDOM.nextLong();
     byte[] randBytes = new byte[12];
@@ -192,8 +266,10 @@ public class LiteralOnlyBrokerRequestTest {
   public void testBrokerRequestHandlerWithAsFunction()
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
-        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId", null, ACCESS_CONTROL_FACTORY,
-            null, null, null, null, mock(ServerRoutingStatsManager.class));
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, null, null, null,
+            mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
+            ThreadAccountantUtils.getNoOpAccountant(), null, null);
     long currentTsMin = System.currentTimeMillis();
     BrokerResponse brokerResponse = requestHandler.handleRequest(
         "SELECT now() AS currentTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') AS firstDayOf2020");
@@ -296,7 +372,7 @@ public class LiteralOnlyBrokerRequestTest {
     assertEquals(brokerResponse.getTotalDocs(), 0);
 
     brokerResponse = requestHandler.handleRequest("SELECT fromBase64(0) AS decoded");
-    assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+    assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
 
     brokerResponse = requestHandler.handleRequest(
         "SELECT isSubnetOf('2001:db8:85a3::8a2e:370:7334/62', '2001:0db8:85a3:0003:ffff:ffff:ffff:ffff') "
@@ -314,40 +390,42 @@ public class LiteralOnlyBrokerRequestTest {
     // first argument must be in prefix format
     brokerResponse = requestHandler.handleRequest(
         "SELECT isSubnetOf('2001:db8:85a3::8a2e:370:7334', '2001:0db8:85a3:0003:ffff:ffff:ffff:ffff') AS booleanCol");
-    assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+    assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
 
     // first argument must be in prefix format
     brokerResponse =
         requestHandler.handleRequest("SELECT isSubnetOf('105.25.245.115', '105.25.245.115') AS booleanCol");
-    assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+    assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
 
     // second argument should not be a prefix
     brokerResponse = requestHandler.handleRequest("SELECT isSubnetOf('1.2.3.128/26', '3.175.47.239/26') AS booleanCol");
-    assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+    assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
 
     // second argument should not be a prefix
     brokerResponse = requestHandler.handleRequest("SELECT isSubnetOf('5f3f:bfdb:1bbe:a824:6bf9:0fbb:d358:1889/64', "
         + "'4275:386f:b2b5:0664:04aa:d7bd:0589:6909/64') AS booleanCol");
-    assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+    assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
 
     // invalid prefix length
     brokerResponse = requestHandler.handleRequest(
         "SELECT isSubnetOf('2001:4801:7825:103:be76:4eff::/129', '2001:4801:7825:103:be76:4eff::') AS booleanCol");
-    assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+    assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
 
     // invalid prefix length
     brokerResponse =
         requestHandler.handleRequest("SELECT isSubnetOf('170.189.0.175/33', '170.189.0.175') AS booleanCol");
-    assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+    assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
   }
 
-  /** Tests for EXPLAIN PLAN for literal only queries. */
+  /// Tests for EXPLAIN PLAN for literal only queries.
   @Test
   public void testExplainPlanLiteralOnly()
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
-        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId", null, ACCESS_CONTROL_FACTORY,
-            null, null, null, null, mock(ServerRoutingStatsManager.class));
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, null, null, null,
+            mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
+            ThreadAccountantUtils.getNoOpAccountant(), null, null);
 
     // Test 1: select constant
     BrokerResponse brokerResponse = requestHandler.handleRequest("EXPLAIN PLAN FOR SELECT 1.5, 'test'");

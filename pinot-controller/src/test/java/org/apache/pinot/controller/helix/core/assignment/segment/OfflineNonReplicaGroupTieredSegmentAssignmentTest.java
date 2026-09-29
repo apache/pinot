@@ -19,20 +19,25 @@
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.collect.Lists;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import org.apache.helix.AccessOption;
+import org.apache.helix.HelixManager;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.tier.TierSegmentSelector;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
@@ -43,13 +48,18 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests the {@link OfflineSegmentAssignment#rebalanceTable} method for table with tiers
- */
+/// Tests the [OfflineSegmentAssignment#rebalanceTable] method for table with tiers
 public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
   private static final int NUM_REPLICAS = 3;
   private static final String SEGMENT_NAME_PREFIX = "segment_";
@@ -100,6 +110,24 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
 
   @BeforeClass
   public void setUp() {
+    HelixManager helixManager = mock(HelixManager.class);
+    //noinspection rawtypes
+    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+    when(propertyStore.get(anyString(), eq(null), eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> {
+      String path = invocation.getArgument(0, String.class);
+      String segmentName = path.substring(path.lastIndexOf('/') + 1);
+      return new ZNRecord(segmentName);
+    });
+    // Bulk read of all segment ZK metadata, used to resolve the eligible tier of each segment once per rebalance
+    List<ZNRecord> segmentZNRecords = new ArrayList<>(NUM_SEGMENTS);
+    for (String segmentName : SEGMENTS) {
+      segmentZNRecords.add(new ZNRecord(segmentName));
+    }
+    when(propertyStore.getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt())).thenReturn(
+        segmentZNRecords);
+    //noinspection unchecked
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+
     List<TierConfig> tierConfigList = Lists.newArrayList(
         new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "50d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_A_NAME, null, null),
@@ -111,7 +139,7 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setTierConfigList(tierConfigList).build();
 
-    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig, null);
+    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(helixManager, tableConfig, null);
 
     // {
     //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7,
@@ -119,7 +147,7 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     // }
     InstancePartitions instancePartitionsOffline = new InstancePartitions(INSTANCE_PARTITIONS_NAME);
     instancePartitionsOffline.setInstances(0, 0, INSTANCES);
-    _instancePartitionsMap = Collections.singletonMap(InstancePartitionsType.OFFLINE, instancePartitionsOffline);
+    _instancePartitionsMap = Map.of(InstancePartitionsType.OFFLINE, instancePartitionsOffline);
     InstancePartitions instancePartitionsTierA = new InstancePartitions(TIER_A_INSTANCE_PARTITIONS_NAME);
     instancePartitionsTierA.setInstances(0, 0, INSTANCES_TIER_A);
     InstancePartitions instancePartitionsTierB = new InstancePartitions(TIER_B_INSTANCE_PARTITIONS_NAME);
@@ -250,9 +278,58 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     }
   }
 
-  /**
-   * Selects segment_50 to segment_69 i.e. 20 segments
-   */
+  /// The segment to tier resolution is computed once (single bulk ZK read) at the start of the rebalance and reused
+  /// across the multiple rebalanceTable() invocations of that rebalance. A segment that appears in the current
+  /// assignment only in a later invocation (e.g. after the ideal state changes during a long rebalance) is absent from
+  /// the resolution map, so it is kept on the default instances rather than triggering another ZK read.
+  @Test
+  public void testSegmentAddedAfterInitialBulkReadStaysOnDefaultTier() {
+    HelixManager helixManager = mock(HelixManager.class);
+    //noinspection rawtypes
+    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+    // The initial bulk read only returns the segments that existed when the rebalance started (segment_0 .. 99)
+    List<ZNRecord> segmentZNRecords = new ArrayList<>(NUM_SEGMENTS);
+    for (String segmentName : SEGMENTS) {
+      segmentZNRecords.add(new ZNRecord(segmentName));
+    }
+    //noinspection unchecked
+    when(propertyStore.getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt())).thenReturn(
+        segmentZNRecords);
+    //noinspection unchecked
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+    SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(helixManager,
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build(),
+        null);
+
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    for (String segmentName : SEGMENTS) {
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(INSTANCES.subList(0, NUM_REPLICAS), SegmentStateModel.ONLINE));
+    }
+
+    // First rebalance resolves the segment to tier map from the single bulk read
+    segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _sortedTiers,
+        _tierInstancePartitionsMap, new RebalanceConfig());
+    //noinspection unchecked
+    verify(propertyStore, times(1)).getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt());
+
+    // A new segment that would be eligible for tierC (segId >= 120) appears in the assignment after the initial bulk
+    // read
+    String newSegment = SEGMENT_NAME_PREFIX + 200;
+    currentAssignment.put(newSegment,
+        SegmentAssignmentUtils.getInstanceStateMap(INSTANCES.subList(0, NUM_REPLICAS), SegmentStateModel.ONLINE));
+    Map<String, Map<String, String>> newAssignment =
+        segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _sortedTiers,
+            _tierInstancePartitionsMap, new RebalanceConfig());
+
+    // No second bulk read happens, and the new segment is kept on the default instances (not relocated to tierC)
+    //noinspection unchecked
+    verify(propertyStore, times(1)).getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt());
+    Assert.assertEquals(newAssignment.get(newSegment).size(), NUM_REPLICAS);
+    Assert.assertTrue(INSTANCES.containsAll(newAssignment.get(newSegment).keySet()));
+  }
+
+  /// Selects segment_50 to segment_69 i.e. 20 segments
   private static class TestSegmentSelectorA implements TierSegmentSelector {
     @Override
     public String getType() {
@@ -260,15 +337,13 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     @Override
-    public boolean selectSegment(String tableNameWithType, String segmentName) {
-      int segId = Integer.parseInt(segmentName.split("_")[1]);
+    public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
+      int segId = Integer.parseInt(segmentZKMetadata.getSegmentName().split("_")[1]);
       return segId >= 50 && segId < 70;
     }
   }
 
-  /**
-   * Selects segment_70 to segment_99 i.e. 30 segments
-   */
+  /// Selects segment_70 to segment_99 i.e. 30 segments
   private static class TestSegmentSelectorB implements TierSegmentSelector {
     @Override
     public String getType() {
@@ -276,15 +351,13 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     @Override
-    public boolean selectSegment(String tableNameWithType, String segmentName) {
-      int segId = Integer.parseInt(segmentName.split("_")[1]);
+    public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
+      int segId = Integer.parseInt(segmentZKMetadata.getSegmentName().split("_")[1]);
       return segId >= 70 && segId < 100;
     }
   }
 
-  /**
-   * Selects segments >= segment_120 i.e. 0 segments
-   */
+  /// Selects segments >= segment_120 i.e. 0 segments
   private static class TestSegmentSelectorC implements TierSegmentSelector {
     @Override
     public String getType() {
@@ -292,8 +365,8 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     @Override
-    public boolean selectSegment(String tableNameWithType, String segmentName) {
-      int segId = Integer.parseInt(segmentName.split("_")[1]);
+    public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
+      int segId = Integer.parseInt(segmentZKMetadata.getSegmentName().split("_")[1]);
       return segId >= 120;
     }
   }

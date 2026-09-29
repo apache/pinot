@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.query.catalog;
 
-import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.rel.type.RelProtoDataType;
@@ -38,49 +38,62 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import static java.util.Objects.requireNonNull;
 
 
-/**
- * Simple Catalog that only contains list of tables. Backed by {@link TableCache}.
- *
- * <p>Catalog is needed for utilizing Apache Calcite's validator, which requires a root schema to store the
- * entire catalog. In Pinot, since we don't have nested sub-catalog concept, we just return a flat list of schemas.
- */
+/// Simple Catalog that only contains list of tables. Backed by [TableCache].
+///
+/// Catalog is needed for utilizing Apache Calcite's validator, which requires a root schema to store the
+/// entire catalog. In Pinot, since we don't have nested sub-catalog concept, we just return a flat list of schemas.
 public class PinotCatalog implements Schema {
 
   private final TableCache _tableCache;
   private final String _databaseName;
+  private boolean _excludeVirtualColumns = false;
 
-  /**
-   * PinotCatalog needs have access to the actual {@link TableCache} object because TableCache hosts the actual
-   * table available for query and processes table/segment metadata updates when cluster status changes.
-   */
+  /// PinotCatalog needs have access to the actual [TableCache] object because TableCache hosts the actual
+  /// table available for query and processes table/segment metadata updates when cluster status changes.
   public PinotCatalog(TableCache tableCache, String databaseName) {
     _tableCache = tableCache;
     _databaseName = databaseName;
   }
 
-  /**
-   * Acquire a table by its name.
-   * @param name name of the table.
-   * @return table object used by calcite planner.
-   */
+  /// Configures whether virtual columns should be excluded from table schemas.
+  /// This is typically used for NATURAL JOIN operations where virtual columns
+  /// should not participate in join condition matching.
+  public void configureVirtualColumnExclusion(boolean excludeVirtualColumns) {
+    _excludeVirtualColumns = excludeVirtualColumns;
+  }
+
+  /// Acquire a table by its name.
+  /// @param name name of the table.
+  /// @return table object used by calcite planner.
+  @Nullable
   @Override
   public Table getTable(String name) {
     String rawTableName = TableNameBuilder.extractRawTableName(name);
     String physicalTableName = DatabaseUtils.translateTableName(rawTableName, _databaseName);
     String tableName = _tableCache.getActualTableName(physicalTableName);
-    Preconditions.checkArgument(tableName != null, String.format("Table does not exist: '%s'", physicalTableName));
+
+    if (tableName == null) {
+      tableName = _tableCache.getActualLogicalTableName(physicalTableName);
+    }
+
+    if (tableName == null) {
+      return null;
+    }
     org.apache.pinot.spi.data.Schema schema = _tableCache.getSchema(tableName);
-    Preconditions.checkArgument(schema != null, String.format("Could not find schema for table: '%s'", tableName));
-    return new PinotTable(schema);
+    if (schema == null) {
+      return null;
+    }
+
+    return new PinotTable(schema, _excludeVirtualColumns);
   }
 
-  /**
-   * acquire a set of available table names.
-   * @return the set of table names at the time of query planning.
-   */
+  /// acquire a set of available table names.
+  /// @return the set of table names at the time of query planning.
   @Override
   public Set<String> getTableNames() {
-    return _tableCache.getTableNameMap().keySet().stream().filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
+    return Stream.concat(_tableCache.getTableNameMap().keySet().stream(),
+            _tableCache.getLogicalTableNameMap().keySet().stream())
+        .filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
         .collect(Collectors.toSet());
   }
 

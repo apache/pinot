@@ -57,7 +57,7 @@ public class RealtimeSegmentStatsHistoryTest {
     String columName = "col1";
 
     {
-      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
+      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserializeFrom(serializedFile);
       RealtimeSegmentStatsHistory.SegmentStats segmentStats = new RealtimeSegmentStatsHistory.SegmentStats();
       segmentStats.setMemUsedBytes(100);
       segmentStats.setNumSeconds(101);
@@ -72,7 +72,7 @@ public class RealtimeSegmentStatsHistoryTest {
       history.addSegmentStats(segmentStats);
     }
     {
-      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
+      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserializeFrom(serializedFile);
       Assert.assertTrue(history.getEstimatedAvgColSize(columName) > 0);
       Assert.assertTrue(history.getEstimatedCardinality(columName) > 0);
       Assert.assertEquals(history.getEstimatedRowsToIndex(), 103);
@@ -90,7 +90,7 @@ public class RealtimeSegmentStatsHistoryTest {
     int maxNumEntries = RealtimeSegmentStatsHistory.getMaxNumEntries();
     int segmentId = 0;
     {
-      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
+      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserializeFrom(serializedFile);
       // We should have got an empty one here.
 
       history.getEstimatedAvgColSize("1");
@@ -113,7 +113,7 @@ public class RealtimeSegmentStatsHistoryTest {
       maxNumEntries += 2;
       RealtimeSegmentStatsHistory.setMaxNumEntries(maxNumEntries);
       // Deserialize
-      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
+      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserializeFrom(serializedFile);
       Assert.assertEquals(history.isFull(), false);
       Assert.assertEquals(history.getArraySize(), maxNumEntries);
       Assert.assertEquals(history.getCursor(), prevMax - 1);
@@ -157,7 +157,7 @@ public class RealtimeSegmentStatsHistoryTest {
       maxNumEntries -= 2;
       RealtimeSegmentStatsHistory.setMaxNumEntries(maxNumEntries);
 
-      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
+      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserializeFrom(serializedFile);
       Assert.assertEquals(history.isFull(), true);
       Assert.assertEquals(history.getArraySize(), maxNumEntries);
       Assert.assertEquals(history.getCursor(), 0);
@@ -174,7 +174,7 @@ public class RealtimeSegmentStatsHistoryTest {
       maxNumEntries += 2;
       RealtimeSegmentStatsHistory.setMaxNumEntries(maxNumEntries);
 
-      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
+      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserializeFrom(serializedFile);
       Assert.assertEquals(history.isFull(), false);
       Assert.assertEquals(history.getArraySize(), maxNumEntries);
       Assert.assertEquals(history.getCursor(), prevMax);
@@ -185,7 +185,7 @@ public class RealtimeSegmentStatsHistoryTest {
     boolean savedIsFull;
     int savedCursor;
     {
-      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
+      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserializeFrom(serializedFile);
       Assert.assertEquals(history.getEstimatedAvgColSize("new"), RealtimeSegmentStatsHistory.getDefaultEstAvgColSize());
       Assert
           .assertEquals(history.getEstimatedCardinality("new"), RealtimeSegmentStatsHistory.getDefaultEstCardinality());
@@ -193,7 +193,7 @@ public class RealtimeSegmentStatsHistoryTest {
       savedCursor = history.getCursor();
     }
     {
-      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
+      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserializeFrom(serializedFile);
       Assert.assertEquals(history.isFull(), savedIsFull);
       Assert.assertEquals(history.getCursor(), savedCursor);
     }
@@ -210,7 +210,7 @@ public class RealtimeSegmentStatsHistoryTest {
     File serializedFile = new File(tmpDir, STATS_FILE_NAME);
     FileUtils.deleteQuietly(serializedFile);
     serializedFile.deleteOnExit();
-    RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
+    RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserializeFrom(serializedFile);
 
     for (int i = 0; i < numThreads; i++) {
       threads[i] = new Thread(new StatsUpdater(statsHistory, numIterations, avgSleepTimeMs));
@@ -235,7 +235,7 @@ public class RealtimeSegmentStatsHistoryTest {
     File v1StatsFile = new File(
         TestUtils.getFileFromResourceUrl(RealtimeSegmentStatsHistoryTest.class.getClassLoader().getResource("data")),
         fileName);
-    RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(v1StatsFile);
+    RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserializeFrom(v1StatsFile);
     RealtimeSegmentStatsHistory.SegmentStats segmentStats = statsHistory.getSegmentStatsAt(0);
     RealtimeSegmentStatsHistory.ColumnStats columnStats;
 
@@ -261,7 +261,7 @@ public class RealtimeSegmentStatsHistoryTest {
     FileUtils.deleteQuietly(serializedFile);
     long[] memoryValues = {100, 100, 200, 400, 450, 600};
 
-    RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
+    RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserializeFrom(serializedFile);
     Assert.assertEquals(history.getLatestSegmentMemoryConsumed(), -1);
     RealtimeSegmentStatsHistory.SegmentStats segmentStats = null;
 

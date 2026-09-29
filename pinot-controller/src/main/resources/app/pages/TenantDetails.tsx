@@ -17,12 +17,13 @@
  * under the License.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Box, Button, FormControlLabel, Grid, Switch, Tooltip, Typography } from '@material-ui/core';
+import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography, CircularProgress, Menu, MenuItem, Chip } from '@material-ui/core';
+import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
-import { DISPLAY_SEGMENT_STATUS, InstanceState, TableData, TableSegmentJobs, TableType } from 'Models';
+import { DISPLAY_SEGMENT_STATUS, InstanceState, TableData, TableSegmentJobs, TableType, ConsumingSegmentsInfo, PauseStatusDetails } from 'Models';
 import AppLoader from '../components/AppLoader';
 import CustomizedTables from '../components/Table';
 import TableToolbar from '../components/TableToolbar';
@@ -37,6 +38,7 @@ import EditConfigOp from '../components/Homepage/Operations/EditConfigOp';
 import ReloadStatusOp from '../components/Homepage/Operations/ReloadStatusOp';
 import RebalanceServerTableOp from '../components/Homepage/Operations/RebalanceServerTableOp';
 import Confirm from '../components/Confirm';
+import CustomDialog from '../components/CustomDialog';
 import { NotificationContext } from '../components/Notification/NotificationContext';
 import Utils from '../utils/Utils';
 import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
@@ -44,6 +46,11 @@ import { get, isEmpty } from "lodash";
 import { SegmentStatusRenderer } from '../components/SegmentStatusRenderer';
 import Skeleton from '@material-ui/lab/Skeleton';
 import NotFound from '../components/NotFound';
+import {
+  RebalanceServerStatusOp
+} from "../components/Homepage/Operations/RebalanceServerStatusOp";
+import ConsumingSegmentsTable from '../components/ConsumingSegmentsTable';
+import StatusFilter from '../components/StatusFilter';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -80,6 +87,20 @@ const useStyles = makeStyles((theme) => ({
   copyIdButton: {
     paddingBlock: 0,
     marginLeft: 10
+  }
+  ,
+  // Status pill styles
+  statusActive: {
+    backgroundColor: '#4CAF50',
+    color: 'white'
+  },
+  statusPaused: {
+    backgroundColor: '#f44336',
+    color: 'white'
+  },
+  statusPausing: {
+    backgroundColor: '#ff9800',
+    color: 'white'
   }
 }));
 
@@ -130,13 +151,37 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const [showEditConfig, setShowEditConfig] = useState(false);
   const [config, setConfig] = useState('{}');
 
-  const instanceColumns = ["Instance Name", "# of segments"];
+  const instanceColumns = ["Instance Name", "# of segments", "Status"];
   const loadingInstanceData = Utils.getLoadingTableData(instanceColumns);
   const [instanceCountData, setInstanceCountData] = useState<TableData>(loadingInstanceData);
 
   const segmentListColumns = ['Segment Name', 'Status'];
   const loadingSegmentList = Utils.getLoadingTableData(segmentListColumns);
   const [segmentList, setSegmentList] = useState<TableData>(loadingSegmentList);
+  const [segmentStatusFilter, setSegmentStatusFilter] = useState<'ALL' | DISPLAY_SEGMENT_STATUS | 'BAD_OR_UPDATING'>('ALL');
+  const displaySegmentList = useMemo(() => {
+    const filtered = segmentList.records.filter(([_, status]) => {
+      const value = typeof status === 'object' && status !== null && 'value' in status ? status.value as DISPLAY_SEGMENT_STATUS : status as DISPLAY_SEGMENT_STATUS;
+      if (segmentStatusFilter === 'ALL') return true;
+      if (segmentStatusFilter === 'BAD_OR_UPDATING') return value !== DISPLAY_SEGMENT_STATUS.GOOD;
+      return value === segmentStatusFilter;
+    });
+    return { ...segmentList, records: filtered };
+  }, [segmentList, segmentStatusFilter]);
+
+  const segmentStatusFilterElement = (
+    <StatusFilter
+      value={segmentStatusFilter}
+      onChange={setSegmentStatusFilter}
+      options={[
+        { label: 'All', value: 'ALL' },
+        { label: 'Bad or Updating', value: 'BAD_OR_UPDATING' },
+        { label: 'Bad', value: DISPLAY_SEGMENT_STATUS.BAD },
+        { label: 'Updating', value: DISPLAY_SEGMENT_STATUS.UPDATING },
+        { label: 'Good', value: DISPLAY_SEGMENT_STATUS.GOOD },
+      ]}
+    />
+  );
 
   const [tableSchema, setTableSchema] = useState<TableData>({
     columns: [],
@@ -151,6 +196,32 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const [tableJobsData, setTableJobsData] = useState<TableSegmentJobs | null>(null);
   const [showRebalanceServerModal, setShowRebalanceServerModal] = useState(false);
   const [schemaJSONFormat, setSchemaJSONFormat] = useState(false);
+  const [showRebalanceServerStatus, setShowRebalanceServerStatus] = useState(false);
+  // State for consuming segments info
+  const [showConsumingSegmentsModal, setShowConsumingSegmentsModal] = useState(false);
+  const [loadingConsumingSegments, setLoadingConsumingSegments] = useState(false);
+  const [consumingSegmentsInfo, setConsumingSegmentsInfo] = useState<ConsumingSegmentsInfo | null>(null);
+  // State for pause status of realtime tables
+  const [loadingPauseStatus, setLoadingPauseStatus] = useState(false);
+  const [pauseStatusData, setPauseStatusData] = useState<PauseStatusDetails | null>(null);
+  // State for rebalance operations menu
+  const [rebalanceMenuAnchorEl, setRebalanceMenuAnchorEl] = useState<null | HTMLElement>(null);
+  // State for pause/resume action progress and polling
+  const [isPauseActionInProgress, setIsPauseActionInProgress] = useState(false);
+  const [pauseActionType, setPauseActionType] = useState<'pause' | 'resume' | null>(null);
+  const pausePollingRef = useRef<number | null>(null);
+
+  // This is quite hacky, but it's the only way to get this to work with the dialog.
+  // The useState variables are simply for the dialog box to know what to render in
+  // the checkbox fields. The actual state of the checkboxes is stored in the refs.
+  // The refs are then used to determine how we delete the table. If you try to use
+  // the state variables in this class, you will not be able to get their latest values.
+  const [dialogCheckboxes, setDialogCheckboxes] = useState({
+    deleteImmediately: false,
+    deleteSchema: false
+  });
+  const deleteImmediatelyRef = useRef(false);
+  const deleteSchemaRef = useRef(false);
 
   const fetchTableData = async () => {
     // We keep all the fetching inside this component since we need to be able
@@ -181,16 +252,20 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     PinotMethodUtils.getTableSummaryData(tableName).then((result) => {
       setTableSummary(result);
     });
-    fetchSegmentData()
+    fetchSegmentData();
+    // (pause status fetched by effect after tableType is set)
   }
 
   const fetchSegmentData = async () => {
     const result = await PinotMethodUtils.getSegmentList(tableName);
     const data = await PinotMethodUtils.fetchServerToSegmentsCountData(tableName, tableType);
+    const liveInstanceNames = await PinotMethodUtils.getLiveInstances();
     const {columns, records} = result;
     setInstanceCountData({
       columns: instanceColumns,
-      records: data.records
+      records: data.records.map((record) => {
+        return [...record, liveInstanceNames.data.includes(record[0]) ? 'Alive' : 'Dead'];
+      })
     });
 
     const segmentTableRows = [];
@@ -198,6 +273,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
       segmentTableRows.push([
         name,
         {
+          value: status,
           customRenderer: (
             <SegmentStatusRenderer
               segmentName={name}
@@ -217,7 +293,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     if(result.error){
       setSchemaJSON(null);
       setTableSchema({
-        columns: ['Column', 'Type', 'Field Type', 'Multi Value'],
+        columns: ['Column', 'Type', 'Field Type', 'Multi Value', 'Primary Key'],
         records: []
       });
     } else {
@@ -254,6 +330,26 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   useEffect(() => {
     fetchTableData();
   }, []);
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pausePollingRef.current) {
+        clearInterval(pausePollingRef.current);
+      }
+    };
+  }, []);
+  // Fetch pause status once tableType is known
+  useEffect(() => {
+    if (tableType.toLowerCase() === TableType.REALTIME) {
+      setLoadingPauseStatus(true);
+      PinotMethodUtils.getPauseStatusData(tableName)
+        .then((data: PauseStatusDetails) => setPauseStatusData(data))
+        .catch((error: any) => dispatch({ type: 'error', message: `Error fetching pause status: ${error}`, show: true }))
+        .finally(() => setLoadingPauseStatus(false));
+    } else {
+      setPauseStatusData(null);
+    }
+  }, [tableType, tableName]);
 
   const handleSwitchChange = (event) => {
     setDialogDetails({
@@ -299,45 +395,66 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   };
 
   const handleDeleteTableAction = () => {
+    // Set checkboxes to the last state when opening dialog
+    setDialogCheckboxes({
+      deleteImmediately: deleteImmediatelyRef.current,
+      deleteSchema: deleteSchemaRef.current
+    });
+
     setDialogDetails({
       title: 'Delete Table',
-      content: 'Are you sure want to delete this table? All data and configs will be deleted.',
-      successCb: () => deleteTable()
+      content:
+        'Are you sure want to delete this table? All data and configs will be deleted.',
+      successCb: () => {
+        deleteTable();
+      },
+      renderChildren: true,
     });
     setConfirmDialog(true);
   };
 
   const deleteTable = async () => {
-    const result = await PinotMethodUtils.deleteTableOp(tableName);
-    if(result.status){
-      dispatch({type: 'success', message: result.status, show: true});
-    } else {
-      dispatch({type: 'error', message: result.error, show: true});
-    }
-    closeDialog();
-    if(result.status){
-      setTimeout(()=>{
-        if(tenantName){
-          history.push(Utils.navigateToPreviousPage(location, true));  
-        } else {
-          history.push('/tables');
+    let message = '';
+    let tableDeleted = false;
+    let schemaDeleted = false;
+
+    try {
+      const tableRes = await PinotMethodUtils.deleteTableOp(tableName, deleteImmediatelyRef.current ? '0d' : undefined);
+
+      if (tableRes.status) {
+        message = tableRes.status;
+        tableDeleted = true;
+
+        if (deleteSchemaRef.current) {
+          const schemaRes = await PinotMethodUtils.deleteSchemaOp(schemaJSON.schemaName);
+          if (schemaRes.status) {
+            message += ". " + schemaRes.status;
+            schemaDeleted = true;
+          } else {
+            message += ". " + schemaRes.error || "Unknown error deleting schema";
+          }
         }
-      }, 1000);
+      } else {
+        message = tableRes.error || "Unknown error deleting table";
+      }
+
+      const isSuccess = tableDeleted && (!deleteSchemaRef.current || schemaDeleted);
+      dispatch({ type: isSuccess ? 'success' : 'error', message, show: true });
+      closeDialog();
+
+      if (tableDeleted) {
+        setTimeout(() => {
+          if (tenantName) {
+            history.push(Utils.navigateToPreviousPage(location, true));
+          } else {
+            history.push('/tables');
+          }
+        }, 1000);
+      }
+    } catch (error) {
+      dispatch({ type: 'error', message: error.toString(), show: true });
+      closeDialog();
     }
-  };
-
-  const handleDeleteSchemaAction = () => {
-    setDialogDetails({
-      title: 'Delete Schema',
-      content: 'Are you sure want to delete this schema? Any tables using this schema might not function correctly.',
-      successCb: () => deleteSchema()
-    });
-    setConfirmDialog(true);
-  };
-
-  const deleteSchema = async () => {
-    const result = await PinotMethodUtils.deleteSchemaOp(schemaJSON.schemaName);
-    syncResponse(result);
   };
 
   const handleReloadSegments = () => {
@@ -372,18 +489,18 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     const customMessage = (
       <Box>
         <Typography variant='inherit'>{result.status}</Typography>
-        <Button 
-          className={classes.copyIdButton} 
-          variant="outlined" 
-          color="inherit" 
-          size="small" 
+        <Button
+          className={classes.copyIdButton}
+          variant="outlined"
+          color="inherit"
+          size="small"
           onClick={handleCopyReloadJobId}
         >
           Copy Id
         </Button>
       </Box>
     )
-    
+
     syncResponse(result, reloadJobId && customMessage);
   };
 
@@ -400,12 +517,30 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         setShowReloadStatusModal(false);
         return;
       }
-      
+
       setReloadStatusData(reloadStatusData);
       setTableJobsData(tableJobsData);
     } catch(error) {
       dispatch({type: 'error', message: error, show: true});
       setShowReloadStatusModal(false);
+    }
+  };
+
+  const handleRebalanceTableStatus = () => {
+    setShowRebalanceServerStatus(true);
+  };
+  // Handler to view consuming segments info
+  const handleViewConsumingSegments = async () => {
+    setShowConsumingSegmentsModal(true);
+    setLoadingConsumingSegments(true);
+    try {
+      const data = await PinotMethodUtils.getConsumingSegmentsInfoData(tableName);
+      setConsumingSegmentsInfo(data);
+    } catch (error) {
+      dispatch({ type: 'error', message: `Error fetching consuming segments info: ${error}` });
+      setShowConsumingSegmentsModal(false);
+    } finally {
+      setLoadingConsumingSegments(false);
     }
   };
 
@@ -417,10 +552,91 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     });
     setConfirmDialog(true);
   };
-  
+
   const rebalanceBrokers = async () => {
     const result = await PinotMethodUtils.rebalanceBrokersForTableOp(tableName);
     syncResponse(result);
+  };
+
+  const handleRepairTable = () => {
+    setDialogDetails({
+      title: 'Repair Table',
+      content: 'This action will trigger RealtimeSegmentValidationManager periodic task on Controller which will try to fix stuck consumers and segments in ERROR state. Continue?',
+      successCb: () => repairTable()
+    });
+    setConfirmDialog(true);
+  };
+
+  const repairTable = async () => {
+    try {
+      const result = await PinotMethodUtils.repairTableOp(tableName, tableType);
+      dispatch({type: 'success', message: 'RealtimeSegmentValidationManager triggered successfully with id: ' + result.taskId, show: true});
+      closeDialog();
+    } catch (error) {
+      dispatch({type: 'error', message: 'Failed to trigger RealtimeSegmentValidationManager with error: ' + error, show: true});
+    }
+  };
+  // Pause or resume consumption for realtime tables with polling status
+  const doPauseResume = async () => {
+    const willPause = !pauseStatusData?.pauseFlag;
+    setPauseActionType(willPause ? 'pause' : 'resume');
+    setIsPauseActionInProgress(true);
+    try {
+      const result: PauseStatusDetails = willPause
+        ? await PinotMethodUtils.pauseConsumptionOp(tableName, "Pause Triggered from Admin UI")
+        : await PinotMethodUtils.resumeConsumptionOp(tableName, "Resume Triggered from Admin UI", "lastConsumed");
+      dispatch({
+        type: 'success',
+        message: willPause
+          ? "Pause Flag set in Ideal state, waiting for consuming segments to commit"
+          : "Pause flag cleared, waiting for consumption to resume",
+        show: true
+      });
+      if (pausePollingRef.current) {
+        clearInterval(pausePollingRef.current);
+      }
+      pausePollingRef.current = window.setInterval(async () => {
+        try {
+          const status = await PinotMethodUtils.getPauseStatusData(tableName);
+          setPauseStatusData(status);
+          const settled = willPause
+            ? (status.pauseFlag && (!status.consumingSegments || status.consumingSegments.length === 0))
+            : !status.pauseFlag;
+          if (settled) {
+            if (pausePollingRef.current) {
+              clearInterval(pausePollingRef.current);
+            }
+            setIsPauseActionInProgress(false);
+            setPauseActionType(null);
+          }
+        } catch {
+          // ignore polling errors
+        }
+      }, 5000);
+    } catch (error) {
+      dispatch({
+        type: 'error',
+        message: `Error during ${pauseStatusData?.pauseFlag ? 'resume' : 'pause'}: ${error}`,
+        show: true
+      });
+      setIsPauseActionInProgress(false);
+      setPauseActionType(null);
+    }
+  };
+
+  const handlePauseResume = () => {
+    const willPause = !pauseStatusData?.pauseFlag;
+    setDialogDetails({
+      title: willPause ? 'Pause consumption' : 'Resume consumption',
+      content: willPause
+        ? 'Are you sure you want to pause consumption of this realtime table?'
+        : 'Are you sure you want to resume consumption of this realtime table?',
+      successCb: () => {
+        closeDialog();
+        doPauseResume();
+      }
+    });
+    setConfirmDialog(true);
   };
 
   const closeDialog = () => {
@@ -480,20 +696,6 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                 Edit Schema
               </CustomButton>
               <CustomButton
-                isDisabled={!schemaJSON} onClick={handleDeleteSchemaAction}
-                tooltipTitle="Delete Schema"
-                enableTooltip={true}
-              >
-                Delete Schema
-              </CustomButton>
-              <CustomButton
-                isDisabled={true} onClick={()=>{}}
-                tooltipTitle="Truncate Table"
-                enableTooltip={true}
-              >
-                Truncate Table
-              </CustomButton>
-              <CustomButton
                 onClick={handleReloadSegments}
                 tooltipTitle="Reloads all segments of the table to apply changes such as indexing, column default values, etc"
                 enableTooltip={true}
@@ -507,20 +709,78 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
               >
                 Reload Status
               </CustomButton>
+              {/* Rebalance operations dropdown */}
               <CustomButton
-                onClick={()=>{setShowRebalanceServerModal(true);}}
-                tooltipTitle="Recalculates the segment to server mapping for this table"
+                onClick={(e) => setRebalanceMenuAnchorEl(e.currentTarget)}
+                tooltipTitle="Rebalance operations"
+                enableTooltip={false}
+              >
+                Rebalance <ArrowDropDownIcon />
+              </CustomButton>
+              <Menu
+                anchorEl={rebalanceMenuAnchorEl}
+                keepMounted
+                open={Boolean(rebalanceMenuAnchorEl)}
+                onClose={() => setRebalanceMenuAnchorEl(null)}
+              >
+                <MenuItem onClick={() => { setShowRebalanceServerModal(true); setRebalanceMenuAnchorEl(null); }}>
+                  Rebalance Servers
+                </MenuItem>
+                <MenuItem onClick={() => { setShowRebalanceServerStatus(true); setRebalanceMenuAnchorEl(null); }}>
+                  Rebalance Servers Status
+                </MenuItem>
+                <MenuItem onClick={() => { handleRebalanceBrokers(); setRebalanceMenuAnchorEl(null); }}>
+                  Rebalance Brokers
+                </MenuItem>
+              </Menu>
+              {tableType.toLowerCase() === TableType.REALTIME && (
+                <CustomButton
+                  onClick={handleRepairTable}
+                  tooltipTitle="Triggers RealtimeSegmentValidationManager periodic task. Use this to fix missing CONSUMING segments or segments in ERROR state."
+                  enableTooltip={true}
+                >
+                 Repair Table
+                </CustomButton>
+              )}
+             {/* Button to view consuming segments info */}
+             {tableType.toLowerCase() === TableType.REALTIME && (
+              <CustomButton
+                onClick={handleViewConsumingSegments}
+                tooltipTitle="View offset and lag information about consuming segments"
                 enableTooltip={true}
               >
-                Rebalance Servers
+                View Consuming Segments
               </CustomButton>
-              <CustomButton
-                onClick={handleRebalanceBrokers}
-                tooltipTitle="Rebuilds brokerResource mapping for this table"
-                enableTooltip={true}
-              >
-                Rebalance Brokers
-              </CustomButton>
+              )}
+              {/* Toggle realtime consumption */}
+              {tableType.toLowerCase() === TableType.REALTIME && (
+                <Tooltip
+                  title={
+                    pauseStatusData?.pauseFlag
+                      ? 'Resume consumption of realtime table'
+                      : 'Pause consumption of realtime table. This will force the table to commit all consuming segments.'
+                  }
+                  arrow
+                  placement="top"
+                >
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={!pauseStatusData?.pauseFlag}
+                        onChange={handlePauseResume}
+                        name="consumptionEnabled"
+                        color="primary"
+                        disabled={
+                          loadingPauseStatus ||
+                          isPauseActionInProgress ||
+                          (pauseStatusData?.pauseFlag && pauseStatusData?.consumingSegments?.length > 0)
+                        }
+                      />
+                    }
+                    label="Consume"
+                  />
+                </Tooltip>
+              )}
               <Tooltip title="Disabling will disable the table for queries, consumption and data push" arrow placement="top">
               <FormControlLabel
                 control={
@@ -540,10 +800,54 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         <div className={classes.highlightBackground}>
           <TableToolbar name="Summary" showSearchBox={false} />
           <Grid container spacing={2} alignItems="center" className={classes.body}>
-            <Grid item xs={4}>
-              <strong>Table Name:</strong> {tableSummary.tableName}
+            <Grid item xs={3}>
+              <div
+                style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}
+                title={tableSummary.tableName}
+              >
+                <strong>Table Name:</strong> {tableSummary.tableName}
+              </div>
             </Grid>
-            <Grid item container xs={4} wrap="nowrap" spacing={1}>
+            {tableType.toLowerCase() === TableType.REALTIME && (
+              <Grid item xs={3}>
+                <Box display="flex" alignItems="center">
+                  <strong>Consuming status:</strong>
+                  {loadingPauseStatus ? (
+                    <CircularProgress size={16} style={{ marginLeft: 8 }} />
+                  ) : pauseStatusData ? (
+                    <Chip
+                      label={
+                        isPauseActionInProgress
+                          ? (pauseActionType === 'pause' ? 'PAUSING...' : 'RESUMING...')
+                          : (pauseStatusData.pauseFlag
+                              ? (pauseStatusData.consumingSegments && pauseStatusData.consumingSegments.length > 0
+                                  ? 'PAUSING'
+                                  : 'PAUSED')
+                              : 'ACTIVE')
+                      }
+                      className={
+                        isPauseActionInProgress
+                          ? classes.statusPausing
+                          : (pauseStatusData.pauseFlag
+                              ? (pauseStatusData.consumingSegments && pauseStatusData.consumingSegments.length > 0
+                                  ? classes.statusPausing
+                                  : classes.statusPaused)
+                              : classes.statusActive)
+                      }
+                      size="small"
+                      style={{ marginLeft: 8 }}
+                    />
+                  ) : (
+                    <Box ml={1}>N/A</Box>
+                  )}
+                </Box>
+              </Grid>
+            )}
+            <Grid item container xs={3} wrap="nowrap" spacing={1}>
               <Grid item>
                 <Tooltip title="Uncompressed size of all data segments with replication" arrow placement="top">
                   <strong>Reported Size:</strong>
@@ -557,7 +861,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                 }
               </Grid>
             </Grid>
-            <Grid item container xs={4} wrap="nowrap" spacing={1}>
+            <Grid item container xs={3} wrap="nowrap" spacing={1}>
               <Grid item>
                 <Tooltip title="Estimated size of all data segments with replication, in case any servers are not reachable for actual size" arrow placement="top-start">
                   <strong>Estimated Size: </strong>
@@ -588,10 +892,10 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                   autoCursor={false}
                 />
               </SimpleAccordion>
-            </div>
+              </div>
             <CustomizedTables
               title={"Segments - " + segmentList.records.length}
-              data={segmentList}
+              data={displaySegmentList}
               baseURL={
                 tenantName && `/tenants/${tenantName}/table/${tableName}/` ||
                 instanceName && `/instance/${instanceName}/table/${tableName}/` ||
@@ -600,6 +904,19 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
               addLinks
               showSearchBox={true}
               inAccordionFormat={true}
+              additionalControls={
+                <StatusFilter
+                  value={segmentStatusFilter}
+                  onChange={setSegmentStatusFilter}
+                  options={[
+                    { label: 'All', value: 'ALL' },
+                    { label: 'Bad or Updating', value: 'BAD_OR_UPDATING' },
+                    { label: 'Bad', value: DISPLAY_SEGMENT_STATUS.BAD },
+                    { label: 'Updating', value: DISPLAY_SEGMENT_STATUS.UPDATING },
+                    { label: 'Good', value: DISPLAY_SEGMENT_STATUS.GOOD },
+                  ]}
+                />
+              }
             />
           </Grid>
           <Grid item xs={6}>
@@ -647,35 +964,126 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         </Grid>
         <EditConfigOp
           showModal={showEditConfig}
-          hideModal={()=>{setShowEditConfig(false);}}
+          hideModal={() => {
+            setShowEditConfig(false);
+          }}
           saveConfig={saveConfigAction}
           config={config}
           handleConfigChange={handleConfigChange}
         />
-        {
-          showReloadStatusModal &&
+        {showReloadStatusModal && (
           <ReloadStatusOp
-            hideModal={()=>{setShowReloadStatusModal(false); setReloadStatusData(null)}}
+            hideModal={() => {
+              setShowReloadStatusModal(false);
+              setReloadStatusData(null);
+            }}
             reloadStatusData={reloadStatusData}
             tableJobsData={tableJobsData}
           />
-        }
-        {showRebalanceServerModal &&
+        )}
+        {showRebalanceServerStatus && (
+            <RebalanceServerStatusOp
+                hideModal={() => setShowRebalanceServerStatus(false)}
+                tableName={tableName} />
+        )}
+        {showRebalanceServerModal && (
           <RebalanceServerTableOp
-            hideModal={()=>{setShowRebalanceServerModal(false)}}
+            hideModal={() => {
+              setShowRebalanceServerModal(false);
+            }}
             tableType={tableType.toUpperCase()}
             tableName={tableName}
           />
-        }
-        {confirmDialog && dialogDetails && <Confirm
-          openDialog={confirmDialog}
-          dialogTitle={dialogDetails.title}
-          dialogContent={dialogDetails.content}
-          successCallback={dialogDetails.successCb}
-          closeDialog={closeDialog}
-          dialogYesLabel='Yes'
-          dialogNoLabel='No'
-        />}
+        )}
+        {/* Consuming Segments Info Dialog */}
+        {showConsumingSegmentsModal && (
+          <CustomDialog
+            open={showConsumingSegmentsModal}
+            handleClose={() => setShowConsumingSegmentsModal(false)}
+            title="Consuming Segments Info"
+            size="lg"
+            showOkBtn={false}
+            btnCancelText="Close"
+            disableBackdropClick
+          >
+            {loadingConsumingSegments && (
+              <Box display="flex" justifyContent="center">
+                <CircularProgress />
+              </Box>
+            )}
+            {!loadingConsumingSegments && consumingSegmentsInfo && (
+              <Box style={{ height: '100%', overflowY: 'auto' }}>
+                <Typography><strong>Servers Failing To Respond:</strong> {consumingSegmentsInfo?.serversFailingToRespond ?? 'N/A'}</Typography>
+                <Typography><strong>Servers Unparsable Respond:</strong> {consumingSegmentsInfo?.serversUnparsableRespond ?? 'N/A'}</Typography>
+                <Box mt={2}>
+                  <ConsumingSegmentsTable info={consumingSegmentsInfo} />
+                </Box>
+              </Box>
+            )}
+            {!loadingConsumingSegments && !consumingSegmentsInfo && (
+              <Typography>No consuming segments data available.</Typography>
+            )}
+          </CustomDialog>
+        )}
+        {confirmDialog && dialogDetails && (
+          <Confirm
+            openDialog={confirmDialog}
+            dialogTitle={dialogDetails.title}
+            dialogContent={dialogDetails.content}
+            successCallback={dialogDetails.successCb}
+            children={
+              dialogDetails.renderChildren && <>
+                <Tooltip
+                  title="Delete table and all segments immediately.
+                         If not checked, all segments will be copied over to a separate path
+                         and kept until the cluster default retention period is met."
+                  arrow
+                  placement="right"
+                >
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={dialogCheckboxes.deleteImmediately}
+                        onChange={(e) => {
+                          const { checked } = e.target;
+                          setDialogCheckboxes(prev => ({
+                            ...prev,
+                            deleteImmediately: checked
+                          }));
+                          deleteImmediatelyRef.current = checked
+                        }}
+                        color="primary"
+                      />
+                    }
+                    label="Delete Immediately"
+                  />
+                </Tooltip>
+                <Tooltip title="If the table is successfully deleted, also delete the schema associated with this table." arrow placement="right">
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={dialogCheckboxes.deleteSchema}
+                        onChange={(e) => {
+                          const { checked } = e.target;
+                          setDialogCheckboxes(prev => ({
+                            ...prev,
+                            deleteSchema: checked
+                          }));
+                          deleteSchemaRef.current = checked;
+                        }}
+                        color="primary"
+                      />
+                    }
+                    label="Delete Schema"
+                  />
+                </Tooltip>
+              </>
+            }
+            closeDialog={closeDialog}
+            dialogYesLabel="Yes"
+            dialogNoLabel="No"
+          />
+        )}
       </Grid>
     );
   }

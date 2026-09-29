@@ -21,7 +21,11 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
@@ -34,38 +38,51 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
     super(column, statsCollectorConfig);
   }
 
+  public LongColumnPreIndexStatsCollector(FieldSpec fieldSpec, @Nullable FieldConfig fieldConfig,
+      @Nullable PartitionFunction partitionFunction) {
+    super(fieldSpec, fieldConfig, partitionFunction);
+  }
+
   @Override
   public void collect(Object entry) {
     assert !_sealed;
 
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;
-      for (Object obj : values) {
-        long value = (long) obj;
-        _values.add(value);
-      }
-
-      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
-      updateTotalNumberOfEntries(values);
+      collectMultiValue(values.length, i -> (long) values[i]);
     } else if (entry instanceof long[]) {
-      long[] values = (long[]) entry;
-      for (long value : values) {
-        _values.add(value);
-      }
-
-      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
-      updateTotalNumberOfEntries(values.length);
+      collect((long[]) entry);
     } else {
-      long value = (long) entry;
-      addressSorted(value);
-      if (_values.add(value)) {
-        if (isPartitionEnabled()) {
-          updatePartition(Long.toString(value));
-        }
-      }
-
-      _totalNumberOfEntries++;
+      collect((long) entry);
     }
+  }
+
+  @Override
+  public void collect(long value) {
+    assert !_sealed;
+    addressSorted(value);
+    if (_values.add(value)) {
+      if (isPartitionEnabled()) {
+        updatePartition(Long.toString(value));
+      }
+    }
+    _totalDocs++;
+    _totalNumberOfEntries++;
+  }
+
+  @Override
+  public void collect(long[] values) {
+    assert !_sealed;
+    collectMultiValue(values.length, i -> values[i]);
+  }
+
+  private void collectMultiValue(int length, java.util.function.IntFunction<Long> valueGetter) {
+    for (int i = 0; i < length; i++) {
+      _values.add(valueGetter.apply(i));
+    }
+    _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, length);
+    _totalDocs++;
+    updateTotalNumberOfEntries(length);
   }
 
   private void addressSorted(long entry) {
@@ -102,6 +119,10 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
   @Override
   public int getCardinality() {
     return _sealed ? _sortedValues.length : _values.size();
+  }
+
+  long[] getValues() {
+    return _values.toLongArray();
   }
 
   @Override

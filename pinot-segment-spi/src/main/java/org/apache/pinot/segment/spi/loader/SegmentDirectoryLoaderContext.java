@@ -21,27 +21,26 @@ package org.apache.pinot.segment.spi.loader;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.ReadMode;
 
 
-/**
- * Context for {@link SegmentDirectoryLoader}
- */
+/// Context for [SegmentDirectoryLoader]
 public class SegmentDirectoryLoaderContext {
-
+  private final ReadMode _readMode;
   private final TableConfig _tableConfig;
   private final Schema _schema;
   private final String _instanceId;
   private final String _tableDataDir;
   private final String _segmentName;
-  private final String _segmentCrc;
+  private final long _segmentCrc;
   private final String _segmentTier;
   private final Map<String, Map<String, String>> _instanceTierConfigs;
-  private final PinotConfiguration _segmentDirectoryConfigs;
+  private final Map<String, String> _segmentCustomConfigs;
 
-  private SegmentDirectoryLoaderContext(TableConfig tableConfig, Schema schema, String instanceId, String tableDataDir,
-      String segmentName, String segmentCrc, String segmentTier, Map<String, Map<String, String>> instanceTierConfigs,
-      PinotConfiguration segmentDirectoryConfigs) {
+  private SegmentDirectoryLoaderContext(ReadMode readMode, TableConfig tableConfig, Schema schema, String instanceId,
+      String tableDataDir, String segmentName, long segmentCrc, String segmentTier,
+      Map<String, Map<String, String>> instanceTierConfigs, Map<String, String> segmentCustomConfigs) {
+    _readMode = readMode;
     _tableConfig = tableConfig;
     _schema = schema;
     _instanceId = instanceId;
@@ -50,7 +49,11 @@ public class SegmentDirectoryLoaderContext {
     _segmentCrc = segmentCrc;
     _segmentTier = segmentTier;
     _instanceTierConfigs = instanceTierConfigs;
-    _segmentDirectoryConfigs = segmentDirectoryConfigs;
+    _segmentCustomConfigs = segmentCustomConfigs;
+  }
+
+  public ReadMode getReadMode() {
+    return _readMode;
   }
 
   public TableConfig getTableConfig() {
@@ -73,7 +76,8 @@ public class SegmentDirectoryLoaderContext {
     return _segmentName;
   }
 
-  public String getSegmentCrc() {
+  /// Returns the CRC of the segment being loaded, or `Long.MIN_VALUE` when the caller did not supply one.
+  public long getSegmentCrc() {
     return _segmentCrc;
   }
 
@@ -81,24 +85,30 @@ public class SegmentDirectoryLoaderContext {
     return _segmentTier;
   }
 
-  public PinotConfiguration getSegmentDirectoryConfigs() {
-    return _segmentDirectoryConfigs;
-  }
-
   public Map<String, Map<String, String>> getInstanceTierConfigs() {
     return _instanceTierConfigs;
   }
 
+  public Map<String, String> getSegmentCustomConfigs() {
+    return _segmentCustomConfigs;
+  }
+
   public static class Builder {
+    private ReadMode _readMode = ReadMode.DEFAULT_MODE;
     private TableConfig _tableConfig;
     private Schema _schema;
     private String _instanceId;
     private String _tableDataDir;
     private String _segmentName;
-    private String _segmentCrc;
+    private long _segmentCrc = Long.MIN_VALUE;
     private String _segmentTier;
     private Map<String, Map<String, String>> _instanceTierConfigs;
-    private PinotConfiguration _segmentDirectoryConfigs;
+    private Map<String, String> _segmentCustomConfigs;
+
+    public Builder setReadMode(ReadMode readMode) {
+      _readMode = readMode;
+      return this;
+    }
 
     public Builder setTableConfig(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -125,7 +135,7 @@ public class SegmentDirectoryLoaderContext {
       return this;
     }
 
-    public Builder setSegmentCrc(String segmentCrc) {
+    public Builder setSegmentCrc(long segmentCrc) {
       _segmentCrc = segmentCrc;
       return this;
     }
@@ -140,14 +150,14 @@ public class SegmentDirectoryLoaderContext {
       return this;
     }
 
-    public Builder setSegmentDirectoryConfigs(PinotConfiguration segmentDirectoryConfigs) {
-      _segmentDirectoryConfigs = segmentDirectoryConfigs;
+    public Builder setSegmentCustomConfigs(Map<String, String> segmentCustomConfigs) {
+      _segmentCustomConfigs = segmentCustomConfigs;
       return this;
     }
 
     public SegmentDirectoryLoaderContext build() {
-      return new SegmentDirectoryLoaderContext(_tableConfig, _schema, _instanceId, _tableDataDir, _segmentName,
-          _segmentCrc, _segmentTier, _instanceTierConfigs, _segmentDirectoryConfigs);
+      return new SegmentDirectoryLoaderContext(_readMode, _tableConfig, _schema, _instanceId, _tableDataDir,
+          _segmentName, _segmentCrc, _segmentTier, _instanceTierConfigs, _segmentCustomConfigs);
     }
   }
 }

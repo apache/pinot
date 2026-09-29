@@ -24,15 +24,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
-import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -46,6 +47,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.assertj.core.api.Assertions;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -55,12 +57,11 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for histogram queries.
- */
+/// Queries test for histogram queries.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class HistogramQueriesTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "HistogramQueriesTest");
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), "HistogramQueriesTest-" + UUID.randomUUID());
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
 
@@ -217,19 +218,19 @@ public class HistogramQueriesTest extends BaseQueriesTest {
     GroupByResultsBlock resultsBlock = ((GroupByOperator) operator).nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 2, NUM_RECORDS);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    assertNotNull(aggregationGroupByResult);
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.getResultForGroupId(0, 0)).elements(),
+    List<IntermediateRecord> resultRecords = resultsBlock.getIntermediateRecords();
+    assertNotNull(resultRecords);
+    assertEquals(((DoubleArrayList) resultRecords.get(0)._record.getValues()[1]).elements(),
         new double[]{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}); // [0]
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.getResultForGroupId(0, 1)).elements(),
+    assertEquals(((DoubleArrayList) resultRecords.get(1)._record.getValues()[1]).elements(),
         new double[]{99, 100, 100, 100, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}); // [1-400]
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.getResultForGroupId(0, 2)).elements(),
+    assertEquals(((DoubleArrayList) resultRecords.get(2)._record.getValues()[1]).elements(),
         new double[]{0, 0, 0, 0, 99, 100, 100, 100, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}); // [401-800]
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.getResultForGroupId(0, 3)).elements(),
+    assertEquals(((DoubleArrayList) resultRecords.get(3)._record.getValues()[1]).elements(),
         new double[]{0, 0, 0, 0, 0, 0, 0, 0, 99, 100, 100, 100, 1, 0, 0, 0, 0, 0, 0, 0}); // [801-1200]
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.getResultForGroupId(0, 4)).elements(),
+    assertEquals(((DoubleArrayList) resultRecords.get(4)._record.getValues()[1]).elements(),
         new double[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99, 100, 100, 100, 1, 0, 0, 0}); // [1201-1600]
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.getResultForGroupId(0, 5)).elements(),
+    assertEquals(((DoubleArrayList) resultRecords.get(5)._record.getValues()[1]).elements(),
         new double[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99, 100, 100, 100}); // [1601-2000]
 
     // Inter segment
@@ -322,8 +323,9 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       assertTrue(operator instanceof AggregationOperator);
       operator.nextBlock();
     } catch (Exception e) {
-      assertEquals(e.getMessage(),
-          "Caught exception while parsing query: SELECT HISTOGRAM(intColumn,FUNCTION[0, 10, 20]) FROM testTable");
+      Assertions.assertThat(e.getMessage())
+          .startsWith("Caught exception while parsing query: SELECT HISTOGRAM(intColumn,FUNCTION[0, 10, 20]) "
+              + "FROM testTable");
     }
 
     try {

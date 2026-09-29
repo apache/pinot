@@ -1,0 +1,64 @@
+{
+  "non_equi_outer_joins": {
+    "comment": "Tests for RIGHT JOIN and FULL OUTER JOIN with ONLY non-equi conditions (no equi keys). These trigger the NonEquiJoinOperator.",
+    "tables": {
+      "tbl1": {
+        "schema": [
+          {"name": "num", "type": "INT"},
+          {"name": "name", "type": "STRING"}
+        ],
+        "inputs": [
+          [5, "a"],
+          [6, "b"],
+          [8, "c"],
+          [12, "d"]
+        ]
+      },
+      "tbl2": {
+        "schema": [
+          {"name": "num", "type": "INT"},
+          {"name": "val", "type": "STRING"}
+        ],
+        "inputs": [
+          [3, "x"],
+          [7, "y"],
+          [10, "z"],
+          [11, "w"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "RIGHT JOIN with only non-equi condition (inequality)",
+        "sql": "SELECT {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} RIGHT JOIN {tbl2} ON {tbl1}.num < {tbl2}.num",
+        "outputs": [
+          [null, null, 3, "x"],
+          [5, "a", 7, "y"],
+          [6, "b", 7, "y"],
+          [5, "a", 10, "z"],
+          [6, "b", 10, "z"],
+          [8, "c", 10, "z"],
+          [5, "a", 11, "w"],
+          [6, "b", 11, "w"],
+          [8, "c", 11, "w"]
+        ]
+      },
+      {
+        "description": "FULL OUTER JOIN with only non-equi condition (inequality)",
+        "sql": "SELECT {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} FULL OUTER JOIN {tbl2} ON {tbl1}.num < {tbl2}.num",
+        "outputs": [
+          [5, "a", 7, "y"],
+          [5, "a", 10, "z"],
+          [5, "a", 11, "w"],
+          [6, "b", 7, "y"],
+          [6, "b", 10, "z"],
+          [6, "b", 11, "w"],
+          [8, "c", 10, "z"],
+          [8, "c", 11, "w"],
+          [12, "d", null, null],
+          [null, null, 3, "x"]
+        ]
+      }
+    ]
+  }
+}

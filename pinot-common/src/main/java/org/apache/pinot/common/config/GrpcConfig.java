@@ -18,12 +18,22 @@
  */
 package org.apache.pinot.common.config;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
-
+/// Configs used for the gRPC **query** service.
+///
+/// Remember that in Pinot we use different gPRC services for different purposes:
+/// - **query**: used by Pinot users for executing queries
+/// - **internal**: used by Pinot for internal communication between servers/broker in MSE. This includes:
+///    - The ability to send query plans from broker to server, and the mailbox service for sending data between
+///      servers/brokers
+///    - The broker -> server communication for the SSE when `pinot.broker.request.handler.type` is set to grpc
+///      (see the GrpcBrokerRequestHandler)
+///
+/// This class only affects the **query** service. See ChannelManager, MailboxService and GrpcMailboxServer to learn
+/// more about the Grpc config used for MSE.
 public class GrpcConfig {
   public static final String GRPC_TLS_PREFIX = "tls";
   public static final String CONFIG_USE_PLAIN_TEXT = "usePlainText";
@@ -49,6 +59,11 @@ public class GrpcConfig {
 
   public static final String CONFIG_QUERY_WORKER_THREADS = "queryWorkerThreads";
 
+  // memory usage threshold that triggers request throttling
+  public static final String REQUEST_THROTTLING_MEMORY_THRESHOLD_BYTES = "requestThrottlingMemoryThresholdBytes";
+  // Default threshold in bytes (16GB)
+  public static final long DEFAULT_REQUEST_THROTTLING_MEMORY_THRESHOLD_BYTES = 16 * 1024 * 1024 * 1024L;
+
   private final TlsConfig _tlsConfig;
   private final PinotConfiguration _pinotConfig;
 
@@ -66,7 +81,7 @@ public class GrpcConfig {
   }
 
   public GrpcConfig(int maxInboundMessageSizeBytes, boolean usePlainText) {
-    this(ImmutableMap.of(CONFIG_MAX_INBOUND_MESSAGE_BYTES_SIZE, maxInboundMessageSizeBytes, CONFIG_USE_PLAIN_TEXT,
+    this(Map.of(CONFIG_MAX_INBOUND_MESSAGE_BYTES_SIZE, maxInboundMessageSizeBytes, CONFIG_USE_PLAIN_TEXT,
         usePlainText));
   }
 
@@ -110,6 +125,14 @@ public class GrpcConfig {
 
   public int getQueryWorkerThreads() {
     return _pinotConfig.getProperty(CONFIG_QUERY_WORKER_THREADS, Integer.class);
+  }
+
+  public long getRequestThrottlingMemoryThresholdBytes() {
+    return _pinotConfig.getProperty(REQUEST_THROTTLING_MEMORY_THRESHOLD_BYTES, Long.class);
+  }
+
+  public boolean isRequestThrottlingMemroyThresholdSet() {
+    return _pinotConfig.containsKey(REQUEST_THROTTLING_MEMORY_THRESHOLD_BYTES);
   }
 
   public boolean isQueryWorkerThreadsSet() {

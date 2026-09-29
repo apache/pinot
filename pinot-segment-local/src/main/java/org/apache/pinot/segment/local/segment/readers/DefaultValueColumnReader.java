@@ -1,0 +1,254 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.segment.local.segment.readers;
+
+import java.math.BigDecimal;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.ColumnReader;
+import org.apache.pinot.spi.data.readers.MultiValueResult;
+import org.apache.pinot.spi.utils.PinotDataType;
+
+
+/// ColumnReader implementation that returns default values for new columns.
+///
+/// This reader is used when a column exists in the target schema but not in the source data.
+/// It returns the default null value for the field spec for all document IDs.
+public class DefaultValueColumnReader implements ColumnReader {
+
+  private final String _columnName;
+  private final int _numDocs;
+  private final Object _defaultValue;
+  private final Object _logicalValue;
+  private final FieldSpec _fieldSpec;
+  private final DataType _dataType;
+
+  // Pre-computed multi-value arrays for reuse
+  private int[] _defaultIntMV;
+  private long[] _defaultLongMV;
+  private float[] _defaultFloatMV;
+  private double[] _defaultDoubleMV;
+  private BigDecimal[] _defaultBigDecimalMV;
+  private String[] _defaultStringMV;
+  private byte[][] _defaultBytesMV;
+
+  /// Create a DefaultValueColumnReader for a new column.
+  ///
+  /// @param columnName Name of the new column
+  /// @param numDocs Total number of documents
+  /// @param fieldSpec Field specification for the new column
+  public DefaultValueColumnReader(String columnName, int numDocs, FieldSpec fieldSpec) {
+    _columnName = columnName;
+    _numDocs = numDocs;
+    _fieldSpec = fieldSpec;
+    _dataType = fieldSpec.getDataType();
+
+    // For multi-value fields, wrap the default value in an array
+    Object defaultNullValue = fieldSpec.getDefaultNullValue();
+    if (fieldSpec.isSingleValueField()) {
+      _defaultValue = defaultNullValue;
+    } else {
+      _defaultValue = new Object[]{defaultNullValue};
+      // Pre-compute typed arrays for multi-value fields to avoid repeated allocations
+      Object[] defaultArray = (Object[]) _defaultValue;
+      switch (_dataType) {
+        case INT:
+          _defaultIntMV = new int[defaultArray.length];
+          for (int i = 0; i < defaultArray.length; i++) {
+            _defaultIntMV[i] = ((Number) defaultArray[i]).intValue();
+          }
+          break;
+        case LONG:
+          _defaultLongMV = new long[defaultArray.length];
+          for (int i = 0; i < defaultArray.length; i++) {
+            _defaultLongMV[i] = ((Number) defaultArray[i]).longValue();
+          }
+          break;
+        case FLOAT:
+          _defaultFloatMV = new float[defaultArray.length];
+          for (int i = 0; i < defaultArray.length; i++) {
+            _defaultFloatMV[i] = ((Number) defaultArray[i]).floatValue();
+          }
+          break;
+        case DOUBLE:
+          _defaultDoubleMV = new double[defaultArray.length];
+          for (int i = 0; i < defaultArray.length; i++) {
+            _defaultDoubleMV[i] = ((Number) defaultArray[i]).doubleValue();
+          }
+          break;
+        case BIG_DECIMAL:
+          _defaultBigDecimalMV = new BigDecimal[defaultArray.length];
+          for (int i = 0; i < defaultArray.length; i++) {
+            _defaultBigDecimalMV[i] = (BigDecimal) defaultArray[i];
+          }
+          break;
+        case STRING:
+          _defaultStringMV = new String[defaultArray.length];
+          for (int i = 0; i < defaultArray.length; i++) {
+            _defaultStringMV[i] = (String) defaultArray[i];
+          }
+          break;
+        case BYTES:
+          _defaultBytesMV = new byte[defaultArray.length][];
+          for (int i = 0; i < defaultArray.length; i++) {
+            _defaultBytesMV[i] = (byte[]) defaultArray[i];
+          }
+          break;
+        default:
+          break;
+      }
+    }
+    // getValue() surfaces the logical object; the segment stores BOOLEAN as int and TIMESTAMP as long, so the
+    // physical default is converted once here. Typed accessors keep using the physical _defaultValue.
+    _logicalValue = ColumnReader.toLogicalValue(_defaultValue, _dataType);
+  }
+
+  @Override
+  public String getColumnName() {
+    return _columnName;
+  }
+
+  @Nullable
+  @Override
+  public PinotDataType getValueType() {
+    return ColumnReader.toValueType(_dataType, _fieldSpec.isSingleValueField());
+  }
+
+  @Override
+  public int getTotalDocs() {
+    return _numDocs;
+  }
+
+  @Override
+  public boolean isNull(int docId) {
+    validateDocId(docId);
+    return _defaultValue == null;
+  }
+
+  @Override
+  public Object getValue(int docId) {
+    validateDocId(docId);
+    return _logicalValue;
+  }
+
+  // Single-value accessors
+
+  @Override
+  public int getInt(int docId) {
+    validateDocId(docId);
+    return ((Number) _defaultValue).intValue();
+  }
+
+  @Override
+  public long getLong(int docId) {
+    validateDocId(docId);
+    return ((Number) _defaultValue).longValue();
+  }
+
+  @Override
+  public float getFloat(int docId) {
+    validateDocId(docId);
+    return ((Number) _defaultValue).floatValue();
+  }
+
+  @Override
+  public double getDouble(int docId) {
+    validateDocId(docId);
+    return ((Number) _defaultValue).doubleValue();
+  }
+
+  @Override
+  public BigDecimal getBigDecimal(int docId) {
+    validateDocId(docId);
+    return (BigDecimal) _defaultValue;
+  }
+
+  @Override
+  public String getString(int docId) {
+    validateDocId(docId);
+    return (String) _defaultValue;
+  }
+
+  @Override
+  public byte[] getBytes(int docId) {
+    validateDocId(docId);
+    return (byte[]) _defaultValue;
+  }
+
+  // Multi-value accessors
+
+  @Override
+  public MultiValueResult<int[]> getIntMV(int docId) {
+    validateDocId(docId);
+    return MultiValueResult.of(_defaultIntMV, null);
+  }
+
+  @Override
+  public MultiValueResult<long[]> getLongMV(int docId) {
+    validateDocId(docId);
+    return MultiValueResult.of(_defaultLongMV, null);
+  }
+
+  @Override
+  public MultiValueResult<float[]> getFloatMV(int docId) {
+    validateDocId(docId);
+    return MultiValueResult.of(_defaultFloatMV, null);
+  }
+
+  @Override
+  public MultiValueResult<double[]> getDoubleMV(int docId) {
+    validateDocId(docId);
+    return MultiValueResult.of(_defaultDoubleMV, null);
+  }
+
+  @Override
+  public BigDecimal[] getBigDecimalMV(int docId) {
+    validateDocId(docId);
+    return _defaultBigDecimalMV;
+  }
+
+  @Override
+  public String[] getStringMV(int docId) {
+    validateDocId(docId);
+    return _defaultStringMV;
+  }
+
+  @Override
+  public byte[][] getBytesMV(int docId) {
+    validateDocId(docId);
+    return _defaultBytesMV;
+  }
+
+  /// Validate that the document ID is within valid range.
+  ///
+  /// @param docId Document ID to validate
+  /// @throws IndexOutOfBoundsException if docId is out of range
+  private void validateDocId(int docId) {
+    if (docId < 0 || docId >= _numDocs) {
+      throw new IndexOutOfBoundsException(
+          "docId " + docId + " is out of range. Valid range is 0 to " + (_numDocs - 1));
+    }
+  }
+
+  @Override
+  public void close() {
+    // No resources to close
+  }
+}

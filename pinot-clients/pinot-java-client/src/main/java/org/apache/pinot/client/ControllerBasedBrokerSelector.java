@@ -23,19 +23,12 @@ import java.util.List;
 import java.util.Properties;
 
 
-/**
- * Maintains broker cache using controller APIs
- */
+/// Maintains broker cache using controller APIs
 public class ControllerBasedBrokerSelector implements BrokerSelector {
   private static final String SCHEME = "scheme";
 
   private final UpdatableBrokerCache _brokerCache;
   private final Properties _properties;
-
-  public ControllerBasedBrokerSelector(String scheme, String controllerHost, int controllerPort)
-      throws Exception {
-    this(scheme, controllerHost, controllerPort, new Properties());
-  }
 
   public ControllerBasedBrokerSelector(String scheme, String controllerHost, int controllerPort, Properties properties)
       throws Exception {
@@ -52,7 +45,6 @@ public class ControllerBasedBrokerSelector implements BrokerSelector {
     _brokerCache = new BrokerCacheUpdaterPeriodic(properties, controllerUrl);
     _brokerCache.init();
   }
-
 
   @Override
   public String selectBroker(String... tableNames) {

@@ -31,12 +31,12 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datablock.DataBlockUtils;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.MapUtils;
@@ -45,40 +45,38 @@ import org.roaringbitmap.RoaringBitmap;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * Datatable V4 implementation.
- *
- * The layout of serialized V4 datatable looks like:
- * +-----------------------------------------------+
- * | 13 integers of header:                        |
- * | VERSION                                       |
- * | NUM_ROWS                                      |
- * | NUM_COLUMNS                                   |
- * | EXCEPTIONS SECTION START OFFSET               |
- * | EXCEPTIONS SECTION LENGTH                     |
- * | DICTIONARY_MAP SECTION START OFFSET           |
- * | DICTIONARY_MAP SECTION LENGTH                 |
- * | DATA_SCHEMA SECTION START OFFSET              |
- * | DATA_SCHEMA SECTION LENGTH                    |
- * | FIXED_SIZE_DATA SECTION START OFFSET          |
- * | FIXED_SIZE_DATA SECTION LENGTH                |
- * | VARIABLE_SIZE_DATA SECTION START OFFSET       |
- * | VARIABLE_SIZE_DATA SECTION LENGTH             |
- * +-----------------------------------------------+
- * | EXCEPTIONS SECTION                            |
- * +-----------------------------------------------+
- * | DICTIONARY_MAP SECTION                        |
- * +-----------------------------------------------+
- * | DATA_SCHEMA SECTION                           |
- * +-----------------------------------------------+
- * | FIXED_SIZE_DATA SECTION                       |
- * +-----------------------------------------------+
- * | VARIABLE_SIZE_DATA SECTION                    |
- * +-----------------------------------------------+
- * | METADATA LENGTH                               |
- * | METADATA SECTION                              |
- * +-----------------------------------------------+
- */
+/// Datatable V4 implementation.
+///
+/// The layout of serialized V4 datatable looks like:
+/// +-----------------------------------------------+
+/// | 13 integers of header:                        |
+/// | VERSION                                       |
+/// | NUM_ROWS                                      |
+/// | NUM_COLUMNS                                   |
+/// | EXCEPTIONS SECTION START OFFSET               |
+/// | EXCEPTIONS SECTION LENGTH                     |
+/// | DICTIONARY_MAP SECTION START OFFSET           |
+/// | DICTIONARY_MAP SECTION LENGTH                 |
+/// | DATA_SCHEMA SECTION START OFFSET              |
+/// | DATA_SCHEMA SECTION LENGTH                    |
+/// | FIXED_SIZE_DATA SECTION START OFFSET          |
+/// | FIXED_SIZE_DATA SECTION LENGTH                |
+/// | VARIABLE_SIZE_DATA SECTION START OFFSET       |
+/// | VARIABLE_SIZE_DATA SECTION LENGTH             |
+/// +-----------------------------------------------+
+/// | EXCEPTIONS SECTION                            |
+/// +-----------------------------------------------+
+/// | DICTIONARY_MAP SECTION                        |
+/// +-----------------------------------------------+
+/// | DATA_SCHEMA SECTION                           |
+/// +-----------------------------------------------+
+/// | FIXED_SIZE_DATA SECTION                       |
+/// +-----------------------------------------------+
+/// | VARIABLE_SIZE_DATA SECTION                    |
+/// +-----------------------------------------------+
+/// | METADATA LENGTH                               |
+/// | METADATA SECTION                              |
+/// +-----------------------------------------------+
 public class DataTableImplV4 implements DataTable {
 
   protected static final int HEADER_SIZE = Integer.BYTES * 13;
@@ -309,6 +307,19 @@ public class DataTableImplV4 implements DataTable {
   }
 
   @Override
+  public BigDecimal[] getBigDecimalArray(int rowId, int colId) {
+    int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
+    BigDecimal[] bigDecimals = new BigDecimal[length];
+    for (int i = 0; i < length; i++) {
+      int byteLength = _variableSizeData.getInt();
+      byte[] bytes = new byte[byteLength];
+      _variableSizeData.get(bytes);
+      bigDecimals[i] = BigDecimalUtils.deserialize(bytes);
+    }
+    return bigDecimals;
+  }
+
+  @Override
   public String[] getStringArray(int rowId, int colId) {
     int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
     String[] strings = new String[length];
@@ -316,6 +327,19 @@ public class DataTableImplV4 implements DataTable {
       strings[i] = _stringDictionary[_variableSizeData.getInt()];
     }
     return strings;
+  }
+
+  @Override
+  public ByteArray[] getBytesArray(int rowId, int colId) {
+    int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
+    ByteArray[] bytes = new ByteArray[length];
+    for (int i = 0; i < length; i++) {
+      int byteLength = _variableSizeData.getInt();
+      byte[] value = new byte[byteLength];
+      _variableSizeData.get(value);
+      bytes[i] = new ByteArray(value);
+    }
+    return bytes;
   }
 
   @Nullable
@@ -369,9 +393,7 @@ public class DataTableImplV4 implements DataTable {
   // Ser/De and exception handling
   // --------------------------------------------------------------------------
 
-  /**
-   * Helper method to serialize dictionary map.
-   */
+  /// Helper method to serialize dictionary map.
   protected byte[] serializeStringDictionary()
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
@@ -380,32 +402,20 @@ public class DataTableImplV4 implements DataTable {
     dataOutputStream.writeInt(_stringDictionary.length);
     int numEntriesAdded = 0;
     for (String entry : _stringDictionary) {
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numEntriesAdded);
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numEntriesAdded++,
+          "DataTableImplV4#serializeStringDictionary");
       byte[] valueBytes = entry.getBytes(UTF_8);
       dataOutputStream.writeInt(valueBytes.length);
       dataOutputStream.write(valueBytes);
-      numEntriesAdded++;
     }
 
     return byteArrayOutputStream.toByteArray();
   }
 
-  /**
-   * Helper method to deserialize dictionary map.
-   */
+  /// Helper method to deserialize dictionary map.
   protected String[] deserializeStringDictionary(ByteBuffer buffer)
       throws IOException {
-    int dictionarySize = buffer.getInt();
-    String[] stringDictionary = new String[dictionarySize];
-    for (int i = 0; i < dictionarySize; i++) {
-      stringDictionary[i] = DataTableUtils.decodeString(buffer);
-    }
-    return stringDictionary;
-  }
-
-  @Override
-  public void addException(ProcessingException processingException) {
-    _errCodeToExceptionMap.put(processingException.getErrorCode(), processingException.getMessage());
+    return DataTableUtils.decodeStringArray(buffer);
   }
 
   @Override
@@ -421,16 +431,21 @@ public class DataTableImplV4 implements DataTable {
   @Override
   public byte[] toBytes()
       throws IOException {
-    ThreadResourceUsageProvider threadTimer = new ThreadResourceUsageProvider();
+    ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
 
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
     writeLeadingSections(dataOutputStream);
 
-    // Add table serialization time metadata if thread timer is enabled.
+    // Add table serialization time and memory metadata when the corresponding measurement is enabled.
+    // When CPU time/memory usage is not collectable, we omit these values from the metadata.
     if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
-      long responseSerializationCpuTimeNs = threadTimer.getThreadTimeNs();
-      getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), String.valueOf(responseSerializationCpuTimeNs));
+      getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(),
+          String.valueOf(resourceSnapshot.getCpuTimeNs()));
+    }
+    if (ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
+      getMetadata().put(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName(),
+          String.valueOf(resourceSnapshot.getAllocatedBytes()));
     }
 
     // Write metadata: length followed by actual metadata bytes.
@@ -517,18 +532,16 @@ public class DataTableImplV4 implements DataTable {
     }
   }
 
-  /**
-   * Serialize metadata section to bytes.
-   * Format of the bytes looks like:
-   * [numEntries, bytesOfKV2, bytesOfKV2, bytesOfKV3]
-   * For each KV pair:
-   * - if the value type is String, encode it as: [enumKeyOrdinal, valueLength, Utf8EncodedValue].
-   * - if the value type is int, encode it as: [enumKeyOrdinal, bigEndianRepresentationOfIntValue]
-   * - if the value type is long, encode it as: [enumKeyOrdinal, bigEndianRepresentationOfLongValue]
-   *
-   * Unlike V2, where numeric metadata values (int and long) in V3 are encoded in UTF-8 in the wire format,
-   * in V3 big endian representation is used.
-   */
+  /// Serialize metadata section to bytes.
+  /// Format of the bytes looks like:
+  /// \[numEntries, bytesOfKV2, bytesOfKV2, bytesOfKV3\]
+  /// For each KV pair:
+  /// - if the value type is String, encode it as: \[enumKeyOrdinal, valueLength, Utf8EncodedValue\].
+  /// - if the value type is int, encode it as: \[enumKeyOrdinal, bigEndianRepresentationOfIntValue\]
+  /// - if the value type is long, encode it as: \[enumKeyOrdinal, bigEndianRepresentationOfLongValue\]
+  ///
+  /// Unlike V2, where numeric metadata values (int and long) in V3 are encoded in UTF-8 in the wire format,
+  /// in V3 big endian representation is used.
   private byte[] serializeMetadata()
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
@@ -548,6 +561,8 @@ public class DataTableImplV4 implements DataTable {
         dataOutputStream.write(Ints.toByteArray(Integer.parseInt(value)));
       } else if (key.getValueType() == MetadataValueType.LONG) {
         dataOutputStream.write(Longs.toByteArray(Long.parseLong(value)));
+      } else if (key.getValueType() == MetadataValueType.BOOLEAN) {
+        dataOutputStream.write(DataTableUtils.encodeBoolean(Boolean.parseBoolean(value)));
       } else {
         byte[] valueBytes = value.getBytes(UTF_8);
         dataOutputStream.writeInt(valueBytes.length);
@@ -558,16 +573,14 @@ public class DataTableImplV4 implements DataTable {
     return byteArrayOutputStream.toByteArray();
   }
 
-  /**
-   * Even though the wire format of V3 uses UTF-8 for string/bytes and big-endian for numeric values,
-   * the in-memory representation is STRING based for processing the metadata before serialization
-   * (by the server as it adds the statistics in metadata) and after deserialization (by the broker as it receives
-   * DataTable from each server and aggregates the values).
-   * This is to make V3 implementation keep the consumers of Map<String, String> getMetadata() API in the code happy
-   * by internally converting it.
-   *
-   * This method use relative operations on the ByteBuffer and expects the buffer's position to be set correctly.
-   */
+  /// Even though the wire format of V3 uses UTF-8 for string/bytes and big-endian for numeric values,
+  /// the in-memory representation is STRING based for processing the metadata before serialization
+  /// (by the server as it adds the statistics in metadata) and after deserialization (by the broker as it receives
+  /// DataTable from each server and aggregates the values).
+  /// This is to make V3 implementation keep the consumers of Map<String, String> getMetadata() API in the code happy
+  /// by internally converting it.
+  ///
+  /// This method use relative operations on the ByteBuffer and expects the buffer's position to be set correctly.
   private Map<String, String> deserializeMetadata(ByteBuffer buffer)
       throws IOException {
     int numEntries = buffer.getInt();
@@ -584,6 +597,9 @@ public class DataTableImplV4 implements DataTable {
         metadata.put(key.getName(), value);
       } else if (key.getValueType() == MetadataValueType.LONG) {
         String value = "" + buffer.getLong();
+        metadata.put(key.getName(), value);
+      } else if (key.getValueType() == MetadataValueType.BOOLEAN) {
+        String value = "" + DataTableUtils.decodeBoolean(buffer);
         metadata.put(key.getName(), value);
       } else {
         String value = DataTableUtils.decodeString(buffer);
@@ -632,24 +648,20 @@ public class DataTableImplV4 implements DataTable {
     }
   }
 
-  /**
-   * return the offset in {@code _fixedSizeDataBytes} of the row/column ID.
-   * @param rowId row ID
-   * @param colId column ID
-   * @return the offset in the fixed size buffer for the row/columnID.
-   */
+  /// return the offset in `_fixedSizeDataBytes` of the row/column ID.
+  /// @param rowId row ID
+  /// @param colId column ID
+  /// @return the offset in the fixed size buffer for the row/columnID.
   protected int getOffsetInFixedBuffer(int rowId, int colId) {
     return rowId * _rowSizeInBytes + _columnOffsets[colId];
   }
 
-  /**
-   * position the {@code _variableSizeDataBytes} to the corresponding row/column ID. and return the
-   * length of bytes to extract from the variable size buffer.
-   *
-   * @param rowId row ID
-   * @param colId column ID
-   * @return the length to extract from variable size buffer.
-   */
+  /// position the `_variableSizeDataBytes` to the corresponding row/column ID. and return the
+  /// length of bytes to extract from the variable size buffer.
+  ///
+  /// @param rowId row ID
+  /// @param colId column ID
+  /// @return the length to extract from variable size buffer.
   protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
     int offset = getOffsetInFixedBuffer(rowId, colId);
     _variableSizeData.position(_fixedSizeData.getInt(offset));

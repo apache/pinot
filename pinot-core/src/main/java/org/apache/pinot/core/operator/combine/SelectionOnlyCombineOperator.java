@@ -27,12 +27,13 @@ import org.apache.pinot.core.operator.combine.merger.SelectionOnlyResultsBlockMe
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-/**
- * Combine operator for selection only queries.
- * <p>For query with LIMIT 0, directly use main thread to process one segment to get the data schema of the query.
- * <p>Query can be early-terminated when enough documents have been collected to fulfill the LIMIT requirement.
- * <p>NOTE: Selection order-by query with LIMIT 0 is treated as selection only query.
- */
+/// Combine operator for selection only queries.
+///
+/// For query with LIMIT 0, directly use main thread to process one segment to get the data schema of the query.
+///
+/// Query can be early-terminated when enough documents have been collected to fulfill the LIMIT requirement.
+///
+/// NOTE: Selection order-by query with LIMIT 0 is treated as selection only query.
 @SuppressWarnings("rawtypes")
 public class SelectionOnlyCombineOperator extends BaseSingleBlockCombineOperator<SelectionResultsBlock> {
   private static final String EXPLAIN_NAME = "COMBINE_SELECT";
@@ -53,11 +54,18 @@ public class SelectionOnlyCombineOperator extends BaseSingleBlockCombineOperator
   protected BaseResultsBlock getNextBlock() {
     // For LIMIT 0 query, only process one segment to get the data schema
     if (_numRowsToKeep == 0) {
-      BaseResultsBlock resultsBlock = (BaseResultsBlock) _operators.get(0).nextBlock();
-      CombineOperatorUtils.setExecutionStatistics(resultsBlock, _operators, 0, 1);
-      return resultsBlock;
+      try {
+        return checkTerminateExceptionAndAttachExecutionStats((BaseResultsBlock) _operators.get(0).nextBlock());
+      } catch (Exception e) {
+        return createExceptionResultsBlockAndAttachExecutionStats(e, "processing single segment");
+      }
     }
-
     return super.getNextBlock();
+  }
+
+  @Override
+  protected int getNumWorkerThreads() {
+    // For LIMIT 0 query, the segment is processed by the main thread
+    return _numRowsToKeep == 0 ? 1 : super.getNumWorkerThreads();
   }
 }

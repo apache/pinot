@@ -24,11 +24,9 @@ import org.apache.pinot.tsdb.spi.series.BaseTimeSeriesBuilder;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 
 
-/**
- * MaxSeriesBuilder is a series builder that computes the maximum value in each time bucket.
- * <b>Context:</b>We provide some ready to use implementations for some of the most common use-cases in the SPI. This
- * reduces redundancy and also serves as a reference implementation for language developers.
- */
+/// MaxSeriesBuilder is a series builder that computes the maximum value in each time bucket.
+/// **Context:** We provide some ready to use implementations for some of the most common use-cases in the SPI. This
+/// reduces redundancy and also serves as a reference implementation for language developers.
 public class MaxTimeSeriesBuilder extends BaseTimeSeriesBuilder {
   private final Double[] _values;
 
@@ -53,5 +51,10 @@ public class MaxTimeSeriesBuilder extends BaseTimeSeriesBuilder {
   @Override
   public TimeSeries build() {
     return new TimeSeries(_id, null, _timeBuckets, _values, _tagNames, _tagValues);
+  }
+
+  @Override
+  public TimeSeries buildWithTagOverrides(List<String> tagNames, Object[] tagValues) {
+    return new TimeSeries(_id, null, _timeBuckets, _values, tagNames, tagValues);
   }
 }

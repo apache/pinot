@@ -25,9 +25,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * Time handler that modifies and partitions the time value based on the epoch time.
- */
+/// Time handler that modifies and partitions the time value based on the epoch time.
 public class EpochTimeHandler implements TimeHandler {
   private final String _timeColumn;
   private final DataType _dataType;
@@ -38,9 +36,19 @@ public class EpochTimeHandler implements TimeHandler {
 
   private final long _roundBucketMs;
   private final long _partitionBucketMs;
+  private final boolean _storeOriginalTimeField;
 
   public EpochTimeHandler(DateTimeFieldSpec fieldSpec, long startTimeMs, long endTimeMs, boolean negateWindowFilter,
       long roundBucketMs, long partitionBucketMs) {
+    this(fieldSpec, startTimeMs, endTimeMs, negateWindowFilter, roundBucketMs, partitionBucketMs, false);
+  }
+
+  /// Creates the time handler. When `storeOriginalTimeField` is `true`, [#handleTime] stores the original
+  /// (pre-rounding) time value in millis into the hidden [#ORIGINAL_TIME_MS_COLUMN] field of the row before
+  /// rounding the time column, so that order sensitive aggregations (FIRSTWITHTIME/LASTWITHTIME) can order the
+  /// rows by the original time.
+  public EpochTimeHandler(DateTimeFieldSpec fieldSpec, long startTimeMs, long endTimeMs, boolean negateWindowFilter,
+      long roundBucketMs, long partitionBucketMs, boolean storeOriginalTimeField) {
     _timeColumn = fieldSpec.getName();
     _dataType = fieldSpec.getDataType();
     _formatSpec = fieldSpec.getFormatSpec();
@@ -49,6 +57,7 @@ public class EpochTimeHandler implements TimeHandler {
     _negateWindowFilter = negateWindowFilter;
     _roundBucketMs = roundBucketMs;
     _partitionBucketMs = partitionBucketMs;
+    _storeOriginalTimeField = storeOriginalTimeField;
   }
 
   @Nullable
@@ -60,6 +69,9 @@ public class EpochTimeHandler implements TimeHandler {
         return null;
       }
     }
+    if (_storeOriginalTimeField) {
+      row.putValue(ORIGINAL_TIME_MS_COLUMN, timeMs);
+    }
     if (_roundBucketMs > 0) {
       timeMs = (timeMs / _roundBucketMs) * _roundBucketMs;
       row.putValue(_timeColumn, _dataType.convert(_formatSpec.fromMillisToFormat(timeMs)));
@@ -68,6 +80,50 @@ public class EpochTimeHandler implements TimeHandler {
       return Long.toString(timeMs / _partitionBucketMs);
     } else {
       return DEFAULT_PARTITION;
+    }
+  }
+
+  @Override
+  public String getTimeColumn() {
+    return _timeColumn;
+  }
+
+  @Override
+  @Nullable
+  public String handleTimeColumn(Object columnValue) {
+    long timeMs = _formatSpec.fromFormatToMillis(columnValue.toString());
+
+    // Apply time filter
+    if (_startTimeMs > 0) {
+      boolean outsideTimeWindow = (timeMs < _startTimeMs || timeMs >= _endTimeMs);
+      if (outsideTimeWindow != _negateWindowFilter) {
+        return null;
+      }
+    }
+
+    // Round time if needed
+    if (_roundBucketMs > 0) {
+      timeMs = (timeMs / _roundBucketMs) * _roundBucketMs;
+    }
+
+    // Compute partition
+    if (_partitionBucketMs > 0) {
+      return Long.toString(timeMs / _partitionBucketMs);
+    } else {
+      return DEFAULT_PARTITION;
+    }
+  }
+
+  @Override
+  @Nullable
+  public Object getModifiedTimeValue(Object columnValue) {
+    // Round time if needed
+    if (_roundBucketMs > 0) {
+      long timeMs = _formatSpec.fromFormatToMillis(columnValue.toString());
+      timeMs = (timeMs / _roundBucketMs) * _roundBucketMs;
+      return _dataType.convert(_formatSpec.fromMillisToFormat(timeMs));
+    } else {
+      return columnValue;
     }
   }
 }

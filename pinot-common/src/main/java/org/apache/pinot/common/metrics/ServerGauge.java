@@ -18,14 +18,10 @@
  */
 package org.apache.pinot.common.metrics;
 
-import io.netty.buffer.PooledByteBufAllocatorMetric;
 import org.apache.pinot.common.Utils;
 
 
-/**
- * Enumeration containing all the gauges exposed by the Pinot server.
- *
- */
+/// Enumeration containing all the gauges exposed by the Pinot server.
 public enum ServerGauge implements AbstractMetrics.Gauge {
   VERSION("version", true),
   DOCUMENT_COUNT("documents", false),
@@ -41,11 +37,21 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   REALTIME_MERGED_TEXT_IDX_DOCUMENT_AVG_LEN("bytes", false),
   REALTIME_SEGMENT_NUM_PARTITIONS("realtimeSegmentNumPartitions", false),
   LLC_SIMULTANEOUS_SEGMENT_BUILDS("llcSimultaneousSegmentBuilds", true),
+  // Gauge to reflect whether pauseless is enabled or not
+  PAUSELESS_CONSUMPTION_ENABLED("pauselessConsumptionEnabled", false),
   // Upsert metrics
   UPSERT_PRIMARY_KEYS_COUNT("upsertPrimaryKeysCount", false),
   // Dedup metrics
   DEDUP_PRIMARY_KEYS_COUNT("dedupPrimaryKeysCount", false),
   CONSUMPTION_QUOTA_UTILIZATION("ratio", false),
+  // Server-level consumption rate limiting is server-wide, so these are global gauges (no table/partition
+  // dimension), kept distinct from the per-partition CONSUMPTION_QUOTA_UTILIZATION above.
+  SERVER_CONSUMPTION_QUOTA_UTILIZATION("ratio", true),
+  // Configured consumption rate limits, emitted when the limiter is created or its config changes; the server gauge
+  // is set to -1 when server-level rate limiting is disabled. Units follow the active throttling strategy
+  // (bytes/sec in byte mode, messages/sec in message mode).
+  SERVER_CONSUMPTION_RATE_LIMIT("perSecond", true),
+  CONSUMPTION_RATE_LIMIT("perSecond", false),
   JVM_HEAP_USED_BYTES("bytes", true),
   NETTY_POOLED_USED_DIRECT_MEMORY("bytes", true),
   NETTY_POOLED_USED_HEAP_MEMORY("bytes", true),
@@ -53,33 +59,134 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   NETTY_POOLED_ARENAS_HEAP("arenas", true),
   STREAM_DATA_LOSS("streamDataLoss", false),
 
-  /**
-   * The size of the small cache.
-   * See {@link PooledByteBufAllocatorMetric#smallCacheSize()}
-   */
+  // Segment operation throttle metrics - threshold is the upper limit of the throttle and is set whenever the
+  // throttle configs are modified
+  SEGMENT_TABLE_DOWNLOAD_THROTTLE_THRESHOLD("segmentTableDownloadThrottleThreshold", false),
+  SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD("segmentDownloadThrottleThreshold", true),
+  SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD("segmentAllPreprocessThrottleThreshold", true),
+  SEGMENT_STARTREE_PREPROCESS_THROTTLE_THRESHOLD("segmentStartreePreprocessThreshold", true),
+  SEGMENT_MULTI_COL_TEXT_INDEX_PREPROCESS_THROTTLE_THRESHOLD("segmentMultiColTextIndexPreprocessThreshold", true),
+  // Segment operation metrics - count is the current number of segments undergoing the given operation.
+  // Incremented when the semaphore is acquired and decremented when the semaphore is released
+  SEGMENT_TABLE_DOWNLOAD_COUNT("segmentTableDownloadCount", false),
+  SEGMENT_DOWNLOAD_COUNT("segmentDownloadCount", true),
+  SEGMENT_ALL_PREPROCESS_COUNT("segmentAllPreprocessCount", true),
+  SEGMENT_STARTREE_PREPROCESS_COUNT("segmentStartreePreprocessCount", true),
+  SEGMENT_MULTI_COL_TEXT_INDEX_PREPROCESS_COUNT("segmentMultiColTextIndexPreprocessCount", true),
+
+  /// The size of the small cache.
+  /// See [io.netty.buffer.PooledByteBufAllocatorMetric#smallCacheSize()]
   NETTY_POOLED_CACHE_SIZE_SMALL("bytes", true),
-  /**
-   * The size of the normal cache.
-   * See {@link PooledByteBufAllocatorMetric#normalCacheSize()}
-   */
+  /// The size of the normal cache.
+  /// See [io.netty.buffer.PooledByteBufAllocatorMetric#normalCacheSize()]
   NETTY_POOLED_CACHE_SIZE_NORMAL("bytes", true),
-  /**
-   * The cache size used by the allocator for normal arenas
-   */
+  /// The cache size used by the allocator for normal arenas
   NETTY_POOLED_THREADLOCALCACHE("bytes", true),
   NETTY_POOLED_CHUNK_SIZE("bytes", true),
-  // Ingestion delay metrics
-  REALTIME_INGESTION_DELAY_MS("milliseconds", false),
-  END_TO_END_REALTIME_INGESTION_DELAY_MS("milliseconds", false),
   LUCENE_INDEXING_DELAY_MS("milliseconds", false),
   LUCENE_INDEXING_DELAY_DOCS("documents", false),
   // Needed to track if valid doc id snapshots are present for faster restarts
   UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT("upsertValidDocIdSnapshotCount", false),
+  UPSERT_QUERYABLE_DOC_ID_SNAPSHOT_COUNT("upsertQueryableDocIdSnapshotCount", false),
   UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT("upsertPrimaryKeysInSnapshotCount", false),
-  REALTIME_INGESTION_OFFSET_LAG("offsetLag", false),
-  REALTIME_INGESTION_UPSTREAM_OFFSET("upstreamOffset", false),
-  REALTIME_INGESTION_CONSUMING_OFFSET("consumingOffset", false),
-  REALTIME_CONSUMER_DIR_USAGE("bytes", true);
+  UPSERT_QUERYABLE_DOCS_IN_SNAPSHOT_COUNT("upsertQueryableDocIdsInSnapshot", false),
+  REALTIME_INGESTION_OFFSET_LAG("offsetLag", false,
+      "The difference between latest message offset and the last consumed message offset."),
+  REALTIME_INGESTION_OOM_PROTECTION_ACTIVE("boolean", true,
+      "Binary indicator (1 or 0) for whether the server-wide realtime ingestion OOM throttle is active."),
+  REALTIME_INGESTION_UPSTREAM_OFFSET("upstreamOffset", false, "The offset of the latest message in the upstream."),
+  REALTIME_INGESTION_CONSUMING_OFFSET("consumingOffset", false, "The offset of the last consumed message."),
+  REALTIME_INGESTION_DELAY_MS("milliseconds", false,
+      "The difference of the current timestamp and the timestamp present in the last consumed message record."),
+  END_TO_END_REALTIME_INGESTION_DELAY_MS("milliseconds", false),
+  REALTIME_INGESTION_DELAY_REPORTING_STATUS("boolean", false,
+      "Binary indicator (1 or 0) for whether ingestion delay data is available for a partition."),
+  REALTIME_CONSUMER_DIR_USAGE("bytes", true),
+  SEGMENT_DOWNLOAD_SPEED("bytes", true),
+  PREDOWNLOAD_SPEED("bytes", true),
+  PEER_DOWNLOAD_SPEED_MBPS("mbps", true),
+  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true),
+
+  // gRPC Netty buffer metrics
+  GRPC_NETTY_POOLED_USED_DIRECT_MEMORY("bytes", true),
+  GRPC_NETTY_POOLED_USED_HEAP_MEMORY("bytes", true),
+  GRPC_NETTY_POOLED_ARENAS_DIRECT("arenas", true),
+  GRPC_NETTY_POOLED_ARENAS_HEAP("arenas", true),
+  GRPC_NETTY_POOLED_CACHE_SIZE_SMALL("bytes", true),
+  GRPC_NETTY_POOLED_CACHE_SIZE_NORMAL("bytes", true),
+  GRPC_NETTY_POOLED_THREADLOCALCACHE("bytes", true),
+  GRPC_NETTY_POOLED_CHUNK_SIZE("bytes", true),
+
+  // GrpcMailboxServer memory metrics
+  MAILBOX_SERVER_USED_DIRECT_MEMORY("bytes", true),
+  MAILBOX_SERVER_USED_HEAP_MEMORY("bytes", true),
+  MAILBOX_SERVER_ARENAS_DIRECT("arenas", true),
+  MAILBOX_SERVER_ARENAS_HEAP("arenas", true),
+  MAILBOX_SERVER_CACHE_SIZE_SMALL("bytes", true),
+  MAILBOX_SERVER_CACHE_SIZE_NORMAL("bytes", true),
+  MAILBOX_SERVER_THREADLOCALCACHE("bytes", true),
+  MAILBOX_SERVER_CHUNK_SIZE("bytes", true),
+
+  // MailboxService gRPC client (outbound to peer mailboxes) memory metrics
+  MAILBOX_CLIENT_USED_DIRECT_MEMORY("bytes", true),
+  MAILBOX_CLIENT_USED_HEAP_MEMORY("bytes", true),
+
+  /// Exports the max amount of direct memory that can be allocated by Netty
+  /// It is basically an adaptor for io.netty.util.internal.PlatformDependent.maxDirectMemory()
+  ///
+  /// This value can be changed by setting the JVM option -Dio.netty.maxDirectMemory
+  NETTY_TOTAL_MAX_DIRECT_MEMORY("bytes", true),
+  /// Exports the total amount of direct memory allocated by Netty
+  /// It is basically an adaptor for io.netty.util.internal.PlatformDependent.usedDirectMemory()
+  NETTY_TOTAL_USED_DIRECT_MEMORY("bytes", true),
+  /// Exports the max amount of direct memory that can be allocated by the shaded Netty code used by gRPC
+  /// It is basically an adaptor for io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent.maxDirectMemory()
+  ///
+  /// This value can be changed by setting the JVM option -Dio.grpc.netty.shaded.io.netty.maxDirectMemory
+  GRPC_TOTAL_MAX_DIRECT_MEMORY("bytes", true),
+  /// Exports the total amount of direct memory allocated by the shaded Netty code used by gRPC
+  /// It is basically an adaptor for io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent.usedDirectMemory()
+  GRPC_TOTAL_USED_DIRECT_MEMORY("bytes", true),
+
+  // how many message are there in the server's message queue in helix
+  HELIX_MESSAGES_COUNT("count", true),
+  STARTUP_STATUS_CHECK_IN_PROGRESS("state", true,
+      "Indicates whether the server startup status check is currently in progress"),
+  STARTUP_CURRENT_STATE_MATCH_TIME_MS("milliseconds", true,
+      "Time in ms from status checker registration until ideal-state/current-state match first reports GOOD"),
+  STARTUP_EXTERNAL_VIEW_MATCH_TIME_MS("milliseconds", true,
+      "Time in ms from status checker registration until ideal-state/external-view match first reports GOOD"),
+  STARTUP_REALTIME_CONSUMPTION_CATCHUP_TIME_MS("milliseconds", true,
+      "Time in ms from status checker registration until realtime consumption catchup first reports GOOD"),
+  CONSUMER_LOCK_WAIT_TIME_MS("milliseconds", false,
+      "Indicates the time consumer spends while waiting on the consumer lock."),
+
+  // commit-time compaction gauge metrics
+  COMMIT_TIME_COMPACTION_RATIO_PERCENT("percentage", false, "Percentage of rows removed during commit-time compaction"),
+
+  // ThrottleOnCriticalHeapUsageExecutor metrics
+  THROTTLE_EXECUTOR_QUEUE_SIZE("count", true,
+      "Current number of tasks in the throttle executor queue"),
+  // Workload config fetch status: 1 = success, 0 = failure
+  WORKLOAD_CONFIG_FETCH_STATUS("status", true),
+  // OPEN_STRUCT segment build observability. Each seal on this server overwrites the previous value for the
+  // same (table, column), so these are not table-wide totals and must not be summed across segments or
+  // replicas; sampling them over time gives the trend.
+  OPEN_STRUCT_LAST_SEGMENT_DENSE_KEY_COUNT("keys", false,
+      "Number of OPEN_STRUCT keys classified as dense in the most recently sealed segment"),
+  OPEN_STRUCT_LAST_SEGMENT_SPARSE_KEY_COUNT("keys", false,
+      "Number of OPEN_STRUCT keys classified as sparse in the most recently sealed segment"),
+  OPEN_STRUCT_LAST_SEGMENT_KEY_COUNT("keys", false,
+      "Unique keys in the most recently sealed segment for this OPEN_STRUCT column (dense + sparse)"),
+  OPEN_STRUCT_LAST_SEGMENT_DOC_COUNT("documents", false,
+      "Total docs in the most recently sealed segment for this OPEN_STRUCT column; denominator for "
+          + "openStructLastSegmentKeyDocCount"),
+  /// When `perKeyMetricsEnabled` is false (default), emitted only for keys named in `denseKeys`. When
+  /// true, emitted for every key in the sealed segment — registry entries follow the ingested key space.
+  /// See `OpenStructColumnSplitter#emitMetrics`.
+  OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT("documents", false,
+      "Docs in which an OPEN_STRUCT key was present in the most recently sealed segment; "
+          + "divide by openStructLastSegmentDocCount for the fill rate");
 
   private final String _gaugeName;
   private final String _unit;
@@ -108,11 +215,9 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
     return _unit;
   }
 
-  /**
-   * Returns true if the gauge is global (not attached to a particular resource)
-   *
-   * @return true if the gauge is global
-   */
+  /// Returns true if the gauge is global (not attached to a particular resource)
+  ///
+  /// @return true if the gauge is global
   @Override
   public boolean isGlobal() {
     return _global;

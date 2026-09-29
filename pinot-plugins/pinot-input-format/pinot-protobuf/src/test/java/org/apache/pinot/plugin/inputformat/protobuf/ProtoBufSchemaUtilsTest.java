@@ -24,8 +24,8 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -37,7 +37,8 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.plugin.inputformat.protobuf.ProtoBufTestDataGenerator.*;
-import static org.junit.Assert.assertEquals;
+import static org.testng.Assert.assertEquals;
+
 
 public class ProtoBufSchemaUtilsTest {
 
@@ -76,6 +77,7 @@ public class ProtoBufSchemaUtilsTest {
         new Object[] {REPEATED_ENUMS, FieldSpec.DataType.STRING, false},
     };
   }
+
   @Test(dataProvider = "scalarCases")
   public void testExtractSchemaWithComplexTypeHandling(
       String fieldName, FieldSpec.DataType type, boolean isSingleValue) {
@@ -83,7 +85,7 @@ public class ProtoBufSchemaUtilsTest {
     Schema schema = new Schema();
     ProtoBufSchemaUtils.extractSchemaWithComplexTypeHandling(
         desc,
-        Collections.emptyList(),
+        List.of(),
         ".",
         desc.getName(),
         schema,
@@ -99,7 +101,7 @@ public class ProtoBufSchemaUtilsTest {
           .addMultiValueDimension(fieldName, type)
           .build();
     }
-    assertEquals(expectedSchema, schema);
+    assertEquals(schema, expectedSchema);
   }
 
   @Test
@@ -108,7 +110,7 @@ public class ProtoBufSchemaUtilsTest {
     Schema schema = new Schema();
     ProtoBufSchemaUtils.extractSchemaWithComplexTypeHandling(
         desc,
-        Collections.emptyList(),
+        List.of(),
         ".",
         desc.getName(),
         schema,
@@ -118,12 +120,12 @@ public class ProtoBufSchemaUtilsTest {
           .addSingleValueDimension("nested_message.nested_string_field", FieldSpec.DataType.STRING)
           .addSingleValueDimension("nested_message.nested_int_field", FieldSpec.DataType.INT)
           .build();
-    assertEquals(expectedSchema, schema);
+    assertEquals(schema, expectedSchema);
 
     schema = new Schema();
     ProtoBufSchemaUtils.extractSchemaWithComplexTypeHandling(
         desc,
-        Collections.emptyList(),
+        List.of(),
         "__",
         desc.getName(),
         schema,
@@ -133,14 +135,13 @@ public class ProtoBufSchemaUtilsTest {
         .addSingleValueDimension("nested_message__nested_string_field", FieldSpec.DataType.STRING)
         .addSingleValueDimension("nested_message__nested_int_field", FieldSpec.DataType.INT)
         .build();
-    assertEquals(expectedSchema, schema);
-
+    assertEquals(schema, expectedSchema);
 
     desc = ComplexTypes.TestMessage.getDescriptor().findFieldByName(REPEATED_NESTED_MESSAGES);
     schema = new Schema();
     ProtoBufSchemaUtils.extractSchemaWithComplexTypeHandling(
         desc,
-        Collections.emptyList(),
+        List.of(),
         "__",
         desc.getName(),
         schema,
@@ -149,12 +150,12 @@ public class ProtoBufSchemaUtilsTest {
     expectedSchema = new Schema.SchemaBuilder()
         .addSingleValueDimension(REPEATED_NESTED_MESSAGES, FieldSpec.DataType.STRING)
         .build();
-    assertEquals(expectedSchema, schema);
+    assertEquals(schema, expectedSchema);
 
     schema = new Schema();
     ProtoBufSchemaUtils.extractSchemaWithComplexTypeHandling(
         desc,
-        Collections.singletonList(REPEATED_NESTED_MESSAGES),
+        List.of(REPEATED_NESTED_MESSAGES),
         "__",
         desc.getName(),
         schema,
@@ -164,7 +165,7 @@ public class ProtoBufSchemaUtilsTest {
         .addSingleValueDimension("repeated_nested_messages__nested_string_field", FieldSpec.DataType.STRING)
         .addSingleValueDimension("repeated_nested_messages__nested_int_field", FieldSpec.DataType.INT)
         .build();
-    assertEquals(expectedSchema, schema);
+    assertEquals(schema, expectedSchema);
   }
 
   @Test(dataProvider = "scalarCases")
@@ -175,10 +176,10 @@ public class ProtoBufSchemaUtilsTest {
         desc,
         new HashMap<>(),
         TimeUnit.SECONDS,
-        Collections.emptyList(),
+        List.of(),
         ".").getFieldSpecFor("test_message." + fieldName);
     FieldSpec expectedSchema = new DimensionFieldSpec("test_message." + fieldName, type, isSingleValue);
-    assertEquals(expectedSchema, schema);
+    assertEquals(schema, expectedSchema);
   }
 
   @Test
@@ -192,20 +193,20 @@ public class ProtoBufSchemaUtilsTest {
         desc,
         fieldTypeMap,
         TimeUnit.SECONDS,
-        Collections.emptyList(),
+        List.of(),
         ".");
     FieldSpec fieldSpec = schema.getFieldSpecFor("test_message.long_field");
-    FieldSpec expectedSchema = new DateTimeFieldSpec("test_message.long_field", FieldSpec.DataType.LONG,
-        "1:SECONDS:EPOCH", "1:SECONDS");
-    assertEquals(expectedSchema, fieldSpec);
+    FieldSpec expectedFieldSpec = new DateTimeFieldSpec("test_message.long_field", FieldSpec.DataType.LONG,
+        "EPOCH|SECONDS", "1:SECONDS");
+    assertEquals(fieldSpec, expectedFieldSpec);
 
     fieldSpec = schema.getFieldSpecFor("test_message.int_field");
-    expectedSchema = new MetricFieldSpec("test_message.int_field", FieldSpec.DataType.INT);
-    assertEquals(expectedSchema, fieldSpec);
+    expectedFieldSpec = new MetricFieldSpec("test_message.int_field", FieldSpec.DataType.INT);
+    assertEquals(fieldSpec, expectedFieldSpec);
 
     fieldSpec = schema.getFieldSpecFor("test_message.double_field");
-    expectedSchema = new MetricFieldSpec("test_message.double_field", FieldSpec.DataType.DOUBLE);
-    assertEquals(expectedSchema, fieldSpec);
+    expectedFieldSpec = new MetricFieldSpec("test_message.double_field", FieldSpec.DataType.DOUBLE);
+    assertEquals(fieldSpec, expectedFieldSpec);
   }
 
   @Test
@@ -218,10 +219,10 @@ public class ProtoBufSchemaUtilsTest {
         desc,
         fieldTypeMap,
         TimeUnit.MILLISECONDS,
-        Collections.emptyList(),
+        List.of(),
         ".");
     URL resource = getClass().getClassLoader().getResource("complex_type_schema.json");
     Schema expectedSchema = Schema.fromString(new String(Files.readAllBytes(Paths.get(resource.toURI()))));
-    assertEquals(expectedSchema, schema);
+    assertEquals(schema, expectedSchema);
   }
 }

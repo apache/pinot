@@ -26,7 +26,7 @@ import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -34,7 +34,7 @@ import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.routing.RoutingTable;
-import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -84,9 +84,10 @@ public class HelixBrokerStarterTest extends ControllerTest {
     Map<String, Object> properties = new HashMap<>();
     properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
     properties.put(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
-    properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    properties.put(Helix.CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     properties.put(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, true);
     properties.put(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
+    properties.put(Broker.CONFIG_OF_BROKER_DEFAULT_QUERY_LIMIT, 1000);
 
     _brokerStarter = new HelixBrokerStarter();
     _brokerStarter.init(new PinotConfiguration(properties));
@@ -128,7 +129,6 @@ public class HelixBrokerStarterTest extends ControllerTest {
   private Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
-    streamConfigs.put("stream.kafka.consumer.type", "lowlevel");
     streamConfigs.put("stream.kafka.topic.name", "kafkaTopic");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder");
@@ -145,6 +145,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
 
     // NOTE: It is disabled in cluster config, but enabled in instance config. Instance config should take precedence.
     assertTrue(config.getProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false));
+    assertEquals(config.getProperty(Broker.CONFIG_OF_BROKER_DEFAULT_QUERY_LIMIT, 1), 1000);
   }
 
   @Test
@@ -172,7 +173,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     RoutingTable routingTable = routingManager.getRoutingTable(brokerRequest, 0);
     assertNotNull(routingTable);
     assertEquals(routingTable.getServerInstanceToSegmentsMap().size(), NUM_SERVERS);
-    assertEquals(routingTable.getServerInstanceToSegmentsMap().values().iterator().next().getLeft().size(),
+    assertEquals(routingTable.getServerInstanceToSegmentsMap().values().iterator().next().getSegments().size(),
         NUM_OFFLINE_SEGMENTS);
     assertTrue(routingTable.getUnavailableSegments().isEmpty());
 
@@ -182,7 +183,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
 
     TestUtils.waitForCondition(aVoid ->
             routingManager.getRoutingTable(brokerRequest, 0).getServerInstanceToSegmentsMap().values().iterator().next()
-                .getLeft().size() == NUM_OFFLINE_SEGMENTS + 1, 30_000L,
+                .getSegments().size() == NUM_OFFLINE_SEGMENTS + 1, 30_000L,
         "Failed to add the new segment " + "into the routing table");
 
     // Add a new table with different broker tenant
@@ -221,9 +222,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     assertTrue(routingManager.routingExists(newOfflineTableName));
   }
 
-  /**
-   * This test verifies that when the segments of an OFFLINE are refreshed, the TimeBoundaryInfo is also updated.
-   */
+  /// This test verifies that when the segments of an OFFLINE are refreshed, the TimeBoundaryInfo is also updated.
   @Test
   public void testTimeBoundaryUpdate() {
     BrokerRoutingManager routingManager = _brokerStarter.getRoutingManager();

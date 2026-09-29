@@ -22,12 +22,10 @@ import com.google.common.base.Preconditions;
 import java.util.concurrent.Semaphore;
 
 
-/**
- * A semaphore that allows adjusting the number of permits in a non-blocking way.
- */
+/// A semaphore that allows adjusting the number of permits in a non-blocking way.
 public class AdjustableSemaphore extends Semaphore {
 
-  private int _totalPermits;
+  private volatile int _totalPermits;
 
   public AdjustableSemaphore(int permits) {
     super(permits);
@@ -39,13 +37,21 @@ public class AdjustableSemaphore extends Semaphore {
     _totalPermits = permits;
   }
 
-  public void setPermits(int permits) {
-    Preconditions.checkArgument(permits > 0, "Permits must be a positive integer");
+  /// Sets the total number of permits to the given value without blocking.
+  /// Synchronized to allow multiple threads to update permits concurrently
+  public synchronized void setPermits(int permits) {
+    Preconditions.checkArgument(permits >= 0, "Permits must be a non-negative integer");
     if (permits < _totalPermits) {
       reducePermits(_totalPermits - permits);
     } else if (permits > _totalPermits) {
       release(permits - _totalPermits);
     }
     _totalPermits = permits;
+  }
+
+  /// Returns the total number of permits (as opposed to just the number of available permits returned by
+  /// [#availablePermits()]).
+  public int getTotalPermits() {
+    return _totalPermits;
   }
 }

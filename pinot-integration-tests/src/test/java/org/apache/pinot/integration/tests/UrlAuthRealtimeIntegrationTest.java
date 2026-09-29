@@ -19,22 +19,18 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URL;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.client.Connection;
-import org.apache.pinot.client.ConnectionFactory;
-import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.client.admin.PinotAdminAuthenticationException;
+import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.common.auth.UrlAuthProvider;
-import org.apache.pinot.controller.helix.ControllerRequestClient;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -136,35 +132,27 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
     properties.put("bucketTimePeriod", "30d");
 
     return new TableTaskConfig(
-        Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, properties));
+        Map.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, properties));
   }
 
   @Override
-  public ControllerRequestClient getControllerRequestClient() {
-    if (_controllerRequestClient == null) {
-      _controllerRequestClient =
-          new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient(), AUTH_HEADER);
-    }
-    return _controllerRequestClient;
+  protected Map<String, String> getAdminClientHeaders() {
+    return AUTH_HEADER;
   }
 
   @Override
-  protected Connection getPinotConnection() {
-    if (_pinotConnection == null) {
-      JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
-      factory.setHeaders(AUTH_HEADER);
-
-      _pinotConnection =
-          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), factory.buildTransport());
-    }
-    return _pinotConnection;
+  protected Map<String, String> getPinotClientTransportHeaders() {
+    return AUTH_HEADER;
   }
 
-  @Test(expectedExceptions = IOException.class)
+  @Test(expectedExceptions = PinotAdminAuthenticationException.class)
   public void testUnauthenticatedFailure()
-      throws IOException {
-    sendDeleteRequest(
-        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType("mytable")));
+      throws Exception {
+    try (PinotAdminClient unauthenticatedAdminClient =
+        new PinotAdminClient(getControllerBaseApiUrl().replaceFirst("^https?://", ""))) {
+      unauthenticatedAdminClient.getTableClient()
+          .deleteTable(TableNameBuilder.REALTIME.tableNameWithType("mytable"));
+    }
   }
 
   @Test
@@ -176,12 +164,13 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
     Assert.assertTrue(resultBeforeOffline.getResultSet(0).getLong(0) > 0);
 
     // schedule offline segment generation
-    Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleAllTasksForAllTables(null));
+    Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleTasks(new TaskSchedulingContext()));
 
     // wait for offline segments
     List<String> offlineSegments = TestUtils.waitForResult(() -> {
       List<String> currentOfflineSegments =
-          getControllerRequestClient().listSegments(getTableName(), TableType.OFFLINE.name(), false);
+          getOrCreateAdminClient().getSegmentClient()
+              .listSegments(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), false);
       Assert.assertFalse(currentOfflineSegments.isEmpty());
       return currentOfflineSegments;
     }, 30000);
@@ -192,9 +181,9 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
 
     // download and sanity-check size of offline segment(s)
     for (String segment : offlineSegments) {
-      Assert.assertTrue(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
-              > 200000); // download segment
+      byte[] segmentBytes = getOrCreateAdminClient().getSegmentClient()
+          .downloadSegment(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), segment);
+      Assert.assertTrue(segmentBytes.length > 200000); // download segment
     }
   }
 }

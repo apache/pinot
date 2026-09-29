@@ -22,8 +22,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import java.util.Set;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.query.planner.PlanFragment;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.WorkerMetadata;
 
@@ -49,6 +51,20 @@ public class DispatchablePlanFragment {
 
   public DispatchablePlanFragment(PlanFragment planFragment) {
     this(planFragment, new ArrayList<>(), new HashMap<>(), new HashMap<>());
+  }
+
+  /// Returns a copy of `original` with its plan fragment root replaced by `newRoot`.
+  /// Worker metadata, server-instance mapping and the worker-to-segments map are shallow-copied so the new fragment is
+  /// independent of the original.
+  public static DispatchablePlanFragment copyWithRoot(DispatchablePlanFragment original, PlanNode newRoot) {
+    int fragmentId = original.getPlanFragment().getFragmentId();
+    DispatchablePlanFragment copy = new DispatchablePlanFragment(
+        new PlanFragment(fragmentId, newRoot, List.of()),
+        new ArrayList<>(original.getWorkerMetadataList()),
+        new HashMap<>(original.getServerInstanceToWorkerIdMap()),
+        new HashMap<>(original.getCustomProperties()));
+    copy.setWorkerIdToSegmentsMap(original.getWorkerIdToSegmentsMap());
+    return copy;
   }
 
   public DispatchablePlanFragment(PlanFragment planFragment, List<WorkerMetadata> workerMetadataList,
@@ -111,5 +127,9 @@ public class DispatchablePlanFragment {
   public void setServerInstanceToWorkerIdMap(Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap) {
     _serverInstanceToWorkerIdMap.clear();
     _serverInstanceToWorkerIdMap.putAll(serverInstanceToWorkerIdMap);
+  }
+
+  public Set<QueryServerInstance> getServerInstances() {
+    return _serverInstanceToWorkerIdMap.keySet();
   }
 }

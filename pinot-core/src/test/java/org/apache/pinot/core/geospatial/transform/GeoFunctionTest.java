@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.BiConsumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -36,6 +37,7 @@ import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -52,9 +54,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 
 
-/**
- * Base class for geospatial tests.
- */
+/// Base class for geospatial tests.
 public abstract class GeoFunctionTest {
   protected static final String STRING_SV_COLUMN = "stringSV";
   protected static final String LONG_SV_COLUMN = "longSV";
@@ -62,7 +62,8 @@ public abstract class GeoFunctionTest {
 
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
-  private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
+  private static final String INDEX_DIR_PATH =
+      FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME + "-" + UUID.randomUUID();
 
   private static final double DELTA = 0.00001;
 
@@ -142,13 +143,10 @@ public abstract class GeoFunctionTest {
     }
     Schema schema = sb.build();
     for (int i = 0; i < length; i++) {
-
-      Map<String, Object> map = new HashMap<>();
-      for (Column column : columns) {
-        map.put(column._name, column._values[i]);
-      }
       GenericRow row = new GenericRow();
-      row.init(map);
+      for (Column column : columns) {
+        row.putValue(column._name, column._values[i]);
+      }
       rows.add(row);
     }
 
@@ -168,7 +166,8 @@ public abstract class GeoFunctionTest {
     }
 
     ProjectionBlock projectionBlock = new ProjectionOperator(dataSourceMap,
-        new DocIdSetOperator(new MatchAllFilterOperator(length), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
+        new DocIdSetOperator(new MatchAllFilterOperator(length), DocIdSetPlanNode.MAX_DOC_PER_CALL),
+        new QueryContext.Builder().build()).nextBlock();
 
     ExpressionContext expression = RequestContextUtils.getExpression(function);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, dataSourceMap);

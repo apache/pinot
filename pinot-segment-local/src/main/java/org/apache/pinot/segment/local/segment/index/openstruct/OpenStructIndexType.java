@@ -1,0 +1,251 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.segment.local.segment.index.openstruct;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.creator.impl.openstruct.OpenStructColumnSplitter;
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.AbstractIndexType;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
+import org.apache.pinot.segment.spi.index.IndexHandler;
+import org.apache.pinot.segment.spi.index.IndexReaderFactory;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.creator.ColumnarOpenStructIndexCreator;
+import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
+import org.apache.pinot.segment.spi.index.reader.OpenStructIndexReader;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+
+
+/// Index type for the OPEN_STRUCT index on OPEN_STRUCT columns.
+///
+/// The OPEN_STRUCT index has no reader of its own — per-key materialized columns are loaded by
+/// the standard `PhysicalColumnIndexContainer` and served via standard index readers. This
+/// type exists for SPI registration, config deserialization, and validation.
+public class OpenStructIndexType
+    extends AbstractIndexType<OpenStructIndexConfig, OpenStructIndexReader, ColumnarOpenStructIndexCreator> {
+
+  public static final String INDEX_DISPLAY_NAME = "open_struct";
+  private static final List<String> EXTENSIONS = List.of(".open_struct.idx");
+
+  protected OpenStructIndexType() {
+    super(StandardIndexes.OPEN_STRUCT_ID);
+  }
+
+  @Override
+  public Class<OpenStructIndexConfig> getIndexConfigClass() {
+    return OpenStructIndexConfig.class;
+  }
+
+  @Override
+  public OpenStructIndexConfig getDefaultConfig() {
+    return OpenStructIndexConfig.DEFAULT;
+  }
+
+  @Override
+  public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
+    // The default OpenStructIndexConfig is auto-applied to every column; only enforce on OPEN_STRUCT
+    // fields. Non-OPEN_STRUCT columns cannot meaningfully opt in to this index.
+    if (fieldSpec.getDataType() != FieldSpec.DataType.OPEN_STRUCT) {
+      return;
+    }
+    OpenStructIndexConfig config = indexConfigs.getConfig(this);
+    if (config.isEnabled()) {
+      Preconditions.checkState(fieldSpec.isSingleValueField(),
+          "OPEN_STRUCT index can only be created on single-value columns, but column '%s' is multi-value",
+          fieldSpec.getName());
+      validatePerKeyIndexes(config, fieldSpec.getName());
+      validateIgnoredKeys(config, fieldSpec);
+      if (fieldSpec instanceof ComplexFieldSpec) {
+        validateChildFieldSpecTypes((ComplexFieldSpec) fieldSpec);
+      }
+    }
+  }
+
+  /// Rejects a declared child key type that a key column cannot actually store (e.g. STRUCT, LIST, MAP, nested
+  /// OPEN_STRUCT, UNKNOWN — [FieldSpec#getDefaultNullValue(FieldSpec.FieldType,FieldSpec.DataType,String)] has no
+  /// DIMENSION case for these). Catching this at config validation, rather than surfacing it as an uncaught
+  /// exception on the first row ingested for such a key, keeps a bad declared type from taking down the whole
+  /// consuming thread.
+  private void validateChildFieldSpecTypes(ComplexFieldSpec fieldSpec) {
+    Map<String, FieldSpec> childFieldSpecs = fieldSpec.getChildFieldSpecs();
+    if (childFieldSpecs == null) {
+      return;
+    }
+    for (Map.Entry<String, FieldSpec> entry : childFieldSpecs.entrySet()) {
+      FieldSpec.DataType storedType = entry.getValue().getDataType().getStoredType();
+      Preconditions.checkState(isCoercible(storedType),
+          "OPEN_STRUCT column '%s': child key '%s' declares type '%s', which cannot be coerced for indexing",
+          fieldSpec.getName(), entry.getKey(), storedType);
+    }
+  }
+
+  private static boolean isCoercible(FieldSpec.DataType storedType) {
+    try {
+      // The exact call allocateKeyColumn() makes to compute a key column's default null value; a declared type
+      // that fails it here (e.g. MAP, OPEN_STRUCT, which ColumnDataType conversion alone accepts) would otherwise
+      // throw uncaught on the consuming thread instead of being rejected at config validation time.
+      FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, storedType, null);
+      return true;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void validatePerKeyIndexes(OpenStructIndexConfig config, String column) {
+    if (config.getValueFieldConfigs() != null) {
+      for (FieldConfig fieldConfig : config.getValueFieldConfigs()) {
+        validatePerKeyFieldConfig(fieldConfig, column, "key '" + fieldConfig.getName() + "'");
+      }
+    }
+    FieldConfig defaultValueFieldConfig = config.getDefaultValueFieldConfig();
+    if (defaultValueFieldConfig != null) {
+      validatePerKeyFieldConfig(defaultValueFieldConfig, column, "defaultValueFieldConfig");
+    }
+  }
+
+  /// Validates one per-key [FieldConfig] of OPEN_STRUCT `column`; `target` names it in error messages.
+  private static void validatePerKeyFieldConfig(FieldConfig fieldConfig, String column, String target) {
+    JsonNode indexes = fieldConfig.getIndexes();
+    if (indexes == null) {
+      return;
+    }
+    JsonNode forwardIndex = indexes.get(StandardIndexes.forward().getPrettyName());
+    // The OPEN_STRUCT splitter builds its own per-key forward-index configs (dict-vs-raw decision plus a
+    // fixed LZ4 raw compression), so a per-key codecSpec would be silently discarded. Reject it explicitly.
+    Preconditions.checkState(forwardIndex == null || !forwardIndex.hasNonNull("codecSpec"),
+        "OPEN_STRUCT column '%s': codecSpec is not supported for %s; materialized keys always use a "
+            + "dictionary-encoded or LZ4 raw forward index", column, target);
+    Iterator<String> indexNames = indexes.fieldNames();
+    while (indexNames.hasNext()) {
+      String indexName = indexNames.next();
+      Preconditions.checkState(OpenStructSupportedIndexes.ALLOWED_PRETTY_NAMES.contains(indexName),
+          "OPEN_STRUCT key '%s' declares unsupported index '%s'; supported indexes are %s",
+          fieldConfig.getName(), indexName, OpenStructSupportedIndexes.ALLOWED_PRETTY_NAMES);
+    }
+  }
+
+  private void validateIgnoredKeys(OpenStructIndexConfig config, FieldSpec fieldSpec) {
+    Set<String> ignoredKeys = config.getIgnoredKeys();
+    if (ignoredKeys.isEmpty()) {
+      return;
+    }
+    for (String key : ignoredKeys) {
+      Preconditions.checkState(!config.getDenseKeys().contains(key),
+          "OPEN_STRUCT column '%s': key '%s' is in both ignoredKeys and denseKeys", fieldSpec.getName(), key);
+      Preconditions.checkState(config.getValueFieldConfig(key) == null,
+          "OPEN_STRUCT column '%s': key '%s' is in ignoredKeys but also has a valueFieldConfigs entry",
+          fieldSpec.getName(), key);
+    }
+    if (fieldSpec instanceof ComplexFieldSpec) {
+      Map<String, FieldSpec> childFieldSpecs = ((ComplexFieldSpec) fieldSpec).getChildFieldSpecs();
+      for (String key : ignoredKeys) {
+        Preconditions.checkState(childFieldSpecs == null || !childFieldSpecs.containsKey(key),
+            "OPEN_STRUCT column '%s': key '%s' is in ignoredKeys but also declared in childFieldSpecs",
+            fieldSpec.getName(), key);
+      }
+    }
+  }
+
+  @Override
+  public String getPrettyName() {
+    return INDEX_DISPLAY_NAME;
+  }
+
+  @Override
+  protected ColumnConfigDeserializer<OpenStructIndexConfig> createDeserializerForLegacyConfigs() {
+    // OPEN_STRUCT is net-new; no legacy FieldConfig.properties path to migrate.
+    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.OPEN_STRUCT,
+        (tableConfig, fieldConfig) -> OpenStructIndexConfig.DEFAULT);
+  }
+
+  @Override
+  public boolean shouldCreateIndex(IndexCreationContext context, OpenStructIndexConfig indexConfig) {
+    // The default OpenStructIndexConfig is auto-applied to every column; only build a creator for
+    // OPEN_STRUCT columns. Non-OPEN_STRUCT columns cannot meaningfully host this index.
+    return context.getFieldSpec().getDataType() == FieldSpec.DataType.OPEN_STRUCT;
+  }
+
+  @Override
+  public ColumnarOpenStructIndexCreator createIndexCreator(IndexCreationContext context,
+      OpenStructIndexConfig indexConfig) {
+    FieldSpec fieldSpec = context.getFieldSpec();
+    return new OpenStructColumnSplitter(context.getIndexDir(), fieldSpec.getName(), context.getTableNameWithType(),
+        fieldSpec, indexConfig);
+  }
+
+  @Override
+  protected IndexReaderFactory<OpenStructIndexReader> createReaderFactory() {
+    return new NoOpReaderFactory();
+  }
+
+  @Override
+  public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
+    return EXTENSIONS;
+  }
+
+  @Override
+  public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory,
+      Map<String, FieldIndexConfigs> configsByCol, Schema schema, TableConfig tableConfig) {
+    return IndexHandler.NoOp.INSTANCE;
+  }
+
+  @Nullable
+  @Override
+  public MutableIndex createMutableIndex(MutableIndexContext context, OpenStructIndexConfig config) {
+    throw new UnsupportedOperationException("Mutable OPEN_STRUCT index is constructed by MutableSegmentImpl, "
+        + "not via this SPI path");
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, OpenStructIndexConfig indexConfig) {
+    return false;
+  }
+
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, OpenStructIndexConfig indexConfig) {
+    return false;
+  }
+
+  /// Reader factory that always returns null. The OPEN_STRUCT index has no reader of its own —
+  /// materialized columns are loaded independently by the standard column loading infrastructure.
+  private static class NoOpReaderFactory implements IndexReaderFactory<OpenStructIndexReader> {
+    @Nullable
+    @Override
+    public OpenStructIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
+        FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata) {
+      return null;
+    }
+  }
+}

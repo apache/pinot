@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -25,6 +26,8 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class ReducerDataSchemaUtilsTest {
@@ -41,16 +44,16 @@ public class ReducerDataSchemaUtilsTest {
 
     queryContext = QueryContextConverterUtils.getQueryContext("SELECT SUM(col1 + 1), MIN(col2 + 2) FROM testTable");
     // Intentionally make data schema not matching the string representation of the expression
-    dataSchema = new DataSchema(new String[]{"sum(col1+1)", "min(col2+2)"},
+    dataSchema = new DataSchema(new String[]{"sum(col1)", "count(1)", "min(col2)"},
         new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
     canonicalDataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForAggregation(queryContext, dataSchema);
-    assertEquals(canonicalDataSchema, new DataSchema(new String[]{"sum(plus(col1,'1'))", "min(plus(col2,'2'))"},
+    assertEquals(canonicalDataSchema, new DataSchema(new String[]{"sum(col1)", "count(*)", "min(col2)"},
         new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE}));
 
     queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT MAX(col1 + 1) FILTER(WHERE col3 > 0) - MIN(col2 + 2) FILTER(WHERE col4 > 0) FROM testTable");
     // Intentionally make data schema not matching the string representation of the expression
-    dataSchema = new DataSchema(new String[]{"max(col1+1)", "min(col2+2)"},
+    dataSchema = new DataSchema(new String[]{"max(col1)", "min(col2)"},
         new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
     canonicalDataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForAggregation(queryContext, dataSchema);
     assertEquals(canonicalDataSchema, new DataSchema(
@@ -72,12 +75,14 @@ public class ReducerDataSchemaUtilsTest {
     queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT SUM(col1 + 1), MIN(col2 + 2), col4 FROM testTable GROUP BY col3, col4");
     // Intentionally make data schema not matching the string representation of the expression
-    dataSchema = new DataSchema(new String[]{"col3", "col4", "sum(col1+1)", "min(col2+2)"},
-        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    dataSchema = new DataSchema(new String[]{"col3", "col4", "sum(col1)", "count(1)", "min(col2)"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.DOUBLE,
+            ColumnDataType.LONG, ColumnDataType.DOUBLE});
     canonicalDataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForGroupBy(queryContext, dataSchema);
     assertEquals(canonicalDataSchema,
-        new DataSchema(new String[]{"col3", "col4", "sum(plus(col1,'1'))", "min(plus(col2,'2'))"}, new ColumnDataType[]{
-            ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
+        new DataSchema(new String[]{"col3", "col4", "sum(col1)", "count(*)", "min(col2)"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.LONG,
+            ColumnDataType.DOUBLE
         }));
 
     queryContext = QueryContextConverterUtils.getQueryContext(
@@ -103,5 +108,31 @@ public class ReducerDataSchemaUtilsTest {
     DataSchema canonicalDataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForDistinct(queryContext, dataSchema);
     assertEquals(canonicalDataSchema, new DataSchema(new String[]{"col1", "plus(col2,col3)"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.DOUBLE}));
+  }
+
+  /// A grouping-set query expects the synthetic $groupingId key column. During a rolling upgrade an older
+  /// server (without grouping-set support) silently ignores the wire field and returns a plain GROUP BY result
+  /// missing that column. The reducer must reject this with an actionable "upgrade all servers" message rather
+  /// than an opaque column-count BUG, and must still canonicalize the fully-upgraded (correct) shape.
+  @Test
+  public void testCanonicalizeDataSchemaForGroupByGroupingSetsMixedVersion() {
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT col3, COUNT(*) FROM testTable GROUP BY ROLLUP(col3)");
+    assertTrue(queryContext.isGroupingSets());
+
+    /// Old-server shape: [col3, count(*)] -- missing the $groupingId column the new broker expects.
+    DataSchema oldServerSchema =
+        new DataSchema(new String[]{"col3", "count(*)"}, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> ReducerDataSchemaUtils.canonicalizeDataSchemaForGroupBy(queryContext, oldServerSchema));
+    assertTrue(e.getMessage().contains("Upgrade all servers"), "unexpected message: " + e.getMessage());
+
+    /// Fully-upgraded shape: [col3, $groupingId, count(*)] canonicalizes without throwing.
+    DataSchema newServerSchema = new DataSchema(new String[]{"col3", GroupingSets.GROUPING_ID_COLUMN, "count(*)"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.LONG});
+    DataSchema canonicalDataSchema =
+        ReducerDataSchemaUtils.canonicalizeDataSchemaForGroupBy(queryContext, newServerSchema);
+    assertEquals(canonicalDataSchema.size(), 3);
+    assertEquals(canonicalDataSchema.getColumnName(1), GroupingSets.GROUPING_ID_COLUMN);
   }
 }

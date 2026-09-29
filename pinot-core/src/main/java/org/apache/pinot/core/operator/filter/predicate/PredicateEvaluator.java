@@ -25,62 +25,42 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public interface PredicateEvaluator {
 
-  /**
-   * APIs for both dictionary based and raw value based predicate evaluator
-   */
+  /// APIs for both dictionary based and raw value based predicate evaluator
 
-  /**
-   * Get the predicate.
-   */
+  /// Get the predicate.
   Predicate getPredicate();
 
-  /**
-   * Get the predicate type.
-   */
+  /// Get the predicate type.
   Predicate.Type getPredicateType();
 
-  /**
-   * Return whether the predicate evaluator is dictionary based or raw value based.
-   */
+  /// Return whether the predicate evaluator is dictionary based or raw value based.
   boolean isDictionaryBased();
 
-  /**
-   * Returns the data type expected by the PredicateEvaluator. Returns INT for dictionary-based PredicateEvaluator.
-   */
+  /// Returns the data type expected by the PredicateEvaluator. Returns INT for dictionary-based PredicateEvaluator.
   DataType getDataType();
 
-  /**
-   * Return whether the predicate is exclusive (e.g. NEQ, NOT_IN).
-   */
+  /// Return whether the predicate is exclusive (e.g. NEQ, NOT_IN).
   boolean isExclusive();
 
-  /**
-   * Return whether the predicate will always be evaluated as true.
-   */
+  /// Return whether the predicate will always be evaluated as true.
   boolean isAlwaysTrue();
 
-  /**
-   * Return whether the predicate will always be evaluated as false.
-   */
+  /// Return whether the predicate will always be evaluated as false.
   boolean isAlwaysFalse();
 
-  /**
-   * Apply a single-value entry to the predicate.
-   *
-   * @param value Dictionary id or raw value
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a single-value entry to the predicate.
+  ///
+  /// @param value Dictionary id or raw value
+  /// @return Whether the entry matches the predicate
   boolean applySV(int value);
 
-  /**
-   * Apply the predicate to a batch of single-value entries.
-   * Compact matching entries into the prefix of the docIds array.
-   *
-   * @param limit How much of the input to consume.
-   * @param docIds The docIds associated with the values - may be modified by invocation.
-   * @param values Batch of dictionary ids or raw values.
-   * @return the index of the first non-matching entry.
-   */
+  /// Apply the predicate to a batch of single-value entries.
+  /// Compact matching entries into the prefix of the docIds array.
+  ///
+  /// @param limit How much of the input to consume.
+  /// @param docIds The docIds associated with the values - may be modified by invocation.
+  /// @param values Batch of dictionary ids or raw values.
+  /// @return the index of the first non-matching entry.
   default int applySV(int limit, int[] docIds, int[] values) {
     int matches = 0;
     for (int i = 0; i < limit; i++) {
@@ -92,58 +72,42 @@ public interface PredicateEvaluator {
     return matches;
   }
 
-  /**
-   * Apply a multi-value entry to the predicate.
-   *
-   * @param values Array of dictionary ids or raw values
-   * @param length Number of values in the entry
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a multi-value entry to the predicate.
+  ///
+  /// @param values Array of dictionary ids or raw values
+  /// @param length Number of values in the entry
+  /// @return Whether the entry matches the predicate
   boolean applyMV(int[] values, int length);
 
-  /**
-   * Get the number of matching items. Negative number indicates exclusive (e.g. NOT_EQ, NOT_IN) match. Returns
-   * {@code Integer.MIN_VALUE} if not applicable.
-   */
+  /// Get the number of matching items. Negative number indicates exclusive (e.g. NOT_EQ, NOT_IN) match. Returns
+  /// `Integer.MIN_VALUE` if not applicable.
   default int getNumMatchingItems() {
     return Integer.MIN_VALUE;
   }
 
-  /**
-   * APIs for dictionary based predicate evaluator
-   */
+  /// APIs for dictionary based predicate evaluator
 
-  /**
-   * Get the matching dictionary ids. The returned ids should be sorted.
-   */
+  /// Get the matching dictionary ids. The returned ids should be sorted.
   int[] getMatchingDictIds();
 
-  /**
-   * Get the non-matching dictionary ids. The returned ids should be sorted.
-   */
+  /// Get the non-matching dictionary ids. The returned ids should be sorted.
   int[] getNonMatchingDictIds();
 
-  /**
-   * APIs for raw value based predicate evaluator.
-   */
+  /// APIs for raw value based predicate evaluator.
 
-  /**
-   * Apply a single-value entry to the predicate.
-   *
-   * @param value Raw value
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a single-value entry to the predicate.
+  ///
+  /// @param value Raw value
+  /// @return Whether the entry matches the predicate
   boolean applySV(long value);
 
-  /**
-   * Apply the predicate to a batch of single-value entries.
-   * Compact matching entries into the prefix of the docIds array.
-   *
-   * @param limit How much of the input to consume.
-   * @param docIds The docIds associated with the values - may be modified by invocation.
-   * @param values Batch of raw values - may be modified by invocation.
-   * @return the index of the first non-matching entry.
-   */
+  /// Apply the predicate to a batch of single-value entries.
+  /// Compact matching entries into the prefix of the docIds array.
+  ///
+  /// @param limit How much of the input to consume.
+  /// @param docIds The docIds associated with the values - may be modified by invocation.
+  /// @param values Batch of raw values - may be modified by invocation.
+  /// @return the index of the first non-matching entry.
   default int applySV(int limit, int[] docIds, long[] values) {
     int matches = 0;
     for (int i = 0; i < limit; i++) {
@@ -155,32 +119,26 @@ public interface PredicateEvaluator {
     return matches;
   }
 
-  /**
-   * Apply a multi-value entry to the predicate.
-   *
-   * @param values Array of raw values
-   * @param length Number of values in the entry
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a multi-value entry to the predicate.
+  ///
+  /// @param values Array of raw values
+  /// @param length Number of values in the entry
+  /// @return Whether the entry matches the predicate
   boolean applyMV(long[] values, int length);
 
-  /**
-   * Apply a single-value entry to the predicate.
-   *
-   * @param value Raw value
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a single-value entry to the predicate.
+  ///
+  /// @param value Raw value
+  /// @return Whether the entry matches the predicate
   boolean applySV(float value);
 
-  /**
-   * Apply the predicate to a batch of single-value entries.
-   * Compact matching entries into the prefix of the docIds array.
-   *
-   * @param limit How much of the input to consume.
-   * @param docIds The docIds associated with the values - may be modified by invocation.
-   * @param values Batch of raw values - may be modified by invocation.
-   * @return the index of the first non-matching entry.
-   */
+  /// Apply the predicate to a batch of single-value entries.
+  /// Compact matching entries into the prefix of the docIds array.
+  ///
+  /// @param limit How much of the input to consume.
+  /// @param docIds The docIds associated with the values - may be modified by invocation.
+  /// @param values Batch of raw values - may be modified by invocation.
+  /// @return the index of the first non-matching entry.
   default int applySV(int limit, int[] docIds, float[] values) {
     int matches = 0;
     for (int i = 0; i < limit; i++) {
@@ -192,32 +150,26 @@ public interface PredicateEvaluator {
     return matches;
   }
 
-  /**
-   * Apply a multi-value entry to the predicate.
-   *
-   * @param values Array of raw values
-   * @param length Number of values in the entry
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a multi-value entry to the predicate.
+  ///
+  /// @param values Array of raw values
+  /// @param length Number of values in the entry
+  /// @return Whether the entry matches the predicate
   boolean applyMV(float[] values, int length);
 
-  /**
-   * Apply a single-value entry to the predicate.
-   *
-   * @param value Raw value
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a single-value entry to the predicate.
+  ///
+  /// @param value Raw value
+  /// @return Whether the entry matches the predicate
   boolean applySV(double value);
 
-  /**
-   * Apply the predicate to a batch of single-value entries.
-   * Compact matching entries into the prefix of the docIds array.
-   *
-   * @param limit How much of the input to consume.
-   * @param docIds The docIds associated with the values - may be modified by invocation.
-   * @param values Batch of raw values - may be modified by invocation.
-   * @return the index of the first non-matching entry.
-   */
+  /// Apply the predicate to a batch of single-value entries.
+  /// Compact matching entries into the prefix of the docIds array.
+  ///
+  /// @param limit How much of the input to consume.
+  /// @param docIds The docIds associated with the values - may be modified by invocation.
+  /// @param values Batch of raw values - may be modified by invocation.
+  /// @return the index of the first non-matching entry.
   default int applySV(int limit, int[] docIds, double[] values) {
     int matches = 0;
     for (int i = 0; i < limit; i++) {
@@ -229,54 +181,49 @@ public interface PredicateEvaluator {
     return matches;
   }
 
-  /**
-   * Apply a multi-value entry to the predicate.
-   *
-   * @param values Array of raw values
-   * @param length Number of values in the entry
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a multi-value entry to the predicate.
+  ///
+  /// @param values Array of raw values
+  /// @param length Number of values in the entry
+  /// @return Whether the entry matches the predicate
   boolean applyMV(double[] values, int length);
 
-  /**
-   * Apply a single-value entry to the predicate.
-   *
-   * @param value Raw value
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a single-value entry to the predicate.
+  ///
+  /// @param value Raw value
+  /// @return Whether the entry matches the predicate
   boolean applySV(BigDecimal value);
 
-  /**
-   * Apply a single-value entry to the predicate.
-   *
-   * @param value Raw value
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a multi-value entry to the predicate.
+  ///
+  /// @param values Array of raw values
+  /// @param length Number of values in the entry
+  /// @return Whether the entry matches the predicate
+  boolean applyMV(BigDecimal[] values, int length);
+
+  /// Apply a single-value entry to the predicate.
+  ///
+  /// @param value Raw value
+  /// @return Whether the entry matches the predicate
   boolean applySV(String value);
 
-  /**
-   * Apply a multi-value entry to the predicate.
-   *
-   * @param values Array of raw values
-   * @param length Number of values in the entry
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a multi-value entry to the predicate.
+  ///
+  /// @param values Array of raw values
+  /// @param length Number of values in the entry
+  /// @return Whether the entry matches the predicate
   boolean applyMV(String[] values, int length);
 
-  /**
-   * Apply a single-value entry to the predicate.
-   *
-   * @param value Raw value
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a single-value entry to the predicate.
+  ///
+  /// @param value Raw value
+  /// @return Whether the entry matches the predicate
   boolean applySV(byte[] value);
 
-  /**
-   * Apply a multi-value entry to the predicate.
-   *
-   * @param values Array of raw values
-   * @param length Number of values in the entry
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a multi-value entry to the predicate.
+  ///
+  /// @param values Array of raw values
+  /// @param length Number of values in the entry
+  /// @return Whether the entry matches the predicate
   boolean applyMV(byte[][] values, int length);
 }

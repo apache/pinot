@@ -20,29 +20,25 @@ package org.apache.pinot.core.minion;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorCustomConfigs;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -78,10 +74,11 @@ public class SegmentPurgerTest {
     FileUtils.deleteDirectory(TEMP_DIR);
 
     _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Collections.singletonList(D1)).setCreateInvertedIndexDuringSegmentGeneration(true)
+        .setInvertedIndexColumns(List.of(D1))
         .build();
     _schema = new Schema.SchemaBuilder().addSingleValueDimension(D1, FieldSpec.DataType.INT)
-        .addSingleValueDimension(D2, FieldSpec.DataType.INT).build();
+        .addSingleValueDimension(D2, FieldSpec.DataType.INT)
+        .build();
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -100,6 +97,7 @@ public class SegmentPurgerTest {
     GenericRowRecordReader genericRowRecordReader = new GenericRowRecordReader(rows);
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, _schema);
+    config.setInstanceType(InstanceType.MINION);
     config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
     config.setSegmentName(SEGMENT_NAME);
 
@@ -126,7 +124,8 @@ public class SegmentPurgerTest {
     };
 
     SegmentPurger segmentPurger =
-        new SegmentPurger(_originalIndexDir, PURGED_SEGMENT_DIR, _tableConfig, _schema, recordPurger, recordModifier);
+        new SegmentPurger(_originalIndexDir, PURGED_SEGMENT_DIR, _tableConfig, _schema, recordPurger, recordModifier,
+            null);
     File purgedIndexDir = segmentPurger.purgeSegment();
 
     // Check the purge/modify counter in segment purger
@@ -162,15 +161,34 @@ public class SegmentPurgerTest {
     }
 
     // Check inverted index
-    Map<String, Object> props = new HashMap<>();
-    props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap.toString());
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
         .load(purgedIndexDir.toURI(), new SegmentDirectoryLoaderContext.Builder().setTableConfig(_tableConfig)
-            .setSegmentName(purgedSegmentMetadata.getName()).setSegmentDirectoryConfigs(new PinotConfiguration(props))
+            .setSegmentName(purgedSegmentMetadata.getName())
             .build()); SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       assertTrue(reader.hasIndexFor(D1, StandardIndexes.inverted()));
       assertFalse(reader.hasIndexFor(D2, StandardIndexes.inverted()));
     }
+  }
+
+  @Test
+  public void testSegmentPurgerWithCustomSegmentGeneratorConfig() {
+    SegmentPurger.RecordPurger recordPurger = row -> row.getValue(D1).equals(0);
+
+    SegmentPurger segmentPurger =
+        new SegmentPurger(_originalIndexDir, PURGED_SEGMENT_DIR, _tableConfig, _schema, recordPurger, null, null);
+    segmentPurger.initSegmentGeneratorConfig("currentSegmentName");
+    assertEquals(segmentPurger.getSegmentGeneratorConfig().getSegmentName(), "currentSegmentName");
+
+    String newSegmentName = "myTable_segment_001";
+    SegmentGeneratorCustomConfigs segmentGeneratorCustomConfigs = new SegmentGeneratorCustomConfigs();
+    segmentGeneratorCustomConfigs.setSegmentName(newSegmentName);
+
+    // test with custom segment generator configs
+    SegmentPurger segmentPurger2 =
+        new SegmentPurger(_originalIndexDir, PURGED_SEGMENT_DIR, _tableConfig, _schema, recordPurger, null,
+            segmentGeneratorCustomConfigs);
+    segmentPurger2.initSegmentGeneratorConfig("currentSegmentName");
+    assertEquals(segmentPurger2.getSegmentGeneratorConfig().getSegmentName(), newSegmentName);
   }
 
   @AfterClass

@@ -23,27 +23,19 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Base abstract class for minion task metadata.
- *
- * This metadata gets serialized and stored in zookeeper under the path:
- * MINION_TASK_METADATA/${tableNameWithType}/${taskName}
- */
+/// Base abstract class for minion task metadata.
+///
+/// This metadata gets serialized and stored in zookeeper under the path:
+/// MINION_TASK_METADATA/${tableNameWithType}/${taskName}
 public abstract class BaseTaskMetadata {
 
-  /**
-   * @return table name appended with its type. E.g. MyTable_OFFLINE
-   */
+  /// @return table name appended with its type. E.g. MyTable_OFFLINE
   public abstract String getTableNameWithType();
 
-  /**
-   * @return {@link ZNRecord} containing the task metadata
-   */
+  /// @return [ZNRecord] containing the task metadata
   public abstract ZNRecord toZNRecord();
 
-  /**
-   * @return task metadata as a Json string
-   */
+  /// @return task metadata as a Json string
   public String toJsonString() {
     try {
       return JsonUtils.objectToString(this);

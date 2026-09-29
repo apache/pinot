@@ -38,9 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class provides utilities that change zookeeper state in a cluster
- */
+/// This class provides utilities that change zookeeper state in a cluster
 public class PinotZKChanger {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotZKChanger.class);
 
@@ -49,11 +47,11 @@ public class PinotZKChanger {
   protected String _clusterName;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
-  public PinotZKChanger(String zkAddress, String clusterName) {
+  public PinotZKChanger(String name, String zkAddress, String clusterName) {
     _clusterName = clusterName;
     _helixAdmin = new ZKHelixAdmin(zkAddress);
     _helixManager = HelixManagerFactory
-        .getZKHelixManager(clusterName, "PinotNumReplicaChanger", InstanceType.ADMINISTRATOR, zkAddress);
+        .getZKHelixManager(clusterName, name, InstanceType.ADMINISTRATOR, zkAddress);
     try {
       _helixManager.connect();
     } catch (Exception e) {
@@ -68,10 +66,8 @@ public class PinotZKChanger {
     return _helixAdmin;
   }
 
-  /**
-   * return true if IdealState = ExternalView
-   * @return
-   */
+  /// return true if IdealState = ExternalView
+  /// @return
   public int isStable(String tableName) {
     IdealState idealState = _helixAdmin.getResourceIdealState(_clusterName, tableName);
     ExternalView externalView = _helixAdmin.getResourceExternalView(_clusterName, tableName);
@@ -94,11 +90,9 @@ public class PinotZKChanger {
     return numDiff;
   }
 
-  /**
-   * Wait till state has stabilized {@link #isStable(String)}
-   * @param resourceName
-   * @throws InterruptedException
-   */
+  /// Wait till state has stabilized [#isStable(String)]
+  /// @param resourceName
+  /// @throws InterruptedException
   public void waitForStable(String resourceName)
       throws InterruptedException {
     int diff;

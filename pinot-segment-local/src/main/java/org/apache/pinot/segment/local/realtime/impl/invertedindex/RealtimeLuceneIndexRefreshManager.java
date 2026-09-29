@@ -35,15 +35,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class manages the refreshing of all realtime Lucene index readers. It uses an auto-scaling pool of threads,
- * which expands up to a configurable size, to refresh the readers.
- * <p>
- * During instantiation of a RealtimeLuceneTextIndex the corresponding SearcherManager is registered with this class.
- * When the RealtimeLuceneTextIndex is closed, the flag set by the RealtimeLuceneTextIndex is checked before attempting
- * a refresh, and SearcherManagerHolder instance previously registered to this class is dropped from the queue of
- * readers to be refreshed.
- */
+/// This class manages the refreshing of all realtime Lucene index readers. It uses an auto-scaling pool of threads,
+/// which expands up to a configurable size, to refresh the readers.
+///
+/// During instantiation of a RealtimeLuceneTextIndex the corresponding SearcherManager is registered with this class.
+/// When the RealtimeLuceneTextIndex is closed, the flag set by the RealtimeLuceneTextIndex is checked before attempting
+/// a refresh, and SearcherManagerHolder instance previously registered to this class is dropped from the queue of
+/// readers to be refreshed.
 public class RealtimeLuceneIndexRefreshManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeLuceneIndexRefreshManager.class);
   // max number of parallel refresh threads
@@ -70,12 +68,10 @@ public class RealtimeLuceneIndexRefreshManager {
     return _singletonInstance;
   }
 
-  /**
-   * Initializes the RealtimeLuceneIndexRefreshManager with the given maxParallelism and delayMs. This is
-   * intended to be called only once at the beginning of the server lifecycle.
-   * @param maxParallelism maximum number of refresh threads to use
-   * @param delayMs minimum delay between refreshes
-   */
+  /// Initializes the RealtimeLuceneIndexRefreshManager with the given maxParallelism and delayMs. This is
+  /// intended to be called only once at the beginning of the server lifecycle.
+  /// @param maxParallelism maximum number of refresh threads to use
+  /// @param delayMs minimum delay between refreshes
   public static RealtimeLuceneIndexRefreshManager init(int maxParallelism, int delayMs) {
     _singletonInstance = new RealtimeLuceneIndexRefreshManager(maxParallelism, delayMs);
     return _singletonInstance;
@@ -93,19 +89,17 @@ public class RealtimeLuceneIndexRefreshManager {
     _delayMs = delayMs;
   }
 
-  /**
-   * Add a new SearcherManagerHolder and submit it to the executor service for refreshing.
-   * <p>
-   * If the _partitionedListsOfSearchers has less than _maxParallelism lists, a new list is created and submitted to
-   * the executor service to begin refreshing. If there are already _maxParallelism lists, the SearcherManagerHolder
-   * will be added to the list with the smallest size. If the smallest list is empty, it will be submitted to the
-   * executor as the old one was stopped.
-   * <p>
-   * The RealtimeLuceneRefreshRunnable will drop closed indexes from the list, and if all indexes are closed, the
-   * empty list will ensure the Runnable finishes. ScalingThreadPoolExecutor will then scale down the number of
-   * threads. This ensures that we do not leave any threads if there are no tables with text index, or text indices
-   * are removed on the server through actions such as config update or re-balance.
-   */
+  /// Add a new SearcherManagerHolder and submit it to the executor service for refreshing.
+  ///
+  /// If the \_partitionedListsOfSearchers has less than \_maxParallelism lists, a new list is created and submitted to
+  /// the executor service to begin refreshing. If there are already \_maxParallelism lists, the SearcherManagerHolder
+  /// will be added to the list with the smallest size. If the smallest list is empty, it will be submitted to the
+  /// executor as the old one was stopped.
+  ///
+  /// The RealtimeLuceneRefreshRunnable will drop closed indexes from the list, and if all indexes are closed, the
+  /// empty list will ensure the Runnable finishes. ScalingThreadPoolExecutor will then scale down the number of
+  /// threads. This ensures that we do not leave any threads if there are no tables with text index, or text indices
+  /// are removed on the server through actions such as config update or re-balance.
   public synchronized void addSearcherManagerHolder(SearcherManagerHolder searcherManagerHolder) {
     if (_partitionedListsOfSearchers.size() < _maxParallelism) {
       List<SearcherManagerHolder> searcherManagers = Collections.synchronizedList(new ArrayList<>());
@@ -131,10 +125,8 @@ public class RealtimeLuceneIndexRefreshManager {
     }
   }
 
-  /**
-   * Blocks for up to 45 seconds waiting for refreshes of realtime Lucene index readers to complete.
-   * If all segments were previously closed, it should return immediately.
-   */
+  /// Blocks for up to 45 seconds waiting for refreshes of realtime Lucene index readers to complete.
+  /// If all segments were previously closed, it should return immediately.
   public boolean awaitTermination() {
     // Interrupts will be handled by the RealtimeLuceneRefreshRunnable refresh loop. In general, all
     // indexes should be marked closed before this method is called, and _executorService should
@@ -164,11 +156,9 @@ public class RealtimeLuceneIndexRefreshManager {
     return _partitionedListsOfSearchers.stream().map(List::size).sorted().collect(Collectors.toList());
   }
 
-  /**
-   * SearcherManagerHolder is a class that holds a SearcherManager instance for a segment and column. Instances
-   * of this class should be registered with the RealtimeLuceneIndexRefreshManager class to manage refreshing of
-   * the SearcherManager instance it holds.
-   */
+  /// SearcherManagerHolder is a class that holds a SearcherManager instance for a segment and column. Instances
+  /// of this class should be registered with the RealtimeLuceneIndexRefreshManager class to manage refreshing of
+  /// the SearcherManager instance it holds.
   public static class SearcherManagerHolder {
     private final String _segmentName;
     private final String _columnName;
@@ -209,11 +199,9 @@ public class RealtimeLuceneIndexRefreshManager {
     }
   }
 
-  /**
-   * Runnable that refreshes a list of SearcherManagerHolder instances. This class is responsible for refreshing
-   * each SearcherManagerHolder in the list, and re-adding it to the list if it has not been closed. If every
-   * instance has been closed, the thread will terminate as the list size will be empty.
-   */
+  /// Runnable that refreshes a list of SearcherManagerHolder instances. This class is responsible for refreshing
+  /// each SearcherManagerHolder in the list, and re-adding it to the list if it has not been closed. If every
+  /// instance has been closed, the thread will terminate as the list size will be empty.
   private static class RealtimeLuceneRefreshRunnable implements Runnable {
     private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeLuceneRefreshRunnable.class);
     private final int _delayMs;

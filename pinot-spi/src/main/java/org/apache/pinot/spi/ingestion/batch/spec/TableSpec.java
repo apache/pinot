@@ -21,32 +21,24 @@ package org.apache.pinot.spi.ingestion.batch.spec;
 import java.io.Serializable;
 
 
-/**
- * TableSpec defines table name and where to fetch corresponding table config and table schema.
- */
+/// TableSpec defines table name and where to fetch corresponding table config and table schema.
 public class TableSpec implements Serializable {
 
-  /**
-   * Table name
-   */
+  /// Table name
   String _tableName;
 
-  /**
-   * schemaURI defines where to read the table schema.
-   * Supports using PinotFS or HTTP.
-   * E.g. hdfs://path/to/table_schema.json
-   *      http://localhost:9000/tables/myTable/schema
-   */
+  /// schemaURI defines where to read the table schema.
+  /// Supports using PinotFS or HTTP.
+  /// E.g. hdfs://path/to/table_schema.json
+  ///      http://localhost:9000/tables/myTable/schema
   String _schemaURI;
 
-  /**
-   * tableConfigURI defines where to reade the table config.
-   * Supports using PinotFS or HTTP.
-   * E.g. hdfs://path/to/table_config.json
-   *      http://localhost:9000/tables/myTable
-   * Note that the API to read Pinot table config directly from pinot controller contains a JSON wrapper.
-   * The real table config is the object under the field 'OFFLINE'.
-   */
+  /// tableConfigURI defines where to reade the table config.
+  /// Supports using PinotFS or HTTP.
+  /// E.g. hdfs://path/to/table_config.json
+  ///      http://localhost:9000/tables/myTable
+  /// Note that the API to read Pinot table config directly from pinot controller contains a JSON wrapper.
+  /// The real table config is the object under the field 'OFFLINE'.
   String _tableConfigURI;
 
   public String getTableName() {

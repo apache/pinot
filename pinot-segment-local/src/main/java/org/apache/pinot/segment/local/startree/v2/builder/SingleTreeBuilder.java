@@ -21,14 +21,10 @@ package org.apache.pinot.segment.local.startree.v2.builder;
 import java.io.Closeable;
 
 
-/**
- * A star-tree builder that builds a single star-tree.
- */
+/// A star-tree builder that builds a single star-tree.
 public interface SingleTreeBuilder extends Closeable {
 
-  /**
-   * Builds the star-tree.
-   */
+  /// Builds the star-tree.
   void build()
       throws Exception;
 }

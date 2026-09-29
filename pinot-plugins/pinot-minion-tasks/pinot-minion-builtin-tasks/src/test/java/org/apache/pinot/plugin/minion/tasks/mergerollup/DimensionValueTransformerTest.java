@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.core.common.MinionConstants;
@@ -64,16 +64,16 @@ public class DimensionValueTransformerTest {
     GenericRow record = new GenericRow();
     record.putValue("svInt", (byte) 123);
     record.putValue("svLong", (char) 123);
-    record.putValue("svFloat", Collections.singletonList((short) 123));
+    record.putValue("svFloat", List.of((short) 123));
     record.putValue("svDouble", new String[]{"123"});
     record.putValue("svBoolean", "true");
     record.putValue("svTimestamp", "2020-02-02 22:22:22.222");
     record.putValue("svBytes", "7b7b"/*new byte[]{123, 123}*/);
     record.putValue("svJson", "{\"first\": \"daffy\", \"last\": \"duck\"}");
     record.putValue("mvInt", new Object[]{123L});
-    record.putValue("mvLong", Collections.singletonList(123f));
+    record.putValue("mvLong", List.of(123f));
     record.putValue("mvFloat", new Double[]{123d});
-    record.putValue("mvDouble", Collections.singletonMap("key", 123));
+    record.putValue("mvDouble", Map.of("key", 123));
     record.putValue("mvString1", new Object[]{"123", 123, 123L, 123f, 123.0});
     record.putValue("svFloatNegativeZero", -0.00f);
     return record;
@@ -90,7 +90,7 @@ public class DimensionValueTransformerTest {
 
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
-      record = transformer.transform(record);
+      transformer.transform(record);
       assertNotNull(record);
       assertEquals(record.getValue("svInt"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
       assertEquals(record.getValue("svLong"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
@@ -110,7 +110,7 @@ public class DimensionValueTransformerTest {
     // Test empty record
     record = new GenericRow();
     for (int i = 0; i < NUM_ROUNDS; i++) {
-      record = transformer.transform(record);
+      transformer.transform(record);
       assertNotNull(record);
       assertEquals(record.getValue("svInt"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
       assertEquals(record.getValue("svLong"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);

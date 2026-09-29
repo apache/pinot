@@ -29,25 +29,23 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
 
-/**
- * POJO returned by the Pinot broker in a time-series query response. Format is defined
- * <a href="https://prometheus.io/docs/prometheus/latest/querying/api/">in the prometheus docs.</a>
- * TODO: We will evolve this until Pinot 1.3. At present we are mimicking Prometheus HTTP API.
- */
+/// POJO returned by the Pinot broker in a time-series query response. Format is defined
+/// [in the prometheus docs.](https://prometheus.io/docs/prometheus/latest/querying/api/)
+/// TODO: We will evolve this until Pinot 1.3. At present we are mimicking Prometheus HTTP API.
 @InterfaceStability.Evolving
 public class PinotBrokerTimeSeriesResponse {
   public static final String SUCCESS_STATUS = "success";
   public static final String ERROR_STATUS = "error";
-  /**
-   * Prometheus returns a __name__ tag to denote the "name" of a time-series query. Time series language developers
-   * can set this tag in the final operator in their queries, which would allow them to configure the name tag
-   * returned by the Pinot Broker. By default, we use {@link TimeSeries#getTagsSerialized()} as the name of a series.
-   */
+  /// Prometheus returns a \_\_name\_\_ tag to denote the "name" of a time-series query. Time series language developers
+  /// can set this tag in the final operator in their queries, which would allow them to configure the name tag
+  /// returned by the Pinot Broker. By default, we use [TimeSeries#getTagsSerialized()] as the name of a series.
   public static final String METRIC_NAME_KEY = "__name__";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private String _status;
@@ -56,12 +54,13 @@ public class PinotBrokerTimeSeriesResponse {
   private String _error;
 
   static {
-    OBJECT_MAPPER.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+    OBJECT_MAPPER.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
   }
 
   @JsonCreator
   public PinotBrokerTimeSeriesResponse(@JsonProperty("status") String status, @JsonProperty("data") Data data,
-      @JsonProperty("errorType") String errorType, @JsonProperty("error") String error) {
+      @JsonProperty("errorType") String errorType, @JsonProperty("error") String error,
+      @JsonProperty("warnings") List<String> warnings) {
     _status = status;
     _data = data;
     _errorType = errorType;
@@ -89,24 +88,42 @@ public class PinotBrokerTimeSeriesResponse {
     return OBJECT_MAPPER.writeValueAsString(this);
   }
 
+  public static PinotBrokerTimeSeriesResponse newEmptyResponse() {
+    return new PinotBrokerTimeSeriesResponse(SUCCESS_STATUS, Data.EMPTY, null, null, null);
+  }
+
   public static PinotBrokerTimeSeriesResponse newSuccessResponse(Data data) {
-    return new PinotBrokerTimeSeriesResponse(SUCCESS_STATUS, data, null, null);
+    return new PinotBrokerTimeSeriesResponse(SUCCESS_STATUS, data, null, null, null);
   }
 
   public static PinotBrokerTimeSeriesResponse newErrorResponse(String errorType, String errorMessage) {
-    return new PinotBrokerTimeSeriesResponse(ERROR_STATUS, Data.EMPTY, errorType, errorMessage);
+    return new PinotBrokerTimeSeriesResponse(ERROR_STATUS, Data.EMPTY, errorType, errorMessage, null);
   }
 
   public static PinotBrokerTimeSeriesResponse fromTimeSeriesBlock(TimeSeriesBlock seriesBlock) {
     if (seriesBlock.getTimeBuckets() == null) {
       throw new UnsupportedOperationException("Non-bucketed series block not supported yet");
     }
+    if (seriesBlock.getExceptions() != null && !seriesBlock.getExceptions().isEmpty()) {
+      QueryException firstException = seriesBlock.getExceptions().get(0);
+      return newErrorResponse(firstException.getErrorCode().getDefaultMessage(), seriesBlock.getExceptions().stream()
+          .map(QueryException::toString).collect(Collectors.joining("; ")));
+    }
     return convertBucketedSeriesBlock(seriesBlock);
+  }
+
+  public static PinotBrokerTimeSeriesResponse fromException(Exception e) {
+    if (e instanceof QueryException) {
+      QueryException qe = (QueryException) e;
+      return newErrorResponse(qe.getErrorCode().getDefaultMessage(), e.getMessage());
+    }
+    return newErrorResponse(e.getClass().getSimpleName(), e.getMessage());
   }
 
   private static PinotBrokerTimeSeriesResponse convertBucketedSeriesBlock(TimeSeriesBlock seriesBlock) {
     Long[] timeValues = Objects.requireNonNull(seriesBlock.getTimeBuckets()).getTimeBuckets();
     List<PinotBrokerTimeSeriesResponse.Value> result = new ArrayList<>();
+    List<String> warnings = null;
     for (var listOfTimeSeries : seriesBlock.getSeriesMap().values()) {
       Preconditions.checkState(!listOfTimeSeries.isEmpty(), "Received empty time-series");
       TimeSeries anySeries = listOfTimeSeries.get(0);

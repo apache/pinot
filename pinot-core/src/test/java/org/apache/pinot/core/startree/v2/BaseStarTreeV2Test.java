@@ -22,13 +22,13 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -44,6 +44,7 @@ import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
@@ -76,29 +77,28 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
 
-/**
- * The {@code BaseStarTreeV2Test} is the base class to test star-tree index by scanning and aggregating records filtered
- * out from the {@link StarTreeFilterPlanNode} against normal {@link FilterPlanNode}.
- *
- * @param <R> Type or raw value
- * @param <A> Type of aggregated value
- */
+/// The `BaseStarTreeV2Test` is the base class to test star-tree index by scanning and aggregating records
+/// filtered out from the [StarTreeFilterPlanNode] against normal [FilterPlanNode].
+///
+/// @param <R> Type or raw value
+/// @param <A> Type of aggregated value
 @SuppressWarnings({"rawtypes", "unchecked"})
 abstract class BaseStarTreeV2Test<R, A> {
   private static final Random RANDOM = new Random();
 
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "BaseStarTreeV2Test");
-  private static final String TABLE_NAME = "testTable";
+  private static final File TEMP_DIR =
+      new File(FileUtils.getTempDirectory(), "BaseStarTreeV2Test-" + UUID.randomUUID());
+  protected static final String TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
 
   private static final int NUM_SEGMENT_RECORDS = 100_000;
   private static final int MAX_LEAF_RECORDS = RANDOM.nextInt(100) + 1;
   // Using column names with '__' to make sure regular table columns with '__' in the name aren't wrongly interpreted
   // as AggregationFunctionColumnPair
-  private static final String DIMENSION1 = "d1__COLUMN_NAME";
-  private static final String DIMENSION2 = "DISTINCTCOUNTRAWHLL__d2";
-  private static final int DIMENSION_CARDINALITY = 100;
-  private static final String METRIC = "m";
+  protected static final String DIMENSION1 = "d1__COLUMN_NAME";
+  protected static final String DIMENSION2 = "DISTINCTCOUNTRAWHLL__d2";
+  protected static final int DIMENSION_CARDINALITY = 100;
+  private static final String AGG_COL = "m";
 
   // Supported filters
   private static final String QUERY_FILTER_AND = String.format(" WHERE %1$s = 0 AND %2$s < 10", DIMENSION1, DIMENSION2);
@@ -146,23 +146,23 @@ abstract class BaseStarTreeV2Test<R, A> {
     _aggregatedValueType = _valueAggregator.getAggregatedValueType();
     _aggregation = getAggregation(_valueAggregator.getAggregationType());
 
-    Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder().addSingleValueDimension(DIMENSION1, DataType.INT)
-        .addSingleValueDimension(DIMENSION2, DataType.INT);
+    Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder();
+    addDimensionFields(schemaBuilder);
     DataType rawValueType = getRawValueType();
     // Raw value type will be null for COUNT aggregation function
     if (rawValueType != null) {
-      schemaBuilder.addMetric(METRIC, rawValueType);
+      schemaBuilder.addDimensionField(AGG_COL, rawValueType,
+              dimensionFieldSpec -> dimensionFieldSpec.setSingleValueField(isAggColSingleValueField()));
     }
     Schema schema = schemaBuilder.build();
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    TableConfig tableConfig = createTableConfig();
 
     List<GenericRow> segmentRecords = new ArrayList<>(NUM_SEGMENT_RECORDS);
     for (int i = 0; i < NUM_SEGMENT_RECORDS; i++) {
       GenericRow segmentRecord = new GenericRow();
-      segmentRecord.putValue(DIMENSION1, RANDOM.nextInt(DIMENSION_CARDINALITY));
-      segmentRecord.putValue(DIMENSION2, RANDOM.nextInt(DIMENSION_CARDINALITY));
+      addDimensionValues(segmentRecord, RANDOM);
       if (rawValueType != null) {
-        segmentRecord.putValue(METRIC, getRandomRawValue(RANDOM));
+        segmentRecord.putValue(AGG_COL, getRandomRawValue(RANDOM));
       }
       segmentRecords.add(segmentRecord);
     }
@@ -174,14 +174,15 @@ abstract class BaseStarTreeV2Test<R, A> {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(segmentRecords));
     driver.build();
 
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList(DIMENSION1, DIMENSION2), null, null,
-        Collections.singletonList(new StarTreeAggregationConfig(METRIC, _valueAggregator.getAggregationType().getName(),
-            null, getCompressionCodec(), true, getIndexVersion(), null, null)), MAX_LEAF_RECORDS);
+    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(getDimensionsSplitOrder(), null, null,
+        List.of(new StarTreeAggregationConfig(AGG_COL,
+                _valueAggregator.getAggregationType().getName(), null, getCompressionCodec(),
+                true, getIndexVersion(), null, null)), MAX_LEAF_RECORDS);
     File indexDir = new File(TEMP_DIR, SEGMENT_NAME);
     // Randomly build star-tree using on-heap or off-heap mode
     MultipleTreesBuilder.BuildMode buildMode =
         RANDOM.nextBoolean() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
-    try (MultipleTreesBuilder builder = new MultipleTreesBuilder(Collections.singletonList(starTreeIndexConfig), false,
+    try (MultipleTreesBuilder builder = new MultipleTreesBuilder(List.of(starTreeIndexConfig), false,
         indexDir, buildMode)) {
       builder.build();
     }
@@ -196,9 +197,9 @@ abstract class BaseStarTreeV2Test<R, A> {
     } else if (aggregationType == AggregationFunctionType.PERCENTILEEST
         || aggregationType == AggregationFunctionType.PERCENTILETDIGEST) {
       // Append a percentile number for percentile functions
-      return String.format("%s(%s, 50)", aggregationType.getName(), METRIC);
+      return String.format("%s(%s, 50)", aggregationType.getName(), AGG_COL);
     } else {
-      return String.format("%s(%s)", aggregationType.getName(), METRIC);
+      return String.format("%s(%s)", aggregationType.getName(), AGG_COL);
     }
   }
 
@@ -248,11 +249,11 @@ abstract class BaseStarTreeV2Test<R, A> {
     filterPlanNode.run();
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
         StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, queryContext.getFilter(),
-            filterPlanNode.getPredicateEvaluators());
+            filterPlanNode.getPredicateEvaluators(), queryContext.isNullHandlingEnabled());
     assertNull(predicateEvaluatorsMap);
   }
 
-  private void testQuery(String query)
+  protected void testQuery(String query)
       throws IOException {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
 
@@ -280,7 +281,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     filterPlanNode.run();
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
         StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, queryContext.getFilter(),
-            filterPlanNode.getPredicateEvaluators());
+            filterPlanNode.getPredicateEvaluators(), queryContext.isNullHandlingEnabled());
     assertNotNull(predicateEvaluatorsMap);
 
     // Extract values with star-tree
@@ -312,9 +313,12 @@ abstract class BaseStarTreeV2Test<R, A> {
         nonStarTreeAggregationColumnDictionaries.add(dataSource.getDictionary());
       }
     }
-    List<ForwardIndexReader> nonStarTreeGroupByColumnReaders = new ArrayList<>(numGroupByColumns);
+    // Use PinotSegmentColumnReader so a RAW forward-index group-by column with a separated dictionary resolves
+    // its dict ids via the dictionary — mirroring the same lookup the star-tree builder performs at build time
+    // (see BaseSingleTreeBuilder). Behavior is identical for dictionary-encoded columns.
+    List<PinotSegmentColumnReader> nonStarTreeGroupByColumnReaders = new ArrayList<>(numGroupByColumns);
     for (String groupByColumn : groupByColumns) {
-      nonStarTreeGroupByColumnReaders.add(_indexSegment.getDataSource(groupByColumn).getForwardIndex());
+      nonStarTreeGroupByColumnReaders.add(new PinotSegmentColumnReader(_indexSegment, groupByColumn));
     }
     Map<List<Integer>, List<Object>> nonStarTreeResult =
         computeNonStarTreeResult(nonStarTreeFilterPlanNode, nonStarTreeAggregationColumnReaders,
@@ -402,14 +406,13 @@ abstract class BaseStarTreeV2Test<R, A> {
 
   private Map<List<Integer>, List<Object>> computeNonStarTreeResult(FilterPlanNode nonStarTreeFilterPlanNode,
       List<ForwardIndexReader> aggregationColumnReaders, List<Dictionary> aggregationColumnDictionaries,
-      List<ForwardIndexReader> groupByColumnReaders)
+      List<PinotSegmentColumnReader> groupByColumnReaders)
       throws IOException {
     Map<List<Integer>, List<Object>> result = new HashMap<>();
     int numAggregations = aggregationColumnReaders.size();
     int numGroupByColumns = groupByColumnReaders.size();
 
     List<ForwardIndexReaderContext> aggregationColumnReaderContexts = new ArrayList<>(numAggregations);
-    List<ForwardIndexReaderContext> groupByColumnReaderContexts = new ArrayList<>(numGroupByColumns);
     try {
       for (ForwardIndexReader aggregationColumnReader : aggregationColumnReaders) {
         if (aggregationColumnReader != null) {
@@ -418,9 +421,6 @@ abstract class BaseStarTreeV2Test<R, A> {
           aggregationColumnReaderContexts.add(null);
         }
       }
-      for (ForwardIndexReader groupByColumnReader : groupByColumnReaders) {
-        groupByColumnReaderContexts.add(groupByColumnReader.createContext());
-      }
 
       BlockDocIdIterator docIdIterator = nonStarTreeFilterPlanNode.run().nextBlock().getBlockDocIdSet().iterator();
       int docId;
@@ -428,7 +428,7 @@ abstract class BaseStarTreeV2Test<R, A> {
         // Array of dictionary ids (zero-length array for non-group-by queries)
         List<Integer> group = new ArrayList<>(numGroupByColumns);
         for (int i = 0; i < numGroupByColumns; i++) {
-          group.add(groupByColumnReaders.get(i).getDictId(docId, groupByColumnReaderContexts.get(i)));
+          group.add(groupByColumnReaders.get(i).getDictId(docId));
         }
         List<Object> values = result.computeIfAbsent(group, k -> new ArrayList<>(numAggregations));
         if (values.isEmpty()) {
@@ -466,22 +466,27 @@ abstract class BaseStarTreeV2Test<R, A> {
           readerContext.close();
         }
       }
-      for (ForwardIndexReaderContext readerContext : groupByColumnReaderContexts) {
-        if (readerContext != null) {
-          readerContext.close();
-        }
+      for (PinotSegmentColumnReader groupByColumnReader : groupByColumnReaders) {
+        groupByColumnReader.close();
       }
     }
   }
 
   private Object getNextRawValue(int docId, ForwardIndexReader reader, ForwardIndexReaderContext readerContext,
       Dictionary dictionary) {
-    return dictionary.get(reader.getDictId(docId, readerContext));
+    if (isAggColSingleValueField()) {
+      return dictionary.get(reader.getDictId(docId, readerContext));
+    } else {
+      int[] dictIds = reader.getDictIdMV(docId, readerContext);
+      Object[] rawValue = new Object[dictIds.length];
+      for (int i = 0; i < dictIds.length; i++) {
+        rawValue[i] = dictionary.get(dictIds[i]);
+      }
+      return rawValue;
+    }
   }
 
-  /**
-   * Can be overridden to force the compression codec.
-   */
+  /// Can be overridden to force the compression codec.
   @Nullable
   CompressionCodec getCompressionCodec() {
     CompressionCodec[] compressionCodecs = CompressionCodec.values();
@@ -489,14 +494,43 @@ abstract class BaseStarTreeV2Test<R, A> {
     return compressionCodec.isApplicableToRawIndex() ? compressionCodec : null;
   }
 
-  /**
-   * Can be overridden to force the index version.
-   */
+  /// Can be overridden to force the index version.
   @Nullable
   Integer getIndexVersion() {
     // Allow 2, 3, 4 or null
     int version = 1 + RANDOM.nextInt(4);
     return version > 1 ? version : null;
+  }
+
+  protected boolean isAggColSingleValueField() {
+    return true;
+  }
+
+  /// Can be overridden to customize the table config (e.g. to attach `FieldConfig`s that force a specific
+  /// forward-index encoding or dictionary configuration for the dimension columns).
+  protected TableConfig createTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+  }
+
+  protected void addDimensionFields(Schema.SchemaBuilder schemaBuilder) {
+    schemaBuilder.addSingleValueDimension(DIMENSION1, DataType.INT).addSingleValueDimension(DIMENSION2, DataType.INT);
+  }
+
+  protected void addDimensionValues(GenericRow segmentRecord, Random random) {
+    segmentRecord.putValue(DIMENSION1, random.nextInt(DIMENSION_CARDINALITY));
+    segmentRecord.putValue(DIMENSION2, random.nextInt(DIMENSION_CARDINALITY));
+  }
+
+  protected List<String> getDimensionsSplitOrder() {
+    return List.of(DIMENSION1, DIMENSION2);
+  }
+
+  protected String getAggregation() {
+    return _aggregation;
+  }
+
+  protected StarTreeV2 getStarTreeV2() {
+    return _starTreeV2;
   }
 
   abstract ValueAggregator<R, A> getValueAggregator();

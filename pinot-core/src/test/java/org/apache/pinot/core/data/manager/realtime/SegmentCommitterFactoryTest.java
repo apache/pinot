@@ -19,7 +19,6 @@
 
 package org.apache.pinot.core.data.manager.realtime;
 
-import com.google.common.collect.ImmutableMap;
 import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
@@ -42,11 +41,8 @@ import org.testng.annotations.Test;
 public class SegmentCommitterFactoryTest {
 
   private Map<String, String> getMinimumStreamConfigMap() {
-    return ImmutableMap.of(
-        "streamType", "kafka",
-        "stream.kafka.consumer.type", "simple",
-        "stream.kafka.topic.name", "ignore",
-        "stream.kafka.decoder.class.name", "org.apache.pinot.plugin.inputformat.json.JsonMessageDecoder");
+    return Map.of("streamType", "kafka", "stream.kafka.topic.name", "ignore", "stream.kafka.decoder.class.name",
+        "org.apache.pinot.plugin.inputformat.json.JsonMessageDecoder");
   }
 
   private TableConfigBuilder createRealtimeTableConfig(String tableName) {

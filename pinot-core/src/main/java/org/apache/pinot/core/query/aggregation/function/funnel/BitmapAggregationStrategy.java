@@ -23,13 +23,11 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
-/**
- * Aggregation strategy leveraging roaring bitmap algebra (unions/intersections).
- */
+/// Aggregation strategy leveraging roaring bitmap algebra (unions/intersections).
 class BitmapAggregationStrategy extends AggregationStrategy<DictIdsWrapper> {
   public BitmapAggregationStrategy(List<ExpressionContext> stepExpressions,
-      List<ExpressionContext> correlateByExpressions) {
-    super(stepExpressions, correlateByExpressions);
+      List<ExpressionContext> correlateByExpressions, boolean nullHandlingEnabled) {
+    super(stepExpressions, correlateByExpressions, nullHandlingEnabled);
   }
 
   @Override
@@ -38,7 +36,17 @@ class BitmapAggregationStrategy extends AggregationStrategy<DictIdsWrapper> {
   }
 
   @Override
+  public DictIdsWrapper createAggregationResultMultiKey(Dictionary[] dictionaries) {
+    return new DictIdsWrapper(_numSteps, dictionaries);
+  }
+
+  @Override
   protected void add(Dictionary dictionary, DictIdsWrapper dictIdsWrapper, int step, int correlationId) {
     dictIdsWrapper._stepsBitmaps[step].add(correlationId);
+  }
+
+  @Override
+  void addMultiKey(DictIdsWrapper dictIdsWrapper, int step, Dictionary[] dictionaries, int[] correlationDictIds) {
+    dictIdsWrapper._stepsBitmaps[step].add(dictIdsWrapper.getCompositeCorrelationId(correlationDictIds));
   }
 }

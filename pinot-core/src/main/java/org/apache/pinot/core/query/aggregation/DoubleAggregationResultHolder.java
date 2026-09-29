@@ -18,69 +18,71 @@
  */
 package org.apache.pinot.core.query.aggregation;
 
-/**
- * AggregationResultHolder interface implementation for result type 'primitive double'.
- *
- */
+/// AggregationResultHolder interface implementation for result type 'primitive double'.
 public class DoubleAggregationResultHolder implements AggregationResultHolder {
   double _value;
 
-  /**
-   * Constructor for the class.
-   * @param defaultValue
-   */
+  /// Constructor for the class.
+  /// @param defaultValue
   public DoubleAggregationResultHolder(double defaultValue) {
     _value = defaultValue;
   }
 
-  /**
-   * {@inheritDoc}
-   * @param value
-   */
+  /// {@inheritDoc}
+  /// @param value
   @Override
   public void setValue(double value) {
     _value = value;
   }
 
+  /// {@inheritDoc}
+  /// @param value
   @Override
   public void setValue(int value) {
     throw new RuntimeException("Method 'setValue' (with int value) not supported in DoubleAggregationResultHolder");
   }
 
-  /**
-   * {@inheritDoc}
-   * Value for this class is 'primitive double', so this method is not implemented.
-   * @param value
-   */
+  /// {@inheritDoc}
+  /// @param value
+  @Override
+  public void setValue(long value) {
+    throw new RuntimeException("Method 'setValue' (with long value) not supported in DoubleAggregationResultHolder");
+  }
+
+  /// {@inheritDoc}
+  /// Value for this class is 'primitive double', so this method is not implemented.
+  /// @param value
   @Override
   public void setValue(Object value) {
     throw new RuntimeException("Method 'setValue' (with object value) not supported in DoubleAggregationResultHolder");
   }
 
-  /**
-   * {@inheritDoc}
-   * @return
-   */
+  /// {@inheritDoc}
+  /// @return
   @Override
   public double getDoubleResult() {
     return _value;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @return
-   */
+  /// {@inheritDoc}
+  ///
+  /// @return
   @Override
   public int getIntResult() {
     throw new RuntimeException("Method 'getIntResult' not supported in DoubleAggregationResultHolder");
   }
 
-  /**
-   * {@inheritDoc}
-   * Result for this class is 'primitive double', so this method is not implemented.
-   * @return
-   */
+  /// {@inheritDoc}
+  ///
+  /// @return
+  @Override
+  public long getLongResult() {
+    throw new RuntimeException("Method 'getLongResult' not supported in DoubleAggregationResultHolder");
+  }
+
+  /// {@inheritDoc}
+  /// Result for this class is 'primitive double', so this method is not implemented.
+  /// @return
   @Override
   public <T> T getResult() {
     throw new RuntimeException("Method 'getResult' not supported in DoubleAggregationResultHolder");

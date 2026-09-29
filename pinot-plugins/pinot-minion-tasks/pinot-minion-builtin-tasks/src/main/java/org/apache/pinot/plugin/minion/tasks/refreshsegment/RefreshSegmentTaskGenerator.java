@@ -81,7 +81,6 @@ public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
     String tableNameWithType = tableConfig.getTableName();
     Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: %s", tableNameWithType);
 
-
     String taskType = RefreshSegmentTask.TASK_TYPE;
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
     PinotHelixResourceManager pinotHelixResourceManager = _clusterInfoAccessor.getPinotHelixResourceManager();
@@ -89,20 +88,14 @@ public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
     LOGGER.info("Start generating RefreshSegment tasks for table: {}", tableNameWithType);
 
     int tableNumTasks = 0;
-    int tableMaxNumTasks = RefreshSegmentTask.MAX_NUM_TASKS_PER_TABLE;
-    String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
-    if (tableMaxNumTasksConfig != null) {
-      try {
-        tableMaxNumTasks = Integer.parseInt(tableMaxNumTasksConfig);
-      } catch (Exception e) {
-        tableMaxNumTasks = RefreshSegmentTask.MAX_NUM_TASKS_PER_TABLE;
-        LOGGER.warn("MaxNumTasks have been wrongly set for table : {}, and task {}", tableNameWithType, taskType);
-      }
-    }
+    // Get max number of subtasks for this table
+    int tableMaxNumTasks = getAndUpdateMaxNumSubTasks(taskConfigs,
+        RefreshSegmentTask.MAX_NUM_TASKS_PER_TABLE, tableNameWithType);
 
     // Get info about table and schema.
     Stat tableStat = pinotHelixResourceManager.getTableStat(tableNameWithType);
-    Schema schema = pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+    Schema schema = pinotHelixResourceManager.getTableSchema(tableNameWithType);
+    Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
     Stat schemaStat = pinotHelixResourceManager.getSchemaStat(schema.getSchemaName());
 
     // Get the running segments for a table.
@@ -110,17 +103,15 @@ public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
         TaskGeneratorUtils.getRunningSegments(RefreshSegmentTask.TASK_TYPE, _clusterInfoAccessor);
 
     // Make a single ZK call to get the segments.
-    List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
+    List<SegmentZKMetadata> allSegments =
+        tableConfig.getTableType() == TableType.OFFLINE
+            ? getSegmentsZKMetadataForTable(tableNameWithType)
+            : getNonConsumingSegmentsZKMetadataForRealtimeTable(tableNameWithType);
 
     for (SegmentZKMetadata segmentZKMetadata : allSegments) {
       // Skip if we have reached the maximum number of permissible tasks per iteration.
       if (tableNumTasks >= tableMaxNumTasks) {
         break;
-      }
-
-      // Skip consuming segments.
-      if (tableConfig.getTableType() == TableType.REALTIME && !segmentZKMetadata.getStatus().isCompleted()) {
-        continue;
       }
 
       // Skip segments for which a task is already running.
@@ -136,8 +127,12 @@ public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
       }
 
       Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig, List.of(segmentName)));
+      configs.putAll(MinionTaskUtils.getPushTaskConfig(tableNameWithType, taskConfigs, _clusterInfoAccessor));
       configs.put(MinionConstants.DOWNLOAD_URL_KEY, segmentZKMetadata.getDownloadUrl());
-      configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
+      // Refresh can reuse the original index directory, whose metadata may name the source table. Other conversion
+      // tasks use v1 because they regenerate destination-bound metadata; any future artifact-reuse path must use v2.
+      configs.put(MinionConstants.UPLOAD_URL_KEY,
+          _clusterInfoAccessor.getVipUrlForLeadController(tableNameWithType) + "/v2/segments");
       configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segmentZKMetadata.getCrc()));
       pinotTaskConfigs.add(new PinotTaskConfig(taskType, configs));
       tableNumTasks++;
@@ -148,14 +143,12 @@ public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
-  /**
-   * We need not refresh when: There were no tableConfig or schema updates after the last time the segment was
-   * refreshed by this task.
-   *
-   * Note that newly created segments after the latest tableConfig/schema update will still need to be refreshed. This
-   * is because inverted index created is disabled by default during segment generation. This can be added as an
-   * additional check in the future, if required.
-   */
+  /// We need not refresh when: There were no tableConfig or schema updates after the last time the segment was
+  /// refreshed by this task.
+  ///
+  /// Note that newly created segments after the latest tableConfig/schema update will still need to be refreshed. This
+  /// is because inverted index created is disabled by default during segment generation. This can be added as an
+  /// additional check in the future, if required.
   private boolean shouldRefreshSegment(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig, Stat tableStat,
       Stat schemaStat) {
     String tableNameWithType = tableConfig.getTableName();

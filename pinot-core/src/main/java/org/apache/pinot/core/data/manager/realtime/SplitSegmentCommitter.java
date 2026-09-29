@@ -30,16 +30,14 @@ import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 
 
-/**
- * Sends segmentStart, segmentUpload, & segmentCommitEnd to the controller
- * If that succeeds, swap in-memory segment with the one built.
- */
+/// Sends segmentStart, segmentUpload, & segmentCommitEnd to the controller
+/// If that succeeds, swap in-memory segment with the one built.
 public class SplitSegmentCommitter implements SegmentCommitter {
-  private final SegmentCompletionProtocol.Request.Params _params;
-  private final ServerSegmentCompletionProtocolHandler _protocolHandler;
-  private final SegmentUploader _segmentUploader;
-  private final String _peerDownloadScheme;
-  private final Logger _segmentLogger;
+  protected final SegmentCompletionProtocol.Request.Params _params;
+  protected final ServerSegmentCompletionProtocolHandler _protocolHandler;
+  protected final SegmentUploader _segmentUploader;
+  protected final String _peerDownloadScheme;
+  protected final Logger _segmentLogger;
 
   public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
       SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader,
@@ -97,7 +95,7 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       return segmentLocation.toString();
     }
     if (_peerDownloadScheme != null) {
-        return StringUtil.join("/", CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME,
+      return StringUtil.join("/", CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME,
             params.getSegmentName());
     }
     return null;

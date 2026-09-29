@@ -30,9 +30,7 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 
 
-/**
- * Inbuilt array scalar functions. See {@link ArrayUtils} for details.
- */
+/// Inbuilt array scalar functions. See [ArrayUtils] for details.
 public class ArrayFunctions {
   private ArrayFunctions() {
   }
@@ -100,14 +98,12 @@ public class ArrayFunctions {
     return ArrayUtils.indexesOf(value, valueToFind).stream().toArray();
   }
 
-  /**
-   * Assume values1, and values2 are monotonous increasing indices of MV cols.
-   * Here is the common usage:
-   * col1: ["a", "b", "a", "b"]
-   * col2: ["c", "d", "d", "c"]
-   * The user want to get the first index called idx, s.t. col1[idx] == "b" && col2[idx] == "d"
-   * arrayElementAtInt(0, intersectIndices(arrayIndexOfAllString(col1, "b"), arrayIndexOfAllString(col2, "d")))
-   */
+  /// Assume values1, and values2 are monotonous increasing indices of MV cols.
+  /// Here is the common usage:
+  /// col1: \["a", "b", "a", "b"\]
+  /// col2: \["c", "d", "d", "c"\]
+  /// The user want to get the first index called idx, s.t. col1\[idx\] == "b" && col2\[idx\] == "d"
+  /// arrayElementAtInt(0, intersectIndices(arrayIndexOfAllString(col1, "b"), arrayIndexOfAllString(col2, "d")))
   @ScalarFunction
   public static int[] intersectIndices(int[] values1, int[] values2) {
     // TODO: if values1.length << values2.length. Use binary search can speed up the query
@@ -136,6 +132,11 @@ public class ArrayFunctions {
 
   @ScalarFunction
   public static int[] arraySliceInt(int[] values, int start, int end) {
+    return Arrays.copyOfRange(values, start, end);
+  }
+
+  @ScalarFunction
+  public static long[] arraySliceLong(long[] values, int start, int end) {
     return Arrays.copyOfRange(values, start, end);
   }
 
@@ -201,6 +202,56 @@ public class ArrayFunctions {
   @ScalarFunction
   public static String[] arrayConcatString(String[] values1, String[] values2) {
     return ArrayUtils.addAll(values1, values2);
+  }
+
+  @ScalarFunction
+  public static int[] arrayPushBackInt(int[] values, int element) {
+    return ArrayUtils.add(values, element);
+  }
+
+  @ScalarFunction
+  public static long[] arrayPushBackLong(long[] values, long element) {
+    return ArrayUtils.add(values, element);
+  }
+
+  @ScalarFunction
+  public static float[] arrayPushBackFloat(float[] values, float element) {
+    return ArrayUtils.add(values, element);
+  }
+
+  @ScalarFunction
+  public static double[] arrayPushBackDouble(double[] values, double element) {
+    return ArrayUtils.add(values, element);
+  }
+
+  @ScalarFunction
+  public static String[] arrayPushBackString(String[] values, String element) {
+    return ArrayUtils.add(values, element);
+  }
+
+  @ScalarFunction
+  public static int[] arrayPushFrontInt(int[] values, int element) {
+    return ArrayUtils.insert(0, values, element);
+  }
+
+  @ScalarFunction
+  public static long[] arrayPushFrontLong(long[] values, long element) {
+    return ArrayUtils.insert(0, values, element);
+  }
+
+  @ScalarFunction
+  public static float[] arrayPushFrontFloat(float[] values, float element) {
+    return ArrayUtils.insert(0, values, element);
+  }
+
+  @ScalarFunction
+  public static double[] arrayPushFrontDouble(double[] values, double element) {
+    return ArrayUtils.insert(0, values, element);
+  }
+
+  @ScalarFunction
+  public static String[] arrayPushFrontString(String[] values, String element) {
+    return ArrayUtils.insert(0, values, element);
   }
 
   @ScalarFunction
@@ -300,6 +351,13 @@ public class ArrayFunctions {
         strArr[i] = (String) arr[i];
       }
       return strArr;
+    }
+    if (clazz == byte[].class) {
+      byte[][] bytesArr = new byte[arr.length][];
+      for (int i = 0; i < arr.length; i++) {
+        bytesArr[i] = (byte[]) arr[i];
+      }
+      return bytesArr;
     }
     return arr;
   }

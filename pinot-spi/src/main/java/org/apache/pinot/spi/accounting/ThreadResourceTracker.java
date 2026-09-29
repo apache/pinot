@@ -19,36 +19,22 @@
 package org.apache.pinot.spi.accounting;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
-/**
- * Tracks allocated bytes and CPU time by a thread when executing a task of a query.
- */
+/// Tracks CPU time and allocated bytes by a thread when executing a query.
+///
+/// It is made JSON serializable for debugging purpose only, and should never be serialized in production.
 @JsonSerialize
 public interface ThreadResourceTracker {
-  /**
-   * Total execution CPU Time(nanoseconds) of a thread when executing a query task in a server or broker.
-   * @return A long containing the nanoseconds.
-   */
-  long getCPUTimeMS();
 
-  /**
-   * Allocated bytes for a query task in a server or broker
-   * @return A long containing the number of bytes allocated to execute the query task.
-   */
+  /// Returns the [QueryThreadContext] associated with the current thread when the thread is executing a query, `null`
+  /// otherwise.
+  @Nullable
+  QueryThreadContext getThreadContext();
+
+  long getCpuTimeNs();
+
   long getAllocatedBytes();
-
-  /**
-   * QueryId of the task the thread is executing.
-   * @return a string containing the query id.
-   */
-  String getQueryId();
-
-  /**
-   * TaskId of the task the thread is executing.
-   * @return an int containing the task id.
-   */
-  int getTaskId();
-
-  ThreadExecutionContext.TaskType getTaskType();
 }

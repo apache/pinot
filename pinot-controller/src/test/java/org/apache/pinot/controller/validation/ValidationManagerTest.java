@@ -46,9 +46,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for the ValidationManagers.
- */
+/// Tests for the ValidationManagers.
 public class ValidationManagerTest {
   private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
   private static final String TEST_TABLE_NAME = "validationTable";
@@ -95,7 +93,7 @@ public class ValidationManagerTest {
           TEST_INSTANCE.getHelixAdmin().getResourceExternalView(TEST_INSTANCE.getHelixClusterName(), offlineTableName);
       return externalView != null && externalView.getPartitionSet().contains(TEST_SEGMENT_NAME);
     }, 30_000L, "Failed to find the segment in the ExternalView");
-    Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
+    Mockito.when(segmentMetadata.getCrc()).thenReturn(System.nanoTime());
     TEST_INSTANCE.getHelixResourceManager()
         .refreshSegment(offlineTableName, segmentMetadata, segmentZKMetadata, EXPECTED_VERSION, "downloadUrl");
 
@@ -132,18 +130,19 @@ public class ValidationManagerTest {
     jan1st2nd3rd.add(jan1st);
     jan1st2nd3rd.add(jan2nd);
     jan1st2nd3rd.add(jan3rd);
-    assertEquals(OfflineSegmentIntervalChecker.computeNumMissingSegments(jan1st2nd3rd, Duration.standardDays(1)), 0);
+    assertEquals(OfflineSegmentValidationManager.computeNumMissingSegments(jan1st2nd3rd, Duration.standardDays(1)), 0);
 
     ArrayList<Interval> jan1st2nd3rd5th = new ArrayList<>(jan1st2nd3rd);
     jan1st2nd3rd5th.add(jan5th);
-    assertEquals(OfflineSegmentIntervalChecker.computeNumMissingSegments(jan1st2nd3rd5th, Duration.standardDays(1)), 1);
+    assertEquals(OfflineSegmentValidationManager.computeNumMissingSegments(jan1st2nd3rd5th, Duration.standardDays(1)),
+        1);
 
     // Should also work if the intervals are in random order
     ArrayList<Interval> jan5th2nd1st = new ArrayList<>();
     jan5th2nd1st.add(jan5th);
     jan5th2nd1st.add(jan2nd);
     jan5th2nd1st.add(jan1st);
-    assertEquals(OfflineSegmentIntervalChecker.computeNumMissingSegments(jan5th2nd1st, Duration.standardDays(1)), 2);
+    assertEquals(OfflineSegmentValidationManager.computeNumMissingSegments(jan5th2nd1st, Duration.standardDays(1)), 2);
 
     // Should also work if the intervals are of different sizes
     Interval jan1stAnd2nd = new Interval(new DateTime(2015, 1, 1, 0, 0, 0), new DateTime(2015, 1, 2, 23, 59, 59));
@@ -151,7 +150,8 @@ public class ValidationManagerTest {
     jan1st2nd4th5th.add(jan1stAnd2nd);
     jan1st2nd4th5th.add(jan4th);
     jan1st2nd4th5th.add(jan5th);
-    assertEquals(OfflineSegmentIntervalChecker.computeNumMissingSegments(jan1st2nd4th5th, Duration.standardDays(1)), 1);
+    assertEquals(OfflineSegmentValidationManager.computeNumMissingSegments(jan1st2nd4th5th, Duration.standardDays(1)),
+        1);
   }
 
   @AfterClass

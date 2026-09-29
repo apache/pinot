@@ -20,59 +20,73 @@ package org.apache.pinot.controller.validation;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
+import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
-import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Validates realtime ideal states and segment metadata, fixing any partitions which have stopped consuming,
- * and uploading segments to deep store if segment download url is missing in the metadata.
- */
+/// Validates realtime ideal states and segment metadata, fixing any partitions which have stopped consuming,
+/// and uploading segments to deep store if segment download url is missing in the metadata.
 public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<RealtimeSegmentValidationManager.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentValidationManager.class);
+  public static final String OFFSET_CRITERIA = "offsetCriteria";
+  public static final String REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP =
+      "repairErrorSegmentsForPartialUpsertOrDedup";
 
   private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
   private final ValidationMetrics _validationMetrics;
   private final ControllerMetrics _controllerMetrics;
   private final StorageQuotaChecker _storageQuotaChecker;
-
+  private final ResourceUtilizationManager _resourceUtilizationManager;
   private final int _segmentLevelValidationIntervalInSeconds;
-  private long _lastSegmentLevelValidationRunTimeMs = 0L;
+  private final boolean _segmentAutoResetOnErrorAtValidation;
 
-  public static final String OFFSET_CRITERIA = "offsetCriteria";
+  private long _lastSegmentLevelValidationRunTimeMs = 0L;
+  private volatile DisasterRecoveryMode _disasterRecoveryMode;
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
-      ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics, StorageQuotaChecker quotaChecker) {
+      ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics, StorageQuotaChecker quotaChecker,
+      ResourceUtilizationManager resourceUtilizationManager) {
     super("RealtimeSegmentValidationManager", config.getRealtimeSegmentValidationFrequencyInSeconds(),
-        config.getRealtimeSegmentValidationManagerInitialDelaySeconds(), pinotHelixResourceManager,
-        leadControllerManager, controllerMetrics);
+        config.getRealtimeSegmentValidationManagerInitialDelaySeconds(),
+        config.getRealtimeSegmentValidationCronExpression(),
+        pinotHelixResourceManager, leadControllerManager, controllerMetrics);
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
     _validationMetrics = validationMetrics;
     _controllerMetrics = controllerMetrics;
     _storageQuotaChecker = quotaChecker;
+    _resourceUtilizationManager = resourceUtilizationManager;
 
     _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
+    _segmentAutoResetOnErrorAtValidation = config.isAutoResetErrorSegmentsOnValidationEnabled();
+    _disasterRecoveryMode = config.getDisasterRecoveryMode();
     Preconditions.checkState(_segmentLevelValidationIntervalInSeconds > 0);
   }
 
@@ -81,12 +95,13 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     Context context = new Context();
     // Run segment level validation only if certain time has passed after previous run
     long currentTimeMs = System.currentTimeMillis();
-    if (TimeUnit.MILLISECONDS.toSeconds(currentTimeMs - _lastSegmentLevelValidationRunTimeMs)
-        >= _segmentLevelValidationIntervalInSeconds) {
+    if (shouldRunSegmentValidation(periodicTaskProperties, currentTimeMs)) {
       LOGGER.info("Run segment-level validation");
       context._runSegmentLevelValidation = true;
       _lastSegmentLevelValidationRunTimeMs = currentTimeMs;
     }
+    context._repairErrorSegmentsForPartialUpsertOrDedup =
+        shouldRepairErrorSegmentsForPartialUpsertOrDedup(periodicTaskProperties);
     String offsetCriteriaStr = periodicTaskProperties.getProperty(OFFSET_CRITERIA);
     if (offsetCriteriaStr != null) {
       context._offsetCriteria = new OffsetCriteria.OffsetCriteriaBuilder().withOffsetString(offsetCriteriaStr);
@@ -105,31 +120,80 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
       return;
     }
-    List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigMaps(tableConfig).stream().map(
-        streamConfig -> new StreamConfig(tableConfig.getTableName(), streamConfig)
-    ).collect(Collectors.toList());
-    if (context._runSegmentLevelValidation) {
-      runSegmentLevelValidation(tableConfig);
-    }
+    List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
 
     if (shouldEnsureConsuming(tableNameWithType)) {
       _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfigs, context._offsetCriteria);
     }
+
+    if (context._runSegmentLevelValidation) {
+      runSegmentLevelValidation(tableConfig);
+    } else {
+      LOGGER.info("Skipping segment-level validation for table: {}", tableConfig.getTableName());
+    }
+
+    boolean isPauselessTable = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
+    if (isPauselessTable || _segmentAutoResetOnErrorAtValidation) {
+      // For realtime tables without dedup or partial upsert, repair segments in error state.
+      // When pauseless consumption is disabled, this behavior remains gated by
+      // _segmentAutoResetOnErrorAtValidation to preserve legacy semantics.
+      _llcRealtimeSegmentManager.repairSegmentsInErrorState(tableConfig,
+          context._repairErrorSegmentsForPartialUpsertOrDedup);
+    } else {
+      LOGGER.debug(
+          "Skipping segment error repair for table {} because pauseless consumption is disabled and "
+              + "_segmentAutoResetOnErrorAtValidation=false",
+          tableConfig.getTableName());
+    }
   }
 
-  /**
-   *
-   * Updates the table paused state based on pause validations (e.g. storage quota being exceeded).
-   * Skips updating the pause state if table is paused by admin.
-   * Returns true if table is not paused
-   */
-  private boolean shouldEnsureConsuming(String tableNameWithType) {
+  /// Updates the table paused state based on pause validations (e.g. storage quota being exceeded).
+  /// Skips updating the pause state if table is paused by admin.
+  /// Returns true if table is not paused
+  @VisibleForTesting
+  boolean shouldEnsureConsuming(String tableNameWithType) {
     PauseStatusDetails pauseStatus = _llcRealtimeSegmentManager.getPauseStatusDetails(tableNameWithType);
     boolean isTablePaused = pauseStatus.getPauseFlag();
-    // if table is paused by admin then don't compute
     if (isTablePaused && pauseStatus.getReasonCode().equals(PauseState.ReasonCode.ADMINISTRATIVE)) {
+      return false; // if table is paused by admin, then skip subsequent checks
+    }
+    // Perform resource utilization checks.
+    UtilizationChecker.CheckResult isResourceUtilizationWithinLimits =
+        _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
+            UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
+    if (isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.FAIL) {
+      LOGGER.warn("Resource utilization limit exceeded for table: {}", tableNameWithType);
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+          1L);
+      // update IS when table is not paused or paused with another reason code
+      if (!isTablePaused || !pauseStatus.getReasonCode()
+          .equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
+        _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType,
+            PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+            "Resource utilization limit exceeded. Check ResourceUtilizationManager log on controllers for detail "
+                + "reasons");
+      }
+      return false; // if resource utilization check failed, then skip subsequent checks
+    } else if ((isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.PASS) && isTablePaused
+        && pauseStatus.getReasonCode().equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
+      // within limits and table previously paused by resource utilization --> unpause
+      LOGGER.info("Resource utilization limit is back within limits for table: {}", tableNameWithType);
+      // unset the pause state and allow consuming segment recreation.
+      _llcRealtimeSegmentManager.updatePauseStateInIdealState(tableNameWithType, false,
+          PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, "Resource utilization within limits");
+      pauseStatus = _llcRealtimeSegmentManager.getPauseStatusDetails(tableNameWithType);
+      isTablePaused = pauseStatus.getPauseFlag();
+    } else if ((isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.UNDETERMINED) && isTablePaused
+        && pauseStatus.getReasonCode().equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
+      // The table was previously paused due to exceeding resource utilization, but the current status cannot be
+      // determined. To be safe, leave it as paused and once the status is available take the correct action
+      LOGGER.warn("Resource utilization limit could not be determined for table: {}, and it is paused, leave it as "
+          + "paused", tableNameWithType);
       return false;
     }
+    _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+        0L);
+    // Perform storage quota checks.
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     boolean isQuotaExceeded = _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig);
     if (isQuotaExceeded == isTablePaused) {
@@ -171,9 +235,66 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     // Update the total document count gauge
     _validationMetrics.updateTotalDocumentCountGauge(realtimeTableName, computeTotalDocumentCount(segmentsZKMetadata));
 
+    // Ensures all segments in COMMITTING state are properly tracked in ZooKeeper.
+    // Acts as a recovery mechanism for segments that may have failed to register during start of commit protocol.
+    boolean pauselessEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
+    if (pauselessEnabled) {
+      syncCommittingSegmentsFromMetadata(realtimeTableName, segmentsZKMetadata);
+    }
+
     // Check missing segments and upload them to the deep store
-    if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
+    // If pauseless consumption is enabled, always run uploadToDeepStoreIfMissing step because in pauseless
+    // consumption, the segment commit can be marked completed even if segment was not uploaded to the deep store.
+    if (pauselessEnabled || _llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
+    }
+  }
+
+  private void syncCommittingSegmentsFromMetadata(String realtimeTableName,
+      List<SegmentZKMetadata> segmentsZKMetadata) {
+    List<String> committingSegments = new ArrayList<>();
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      if (CommonConstants.Segment.Realtime.Status.COMMITTING.equals(segmentZKMetadata.getStatus())) {
+        committingSegments.add(segmentZKMetadata.getSegmentName());
+      }
+    }
+    LOGGER.info("Adding committing segments to ZK: {}", committingSegments);
+    if (!_llcRealtimeSegmentManager.syncCommittingSegments(realtimeTableName, committingSegments)) {
+      LOGGER.error("Failed to add committing segments for table: {}", realtimeTableName);
+    }
+  }
+
+  private boolean shouldRunSegmentValidation(Properties periodicTaskProperties, long currentTimeMs) {
+    boolean runValidation = Optional.ofNullable(
+            periodicTaskProperties.getProperty(RUN_SEGMENT_LEVEL_VALIDATION))
+        .map(value -> {
+          try {
+            return Boolean.parseBoolean(value);
+          } catch (Exception e) {
+            return false;
+          }
+        })
+        .orElse(false);
+
+    boolean timeThresholdMet = TimeUnit.MILLISECONDS.toSeconds(currentTimeMs - _lastSegmentLevelValidationRunTimeMs)
+        >= _segmentLevelValidationIntervalInSeconds;
+
+    return runValidation || timeThresholdMet;
+  }
+
+  private boolean shouldRepairErrorSegmentsForPartialUpsertOrDedup(Properties periodicTaskProperties) {
+    String property = periodicTaskProperties.getProperty(REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP);
+
+    if (property == null) {
+      return _llcRealtimeSegmentManager.shouldRepairErrorSegmentsForPartialUpsertOrDedup(_disasterRecoveryMode);
+    }
+
+    try {
+      return Boolean.parseBoolean(property);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to parse property '{}' for '{}'. Returning false.", property,
+          REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP, e);
+      return false;
     }
   }
 
@@ -202,8 +323,23 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     _validationMetrics.unregisterAllMetrics();
   }
 
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.DISASTER_RECOVERY_MODE_CONFIG_KEY)) {
+      String disasterRecoveryModeString =
+          clusterConfigs.get(ControllerConf.ControllerPeriodicTasksConf.DISASTER_RECOVERY_MODE_CONFIG_KEY);
+      _disasterRecoveryMode = ControllerConf.getDisasterRecoveryMode(disasterRecoveryModeString);
+    }
+  }
+
+  @VisibleForTesting
+  DisasterRecoveryMode getDisasterRecoveryMode() {
+    return _disasterRecoveryMode;
+  }
+
   public static final class Context {
     private boolean _runSegmentLevelValidation;
+    private boolean _repairErrorSegmentsForPartialUpsertOrDedup;
     private OffsetCriteria _offsetCriteria;
   }
 

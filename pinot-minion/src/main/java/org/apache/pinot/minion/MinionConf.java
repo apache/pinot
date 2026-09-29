@@ -28,7 +28,15 @@ import org.apache.pinot.spi.utils.NetUtils;
 
 public class MinionConf extends PinotConfiguration {
   public static final String END_REPLACE_SEGMENTS_TIMEOUT_MS_KEY = "pinot.minion.endReplaceSegments.timeoutMs";
+  public static final String START_REPLACE_SEGMENTS_TIMEOUT_MS_KEY = "pinot.minion.startReplaceSegments.timeoutMs";
+  public static final String MINION_TASK_PROGRESS_MANAGER_CLASS = "pinot.minion.taskProgressManager.class";
   public static final int DEFAULT_END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS = 10 * 60 * 1000; // 10 mins
+  public static final int DEFAULT_START_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS = 10 * 60 * 1000; // 10 mins
+
+  /// The number of threads to use for downloading segments from the deepstore.
+  /// This is a global setting that applies to all tasks of BaseMultipleSegmentsConversionExecutor class.
+  public static final String SEGMENT_DOWNLOAD_PARALLELISM = "pinot.minion.task.segmentDownloadParallelism";
+  public static final int DEFAULT_SEGMENT_DOWNLOAD_PARALLELISM = 1;
 
   public MinionConf() {
     super(new HashMap<>());
@@ -43,7 +51,7 @@ public class MinionConf extends PinotConfiguration {
   }
 
   public String getZkAddress() {
-    return getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
+    return getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER);
   }
 
   public String getHostName()
@@ -66,6 +74,10 @@ public class MinionConf extends PinotConfiguration {
     return getProperty(END_REPLACE_SEGMENTS_TIMEOUT_MS_KEY, DEFAULT_END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS);
   }
 
+  public int getStartReplaceSegmentsTimeoutMs() {
+    return getProperty(START_REPLACE_SEGMENTS_TIMEOUT_MS_KEY, DEFAULT_START_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS);
+  }
+
   public boolean isAllowDownloadFromServer() {
     return Boolean.parseBoolean(getProperty(CommonConstants.Minion.CONFIG_OF_ALLOW_DOWNLOAD_FROM_SERVER,
         CommonConstants.Minion.DEFAULT_ALLOW_DOWNLOAD_FROM_SERVER));
@@ -75,9 +87,18 @@ public class MinionConf extends PinotConfiguration {
     return subset(CommonConstants.Minion.METRICS_CONFIG_PREFIX);
   }
 
+  public int getSegmentDownloadParallelism() {
+    return getProperty(SEGMENT_DOWNLOAD_PARALLELISM, DEFAULT_SEGMENT_DOWNLOAD_PARALLELISM);
+  }
+
   public String getMetricsPrefix() {
     return Optional.ofNullable(getProperty(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY))
         .orElseGet(() -> getProperty(CommonConstants.Minion.DEPRECATED_CONFIG_OF_METRICS_PREFIX_KEY,
             CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX));
+  }
+
+  public int getMaxConcurrentTasksPerInstance() {
+    return getProperty(CommonConstants.Minion.CONFIG_OF_MAX_CONCURRENT_TASKS_PER_INSTANCE,
+        CommonConstants.Minion.DEFAULT_MAX_CONCURRENT_TASKS_PER_INSTANCE);
   }
 }

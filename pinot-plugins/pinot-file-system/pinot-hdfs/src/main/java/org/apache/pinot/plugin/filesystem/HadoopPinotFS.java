@@ -20,12 +20,12 @@
 package org.apache.pinot.plugin.filesystem;
 
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import org.apache.hadoop.conf.Configuration;
@@ -42,9 +42,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Implementation of PinotFS for the Hadoop Filesystem
- */
+/// Implementation of PinotFS for the Hadoop Filesystem
 public class HadoopPinotFS extends BasePinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(HadoopPinotFS.class);
 
@@ -52,6 +50,8 @@ public class HadoopPinotFS extends BasePinotFS {
   private static final String KEYTAB = "hadoop.kerberos.keytab";
   private static final String HADOOP_CONF_PATH = "hadoop.conf.path";
   private static final String WRITE_CHECKSUM = "hadoop.write.checksum";
+  private static final String GLOBAL_HADOOP_USER = "hadoop.user.name";
+  private static final String ALLOW_INSECURE = "hadoop.allow.insecure";
 
   private org.apache.hadoop.fs.FileSystem _hadoopFS = null;
   private org.apache.hadoop.conf.Configuration _hadoopConf;
@@ -63,8 +63,23 @@ public class HadoopPinotFS extends BasePinotFS {
   public void init(PinotConfiguration config) {
     try {
       _hadoopConf = getConf(config.getProperty(HADOOP_CONF_PATH));
-      authenticate(_hadoopConf, config);
-      _hadoopFS = org.apache.hadoop.fs.FileSystem.get(_hadoopConf);
+      boolean allowInsecure = Boolean.parseBoolean(config.getProperty(ALLOW_INSECURE, "false"));
+
+      if (!allowInsecure) {
+        authenticate(_hadoopConf, config);
+      } else {
+        String globalHadoopUser = config.getProperty(GLOBAL_HADOOP_USER);
+        if (Strings.isNullOrEmpty(globalHadoopUser)) {
+          throw new RuntimeException("HADOOP_USER must be provided when ALLOW_INSECURE is true");
+        }
+
+        UserGroupInformation ugi = UserGroupInformation.createRemoteUser(globalHadoopUser);
+        UserGroupInformation.setLoginUser(ugi);
+        LOGGER.info("Setting HDFS login user to: {}", globalHadoopUser);
+      }
+      // Hadoop's FileSystem.get() returns a process-cached instance. HadoopPinotFS closes its filesystem, so it must
+      // own a distinct instance to avoid one PinotFS closing a client that is still in use elsewhere.
+      _hadoopFS = org.apache.hadoop.fs.FileSystem.newInstance(_hadoopConf);
       _hadoopFS.setWriteChecksum((config.getProperty(WRITE_CHECKSUM, false)));
       LOGGER.info("successfully initialized HadoopPinotFS");
     } catch (IOException e) {
@@ -81,11 +96,17 @@ public class HadoopPinotFS extends BasePinotFS {
   @Override
   public boolean delete(URI segmentUri, boolean forceDelete)
       throws IOException {
-    // Returns false if we are moving a directory and that directory is not empty
+    Path path = new Path(segmentUri);
+
+    if (!_hadoopFS.exists(path)) {
+      return true;
+    }
+
     if (isDirectory(segmentUri) && listFiles(segmentUri, false).length > 0 && !forceDelete) {
       return false;
     }
-    return _hadoopFS.delete(new Path(segmentUri), true);
+
+    return _hadoopFS.delete(path, true);
   }
 
   @Override
@@ -94,10 +115,8 @@ public class HadoopPinotFS extends BasePinotFS {
     return _hadoopFS.rename(new Path(srcUri), new Path(dstUri));
   }
 
-  /**
-   * Note that this method copies within a cluster. If you want to copy outside the cluster, you will
-   * need to create a new configuration and filesystem. Keeps files if copy/move is partial.
-   */
+  /// Note that this method copies within a cluster. If you want to copy outside the cluster, you will
+  /// need to create a new configuration and filesystem. Keeps files if copy/move is partial.
   @Override
   public boolean copyDir(URI srcUri, URI dstUri)
       throws IOException {
@@ -142,9 +161,9 @@ public class HadoopPinotFS extends BasePinotFS {
   @Override
   public String[] listFiles(URI fileUri, boolean recursive)
       throws IOException {
-    ImmutableList.Builder<String> builder = ImmutableList.builder();
+    ArrayList<String> builder = new ArrayList<>();
     visitFiles(fileUri, recursive, f -> builder.add(f.getPath().toString()));
-    String[] listedFiles = builder.build().toArray(new String[0]);
+    String[] listedFiles = builder.toArray(new String[0]);
     LOGGER.debug("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
     return listedFiles;
   }
@@ -152,14 +171,14 @@ public class HadoopPinotFS extends BasePinotFS {
   @Override
   public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
       throws IOException {
-    ImmutableList.Builder<FileMetadata> listBuilder = ImmutableList.builder();
+    ArrayList<FileMetadata> listBuilder = new ArrayList<>();
     visitFiles(fileUri, recursive, f -> {
       FileMetadata.Builder fileBuilder =
           new FileMetadata.Builder().setFilePath(f.getPath().toString()).setLastModifiedTime(f.getModificationTime())
               .setLength(f.getLen()).setIsDirectory(f.isDirectory());
       listBuilder.add(fileBuilder.build());
     });
-    ImmutableList<FileMetadata> listedFiles = listBuilder.build();
+    List<FileMetadata> listedFiles = List.copyOf(listBuilder);
     LOGGER.debug("Listed {} files from URI: {}, is recursive: {}", listedFiles.size(), fileUri, recursive);
     return listedFiles;
   }
@@ -177,6 +196,9 @@ public class HadoopPinotFS extends BasePinotFS {
       throws IOException {
     // _hadoopFS.listFiles(path, false) will not return directories as files, thus use listStatus(path) here.
     FileStatus[] files = _hadoopFS.listStatus(path);
+    if (files == null) {
+      throw new IOException("FileSystem.listStatus() returned null for path: " + path);
+    }
     for (FileStatus file : files) {
       visitor.accept(file);
       if (file.isDirectory() && recursive) {
@@ -198,7 +220,7 @@ public class HadoopPinotFS extends BasePinotFS {
         throw new RuntimeException("_hadoopFS client is not initialized when trying to copy files");
       }
       if (_hadoopFS.isDirectory(remoteFile)) {
-        throw new IllegalArgumentException(srcUri.toString() + " is a direactory");
+        throw new IllegalArgumentException(srcUri.toString() + " is a directory");
       }
       long startMs = System.currentTimeMillis();
       _hadoopFS.copyToLocalFile(remoteFile, localFile);
@@ -228,23 +250,19 @@ public class HadoopPinotFS extends BasePinotFS {
   }
 
   @Override
-  public boolean isDirectory(URI uri) {
+  public boolean isDirectory(URI uri)
+      throws IOException {
     try {
       return _hadoopFS.getFileStatus(new Path(uri)).isDirectory();
-    } catch (IOException e) {
-      LOGGER.error("Could not get file status for {}", uri, e);
-      throw new RuntimeException(e);
+    } catch (FileNotFoundException e) {
+      return false;
     }
   }
 
   @Override
-  public long lastModified(URI uri) {
-    try {
-      return _hadoopFS.getFileStatus(new Path(uri)).getModificationTime();
-    } catch (IOException e) {
-      LOGGER.error("Could not get file status for {}", uri, e);
-      throw new RuntimeException(e);
-    }
+  public long lastModified(URI uri)
+      throws IOException {
+    return _hadoopFS.getFileStatus(new Path(uri)).getModificationTime();
   }
 
   @Override
@@ -252,8 +270,9 @@ public class HadoopPinotFS extends BasePinotFS {
       throws IOException {
     Path path = new Path(uri);
     if (!exists(uri)) {
-      FSDataOutputStream fos = _hadoopFS.create(path);
-      fos.close();
+      try (FSDataOutputStream fos = _hadoopFS.create(path)) {
+        // create an empty file; stream closed by try-with-resources
+      }
     } else {
       _hadoopFS.setTimes(path, System.currentTimeMillis(), -1);
     }
@@ -301,7 +320,9 @@ public class HadoopPinotFS extends BasePinotFS {
   @Override
   public void close()
       throws IOException {
-    _hadoopFS.close();
+    if (_hadoopFS != null) {
+      _hadoopFS.close();
+    }
     super.close();
   }
 }

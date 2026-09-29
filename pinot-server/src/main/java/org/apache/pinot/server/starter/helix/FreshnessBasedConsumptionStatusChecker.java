@@ -24,17 +24,20 @@ import java.util.Set;
 import java.util.function.Function;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentMetadataUtils;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
-/**
- * This class is used at startup time to have a more accurate estimate of the catchup period in which no query
- * execution happens and consumers try to catch up to the latest messages available in streams.
- * To achieve this, every time status check is called - {@link #getNumConsumingSegmentsNotReachedIngestionCriteria} -
- * for each consuming segment, we check if either:
- *   - the segment's latest ingested offset has reached the current stream offset that's
- *   - the last ingested message is within {@link #_minFreshnessMs} of the current system time
- */
+/// This class is used at startup time to have a more accurate estimate of the catchup period in which no query
+/// execution happens and consumers try to catch up to the latest messages available in streams.
+/// To achieve this, every time status check is called - [#getNumConsumingSegmentsNotReachedIngestionCriteria] -
+/// for each consuming segment, we check if either:
+///   - the segment's minimum ingestion lag is within [#_minFreshnessMs]
+///   - the segment's latest ingested offset has reached the current stream offset
+///   - the segment has been idle longer than [#_idleTimeoutMs]
 public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsumptionStatusChecker {
   private final long _minFreshnessMs;
   private final long _idleTimeoutMs;
@@ -45,67 +48,63 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
     super(instanceDataManager, consumingSegments, consumingSegmentsSupplier);
     _minFreshnessMs = minFreshnessMs;
     _idleTimeoutMs = idleTimeoutMs;
-  }
-
-  private boolean isOffsetCaughtUp(StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestOffset) {
-    if (currentOffset != null && latestOffset != null) {
-      // Kafka's "latest" offset is actually the next available offset. Therefore it will be 1 ahead of the
-      // current offset in the case we are caught up.
-      // TODO: implement a way to have this work correctly for kafka consumers
-      return currentOffset.compareTo(latestOffset) >= 0;
-    }
-    return false;
+    _logger.info("FreshnessBasedConsumptionStatusChecker initialized with min_freshness={}ms, idle_timeout={}ms",
+        _minFreshnessMs, _idleTimeoutMs);
   }
 
   private boolean segmentHasBeenIdleLongerThanThreshold(long segmentIdleTime) {
     return _idleTimeoutMs > 0 && segmentIdleTime > _idleTimeoutMs;
   }
 
-  protected long now() {
-    return System.currentTimeMillis();
-  }
-
   @Override
-  protected boolean isSegmentCaughtUp(String segmentName, RealtimeSegmentDataManager rtSegmentDataManager) {
-    long now = now();
-    long latestIngestionTimestamp =
-        rtSegmentDataManager.getSegment().getSegmentMetadata().getLatestIngestionTimestamp();
-    long freshnessMs = now - latestIngestionTimestamp;
+  protected boolean isSegmentCaughtUp(String segmentName, RealtimeSegmentDataManager rtSegmentDataManager,
+      RealtimeTableDataManager realtimeTableDataManager) {
+    SegmentMetadata segmentMetadata = rtSegmentDataManager.getSegment().getSegmentMetadata();
+    long minimumIngestionLagMs = segmentMetadata.getMinimumIngestionLagMs();
 
-    // We check latestIngestionTimestamp >= 0 because the default freshness when unknown is Long.MIN_VALUE
-    if (latestIngestionTimestamp >= 0 && freshnessMs <= _minFreshnessMs) {
-      _logger.info("Segment {} with freshness {}ms has caught up within min freshness {}", segmentName, freshnessMs,
-          _minFreshnessMs);
+    // Simple freshness check - if minimum lag ever seen is within threshold, we're caught up.
+    // Note: default value is Long.MAX_VALUE when unknown, which will correctly fail this check.
+    if (minimumIngestionLagMs <= _minFreshnessMs) {
+      _logger.info("Segment {} with minimum ingestion lag {}ms has caught up within min freshness {}ms",
+          segmentName, minimumIngestionLagMs, _minFreshnessMs);
       return true;
     }
 
-    // For stream partitions that see very low volume, it's possible we're already caught up but the oldest
+    // Fallback: Check offset catchup.
     // message is too old to pass the freshness check. We check this condition separately to avoid hitting
     // the stream consumer to check partition count if we're already caught up.
     StreamPartitionMsgOffset currentOffset = rtSegmentDataManager.getCurrentOffset();
-    StreamPartitionMsgOffset latestStreamOffset = rtSegmentDataManager.fetchLatestStreamOffset(5000);
-    if (isOffsetCaughtUp(currentOffset, latestStreamOffset)) {
-      _logger.info("Segment {} with freshness {}ms has not caught up within min freshness {}. "
-              + "But the current ingested offset is equal to the latest available offset {}.", segmentName, freshnessMs,
-          _minFreshnessMs, currentOffset);
+
+    StreamPartitionMsgOffset latestStreamOffset = null;
+    try {
+      StreamMetadataProvider streamMetadataProvider =
+          realtimeTableDataManager.getStreamMetadataProvider(rtSegmentDataManager);
+      latestStreamOffset =
+          RealtimeSegmentMetadataUtils.fetchLatestStreamOffset(rtSegmentDataManager, streamMetadataProvider);
+    } catch (Exception e) {
+      _logger.warn("Failed to fetch latest stream offset for segment: {}. Will continue with other checks.",
+          segmentName, e);
+    }
+
+    if (isOffsetCaughtUp(segmentName, currentOffset, latestStreamOffset)) {
+      _logger.info("Segment {} with minimum ingestion lag {}ms has not caught up within min freshness {}ms. "
+              + "But the current ingested offset is equal to the latest available offset {}.",
+          segmentName, minimumIngestionLagMs, _minFreshnessMs, currentOffset);
       return true;
     }
 
-    StreamPartitionMsgOffset earliestStreamOffset = rtSegmentDataManager.fetchEarliestStreamOffset(5000);
-
+    // Fallback: Check idle timeout.
     long idleTimeMs = rtSegmentDataManager.getTimeSinceEventLastConsumedMs();
     if (segmentHasBeenIdleLongerThanThreshold(idleTimeMs)) {
-      _logger.warn("Segment {} with freshness {}ms has not caught up within min freshness {}. "
-              + "But the current ingested offset {} has been idle for {}ms. At offset {}. Earliest offset {}. "
-              + "Latest offset {}.", segmentName, freshnessMs, _minFreshnessMs, currentOffset, idleTimeMs,
-          currentOffset,
-          earliestStreamOffset, latestStreamOffset);
+      _logger.warn("Segment {} with minimum ingestion lag {}ms has not caught up within min freshness {}ms. "
+              + "But has been idle for {}ms. At offset {}. Latest offset {}.",
+          segmentName, minimumIngestionLagMs, _minFreshnessMs, idleTimeMs, currentOffset, latestStreamOffset);
       return true;
     }
 
-    _logger.info("Segment {} with freshness {}ms has not caught up within "
-            + "min freshness {}. At offset {}. Earliest offset {}. Latest offset {}.", segmentName, freshnessMs,
-        _minFreshnessMs, currentOffset, earliestStreamOffset, latestStreamOffset);
+    _logger.info("Segment {} with minimum ingestion lag {}ms has not caught up within min freshness {}ms. "
+            + "At offset {}. Latest offset {}. Idle time ms {}",
+        segmentName, minimumIngestionLagMs, _minFreshnessMs, currentOffset, latestStreamOffset, idleTimeMs);
     return false;
   }
 }

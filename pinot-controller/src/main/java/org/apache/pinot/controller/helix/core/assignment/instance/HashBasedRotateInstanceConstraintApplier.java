@@ -27,10 +27,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Rotate the instances based on the table name hash to prevent creating hotspot instances. Use this as the default
- * instance constraint to align with the default instance partitions.
- */
+/// Rotate the instances based on the table name hash to prevent creating hotspot instances. Use this as the default
+/// instance constraint to align with the default instance partitions.
 public class HashBasedRotateInstanceConstraintApplier implements InstanceConstraintApplier {
   private static final Logger LOGGER = LoggerFactory.getLogger(HashBasedRotateInstanceConstraintApplier.class);
 

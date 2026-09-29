@@ -21,6 +21,7 @@ package org.apache.pinot.common.assignment;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
@@ -29,18 +30,16 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.workload.WorkloadChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-/**
- * Utility class for instance partitions.
- */
+/// Utility class for instance partitions.
 public class InstancePartitionsUtils {
   private InstancePartitionsUtils() {
   }
@@ -48,24 +47,26 @@ public class InstancePartitionsUtils {
   public static final char TYPE_SUFFIX_SEPARATOR = '_';
   public static final String TIER_SUFFIX = "__TIER__";
 
-  /**
-   * Returns the name of the instance partitions for the given table name (with or without type suffix) and instance
-   * partitions type.
-   */
+  /// Returns the name of the instance partitions for the given table name (with or without type suffix) and instance
+  /// partitions type.
   public static String getInstancePartitionsName(String tableName, String instancePartitionsType) {
     return TableNameBuilder.extractRawTableName(tableName) + TYPE_SUFFIX_SEPARATOR + instancePartitionsType;
   }
 
-  /**
-   * Fetches the instance partitions from Helix property store if it exists, or computes it for backward-compatibility.
-   */
+  /// Returns the name of the instance partitions for the given table name (with or without type suffix) and instance
+  /// partitions type.
+  public static String getInstancePartitionsName(String tableName, InstancePartitionsType instancePartitionsType) {
+    return getInstancePartitionsName(tableName, instancePartitionsType.name());
+  }
+
+  /// Fetches the instance partitions from Helix property store if it exists, or computes it for backward-compatibility.
   public static InstancePartitions fetchOrComputeInstancePartitions(HelixManager helixManager, TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
-    // If table has pre-configured instance partitions.
-    if (TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
+    // If table has pre-configured table-level instance partitions
+    if (shouldFetchPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
       return fetchInstancePartitionsWithRename(helixManager.getHelixPropertyStore(),
           tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
           instancePartitionsType.getInstancePartitionsName(rawTableName));
@@ -73,8 +74,8 @@ public class InstancePartitionsUtils {
 
     // Fetch the instance partitions from property store if it exists
     ZkHelixPropertyStore<ZNRecord> propertyStore = helixManager.getHelixPropertyStore();
-    InstancePartitions instancePartitions = fetchInstancePartitions(propertyStore,
-        getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
+    InstancePartitions instancePartitions =
+        fetchInstancePartitions(propertyStore, getInstancePartitionsName(tableNameWithType, instancePartitionsType));
     if (instancePartitions != null) {
       return instancePartitions;
     }
@@ -83,9 +84,7 @@ public class InstancePartitionsUtils {
     return computeDefaultInstancePartitions(helixManager, tableConfig, instancePartitionsType);
   }
 
-  /**
-   * Fetches the instance partitions from Helix property store.
-   */
+  /// Fetches the instance partitions from Helix property store.
   @Nullable
   public static InstancePartitions fetchInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
       String instancePartitionsName) {
@@ -98,27 +97,23 @@ public class InstancePartitionsUtils {
     return TableNameBuilder.extractRawTableName(tableName) + TIER_SUFFIX + tierName;
   }
 
-
-  /**
-   * Gets the instance partitions with the given name, and returns a re-named copy of the same.
-   * This method is useful when we use a table with instancePartitionsMap since in that case
-   * the value of a table's instance partitions are copied over from an existing instancePartitions.
-   */
+  /// Gets the instance partitions with the given name, and returns a re-named copy of the same.
+  /// This method is useful when we use a table with instancePartitionsMap since in that case
+  /// the value of a table's instance partitions are copied over from an existing instancePartitions.
   public static InstancePartitions fetchInstancePartitionsWithRename(HelixPropertyStore<ZNRecord> propertyStore,
       String instancePartitionsName, String newName) {
     InstancePartitions instancePartitions = fetchInstancePartitions(propertyStore, instancePartitionsName);
     Preconditions.checkNotNull(instancePartitions,
-        String.format("Couldn't find instance-partitions with name=%s. Cannot rename to %s",
-            instancePartitionsName, newName));
+        String.format("Couldn't find instance-partitions with name=%s. Cannot rename to %s", instancePartitionsName,
+            newName));
     return instancePartitions.withName(newName);
   }
 
-  /**
-   * Computes the default instance partitions. Sort all qualified instances and rotate the list based on the table name
-   * to prevent creating hotspot servers.
-   * <p>Choose both enabled and disabled instances with the server tag as the qualified instances to avoid unexpected
-   * data shuffling when instances get disabled.
-   */
+  /// Computes the default instance partitions. Sort all qualified instances and rotate the list based on the table name
+  /// to prevent creating hotspot servers.
+  ///
+  /// Choose both enabled and disabled instances with the server tag as the qualified instances to avoid unexpected
+  /// data shuffling when instances get disabled.
   public static InstancePartitions computeDefaultInstancePartitions(HelixManager helixManager, TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
     TenantConfig tenantConfig = tableConfig.getTenantConfig();
@@ -136,21 +131,25 @@ public class InstancePartitionsUtils {
       default:
         throw new IllegalStateException();
     }
-    return computeDefaultInstancePartitionsForTag(helixManager, tableConfig.getTableName(),
-        instancePartitionsType.toString(), serverTag);
+    return computeDefaultInstancePartitionsForTag(helixManager, tableConfig, instancePartitionsType.toString(),
+        serverTag);
   }
 
-  /**
-   * Computes the default instance partitions using the given serverTag.
-   * Sort all qualified instances and rotate the list based on the table name to prevent creating hotspot servers.
-   * <p>Choose both enabled and disabled instances with the server tag as the qualified instances to avoid unexpected
-   * data shuffling when instances get disabled.
-   */
+  /// Computes the default instance partitions using the given serverTag.
+  /// Sort all qualified instances and rotate the list based on the table name to prevent creating hotspot servers.
+  ///
+  /// Choose both enabled and disabled instances with the server tag as the qualified instances to avoid unexpected
+  /// data shuffling when instances get disabled.
   public static InstancePartitions computeDefaultInstancePartitionsForTag(HelixManager helixManager,
-      String tableNameWithType, String instancePartitionsType, String serverTag) {
+      TableConfig tableConfig, String instancePartitionsType, String serverTag) {
+    String tableNameWithType = tableConfig.getTableName();
     List<String> instances = HelixHelper.getInstancesWithTag(helixManager, serverTag);
     int numInstances = instances.size();
-    Preconditions.checkState(numInstances > 0, "No instance found with tag: %s", serverTag);
+    Preconditions.checkState(numInstances > 0, "No instance found with tag: %s for table: %s", serverTag,
+        tableNameWithType);
+    Preconditions.checkState(numInstances >= tableConfig.getReplication(),
+        "Number of instances: %s with tag: %s < table replication: %s for table: %s", numInstances, serverTag,
+        tableConfig.getReplication(), tableNameWithType);
 
     // Sort the instances and rotate the list based on the table name
     instances.sort(null);
@@ -161,21 +160,21 @@ public class InstancePartitionsUtils {
     return instancePartitions;
   }
 
-  /**
-   * Persists the instance partitions to Helix property store.
-   */
+  /// Persists the instance partitions to Helix property store.
   public static void persistInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
-      InstancePartitions instancePartitions) {
+      InstancePartitions instancePartitions, @Nullable WorkloadChangeListener listener) {
     String path = ZKMetadataProvider
         .constructPropertyStorePathForInstancePartitions(instancePartitions.getInstancePartitionsName());
     if (!propertyStore.set(path, instancePartitions.toZNRecord(), AccessOption.PERSISTENT)) {
       throw new ZkException("Failed to persist instance partitions: " + instancePartitions);
     }
+
+    if (listener != null) {
+      listener.onInstancePartitionsChanged(instancePartitions);
+    }
   }
 
-  /**
-   * Removes the instance partitions from Helix property store.
-   */
+  /// Removes the instance partitions from Helix property store.
   public static void removeInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
       String instancePartitionsName) {
     String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(instancePartitionsName);
@@ -187,10 +186,25 @@ public class InstancePartitionsUtils {
   public static void removeTierInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
       String tableNameWithType) {
     List<InstancePartitions> instancePartitions = ZKMetadataProvider.getAllInstancePartitions(propertyStore);
-    instancePartitions.stream().filter(instancePartition -> instancePartition.getInstancePartitionsName()
+    instancePartitions.stream()
+        .filter(instancePartition -> instancePartition.getInstancePartitionsName()
             .startsWith(TableNameBuilder.extractRawTableName(tableNameWithType) + TIER_SUFFIX))
         .forEach(instancePartition -> {
           removeInstancePartitions(propertyStore, instancePartition.getInstancePartitionsName());
         });
+  }
+
+  /// Returns `true` if the table has pre-configured instance partitions of the given type.
+  public static boolean hasPreConfiguredInstancePartitions(TableConfig tableConfig,
+      InstancePartitionsType instancePartitionsType) {
+    Map<InstancePartitionsType, String> instancePartitionsMap = tableConfig.getInstancePartitionsMap();
+    return instancePartitionsMap != null && instancePartitionsMap.containsKey(instancePartitionsType);
+  }
+
+  /// Returns `true` if the table should use pre-configured instance partitions of the given type.
+  public static boolean shouldFetchPreConfiguredInstancePartitions(TableConfig tableConfig,
+      InstancePartitionsType instancePartitionsType) {
+    return hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)
+        && !InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
   }
 }

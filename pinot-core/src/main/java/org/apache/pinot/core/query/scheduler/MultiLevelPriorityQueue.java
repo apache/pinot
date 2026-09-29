@@ -36,15 +36,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Priority queues of scheduler groups that determines query priority based on tokens
- *
- * This is a multi-level query scheduling queue with each sublevel maintaining a waitlist of
- * queries for the group. The priority between groups is provided by specific SchedulerGroup
- * implementation. If two groups have the same priority then the group with lower
- * resource utilization is selected first. Oldest query from the winning SchedulerGroup
- * is selected for execution.
- */
+/// Priority queues of scheduler groups that determines query priority based on tokens
+///
+/// This is a multi-level query scheduling queue with each sublevel maintaining a waitlist of
+/// queries for the group. The priority between groups is provided by specific SchedulerGroup
+/// implementation. If two groups have the same priority then the group with lower
+/// resource utilization is selected first. Oldest query from the winning SchedulerGroup
+/// is selected for execution.
 public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiLevelPriorityQueue.class);
@@ -101,10 +99,8 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
     }
   }
 
-  /**
-   * Blocking call to read the next query in order of priority
-   * @return
-   */
+  /// Blocking call to read the next query in order of priority
+  /// @return
   @Nullable
   @Override
   public SchedulerQueryContext take() {

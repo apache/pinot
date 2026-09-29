@@ -18,32 +18,45 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.common.tier.PinotServerTierStorage;
+import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.common.tier.TierSegmentSelector;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
+import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -66,8 +79,7 @@ public class StrictRealtimeSegmentAssignmentTest {
   private static final String CONSUMING_INSTANCE_PARTITIONS_NAME =
       InstancePartitionsType.CONSUMING.getInstancePartitionsName(RAW_TABLE_NAME);
 
-  private List<String> _segments;
-  private SegmentAssignment _segmentAssignment;
+  private static List<String> _segments;
   private Map<InstancePartitionsType, InstancePartitions> _instancePartitionsMap;
   private InstancePartitions _newConsumingInstancePartitions;
 
@@ -78,16 +90,6 @@ public class StrictRealtimeSegmentAssignmentTest {
       _segments.add(new LLCSegmentName(RAW_TABLE_NAME, segmentId % NUM_PARTITIONS, segmentId / NUM_PARTITIONS,
           System.currentTimeMillis()).getSegmentName());
     }
-
-    Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
-    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
-            .setStreamConfigs(streamConfigs).setUpsertConfig(upsertConfig)
-            .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
-            .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1)).build();
-    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(createHelixManager(), tableConfig, null);
-
     _instancePartitionsMap = new TreeMap<>();
     // CONSUMING instances:
     // {
@@ -126,25 +128,55 @@ public class StrictRealtimeSegmentAssignmentTest {
     }
   }
 
-  @Test
-  public void testFactory() {
-    assertTrue(_segmentAssignment instanceof StrictRealtimeSegmentAssignment);
+  @DataProvider(name = "tableTypes")
+  public Object[] getTableTypes() {
+    return new Object[]{"upsert", "dedup"};
   }
 
-  @Test
-  public void testAssignSegment() {
-    assertTrue(_segmentAssignment instanceof StrictRealtimeSegmentAssignment);
+  private static SegmentAssignment createSegmentAssignment(String tableType) {
+    return createSegmentAssignment(tableType, createHelixManager());
+  }
+
+  private static SegmentAssignment createSegmentAssignment(String tableType, HelixManager helixManager) {
+    TableConfigBuilder builder = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(NUM_REPLICAS)
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+        .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.COMPLETED.toString(),
+            new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)))
+        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1));
+    TableConfig tableConfig;
+    if ("upsert".equalsIgnoreCase(tableType)) {
+      tableConfig = builder.setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).build();
+    } else {
+      tableConfig = builder.setDedupConfig(new DedupConfig()).build();
+    }
+    SegmentAssignment segmentAssignment =
+        SegmentAssignmentFactory.getSegmentAssignment(helixManager, tableConfig, null);
+    assertSegmentAssignmentType(segmentAssignment, tableType);
+    return segmentAssignment;
+  }
+
+  private static void assertSegmentAssignmentType(SegmentAssignment segmentAssignment, String tableType) {
+    if ("upsert".equalsIgnoreCase(tableType)) {
+      assertTrue(segmentAssignment instanceof SingleTierStrictRealtimeSegmentAssignment);
+    } else {
+      assertTrue(segmentAssignment instanceof MultiTierStrictRealtimeSegmentAssignment);
+    }
+  }
+
+  @Test(dataProvider = "tableTypes")
+  public void testAssignSegment(String tableType) {
+    SegmentAssignment segmentAssignment = createSegmentAssignment(tableType);
     Map<InstancePartitionsType, InstancePartitions> onlyConsumingInstancePartitionMap =
-        ImmutableMap.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
+        Map.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
     int numInstancesPerReplicaGroup = NUM_CONSUMING_INSTANCES / NUM_REPLICAS;
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     // Add segments for partition 0/1/2, but add no segment for partition 3.
     List<String> instancesAssigned;
-    boolean consistent;
     for (int segmentId = 0; segmentId < 3; segmentId++) {
       String segmentName = _segments.get(segmentId);
       instancesAssigned =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, onlyConsumingInstancePartitionMap);
+          segmentAssignment.assignSegment(segmentName, currentAssignment, onlyConsumingInstancePartitionMap);
       assertEquals(instancesAssigned.size(), NUM_REPLICAS);
       // Segment 0 (partition 0) should be assigned to instance 0, 3, 6
       // Segment 1 (partition 1) should be assigned to instance 1, 4, 7
@@ -163,15 +195,15 @@ public class StrictRealtimeSegmentAssignmentTest {
       addToAssignment(currentAssignment, segmentId, instancesAssigned);
     }
     // Use new instancePartition to assign the new segments below.
-    ImmutableMap<InstancePartitionsType, InstancePartitions> newConsumingInstancePartitionMap =
-        ImmutableMap.of(InstancePartitionsType.CONSUMING, _newConsumingInstancePartitions);
+    Map<InstancePartitionsType, InstancePartitions> newConsumingInstancePartitionMap =
+        Map.of(InstancePartitionsType.CONSUMING, _newConsumingInstancePartitions);
 
     // No existing segments for partition 3, so use the assignment decided by new instancePartition.
     // So segment 3 (partition 3) should be assigned to instance new_0, new_3, new_6
     int segmentId = 3;
     String segmentName = _segments.get(segmentId);
     instancesAssigned =
-        _segmentAssignment.assignSegment(segmentName, currentAssignment, newConsumingInstancePartitionMap);
+        segmentAssignment.assignSegment(segmentName, currentAssignment, newConsumingInstancePartitionMap);
     assertEquals(instancesAssigned,
         Arrays.asList("new_consumingInstance_0", "new_consumingInstance_3", "new_consumingInstance_6"));
     addToAssignment(currentAssignment, segmentId, instancesAssigned);
@@ -180,7 +212,7 @@ public class StrictRealtimeSegmentAssignmentTest {
     for (segmentId = 4; segmentId < 7; segmentId++) {
       segmentName = _segments.get(segmentId);
       instancesAssigned =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, newConsumingInstancePartitionMap);
+          segmentAssignment.assignSegment(segmentName, currentAssignment, newConsumingInstancePartitionMap);
       assertEquals(instancesAssigned.size(), NUM_REPLICAS);
 
       // Those segments are assigned according to the assignment from idealState, instead of using new_xxx instances
@@ -197,20 +229,19 @@ public class StrictRealtimeSegmentAssignmentTest {
     }
   }
 
-  @Test
-  public void testAssignSegmentWithOfflineSegment() {
-    assertTrue(_segmentAssignment instanceof StrictRealtimeSegmentAssignment);
+  @Test(dataProvider = "tableTypes")
+  public void testAssignSegmentWithOfflineSegment(String tableType) {
+    SegmentAssignment segmentAssignment = createSegmentAssignment(tableType);
     Map<InstancePartitionsType, InstancePartitions> onlyConsumingInstancePartitionMap =
-        ImmutableMap.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
+        Map.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
     int numInstancesPerReplicaGroup = NUM_CONSUMING_INSTANCES / NUM_REPLICAS;
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     // Add segments for partition 0/1/2, but add no segment for partition 3.
     List<String> instancesAssigned;
-    boolean consistent;
     for (int segmentId = 0; segmentId < 3; segmentId++) {
       String segmentName = _segments.get(segmentId);
       instancesAssigned =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, onlyConsumingInstancePartitionMap);
+          segmentAssignment.assignSegment(segmentName, currentAssignment, onlyConsumingInstancePartitionMap);
       assertEquals(instancesAssigned.size(), NUM_REPLICAS);
       // Segment 0 (partition 0) should be assigned to instance 0, 3, 6
       // Segment 1 (partition 1) should be assigned to instance 1, 4, 7
@@ -230,15 +261,15 @@ public class StrictRealtimeSegmentAssignmentTest {
           SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.OFFLINE));
     }
     // Use new instancePartition to assign the new segments below.
-    ImmutableMap<InstancePartitionsType, InstancePartitions> newConsumingInstancePartitionMap =
-        ImmutableMap.of(InstancePartitionsType.CONSUMING, _newConsumingInstancePartitions);
+    Map<InstancePartitionsType, InstancePartitions> newConsumingInstancePartitionMap =
+        Map.of(InstancePartitionsType.CONSUMING, _newConsumingInstancePartitions);
 
     // No existing segments for partition 3, so use the assignment decided by new instancePartition. All existing
     // segments for partition 0/1/2 are offline, thus skipped, so use the assignment decided by new instancePartition.
     for (int segmentId = 3; segmentId < 7; segmentId++) {
       String segmentName = _segments.get(segmentId);
       instancesAssigned =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, newConsumingInstancePartitionMap);
+          segmentAssignment.assignSegment(segmentName, currentAssignment, newConsumingInstancePartitionMap);
       assertEquals(instancesAssigned.size(), NUM_REPLICAS);
 
       // Those segments are assigned according to the assignment from idealState, instead of using new_xxx instances
@@ -255,9 +286,176 @@ public class StrictRealtimeSegmentAssignmentTest {
     }
   }
 
-  @Test(expectedExceptions = IllegalStateException.class)
-  public void testAssignSegmentToCompletedServers() {
-    _segmentAssignment.assignSegment("seg01", new TreeMap<>(), new TreeMap<>());
+  @Test
+  public void testRebalanceDedupTableWithTiers() {
+    SegmentAssignment segmentAssignment = createSegmentAssignment("dedup");
+    Map<InstancePartitionsType, InstancePartitions> onlyConsumingInstancePartitionMap =
+        Map.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    Set<String> segmentsOnTier = new HashSet<>();
+    for (int segmentId = 0; segmentId < 6; segmentId++) {
+      String segmentName = _segments.get(segmentId);
+      if (segmentId < 3) {
+        segmentsOnTier.add(segmentName);
+      }
+      List<String> instancesAssigned =
+          segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
+    }
+    String tierName = "coldTier";
+    List<Tier> sortedTiers = createSortedTiers(tierName, segmentsOnTier);
+    Map<String, InstancePartitions> tierInstancePartitionsMap = createTierInstancePartitionsMap(tierName, 3);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setIncludeConsuming(true);
+    Map<String, Map<String, String>> newAssignment =
+        segmentAssignment.rebalanceTable(currentAssignment, onlyConsumingInstancePartitionMap, sortedTiers,
+            tierInstancePartitionsMap, rebalanceConfig);
+    assertEquals(newAssignment.size(), currentAssignment.size());
+    for (String segName : currentAssignment.keySet()) {
+      if (segmentsOnTier.contains(segName)) {
+        assertTrue(newAssignment.get(segName).keySet().stream().allMatch(s -> s.startsWith(tierName)));
+      } else {
+        assertTrue(
+            newAssignment.get(segName).keySet().stream().allMatch(s -> s.startsWith(CONSUMING_INSTANCE_NAME_PREFIX)));
+      }
+    }
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Tiers must not be "
+      + "specified for table.*")
+  public void testRebalanceUpsertTableWithTiers() {
+    SegmentAssignment segmentAssignment = createSegmentAssignment("upsert");
+    Map<InstancePartitionsType, InstancePartitions> onlyConsumingInstancePartitionMap =
+        Map.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    Set<String> segmentsOnTier = new HashSet<>();
+    for (int segmentId = 0; segmentId < 6; segmentId++) {
+      String segmentName = _segments.get(segmentId);
+      if (segmentId < 3) {
+        segmentsOnTier.add(segmentName);
+      }
+      List<String> instancesAssigned =
+          segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
+    }
+
+    String tierName = "coldTier";
+    List<Tier> sortedTiers = createSortedTiers(tierName, segmentsOnTier);
+    Map<String, InstancePartitions> tierInstancePartitionsMap = createTierInstancePartitionsMap(tierName, 3);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setIncludeConsuming(true);
+    segmentAssignment.rebalanceTable(currentAssignment, onlyConsumingInstancePartitionMap, sortedTiers,
+        tierInstancePartitionsMap, rebalanceConfig);
+  }
+
+  @Test(dataProvider = "tableTypes")
+  public void testAssignSegmentToCompletedServers(String tableType) {
+    SegmentAssignment segmentAssignment = createSegmentAssignment(tableType);
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
+    instancePartitionsMap.put(InstancePartitionsType.COMPLETED, new InstancePartitions("completed"));
+    try {
+      segmentAssignment.assignSegment("seg01", new TreeMap<>(), instancePartitionsMap);
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Failed to find CONSUMING instance partitions"), e.getMessage());
+    }
+    instancePartitionsMap.put(InstancePartitionsType.CONSUMING, new InstancePartitions("consuming"));
+    try {
+      segmentAssignment.assignSegment("seg01", new TreeMap<>(), instancePartitionsMap);
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("One instance partition type should be provided"), e.getMessage());
+    }
+  }
+
+  @Test(dataProvider = "tableTypes")
+  public void testRebalanceTableToCompletedServers(String tableType) {
+    SegmentAssignment segmentAssignment = createSegmentAssignment(tableType);
+    String tierName = "coldTier";
+    List<Tier> sortedTiers = createSortedTiers(tierName, Set.of());
+    Map<String, InstancePartitions> tierInstancePartitionsMap = createTierInstancePartitionsMap(tierName, 3);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
+    instancePartitionsMap.put(InstancePartitionsType.COMPLETED, new InstancePartitions("completed"));
+    try {
+      segmentAssignment.rebalanceTable(new TreeMap<>(), instancePartitionsMap, sortedTiers, tierInstancePartitionsMap,
+          rebalanceConfig);
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Failed to find CONSUMING instance partitions"), e.getMessage());
+    }
+    instancePartitionsMap.put(InstancePartitionsType.CONSUMING, new InstancePartitions("consuming"));
+    try {
+      segmentAssignment.rebalanceTable(new TreeMap<>(), instancePartitionsMap, sortedTiers, tierInstancePartitionsMap,
+          rebalanceConfig);
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("One instance partition type should be provided"), e.getMessage());
+    }
+  }
+
+  /// Verifies the MultiTierStrictRealtimeSegmentAssignment override picks the LATEST LLC segment (highest sequence
+  /// number) for the partition rather than the first one encountered, so a new CONSUMING segment is aligned with the
+  /// current location of the partition after a rebalance.
+  @Test
+  public void testMultiTierAssignSegmentUsesLatestExistingAssignment() {
+    SegmentAssignment segmentAssignment = createSegmentAssignment("dedup");
+    Map<InstancePartitionsType, InstancePartitions> newConsumingInstancePartitionMap =
+        Map.of(InstancePartitionsType.CONSUMING, _newConsumingInstancePartitions);
+
+    // Pre-seed currentAssignment for partition 0 with two segments:
+    //   - older sequence (seq 0) on the OLD CONSUMING instances (ONLINE),
+    //   - newer sequence (seq 1) on the NEW CONSUMING instances (CONSUMING).
+    // Picking the FIRST entry would return the old instances and cause the new CONSUMING segment to land on stale
+    // instances; picking the LATEST returns the new instances, which matches what new instancePartitions decides.
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    String olderSegment = _segments.get(0); // partition 0, sequence 0
+    String latestSegment = _segments.get(4); // partition 0, sequence 1
+    List<String> oldInstances = Arrays.asList(CONSUMING_INSTANCES.get(0), CONSUMING_INSTANCES.get(3),
+        CONSUMING_INSTANCES.get(6));
+    List<String> newInstances = Arrays.asList(NEW_CONSUMING_INSTANCES.get(0), NEW_CONSUMING_INSTANCES.get(3),
+        NEW_CONSUMING_INSTANCES.get(6));
+    currentAssignment.put(olderSegment, SegmentAssignmentUtils.getInstanceStateMap(oldInstances,
+        SegmentStateModel.ONLINE));
+    currentAssignment.put(latestSegment, SegmentAssignmentUtils.getInstanceStateMap(newInstances,
+        SegmentStateModel.CONSUMING));
+
+    // Now assign the next CONSUMING segment for partition 0 (sequence 2). With the override picking the latest
+    // existing segment, idealAssignment matches the candidate decided by new instancePartitions, so we end up on
+    // the new instances.
+    String nextSegment = _segments.get(8); // partition 0, sequence 2
+    List<String> instancesAssigned =
+        segmentAssignment.assignSegment(nextSegment, currentAssignment, newConsumingInstancePartitionMap);
+    assertEquals(instancesAssigned, newInstances);
+  }
+
+  /// Verifies the MultiTierStrictRealtimeSegmentAssignment override returns null when the latest LLC segment for the
+  /// partition has been moved to a tier (ZK metadata getTier() != null). In that case the existing assignment must not
+  /// be reused because tiered segments live on a different instance pool than CONSUMING segments.
+  @Test
+  public void testMultiTierAssignSegmentSkipsExistingWhenLatestOnTier() {
+    String olderSegment = _segments.get(0); // partition 0, sequence 0
+    String tieredSegment = _segments.get(4); // partition 0, sequence 1 — marked as tiered
+    HelixManager helixManager = createHelixManager(Set.of(tieredSegment));
+    SegmentAssignment segmentAssignment = createSegmentAssignment("dedup", helixManager);
+
+    Map<InstancePartitionsType, InstancePartitions> newConsumingInstancePartitionMap =
+        Map.of(InstancePartitionsType.CONSUMING, _newConsumingInstancePartitions);
+
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    // Older segment still on the original consuming instances.
+    currentAssignment.put(olderSegment, SegmentAssignmentUtils.getInstanceStateMap(
+        Arrays.asList(CONSUMING_INSTANCES.get(0), CONSUMING_INSTANCES.get(3), CONSUMING_INSTANCES.get(6)),
+        SegmentStateModel.ONLINE));
+    // Latest segment has been moved to a cold tier (lives on different instances that we don't even reuse here).
+    currentAssignment.put(tieredSegment, SegmentAssignmentUtils.getInstanceStateMap(
+        Arrays.asList("coldTier_server_0", "coldTier_server_1", "coldTier_server_2"),
+        SegmentStateModel.ONLINE));
+
+    String nextSegment = _segments.get(8); // partition 0, sequence 2
+    List<String> instancesAssigned =
+        segmentAssignment.assignSegment(nextSegment, currentAssignment, newConsumingInstancePartitionMap);
+    // Override returned null -> assignSegment falls back to the assignment decided by new instancePartitions.
+    assertEquals(instancesAssigned, Arrays.asList(NEW_CONSUMING_INSTANCES.get(0), NEW_CONSUMING_INSTANCES.get(3),
+        NEW_CONSUMING_INSTANCES.get(6)));
   }
 
   private void addToAssignment(Map<String, Map<String, String>> currentAssignment, int segmentId,
@@ -276,11 +474,61 @@ public class StrictRealtimeSegmentAssignmentTest {
         SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
   }
 
-  private HelixManager createHelixManager() {
+  private static HelixManager createHelixManager() {
+    return createHelixManager(Set.of());
+  }
+
+  private static HelixManager createHelixManager(Set<String> tieredSegments) {
     HelixManager helixManager = mock(HelixManager.class);
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(propertyStore.get(anyString(), eq(null), eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> {
+      String path = invocation.getArgument(0, String.class);
+      String segmentName = path.substring(path.lastIndexOf('/') + 1);
+      ZNRecord record = new ZNRecord(segmentName);
+      if (tieredSegments.contains(segmentName)) {
+        record.setSimpleField(Segment.TIER, "coldTier");
+      }
+      return record;
+    });
+    // Bulk read of all segment ZK metadata, used to resolve the eligible tier of each segment once per rebalance
+    List<ZNRecord> segmentZNRecords = new ArrayList<>(_segments.size());
+    for (String segmentName : _segments) {
+      ZNRecord record = new ZNRecord(segmentName);
+      if (tieredSegments.contains(segmentName)) {
+        record.setSimpleField(Segment.TIER, "coldTier");
+      }
+      segmentZNRecords.add(record);
+    }
+    when(propertyStore.getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt())).thenReturn(
+        segmentZNRecords);
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
-    when(propertyStore.get(anyString(), isNull(), anyInt())).thenReturn(new ZNRecord("0"));
     return helixManager;
+  }
+
+  private static Map<String, InstancePartitions> createTierInstancePartitionsMap(String tierName, int serverCnt) {
+    Map<String, InstancePartitions> instancePartitionsMap = new HashMap<>();
+    InstancePartitions instancePartitionsColdTier =
+        new InstancePartitions(InstancePartitionsUtils.getInstancePartitionsName(RAW_TABLE_NAME, tierName));
+    List<String> serverList = new ArrayList<>();
+    for (int i = 0; i < serverCnt; i++) {
+      serverList.add(tierName + "_server_" + i);
+    }
+    instancePartitionsColdTier.setInstances(0, 0, serverList);
+    instancePartitionsMap.put(tierName, instancePartitionsColdTier);
+    return instancePartitionsMap;
+  }
+
+  private static List<Tier> createSortedTiers(String tierName, Set<String> segmentsOnTier) {
+    return List.of(new Tier(tierName, new TierSegmentSelector() {
+      @Override
+      public String getType() {
+        return "dummy";
+      }
+
+      @Override
+      public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
+        return segmentsOnTier.contains(segmentZKMetadata.getSegmentName());
+      }
+    }, new PinotServerTierStorage(tierName, null, null)));
   }
 }

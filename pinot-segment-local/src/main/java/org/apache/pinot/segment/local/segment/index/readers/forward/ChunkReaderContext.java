@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,23 +26,20 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 
 
-/**
- * Context for the chunk-based forward index readers.
- * <p>Information saved in the context can be used by subsequent reads as cache:
- * <ul>
- *   <li>
- *     Chunk Buffer from the previous read. Useful if the subsequent read is from the same buffer, as it avoids extra
- *     chunk decompression.
- *   </li>
- *   <li>Id for the chunk</li>
- * </ul>
- */
+/// Context for the chunk-based forward index readers.
+///
+/// Information saved in the context can be used by subsequent reads as cache:
+///
+/// - Chunk Buffer from the previous read. Useful if the subsequent read is from the same buffer, as it avoids extra
+///   chunk decompression.
+/// - Id for the chunk
 public class ChunkReaderContext implements ForwardIndexReaderContext {
   private final ByteBuffer _chunkBuffer;
 
   private int _chunkId;
 
   private List<ForwardIndexReader.ByteRange> _ranges;
+  private boolean _closed;
 
   public ChunkReaderContext(int maxChunkSize) {
     _chunkBuffer = ByteBuffer.allocateDirect(maxChunkSize);
@@ -52,11 +48,12 @@ public class ChunkReaderContext implements ForwardIndexReaderContext {
   }
 
   @Override
-  public void close()
-      throws IOException {
-    if (CleanerUtil.UNMAP_SUPPORTED) {
-      CleanerUtil.getCleaner().freeBuffer(_chunkBuffer);
+  public void close() {
+    if (_closed) {
+      return;
     }
+    _closed = true;
+    CleanerUtil.cleanQuietly(_chunkBuffer);
   }
 
   public ByteBuffer getChunkBuffer() {

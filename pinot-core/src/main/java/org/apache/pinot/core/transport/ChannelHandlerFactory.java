@@ -19,6 +19,7 @@
 package org.apache.pinot.core.transport;
 
 import io.netty.channel.ChannelHandler;
+import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
@@ -26,17 +27,14 @@ import io.netty.handler.ssl.SslContext;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * The {@code ChannelHandlerFactory} provides all kinds of Netty ChannelHandlers
- */
+/// The `ChannelHandlerFactory` provides all kinds of Netty ChannelHandlers
 public class ChannelHandlerFactory {
   public static final String SSL = "ssl";
   // The key is the hashCode of the TlsConfig, the value is the SslContext
@@ -51,59 +49,49 @@ public class ChannelHandlerFactory {
   private ChannelHandlerFactory() {
   }
 
-  /**
-   * The {@code getLengthFieldBasedFrameDecoder} return a decoder ChannelHandler that splits the received ByteBuffers
-   * dynamically by the value of the length field in the message
-   */
+  /// The `getLengthFieldBasedFrameDecoder` return a decoder ChannelHandler that splits the received ByteBuffers
+  /// dynamically by the value of the length field in the message
   public static ChannelHandler getLengthFieldBasedFrameDecoder() {
     return new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, Integer.BYTES, 0, Integer.BYTES);
   }
 
-  /**
-   * The {@code getLengthFieldPrepender} return an encoder ChannelHandler that prepends the length of the message.
-   */
+  /// The `getLengthFieldPrepender` return an encoder ChannelHandler that prepends the length of the message.
   public static ChannelHandler getLengthFieldPrepender() {
     return new LengthFieldPrepender(Integer.BYTES);
   }
 
-  /**
-   * The {@code getClientTlsHandler} return a Client side Tls handler that encrypt and decrypt everything.
-   */
+  /// The `getClientTlsHandler` return a Client side Tls handler that encrypt and decrypt everything.
   public static ChannelHandler getClientTlsHandler(TlsConfig tlsConfig, SocketChannel ch) {
     SslContext sslContext = CLIENT_SSL_CONTEXTS_CACHE
         .computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> TlsUtils.buildClientContext(tlsConfig));
     return sslContext.newHandler(ch.alloc());
   }
 
-  /**
-   * The {@code getServerTlsHandler} return a Server side Tls handler that encrypt and decrypt everything.
-   */
+  /// The `getServerTlsHandler` return a Server side Tls handler that encrypt and decrypt everything.
   public static ChannelHandler getServerTlsHandler(TlsConfig tlsConfig, SocketChannel ch) {
     SslContext sslContext = SERVER_SSL_CONTEXTS_CACHE.computeIfAbsent(
         tlsConfig.hashCode(), tlsConfigHashCode -> TlsUtils.buildServerContext(tlsConfig));
     return sslContext.newHandler(ch.alloc());
   }
 
-  /**
-   * The {@code getDataTableHandler} return a {@code DataTableHandler} Netty inbound handler on Pinot Broker side to
-   * handle the serialized data table responses sent from Pinot Server.
-   */
-  public static ChannelHandler getDataTableHandler(QueryRouter queryRouter, ServerRoutingInstance serverRoutingInstance,
-      BrokerMetrics brokerMetrics) {
-    return new DataTableHandler(queryRouter, serverRoutingInstance, brokerMetrics);
+  /// The `getDataTableHandler` return a `DataTableHandler` Netty inbound handler on Pinot Broker side to
+  /// handle the serialized data table responses sent from Pinot Server.
+  public static ChannelHandler getDataTableHandler(QueryRouter queryRouter, ThreadAccountant threadAccountant,
+      ServerRoutingInstance serverRoutingInstance) {
+    return new DataTableHandler(queryRouter, threadAccountant, serverRoutingInstance);
   }
 
-  /**
-   * The {@code getInstanceRequestHandler} return a {@code InstanceRequestHandler} Netty inbound handler on Pinot
-   * Server side to handle the serialized instance requests sent from Pinot Broker.
-   */
+  /// The `getInstanceRequestHandler` return a `InstanceRequestHandler` Netty inbound handler on Pinot
+  /// Server side to handle the serialized instance requests sent from Pinot Broker.
   public static ChannelHandler getInstanceRequestHandler(String instanceName, PinotConfiguration config,
-      QueryScheduler queryScheduler, ServerMetrics serverMetrics, AccessControl accessControl) {
-    return new InstanceRequestHandler(instanceName, config, queryScheduler, serverMetrics, accessControl);
+      QueryScheduler queryScheduler, AccessControl accessControl, ThreadAccountant threadAccountant) {
+    return new InstanceRequestHandler(instanceName, config, queryScheduler, accessControl, threadAccountant);
   }
 
   public static ChannelHandler getDirectOOMHandler(QueryRouter queryRouter, ServerRoutingInstance serverRoutingInstance,
-      ConcurrentHashMap<ServerRoutingInstance, ServerChannels.ServerChannel> serverToChannelMap) {
-    return new DirectOOMHandler(queryRouter, serverRoutingInstance, serverToChannelMap);
+      ConcurrentHashMap<ServerRoutingInstance, ServerChannels.ServerChannel> serverToChannelMap,
+      ConcurrentHashMap<SocketChannel, Boolean> allChannels, ServerSocketChannel serverSocketChannel) {
+    return new DirectOOMHandler(queryRouter, serverRoutingInstance, serverToChannelMap, allChannels,
+        serverSocketChannel);
   }
 }

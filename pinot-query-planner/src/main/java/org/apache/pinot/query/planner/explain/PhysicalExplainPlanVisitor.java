@@ -18,14 +18,18 @@
  */
 package org.apache.pinot.query.planner.explain;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -38,17 +42,16 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.QueryServerInstance;
 
 
-/**
- * A visitor that converts a {@code QueryPlan} into a human-readable string representation.
- *
- * <p>It is getting used for getting the physical plan of the query.</p>
- */
+/// A visitor that converts a `QueryPlan` into a human-readable string representation.
+///
+/// It is getting used for getting the physical plan of the query.
 public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder, PhysicalExplainPlanVisitor.Context> {
 
   private final DispatchableSubPlan _dispatchableSubPlan;
@@ -57,37 +60,33 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
     _dispatchableSubPlan = dispatchableSubPlan;
   }
 
-  /**
-   * Explains the query plan.
-   *
-   * @param dispatchableSubPlan the queryPlan to explain
-   * @return a String representation of the query plan tree
-   */
+  /// Explains the query plan.
+  ///
+  /// @param dispatchableSubPlan the queryPlan to explain
+  /// @return a String representation of the query plan tree
   public static String explain(DispatchableSubPlan dispatchableSubPlan) {
-    if (dispatchableSubPlan.getQueryStageList().isEmpty()) {
+    if (dispatchableSubPlan.getQueryStageMap().isEmpty()) {
       return "EMPTY";
     }
 
     // the root of a query plan always only has a single node
     QueryServerInstance rootServer =
-        dispatchableSubPlan.getQueryStageList().get(0).getServerInstanceToWorkerIdMap()
+        dispatchableSubPlan.getQueryStageMap().get(0).getServerInstanceToWorkerIdMap()
             .keySet().iterator().next();
     return explainFrom(dispatchableSubPlan,
-        dispatchableSubPlan.getQueryStageList().get(0).getPlanFragment().getFragmentRoot(), rootServer);
+        dispatchableSubPlan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot(), rootServer);
   }
 
-  /**
-   * Explains the query plan from a specific point in the subtree, taking {@code rootServer}
-   * as the node that is executing this sub-tree. This is helpful for debugging what is happening
-   * at a given point in time (for example, printing the tree that will be executed on a
-   * local node right before it is executed).
-   *
-   * @param dispatchableSubPlan the entire query plan, including non-executed portions
-   * @param node the node to begin traversal
-   * @param rootServer the server instance that is executing this plan (should execute {@code node})
-   *
-   * @return a query plan associated with
-   */
+  /// Explains the query plan from a specific point in the subtree, taking `rootServer`
+  /// as the node that is executing this sub-tree. This is helpful for debugging what is happening
+  /// at a given point in time (for example, printing the tree that will be executed on a
+  /// local node right before it is executed).
+  ///
+  /// @param dispatchableSubPlan the entire query plan, including non-executed portions
+  /// @param node the node to begin traversal
+  /// @param rootServer the server instance that is executing this plan (should execute `node`)
+  ///
+  /// @return a query plan associated with
   public static String explainFrom(DispatchableSubPlan dispatchableSubPlan, PlanNode node,
       QueryServerInstance rootServer) {
     final PhysicalExplainPlanVisitor visitor = new PhysicalExplainPlanVisitor(dispatchableSubPlan);
@@ -96,15 +95,13 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
         .toString();
   }
 
-  /**
-   * This wrapper prints out contextual info from {@link Context} before invoking {@link PlanNode#explain()}.
-   * The format of the contextual info is always:
-   *   "`PREFIX`[`FRAGMENT_ID`]@`HOSTNAME`:`PORT`|[`WORKER_ID`(s)] `EXPLAIN`"
-   *
-   * @param node the {@link PlanNode} to be explained
-   * @param context the {@link Context} to be wrapped in front ot plan node explain.
-   * @return stringify format of the explained result wrapped with contextual info.
-   */
+  /// This wrapper prints out contextual info from [Context] before invoking [PlanNode#explain()].
+  /// The format of the contextual info is always:
+  ///   "`PREFIX`\[`FRAGMENT_ID`\]@`HOSTNAME`:`PORT`|\[`WORKER_ID`(s)\] `EXPLAIN`"
+  ///
+  /// @param node the [PlanNode] to be explained
+  /// @param context the [Context] to be wrapped in front ot plan node explain.
+  /// @return stringify format of the explained result wrapped with contextual info.
   private StringBuilder appendInfo(PlanNode node, Context context) {
     int stageId = node.getStageId();
     context._builder
@@ -164,13 +161,22 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
     return context._builder;
   }
 
+  @Deprecated(forRemoval = true, since = "1.6.0")
+  @Override
+  public StringBuilder visitEnrichedJoin(EnrichedJoinNode node, Context context) {
+    appendInfo(node, context).append('\n');
+    node.getInputs().get(0).visit(this, context.next(true, context._host, context._workerId));
+    node.getInputs().get(1).visit(this, context.next(false, context._host, context._workerId));
+    return context._builder;
+  }
+
   @Override
   public StringBuilder visitMailboxReceive(MailboxReceiveNode node, Context context) {
     appendInfo(node, context).append('\n');
 
     MailboxSendNode sender = node.getSender();
     int senderStageId = node.getSenderStageId();
-    DispatchablePlanFragment dispatchablePlanFragment = _dispatchableSubPlan.getQueryStageList().get(senderStageId);
+    DispatchablePlanFragment dispatchablePlanFragment = _dispatchableSubPlan.getQueryStageMap().get(senderStageId);
 
     Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =
         dispatchablePlanFragment.getServerInstanceToWorkerIdMap();
@@ -200,26 +206,32 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
     return node.getInputs().get(0).visit(this, context.next(false, context._host, context._workerId));
   }
 
-  /**
-   * Print out mailbox sending info.
-   *
-   * Noted that when print out mailbox sending info. the receiving side follows the contextual info format defined in
-   * {@link PhysicalExplainPlanVisitor#appendInfo(PlanNode, Context)}.
-   *
-   * e.g. the RECEIVERs are printed as:
-   *   "{[`FRAGMENT_ID`]@`HOSTNAME`:`PORT`|[`WORKER_ID`(s)]}" and are comma-separated.
-   */
+  /// Print out mailbox sending info.
+  ///
+  /// Noted that when print out mailbox sending info. the receiving side follows the contextual info format defined in
+  /// [PhysicalExplainPlanVisitor#appendInfo(PlanNode, Context)].
+  ///
+  /// e.g. the RECEIVERs are printed as:
+  ///   "{\[`FRAGMENT_ID`\]@`HOSTNAME`:`PORT`|\[`WORKER_ID`(s)\]}" and are comma-separated.
   private StringBuilder appendMailboxSend(MailboxSendNode node, Context context) {
     appendInfo(node, context);
 
-    int receiverStageId = node.getReceiverStageId();
-    List<MailboxInfo> receiverMailboxInfos =
-        _dispatchableSubPlan.getQueryStageList().get(node.getStageId()).getWorkerMetadataList().get(context._workerId)
-            .getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
+    List<Stream<String>> perStageDescriptions = new ArrayList<>();
+    // This iterator is guaranteed to be sorted by stageId
+    for (Integer receiverStageId : node.getReceiverStageIds()) {
+      List<MailboxInfo> receiverMailboxInfos =
+          _dispatchableSubPlan.getQueryStageMap().get(node.getStageId()).getWorkerMetadataList().get(context._workerId)
+              .getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
+      // Sort to ensure print order
+      Stream<String> stageDescriptions = receiverMailboxInfos.stream()
+          .sorted(Comparator.comparingInt(MailboxInfo::getPort))
+          .map(v -> "[" + receiverStageId + "]@" + v);
+      perStageDescriptions.add(stageDescriptions);
+    }
     context._builder.append("->");
-    // Sort to ensure print order
-    String receivers = receiverMailboxInfos.stream().sorted(Comparator.comparingInt(MailboxInfo::getPort))
-        .map(v -> "[" + receiverStageId + "]@" + v).collect(Collectors.joining(",", "{", "}"));
+    String receivers = perStageDescriptions.stream()
+        .flatMap(Function.identity())
+        .collect(Collectors.joining(",", "{", "}"));
     return context._builder.append(receivers);
   }
 
@@ -237,7 +249,7 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
   public StringBuilder visitTableScan(TableScanNode node, Context context) {
     return appendInfo(node, context)
         .append(' ')
-        .append(_dispatchableSubPlan.getQueryStageList()
+        .append(_dispatchableSubPlan.getQueryStageMap()
             .get(node.getStageId())
             .getWorkerIdToSegmentsMap()
             .get(context._host))
@@ -252,6 +264,11 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
   @Override
   public StringBuilder visitExplained(ExplainedNode node, Context context) {
     return appendInfo(node, context);
+  }
+
+  @Override
+  public StringBuilder visitUnnest(UnnestNode node, Context context) {
+    return visitSimpleNode(node, context);
   }
 
   static class Context {

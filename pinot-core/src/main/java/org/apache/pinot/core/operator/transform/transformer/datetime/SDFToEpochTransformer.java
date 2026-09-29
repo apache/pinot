@@ -18,16 +18,13 @@
  */
 package org.apache.pinot.core.operator.transform.transformer.datetime;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.joda.time.DateTimeZone;
 
 
-/**
- * Date time transformer to transform and bucket date time values from simple date format to epoch format.
- */
+/// Date time transformer to transform and bucket date time values from simple date format to epoch format.
 public class SDFToEpochTransformer extends BaseDateTimeTransformer<String[], long[]> {
 
   public SDFToEpochTransformer(DateTimeFormatSpec inputFormat, DateTimeFormatSpec outputFormat,
@@ -36,7 +33,7 @@ public class SDFToEpochTransformer extends BaseDateTimeTransformer<String[], lon
   }
 
   @Override
-  public void transform(@Nonnull String[] input, @Nonnull long[] output, int length) {
+  public void transform(String[] input, long[] output, int length) {
     if (useCustomBucketingTimeZone()) {
       for (int i = 0; i < length; i++) {
         output[i] = truncateToMillis(toDateWithTZ(transformSDFToMillis(input[i])));

@@ -19,8 +19,10 @@
 package org.apache.pinot.plugin.ingestion.batch.common;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,6 +30,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -44,10 +47,14 @@ public class SegmentGenerationJobUtils implements Serializable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerationJobUtils.class);
 
-  /**
-   * Always use local directory sequence id unless explicitly config: "use.global.directory.sequence.id".
-   *
-   */
+  // Key used to pass the serialized SegmentGenerationJobSpec through a distributed job framework
+  public static final String SEGMENT_GENERATION_JOB_SPEC = "segmentGenerationJobSpec";
+
+  // Field names in the executionFrameworkSpec/extraConfigs section shared across ingestion frameworks
+  public static final String DEPENDENCY_JAR_DIR = "dependencyJarDir";
+  public static final String STAGING_DIR = "stagingDir";
+
+  /// Always use local directory sequence id unless explicitly config: "use.global.directory.sequence.id".
   public static boolean useGlobalDirectorySequenceId(SegmentNameGeneratorSpec spec) {
     if (spec == null || spec.getConfigs() == null) {
       return false;
@@ -91,5 +98,32 @@ public class SegmentGenerationJobUtils implements Serializable {
       outputPinotFS.copyFromLocalFile(localMetadataTarFile, outputMetadataTarURI);
     }
     FileUtils.deleteQuietly(localMetadataTarFile);
+  }
+
+  /// Move all files from the <sourceDir> to the <destDir>, but don't delete existing contents of destDir.
+  /// If <overwrite> is true, and the source file exists in the destination directory, then replace it, otherwise
+  /// log a warning and continue. We assume that source and destination directories are on the same filesystem,
+  /// so that move() can be used.
+  ///
+  /// @param fs
+  /// @param sourceDir
+  /// @param destDir
+  /// @param overwrite
+  /// @throws IOException
+  /// @throws URISyntaxException
+  public static void moveFiles(PinotFS fs, URI sourceDir, URI destDir, boolean overwrite)
+          throws IOException, URISyntaxException {
+    for (String sourcePath : fs.listFiles(sourceDir, true)) {
+      URI sourceFileUri = SegmentGenerationUtils.getFileURI(sourcePath, sourceDir);
+      String sourceFilename = SegmentGenerationUtils.getFileName(sourceFileUri);
+      URI destFileUri =
+              SegmentGenerationUtils.getRelativeOutputPath(sourceDir, sourceFileUri, destDir).resolve(sourceFilename);
+
+      if (!overwrite && fs.exists(destFileUri)) {
+        LOGGER.warn("Can't overwrite existing output segment tar file: {}", destFileUri);
+      } else {
+        fs.move(sourceFileUri, destFileUri, true);
+      }
+    }
   }
 }

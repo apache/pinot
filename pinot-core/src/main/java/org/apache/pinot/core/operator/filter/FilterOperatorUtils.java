@@ -22,13 +22,16 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.OptionalInt;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.core.operator.filter.predicate.BaseDictIdBasedRegexpLikePredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class FilterOperatorUtils {
@@ -44,46 +47,62 @@ public class FilterOperatorUtils {
 
   public interface Implementation {
 
-    /**
-     * Returns the leaf filter operator (i.e. not {@link AndFilterOperator} or {@link OrFilterOperator}).
-     */
+    /// Returns the leaf filter operator (i.e. not [AndFilterOperator] or [OrFilterOperator]).
     BaseFilterOperator getLeafFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
         DataSource dataSource, int numDocs);
 
-    /**
-     * Returns the AND filter operator or equivalent filter operator.
-     */
-    BaseFilterOperator getAndFilterOperator(QueryContext queryContext,
-        List<BaseFilterOperator> filterOperators, int numDocs);
-
-    /**
-     * Returns the OR filter operator or equivalent filter operator.
-     */
-    BaseFilterOperator getOrFilterOperator(QueryContext queryContext,
-        List<BaseFilterOperator> filterOperators, int numDocs);
-
-    /**
-     * Returns the NOT filter operator or equivalent filter operator.
-     */
-    BaseFilterOperator getNotFilterOperator(QueryContext queryContext, BaseFilterOperator filterOperator,
+    /// Returns the AND filter operator or equivalent filter operator.
+    BaseFilterOperator getAndFilterOperator(QueryContext queryContext, List<BaseFilterOperator> filterOperators,
         int numDocs);
+
+    /// Returns the OR filter operator or equivalent filter operator.
+    BaseFilterOperator getOrFilterOperator(QueryContext queryContext, List<BaseFilterOperator> filterOperators,
+        int numDocs);
+
+    /// Returns the NOT filter operator or equivalent filter operator.
+    BaseFilterOperator getNotFilterOperator(QueryContext queryContext, BaseFilterOperator filterOperator, int numDocs);
+  }
+
+  /// Returns the null rows of the column in this segment, or `null` when there is none.
+  ///
+  /// A column reports nulls through its null value vector, which is absent when the segment has none for the column
+  /// and can also be present but empty. Under null handling these are the rows a predicate on the column is UNKNOWN
+  /// over, and the reason a verdict of always true or always false over the column's values does not cover every row.
+  /// A consuming segment hands out a copy of its vector on each read, so callers read it once and keep the result.
+  @Nullable
+  public static ImmutableRoaringBitmap getNullBitmap(DataSource dataSource) {
+    NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
+    if (nullValueVector != null) {
+      ImmutableRoaringBitmap nullBitmap = nullValueVector.getNullBitmap();
+      if (!nullBitmap.isEmpty()) {
+        return nullBitmap;
+      }
+    }
+    return null;
+  }
+
+  /// Returns whether the column holds any null value in this segment, see [#getNullBitmap].
+  public static boolean hasNulls(DataSource dataSource) {
+    return getNullBitmap(dataSource) != null;
   }
 
   public static class DefaultImplementation implements Implementation {
     @Override
     public BaseFilterOperator getLeafFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
         DataSource dataSource, int numDocs) {
+      // The evaluator's verdicts are over the column's real values. With null handling enabled a null row is UNKNOWN
+      // under either verdict, so it is selected by neither the predicate nor its negation: the leaf has to carry the
+      // null rows for the negation to leave them out, instead of collapsing to a constant that knows nothing of them.
       if (predicateEvaluator.isAlwaysFalse()) {
+        ImmutableRoaringBitmap nullBitmap = queryContext.isNullHandlingEnabled() ? getNullBitmap(dataSource) : null;
+        if (nullBitmap != null) {
+          return new BitmapBasedFilterOperator(new MutableRoaringBitmap(), false, numDocs, nullBitmap);
+        }
         return EmptyFilterOperator.getInstance();
       } else if (predicateEvaluator.isAlwaysTrue()) {
-        if (queryContext.isNullHandlingEnabled()) {
-          NullValueVectorReader nullValueVectorReader = dataSource.getNullValueVector();
-          if (nullValueVectorReader != null) {
-            ImmutableRoaringBitmap nullBitmap = nullValueVectorReader.getNullBitmap();
-            if (nullBitmap != null && !nullBitmap.isEmpty()) {
-              return new BitmapBasedFilterOperator(nullBitmap, true, numDocs);
-            }
-          }
+        ImmutableRoaringBitmap nullBitmap = queryContext.isNullHandlingEnabled() ? getNullBitmap(dataSource) : null;
+        if (nullBitmap != null) {
+          return new BitmapBasedFilterOperator(nullBitmap, true, numDocs, nullBitmap);
         }
         return new MatchAllFilterOperator(numDocs);
       }
@@ -106,13 +125,15 @@ public class FilterOperatorUtils {
         }
         return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
       } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
-        if (dataSource.getFSTIndex() != null && dataSource.getDataSourceMetadata().isSorted()
-            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
-          return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
-        }
-        if (dataSource.getFSTIndex() != null && dataSource.getInvertedIndex() != null
-            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
-          return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+        if (predicateEvaluator instanceof BaseDictIdBasedRegexpLikePredicateEvaluator) {
+          if (dataSource.getDataSourceMetadata().isSorted()
+              && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
+            return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+          }
+          if (dataSource.getInvertedIndex() != null
+              && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
+            return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+          }
         }
         return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
       } else {
@@ -159,8 +180,8 @@ public class FilterOperatorUtils {
     }
 
     @Override
-    public BaseFilterOperator getOrFilterOperator(QueryContext queryContext,
-        List<BaseFilterOperator> filterOperators, int numDocs) {
+    public BaseFilterOperator getOrFilterOperator(QueryContext queryContext, List<BaseFilterOperator> filterOperators,
+        int numDocs) {
       List<BaseFilterOperator> childFilterOperators = new ArrayList<>(filterOperators.size());
       for (BaseFilterOperator filterOperator : filterOperators) {
         if (filterOperator.isResultMatchingAll()) {
@@ -195,13 +216,11 @@ public class FilterOperatorUtils {
       return new NotFilterOperator(filterOperator, numDocs, queryContext.isNullHandlingEnabled());
     }
 
-
-    /**
-     * For AND filter operator, reorders its child filter operators based on their cost and puts the ones with
-     * inverted index first in order to reduce the number of documents to be processed.
-     * <p>Special filter operators such as {@link MatchAllFilterOperator} and {@link EmptyFilterOperator} should be
-     * removed from the list before calling this method.
-     */
+    /// For AND filter operator, reorders its child filter operators based on their cost and puts the ones with
+    /// inverted index first in order to reduce the number of documents to be processed.
+    ///
+    /// Special filter operators such as [MatchAllFilterOperator] and [EmptyFilterOperator] should be
+    /// removed from the list before calling this method.
     protected void reorderAndFilterChildOperators(QueryContext queryContext, List<BaseFilterOperator> filterOperators) {
       filterOperators.sort(new Comparator<BaseFilterOperator>() {
         @Override
@@ -219,11 +238,11 @@ public class FilterOperatorUtils {
           if (filterOperator instanceof SortedIndexBasedFilterOperator) {
             return PrioritizedFilterOperator.HIGH_PRIORITY;
           }
-          if (filterOperator instanceof BitmapBasedFilterOperator) {
+          if (filterOperator instanceof BitmapBasedFilterOperator
+              || filterOperator instanceof InvertedIndexFilterOperator) {
             return PrioritizedFilterOperator.MEDIUM_PRIORITY;
           }
           if (filterOperator instanceof RangeIndexBasedFilterOperator
-              || filterOperator instanceof TextContainsFilterOperator
               || filterOperator instanceof TextMatchFilterOperator || filterOperator instanceof JsonMatchFilterOperator
               || filterOperator instanceof H3IndexFilterOperator
               || filterOperator instanceof H3InclusionIndexFilterOperator) {
@@ -265,33 +284,25 @@ public class FilterOperatorUtils {
     }
   }
 
-  /**
-   * Returns the leaf filter operator (i.e. not {@link AndFilterOperator} or {@link OrFilterOperator}).
-   */
+  /// Returns the leaf filter operator (i.e. not [AndFilterOperator] or [OrFilterOperator]).
   public static BaseFilterOperator getLeafFilterOperator(QueryContext queryContext,
       PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
     return _instance.getLeafFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
   }
 
-  /**
-   * Returns the AND filter operator or equivalent filter operator.
-   */
+  /// Returns the AND filter operator or equivalent filter operator.
   public static BaseFilterOperator getAndFilterOperator(QueryContext queryContext,
       List<BaseFilterOperator> filterOperators, int numDocs) {
     return _instance.getAndFilterOperator(queryContext, filterOperators, numDocs);
   }
 
-  /**
-   * Returns the OR filter operator or equivalent filter operator.
-   */
+  /// Returns the OR filter operator or equivalent filter operator.
   public static BaseFilterOperator getOrFilterOperator(QueryContext queryContext,
       List<BaseFilterOperator> filterOperators, int numDocs) {
     return _instance.getOrFilterOperator(queryContext, filterOperators, numDocs);
   }
 
-  /**
-   * Returns the NOT filter operator or equivalent filter operator.
-   */
+  /// Returns the NOT filter operator or equivalent filter operator.
   public static BaseFilterOperator getNotFilterOperator(QueryContext queryContext, BaseFilterOperator filterOperator,
       int numDocs) {
     return _instance.getNotFilterOperator(queryContext, filterOperator, numDocs);

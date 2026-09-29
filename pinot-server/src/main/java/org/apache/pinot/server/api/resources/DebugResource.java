@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -47,27 +48,29 @@ import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.restlet.resources.SegmentServerDebugInfo;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentMetadataUtils;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.stream.PartitionLagState;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/**
- * Debug resource for Pinot Server.
- */
+/// Debug resource for Pinot Server.
 @Api(tags = "Debug", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
@@ -82,6 +85,9 @@ public class DebugResource {
 
   @Inject
   private ServerInstance _serverInstance;
+  @Inject
+  @Named(AdminApiApplication.SERVER_INSTANCE_ID)
+  private String _instanceId;
 
   @GET
   @Path("tables/{tableName}")
@@ -113,7 +119,7 @@ public class DebugResource {
     Map<String, SegmentErrorInfo> segmentErrorsMap = tableDataManager.getSegmentErrors();
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     try {
-      SegmentConsumerInfo segmentConsumerInfo = getSegmentConsumerInfo(segmentDataManager, tableType);
+      SegmentConsumerInfo segmentConsumerInfo = getSegmentConsumerInfo(tableDataManager, segmentDataManager, tableType);
       long segmentSize = getSegmentSize(segmentDataManager);
       SegmentErrorInfo segmentErrorInfo = segmentErrorsMap.get(segmentName);
       return new SegmentServerDebugInfo(segmentName, FileUtils.byteCountToDisplaySize(segmentSize), segmentConsumerInfo,
@@ -134,8 +140,7 @@ public class DebugResource {
   @ApiOperation(value = "Get current resource usage of threads",
       notes = "This is a debug endpoint, and won't maintain backward compatibility")
   public Collection<? extends ThreadResourceTracker> getThreadUsage() {
-    ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
-    return threadAccountant.getThreadResources();
+    return _serverInstance.getThreadAccountant().getThreadResources();
   }
 
   @GET
@@ -144,9 +149,7 @@ public class DebugResource {
   @ApiOperation(value = "Get current resource usage of queries in this service",
       notes = "This is a debug endpoint, and won't maintain backward compatibility")
   public Collection<? extends QueryResourceTracker> getQueryUsage() {
-    ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
-    Collection<? extends QueryResourceTracker> resources = threadAccountant.getQueryResources().values();
-    return resources;
+    return _serverInstance.getThreadAccountant().getQueryResources().values();
   }
 
   private List<SegmentServerDebugInfo> getSegmentServerDebugInfo(String tableNameWithType, TableType tableType) {
@@ -164,7 +167,8 @@ public class DebugResource {
         segmentsWithDataManagers.add(segmentName);
 
         // Get segment consumer info.
-        SegmentConsumerInfo segmentConsumerInfo = getSegmentConsumerInfo(segmentDataManager, tableType);
+        SegmentConsumerInfo segmentConsumerInfo =
+            getSegmentConsumerInfo(tableDataManager, segmentDataManager, tableType);
 
         // Get segment size.
         long segmentSize = getSegmentSize(segmentDataManager);
@@ -197,21 +201,34 @@ public class DebugResource {
   }
 
   private long getSegmentSize(SegmentDataManager segmentDataManager) {
-    return (segmentDataManager instanceof ImmutableSegmentDataManager) ? ((ImmutableSegment) segmentDataManager
-        .getSegment()).getSegmentSizeBytes() : 0;
+    long size = 0;
+    for (IndexSegment segment : segmentDataManager.getReportableSegments()) {
+      if (segment instanceof ImmutableSegment) {
+        size += ((ImmutableSegment) segment).getSegmentSizeBytes();
+      }
+    }
+    return size;
   }
 
-  private SegmentConsumerInfo getSegmentConsumerInfo(SegmentDataManager segmentDataManager, TableType tableType) {
+  private SegmentConsumerInfo getSegmentConsumerInfo(TableDataManager tableDataManager,
+      SegmentDataManager segmentDataManager, TableType tableType) {
     SegmentConsumerInfo segmentConsumerInfo = null;
     if (tableType == TableType.REALTIME) {
       RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-      Map<String, ConsumerPartitionState> partitionStateMap = realtimeSegmentDataManager.getConsumerPartitionState();
+      StreamMetadataProvider streamMetadataProvider =
+          ((RealtimeTableDataManager) (tableDataManager)).getStreamMetadataProvider(realtimeSegmentDataManager);
+      StreamPartitionMsgOffset latestMsgOffset =
+          RealtimeSegmentMetadataUtils.fetchLatestStreamOffset(realtimeSegmentDataManager, streamMetadataProvider);
+      Map<String, ConsumerPartitionState> partitionIdToStateMap =
+          realtimeSegmentDataManager.getConsumerPartitionState(latestMsgOffset);
       Map<String, String> currentOffsets = realtimeSegmentDataManager.getPartitionToCurrentOffset();
-      Map<String, String> upstreamLatest = partitionStateMap.entrySet().stream().collect(
+      Map<String, String> upstreamLatest = partitionIdToStateMap.entrySet().stream().collect(
           Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString()));
       Map<String, String> recordsLagMap = new HashMap<>();
       Map<String, String> availabilityLagMsMap = new HashMap<>();
-      realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap).forEach((k, v) -> {
+      Map<String, PartitionLagState> partitionToLagState =
+          streamMetadataProvider.getCurrentPartitionLagState(partitionIdToStateMap);
+      partitionToLagState.forEach((k, v) -> {
         recordsLagMap.put(k, v.getRecordsLag());
         availabilityLagMsMap.put(k, v.getAvailabilityLagMs());
       });

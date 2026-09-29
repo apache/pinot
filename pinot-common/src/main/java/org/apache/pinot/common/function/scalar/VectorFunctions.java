@@ -22,35 +22,29 @@ import com.google.common.base.Preconditions;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Inbuilt Vector Transformation Functions
- * The functions can be used as UDFs in Query when added in the FunctionRegistry.
- * @ScalarFunction annotation is used with each method for the registration
- *
- * Example usage:
- */
+/// Inbuilt Vector Transformation Functions
+/// The functions can be used as UDFs in Query when added in the FunctionRegistry.
+/// @ScalarFunction annotation is used with each method for the registration
+///
+/// Example usage:
 public class VectorFunctions {
   private VectorFunctions() {
   }
 
-  /**
-   * Returns the cosine distance between two vectors
-   * @param vector1 vector1
-   * @param vector2 vector2
-   * @return cosine distance
-   */
+  /// Returns the cosine distance between two vectors
+  /// @param vector1 vector1
+  /// @param vector2 vector2
+  /// @return cosine distance
   @ScalarFunction
   public static double cosineDistance(float[] vector1, float[] vector2) {
     return cosineDistance(vector1, vector2, Double.NaN);
   }
 
-  /**
-   * Returns the cosine distance between two vectors, with a default value if the norm of either vector is 0.
-   * @param vector1 vector1
-   * @param vector2 vector2
-   * @param defaultValue default value when either vector has a norm of 0
-   * @return cosine distance
-   */
+  /// Returns the cosine distance between two vectors, with a default value if the norm of either vector is 0.
+  /// @param vector1 vector1
+  /// @param vector2 vector2
+  /// @param defaultValue default value when either vector has a norm of 0
+  /// @return cosine distance
   @ScalarFunction
   public static double cosineDistance(float[] vector1, float[] vector2, double defaultValue) {
     validateVectors(vector1, vector2);
@@ -68,12 +62,10 @@ public class VectorFunctions {
     return 1 - (dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2)));
   }
 
-  /**
-   * Returns the inner product between two vectors
-   * @param vector1 vector1
-   * @param vector2 vector2
-   * @return inner product
-   */
+  /// Returns the inner product between two vectors
+  /// @param vector1 vector1
+  /// @param vector2 vector2
+  /// @return inner product
   @ScalarFunction
   public static double innerProduct(float[] vector1, float[] vector2) {
     validateVectors(vector1, vector2);
@@ -84,12 +76,10 @@ public class VectorFunctions {
     return dotProduct;
   }
 
-  /**
-   * Returns the L2 distance between two vectors
-   * @param vector1 vector1
-   * @param vector2 vector2
-   * @return L2 distance
-   */
+  /// Returns the L2 distance between two vectors
+  /// @param vector1 vector1
+  /// @param vector2 vector2
+  /// @return L2 distance
   @ScalarFunction
   public static double l2Distance(float[] vector1, float[] vector2) {
     validateVectors(vector1, vector2);
@@ -100,12 +90,10 @@ public class VectorFunctions {
     return Math.sqrt(distance);
   }
 
-  /**
-   * Returns the L1 distance between two vectors
-   * @param vector1 vector1
-   * @param vector2 vector2
-   * @return L1 distance
-   */
+  /// Returns the L1 distance between two vectors
+  /// @param vector1 vector1
+  /// @param vector2 vector2
+  /// @return L1 distance
   @ScalarFunction
   public static double l1Distance(float[] vector1, float[] vector2) {
     validateVectors(vector1, vector2);
@@ -116,12 +104,10 @@ public class VectorFunctions {
     return distance;
   }
 
-  /**
-   * Returns the Euclidean distance between two vectors
-   * @param vector1 vector1
-   * @param vector2 vector2
-   * @return Euclidean distance
-   */
+  /// Returns the Euclidean distance between two vectors
+  /// @param vector1 vector1
+  /// @param vector2 vector2
+  /// @return Euclidean distance
   @ScalarFunction
   public static double euclideanDistance(float[] vector1, float[] vector2) {
     validateVectors(vector1, vector2);
@@ -132,12 +118,10 @@ public class VectorFunctions {
     return distance;
   }
 
-  /**
-   * Returns the dot product between two vectors
-   * @param vector1 vector1
-   * @param vector2 vector2
-   * @return dot product
-   */
+  /// Returns the dot product between two vectors
+  /// @param vector1 vector1
+  /// @param vector2 vector2
+  /// @return dot product
   @ScalarFunction
   public static double dotProduct(float[] vector1, float[] vector2) {
     validateVectors(vector1, vector2);
@@ -148,22 +132,18 @@ public class VectorFunctions {
     return dotProduct;
   }
 
-  /**
-   * Returns the number of dimensions in a vector
-   * @param vector input vector
-   * @return number of dimensions
-   */
+  /// Returns the number of dimensions in a vector
+  /// @param vector input vector
+  /// @return number of dimensions
   @ScalarFunction
   public static int vectorDims(float[] vector) {
     validateVector(vector);
     return vector.length;
   }
 
-  /**
-   * Returns the norm of a vector
-   * @param vector input vector
-   * @return norm
-   */
+  /// Returns the norm of a vector
+  /// @param vector input vector
+  /// @return norm
   @ScalarFunction
   public static double vectorNorm(float[] vector) {
     validateVector(vector);

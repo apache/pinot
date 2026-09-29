@@ -1,0 +1,270 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.common.cursors;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.CursorResponse;
+import org.apache.pinot.common.response.broker.CursorResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.spi.cursors.ResponseStore;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.TimeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+public abstract class AbstractResponseStore implements ResponseStore {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AbstractResponseStore.class);
+
+  protected String _brokerHost;
+  protected int _brokerPort;
+  protected String _brokerId;
+  protected BrokerMetrics _brokerMetrics;
+  protected long _expirationIntervalInMs;
+
+  protected void init(String brokerHost, int brokerPort, String brokerId, BrokerMetrics brokerMetrics,
+      String expirationTime) {
+    _brokerMetrics = brokerMetrics;
+    _brokerHost = brokerHost;
+    _brokerPort = brokerPort;
+    _brokerId = brokerId;
+    _expirationIntervalInMs = TimeUtils.convertPeriodToMillis(expirationTime);
+  }
+
+  /// Initialize the store.
+  /// @param config Subset configuration of pinot.broker.cursor.response.store.&lt;type&gt;
+  /// @param brokerHost Hostname of the broker where ResponseStore is created
+  /// @param brokerPort Port of the broker where the ResponseStore is created
+  /// @param brokerId ID of the broker where the ResponseStore is created.
+  /// @param brokerMetrics Metrics utility to track cursor metrics.
+  public abstract void init(PinotConfiguration config, String brokerHost, int brokerPort, String brokerId,
+      BrokerMetrics brokerMetrics, String expirationTime)
+      throws Exception;
+
+  /// Get the hostname of the broker where the query is executed
+  /// @return String containing the hostname
+  protected String getBrokerHost() {
+    return _brokerHost;
+  }
+
+  /// Get the port of the broker where the query is executed
+  /// @return int containing the port
+  protected int getBrokerPort() {
+    return _brokerPort;
+  }
+
+  /// Get the expiration interval of a query response.
+  /// @return long containing the expiration interval.
+  protected long getExpirationIntervalInMs() {
+    return _expirationIntervalInMs;
+  }
+
+  /// Write a CursorResponse
+  /// @param requestId Request ID of the response
+  /// @param response The response to write
+  /// @throws Exception Thrown if there is any error while writing the response
+  protected abstract void writeResponse(String requestId, CursorResponse response)
+      throws Exception;
+
+  /// Write a [ResultTable] to the store
+  /// @param requestId Request ID of the response
+  /// @param resultTable The [ResultTable] of the query
+  /// @throws Exception Thrown if there is any error while writing the result table.
+  /// @return Returns the number of bytes written
+  protected abstract long writeResultTable(String requestId, ResultTable resultTable)
+      throws Exception;
+
+  /// Read the response (excluding the [ResultTable]) from the store
+  /// @param requestId Request ID of the response
+  /// @return CursorResponse (without the [ResultTable])
+  /// @throws Exception Thrown if there is any error while reading the response
+  public abstract CursorResponse readResponse(String requestId)
+      throws Exception;
+
+  /// Read the [ResultTable] of a query response
+  /// @param requestId Request ID of the query
+  /// @param offset Offset of the result slice
+  /// @param numRows Number of rows required in the slice
+  /// @return [ResultTable] of the query
+  /// @throws Exception Thrown if there is any error while reading the result table
+  protected abstract ResultTable readResultTable(String requestId, int offset, int numRows)
+      throws Exception;
+
+  // Must only be reached via doDelete(), which is invoked from synchronized delete paths on this instance.
+  protected abstract boolean deleteResponseImpl(String requestId)
+      throws Exception;
+
+  /// Stores the response in the store. [CursorResponse] and [ResultTable] are stored separately.
+  /// @param response Response to be stored
+  /// @throws Exception Thrown if there is any error while storing the response.
+  public void storeResponse(BrokerResponse response)
+      throws Exception {
+    String requestId = response.getRequestId();
+
+    CursorResponse cursorResponse = new CursorResponseNative(response);
+
+    long submissionTimeMs = System.currentTimeMillis();
+    // Initialize all CursorResponse specific metadata
+    cursorResponse.setBrokerHost(getBrokerHost());
+    cursorResponse.setBrokerPort(getBrokerPort());
+    cursorResponse.setSubmissionTimeMs(submissionTimeMs);
+    cursorResponse.setExpirationTimeMs(submissionTimeMs + getExpirationIntervalInMs());
+    cursorResponse.setOffset(0);
+    cursorResponse.setNumRows(response.getNumRowsResultSet());
+
+    try {
+      long bytesWritten = writeResultTable(requestId, response.getResultTable());
+
+      // Remove the resultTable from the response as it is serialized in a data file.
+      cursorResponse.setResultTable(null);
+      cursorResponse.setBytesWritten(bytesWritten);
+      writeResponse(requestId, cursorResponse);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_RESPONSE_STORE_SIZE, bytesWritten);
+    } catch (Exception e) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_WRITE_EXCEPTION, 1);
+      deleteResponse(requestId);
+      throw e;
+    }
+  }
+
+  /// Reads the response from the store and populates it with a slice of the [ResultTable]
+  /// @param requestId Request ID of the query
+  /// @param offset Offset of the result slice
+  /// @param numRows Number of rows required in the slice
+  /// @return A CursorResponse with a slice of the [ResultTable]
+  /// @throws Exception Thrown if there is any error during the operation.
+  public CursorResponse handleCursorRequest(String requestId, int offset, int numRows)
+      throws Exception {
+
+    CursorResponse response;
+    ResultTable resultTable;
+
+    try {
+      response = readResponse(requestId);
+    } catch (Exception e) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_READ_EXCEPTION, 1);
+      throw e;
+    }
+
+    int totalTableRows = response.getNumRowsResultSet();
+
+    if (totalTableRows == 0 && offset == 0) {
+      // TODO: Set a result table with schema and no rows
+      response.setResultTable(null);
+      response.setOffset(0);
+      response.setNumRows(0);
+      return response;
+    } else if (offset >= totalTableRows) {
+      throw new RuntimeException("Offset " + offset + " should be lesser than totalRecords " + totalTableRows);
+    }
+
+    long fetchStartTime = System.currentTimeMillis();
+    try {
+      resultTable = readResultTable(requestId, offset, numRows);
+    } catch (Exception e) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_READ_EXCEPTION, 1);
+      throw e;
+    }
+
+    response.setResultTable(resultTable);
+    response.setCursorFetchTimeMs(System.currentTimeMillis() - fetchStartTime);
+    response.setOffset(offset);
+    response.setNumRows(resultTable.getRows().size());
+    response.setNumRowsResultSet(totalTableRows);
+    return response;
+  }
+
+  /// Returns the list of responses created by the broker.
+  /// Note that the ResponseStore object in a broker should only return responses created by it.
+  /// @return A list of CursorResponse objects created by the specific broker
+  /// @throws Exception Thrown if there is an error during an operation.
+  public List<CursorResponse> getAllStoredResponses()
+      throws Exception {
+    List<CursorResponse> responses = new ArrayList<>();
+
+    for (String requestId : getAllStoredRequestIds()) {
+      responses.add(readResponse(requestId));
+    }
+
+    return responses;
+  }
+
+  /// Deletes all responses expired at or before the given epoch ms cutoff.
+  /// Iterates [#getAllStoredRequestIds()], reads each entry once via [#readResponse(String)] to evaluate
+  /// expiration and obtain `bytesWritten`, then deletes via [#deleteResponseWithKnownBytes(String, long)]
+  /// so metrics are updated without a second metadata read.
+  ///
+  /// @return Number of responses deleted.
+  @Override
+  public int deleteExpiredResponses(long expiredBeforeMs)
+      throws Exception {
+    int deletedCount = 0;
+    for (String requestId : getAllStoredRequestIds()) {
+      try {
+        CursorResponse response = readResponse(requestId);
+        if (response.getExpirationTimeMs() <= expiredBeforeMs) {
+          if (deleteResponseWithKnownBytes(requestId, response.getBytesWritten())) {
+            deletedCount++;
+          }
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Error during expired-response cleanup for requestId={}", requestId, e);
+      }
+    }
+    return deletedCount;
+  }
+
+  @Override
+  public synchronized boolean deleteResponse(String requestId) throws Exception {
+    if (!exists(requestId)) {
+      return false;
+    }
+    long bytesWritten = 0;
+    try {
+      bytesWritten = readResponse(requestId).getBytesWritten();
+    } catch (Exception e) {
+      LOGGER.debug("Could not read response metadata for requestId={} (may have been deleted concurrently)",
+          requestId, e);
+    }
+    return doDelete(requestId, bytesWritten);
+  }
+
+  /// Deletes a response using an already-known bytesWritten value, skipping a redundant readResponse() call.
+  /// Use this when the caller already has the response metadata (for example from cleanup iteration).
+  protected synchronized boolean deleteResponseWithKnownBytes(String requestId, long bytesWritten)
+      throws Exception {
+    if (!exists(requestId)) {
+      return false;
+    }
+    return doDelete(requestId, bytesWritten);
+  }
+
+  // Single source of truth for deleteResponseImpl + metrics. Only called from synchronized methods.
+  private boolean doDelete(String requestId, long bytesWritten) throws Exception {
+    boolean isSucceeded = deleteResponseImpl(requestId);
+    if (isSucceeded && bytesWritten > 0) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_RESPONSE_STORE_SIZE, bytesWritten * -1);
+    }
+    return isSucceeded;
+  }
+}

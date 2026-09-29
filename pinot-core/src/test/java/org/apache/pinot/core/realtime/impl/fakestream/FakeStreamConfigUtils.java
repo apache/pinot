@@ -38,10 +38,8 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 
 
-/**
- * Helper methods to provide fake stream details
- * TODO: make input tar file and pinot schema configurable
- */
+/// Helper methods to provide fake stream details
+/// TODO: make input tar file and pinot schema configurable
 public class FakeStreamConfigUtils {
   private FakeStreamConfigUtils() {
   }
@@ -56,7 +54,7 @@ public class FakeStreamConfigUtils {
   private static final LongMsgOffset SMALLEST_OFFSET = new LongMsgOffset(0);
   private static final LongMsgOffset LARGEST_OFFSET = new LongMsgOffset(Integer.MAX_VALUE);
   private static final String NUM_PARTITIONS_KEY = "num.partitions";
-  private static final int DEFAULT_NUM_PARTITIONS = 2;
+  public static final int DEFAULT_NUM_PARTITIONS = 2;
 
   private static final String STREAM_TYPE = "fakeStream";
   private static final String TOPIC_NAME = "fakeTopic";
@@ -66,9 +64,7 @@ public class FakeStreamConfigUtils {
   public static final int SEGMENT_FLUSH_THRESHOLD_ROWS = 500;
   public static final int MESSAGE_BATCH_SIZE = SEGMENT_FLUSH_THRESHOLD_ROWS;
 
-  /**
-   * Gets default num partitions
-   */
+  /// Gets default num partitions
   static int getNumPartitions(StreamConfig streamConfig) {
     Map<String, String> streamConfigsMap = streamConfig.getStreamConfigsMap();
     String numPartitionsKey =
@@ -79,23 +75,17 @@ public class FakeStreamConfigUtils {
     return DEFAULT_NUM_PARTITIONS;
   }
 
-  /**
-   * Gets smallest offset based on data
-   */
+  /// Gets smallest offset based on data
   static StreamPartitionMsgOffset getSmallestOffset() {
     return SMALLEST_OFFSET;
   }
 
-  /**
-   * Gets largest offset based on data
-   */
+  /// Gets largest offset based on data
   static StreamPartitionMsgOffset getLargestOffset() {
     return LARGEST_OFFSET;
   }
 
-  /**
-   * Unpacks avro tar file
-   */
+  /// Unpacks avro tar file
   static List<File> unpackAvroTarFile(File outputDir)
       throws Exception {
     if (outputDir.exists()) {
@@ -105,25 +95,19 @@ public class FakeStreamConfigUtils {
     return TarCompressionUtils.untar(avroTarFile, outputDir);
   }
 
-  /**
-   * Gets avro schema
-   */
+  /// Gets avro schema
   static File getAvroSchemaFile() {
     return getResourceFile(AVRO_SCHEMA_FILE);
   }
 
-  /**
-   * Gets pinot schema
-   */
+  /// Gets pinot schema
   static Schema getPinotSchema()
       throws IOException {
     File schemaFile = getResourceFile(PINOT_SCHEMA_FILE);
     return Schema.fromFile(schemaFile);
   }
 
-  /**
-   * Gets pinot table
-   */
+  /// Gets pinot table
   static TableConfig getTableConfig() {
     return new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME_WITH_TYPE)
         .setTimeColumnName(TIME_COLUMN_NAME).build();
@@ -135,9 +119,7 @@ public class FakeStreamConfigUtils {
     return new File(TestUtils.getFileFromResourceUrl(resourceURL), fileName);
   }
 
-  /**
-   * Generate fake stream configs for low level stream with custom number of partitions
-   */
+  /// Generate fake stream configs for low level stream with custom number of partitions
   public static StreamConfig getDefaultLowLevelStreamConfigs(int numPartitions) {
     Map<String, String> streamConfigMap = getDefaultStreamConfigs();
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, NUM_PARTITIONS_KEY),
@@ -145,9 +127,7 @@ public class FakeStreamConfigUtils {
     return new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
   }
 
-  /**
-   * Generate fake stream configs for low level stream
-   */
+  /// Generate fake stream configs for low level stream
   public static StreamConfig getDefaultLowLevelStreamConfigs() {
     return getDefaultLowLevelStreamConfigs(DEFAULT_NUM_PARTITIONS);
   }

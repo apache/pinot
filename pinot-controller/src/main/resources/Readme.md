@@ -29,13 +29,18 @@ This package contains code for Pinot Controller UI.
 ```shell
 cd pinot-controller/src/main/resources
 ```
-3. Install Required Packages. Make sure you are using node v16 or more specifically v16.15.0
+3. Switch to Node `v24.14.1`.
+Use nvm to switch to the required Node.js version used by the `frontend-maven-plugin` in `pinot-controller/pom.xml`. This release line ships with npm `11.11.0`. If you don’t have nvm, install it from [here](https://github.com/nvm-sh/nvm).
 ```shell
-npm install 
+nvm use 24.14.1
 ```
-4. Start the Development Server
+4. Install required packages. Make sure you are using Node `v24.14.1`.
+```shell
+npm ci
+```
+5. Start the Development Server
 ```shell
 npm run dev
 ```
 
-5. App should be running on [http://localhost:8080](http://localhost:8080)
+6. App should be running on [http://localhost:8080](http://localhost:8080)

@@ -19,48 +19,46 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
 
 
-/**
- * This test mimic the behavior of combining slow operators, where operation is not done by the timeout. When the
- * combine operator returns, test whether the slow operators are properly interrupted, and if all the slow operators are
- * not running in order to safely release the segment references.
- */
+/// This test mimic the behavior of combining slow operators, where operation is not done by the timeout. When the
+/// combine operator returns, test whether the slow operators are properly interrupted, and if all the slow operators
+/// are not running in order to safely release the segment references.
 @SuppressWarnings("rawtypes")
 public class CombineSlowOperatorsTest {
   private static final int NUM_OPERATORS = 10;
@@ -139,7 +137,7 @@ public class CombineSlowOperatorsTest {
       DataSourceMetadata dsmd = mock(DataSourceMetadata.class);
       when(dsmd.getMinValue()).thenReturn(100L);
       when(dsmd.getMaxValue()).thenReturn(200L);
-      when(seg.getDataSource(anyString())).thenReturn(ds);
+      when(seg.getDataSource(anyString(), any())).thenReturn(ds);
       when(ds.getDataSourceMetadata()).thenReturn(dsmd);
       return seg;
     });
@@ -172,19 +170,12 @@ public class CombineSlowOperatorsTest {
     testCancelCombineOperator(combineOperator, ready);
   }
 
-  private void testCancelCombineOperator(BaseCombineOperator combineOperator, CountDownLatch ready) {
-    AtomicReference<Exception> exp = new AtomicReference<>();
+  private void testCancelCombineOperator(BaseCombineOperator<?> combineOperator, CountDownLatch ready) {
+    AtomicReference<BaseResultsBlock> resultsBlock = new AtomicReference<>();
     // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
     ExecutorService combineExecutor = Executors.newFixedThreadPool(1);
     try {
-      Future<?> future = combineExecutor.submit(() -> {
-        try {
-          return combineOperator.nextBlock();
-        } catch (Exception e) {
-          exp.set(e);
-          throw e;
-        }
-      });
+      Future<?> future = combineExecutor.submit(() -> resultsBlock.set(combineOperator.nextBlock()));
       ready.await();
       // At this point, the combineOperator is or will be waiting on future.get() for all sub operators, and the
       // waiting can be cancelled as below.
@@ -194,20 +185,18 @@ public class CombineSlowOperatorsTest {
     } finally {
       combineExecutor.shutdownNow();
     }
-    TestUtils.waitForCondition((aVoid) -> exp.get() instanceof EarlyTerminationException, 10_000,
+    TestUtils.waitForCondition((aVoid) -> resultsBlock.get() instanceof ExceptionResultsBlock, 10_000,
         "Should have been cancelled");
   }
 
-  /**
-   * NOTE: It is hard to test the logger behavior, but only one error message about the query timeout should be logged
-   *       for each query.
-   */
+  /// NOTE: It is hard to test the logger behavior, but only one error message about the query timeout should be logged
+  ///       for each query.
   private void testCombineOperator(List<Operator> operators, BaseOperator combineOperator) {
     BaseResultsBlock intermediateResultsBlock = (BaseResultsBlock) combineOperator.nextBlock();
-    List<ProcessingException> processingExceptions = intermediateResultsBlock.getProcessingExceptions();
-    assertNotNull(processingExceptions);
-    assertEquals(processingExceptions.size(), 1);
-    assertTrue(processingExceptions.get(0).getMessage().contains(TimeoutException.class.getName()));
+    List<QueryErrorMessage> errMsgs = intermediateResultsBlock.getErrorMessages();
+    assertNotNull(errMsgs);
+    assertEquals(errMsgs.size(), 1);
+    assertEquals(errMsgs.get(0).getErrCode(), QueryErrorCode.EXECUTION_TIMEOUT);
 
     // When the CombineOperator returns, all operators should be either not scheduled or interrupted, and no operator
     // should be running so that the segment references can be safely released
@@ -279,7 +268,7 @@ public class CombineSlowOperatorsTest {
 
     @Override
     public List<Operator> getChildOperators() {
-      return Collections.emptyList();
+      return List.of();
     }
 
     @Override

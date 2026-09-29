@@ -18,17 +18,32 @@
  */
 package org.apache.pinot.controller.api;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.ext.ContextResolver;
+import javax.ws.rs.ext.Provider;
+import org.apache.pinot.common.audit.AuditLogFilter;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.swagger.SwaggerApiListingResource;
 import org.apache.pinot.common.swagger.SwaggerSetupUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AuthenticationFilter;
+import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.core.api.ServiceAutoDiscoveryFeature;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
@@ -36,20 +51,35 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
+import org.glassfish.grizzly.http.server.NetworkListener;
+import org.glassfish.grizzly.monitoring.MonitoringAware;
+import org.glassfish.grizzly.monitoring.MonitoringConfig;
+import org.glassfish.grizzly.threadpool.AbstractThreadPool;
+import org.glassfish.grizzly.threadpool.ThreadPoolConfig;
+import org.glassfish.grizzly.threadpool.ThreadPoolProbe;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
+import org.glassfish.jersey.media.multipart.MultiPartProperties;
+import org.glassfish.jersey.server.ManagedAsyncExecutor;
 import org.glassfish.jersey.server.ResourceConfig;
+import org.glassfish.jersey.spi.ExecutorServiceProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ControllerAdminApiApplication extends ResourceConfig {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerAdminApiApplication.class);
+
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
 
   public static final String START_TIME = "controllerStartTime";
 
   private final String _controllerResourcePackages;
   private final boolean _useHttps;
+  private final boolean _enableSwagger;
   private HttpServer _httpServer;
+  private final ThreadPoolExecutor _managedAsyncExecutor;
 
   public ControllerAdminApiApplication(ControllerConf conf) {
     super();
@@ -60,15 +90,21 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     // TODO See ControllerResponseFilter
     // register(new LoggingFeature());
     _useHttps = Boolean.parseBoolean(conf.getProperty(ControllerConf.CONSOLE_SWAGGER_USE_HTTPS));
+    _enableSwagger = conf.isEnableSwagger();
     if (conf.getProperty(CommonConstants.Controller.CONTROLLER_SERVICE_AUTO_DISCOVERY, false)) {
       register(ServiceAutoDiscoveryFeature.class);
     }
     register(JacksonFeature.class);
     register(MultiPartFeature.class);
+    register(new MultiPartTempDirResolver());
+    register(new MultiPartTempDirGuard());
     register(SwaggerApiListingResource.class);
     register(SwaggerSerializers.class);
     register(new CorsFilter());
     register(AuthenticationFilter.class);
+    register(AuditLogFilter.class);
+    _managedAsyncExecutor = createManagedAsyncExecutor();
+    register(new ManagedAsyncExecutorServiceProvider(_managedAsyncExecutor));
     // property("jersey.config.server.tracing.type", "ALL");
     // property("jersey.config.server.tracing.threshold", "VERBOSE");
   }
@@ -77,7 +113,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     register(binder);
   }
 
-  public void start(List<ListenerConfig> listenerConfigs) {
+  public void start(List<ListenerConfig> listenerConfigs, ControllerMetrics controllerMetrics) {
     _httpServer = ListenerConfigUtil.buildHttpServer(this, listenerConfigs);
 
     try {
@@ -86,8 +122,10 @@ public class ControllerAdminApiApplication extends ResourceConfig {
       throw new RuntimeException("Failed to start http server", e);
     }
     ClassLoader classLoader = ControllerAdminApiApplication.class.getClassLoader();
-    PinotReflectionUtils.runWithLock(() ->
-        SwaggerSetupUtils.setupSwagger("Controller", _controllerResourcePackages, _useHttps, "/", _httpServer));
+    if (_enableSwagger) {
+      PinotReflectionUtils.runWithLock(() ->
+          SwaggerSetupUtils.setupSwagger("Controller", _controllerResourcePackages, _useHttps, "/", _httpServer));
+    }
 
     // This is ugly from typical patterns to setup static resources but all our APIs are
     // at path "/". So, configuring static handler for path "/" does not work well.
@@ -100,6 +138,10 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     _httpServer.getServerConfiguration()
         .addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/images/"), "/images/");
     _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/js/"), "/js/");
+    _httpServer.getServerConfiguration()
+            .addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/assets/"), "/assets/");
+    registerHttpThreadUtilizationGauge(controllerMetrics);
+    registerManagedAsyncThreadGauges(controllerMetrics);
   }
 
   public void stop() {
@@ -107,6 +149,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
       return;
     }
     _httpServer.shutdownNow();
+    _managedAsyncExecutor.shutdown();
   }
 
   private class CorsFilter implements ContainerResponseFilter {
@@ -125,5 +168,127 @@ public class ControllerAdminApiApplication extends ResourceConfig {
 
   public HttpServer getHttpServer() {
     return _httpServer;
+  }
+
+  /// Registers a gauge that tracks HTTP thread pool utilization without using reflection.
+  /// Instead, it uses a custom ThreadPoolProbe to count active threads.
+  private void registerHttpThreadUtilizationGauge(ControllerMetrics metrics) {
+    NetworkListener listener = _httpServer.getListeners().iterator().next();
+    ExecutorService executor = listener.getTransport().getWorkerThreadPool();
+    ThreadPoolConfig poolCfg = listener.getTransport().getWorkerThreadPoolConfig();
+
+    ActiveThreadProbe probe = new ActiveThreadProbe();
+    // Try to attach probe to the executor if it supports monitoring
+    if (executor instanceof MonitoringAware) {
+      @SuppressWarnings("unchecked")
+      MonitoringConfig<ThreadPoolProbe> mc = ((MonitoringAware<ThreadPoolProbe>) executor).getMonitoringConfig();
+      mc.addProbes(probe);
+    }
+
+    metrics.setOrUpdateGauge(ControllerGauge.HTTP_THREAD_UTILIZATION.getGaugeName(), () -> {
+      int max = poolCfg.getMaxPoolSize();
+      if (max <= 0) {
+        return 0L;
+      }
+      return Math.round(probe.getActiveCount() * 100.0 / max);
+    });
+  }
+
+  private void registerManagedAsyncThreadGauges(ControllerMetrics metrics) {
+    metrics.setOrUpdateGauge(ControllerGauge.MANAGED_ASYNC_ACTIVE_THREADS.getGaugeName(),
+        () -> (long) _managedAsyncExecutor.getActiveCount());
+  }
+
+  private ThreadPoolExecutor createManagedAsyncExecutor() {
+    ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("managed-async-%d").build();
+    return (ThreadPoolExecutor) Executors.newCachedThreadPool(threadFactory);
+  }
+
+  /// Custom probe to track busy threads in Grizzly thread pools without using reflection.
+  public static final class ActiveThreadProbe extends ThreadPoolProbe.Adapter {
+    private final AtomicInteger _active = new AtomicInteger();
+
+    @Override
+    public void onTaskDequeueEvent(AbstractThreadPool pool, Runnable task) {
+      // one more thread just got real work
+      _active.incrementAndGet();
+    }
+
+    @Override
+    public void onTaskCompleteEvent(AbstractThreadPool pool, Runnable task) {
+      // work finished, thread is idle again
+      _active.decrementAndGet();
+    }
+
+    /// Current number of active threads.
+    public int getActiveCount() {
+      return _active.get();
+    }
+  }
+
+  @Provider
+  @ManagedAsyncExecutor
+  private static final class ManagedAsyncExecutorServiceProvider implements ExecutorServiceProvider {
+    private final ExecutorService _executorService;
+
+    private ManagedAsyncExecutorServiceProvider(ExecutorService executorService) {
+      _executorService = executorService;
+    }
+
+    @Override
+    public ExecutorService getExecutorService() {
+      return _executorService;
+    }
+
+    @Override
+    public void dispose(ExecutorService executorService) {
+      // managed in ControllerAdminApiApplication.stop()
+    }
+  }
+
+  /// Points Jersey's multipart parser at the controller's own temporary directory instead of `java.io.tmpdir`.
+  ///
+  /// Jersey buffers any part larger than its threshold to disk, but only registers the parsed `MultiPart` with the
+  /// request's `CloseableService` after parsing succeeds. A request that fails to parse — a truncated upload, a
+  /// client disconnect, a malformed `Content-Disposition` — therefore leaves its spilled parts behind, and for
+  /// segment uploads those are the size of the segment. Directing them at the controller's temp tree means the
+  /// startup clean in [ControllerFilePathProvider] reclaims them rather than leaving them on the host forever.
+  @VisibleForTesting
+  static class MultiPartTempDirResolver implements ContextResolver<MultiPartProperties> {
+    @Override
+    public MultiPartProperties getContext(Class<?> type) {
+      MultiPartProperties properties = new MultiPartProperties();
+      try {
+        return properties.tempDir(ControllerFilePathProvider.getInstance().getMultiPartTempDir().getAbsolutePath());
+      } catch (Exception e) {
+        // Falling back is still better than failing every upload, but it is not a per-request fallback: this runs
+        // once at startup, so the controller is stuck with java.io.tmpdir until it restarts.
+        LOGGER.error("Failed to resolve the multipart temporary directory. Multipart uploads will spill into the JVM "
+            + "default temporary directory for the lifetime of this controller, where orphaned parts are never "
+            + "reclaimed", e);
+        return properties;
+      }
+    }
+  }
+
+  /// Re-creates the multipart temporary directory if it has gone missing since [MultiPartTempDirResolver] resolved it.
+  /// Only multipart requests pay for this, and only the cost of a `stat` when the directory is present.
+  @Provider
+  @VisibleForTesting
+  static class MultiPartTempDirGuard implements ContainerRequestFilter {
+    @Override
+    public void filter(ContainerRequestContext requestContext) {
+      MediaType mediaType = requestContext.getMediaType();
+      if (mediaType == null || !mediaType.getType().equalsIgnoreCase("multipart")) {
+        return;
+      }
+      try {
+        ControllerFilePathProvider.getInstance().getMultiPartTempDir();
+      } catch (Exception e) {
+        // Leave the request alone: if the directory really is unusable the parse fails with its own error, and this
+        // guard must not be the thing that rejects an otherwise valid upload.
+        LOGGER.warn("Failed to ensure the multipart temporary directory exists", e);
+      }
+    }
   }
 }

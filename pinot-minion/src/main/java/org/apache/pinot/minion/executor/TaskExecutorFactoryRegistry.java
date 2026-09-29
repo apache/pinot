@@ -28,24 +28,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Registry for all {@link PinotTaskExecutorFactory}.
- */
+/// Registry for all [PinotTaskExecutorFactory].
 public class TaskExecutorFactoryRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(TaskExecutorFactoryRegistry.class);
 
-  /**
-   * The package regex pattern for auto-registered {@link PinotTaskExecutorFactory}.
-   */
+  /// The package regex pattern for auto-registered [PinotTaskExecutorFactory].
   private static final String TASK_EXECUTOR_FACTORY_PACKAGE_REGEX_PATTERN = ".*\\.plugin\\.minion\\.tasks\\..*";
 
   private final Map<String, PinotTaskExecutorFactory> _taskExecutorFactoryRegistry = new HashMap<>();
 
-  /**
-   * Registers the task executor factories via reflection.
-   * NOTE: In order to plugin a class using reflection, the class should include ".plugin.minion.tasks." in its class
-   * path. This convention can significantly reduce the time of class scanning.
-   */
+  /// Registers the task executor factories via reflection.
+  /// NOTE: In order to plugin a class using reflection, the class should include ".plugin.minion.tasks." in its class
+  /// path. This convention can significantly reduce the time of class scanning.
   public TaskExecutorFactoryRegistry(MinionTaskZkMetadataManager zkMetadataManager, MinionConf minionConf) {
     long startTimeMs = System.currentTimeMillis();
     Set<Class<?>> classes = getTaskExecutorFactoryClasses();
@@ -53,7 +47,8 @@ public class TaskExecutorFactoryRegistry {
       TaskExecutorFactory annotation = clazz.getAnnotation(TaskExecutorFactory.class);
       if (annotation.enabled()) {
         try {
-          PinotTaskExecutorFactory taskExecutorFactory = (PinotTaskExecutorFactory) clazz.newInstance();
+          PinotTaskExecutorFactory taskExecutorFactory =
+              (PinotTaskExecutorFactory) clazz.getDeclaredConstructor().newInstance();
           taskExecutorFactory.init(zkMetadataManager, minionConf);
           registerTaskExecutorFactory(taskExecutorFactory);
         } catch (Exception e) {
@@ -72,23 +67,17 @@ public class TaskExecutorFactoryRegistry {
         .getClassesThroughReflection(TASK_EXECUTOR_FACTORY_PACKAGE_REGEX_PATTERN, TaskExecutorFactory.class);
   }
 
-  /**
-   * Registers a task executor factory.
-   */
+  /// Registers a task executor factory.
   public void registerTaskExecutorFactory(PinotTaskExecutorFactory taskExecutorFactory) {
     _taskExecutorFactoryRegistry.put(taskExecutorFactory.getTaskType(), taskExecutorFactory);
   }
 
-  /**
-   * Returns all registered task types.
-   */
+  /// Returns all registered task types.
   public Set<String> getAllTaskTypes() {
     return _taskExecutorFactoryRegistry.keySet();
   }
 
-  /**
-   * Returns the task executor factory for the given task type.
-   */
+  /// Returns the task executor factory for the given task type.
   public PinotTaskExecutorFactory getTaskExecutorFactory(String taskType) {
     return _taskExecutorFactoryRegistry.get(taskType);
   }

@@ -25,26 +25,22 @@ import java.util.stream.Collectors;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.plan.ExplainInfo;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.core.query.killing.QueryKillingManager;
+import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryScanCostContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
 
 
-/**
- * Any other Pinot Operators should extend BaseOperator
- */
+/// Any other Pinot Operators should extend BaseOperator
 public abstract class BaseOperator<T extends Block> implements Operator<T> {
 
   @Override
   public final T nextBlock() {
-    /* Worker also checks its corresponding runner thread's interruption periodically, worker will abort if it finds
-       runner's flag is raised. If the runner thread has already acted upon the flag and reset it, then the runner
-       itself will cancel all worker's futures. Therefore, the worker will interrupt even if we only kill the runner
-       thread. */
-    if (Tracing.ThreadAccountantOps.isInterrupted()) {
-      throw new EarlyTerminationException("Interrupted while processing next block");
-    }
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
+      checkTermination();
       return getNextBlock();
     }
   }
@@ -57,6 +53,43 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
     ExplainAttributeBuilder attributeBuilder = new ExplainAttributeBuilder();
     explainAttributes(attributeBuilder);
     return new ExplainInfo(getExplainName(), attributeBuilder.build(), getChildrenExplainInfo());
+  }
+
+  protected void checkTermination() {
+    QueryThreadContext.checkTermination(this::getExplainName);
+    checkScanBasedKilling();
+  }
+
+  protected void checkTerminationAndSampleUsage() {
+    QueryThreadContext.checkTerminationAndSampleUsage(this::getExplainName);
+    checkScanBasedKilling();
+  }
+
+  private void checkScanBasedKilling() {
+    QueryKillingManager killingManager = QueryKillingManager.getInstance();
+    if (killingManager == null) {
+      return;
+    }
+    QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
+    if (ctx == null) {
+      return;
+    }
+    QueryExecutionContext execCtx = ctx.getExecutionContext();
+    QueryScanCostContext scanCost = execCtx.getQueryScanCostContext();
+    if (scanCost == null) {
+      return;
+    }
+    killingManager.checkAndKillIfNeeded(execCtx, scanCost);
+    TerminationException te = execCtx.getTerminateException();
+    if (te != null) {
+      throw te;
+    }
+  }
+
+  @javax.annotation.Nullable
+  protected static QueryScanCostContext getScanCostContext() {
+    QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
+    return ctx != null ? ctx.getExecutionContext().getQueryScanCostContext() : null;
   }
 
   protected List<ExplainInfo> getChildrenExplainInfo() {

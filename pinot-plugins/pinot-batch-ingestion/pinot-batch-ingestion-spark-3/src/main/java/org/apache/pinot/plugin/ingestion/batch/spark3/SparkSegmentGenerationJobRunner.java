@@ -67,8 +67,6 @@ import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY
 public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Serializable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SparkSegmentGenerationJobRunner.class);
-  private static final String DEPS_JAR_DIR = "dependencyJarDir";
-  private static final String STAGING_DIR = "stagingDir";
 
   private SegmentGenerationJobSpec _spec;
 
@@ -155,7 +153,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
     outputDirFS.mkdir(outputDirURI);
 
     //Get staging directory for temporary output pinot segments
-    String stagingDir = _spec.getExecutionFrameworkSpec().getExtraConfigs().get(STAGING_DIR);
+    String stagingDir =
+        _spec.getExecutionFrameworkSpec().getExtraConfigs().get(SegmentGenerationJobUtils.STAGING_DIR);
     URI stagingDirURI = null;
     if (stagingDir != null) {
       stagingDirURI = URI.create(stagingDir);
@@ -163,9 +162,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         stagingDirURI = new File(stagingDir).toURI();
       }
       if (!outputDirURI.getScheme().equals(stagingDirURI.getScheme())) {
-        throw new RuntimeException(
-            String.format("The scheme of staging directory URI [%s] and output directory URI [%s] has to be same.",
-                stagingDirURI, outputDirURI));
+        throw new RuntimeException("The scheme of staging directory URI [" + stagingDirURI + "] and output directory "
+            + "URI [" + outputDirURI + "] has to be same.");
       }
       outputDirFS.mkdir(stagingDirURI);
     }
@@ -179,9 +177,10 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       packPluginsToDistributedCache(sparkContext);
 
       // Add dependency jars
-      if (_spec.getExecutionFrameworkSpec().getExtraConfigs().containsKey(DEPS_JAR_DIR)) {
+      if (_spec.getExecutionFrameworkSpec().getExtraConfigs()
+          .containsKey(SegmentGenerationJobUtils.DEPENDENCY_JAR_DIR)) {
         addDepsJarToDistributedCache(sparkContext,
-            _spec.getExecutionFrameworkSpec().getExtraConfigs().get(DEPS_JAR_DIR));
+            _spec.getExecutionFrameworkSpec().getExtraConfigs().get(SegmentGenerationJobUtils.DEPENDENCY_JAR_DIR));
       }
 
       List<String> pathAndIdxList = new ArrayList<>();
@@ -198,12 +197,12 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
           List<String> siblingFiles = localDirIndex.get(parentPath);
           Collections.sort(siblingFiles);
           for (int i = 0; i < siblingFiles.size(); i++) {
-            pathAndIdxList.add(String.format("%s %d", siblingFiles.get(i), i));
+            pathAndIdxList.add(siblingFiles.get(i) + " " + i);
           }
         }
       } else {
         for (int i = 0; i < filteredFiles.size(); i++) {
-          pathAndIdxList.add(String.format("%s %d", filteredFiles.get(i), i));
+          pathAndIdxList.add(filteredFiles.get(i) + " " + i);
         }
       }
       int numDataFiles = pathAndIdxList.size();
@@ -226,7 +225,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
             throws Exception {
           PluginManager.get().init();
           for (PinotFSSpec pinotFSSpec : _spec.getPinotFSSpecs()) {
-            PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
+            PinotFSFactory.registerIfNeeded(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
                 new PinotConfiguration(pinotFSSpec));
           }
           PinotFS finalOutputDirFS = PinotFSFactory.create(finalOutputDirURI.getScheme());
@@ -279,9 +278,11 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
           taskSpec.setOutputDirectoryPath(localOutputTempDir.getAbsolutePath());
           taskSpec.setRecordReaderSpec(_spec.getRecordReaderSpec());
           taskSpec.setSchema(
-              SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI(), _spec.getAuthToken()));
+              SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI(), _spec.getAuthToken(),
+                  _spec.getTlsSpec()));
           taskSpec.setTableConfig(
-              SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), _spec.getAuthToken()));
+              SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), _spec.getAuthToken(),
+                  _spec.getTlsSpec()));
           taskSpec.setSequenceId(idx);
           taskSpec.setSegmentNameGeneratorSpec(_spec.getSegmentNameGeneratorSpec());
           taskSpec.setFailOnEmptySegment(_spec.isFailOnEmptySegment());
@@ -326,9 +327,9 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         }
       });
       if (stagingDirURI != null) {
-        LOGGER.info("Trying to copy segment tars from staging directory: [{}] to output directory [{}]", stagingDirURI,
+        LOGGER.info("Trying to move segment tars from staging directory: [{}] to output directory [{}]", stagingDirURI,
             outputDirURI);
-        outputDirFS.copyDir(stagingDirURI, outputDirURI);
+        SegmentGenerationJobUtils.moveFiles(outputDirFS, stagingDirURI, outputDirURI, true);
       }
     } finally {
       if (stagingDirURI != null) {
@@ -365,7 +366,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       return;
     }
 
-    ArrayList<File> validPluginDirectories = new ArrayList();
+    ArrayList<File> validPluginDirectories = new ArrayList<>();
 
     for (String pluginsDirPath : pluginDirectories) {
       File pluginsDir = new File(pluginsDirPath);

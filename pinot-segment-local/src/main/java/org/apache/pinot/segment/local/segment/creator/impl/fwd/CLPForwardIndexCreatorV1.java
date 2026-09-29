@@ -40,24 +40,21 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPre
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
-import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Writer for CLP forward index.
- * <p>CLP forward index contains 3 parts:
- * <ul>
- *   <li>Header bytes: MAGIC_BYTES, version, </li>
- *   <li>LogType dictionary: dictionary for logType column</li>
- *   <li>DictVars dictionary: dictionary for dictVars column</li>
- *   <li>LogType fwd index: fwd index for logType column</li>
- *   <li>DictVars fwd index: fwd index for dictVars column</li>
- *   <li>EncodedVars fwd index: raw fwd index for encodedVars column</li>
- * </ul>
- */
+/// Writer for CLP forward index.
+///
+/// CLP forward index contains 3 parts:
+///
+/// - Header bytes: MAGIC_BYTES, version,
+/// - LogType dictionary: dictionary for logType column
+/// - DictVars dictionary: dictionary for dictVars column
+/// - LogType fwd index: fwd index for logType column
+/// - DictVars fwd index: fwd index for dictVars column
+/// - EncodedVars fwd index: raw fwd index for encodedVars column
 
-public class CLPForwardIndexCreatorV1 implements ForwardIndexCreator {
+public class CLPForwardIndexCreatorV1 implements CompressionStatsTrackingForwardIndexCreator {
   public static final byte[] MAGIC_BYTES = "CLP.v1".getBytes(StandardCharsets.UTF_8);
   private final String _column;
   private final int _numDocs;
@@ -77,6 +74,8 @@ public class CLPForwardIndexCreatorV1 implements ForwardIndexCreator {
   private final File _logTypeFwdIndexFile;
   private final File _dictVarsFwdIndexFile;
   private final File _encodedVarsFwdIndexFile;
+  private boolean _trackUncompressedValueSize;
+  private long _uncompressedValueSize;
 
   public CLPForwardIndexCreatorV1(File baseIndexDir, String column, int numDocs, ColumnStatistics columnStatistics)
       throws IOException {
@@ -145,6 +144,21 @@ public class CLPForwardIndexCreatorV1 implements ForwardIndexCreator {
   }
 
   @Override
+  public long getRawForwardIndexUncompressedValueSizeInBytes() {
+    return _trackUncompressedValueSize ? _uncompressedValueSize : -1;
+  }
+
+  @Override
+  public ChunkCompressionType getRawForwardIndexChunkCompressionType() {
+    return ChunkCompressionType.PASS_THROUGH;
+  }
+
+  @Override
+  public void enableRawForwardIndexUncompressedValueSizeTracking() {
+    _trackUncompressedValueSize = true;
+  }
+
+  @Override
   public void putBigDecimal(BigDecimal value) {
     throw new UnsupportedOperationException("Non string types are not supported");
   }
@@ -157,6 +171,9 @@ public class CLPForwardIndexCreatorV1 implements ForwardIndexCreator {
 
     try {
       _clpMessageEncoder.encodeMessage(value, _clpEncodedMessage);
+      if (_trackUncompressedValueSize) {
+        _uncompressedValueSize += _clpEncodedMessage.getMessage().length;
+      }
       logtype = _clpEncodedMessage.getLogTypeAsString();
       dictVars = _clpEncodedMessage.getDictionaryVarsAsStrings();
       encodedVars = _clpEncodedMessage.getEncodedVarsAsBoxedLongs();

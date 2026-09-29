@@ -25,12 +25,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.Topics;
 import org.apache.pulsar.client.api.Message;
@@ -41,7 +43,7 @@ import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.api.TopicMetadata;
 import org.apache.pulsar.client.impl.BatchMessageIdImpl;
-import org.testcontainers.containers.PulsarContainer;
+import org.testcontainers.pulsar.PulsarContainer;
 import org.testcontainers.utility.DockerImageName;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -49,12 +51,14 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
 public class PulsarConsumerTest {
   private static final DockerImageName PULSAR_IMAGE = DockerImageName.parse("apachepulsar/pulsar:3.2.2");
+  // The image defaults to 6 GiB, which can exhaust the Docker VM when unit tests use multiple forks.
+  private static final String PULSAR_MEMORY = "-Xms512m -Xmx1g -XX:MaxDirectMemorySize=1g";
+  private static final Duration PULSAR_STARTUP_TIMEOUT = Duration.ofMinutes(10);
   public static final String TABLE_NAME_WITH_TYPE = "tableName_REALTIME";
   public static final String TEST_TOPIC = "test-topic";
   public static final String TEST_TOPIC_BATCH = "test-topic-batch";
@@ -74,7 +78,8 @@ public class PulsarConsumerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    _pulsar = new PulsarContainer(PULSAR_IMAGE).withStartupTimeout(Duration.ofMinutes(5));
+    _pulsar = new PulsarContainer(PULSAR_IMAGE).withEnv("PULSAR_MEM", PULSAR_MEMORY)
+        .withStartupTimeout(PULSAR_STARTUP_TIMEOUT);
     _pulsar.start();
     try (PulsarAdmin admin = PulsarAdmin.builder().serviceHttpUrl(_pulsar.getHttpServiceUrl()).build()) {
       Topics topics = admin.topics();
@@ -87,10 +92,12 @@ public class PulsarConsumerTest {
     }
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    _pulsar.stop();
+    if (_pulsar != null) {
+      _pulsar.stop();
+    }
   }
 
   public void publishRecords(PulsarClient client)
@@ -150,9 +157,9 @@ public class PulsarConsumerTest {
   public StreamConfig getStreamConfig(String topicName) {
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", "pulsar");
-    streamConfigMap.put("stream.pulsar.consumer.type", "simple");
     streamConfigMap.put("stream.pulsar.topic.name", topicName);
     streamConfigMap.put("stream.pulsar.bootstrap.servers", _pulsar.getPulsarBrokerUrl());
+    streamConfigMap.put("stream.pulsar.serviceHttpUrl", _pulsar.getHttpServiceUrl());
     streamConfigMap.put("stream.pulsar.consumer.prop.auto.offset.reset", "smallest");
     streamConfigMap.put("stream.pulsar.consumer.factory.class.name", PulsarConsumerFactory.class.getName());
     streamConfigMap.put("stream.pulsar.decoder.class.name", "dummy");
@@ -208,6 +215,18 @@ public class PulsarConsumerTest {
     }
   }
 
+  @Test
+  public void testGetTopics() throws Exception {
+    try (PulsarStreamMetadataProvider metadataProvider = new PulsarStreamMetadataProvider(CLIENT_ID,
+        getStreamConfig("NON_EXISTING_TOPIC"))) {
+      List<StreamMetadataProvider.TopicMetadata> topics = metadataProvider.getTopics();
+      List<String> topicNames = topics.stream()
+          .map(StreamMetadataProvider.TopicMetadata::getName)
+          .collect(Collectors.toList());
+      assertTrue(topicNames.size() == 4);
+    }
+  }
+
   private void testConsumer(PulsarPartitionLevelConsumer consumer, int startIndex, List<MessageId> messageIds) {
     MessageId startMessageId = startIndex == 0 ? MessageId.earliest : messageIds.get(startIndex);
     int numMessagesFetched = startIndex;
@@ -216,6 +235,7 @@ public class PulsarConsumerTest {
           consumer.fetchMessages(new MessageIdStreamOffset(startMessageId), CONSUMER_FETCH_TIMEOUT_MILLIS);
       int messageCount = messageBatch.getMessageCount();
       assertFalse(messageBatch.isEndOfPartitionGroup());
+      assertTrue(messageBatch.getSizeInBytes() > 0);
       for (int i = 0; i < messageCount; i++) {
         verifyMessage(messageBatch.getStreamMessage(i), numMessagesFetched + i, messageIds);
       }
@@ -230,11 +250,8 @@ public class PulsarConsumerTest {
   private void verifyMessage(BytesStreamMessage streamMessage, int index, List<MessageId> messageIds) {
     assertEquals(new String(streamMessage.getValue()), MESSAGE_PREFIX + index);
     StreamMessageMetadata messageMetadata = streamMessage.getMetadata();
-    assertNotNull(messageMetadata);
     MessageIdStreamOffset offset = (MessageIdStreamOffset) messageMetadata.getOffset();
-    assertNotNull(offset);
     MessageIdStreamOffset nextOffset = (MessageIdStreamOffset) messageMetadata.getNextOffset();
-    assertNotNull(nextOffset);
     assertEquals(offset.getMessageId(), messageIds.get(index));
     if (index < NUM_RECORDS_PER_PARTITION - 1) {
       assertEquals(nextOffset.getMessageId(), messageIds.get(index + 1));

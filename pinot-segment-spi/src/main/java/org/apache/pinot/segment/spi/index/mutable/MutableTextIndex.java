@@ -18,19 +18,19 @@
  */
 package org.apache.pinot.segment.spi.index.mutable;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 
 
 public interface MutableTextIndex extends TextIndexReader, MutableIndex {
+
   @Override
-  default void add(@Nonnull Object value, int dictId, int docId) {
+  default void add(Object value, int dictId, int docId) {
     add((String) value);
   }
 
   @Override
-  default void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId) {
+  default void add(Object[] values, @Nullable int[] dictIds, int docId) {
     if (values instanceof String[]) {
       add((String[]) values);
       return;
@@ -44,15 +44,11 @@ public interface MutableTextIndex extends TextIndexReader, MutableIndex {
     add(strings);
   }
 
-  /**
-   * Index the document
-   * @param document the document as a string
-   */
+  /// Index the document
+  /// @param document the document as a string
   void add(String document);
 
-  /**
-   * Index the multi-value document
-   * @param documents the documents as an array of strings
-   */
+  /// Index the multi-value document
+  /// @param documents the documents as an array of strings
   void add(String[] documents);
 }

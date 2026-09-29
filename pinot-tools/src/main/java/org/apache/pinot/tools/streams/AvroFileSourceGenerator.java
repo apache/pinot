@@ -42,11 +42,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Generates Pinot Real Time Source by an AvroFile.
- * It will keep looping the same file and produce data output. We can pass in a lambda function to compute
- * time index based on row number.
- */
+/// Generates Pinot Real Time Source by an AvroFile.
+/// It will keep looping the same file and produce data output. We can pass in a lambda function to compute
+/// time index based on row number.
 public class AvroFileSourceGenerator implements PinotSourceDataGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSourceGenerator.class);
   private DataFileStream<GenericRecord> _avroDataStream;
@@ -58,23 +56,19 @@ public class AvroFileSourceGenerator implements PinotSourceDataGenerator {
   private final File _avroFile;
   private final int _rowsPerBatch;
 
-  /**
-   * Reads the avro file, produce the rows, and then keep looping without setting time index
-   * @param pinotSchema the Pinot Schema so the avro rows can be produced
-   * @param avroFile the avro file as source.
-   */
+  /// Reads the avro file, produce the rows, and then keep looping without setting time index
+  /// @param pinotSchema the Pinot Schema so the avro rows can be produced
+  /// @param avroFile the avro file as source.
   public AvroFileSourceGenerator(Schema pinotSchema, File avroFile) {
     this(pinotSchema, avroFile, 1, null, null);
   }
 
-  /**
-   * Reads the avro file, produce the rows, and keep looping, allows customization of time index by a lambda function
-   * @param pinotSchema the Pinot Schema so the avro rows can be produced
-   * @param avroFile the avro file as source.
-   * @param rowsPerBatch in one batch, return several rows at the same time
-   * @param timeColumnName the time column name for customizing/overriding time index. Null for skipping customization.
-   * @param rowNumberToTimeIndex the lambda to compute time index based on row number. Null for skipping customization.
-   */
+  /// Reads the avro file, produce the rows, and keep looping, allows customization of time index by a lambda function
+  /// @param pinotSchema the Pinot Schema so the avro rows can be produced
+  /// @param avroFile the avro file as source.
+  /// @param rowsPerBatch in one batch, return several rows at the same time
+  /// @param timeColumnName the time column name for customizing/overriding time index. Null for skipping customization.
+  /// @param rowNumberToTimeIndex the lambda to compute time index based on row number. Null for skipping customization.
   public AvroFileSourceGenerator(Schema pinotSchema, File avroFile, int rowsPerBatch,
       @Nullable String timeColumnName, @Nullable Function<Long, Long> rowNumberToTimeIndex) {
     _pinotSchema = pinotSchema;

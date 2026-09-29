@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.startree.v2.builder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,9 +43,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * The {@code StarTreeV2BuilderConfig} class contains the configuration for star-tree builder.
- */
+/// The `StarTreeV2BuilderConfig` class contains the configuration for star-tree builder.
 public class StarTreeV2BuilderConfig {
   public static final int DEFAULT_MAX_LEAF_RECORDS = 10_000;
 
@@ -58,8 +55,10 @@ public class StarTreeV2BuilderConfig {
   private final Set<String> _skipStarNodeCreationForDimensions;
   private final TreeMap<AggregationFunctionColumnPair, AggregationSpec> _aggregationSpecs;
   private final int _maxLeafRecords;
+  private final boolean _nullHandlingEnabled;
 
   public static StarTreeV2BuilderConfig fromIndexConfig(StarTreeIndexConfig indexConfig) {
+    boolean nullHandlingEnabled = indexConfig.isNullHandlingEnabled();
     List<String> dimensionsSplitOrder = indexConfig.getDimensionsSplitOrder();
 
     Set<String> skipStarNodeCreationForDimensions;
@@ -69,13 +68,13 @@ public class StarTreeV2BuilderConfig {
           "Can not skip star-node creation for dimensions not in the split order, dimensionsSplitOrder: %s, "
               + "skipStarNodeCreationForDimensions: %s", dimensionsSplitOrder, skipStarNodeCreationForDimensions);
     } else {
-      skipStarNodeCreationForDimensions = Collections.emptySet();
+      skipStarNodeCreationForDimensions = Set.of();
     }
     TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = new TreeMap<>();
     if (indexConfig.getFunctionColumnPairs() != null) {
       for (String functionColumnPair : indexConfig.getFunctionColumnPairs()) {
         AggregationFunctionColumnPair aggregationFunctionColumnPair =
-            AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
+            AggregationFunctionColumnPair.fromColumnName(functionColumnPair, nullHandlingEnabled);
         AggregationFunctionColumnPair storedType =
             AggregationFunctionColumnPair.resolveToStoredType(aggregationFunctionColumnPair);
         // If there is already an equivalent functionColumnPair in the map, do not load another.
@@ -86,7 +85,7 @@ public class StarTreeV2BuilderConfig {
     if (indexConfig.getAggregationConfigs() != null) {
       for (StarTreeAggregationConfig aggregationConfig : indexConfig.getAggregationConfigs()) {
         AggregationFunctionColumnPair aggregationFunctionColumnPair =
-            AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
+            AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig, nullHandlingEnabled);
         AggregationFunctionColumnPair storedType =
             AggregationFunctionColumnPair.resolveToStoredType(aggregationFunctionColumnPair);
         // If there is already an equivalent functionColumnPair in the map, do not load another.
@@ -101,32 +100,25 @@ public class StarTreeV2BuilderConfig {
     }
 
     return new StarTreeV2BuilderConfig(dimensionsSplitOrder, skipStarNodeCreationForDimensions, aggregationSpecs,
-        maxLeafRecords);
+        maxLeafRecords, nullHandlingEnabled);
   }
 
   public static StarTreeV2BuilderConfig fromMetadata(StarTreeV2Metadata starTreeV2Metadata) {
     return new StarTreeV2BuilderConfig(starTreeV2Metadata.getDimensionsSplitOrder(),
         starTreeV2Metadata.getSkipStarNodeCreationForDimensions(), starTreeV2Metadata.getAggregationSpecs(),
-        starTreeV2Metadata.getMaxLeafRecords());
+        starTreeV2Metadata.getMaxLeafRecords(), starTreeV2Metadata.isNullHandlingEnabled());
   }
 
-  /**
-   * Generates default config based on the segment metadata.
-   * <ul>
-   *   <li>
-   *     All dictionary-encoded single-value dimensions with cardinality smaller or equal to the threshold will be
-   *     included in the split order, sorted by their cardinality in descending order.
-   *   </li>
-   *   <li>
-   *     All dictionary-encoded Time/DateTime columns will be appended to the split order following the dimensions,
-   *     sorted by their cardinality in descending order. Here we assume that time columns will be included in most
-   *     queries as the range filter column and/or the group by column, so for better performance, we always include
-   *     them as the last elements in the split order.
-   *   </li>
-   *   <li>Use COUNT(*) and SUM for all numeric metrics as function column pairs</li>
-   *   <li>Use default value for max leaf records</li>
-   * </ul>
-   */
+  /// Generates default config based on the segment metadata.
+  ///
+  /// - All dictionary-encoded single-value dimensions with cardinality smaller or equal to the threshold will be
+  ///   included in the split order, sorted by their cardinality in descending order.
+  /// - All dictionary-encoded Time/DateTime columns will be appended to the split order following the dimensions,
+  ///   sorted by their cardinality in descending order. Here we assume that time columns will be included in most
+  ///   queries as the range filter column and/or the group by column, so for better performance, we always include
+  ///   them as the last elements in the split order.
+  /// - Use COUNT(\*) and SUM for all numeric metrics as function column pairs
+  /// - Use default value for max leaf records
   public static StarTreeV2BuilderConfig generateDefaultConfig(SegmentMetadata segmentMetadata) {
     Schema schema = segmentMetadata.getSchema();
     List<ColumnMetadata> dimensionColumnMetadataList = new ArrayList<>();
@@ -183,8 +175,8 @@ public class StarTreeV2BuilderConfig {
           AggregationSpec.DEFAULT);
     }
 
-    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Collections.emptySet(), aggregationSpecs,
-        DEFAULT_MAX_LEAF_RECORDS);
+    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Set.of(), aggregationSpecs, DEFAULT_MAX_LEAF_RECORDS,
+        false);
   }
 
   public static StarTreeV2BuilderConfig generateDefaultConfig(Schema schema, JsonNode columnsMetadata) {
@@ -249,8 +241,8 @@ public class StarTreeV2BuilderConfig {
           AggregationSpec.DEFAULT);
     }
 
-    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Collections.emptySet(), aggregationSpecs,
-        DEFAULT_MAX_LEAF_RECORDS);
+    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Set.of(), aggregationSpecs, DEFAULT_MAX_LEAF_RECORDS,
+        false);
   }
 
   public static Map<String, JsonNode> convertJsonNodeToMap(JsonNode columnsMetadata) {
@@ -263,11 +255,13 @@ public class StarTreeV2BuilderConfig {
   }
 
   private StarTreeV2BuilderConfig(List<String> dimensionsSplitOrder, Set<String> skipStarNodeCreationForDimensions,
-      TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs, int maxLeafRecords) {
+      TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs, int maxLeafRecords,
+      boolean nullHandlingEnabled) {
     _dimensionsSplitOrder = dimensionsSplitOrder;
     _skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
     _aggregationSpecs = aggregationSpecs;
     _maxLeafRecords = maxLeafRecords;
+    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   public List<String> getDimensionsSplitOrder() {
@@ -290,12 +284,16 @@ public class StarTreeV2BuilderConfig {
     return _maxLeafRecords;
   }
 
-  /**
-   * Writes the metadata which is used to initialize the {@link StarTreeV2Metadata} when loading the segment.
-   */
+  /// Returns whether the star-tree should be built with null-aware semantics. See
+  /// [StarTreeIndexConfig#isNullHandlingEnabled].
+  public boolean isNullHandlingEnabled() {
+    return _nullHandlingEnabled;
+  }
+
+  /// Writes the metadata which is used to initialize the [StarTreeV2Metadata] when loading the segment.
   public void writeMetadata(Configuration metadataProperties, int totalDocs) {
     StarTreeV2Metadata.writeMetadata(metadataProperties, totalDocs, _dimensionsSplitOrder, _aggregationSpecs,
-        _maxLeafRecords, _skipStarNodeCreationForDimensions);
+        _maxLeafRecords, _skipStarNodeCreationForDimensions, _nullHandlingEnabled);
   }
 
   @Override
@@ -307,20 +305,23 @@ public class StarTreeV2BuilderConfig {
       return false;
     }
     StarTreeV2BuilderConfig that = (StarTreeV2BuilderConfig) o;
-    return _maxLeafRecords == that._maxLeafRecords && Objects.equals(_dimensionsSplitOrder, that._dimensionsSplitOrder)
+    return _maxLeafRecords == that._maxLeafRecords && _nullHandlingEnabled == that._nullHandlingEnabled
+        && Objects.equals(_dimensionsSplitOrder, that._dimensionsSplitOrder)
         && Objects.equals(_skipStarNodeCreationForDimensions, that._skipStarNodeCreationForDimensions)
         && Objects.equals(_aggregationSpecs, that._aggregationSpecs);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_dimensionsSplitOrder, _skipStarNodeCreationForDimensions, _aggregationSpecs, _maxLeafRecords);
+    return Objects.hash(_dimensionsSplitOrder, _skipStarNodeCreationForDimensions, _aggregationSpecs, _maxLeafRecords,
+        _nullHandlingEnabled);
   }
 
   @Override
   public String toString() {
     return new ToStringBuilder(this, ToStringStyle.SHORT_PREFIX_STYLE).append("splitOrder", _dimensionsSplitOrder)
         .append("skipStarNodeCreation", _skipStarNodeCreationForDimensions)
-        .append("aggregationSpecs", _aggregationSpecs).append("maxLeafRecords", _maxLeafRecords).toString();
+        .append("aggregationSpecs", _aggregationSpecs).append("maxLeafRecords", _maxLeafRecords)
+        .append("nullHandlingEnabled", _nullHandlingEnabled).toString();
   }
 }

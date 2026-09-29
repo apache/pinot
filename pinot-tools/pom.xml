@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-tools</artifactId>
   <name>Pinot Tools</name>
@@ -79,6 +79,10 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-bson</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-orc</artifactId>
     </dependency>
     <dependency>
@@ -88,11 +92,6 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-thrift</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-kafka-2.0</artifactId>
-      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -182,7 +181,6 @@
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-launcher_${scala.compat.version}</artifactId>
-      <version>${spark3.version}</version>
     </dependency>
 
     <dependency>
@@ -194,6 +192,10 @@
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-java-client</artifactId>
     </dependency>
   </dependencies>
   <build>
@@ -322,67 +324,6 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>org.apache.pinot.tools.UpsertQuickStart</mainClass>
-              <name>quick-start-upsert-streaming</name>
-              <jvmSettings>
-                <initialMemorySize>4G</initialMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.tools.PartialUpsertQuickStart</mainClass>
-              <name>quick-start-partial-upsert-streaming</name>
-              <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.tools.JsonIndexQuickStart</mainClass>
-              <name>quick-start-json-index-batch</name>
-              <jvmSettings>
-                <initialMemorySize>4G</initialMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.tools.RealtimeJsonIndexQuickStart</mainClass>
-              <name>quick-start-json-index-streaming</name>
-              <jvmSettings>
-                <initialMemorySize>4G</initialMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.tools.RealtimeComplexTypeHandlingQuickStart</mainClass>
-              <name>quick-start-complex-type-handling-streaming</name>
-              <jvmSettings>
-                <initialMemorySize>4G</initialMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.tools.OfflineComplexTypeHandlingQuickStart</mainClass>
-              <name>quick-start-complex-type-handling-offline</name>
-              <jvmSettings>
-                <initialMemorySize>4G</initialMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-            <program>
               <mainClass>org.apache.pinot.tools.AuthQuickstart</mainClass>
               <name>quick-start-auth</name>
               <jvmSettings>
@@ -474,25 +415,6 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-resources-plugin</artifactId>
         <executions>
-          <execution>
-            <id>copy-kafka-resources</id>
-            <phase>process-resources</phase>
-            <goals>
-              <goal>copy-resources</goal>
-            </goals>
-            <configuration>
-              <!-- this is important -->
-              <overwrite>true</overwrite>
-              <!-- target -->
-              <outputDirectory>${basedir}/target/classes/sample_data/</outputDirectory>
-              <resources>
-                <resource>
-                  <!-- source -->
-                  <directory>src/main/resources/sample_data/kafka_2.0</directory>
-                </resource>
-              </resources>
-            </configuration>
-          </execution>
           <execution>
             <id>copy-batch-ingestion-resources</id>
             <phase>process-resources</phase>

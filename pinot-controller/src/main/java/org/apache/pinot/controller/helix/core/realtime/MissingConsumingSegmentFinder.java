@@ -22,7 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +38,9 @@ import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -49,13 +51,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * For a given table, this class finds out if there is any partition group for which there's no consuming segment in
- * ideal state. If so, it emits three metrics:
- *   - Total number of partitions with missing consuming segments including
- *   - Number of newly added partitions for which there's no consuming segment (there's no completed segment either)
- *   - Maximum duration (in minutes) that a partition hasn't had a consuming segment
- */
+/// For a given table, this class finds out if there is any partition group for which there's no consuming segment in
+/// ideal state. If so, it emits three metrics:
+///   - Total number of partitions with missing consuming segments including
+///   - Number of newly added partitions for which there's no consuming segment (there's no completed segment either)
+///   - Maximum duration (in minutes) that a partition hasn't had a consuming segment
 public class MissingConsumingSegmentFinder {
   private static final Logger LOGGER = LoggerFactory.getLogger(MissingConsumingSegmentFinder.class);
 
@@ -67,7 +67,7 @@ public class MissingConsumingSegmentFinder {
   private ControllerMetrics _controllerMetrics;
 
   public MissingConsumingSegmentFinder(String realtimeTableName, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      ControllerMetrics controllerMetrics, List<StreamConfig> streamConfigs) {
+      ControllerMetrics controllerMetrics, List<StreamConfig> streamConfigs, IdealState idealState) {
     _realtimeTableName = realtimeTableName;
     _controllerMetrics = controllerMetrics;
     _segmentMetadataFetcher = new SegmentMetadataFetcher(propertyStore, controllerMetrics);
@@ -81,9 +81,13 @@ public class MissingConsumingSegmentFinder {
       return streamConfig;
     });
     try {
-      PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs, Collections.emptyList())
-          .forEach(metadata -> {
-            _partitionGroupIdToLargestStreamOffsetMap.put(metadata.getPartitionGroupId(), metadata.getStartOffset());
+      PauseState pauseState = PinotLLCRealtimeSegmentManager.extractTablePauseState(idealState);
+      PinotTableIdealStateBuilder.getStreamMetadataList(streamConfigs, List.of(),
+              pauseState == null ? new ArrayList<>() : pauseState.getIndexOfInactiveTopics(), false)
+          .forEach(streamMetadata -> {
+            for (PartitionGroupMetadata metadata : streamMetadata.getPartitionGroupMetadataList()) {
+              _partitionGroupIdToLargestStreamOffsetMap.put(metadata.getPartitionGroupId(), metadata.getStartOffset());
+            }
           });
     } catch (Exception e) {
       LOGGER.warn("Problem encountered in fetching stream metadata for topics: {} of table: {}. "
@@ -101,6 +105,18 @@ public class MissingConsumingSegmentFinder {
     _segmentMetadataFetcher = segmentMetadataFetcher;
     _partitionGroupIdToLargestStreamOffsetMap = partitionGroupIdToLargestStreamOffsetMap;
     _streamPartitionMsgOffsetFactory = streamPartitionMsgOffsetFactory;
+  }
+
+  /// Zeroes out every gauge that [#findAndEmitMetrics] emits, for callers that intentionally skip the search (e.g. a
+  /// table whose ingestion is paused, where having no CONSUMING segment is expected rather than a defect). These
+  /// gauges are last-write-wins with no "unset" value, so a skipped table would otherwise keep reporting whatever was
+  /// last written before the skip began. Kept here so the class that owns these gauge names also owns their reset.
+  public static void resetMetrics(String realtimeTableName, ControllerMetrics controllerMetrics) {
+    controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.MISSING_CONSUMING_SEGMENT_TOTAL_COUNT, 0);
+    controllerMetrics.setValueOfTableGauge(realtimeTableName,
+        ControllerGauge.MISSING_CONSUMING_SEGMENT_NEW_PARTITION_COUNT, 0);
+    controllerMetrics.setValueOfTableGauge(realtimeTableName,
+        ControllerGauge.MISSING_CONSUMING_SEGMENT_MAX_DURATION_MINUTES, 0);
   }
 
   public void findAndEmitMetrics(IdealState idealState) {

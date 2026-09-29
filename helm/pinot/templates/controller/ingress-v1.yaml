@@ -20,7 +20,7 @@
 {{- if .Values.controller.ingress.v1.enabled }}
 {{- $ingressPath := .Values.controller.ingress.v1.path }}
 {{- $serviceName := include "pinot.controller.fullname" . }}
-{{- $servicePort := .Values.controller.service.port }}
+{{- $servicePort := .Values.controller.ingress.v1.port | default .Values.controller.service.port }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

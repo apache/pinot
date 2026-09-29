@@ -18,7 +18,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import moment from 'moment';
+import { formatTimeInTimezone, convertTimeToMilliseconds } from '../utils/TimezoneUtils';
+import { useTimezone } from '../contexts/TimezoneContext';
 import { keys } from 'lodash';
 import { makeStyles } from '@material-ui/core/styles';
 import { Grid } from '@material-ui/core';
@@ -98,11 +99,17 @@ type Props = {
 type Summary = {
   segmentName: string;
   totalDocs: string | number;
-  createTime: unknown;
+  segmentSizeInBytes?: string | number;
+  createTime: unknown; // Raw timestamp for timezone-aware formatting; validate before use
+  pushTime?: number; // Push time in millisecond epoch for timezone-aware formatting
+  refreshTime?: number; // Refresh time in millisecond epoch for timezone-aware formatting
+  startTime?: number; // Start time converted to milliseconds for timezone-aware formatting
+  endTime?: number;   // End time converted to milliseconds for timezone-aware formatting
 };
 
 const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
   const classes = useStyles();
+  const { currentTimezone } = useTimezone();
   const history = useHistory();
   const location = useLocation();
   const { tableName, segmentName: encodedSegmentName } = match.params;
@@ -118,7 +125,12 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
   const initialSummary = {
     segmentName,
     totalDocs: null,
+    segmentSizeInBytes: null,
     createTime: null,
+    pushTime: null,
+    refreshTime: null,
+    startTime: null,
+    endTime: null,
   };
   const [segmentSummary, setSegmentSummary] = useState<Summary>(initialSummary);
 
@@ -172,12 +184,21 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
 
   const setSummary = (segmentMetadata: SegmentMetadata) => {
     const segmentMetaDataJson = { ...segmentMetadata };
+
+    // Get the time unit from segment metadata for proper time conversion
+    // The start/end times are stored in the segment's time unit and need to be converted to milliseconds
+    // Creation, push, and refresh times are always in millisecond epoch format
+    const timeUnit = segmentMetaDataJson['segment.time.unit'] as string;
+
     setSegmentSummary({
       segmentName,
       totalDocs: segmentMetaDataJson['segment.total.docs'] || 0,
-      createTime: moment(+segmentMetaDataJson['segment.creation.time']).format(
-        'MMMM Do YYYY, h:mm:ss'
-      ),
+      segmentSizeInBytes: segmentMetaDataJson['segment.size.in.bytes'],
+      createTime: convertTimeToMilliseconds(segmentMetaDataJson['segment.creation.time'], 'MILLISECONDS'),
+      pushTime: convertTimeToMilliseconds(segmentMetaDataJson['segment.push.time'], 'MILLISECONDS'),
+      refreshTime: convertTimeToMilliseconds(segmentMetaDataJson['segment.refresh.time'], 'MILLISECONDS'),
+      startTime: convertTimeToMilliseconds(segmentMetaDataJson['segment.start.time'], timeUnit),
+      endTime: convertTimeToMilliseconds(segmentMetaDataJson['segment.end.time'], timeUnit),
     });
   };
 
@@ -282,7 +303,7 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [currentTimezone]);
 
   const closeDialog = () => {
     setConfirmDialog(false);
@@ -323,6 +344,35 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
       successCb: () => handleReloadOp(),
     });
     setConfirmDialog(true);
+  };
+
+  const handleResetSegmentClick = () => {
+    setDialogDetails({
+      title: 'Reset Segment',
+      content: 'Are you sure you want to reset this segment?',
+      successCb: () => handleResetOp(),
+    });
+    setConfirmDialog(true);
+  };
+
+  const handleResetOp = async () => {
+    try {
+      const result = await PinotMethodUtils.resetSegmentOp(
+        tableName,
+        segmentName
+      );
+      if (result.status) {
+        dispatch({ type: 'success', message: result.status, show: true });
+        fetchData();
+      } else {
+        dispatch({ type: 'error', message: result.error, show: true });
+      }
+    } catch (error) {
+      console.error('Error resetting segment:', error);
+      dispatch({ type: 'error', message: 'Failed to reset segment. Please try again later.', show: true });
+    } finally {
+      closeDialog();
+    }
   };
 
   const handleReloadOp = async () => {
@@ -376,40 +426,85 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
               >
                 Reload Segment
               </CustomButton>
+              <CustomButton
+                onClick={() => {
+                  handleResetSegmentClick();
+                }}
+                tooltipTitle="Reset the segment by disabling and enabling it"
+                enableTooltip={true}
+              >
+                Reset Segment
+              </CustomButton>
             </div>
           </SimpleAccordion>
         </div>
         <div className={classes.highlightBackground}>
           <TableToolbar name="Summary" showSearchBox={false} />
           <Grid container className={classes.body}>
-            <Grid item xs={6}>
+            <Grid item xs={12}>
               <strong>Segment Name:</strong>{' '}
               {unescape(segmentSummary.segmentName)}
             </Grid>
-            <Grid item container xs={2} wrap="nowrap" spacing={1}>
-              <Grid item>
-                <strong>Total Docs:</strong>
-              </Grid>
-              <Grid item>
-                {segmentSummary.totalDocs ? (
-                  segmentSummary.totalDocs
-                ) : (
-                  <Skeleton variant="text" animation="wave" width={50} />
-                )}
-              </Grid>
+            <Grid item xs={4}>
+              <strong>Total Docs:</strong>{' '}
+              {segmentSummary.totalDocs ? (
+                Number(segmentSummary.totalDocs).toLocaleString()
+              ) : (
+                <Skeleton variant="text" animation="wave" width={50} />
+              )}
             </Grid>
-            <Grid item container xs={4} wrap="nowrap" spacing={1}>
-              <Grid item>
-                <strong>Create Time:</strong>
-              </Grid>
-              <Grid item>
-                {segmentSummary.createTime ? (
-                  segmentSummary.createTime
-                ) : (
-                  <Skeleton variant="text" animation="wave" width={200} />
-                )}
-              </Grid>
+            <Grid item xs={4}>
+              <strong>Segment Size:</strong>{' '}
+              {segmentSummary.segmentSizeInBytes ? (
+                Utils.formatBytes(Number(segmentSummary.segmentSizeInBytes))
+              ) : (
+                'N/A'
+              )}
             </Grid>
+            <Grid item xs={4} />
+            <Grid item xs={4}>
+              <strong>Create Time:</strong>{' '}
+              {segmentSummary.createTime && typeof segmentSummary.createTime === 'number' ? (
+                formatTimeInTimezone(segmentSummary.createTime, 'MMMM Do YYYY, h:mm:ss z')
+              ) : segmentSummary.createTime === null ? (
+                'N/A'
+              ) : (
+                <Skeleton variant="text" animation="wave" width={200} />
+              )}
+            </Grid>
+            <Grid item xs={4}>
+              <strong>Push Time:</strong>{' '}
+              {segmentSummary.pushTime ? (
+                formatTimeInTimezone(segmentSummary.pushTime, 'MMMM Do YYYY, h:mm:ss z')
+              ) : (
+                'N/A'
+              )}
+            </Grid>
+            <Grid item xs={4}>
+              <strong>Refresh Time:</strong>{' '}
+              {segmentSummary.refreshTime ? (
+                formatTimeInTimezone(segmentSummary.refreshTime, 'MMMM Do YYYY, h:mm:ss z')
+              ) : (
+                'N/A'
+              )}
+            </Grid>
+            <Grid item xs={4}>
+              <strong>Start Time:</strong>{' '}
+              {segmentSummary.startTime ? (
+                formatTimeInTimezone(segmentSummary.startTime, 'MMMM Do YYYY, h:mm:ss z')
+              ) : (
+                'N/A'
+              )}
+            </Grid>
+            <Grid item xs={4}>
+              <strong>End Time:</strong>{' '}
+              {segmentSummary.endTime ? (
+                formatTimeInTimezone(segmentSummary.endTime, 'MMMM Do YYYY, h:mm:ss z')
+              ) : (
+                'N/A'
+              )}
+            </Grid>
+            <Grid item xs={4} />
           </Grid>
         </div>
 

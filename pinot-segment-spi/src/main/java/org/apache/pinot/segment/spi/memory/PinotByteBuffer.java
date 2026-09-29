@@ -70,6 +70,12 @@ public class PinotByteBuffer extends PinotDataBuffer {
     return new PinotByteBuffer(buffer, false, false);
   }
 
+  public static PinotByteBuffer slice(ByteBuffer buffer) {
+    ByteBuffer slice = buffer.slice();
+    slice.order(buffer.order());
+    return new PinotByteBuffer(slice, false, false);
+  }
+
   private PinotByteBuffer(ByteBuffer buffer, boolean closeable, boolean flushable) {
     super(closeable);
     _buffer = buffer;

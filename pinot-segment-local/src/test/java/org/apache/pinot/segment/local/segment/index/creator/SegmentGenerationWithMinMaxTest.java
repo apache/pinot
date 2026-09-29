@@ -22,6 +22,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -38,10 +39,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests filtering of records during segment generation
- */
-public class SegmentGenerationWithMinMaxTest {
+/// Tests filtering of records during segment generation
+public class SegmentGenerationWithMinMaxTest implements PinotBuffersAfterMethodCheckRule {
   private static final String STRING_COLUMN = "col1";
 
   private static final String[] STRING_VALUES_WITH_COMMA_CHARACTER = {"A,,", ",B,", "C,Z,", "D,", "E,"};

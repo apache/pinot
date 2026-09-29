@@ -27,19 +27,20 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.utils.SchemaUtils;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.MinionContext;
-import org.apache.pinot.minion.event.MinionProgressObserver;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskTestUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -85,6 +86,7 @@ public class MergeRollupTaskExecutorTest {
       String segmentName = MERGED_SEGMENT_NAME + i;
       RecordReader recordReader = new GenericRowRecordReader(rows);
       SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+      config.setInstanceType(InstanceType.MINION);
       config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
       config.setTableName(TABLE_NAME);
       config.setSegmentName(segmentName);
@@ -98,9 +100,9 @@ public class MergeRollupTaskExecutorTest {
     @SuppressWarnings("unchecked")
     ZkHelixPropertyStore<ZNRecord> helixPropertyStore = Mockito.mock(ZkHelixPropertyStore.class);
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/testTable_OFFLINE", null, AccessOption.PERSISTENT))
-        .thenReturn(TableConfigUtils.toZNRecord(tableConfig));
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfig));
     Mockito.when(helixPropertyStore.get("/SCHEMAS/testTable", null, AccessOption.PERSISTENT))
-        .thenReturn(SchemaUtils.toZNRecord(schema));
+        .thenReturn(SchemaSerDeUtils.toZNRecord(schema));
     minionContext.setHelixPropertyStore(helixPropertyStore);
   }
 
@@ -108,7 +110,7 @@ public class MergeRollupTaskExecutorTest {
   public void testConvert()
       throws Exception {
     MergeRollupTaskExecutor mergeRollupTaskExecutor = new MergeRollupTaskExecutor(new MinionConf());
-    mergeRollupTaskExecutor.setMinionEventObserver(new MinionProgressObserver());
+    mergeRollupTaskExecutor.setMinionEventObserver(MinionTaskTestUtils.getMinionProgressObserver());
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, "testTable_OFFLINE");
     configs.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "daily");
@@ -128,12 +130,12 @@ public class MergeRollupTaskExecutorTest {
   public void testDimensionErasure()
       throws Exception {
     MergeRollupTaskExecutor mergeRollupTaskExecutor = new MergeRollupTaskExecutor(new MinionConf());
-    mergeRollupTaskExecutor.setMinionEventObserver(new MinionProgressObserver());
+    mergeRollupTaskExecutor.setMinionEventObserver(MinionTaskTestUtils.getMinionProgressObserver());
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, "testTable_OFFLINE");
     configs.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "daily");
     configs.put(MinionConstants.MergeTask.MERGE_TYPE_KEY, "rollup");
-    configs.put(MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY, D1);
+    configs.put("daily." + MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY, D1);
 
     PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.MergeRollupTask.TASK_TYPE, configs);
     List<SegmentConversionResult> conversionResults =

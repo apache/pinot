@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.timeseries;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.query.executor.QueryExecutor;
@@ -29,16 +28,19 @@ import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 
 
 public class TimeSeriesPhysicalTableScan extends BaseTimeSeriesPlanNode {
+  private final TimeSeriesExecutionContext _context;
   private final ServerQueryRequest _request;
   private final QueryExecutor _queryExecutor;
   private final ExecutorService _executorService;
 
   public TimeSeriesPhysicalTableScan(
+      TimeSeriesExecutionContext context,
       String id,
       ServerQueryRequest serverQueryRequest,
       QueryExecutor queryExecutor,
       ExecutorService executorService) {
-    super(id, Collections.emptyList());
+    super(id, List.of());
+    _context = context;
     _request = serverQueryRequest;
     _queryExecutor = queryExecutor;
     _executorService = executorService;
@@ -59,7 +61,7 @@ public class TimeSeriesPhysicalTableScan extends BaseTimeSeriesPlanNode {
   @Override
   public BaseTimeSeriesPlanNode withInputs(List<BaseTimeSeriesPlanNode> newInputs) {
     Preconditions.checkState(newInputs.isEmpty(), "Attempted to add inputs to physical table scan");
-    return new TimeSeriesPhysicalTableScan(_id, _request, _queryExecutor, _executorService);
+    return new TimeSeriesPhysicalTableScan(_context, _id, _request, _queryExecutor, _executorService);
   }
 
   public String getKlass() {
@@ -73,6 +75,6 @@ public class TimeSeriesPhysicalTableScan extends BaseTimeSeriesPlanNode {
 
   @Override
   public BaseTimeSeriesOperator run() {
-    return new LeafTimeSeriesOperator(_request, _queryExecutor, _executorService);
+    return new LeafTimeSeriesOperator(_context, _request, _queryExecutor, _executorService);
   }
 }

@@ -32,9 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Helper methods and constructs for date/time functions
- */
+/// Helper methods and constructs for date/time functions
 public class DateTimeUtils {
   private DateTimeUtils() {
   }
@@ -75,8 +73,6 @@ public class DateTimeUtils {
   public static final class DateTimeZoneIndex {
     private static final DateTimeZone[] DATE_TIME_ZONES;
     private static final ISOChronology[] CHRONOLOGIES;
-    private static final int[] FIXED_ZONE_OFFSET;
-    private static final int VARIABLE_ZONE = Integer.MAX_VALUE;
 
     private DateTimeZoneIndex() {
     }
@@ -92,7 +88,6 @@ public class DateTimeUtils {
     static {
       DATE_TIME_ZONES = new DateTimeZone[TimeZoneKey.MAX_TIME_ZONE_KEY + 1];
       CHRONOLOGIES = new ISOChronology[TimeZoneKey.MAX_TIME_ZONE_KEY + 1];
-      FIXED_ZONE_OFFSET = new int[TimeZoneKey.MAX_TIME_ZONE_KEY + 1];
       for (TimeZoneKey timeZoneKey : TimeZoneKey.getTimeZoneKeys()) {
         short zoneKey = timeZoneKey.getKey();
         DateTimeZone dateTimeZone;
@@ -104,11 +99,6 @@ public class DateTimeUtils {
         }
         DATE_TIME_ZONES[zoneKey] = dateTimeZone;
         CHRONOLOGIES[zoneKey] = ISOChronology.getInstance(dateTimeZone);
-        if (dateTimeZone.isFixed() && dateTimeZone.getOffset(0) % 60_000 == 0) {
-          FIXED_ZONE_OFFSET[zoneKey] = dateTimeZone.getOffset(0) / 60_000;
-        } else {
-          FIXED_ZONE_OFFSET[zoneKey] = VARIABLE_ZONE;
-        }
       }
     }
   }
@@ -154,16 +144,12 @@ public class DateTimeUtils {
     }
   }
 
-  /**
-   * The supported field types for the EXTRACT operator
-   */
+  /// The supported field types for the EXTRACT operator
   public enum ExtractFieldType {
     YEAR, QUARTER, MONTH, WEEK, DAY, DOY, DOW, HOUR, MINUTE, SECOND
   }
 
-  /**
-   * Helper method to implement the SQL <code>EXTRACT</code> operator.
-   */
+  /// Helper method to implement the SQL `EXTRACT` operator.
   public static int extract(ExtractFieldType extractFieldType, long timestamp) {
     switch (extractFieldType) {
       case YEAR:

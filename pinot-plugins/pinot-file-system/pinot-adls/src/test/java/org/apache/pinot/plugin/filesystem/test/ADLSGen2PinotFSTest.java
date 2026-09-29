@@ -29,33 +29,41 @@ import com.azure.storage.file.datalake.models.DataLakeFileOpenInputStreamResult;
 import com.azure.storage.file.datalake.models.DataLakeStorageException;
 import com.azure.storage.file.datalake.models.PathItem;
 import com.azure.storage.file.datalake.models.PathProperties;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Stream;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.filesystem.ADLSGen2PinotFS;
 import org.apache.pinot.plugin.filesystem.AzurePinotFSUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.FileMetadata;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
+import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
 
-/**
- * Tests the Azure implementation of ADLSGen2PinotFS
- */
+/// Tests the Azure implementation of ADLSGen2PinotFS
 public class ADLSGen2PinotFSTest {
 
   @Mock
@@ -108,13 +116,89 @@ public class ADLSGen2PinotFSTest {
   }
 
   @Test
+  public void testSasTokenAuthentication() {
+    PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty("authenticationType", "SAS_TOKEN");
+    pinotConfiguration.setProperty("sasToken", "sp=rwdl&se=2025-12-31T23:59:59Z&sv=2022-11-02&sr=c&sig=test");
+    pinotConfiguration.setProperty("accountName", "testaccount");
+    pinotConfiguration.setProperty("fileSystemName", "testcontainer");
+
+    when(_mockServiceClient.getFileSystemClient("testcontainer")).thenReturn(_mockFileSystemClient);
+    when(_mockFileSystemClient.getProperties()).thenReturn(null);
+
+    // Mock the creation of the service client
+    ADLSGen2PinotFS sasTokenFS = new ADLSGen2PinotFS() {
+      @Override
+      public DataLakeFileSystemClient getOrCreateClientWithFileSystem(DataLakeServiceClient serviceClient,
+          String fileSystemName) {
+        return _mockFileSystemClient;
+      }
+    };
+
+    sasTokenFS.init(pinotConfiguration);
+
+    // Verify that the filesystem client was set properly
+    assertTrue(sasTokenFS != null);
+  }
+
+  @Test
+  public void testChecksumEnabledWithMd5DisabledFails() {
+    PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty("authenticationType", "SAS_TOKEN");
+    pinotConfiguration.setProperty("sasToken", "sp=rwdl&se=2025-12-31T23:59:59Z&sv=2022-11-02&sr=c&sig=test");
+    pinotConfiguration.setProperty("accountName", "testaccount");
+    pinotConfiguration.setProperty("fileSystemName", "testcontainer");
+    pinotConfiguration.setProperty("enableChecksum", "true");
+
+    ADLSGen2PinotFS adlsGen2PinotFs = new ADLSGen2PinotFS() {
+      @Override
+      public DataLakeFileSystemClient getOrCreateClientWithFileSystem(DataLakeServiceClient serviceClient,
+          String fileSystemName) {
+        return _mockFileSystemClient;
+      }
+    };
+
+    try {
+      PinotMd5Mode.setPinotMd5Disabled(true);
+      IllegalStateException exception =
+          expectThrows(IllegalStateException.class, () -> adlsGen2PinotFs.init(pinotConfiguration));
+      assertTrue(exception.getMessage().contains("pinot.md5.disabled"));
+      assertTrue(exception.getMessage().contains("enableChecksum"));
+    } finally {
+      PinotMd5Mode.setPinotMd5Disabled(false);
+    }
+  }
+
+  @Test(expectedExceptions = NullPointerException.class)
+  public void testSasTokenMissingToken() {
+    PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty("authenticationType", "SAS_TOKEN");
+    pinotConfiguration.setProperty("accountName", "testaccount");
+    pinotConfiguration.setProperty("fileSystemName", "testcontainer");
+    // Missing sasToken property
+
+    _adlsGen2PinotFsUnderTest.init(pinotConfiguration);
+  }
+
+  @Test(expectedExceptions = NullPointerException.class)
+  public void testSasTokenNullToken() {
+    PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty("authenticationType", "SAS_TOKEN");
+    pinotConfiguration.setProperty("sasToken", (String) null);
+    pinotConfiguration.setProperty("accountName", "testaccount");
+    pinotConfiguration.setProperty("fileSystemName", "testcontainer");
+
+    _adlsGen2PinotFsUnderTest.init(pinotConfiguration);
+  }
+
+  @Test
   public void testGetOrCreateClientWithFileSystemGet() {
     when(_mockServiceClient.getFileSystemClient(MOCK_FILE_SYSTEM_NAME)).thenReturn(_mockFileSystemClient);
     when(_mockFileSystemClient.getProperties()).thenReturn(null);
 
     final DataLakeFileSystemClient actual =
         _adlsGen2PinotFsUnderTest.getOrCreateClientWithFileSystem(_mockServiceClient, MOCK_FILE_SYSTEM_NAME);
-    Assert.assertEquals(actual, _mockFileSystemClient);
+    assertEquals(actual, _mockFileSystemClient);
 
     verify(_mockFileSystemClient).getProperties();
     verify(_mockServiceClient).getFileSystemClient(MOCK_FILE_SYSTEM_NAME);
@@ -130,7 +214,7 @@ public class ADLSGen2PinotFSTest {
 
     final DataLakeFileSystemClient actual =
         _adlsGen2PinotFsUnderTest.getOrCreateClientWithFileSystem(_mockServiceClient, MOCK_FILE_SYSTEM_NAME);
-    Assert.assertEquals(actual, _mockFileSystemClient);
+    assertEquals(actual, _mockFileSystemClient);
 
     verify(_mockFileSystemClient).getProperties();
     verify(_mockServiceClient).getFileSystemClient(MOCK_FILE_SYSTEM_NAME);
@@ -146,7 +230,7 @@ public class ADLSGen2PinotFSTest {
         .thenReturn(_mockSimpleResponse);
 
     boolean actual = _adlsGen2PinotFsUnderTest.mkdir(_mockURI);
-    Assert.assertTrue(actual);
+    assertTrue(actual);
 
     verify(_mockFileSystemClient).createDirectoryWithResponse(any(), any(), any(), any(), any(), any(), any(), any());
   }
@@ -160,7 +244,7 @@ public class ADLSGen2PinotFSTest {
     when(_mockDataLakeStorageException.getErrorCode()).thenReturn("PathAlreadyExists");
 
     boolean actual = _adlsGen2PinotFsUnderTest.mkdir(_mockURI);
-    Assert.assertTrue(actual);
+    assertTrue(actual);
 
     verify(_mockFileSystemClient).createDirectoryWithResponse(any(), any(), any(), any(), any(), any(), any(), any());
     verify(_mockDataLakeStorageException).getStatusCode();
@@ -178,7 +262,7 @@ public class ADLSGen2PinotFSTest {
     when(_mockPathProperties.getMetadata()).thenReturn(metadata);
 
     boolean actual = _adlsGen2PinotFsUnderTest.isDirectory(_mockURI);
-    Assert.assertTrue(actual);
+    assertTrue(actual);
 
     verify(_mockFileSystemClient).getDirectoryClient(any());
     verify(_mockDirectoryClient).getProperties();
@@ -193,7 +277,7 @@ public class ADLSGen2PinotFSTest {
     when(_mockPathItem.getName()).thenReturn("foo");
 
     String[] actual = _adlsGen2PinotFsUnderTest.listFiles(_mockURI, true);
-    Assert.assertEquals(actual[0], "/foo");
+    assertEquals(actual[0], "/foo");
 
     verify(_mockFileSystemClient).listPaths(any(), any());
     verify(_mockPagedIterable).stream();
@@ -213,10 +297,10 @@ public class ADLSGen2PinotFSTest {
 
     List<FileMetadata> actual = _adlsGen2PinotFsUnderTest.listFilesWithMetadata(_mockURI, true);
     FileMetadata fm = actual.get(0);
-    Assert.assertEquals(fm.getFilePath(), "/foo");
-    Assert.assertFalse(fm.isDirectory());
-    Assert.assertEquals(fm.getLength(), 1024);
-    Assert.assertEquals(fm.getLastModifiedTime(), mtime.toInstant().toEpochMilli());
+    assertEquals(fm.getFilePath(), "/foo");
+    assertFalse(fm.isDirectory());
+    assertEquals(fm.getLength(), 1024);
+    assertEquals(fm.getLastModifiedTime(), mtime.toInstant().toEpochMilli());
 
     verify(_mockFileSystemClient).listPaths(any(), any());
     verify(_mockPagedIterable).stream();
@@ -236,7 +320,7 @@ public class ADLSGen2PinotFSTest {
     when(_mockPathProperties.getLastModified()).thenReturn(mtime);
 
     long actual = _adlsGen2PinotFsUnderTest.lastModified(_mockURI);
-    Assert.assertEquals(actual, now.toEpochMilli());
+    assertEquals(actual, now.toEpochMilli());
 
     verify(_mockFileSystemClient).getDirectoryClient(any());
     verify(_mockDirectoryClient).getProperties();
@@ -247,7 +331,7 @@ public class ADLSGen2PinotFSTest {
   public void testListFilesException() {
     when(_mockFileSystemClient.listPaths(any(), any())).thenThrow(_mockDataLakeStorageException);
 
-    Assert.expectThrows(IOException.class, () -> _adlsGen2PinotFsUnderTest.listFiles(_mockURI, true));
+    expectThrows(IOException.class, () -> _adlsGen2PinotFsUnderTest.listFiles(_mockURI, true));
 
     verify(_mockFileSystemClient).listPaths(any(), any());
   }
@@ -269,7 +353,7 @@ public class ADLSGen2PinotFSTest {
     when(_mockSimpleResponse.getValue()).thenReturn(null);
 
     boolean actual = _adlsGen2PinotFsUnderTest.delete(_mockURI, true);
-    Assert.assertTrue(actual);
+    assertTrue(actual);
 
     verify(_mockFileSystemClient).getDirectoryClient(any());
     verify(_mockDirectoryClient).getProperties();
@@ -293,7 +377,7 @@ public class ADLSGen2PinotFSTest {
     doNothing().when(_mockFileSystemClient).deleteFile(any());
 
     boolean actual = _adlsGen2PinotFsUnderTest.delete(_mockURI, true);
-    Assert.assertTrue(actual);
+    assertTrue(actual);
 
     verify(_mockFileSystemClient).getDirectoryClient(any());
     verify(_mockDirectoryClient).getProperties();
@@ -308,7 +392,7 @@ public class ADLSGen2PinotFSTest {
     when(_mockDirectoryClient.rename(eq(null), any())).thenReturn(_mockDirectoryClient);
 
     boolean actual = _adlsGen2PinotFsUnderTest.doMove(_mockURI, _mockURI);
-    Assert.assertTrue(actual);
+    assertTrue(actual);
 
     verify(_mockFileSystemClient).getDirectoryClient(any());
     verify(_mockDirectoryClient).rename(eq(null), any());
@@ -318,7 +402,7 @@ public class ADLSGen2PinotFSTest {
   public void testDoMoveException() {
     when(_mockFileSystemClient.getDirectoryClient(any())).thenThrow(_mockDataLakeStorageException);
 
-    Assert.expectThrows(IOException.class, () -> _adlsGen2PinotFsUnderTest.doMove(_mockURI, _mockURI));
+    expectThrows(IOException.class, () -> _adlsGen2PinotFsUnderTest.doMove(_mockURI, _mockURI));
 
     verify(_mockFileSystemClient).getDirectoryClient(any());
   }
@@ -330,7 +414,7 @@ public class ADLSGen2PinotFSTest {
     when(_mockDirectoryClient.getProperties()).thenReturn(_mockPathProperties);
 
     boolean actual = _adlsGen2PinotFsUnderTest.exists(_mockURI);
-    Assert.assertTrue(actual);
+    assertTrue(actual);
 
     verify(_mockFileSystemClient).getDirectoryClient(any());
     verify(_mockDirectoryClient).getProperties();
@@ -344,7 +428,7 @@ public class ADLSGen2PinotFSTest {
     when(_mockDataLakeStorageException.getStatusCode()).thenReturn(404);
 
     boolean actual = _adlsGen2PinotFsUnderTest.exists(_mockURI);
-    Assert.assertFalse(actual);
+    assertFalse(actual);
 
     verify(_mockFileSystemClient).getDirectoryClient(any());
     verify(_mockDirectoryClient).getProperties();
@@ -357,7 +441,7 @@ public class ADLSGen2PinotFSTest {
     when(_mockDirectoryClient.getProperties()).thenThrow(_mockDataLakeStorageException);
     when(_mockDataLakeStorageException.getStatusCode()).thenReturn(123);
 
-    Assert.expectThrows(IOException.class, () -> _adlsGen2PinotFsUnderTest.exists(_mockURI));
+    expectThrows(IOException.class, () -> _adlsGen2PinotFsUnderTest.exists(_mockURI));
 
     verify(_mockFileSystemClient).getDirectoryClient(any());
     verify(_mockDirectoryClient).getProperties();
@@ -373,7 +457,7 @@ public class ADLSGen2PinotFSTest {
     when(_mockPathProperties.getFileSize()).thenReturn(testLength);
 
     long actual = _adlsGen2PinotFsUnderTest.length(_mockURI);
-    Assert.assertEquals(actual, testLength);
+    assertEquals(actual, testLength);
 
     verify(_mockFileSystemClient).getDirectoryClient(any());
     verify(_mockDirectoryClient).getProperties();
@@ -385,7 +469,7 @@ public class ADLSGen2PinotFSTest {
     when(_mockFileSystemClient.getDirectoryClient(any())).thenReturn(_mockDirectoryClient);
     when(_mockDirectoryClient.getProperties()).thenThrow(_mockDataLakeStorageException);
 
-    Assert.expectThrows(IOException.class, () -> _adlsGen2PinotFsUnderTest.length(_mockURI));
+    expectThrows(IOException.class, () -> _adlsGen2PinotFsUnderTest.length(_mockURI));
 
     verify(_mockFileSystemClient).getDirectoryClient(any());
     verify(_mockDirectoryClient).getProperties();
@@ -399,7 +483,7 @@ public class ADLSGen2PinotFSTest {
     doNothing().when(_mockFileClient).setHttpHeaders(any());
 
     boolean actual = _adlsGen2PinotFsUnderTest.touch(_mockURI);
-    Assert.assertTrue(actual);
+    assertTrue(actual);
 
     verify(_mockFileSystemClient).getFileClient(any());
     verify(_mockFileClient).getProperties();
@@ -418,7 +502,7 @@ public class ADLSGen2PinotFSTest {
     when(_mockFileClient.getProperties()).thenReturn(_mockPathProperties);
     doThrow(_mockDataLakeStorageException).when(_mockFileClient).setHttpHeaders(any());
 
-    Assert.expectThrows(IOException.class, () -> _adlsGen2PinotFsUnderTest.touch(_mockURI));
+    expectThrows(IOException.class, () -> _adlsGen2PinotFsUnderTest.touch(_mockURI));
 
     verify(_mockFileSystemClient).getFileClient(any());
     verify(_mockFileClient).getProperties();
@@ -439,10 +523,219 @@ public class ADLSGen2PinotFSTest {
     when(_mockFileOpenInputStreamResult.getInputStream()).thenReturn(_mockInputStream);
 
     InputStream actual = _adlsGen2PinotFsUnderTest.open(_mockURI);
-    Assert.assertEquals(actual, _mockInputStream);
+    assertEquals(actual, _mockInputStream);
 
     verify(_mockFileSystemClient).getFileClient(AzurePinotFSUtil.convertUriToAzureStylePath(_mockURI));
     verify(_mockFileClient).openInputStream();
     verify(_mockFileOpenInputStreamResult).getInputStream();
+  }
+
+  @Test
+  public void testCopyToLocalFileWithSubdirectories() throws Exception {
+    // Create a temporary file for the test
+    File tempDir = new File(System.getProperty("java.io.tmpdir"), "pinot_test");
+    tempDir.mkdirs();
+    File mockDstFile = new File(tempDir, "test_file.txt");
+
+    // Create parent directory
+    File parentFile = mockDstFile.getParentFile();
+    if (!parentFile.exists()) {
+      parentFile.mkdirs();
+    }
+
+    // Mock file stream
+    byte[] testData = "test data".getBytes();
+    InputStream mockInputStream = new ByteArrayInputStream(testData);
+    when(_mockFileSystemClient.getFileClient(any())).thenReturn(_mockFileClient);
+    when(_mockFileClient.openInputStream()).thenReturn(_mockFileOpenInputStreamResult);
+    when(_mockFileOpenInputStreamResult.getInputStream()).thenReturn(mockInputStream);
+
+    try {
+      // Execute
+      _adlsGen2PinotFsUnderTest.copyToLocalFile(_mockURI, mockDstFile);
+
+      // Verify file operations in order
+      verify(_mockFileSystemClient).getFileClient(AzurePinotFSUtil.convertUriToAzureStylePath(_mockURI));
+      verify(_mockFileClient).openInputStream();
+      verify(_mockFileOpenInputStreamResult).getInputStream();
+
+      // Verify file was created
+      assertTrue(mockDstFile.exists());
+
+      // Verify content was written correctly
+      byte[] writtenContent = Files.readAllBytes(mockDstFile.toPath());
+      assertArrayEquals(testData, writtenContent);
+    } finally {
+      // Cleanup
+      FileUtils.deleteQuietly(mockDstFile);
+      FileUtils.deleteQuietly(tempDir);
+    }
+  }
+
+  @Test
+  public void testCopyToLocalFileWithoutSubdirectories() throws Exception {
+    // Create a temporary file for the test
+    File tempFile = new File(System.getProperty("java.io.tmpdir"), "test_file.txt");
+
+    // Mock file stream
+    byte[] testData = "test data".getBytes();
+    InputStream mockInputStream = new ByteArrayInputStream(testData);
+    when(_mockFileSystemClient.getFileClient(any())).thenReturn(_mockFileClient);
+    when(_mockFileClient.openInputStream()).thenReturn(_mockFileOpenInputStreamResult);
+    when(_mockFileOpenInputStreamResult.getInputStream()).thenReturn(mockInputStream);
+
+    try {
+      // Execute
+      _adlsGen2PinotFsUnderTest.copyToLocalFile(_mockURI, tempFile);
+
+      // Verify file operations in order
+      verify(_mockFileSystemClient).getFileClient(AzurePinotFSUtil.convertUriToAzureStylePath(_mockURI));
+      verify(_mockFileClient).openInputStream();
+      verify(_mockFileOpenInputStreamResult).getInputStream();
+
+      // Verify file was created
+      assertTrue(tempFile.exists());
+
+      // Verify content was written correctly
+      byte[] writtenContent = Files.readAllBytes(tempFile.toPath());
+      assertArrayEquals(testData, writtenContent);
+    } finally {
+      // Cleanup
+      FileUtils.deleteQuietly(tempFile);
+    }
+  }
+
+  @Test
+  public void testOpenFileNotFound() {
+    when(_mockFileSystemClient.getFileClient(any())).thenReturn(_mockFileClient);
+    when(_mockFileClient.openInputStream()).thenThrow(_mockDataLakeStorageException);
+    when(_mockDataLakeStorageException.getStatusCode()).thenReturn(404);
+
+    expectThrows(FileNotFoundException.class, () -> _adlsGen2PinotFsUnderTest.open(_mockURI));
+
+    verify(_mockFileSystemClient).getFileClient(any());
+    verify(_mockFileClient).openInputStream();
+    verify(_mockDataLakeStorageException).getStatusCode();
+  }
+
+  @Test
+  public void testLastModifiedFileNotFound()
+      throws IOException {
+    when(_mockFileSystemClient.getDirectoryClient(any())).thenReturn(_mockDirectoryClient);
+    when(_mockDirectoryClient.getProperties()).thenThrow(_mockDataLakeStorageException);
+    when(_mockDataLakeStorageException.getStatusCode()).thenReturn(404);
+
+    long actual = _adlsGen2PinotFsUnderTest.lastModified(_mockURI);
+    assertEquals(actual, 0L);
+
+    verify(_mockFileSystemClient).getDirectoryClient(any());
+    verify(_mockDirectoryClient).getProperties();
+    verify(_mockDataLakeStorageException).getStatusCode();
+  }
+
+  @Test
+  public void testLastModifiedNullDateTime()
+      throws IOException {
+    when(_mockFileSystemClient.getDirectoryClient(any())).thenReturn(_mockDirectoryClient);
+    when(_mockDirectoryClient.getProperties()).thenReturn(_mockPathProperties);
+    when(_mockPathProperties.getLastModified()).thenReturn(null);
+
+    long actual = _adlsGen2PinotFsUnderTest.lastModified(_mockURI);
+    assertEquals(actual, 0L);
+
+    verify(_mockFileSystemClient).getDirectoryClient(any());
+    verify(_mockDirectoryClient).getProperties();
+    verify(_mockPathProperties).getLastModified();
+  }
+
+  @Test
+  public void testIsDirectoryNullMetadata()
+      throws IOException {
+    when(_mockFileSystemClient.getDirectoryClient(any())).thenReturn(_mockDirectoryClient);
+    when(_mockDirectoryClient.getProperties()).thenReturn(_mockPathProperties);
+    when(_mockPathProperties.getMetadata()).thenReturn(null);
+
+    boolean actual = _adlsGen2PinotFsUnderTest.isDirectory(_mockURI);
+    assertFalse(actual);
+
+    verify(_mockFileSystemClient).getDirectoryClient(any());
+    verify(_mockDirectoryClient).getProperties();
+    verify(_mockPathProperties).getMetadata();
+  }
+
+  @Test
+  public void testListFilesWithMetadataNullLastModified()
+      throws IOException {
+    when(_mockFileSystemClient.listPaths(any(), any())).thenReturn(_mockPagedIterable);
+    when(_mockPagedIterable.stream()).thenReturn(Stream.of(_mockPathItem));
+    when(_mockPathItem.getName()).thenReturn("foo");
+    when(_mockPathItem.isDirectory()).thenReturn(false);
+    when(_mockPathItem.getContentLength()).thenReturn(1024L);
+    when(_mockPathItem.getLastModified()).thenReturn(null);
+
+    List<FileMetadata> actual = _adlsGen2PinotFsUnderTest.listFilesWithMetadata(_mockURI, true);
+    FileMetadata fm = actual.get(0);
+    assertEquals(fm.getFilePath(), "/foo");
+    assertEquals(fm.getLastModifiedTime(), 0L);
+
+    verify(_mockFileSystemClient).listPaths(any(), any());
+    verify(_mockPagedIterable).stream();
+    verify(_mockPathItem).getName();
+    verify(_mockPathItem).isDirectory();
+    verify(_mockPathItem).getContentLength();
+    verify(_mockPathItem).getLastModified();
+  }
+
+  @Test
+  public void testTouchFileNotFound()
+      throws IOException {
+    when(_mockFileSystemClient.getFileClient(any())).thenReturn(_mockFileClient);
+    when(_mockFileClient.getProperties()).thenThrow(_mockDataLakeStorageException);
+    when(_mockDataLakeStorageException.getStatusCode()).thenReturn(404);
+
+    boolean actual = _adlsGen2PinotFsUnderTest.touch(_mockURI);
+    assertTrue(actual);
+
+    verify(_mockFileSystemClient).getFileClient(any());
+    verify(_mockFileClient).getProperties();
+    verify(_mockDataLakeStorageException).getStatusCode();
+    verify(_mockFileSystemClient).createFile(any());
+  }
+
+  @Test
+  public void testCopyToLocalFileExistingDirectory() throws Exception {
+    // Create a temporary directory for the test
+    File tempDir = new File(System.getProperty("java.io.tmpdir"), "existing_dir");
+    tempDir.mkdirs();
+
+    // Mock file stream
+    byte[] testData = "test data".getBytes();
+    InputStream mockInputStream = new ByteArrayInputStream(testData);
+    when(_mockFileSystemClient.getFileClient(any())).thenReturn(_mockFileClient);
+    when(_mockFileClient.openInputStream()).thenReturn(_mockFileOpenInputStreamResult);
+    when(_mockFileOpenInputStreamResult.getInputStream()).thenReturn(mockInputStream);
+
+    try {
+      // Execute
+      _adlsGen2PinotFsUnderTest.copyToLocalFile(_mockURI, tempDir);
+
+      // Verify file operations in order
+      verify(_mockFileSystemClient).getFileClient(AzurePinotFSUtil.convertUriToAzureStylePath(_mockURI));
+      verify(_mockFileClient).openInputStream();
+      verify(_mockFileOpenInputStreamResult).getInputStream();
+
+      // Verify directory was overwritten with file
+      assertTrue(tempDir.exists());
+      assertFalse(tempDir.isDirectory());
+
+      // Verify content was written correctly
+      byte[] writtenContent = Files.readAllBytes(tempDir.toPath());
+      assertArrayEquals(testData, writtenContent);
+    } finally {
+      // Cleanup
+      if (tempDir.exists()) {
+        FileUtils.deleteQuietly(tempDir);
+      }
+    }
   }
 }

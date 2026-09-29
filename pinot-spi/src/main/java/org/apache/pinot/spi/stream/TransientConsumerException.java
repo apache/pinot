@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.spi.stream;
 
-/**
- * A stream subsystem error that indicates a situation that is likely to be transient (for example, network error or
- * broker not available).
- */
+/// A stream subsystem error that indicates a situation that is likely to be transient (for example, network error or
+/// broker not available).
 public class TransientConsumerException extends RuntimeException {
   public TransientConsumerException(Throwable cause) {
     super(cause);

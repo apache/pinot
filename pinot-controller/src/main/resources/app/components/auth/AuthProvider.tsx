@@ -19,7 +19,7 @@
 
 import { AuthLocalStorageKeys, AuthWorkflow } from 'Models';
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { useHistory, useLocation } from 'react-router';
+import { useHistory, useLocation } from 'react-router-dom';
 import { baseApi, getAxiosErrorInterceptor, getAxiosRequestInterceptor, getAxiosResponseInterceptor, transformApi } from '../../utils/axios-config';
 import PinotMethodUtils from '../../utils/PinotMethodUtils';
 import { AppLoadingIndicator } from '../AppLoadingIndicator';
@@ -92,7 +92,7 @@ export const AuthProvider = ({ children }) => {
             // basic auth is handled by login page
         }
 
-        // set OIDC auth details 
+        // set OIDC auth details
         if (authWorkFlowInternal === AuthWorkflow.OIDC) {
             const issuer =
                 authInfoResponse && authInfoResponse.issuer ? authInfoResponse.issuer : '';
@@ -121,7 +121,7 @@ export const AuthProvider = ({ children }) => {
             setAccessToken(accessToken);
             setAuthUserName(PinotMethodUtils.getAuthUserNameFromAccessToken(accessToken.replace("Bearer ", "")))
             setAuthUserEmail(PinotMethodUtils.getAuthUserEmailFromAccessToken(accessToken.replace("Bearer ", "")))
-            
+
             initAxios(accessToken);
             setAuthenticated(true);
 

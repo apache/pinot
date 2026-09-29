@@ -22,9 +22,7 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 
 
-/**
- * Thresholds and parameters used in @RangeIndexRule
- */
+/// Thresholds and parameters used in @RangeIndexRule
 public class RangeIndexRuleParams {
   public Double _thresholdMinPercentRangeIndex =
       RecommenderConstants.RangeIndexRule.DEFAULT_THRESHOLD_MIN_PERCENT_RANGE_INDEX;

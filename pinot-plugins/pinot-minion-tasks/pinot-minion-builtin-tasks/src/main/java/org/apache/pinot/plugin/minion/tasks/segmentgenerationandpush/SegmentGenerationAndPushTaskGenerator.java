@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -27,7 +26,6 @@ import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -50,44 +48,44 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.Obfuscator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * SegmentGenerationAndPushTaskGenerator generates task configs for SegmentGenerationAndPush minion tasks.
- *
- * This generator consumes configs from org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig:
- *   inputDirURI - Required, the location of input data directory
- *   inputFormat - Required, the input file format, e.g. JSON/Avro/Parquet/CSV/...
- *   input.fs.className - Optional, the class name of filesystem to read input data. Default to be inferred from
- *   inputDirURI if not specified.
- *   input.fs.prop.<keys> - Optional, defines the configs to initialize input filesystem.
- *
- *   outputDirURI - Optional, the location of output segments. Use local temp dir with push mode TAR, If not specified.
- *   output.fs.className - Optional, the class name of filesystem to write output segments. Default to be inferred
- *   from outputDirURI if not specified.
- *   output.fs.prop.<keys> - Optional, the configs to initialize output filesystem.
- *   overwriteOutput - Optional, delete the output segment directory if set to true.
- *
- *   recordReader.className - Optional, the class name of RecordReader. Default to be inferred from inputFormat if
- *   not specified.
- *   recordReader.configClassName - Optional, the class name of RecordReaderConfig. Default to be inferred from
- *   inputFormat if not specified.
- *   recordReader.prop.<keys> - Optional, the configs used to initialize RecordReaderConfig.
- *
- *   schema - Optional, Pinot schema in Json string.
- *   schemaURI - Optional, the URI to query for Pinot schema.
- *
- *   segmentNameGenerator.type - Optional, the segment name generator to create segment name.
- *   segmentNameGenerator.configs.<keys> - Optional, configs of segment name generator.
- *
- *   push.mode - Optional, push job type: TAR/URI/METADATA, default to METADATA
- *   push.controllerUri - Optional, controller uri to send push request to, default to the controller vip uri.
- *   push.segmentUriPrefix - Optional, segment download uri prefix, used when push.mode=uri.
- *   push.segmentUriSuffix - Optional, segment download uri suffix, used when push.mode=uri.
- *
- */
+/// SegmentGenerationAndPushTaskGenerator generates task configs for SegmentGenerationAndPush minion tasks.
+///
+/// This generator consumes configs from org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig:
+///   inputDirURI - Required, the location of input data directory
+///   inputFormat - Required, the input file format, e.g. JSON/Avro/Parquet/CSV/...
+///   input.fs.className - Optional, the class name of filesystem to read input data. Default to be inferred from
+///   inputDirURI if not specified.
+///   input.fs.prop.<keys> - Optional, defines the configs to initialize input filesystem.
+///   includeFileNamePattern - Optional, Java NIO PathMatcher glob or regex pattern for files to include.
+///   excludeFileNamePattern - Optional, Java NIO PathMatcher glob or regex pattern for files to exclude.
+///
+///   outputDirURI - Optional, the location of output segments. Use local temp dir with push mode TAR, If not specified.
+///   output.fs.className - Optional, the class name of filesystem to write output segments. Default to be inferred
+///   from outputDirURI if not specified.
+///   output.fs.prop.<keys> - Optional, the configs to initialize output filesystem.
+///   overwriteOutput - Optional, delete the output segment directory if set to true.
+///
+///   recordReader.className - Optional, the class name of RecordReader. Default to be inferred from inputFormat if
+///   not specified.
+///   recordReader.configClassName - Optional, the class name of RecordReaderConfig. Default to be inferred from
+///   inputFormat if not specified.
+///   recordReader.prop.<keys> - Optional, the configs used to initialize RecordReaderConfig.
+///
+///   schema - Optional, Pinot schema in Json string.
+///   schemaURI - Optional, the URI to query for Pinot schema.
+///
+///   segmentNameGenerator.type - Optional, the segment name generator to create segment name.
+///   segmentNameGenerator.configs.<keys> - Optional, configs of segment name generator.
+///
+///   push.mode - Optional, push job type: TAR/URI/METADATA, default to METADATA
+///   push.controllerUri - Optional, controller uri to send push request to, default to the controller vip uri.
+///   push.segmentUriPrefix - Optional, segment download uri prefix, used when push.mode=uri.
+///   push.segmentUriSuffix - Optional, segment download uri suffix, used when push.mode=uri.
 @TaskGenerator
 public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerationAndPushTaskGenerator.class);
@@ -111,18 +109,8 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
           tableTaskConfig.getConfigsForTaskType(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
       Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: %s", tableNameWithType);
 
-      // Get max number of tasks for this table
-      int tableMaxNumTasks;
-      String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
-      if (tableMaxNumTasksConfig != null) {
-        try {
-          tableMaxNumTasks = Integer.parseInt(tableMaxNumTasksConfig);
-        } catch (NumberFormatException e) {
-          tableMaxNumTasks = Integer.MAX_VALUE;
-        }
-      } else {
-        tableMaxNumTasks = Integer.MAX_VALUE;
-      }
+      // Get max number of subtasks for this table
+      int tableMaxNumTasks = getAndUpdateMaxNumSubTasks(taskConfigs, Integer.MAX_VALUE, tableNameWithType);
 
       // Generate tasks
       int tableNumTasks = 0;
@@ -138,7 +126,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
           URI inputDirURI =
               SegmentGenerationUtils.getDirectoryURI(batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI));
           updateRecordReaderConfigs(batchConfigMap);
-          List<SegmentZKMetadata> segmentsZKMetadata = Collections.emptyList();
+          List<SegmentZKMetadata> segmentsZKMetadata = List.of();
           // For append mode, we don't create segments for input file URIs already created.
           if (BatchConfigProperties.SegmentIngestionType.APPEND.name().equalsIgnoreCase(batchSegmentIngestionType)) {
             segmentsZKMetadata = getSegmentsZKMetadataForTable(tableNameWithType);
@@ -169,8 +157,11 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
             }
           }
         } catch (Exception e) {
-          LOGGER.error("Unable to generate the SegmentGenerationAndPush task. [ table configs: {}, task configs: {} ]",
-              tableConfig, taskConfigs, e);
+          if (LOGGER.isErrorEnabled()) {
+            LOGGER.error(
+                "Unable to generate the SegmentGenerationAndPush task. [ table configs: {}, task configs: {} ]",
+                Obfuscator.DEFAULT.toJsonString(tableConfig), Obfuscator.DEFAULT.toJsonString(taskConfigs), e);
+          }
         }
       }
     }
@@ -196,10 +187,10 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
     try {
       URI inputDirURI =
           SegmentGenerationUtils.getDirectoryURI(batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI));
-      List<URI> inputFileURIs = getInputFilesFromDirectory(batchConfigMap, inputDirURI, Collections.emptySet());
+      List<URI> inputFileURIs = getInputFilesFromDirectory(batchConfigMap, inputDirURI, Set.of());
       if (inputFileURIs.isEmpty()) {
         LOGGER.warn("Skip generating SegmentGenerationAndPushTask, no input files found : {}", inputDirURI);
-        return ImmutableList.of();
+        return List.of();
       }
       if (!batchConfigMap.containsKey(BatchConfigProperties.INPUT_FORMAT)) {
         batchConfigMap.put(BatchConfigProperties.INPUT_FORMAT,
@@ -224,8 +215,10 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
       }
       return pinotTaskConfigs;
     } catch (Exception e) {
-      LOGGER.error("Unable to generate the SegmentGenerationAndPush task. [ table configs: {}, task configs: {} ]",
-          tableConfig, taskConfigs, e);
+      if (LOGGER.isErrorEnabled()) {
+        LOGGER.error("Unable to generate the SegmentGenerationAndPush task. [ table configs: {}, task configs: {} ]",
+            Obfuscator.DEFAULT.toJsonString(tableConfig), Obfuscator.DEFAULT.toJsonString(taskConfigs), e);
+      }
       throw e;
     }
   }
@@ -300,7 +293,8 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
     } else {
       singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
     }
-    singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _clusterInfoAccessor.getVipUrl());
+    singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI,
+        _clusterInfoAccessor.getVipUrlForLeadController(tableName));
     return singleFileGenerationTaskConfig;
   }
 
@@ -330,7 +324,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
         files = inputDirFS.listFiles(inputDirURI, true);
       } catch (IOException e) {
         LOGGER.error("Unable to list files under URI: {}", inputDirURI, e);
-        return Collections.emptyList();
+        return List.of();
       }
       PathMatcher includeFilePathMatcher = null;
       if (includeFileNamePattern != null) {

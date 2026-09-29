@@ -25,49 +25,39 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.spi.config.table.TableConfig;
 
 
-/**
- * Interface to update lineage metadata based on custom inputs and garbage collect lineage entries
- */
+/// Interface to update lineage metadata based on custom inputs and garbage collect lineage entries
 public interface LineageManager {
 
-  /**
-   * Update lineage based on customMap for start replace calls
-   * @param tableConfig
-   * @param lineageEntryId
-   * @param customMap
-   * @param lineage
-   */
+  /// Update lineage based on customMap for start replace calls
+  /// @param tableConfig
+  /// @param lineageEntryId
+  /// @param customMap
+  /// @param lineage
   void updateLineageForStartReplaceSegments(TableConfig tableConfig, String lineageEntryId,
       Map<String, String> customMap, SegmentLineage lineage);
 
-  /**
-   * Update lineage based on customMap for end replace calls
-   * @param tableConfig
-   * @param lineageEntryId
-   * @param customMap
-   * @param lineage
-   */
+  /// Update lineage based on customMap for end replace calls
+  /// @param tableConfig
+  /// @param lineageEntryId
+  /// @param customMap
+  /// @param lineage
   void updateLineageForEndReplaceSegments(TableConfig tableConfig, String lineageEntryId, Map<String, String> customMap,
       SegmentLineage lineage);
 
-  /**
-   * Update lineage based on customMap for revert replace calls
-   * @param tableConfig
-   * @param lineageEntryId
-   * @param customMap
-   * @param lineage
-   */
+  /// Update lineage based on customMap for revert replace calls
+  /// @param tableConfig
+  /// @param lineageEntryId
+  /// @param customMap
+  /// @param lineage
   void updateLineageForRevertReplaceSegments(TableConfig tableConfig, String lineageEntryId,
       Map<String, String> customMap, SegmentLineage lineage);
 
-  /**
-   * Update lineage for retention purposes
-   * @param tableConfig
-   * @param lineage
-   * @param allSegments
-   * @param segmentsToDelete
-   * @param consumingSegments
-   */
+  /// Update lineage for retention purposes
+  /// @param tableConfig
+  /// @param lineage
+  /// @param allSegments
+  /// @param segmentsToDelete
+  /// @param consumingSegments
   void updateLineageForRetention(TableConfig tableConfig, SegmentLineage lineage, List<String> allSegments,
       List<String> segmentsToDelete, Set<String> consumingSegments);
 }

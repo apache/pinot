@@ -65,6 +65,21 @@ public class IntOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   }
 
   @Override
+  public DataType getValueType() {
+    return DataType.INT;
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    return getDictId(Integer.valueOf(stringValue), null);
+  }
+
+  @Override
+  public int indexOf(int intValue) {
+    return getDictId(intValue, null);
+  }
+
+  @Override
   public int compare(int dictId1, int dictId2) {
     return Integer.compare(getIntValue(dictId1), getIntValue(dictId2));
   }
@@ -171,20 +186,6 @@ public class IntOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.INT;
-  }
-
-  @Override
-  public int indexOf(String stringValue) {
-    return getDictId(Integer.valueOf(stringValue), null);
-  }
-
-  @Override
-  public int indexOf(int intValue) {
-    return getDictId(intValue, null);
-  }
-
   public Integer get(int dictId) {
     return getIntValue(dictId);
   }

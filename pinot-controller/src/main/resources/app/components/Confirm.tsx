@@ -60,10 +60,11 @@ type Props = {
   successCallback: (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => void;
   closeDialog: (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => void;
   dialogYesLabel?: string,
-  dialogNoLabel?: string
+  dialogNoLabel?: string,
+  children?: React.ReactNode
 };
 
-const Confirm = ({openDialog, dialogTitle, dialogContent, successCallback, closeDialog, dialogYesLabel = 'Yes', dialogNoLabel = 'No'}: Props) => {
+const Confirm = ({openDialog, dialogTitle, dialogContent, successCallback, closeDialog, dialogYesLabel = 'Yes', dialogNoLabel = 'No', children}: Props) => {
   const classes = useStyles();
   const [open, setOpen] = React.useState(openDialog);
 
@@ -89,6 +90,7 @@ const Confirm = ({openDialog, dialogTitle, dialogContent, successCallback, close
               {dialogContent}
             </DialogContentText>
             : dialogContent}
+          {children}
         </DialogContent>
         <DialogActions style={{paddingBottom: 20}} className={`${isStringDialog ? classes.dialogActions : ''}`}>
           <Button variant="outlined" onClick={closeDialog} color="secondary" className={classes.red}>

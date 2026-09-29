@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
@@ -32,22 +34,28 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.MapUtils.PreparedMapKey;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 
 
-public class VarByteChunkV4Test {
+public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
 
-  private static File[] _dirs;
+  protected File[] _dirs;
 
   @DataProvider(parallel = true)
   public Object[][] params() {
@@ -71,12 +79,27 @@ public class VarByteChunkV4Test {
     return params;
   }
 
+  @DataProvider
+  public Object[][] compressionTypes() {
+    return new Object[][]{
+        {ChunkCompressionType.PASS_THROUGH},
+        {ChunkCompressionType.LZ4},
+        {ChunkCompressionType.LZ4_LENGTH_PREFIXED},
+        {ChunkCompressionType.SNAPPY},
+        {ChunkCompressionType.ZSTANDARD}
+    };
+  }
+
+  protected String getTestDirName() {
+    return "VarByteChunkV4Test";
+  }
+
   @BeforeClass
   public void forceMkDirs()
       throws IOException {
     _dirs = new File[10];
     for (int i = 0; i < _dirs.length; i++) {
-      _dirs[i] = new File(new File(FileUtils.getTempDirectory(), UUID.randomUUID().toString()), "VarByteChunkV4Test");
+      _dirs[i] = new File(new File(FileUtils.getTempDirectory(), UUID.randomUUID().toString()), getTestDirName());
       FileUtils.forceMkdir(_dirs[i]);
     }
   }
@@ -93,7 +116,7 @@ public class VarByteChunkV4Test {
       throws IOException {
     File stringSVFile = new File(file, "testStringSV");
     testWriteRead(stringSVFile, compressionType, longestEntry, chunkSize, FieldSpec.DataType.STRING, x -> x,
-        VarByteChunkForwardIndexWriterV4::putString, (reader, context, docId) -> reader.getString(docId, context));
+        VarByteChunkWriter::putString, (reader, context, docId) -> reader.getString(docId, context));
     FileUtils.deleteQuietly(stringSVFile);
   }
 
@@ -102,7 +125,7 @@ public class VarByteChunkV4Test {
       throws IOException {
     File bytesSVFile = new File(file, "testBytesSV");
     testWriteRead(bytesSVFile, compressionType, longestEntry, chunkSize, FieldSpec.DataType.BYTES,
-        x -> x.getBytes(StandardCharsets.UTF_8), VarByteChunkForwardIndexWriterV4::putBytes,
+        x -> x.getBytes(StandardCharsets.UTF_8), VarByteChunkWriter::putBytes,
         (reader, context, docId) -> reader.getBytes(docId, context));
     FileUtils.deleteQuietly(bytesSVFile);
   }
@@ -112,7 +135,7 @@ public class VarByteChunkV4Test {
       throws IOException {
     File stringMVFile = new File(file, "testStringMV");
     testWriteRead(stringMVFile, compressionType, longestEntry, chunkSize, FieldSpec.DataType.STRING,
-        new StringSplitterMV(), VarByteChunkForwardIndexWriterV4::putStringMV,
+        new StringSplitterMV(), VarByteChunkWriter::putStringMV,
         (reader, context, docId) -> reader.getStringMV(docId, context));
     FileUtils.deleteQuietly(stringMVFile);
   }
@@ -122,8 +145,118 @@ public class VarByteChunkV4Test {
       throws IOException {
     File bytesMVFile = new File(file, "testBytesMV");
     testWriteRead(bytesMVFile, compressionType, longestEntry, chunkSize, FieldSpec.DataType.BYTES, new ByteSplitterMV(),
-        VarByteChunkForwardIndexWriterV4::putBytesMV, (reader, context, docId) -> reader.getBytesMV(docId, context));
+        VarByteChunkWriter::putBytesMV, (reader, context, docId) -> reader.getBytesMV(docId, context));
     FileUtils.deleteQuietly(bytesMVFile);
+  }
+
+  /// A sealed MAP column is a chunked raw index over serialized frames, and a projected `attributes['key']` resolves
+  /// to a selective read against it. Pins that the V4 implementation, also inherited by V5 and V6, agrees with
+  /// deserializing the whole frame for every compression type.
+  @Test(dataProvider = "params")
+  public void testMapSV(File file, ChunkCompressionType compressionType, int longestEntry, int chunkSize)
+      throws Exception {
+    File mapSVFile = new File(file, "testMapSV");
+    int numDocs = 1000;
+    List<Map<String, Object>> maps = new ArrayList<>(numDocs);
+    try (VarByteChunkWriter writer = createWriter(mapSVFile, compressionType, chunkSize)) {
+      for (int i = 0; i < numDocs; i++) {
+        // Dotted OpenTelemetry-style keys, the first two of equal length so the scan has to compare their bytes
+        // rather than skip on a length mismatch.
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("k8s.workload.name", "workload-" + i);
+        map.put("k8s.workload.kind", "Deployment");
+        map.put("k8s.namespace.name", "namespace-" + i % 7);
+        map.put("host_logical_cpus", i);
+        maps.add(map);
+        writer.putBytes(MapUtils.serializeMap(map));
+      }
+    }
+
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(mapSVFile);
+        VarByteChunkForwardIndexReaderV4 reader = createReader(buffer, FieldSpec.DataType.MAP, true);
+        VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
+      // A value-only assertion would also pass through ForwardIndexReader's full-map fallback. Pin the actual
+      // dispatch target so removing either optimized override makes this regression test fail.
+      assertSame(reader.getClass()
+              .getMethod("getMapEntryValue", int.class, VarByteChunkForwardIndexReaderV4.ReaderContext.class,
+                  PreparedMapKey.class)
+              .getDeclaringClass(),
+          VarByteChunkForwardIndexReaderV4.class);
+      assertSame(reader.getClass()
+              .getMethod("getMapEntryValueAsString", int.class, VarByteChunkForwardIndexReaderV4.ReaderContext.class,
+                  PreparedMapKey.class)
+              .getDeclaringClass(),
+          VarByteChunkForwardIndexReaderV4.class);
+      PreparedMapKey workloadName = new PreparedMapKey("k8s.workload.name");
+      PreparedMapKey cpus = new PreparedMapKey("host_logical_cpus");
+      PreparedMapKey absent = new PreparedMapKey("k8s.workload.namf");
+      for (int i = 0; i < numDocs; i++) {
+        Map<String, Object> expected = maps.get(i);
+        assertEquals(reader.getMap(i, context), expected);
+        assertEquals(reader.getMapEntryValue(i, context, workloadName), expected.get("k8s.workload.name"));
+        assertEquals(reader.getMapEntryValueAsString(i, context, workloadName), expected.get("k8s.workload.name"));
+        assertEquals(reader.getMapEntryValue(i, context, cpus), expected.get("host_logical_cpus"));
+        assertEquals(reader.getMapEntryValueAsString(i, context, cpus), String.valueOf(i));
+        assertNull(reader.getMapEntryValue(i, context, absent));
+        assertNull(reader.getMapEntryValueAsString(i, context, absent));
+      }
+    }
+    FileUtils.deleteQuietly(mapSVFile);
+  }
+
+  /// A value larger than the chunk size is stored alone in a huge chunk, which has no regular chunk header. Reading
+  /// the same doc repeatedly with one context returns the written value every time.
+  @Test(dataProvider = "compressionTypes")
+  public void testHugeValueReadTwiceSV(ChunkCompressionType compressionType)
+      throws IOException {
+    File file = new File(_dirs[0], "testHugeValueReadTwiceSV" + compressionType);
+    int chunkSize = 1024;
+    String[] values = {"small", "huge".repeat(chunkSize), "small"};
+    try (VarByteChunkWriter writer = createWriter(file, compressionType, chunkSize)) {
+      for (String value : values) {
+        writer.putString(value);
+      }
+    }
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file);
+        VarByteChunkForwardIndexReaderV4 reader = createReader(buffer, FieldSpec.DataType.STRING, true);
+        VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
+      for (int docId = 0; docId < values.length; docId++) {
+        assertEquals(reader.getString(docId, context), values[docId]);
+        assertEquals(reader.getString(docId, context), values[docId]);
+      }
+    }
+    FileUtils.deleteQuietly(file);
+  }
+
+  /// Multi-value counterpart of [#testHugeValueReadTwiceSV], reading the huge doc through each MV accessor in turn.
+  @Test(dataProvider = "compressionTypes")
+  public void testHugeValueReadTwiceMV(ChunkCompressionType compressionType)
+      throws IOException {
+    File file = new File(_dirs[0], "testHugeValueReadTwiceMV" + compressionType);
+    int chunkSize = 1024;
+    String[] hugeValue = new String[chunkSize];
+    for (int i = 0; i < hugeValue.length; i++) {
+      hugeValue[i] = "huge-" + i;
+    }
+    String[][] values = {{"small"}, hugeValue, {"small", "values"}};
+    try (VarByteChunkWriter writer = createWriter(file, compressionType, chunkSize)) {
+      for (String[] value : values) {
+        writer.putStringMV(value);
+      }
+    }
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file);
+        VarByteChunkForwardIndexReaderV4 reader = createReader(buffer, FieldSpec.DataType.STRING, false);
+        VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
+      String[] valueBuffer = new String[hugeValue.length];
+      for (int docId = 0; docId < values.length; docId++) {
+        String[] expected = values[docId];
+        assertEquals(reader.getNumValuesMV(docId, context), expected.length);
+        assertEquals(reader.getStringMV(docId, context), expected);
+        assertEquals(reader.getStringMV(docId, valueBuffer, context), expected.length);
+        assertEquals(Arrays.copyOf(valueBuffer, expected.length), expected);
+      }
+    }
+    FileUtils.deleteQuietly(file);
   }
 
   static class StringSplitterMV implements Function<String, String[]> {
@@ -150,45 +283,53 @@ public class VarByteChunkV4Test {
     }
   }
 
-  private <T> void testWriteRead(File file, ChunkCompressionType compressionType, int longestEntry, int chunkSize,
+  protected VarByteChunkWriter createWriter(File file, ChunkCompressionType compressionType, int chunkSize)
+      throws IOException {
+    return new VarByteChunkForwardIndexWriterV4(file, compressionType, chunkSize);
+  }
+
+  protected VarByteChunkForwardIndexReaderV4 createReader(PinotDataBuffer buffer, FieldSpec.DataType dataType,
+      boolean isSingleValue) {
+    return new VarByteChunkForwardIndexReaderV4(buffer, dataType, isSingleValue);
+  }
+
+  protected <T> void testWriteRead(File file, ChunkCompressionType compressionType, int longestEntry, int chunkSize,
       FieldSpec.DataType dataType, Function<String, T> forwardMapper,
-      BiConsumer<VarByteChunkForwardIndexWriterV4, T> write,
+      BiConsumer<VarByteChunkWriter, T> write,
       Read<T> read)
       throws IOException {
     List<T> values = randomStrings(1000, longestEntry).map(forwardMapper).collect(Collectors.toList());
-    try (VarByteChunkForwardIndexWriterV4 writer = new VarByteChunkForwardIndexWriterV4(file, compressionType,
-        chunkSize)) {
+    try (VarByteChunkWriter writer = createWriter(file, compressionType, chunkSize)) {
       for (T value : values) {
         write.accept(writer, value);
       }
     }
-    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file)) {
-      try (VarByteChunkForwardIndexReaderV4 reader = new VarByteChunkForwardIndexReaderV4(buffer, dataType,
-          true); VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
-        for (int i = 0; i < values.size(); i++) {
-          assertEquals(read.read(reader, context, i), values.get(i));
-        }
-        for (int i = 0; i < values.size(); i += 2) {
-          assertEquals(read.read(reader, context, i), values.get(i));
-        }
-        for (int i = 1; i < values.size(); i += 2) {
-          assertEquals(read.read(reader, context, i), values.get(i));
-        }
-        for (int i = 1; i < values.size(); i += 100) {
-          assertEquals(read.read(reader, context, i), values.get(i));
-        }
-        for (int i = values.size() - 1; i >= 0; i--) {
-          assertEquals(read.read(reader, context, i), values.get(i));
-        }
-        for (int i = values.size() - 1; i >= 0; i -= 2) {
-          assertEquals(read.read(reader, context, i), values.get(i));
-        }
-        for (int i = values.size() - 2; i >= 0; i -= 2) {
-          assertEquals(read.read(reader, context, i), values.get(i));
-        }
-        for (int i = values.size() - 1; i >= 0; i -= 100) {
-          assertEquals(read.read(reader, context, i), values.get(i));
-        }
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file);
+        VarByteChunkForwardIndexReaderV4 reader = createReader(buffer, dataType, true);
+        VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
+      for (int i = 0; i < values.size(); i++) {
+        assertEquals(read.read(reader, context, i), values.get(i));
+      }
+      for (int i = 0; i < values.size(); i += 2) {
+        assertEquals(read.read(reader, context, i), values.get(i));
+      }
+      for (int i = 1; i < values.size(); i += 2) {
+        assertEquals(read.read(reader, context, i), values.get(i));
+      }
+      for (int i = 1; i < values.size(); i += 100) {
+        assertEquals(read.read(reader, context, i), values.get(i));
+      }
+      for (int i = values.size() - 1; i >= 0; i--) {
+        assertEquals(read.read(reader, context, i), values.get(i));
+      }
+      for (int i = values.size() - 1; i >= 0; i -= 2) {
+        assertEquals(read.read(reader, context, i), values.get(i));
+      }
+      for (int i = values.size() - 2; i >= 0; i -= 2) {
+        assertEquals(read.read(reader, context, i), values.get(i));
+      }
+      for (int i = values.size() - 1; i >= 0; i -= 100) {
+        assertEquals(read.read(reader, context, i), values.get(i));
       }
     }
   }

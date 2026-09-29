@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +38,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Enablement;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -76,14 +75,14 @@ public class SegmentPreloadUtilsTest {
 
     // Setup mocks for TableConfig and Schema.
     TableConfig tableConfig = mock(TableConfig.class);
-    UpsertConfig upsertConfig = new UpsertConfig();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setComparisonColumn("ts");
-    upsertConfig.setEnablePreload(true);
-    upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
+    upsertConfig.setPreload(Enablement.ENABLE);
     when(tableConfig.getUpsertConfig()).thenReturn(upsertConfig);
     when(tableConfig.getTableName()).thenReturn(realtimeTableName);
     Schema schema = mock(Schema.class);
-    when(schema.getPrimaryKeyColumns()).thenReturn(Collections.singletonList("pk"));
+    when(schema.getPrimaryKeyColumns()).thenReturn(List.of("pk"));
     IndexLoadingConfig indexLoadingConfig = mock(IndexLoadingConfig.class);
     when(indexLoadingConfig.getTableConfig()).thenReturn(tableConfig);
 
@@ -93,17 +92,17 @@ public class SegmentPreloadUtilsTest {
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
     // Setup segment assignment. Only ONLINE segments are preloaded.
-    segmentAssignment.put("consuming_seg01", ImmutableMap.of(instanceId, "CONSUMING"));
-    segmentAssignment.put("consuming_seg02", ImmutableMap.of(instanceId, "CONSUMING"));
-    segmentAssignment.put("offline_seg01", ImmutableMap.of(instanceId, "OFFLINE"));
-    segmentAssignment.put("offline_seg02", ImmutableMap.of(instanceId, "OFFLINE"));
+    segmentAssignment.put("consuming_seg01", Map.of(instanceId, "CONSUMING"));
+    segmentAssignment.put("consuming_seg02", Map.of(instanceId, "CONSUMING"));
+    segmentAssignment.put("offline_seg01", Map.of(instanceId, "OFFLINE"));
+    segmentAssignment.put("offline_seg02", Map.of(instanceId, "OFFLINE"));
     String seg01Name = "testTable__0__1__" + System.currentTimeMillis();
-    segmentAssignment.put(seg01Name, ImmutableMap.of(instanceId, "ONLINE"));
+    segmentAssignment.put(seg01Name, Map.of(instanceId, "ONLINE"));
     String seg02Name = "testTable__0__2__" + System.currentTimeMillis();
-    segmentAssignment.put(seg02Name, ImmutableMap.of(instanceId, "ONLINE"));
+    segmentAssignment.put(seg02Name, Map.of(instanceId, "ONLINE"));
     // This segment is skipped as it's not from partition 0.
     String seg03Name = "testTable__1__3__" + System.currentTimeMillis();
-    segmentAssignment.put(seg03Name, ImmutableMap.of(instanceId, "ONLINE"));
+    segmentAssignment.put(seg03Name, Map.of(instanceId, "ONLINE"));
 
     SegmentZKMetadata zkMetadata = new SegmentZKMetadata(seg01Name);
     zkMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);

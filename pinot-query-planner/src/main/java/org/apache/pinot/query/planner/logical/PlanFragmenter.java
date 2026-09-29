@@ -27,8 +27,8 @@ import java.util.List;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
-import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -41,22 +41,22 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
-/**
- * PlanFragmenter is an implementation of {@link PlanNodeVisitor} to fragment a {@link SubPlan} into multiple
- * {@link PlanFragment}s.
- *
- * The fragmenting process is as follows:
- * 1. Traverse the plan tree in a depth-first manner;
- * 2. For each node, if it is a PlanFragment splittable ExchangeNode, split it into {@link MailboxReceiveNode} and
- * {@link MailboxSendNode} pair;
- * 3. Assign current PlanFragment ID to {@link MailboxReceiveNode};
- * 4. Increment current PlanFragment ID by one and assign it to the {@link MailboxSendNode}.
- */
-public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.Context> {
+/// PlanFragmenter is an implementation of [PlanNodeVisitor] to fragment a
+/// [org.apache.pinot.query.planner.SubPlan] into multiple [PlanFragment]s.
+///
+/// The fragmenting process is as follows:
+/// 1. Traverse the plan tree in a depth-first manner;
+/// 2. For each node, if it is a PlanFragment splittable ExchangeNode, split it into [MailboxReceiveNode] and
+/// [MailboxSendNode] pair;
+/// 3. Assign current PlanFragment ID to [MailboxReceiveNode];
+/// 4. Increment current PlanFragment ID by one and assign it to the [MailboxSendNode].
+public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.Context>,
+                                       EquivalentStagesReplacer.OnSubstitution {
   private final Int2ObjectOpenHashMap<PlanFragment> _planFragmentMap = new Int2ObjectOpenHashMap<>();
   private final Int2ObjectOpenHashMap<IntList> _childPlanFragmentIdsMap = new Int2ObjectOpenHashMap<>();
 
@@ -87,6 +87,30 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
   }
 
   @Override
+  public void onSubstitution(int receiver, int oldSender, int newSender) {
+    // Change the sender of the receiver to the new sender
+    IntList senders = _childPlanFragmentIdsMap.get(receiver);
+    senders.rem(oldSender);
+    if (!senders.contains(newSender)) {
+      senders.add(newSender);
+    }
+
+    // Remove the old sender and its children from the plan fragment map
+    _planFragmentMap.remove(oldSender);
+
+    IntList fragmentsToRemove = new IntArrayList();
+    fragmentsToRemove.add(oldSender);
+    while (!fragmentsToRemove.isEmpty()) {
+      int orphan = fragmentsToRemove.removeInt(fragmentsToRemove.size() - 1);
+      IntList children = _childPlanFragmentIdsMap.remove(orphan);
+      if (children != null) {
+        fragmentsToRemove.addAll(children);
+      }
+      _planFragmentMap.remove(orphan);
+    }
+  }
+
+  @Override
   public PlanNode visitAggregate(AggregateNode node, Context context) {
     return process(node, context);
   }
@@ -99,6 +123,12 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
   @Override
   public PlanNode visitJoin(JoinNode node, Context context) {
     return process(node, context);
+  }
+
+  @Deprecated(forRemoval = true, since = "1.6.0")
+  @Override
+  public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Context context) {
+    return visitJoin(node, context);
   }
 
   @Override
@@ -161,7 +191,7 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     MailboxSendNode mailboxSendNode =
         new MailboxSendNode(senderPlanFragmentId, nextPlanFragmentRoot.getDataSchema(), List.of(nextPlanFragmentRoot),
             receiverPlanFragmentId, exchangeType, distributionType, keys, node.isPrePartitioned(), node.getCollations(),
-            node.isSortOnSender());
+            node.isSortOnSender(), node.getHashFunction());
     _planFragmentMap.put(senderPlanFragmentId,
         new PlanFragment(senderPlanFragmentId, mailboxSendNode, new ArrayList<>()));
     _mailboxSendToExchangeNodeMap.put(mailboxSendNode, node);
@@ -178,6 +208,11 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
   @Override
   public PlanNode visitExplained(ExplainedNode node, Context context) {
     throw new UnsupportedOperationException("ExplainNode should not be visited by PlanNodeFragmenter");
+  }
+
+  @Override
+  public PlanNode visitUnnest(UnnestNode node, Context context) {
+    return process(node, context);
   }
 
   public IdentityHashMap<MailboxSendNode, ExchangeNode> getMailboxSendToExchangeNodeMap() {

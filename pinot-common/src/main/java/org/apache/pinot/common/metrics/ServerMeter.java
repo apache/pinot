@@ -19,13 +19,13 @@
 package org.apache.pinot.common.metrics;
 
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.spi.metrics.PinotMeter;
 
 
-/**
- * Enumeration containing all the meters exposed by the Pinot server.
- */
+/// Enumeration containing all the meters exposed by the Pinot server.
 public enum ServerMeter implements AbstractMetrics.Meter {
   QUERIES("queries", true),
+  QUERIES_ON_TABLE("queries", false),
   UNCAUGHT_EXCEPTIONS("exceptions", true),
   REQUEST_DESERIALIZATION_EXCEPTIONS("exceptions", true),
   RESPONSE_SERIALIZATION_EXCEPTIONS("exceptions", true),
@@ -54,6 +54,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_OFFSET_COMMITS("commits", true),
   REALTIME_OFFSET_COMMIT_EXCEPTIONS("exceptions", false),
   STREAM_CONSUMER_CREATE_EXCEPTIONS("exceptions", false),
+  REALTIME_ROWS_AHEAD_OF_ZK("rows", false),
+  REALTIME_UPSERT_INCONSISTENT_ROWS("rows", false),
   // number of times partition of a record did not match the partition of the stream
   REALTIME_PARTITION_MISMATCH("mismatch", false),
   REALTIME_DEDUP_DROPPED("rows", false),
@@ -68,6 +70,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   DELETED_TTL_KEYS_IN_MULTIPLE_SEGMENTS("rows", false),
   METADATA_TTL_PRIMARY_KEYS_REMOVED("rows", false),
   UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT("segments", false),
+  UPSERT_MISSED_QUERYABLE_DOC_ID_SNAPSHOT_COUNT("segments", false),
   UPSERT_PRELOAD_FAILURE("count", false),
   ROWS_WITH_ERRORS("rows", false),
   LLC_CONTROLLER_RESPONSE_NOT_SENT("messages", true),
@@ -92,24 +95,29 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   RELOAD_FAILURES("segments", false),
   REFRESH_FAILURES("segments", false),
   UNTAR_FAILURES("segments", false),
-  SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES("segments", false, "Counts the number of segment "
-      + "fetch failures"),
+  SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES("segments", false, "Counts the number of segment " + "fetch failures"),
   SEGMENT_DIR_MOVEMENT_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES("segments", false),
+  SEGMENT_BUILD_FAILURE("segments", false),
   SEGMENT_UPLOAD_FAILURE("segments", false),
   SEGMENT_UPLOAD_SUCCESS("segments", false),
   // Emitted only by Server to Deep-store segment uploader.
   SEGMENT_UPLOAD_TIMEOUT("segments", false),
   NUM_RESIZES("numResizes", false),
   RESIZE_TIME_MS("resizeTimeMs", false),
+  STAR_TREE_INDEX_BUILD_FAILURES("segments", false),
   NO_TABLE_ACCESS("tables", true),
   INDEXING_FAILURES("attributeValues", true),
 
   READINESS_CHECK_OK_CALLS("readinessCheck", true),
   READINESS_CHECK_BAD_CALLS("readinessCheck", true),
   QUERIES_KILLED("query", true),
+  QUERIES_KILLED_SCAN("queriesKilledScan", true),
+  QUERIES_KILLED_SCAN_DRY_RUN("queriesKilledScanDryRun", true),
+  QUERIES_KILLED_SCAN_ERROR("queriesKilledScanError", true),
+  QUERIES_THROTTLED("query", true),
   HEAP_CRITICAL_LEVEL_EXCEEDED("count", true),
   HEAP_PANIC_LEVEL_EXCEEDED("count", true),
 
@@ -117,6 +125,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
   NETTY_CONNECTION_RESPONSES_SENT("nettyConnection", true),
   NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
+  NETTY_CONNECTION_SEND_RESPONSE_FAILURES("nettyConnection", true),
 
   // GRPC related metrics
   GRPC_QUERIES("grpcQueries", true),
@@ -130,46 +139,145 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NUM_SEGMENTS_PRUNED_BY_VALUE("numSegmentsPrunedByValue", false),
   LARGE_QUERY_RESPONSES_SENT("largeResponses", false),
   TOTAL_THREAD_CPU_TIME_MILLIS("millis", false),
+  THREAD_MEM_ALLOCATED_BYTES("bytes", false),
+  RESPONSE_SER_MEM_ALLOCATED_BYTES("bytes", false),
+  TOTAL_MEM_ALLOCATED_BYTES("bytes", false),
   LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
+  /// Size of the initially serialized query response in bytes.
+  /// Note: This may differ from the final response actually sent to the broker if the response
+  /// is later replaced (for example, when exceeding the configured max response size).
+  QUERY_RESPONSE_SIZE("bytes", false,
+      "Size of the initially serialized query response in bytes (may differ from final response sent to broker)"),
+
+  GRPC_MEMORY_REJECTIONS("rejections", true, "Number of grpc requests rejected due to memory pressure"),
+
+  DIRECT_MEMORY_OOM("directMemoryOOMCount", true),
+
+  TABLE_CONFIG_AND_SCHEMA_REFRESH_FAILURES("tables", true, "Number of failures to refresh table config and schema"),
+
+  // PageCacheWarmup related metrics
+  PAGE_CACHE_WARMUP_QUERIES("pageCacheWarmupQueries", true),
+  PAGE_CACHE_WARMUP_SERVER_ERRORS("pageCacheWarmupServerErrors", true),
 
   // Multi-stage
-  /**
-   * Number of times the max number of rows in the hash table has been reached.
-   * It is increased at most one by one each time per stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
-   * But if a single query has 2 different join operators and each one reaches the limit, this will be increased by 2.
-   */
+  /// Number of times the max number of rows in the hash table has been reached.
+  /// It is increased at most one by one each time per stage.
+  /// That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
+  /// But if a single query has 2 different join operators and each one reaches the limit, this will be increased by 2.
   HASH_JOIN_TIMES_MAX_ROWS_REACHED("times", true),
-  /**
-   * Number of times the max number of groups has been reached.
-   * It is increased at most one by one each time per stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
-   * But if a single query has 2 different aggregate operators and each one reaches the limit, this will be increased
-   * by 2.
-   */
+  /// Number of times group by results were trimmed.
+  /// It is increased in one by each worker that reaches the limit within the stage.
+  /// That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
+  AGGREGATE_TIMES_GROUPS_TRIMMED("times", true),
+  /// Number of times the max number of groups has been reached.
+  /// It is increased in one by each worker that reaches the limit within the stage.
+  /// That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
   AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED("times", true),
-  /**
-   * The number of blocks that have been sent to the next stage without being serialized.
-   * This is the sum of all blocks sent by all workers in the stage.
-   */
+  /// Number of times the warning threshold for number of groups has been reached.
+  /// It is increased in one by each worker that reaches the limit within the stage.
+  /// That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
+  AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED("times", true),
+  /// The number of blocks that have been sent to the next stage without being serialized.
+  /// This is the sum of all blocks sent by all workers in the stage.
   MULTI_STAGE_IN_MEMORY_MESSAGES("messages", true),
-  /**
-   * The number of blocks that have been sent to the next stage in serialized format.
-   * This is the sum of all blocks sent by all workers in the stage.
-   */
+  /// The number of blocks that have been sent to the next stage in serialized format.
+  /// This is the sum of all blocks sent by all workers in the stage.
   MULTI_STAGE_RAW_MESSAGES("messages", true),
-  /**
-   * The number of bytes that have been sent to the next stage in serialized format.
-   * This is the sum of all bytes sent by all workers in the stage.
-   */
+  /// The number of bytes that have been sent to the next stage in serialized format.
+  /// This is the sum of all bytes sent by all workers in the stage.
   MULTI_STAGE_RAW_BYTES("bytes", true),
-  /**
-   * Number of times the max number of rows in window has been reached.
-   * It is increased at most one by one each time per stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
-   * But if a single query has 2 different window operators and each one reaches the limit, this will be increased by 2.
-   */
-  WINDOW_TIMES_MAX_ROWS_REACHED("times", true);
+  /// Number of times the max number of rows in window has been reached. It is increased at most one by one each time
+  /// per stage. That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
+  /// But if a single query has 2 different window operators and each one reaches the limit, this will be increased by
+  /// 2.
+  WINDOW_TIMES_MAX_ROWS_REACHED("times", true),
+
+  /// Number of tasks started by the MSE query runner
+  MULTI_STAGE_RUNNER_STARTED_TASKS("tasks", true),
+  /// Number of stats completed by the MSE query runner
+  MULTI_STAGE_RUNNER_COMPLETED_TASKS("tasks", true),
+  /// Number of tasks started by the MSE query submission executor
+  MULTI_STAGE_SUBMISSION_STARTED_TASKS("tasks", true),
+  /// Number of tasks completed by the MSE query submission executor
+  MULTI_STAGE_SUBMISSION_COMPLETED_TASKS("tasks", true),
+
+  // predownload metrics
+  PREDOWNLOAD_SEGMENT_DOWNLOAD_COUNT("predownloadSegmentCount", true),
+  PREDOWNLOAD_SEGMENT_DOWNLOAD_FAILURE_COUNT("predownloadSegmentFailureCount", true),
+  PREDOWNLOAD_SUCCEED("predownloadSucceed", true),
+  PREDOWNLOAD_FAILED("predownloadFailed", true),
+  PREDOWNLOAD_PEER_SEGMENT_DOWNLOAD_COUNT("predownloadPeerSegmentCount", true),
+  PREDOWNLOAD_PEER_SEGMENT_DOWNLOAD_FAILURE_COUNT("predownloadPeerSegmentFailureCount", false),
+  PREDOWNLOAD_DEEPSTORE_DOWNLOAD_COUNT("predownloadDeepstoreDownloadCount", true),
+
+  // reingestion metrics
+  SEGMENT_REINGESTION_FAILURE("segments", false),
+
+  // ThrottleOnCriticalHeapUsageExecutor meters
+  THROTTLE_EXECUTOR_QUEUED_TASKS("count", true,
+      "Number of tasks that have been queued in the throttle executor"),
+  THROTTLE_EXECUTOR_PROCESSED_TASKS("count", true,
+      "Number of tasks processed from the throttle executor queue"),
+  THROTTLE_EXECUTOR_TIMED_OUT_TASKS("count", true,
+      "Number of tasks that timed out in the throttle executor queue"),
+  THROTTLE_EXECUTOR_SHUTDOWN_CANCELED_TASKS("count", true,
+      "Number of tasks canceled during throttle executor shutdown"),
+
+  // commit-time compaction metrics
+  COMMIT_TIME_COMPACTION_ENABLED_SEGMENTS("segments", false,
+      "Number of segments processed with commit-time compaction enabled"),
+  COMMIT_TIME_COMPACTION_ROWS_PRE_COMPACTION("rows", false, "Total rows before commit-time compaction"),
+  COMMIT_TIME_COMPACTION_ROWS_POST_COMPACTION("rows", false, "Total rows after commit-time compaction"),
+  COMMIT_TIME_COMPACTION_ROWS_REMOVED("rows", false, "Number of rows removed during commit-time compaction"),
+  COMMIT_TIME_COMPACTION_BUILD_TIME_MS("milliseconds", false,
+      "Additional time spent in commit-time compaction processing"),
+
+  /// Approximate heap bytes used by the mutable JSON index at the time of index close.
+  MUTABLE_JSON_INDEX_MEMORY_USAGE("bytes", false),
+  INGESTION_DELAY_TRACKING_ERRORS("errors", false,
+      "Indicates the count of errors encountered while tracking ingestion delay."),
+  INGESTION_DELAY_LATEST_OFFSET_FETCH_ERRORS("errors", false,
+      "Indicates the count of errors encountered while fetching latest stream offset for tracking ingestion offset "
+          + "lag."),
+
+  TRANSFORMATION_ERROR_COUNT("rows", false),
+  DROPPED_RECORD_COUNT("rows", false),
+  CORRUPTED_RECORD_COUNT("rows", false),
+  OPEN_STRUCT_TYPE_COERCION_FAILURES("values", false,
+      "Number of OPEN_STRUCT values dropped because the value could not be coerced to the key's declared or "
+          + "already-established type"),
+  OPEN_STRUCT_TYPE_INFERENCE_FAILURES("values", false,
+      "Number of OPEN_STRUCT values stored as their serialized string form because the value's Java type maps to "
+          + "no Pinot DataType. A value that is instead dropped for failing coercion against a key's "
+          + "already-established non-STRING type is counted by openStructTypeCoercionFailures, not here"),
+  OPEN_STRUCT_IGNORED_KEY_DROPS("values", false,
+      "Number of OPEN_STRUCT map entries dropped at ingestion because the key is listed in the "
+          + "column's ignoredKeys config"),
+  // Workload related metrics
+  WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", true, "Number of times workload budget exceeded"),
+  WORKLOAD_QUERIES("queries", false),
+
+  /// Number of multi-stage execution opchains started.
+  /// This is equal to the number of stages times the average parallelism
+  MSE_OPCHAINS_STARTED("opchains", true),
+  /// Number of multi-stage execution opchains completed.
+  /// This is equal to the number of stages times the average parallelism
+  MSE_OPCHAINS_COMPLETED("opchains", true),
+
+  /// Total execution time spent in multi-stage execution on CPU in milliseconds.
+  /// This is equal to the sum of the executionTimeMs reported by the root of all the opchains executed in the server.
+  MSE_CPU_EXECUTION_TIME_MS("milliseconds", true),
+  /// Total memory allocated in bytes for multi-stage execution.
+  /// This is equal to the sum of the allocatedMemoryBytes reported by all the opchains executed in the server.
+  MSE_MEMORY_ALLOCATED_BYTES("bytes", true),
+  /// Total number of rows emitted by multi-stage execution.
+  /// This is equal to the sum of the emittedRows reported by the root of all the opchains executed in the server.
+  MSE_EMITTED_ROWS("rows", true),
+
+  /// Number of MSE queries received by this server.
+  /// This metric is incremented once per query, even if the server is acting as a leaf, intermediate, or both.
+  MSE_QUERIES("queries", true,
+      "Number of MSE queries received by this server");
 
   private final String _meterName;
   private final String _unit;
@@ -197,11 +305,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
     return _unit;
   }
 
-  /**
-   * Returns true if the metric is global (not attached to a particular resource)
-   *
-   * @return true if the metric is global
-   */
+  /// Returns true if the metric is global (not attached to a particular resource)
+  ///
+  /// @return true if the metric is global
   @Override
   public boolean isGlobal() {
     return _global;
@@ -210,5 +316,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   @Override
   public String getDescription() {
     return _description;
+  }
+
+  public PinotMeter getGlobalMeter() {
+    return ServerMetrics.get().getMeteredValue(this);
   }
 }

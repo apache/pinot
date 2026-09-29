@@ -19,15 +19,11 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -40,20 +36,21 @@ import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Optimized combine operator for selection order-by queries.
- * <p>When the first order-by expression is an identifier (column), skip processing the segments if possible based on
- * the column min/max value and keep enough documents to fulfill the LIMIT and OFFSET requirement.
- * <ul>
- *   <li>1. Sort all the segments by the column min/max value</li>
- *   <li>2. Keep processing segments until we get enough documents to fulfill the LIMIT and OFFSET requirement</li>
- *   <li>3. Skip processing the segments that cannot add values to the final result</li>
- * </ul>
- */
+/// Optimized combine operator for selection order-by queries.
+///
+/// When the first order-by expression is an identifier (column), skip processing the segments if possible based on
+/// the column min/max value and keep enough documents to fulfill the LIMIT and OFFSET requirement.
+///
+/// - 1. Sort all the segments by the column min/max value
+/// - 2. Keep processing segments until we get enough documents to fulfill the LIMIT and OFFSET requirement
+/// - 3. Skip processing the segments that cannot add values to the final result
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MinMaxValueBasedSelectionOrderByCombineOperator
     extends BaseSingleBlockCombineOperator<SelectionResultsBlock> {
@@ -87,7 +84,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
 
     _minMaxValueContexts = new ArrayList<>(_numOperators);
     for (Operator<BaseResultsBlock> operator : _operators) {
-      _minMaxValueContexts.add(new MinMaxValueContext(operator, firstOrderByColumn));
+      _minMaxValueContexts.add(new MinMaxValueContext(operator, firstOrderByColumn, queryContext.getSchema()));
     }
     if (firstOrderByExpression.isAsc()) {
       // For ascending order, sort on column min value in ascending order
@@ -121,13 +118,11 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
     return EXPLAIN_NAME;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * <p> Execute query on one or more segments in a single thread, and store multiple intermediate result blocks
-   * into BlockingQueue, skip processing the segments if possible based on the column min/max value and keep enough
-   * documents to fulfill the LIMIT and OFFSET requirement.
-   */
+  /// {@inheritDoc}
+  ///
+  /// Execute query on one or more segments in a single thread, and store multiple intermediate result blocks
+  /// into BlockingQueue, skip processing the segments if possible based on the column min/max value and keep enough
+  /// documents to fulfill the LIMIT and OFFSET requirement.
   @Override
   protected void processSegments() {
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
@@ -212,21 +207,12 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
-      Collection<Object[]> rows = resultsBlock.getRows();
-      if (rows != null && rows.size() >= _numRowsToKeep) {
+      List<Object[]> rows = resultsBlock.getRows();
+      assert rows != null;
+      int numRows = rows.size();
+      if (numRows >= _numRowsToKeep) {
         // Segment result has enough rows, update the boundary value
-
-        Comparable segmentBoundaryValue;
-        if (rows instanceof PriorityQueue) {
-          // Results from SelectionOrderByOperator
-          assert ((PriorityQueue<Object[]>) rows).peek() != null;
-          segmentBoundaryValue = (Comparable) ((PriorityQueue<Object[]>) rows).peek()[0];
-        } else {
-          // Results from LinearSelectionOrderByOperator
-          assert rows instanceof List;
-          segmentBoundaryValue = (Comparable) ((List<Object[]>) rows).get(rows.size() - 1)[0];
-        }
-
+        Comparable segmentBoundaryValue = (Comparable) rows.get(numRows - 1)[0];
         if (boundaryValue == null) {
           boundaryValue = segmentBoundaryValue;
         } else {
@@ -246,19 +232,12 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * <p>Combines intermediate selection result blocks from underlying operators and returns a merged one.
-   * <ul>
-   *   <li>
-   *     Merges multiple intermediate selection result blocks as a merged one.
-   *   </li>
-   *   <li>
-   *     Set all exceptions encountered during execution into the merged result block
-   *   </li>
-   * </ul>
-   */
+  /// {@inheritDoc}
+  ///
+  /// Combines intermediate selection result blocks from underlying operators and returns a merged one.
+  ///
+  /// - Merges multiple intermediate selection result blocks as a merged one.
+  /// - Set all exceptions encountered during execution into the merged result block
   @Override
   protected BaseResultsBlock mergeResults()
       throws Exception {
@@ -270,16 +249,18 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
           _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
       if (blockToMerge == null) {
         // Query times out, skip merging the remaining results blocks
-        LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
-            _queryContext);
-        return new ExceptionResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
-            new TimeoutException("Timed out while polling results block")));
+        String logMsg = "Timed out while polling results block, numBlocksMerged: " + numBlocksMerged + " (query: "
+            + _queryContext + ")";
+        LOGGER.error(logMsg);
+        QueryErrorMessage errMsg = new QueryErrorMessage(
+            QueryErrorCode.EXECUTION_TIMEOUT, "Timed out while polling results block", logMsg);
+        return new ExceptionResultsBlock(errMsg);
       }
       if (blockToMerge == EMPTY_RESULTS_BLOCK) {
         numBlocksMerged++;
         continue;
       }
-      if (blockToMerge.getProcessingExceptions() != null) {
+      if (blockToMerge.getErrorMessages() != null) {
         // Caught exception while processing segment, skip merging the remaining results blocks and directly return
         // the exception
         return blockToMerge;
@@ -310,8 +291,8 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
               mergedDataSchema, dataSchemaToMerge);
       // NOTE: This is segment level log, so log at debug level to prevent flooding the log.
       LOGGER.debug(errorMessage);
-      mergedBlock.addToProcessingExceptions(
-          QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, errorMessage));
+      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.MERGE_RESPONSE, errorMessage);
+      mergedBlock.addErrorMessage(errMsg);
       return;
     }
     SelectionOperatorUtils.mergeWithOrdering(mergedBlock, blockToMerge, _numRowsToKeep);
@@ -322,9 +303,10 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
     final Comparable _minValue;
     final Comparable _maxValue;
 
-    MinMaxValueContext(Operator<BaseResultsBlock> operator, String column) {
+    MinMaxValueContext(Operator<BaseResultsBlock> operator, String column, Schema schema) {
       _operator = operator;
-      DataSourceMetadata dataSourceMetadata = operator.getIndexSegment().getDataSource(column).getDataSourceMetadata();
+      DataSourceMetadata dataSourceMetadata =
+          operator.getIndexSegment().getDataSource(column, schema).getDataSourceMetadata();
       _minValue = dataSourceMetadata.getMinValue();
       _maxValue = dataSourceMetadata.getMaxValue();
     }

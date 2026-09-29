@@ -47,9 +47,9 @@ type Props = {
 };
 
 const defaultSchemaConfig = {
-  schemaName:'', 
-  dimensionFieldSpecs: [], 
-  metricFieldSpecs: [], 
+  schemaName:'',
+  dimensionFieldSpecs: [],
+  metricFieldSpecs: [],
   dateTimeFieldSpecs: []
 };
 
@@ -156,7 +156,7 @@ export default function AddSchemaOp({
         const types = ["dimensionFieldSpecs","metricFieldSpecs","dateTimeFieldSpecs"];
         let notEmpty = true;
         types.map((t)=>{
-          if(schemaConfig[t].length)
+          if(schemaConfig[t] && schemaConfig[t].length > 0)
           {
             notEmpty = false
           }
@@ -258,9 +258,9 @@ export default function AddSchemaOp({
         )}
 
         {editView === EditView.JSON && (
-          <CustomCodemirror 
-            data={jsonSchema} 
-            isEditable={true} 
+          <CustomCodemirror
+            data={jsonSchema}
+            isEditable={true}
             returnCodemirrorValue={(newValue)=>{
               try{
                 const jsonSchema = JSON.parse(newValue);
@@ -268,7 +268,7 @@ export default function AddSchemaOp({
                   setJsonSchema(jsonSchema);
                 }
               }catch(e){}
-            }} 
+            }}
           />
         )}
       </DialogContent>

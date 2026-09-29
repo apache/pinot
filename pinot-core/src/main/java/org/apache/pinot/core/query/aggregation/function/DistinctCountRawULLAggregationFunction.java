@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.customobject.SerializedULL;
@@ -27,12 +28,16 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class DistinctCountRawULLAggregationFunction extends DistinctCountULLAggregationFunction {
-  public DistinctCountRawULLAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments);
+  public DistinctCountRawULLAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments, nullHandlingEnabled);
   }
 
+  @Nullable
   @Override
-  public SerializedULL extractFinalResult(UltraLogLog intermediateResult) {
+  public SerializedULL extractFinalResult(@Nullable UltraLogLog intermediateResult) {
+    if (intermediateResult == null) {
+      return null;
+    }
     return new SerializedULL(intermediateResult);
   }
 

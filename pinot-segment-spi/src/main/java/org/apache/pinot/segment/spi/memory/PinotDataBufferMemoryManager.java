@@ -21,25 +21,19 @@ package org.apache.pinot.segment.spi.memory;
 import java.io.Closeable;
 
 
-/**
- * Interface for memory manager that allocates/manages PinotDataBuffer.
- * At the moment, this is far from a memory manager, and is just an allocator.
- */
+/// Interface for memory manager that allocates/manages PinotDataBuffer.
+/// At the moment, this is far from a memory manager, and is just an allocator.
 public interface PinotDataBufferMemoryManager extends Closeable {
 
-  /**
-   * Allocates and returns a PinotDataBuffer of specified size with native byte order.
-   *
-   * @param size Size of the data buffer to be allocated.
-   * @param allocationContext Context for allocation.
-   * @return Allocated data buffer.
-   */
+  /// Allocates and returns a PinotDataBuffer of specified size with native byte order.
+  ///
+  /// @param size Size of the data buffer to be allocated.
+  /// @param allocationContext Context for allocation.
+  /// @return Allocated data buffer.
   PinotDataBuffer allocate(long size, String allocationContext);
 
-  /**
-   * Returns total size of memory allocated in bytes.
-   *
-   * @return Total memory size in bytes.
-   */
+  /// Returns total size of memory allocated in bytes.
+  ///
+  /// @return Total memory size in bytes.
   long getTotalAllocatedBytes();
 }

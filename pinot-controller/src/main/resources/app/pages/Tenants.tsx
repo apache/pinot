@@ -46,6 +46,7 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
     [InstanceType.BROKER]: null,
     [InstanceType.SERVER]: null,
   })
+  const [liveInstanceNames, setLiveInstanceNames] = useState<string[]>();
 
   useEffect(() => {
      fetchInstanceData();
@@ -58,6 +59,10 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
       [InstanceType.BROKER]: Array.isArray(brokerNames) ? brokerNames : [],
       [InstanceType.SERVER]: Array.isArray(serverNames) ? serverNames : [],
     });
+
+    const liveInstanceNames = await PinotMethodUtils.getLiveInstances();
+    setLiveInstanceNames(liveInstanceNames.data || []);
+
   }
 
   return (
@@ -76,16 +81,18 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
           <div>
             <CustomButton
               onClick={() => {}}
-              tooltipTitle="Recalculates the segment to server mapping for all tables in this tenant"
-              enableTooltip={true}
+              // Tooltips do not render on disabled buttons. Add this back when we have a working implementation.
+              // tooltipTitle="Recalculates the segment to server mapping for all tables in this tenant"
+              // enableTooltip={true}
               isDisabled={true}
             >
               Rebalance Server Tenant
             </CustomButton>
             <CustomButton
               onClick={() => {}}
-              tooltipTitle="Rebuilds brokerResource mappings for all tables in this tenant"
-              enableTooltip={true}
+              // Tooltips do not render on disabled buttons. Add this back when we have a working implementation.
+              // tooltipTitle="Rebuilds brokerResource mappings for all tables in this tenant"
+              // enableTooltip={true}
               isDisabled={true}
             >
               Rebuild Broker Resource
@@ -99,18 +106,20 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
         baseUrl={`/tenants/${tenantName}/table/`}
       />
       <Grid container spacing={2}>
-        <Grid item xs={6}>
+        <Grid item xs={12}>
           <AsyncInstanceTable
             instanceNames={instanceNames[InstanceType.BROKER]}
             instanceType={InstanceType.BROKER}
-            tenant={tenantName}
+            liveInstanceNames={liveInstanceNames}
+            showInstanceDetails
           />
         </Grid>
-        <Grid item xs={6}>
+        <Grid item xs={12}>
           <AsyncInstanceTable
             instanceNames={instanceNames[InstanceType.SERVER]}
             instanceType={InstanceType.SERVER}
-            tenant={tenantName}
+            liveInstanceNames={liveInstanceNames}
+            showInstanceDetails
           />
         </Grid>
       </Grid>

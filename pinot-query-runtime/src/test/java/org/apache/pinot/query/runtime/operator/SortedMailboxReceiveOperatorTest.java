@@ -27,7 +27,6 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
@@ -38,10 +37,10 @@ import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.routing.SharedMailboxInfos;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterMethod;
@@ -55,6 +54,7 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -119,18 +119,18 @@ public class SortedMailboxReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     try (SortedMailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON,
         DATA_SCHEMA, FIELD_COLLATIONS, System.currentTimeMillis() + 100L)) {
-      TransferableBlock block = operator.nextBlock();
-      assertTrue(block.isErrorBlock());
-      assertTrue(block.getExceptions().containsKey(QueryException.EXECUTION_TIMEOUT_ERROR_CODE));
+      MseBlock block = operator.nextBlock();
+      assertTrue(block.isError());
+      assertTrue(((ErrorMseBlock) block).getErrorMessages().containsKey(QueryErrorCode.EXECUTION_TIMEOUT));
     }
   }
 
   @Test
   public void shouldReceiveEosDirectlyFromSender() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    when(_mailbox1.poll()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.eosWithEmptyStats());
     try (SortedMailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON)) {
-      assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
+      assertTrue(operator.nextBlock().isSuccess());
     }
   }
 
@@ -138,13 +138,14 @@ public class SortedMailboxReceiveOperatorTest {
   public void shouldReceiveSingletonMailbox() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     Object[] row = new Object[]{1, 1};
-    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
-        TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_mailbox1.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row),
+        OperatorTestUtil.eosWithEmptyStats());
     try (SortedMailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON)) {
-      List<Object[]> resultRows = operator.nextBlock().getContainer();
+      List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
       assertEquals(resultRows.size(), 1);
       assertEquals(resultRows.get(0), row);
-      assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
+      assertTrue(operator.nextBlock().isSuccess());
     }
   }
 
@@ -153,28 +154,29 @@ public class SortedMailboxReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     String errorMessage = "TEST ERROR";
     when(_mailbox1.poll()).thenReturn(
-        TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(errorMessage)));
+        OperatorTestUtil.errorWithEmptyStats(new RuntimeException(errorMessage)));
     try (SortedMailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON)) {
-      TransferableBlock block = operator.nextBlock();
-      assertTrue(block.isErrorBlock());
-      assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
+      MseBlock block = operator.nextBlock();
+      assertTrue(block.isError());
+      assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.UNKNOWN).contains(errorMessage));
     }
   }
 
   @Test
   public void shouldReceiveMailboxFromTwoServersOneNull() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    when(_mailbox1.poll()).thenReturn(null, TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_mailbox1.poll()).thenReturn(null, OperatorTestUtil.eosWithEmptyStats());
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row = new Object[]{1, 1};
-    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
-        TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_mailbox2.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row),
+        OperatorTestUtil.eosWithEmptyStats());
     try (SortedMailboxReceiveOperator operator = getOperator(_stageMetadataBoth,
         RelDistribution.Type.HASH_DISTRIBUTED)) {
-      List<Object[]> resultRows = operator.nextBlock().getContainer();
+      List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
       assertEquals(resultRows.size(), 1);
       assertEquals(resultRows.get(0), row);
-      assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
+      assertTrue(operator.nextBlock().isSuccess());
     }
   }
 
@@ -183,16 +185,17 @@ public class SortedMailboxReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     String errorMessage = "TEST ERROR";
     when(_mailbox1.poll()).thenReturn(
-        TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(errorMessage)));
+        OperatorTestUtil.errorWithEmptyStats(new RuntimeException(errorMessage)));
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row = new Object[]{3, 3};
-    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
-        TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_mailbox2.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row),
+        OperatorTestUtil.eosWithEmptyStats());
     try (SortedMailboxReceiveOperator operator = getOperator(_stageMetadataBoth,
         RelDistribution.Type.HASH_DISTRIBUTED)) {
-      TransferableBlock block = operator.nextBlock();
-      assertTrue(block.isErrorBlock());
-      assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
+      MseBlock block = operator.nextBlock();
+      assertTrue(block.isError());
+      assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.UNKNOWN).contains(errorMessage));
     }
   }
 
@@ -201,19 +204,23 @@ public class SortedMailboxReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     Object[] row1 = new Object[]{3, 3};
     Object[] row2 = new Object[]{1, 1};
-    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
-        OperatorTestUtil.block(DATA_SCHEMA, row2), TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_mailbox1.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
+        OperatorTestUtil.eosWithEmptyStats());
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row3 = new Object[]{4, 2};
     Object[] row4 = new Object[]{2, 4};
     Object[] row5 = new Object[]{-1, 95};
-    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row3),
-        OperatorTestUtil.block(DATA_SCHEMA, row4), OperatorTestUtil.block(DATA_SCHEMA, row5),
-        TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_mailbox2.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row3),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row4),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row5),
+        OperatorTestUtil.eosWithEmptyStats());
     try (SortedMailboxReceiveOperator operator = getOperator(_stageMetadataBoth,
         RelDistribution.Type.HASH_DISTRIBUTED)) {
-      assertEquals(operator.nextBlock().getContainer(), List.of(row5, row2, row4, row1, row3));
-      assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
+      assertEquals(((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows(), List.of(row5, row2, row4, row1, row3));
+      assertTrue(operator.nextBlock().isSuccess());
     }
   }
 
@@ -226,20 +233,57 @@ public class SortedMailboxReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     Object[] row1 = new Object[]{3, 3, "queen"};
     Object[] row2 = new Object[]{1, 1, "pink floyd"};
-    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(dataSchema, row1),
-        OperatorTestUtil.block(dataSchema, row2), TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_mailbox1.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(dataSchema, row1),
+        OperatorTestUtil.blockWithStats(dataSchema, row2),
+        OperatorTestUtil.eosWithEmptyStats());
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row3 = new Object[]{4, 2, "pink floyd"};
     Object[] row4 = new Object[]{2, 4, "aerosmith"};
     Object[] row5 = new Object[]{-1, 95, "foo fighters"};
-    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(dataSchema, row3),
-        OperatorTestUtil.block(dataSchema, row4), OperatorTestUtil.block(dataSchema, row5),
-        TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_mailbox2.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(dataSchema, row3),
+        OperatorTestUtil.blockWithStats(dataSchema, row4),
+        OperatorTestUtil.blockWithStats(dataSchema, row5),
+        OperatorTestUtil.eosWithEmptyStats());
     try (SortedMailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED,
         dataSchema, collations, Long.MAX_VALUE)) {
-      assertEquals(operator.nextBlock().getContainer(), List.of(row1, row2, row3, row5, row4));
-      assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
+      assertEquals(((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows(), List.of(row1, row2, row3, row5, row4));
+      assertTrue(operator.nextBlock().isSuccess());
     }
+  }
+
+  /// The block this operator emits wraps the very list it buffered the rows into, and a block handed to a local
+  /// mailbox can still be read after this op chain has been closed. Releasing the buffer must therefore drop the
+  /// reference, never empty the list.
+  @Test
+  public void shouldNotEmptyTheEmittedBlockOnClose() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    Object[] row = new Object[]{1, 1};
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row),
+        OperatorTestUtil.eosWithEmptyStats());
+    SortedMailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON);
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(resultRows.size(), 1);
+
+    operator.close();
+
+    assertEquals(resultRows.size(), 1, "the emitted block must survive the operator being closed");
+    assertEquals(resultRows.get(0), row);
+  }
+
+  /// The buffered rows must be gone on the error path too, not only once the sorted block has been produced.
+  @Test
+  public void shouldReleaseBufferedRowsOnError() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{1, 1}),
+        OperatorTestUtil.errorWithEmptyStats(new RuntimeException("TEST ERROR")));
+    SortedMailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON);
+    assertTrue(operator.nextBlock().isError());
+
+    operator.cancel(new RuntimeException("TEST ERROR"));
+
+    assertFalse(operator.hasBufferedState());
   }
 
   private SortedMailboxReceiveOperator getOperator(StageMetadata stageMetadata, RelDistribution.Type distributionType,

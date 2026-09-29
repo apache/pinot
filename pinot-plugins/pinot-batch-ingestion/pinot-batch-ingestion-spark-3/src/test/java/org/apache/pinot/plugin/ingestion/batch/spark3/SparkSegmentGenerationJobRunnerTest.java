@@ -23,7 +23,7 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
@@ -107,7 +107,7 @@ public class SparkSegmentGenerationJobRunnerTest {
     PinotFSSpec pfsSpec = new PinotFSSpec();
     pfsSpec.setScheme("file");
     pfsSpec.setClassName(LocalPinotFS.class.getName());
-    jobSpec.setPinotFSSpecs(Collections.singletonList(pfsSpec));
+    jobSpec.setPinotFSSpecs(List.of(pfsSpec));
 
     return jobSpec;
   }
@@ -163,7 +163,7 @@ public class SparkSegmentGenerationJobRunnerTest {
     PinotFSSpec pfsSpec = new PinotFSSpec();
     pfsSpec.setScheme("file");
     pfsSpec.setClassName(LocalPinotFS.class.getName());
-    jobSpec.setPinotFSSpecs(Collections.singletonList(pfsSpec));
+    jobSpec.setPinotFSSpecs(List.of(pfsSpec));
 
     return jobSpec;
   }
@@ -299,7 +299,7 @@ public class SparkSegmentGenerationJobRunnerTest {
     PinotFSSpec pfsSpec = new PinotFSSpec();
     pfsSpec.setScheme("file");
     pfsSpec.setClassName(LocalPinotFS.class.getName());
-    jobSpec.setPinotFSSpecs(Collections.singletonList(pfsSpec));
+    jobSpec.setPinotFSSpecs(List.of(pfsSpec));
 
     SparkSegmentGenerationJobRunner jobRunner = new SparkSegmentGenerationJobRunner(jobSpec);
     jobRunner.run();

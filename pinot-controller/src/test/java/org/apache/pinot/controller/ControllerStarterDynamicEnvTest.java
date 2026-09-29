@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.controller;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.HelixConfigScope;
@@ -31,7 +31,6 @@ import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.CONTROLLER_HOST;
@@ -41,11 +40,10 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.CONTROLLER_INSTAN
 import static org.testng.Assert.*;
 
 
-/**
- * This class tests env variables when starting controller from configs
- */
+/// This class tests env variables when starting controller from configs
 public class ControllerStarterDynamicEnvTest extends ControllerTest {
   private final Map<String, Object> _configOverride = new HashMap<>();
+  private int _controllerPortOverride;
 
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
@@ -56,10 +54,11 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
   @Test
   public void testNoVariable()
       throws Exception {
+    int controllerPort = findControllerPortInForkRange();
     _configOverride.clear();
     _configOverride.put(CONTROLLER_HOST, "myHost");
     _configOverride.put(CONFIG_OF_INSTANCE_ID, "Controller_myInstance");
-    _configOverride.put(CONTROLLER_PORT, 1234);
+    _configOverride.put(CONTROLLER_PORT, controllerPort);
 
     startZk();
     this.startController();
@@ -69,8 +68,8 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, instanceId);
     assertEquals(instanceConfig.getInstanceName(), instanceId);
     assertEquals(instanceConfig.getHostName(), "myHost");
-    assertEquals(instanceConfig.getPort(), "1234");
-    assertEquals(instanceConfig.getTags(), Collections.singleton(CONTROLLER_INSTANCE));
+    assertEquals(instanceConfig.getPort(), Integer.toString(controllerPort));
+    assertEquals(instanceConfig.getTags(), Set.of(CONTROLLER_INSTANCE));
 
     stopController();
     stopZk();
@@ -79,11 +78,12 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
   @Test
   public void testOneVariable()
       throws Exception {
+    int controllerPort = findControllerPortInForkRange();
     _configOverride.clear();
     _configOverride.put("dynamic.env.config", "controller.host");
     _configOverride.put(CONTROLLER_HOST, "HOST");
     _configOverride.put(CONFIG_OF_INSTANCE_ID, "Controller_myInstance");
-    _configOverride.put(CONTROLLER_PORT, 1234);
+    _configOverride.put(CONTROLLER_PORT, controllerPort);
 
     startZk();
     this.startController();
@@ -93,8 +93,8 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, instanceId);
     assertEquals(instanceConfig.getInstanceName(), instanceId);
     assertEquals(instanceConfig.getHostName(), "myHost");
-    assertEquals(instanceConfig.getPort(), "1234");
-    assertEquals(instanceConfig.getTags(), Collections.singleton(CONTROLLER_INSTANCE));
+    assertEquals(instanceConfig.getPort(), Integer.toString(controllerPort));
+    assertEquals(instanceConfig.getTags(), Set.of(CONTROLLER_INSTANCE));
 
     stopController();
     stopZk();
@@ -103,6 +103,7 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
   @Test
   public void testMultipleVariables()
       throws Exception {
+    int controllerPort = findControllerPortInForkRange();
     _configOverride.clear();
     _configOverride.put("dynamic.env.config", "controller.host,controller.port");
     _configOverride.put(CONTROLLER_HOST, "HOST");
@@ -117,8 +118,8 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, instanceId);
     assertEquals(instanceConfig.getInstanceName(), instanceId);
     assertEquals(instanceConfig.getHostName(), "myHost");
-    assertEquals(instanceConfig.getPort(), "1234");
-    assertEquals(instanceConfig.getTags(), Collections.singleton(CONTROLLER_INSTANCE));
+    assertEquals(instanceConfig.getPort(), Integer.toString(controllerPort));
+    assertEquals(instanceConfig.getTags(), Set.of(CONTROLLER_INSTANCE));
 
     stopController();
     stopZk();
@@ -153,13 +154,12 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
       throws Exception {
     Map<String, String> envVariables = new HashMap<>();
     envVariables.put("HOST", "myHost");
-    envVariables.put("PORT", "1234");
+    envVariables.put("PORT", Integer.toString(_controllerPortOverride));
     _controllerStarter = createControllerStarter();
     _controllerStarter.init(new PinotConfiguration(properties, envVariables));
     _controllerStarter.start();
     _controllerConfig = _controllerStarter.getConfig();
     _controllerBaseApiUrl = _controllerConfig.generateVipUrl();
-    _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
     _controllerDataDir = _controllerConfig.getDataDir();
     _helixResourceManager = _controllerStarter.getHelixResourceManager();
     _helixManager = _controllerStarter.getHelixControllerManager();
@@ -187,5 +187,10 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
         break;
     }
     assertEquals(System.getProperty("user.timezone"), "UTC");
+  }
+
+  private int findControllerPortInForkRange() {
+    _controllerPortOverride = NetUtils.findOpenPort(_nextControllerPort);
+    return _controllerPortOverride;
   }
 }

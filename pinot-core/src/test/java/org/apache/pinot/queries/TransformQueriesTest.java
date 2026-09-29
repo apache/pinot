@@ -19,10 +19,10 @@
 
 package org.apache.pinot.queries;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -56,6 +56,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 
 
@@ -130,19 +131,22 @@ public class TransformQueriesTest extends BaseQueriesTest {
     row.putValue(TIME, new DateTime(1973, 1, 8, 14, 6, 4, 3, DateTimeZone.UTC).getMillis());
     rows.add(row);
 
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME)
-        .setIngestionConfig(new IngestionConfig(null, null, null, null,
-            Arrays.asList(new TransformConfig(M1_V2, "Groovy({INT_COL1_V3  == null || "
-                + "INT_COL1_V3 == Integer.MIN_VALUE ? INT_COL1 : INT_COL1_V3 }, INT_COL1, INT_COL1_V3)")),
-            null, null, null, null))
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig(M1_V2, "Groovy({INT_COL1_V3  == null || "
+        + "INT_COL1_V3 == Integer.MIN_VALUE ? INT_COL1 : INT_COL1_V3 }, INT_COL1, INT_COL1_V3)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME)
+        .setIngestionConfig(ingestionConfig)
         .build();
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
-            .addSingleValueDimension(M1, FieldSpec.DataType.INT).addSingleValueDimension(M2, FieldSpec.DataType.INT)
-            .addSingleValueDimension(M3, FieldSpec.DataType.LONG).addSingleValueDimension(M4, FieldSpec.DataType.LONG)
-            .addSingleValueDimension(M1_V2, FieldSpec.DataType.INT)
-            .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME), null).build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(D1, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(M1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(M2, FieldSpec.DataType.INT)
+        .addSingleValueDimension(M3, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(M4, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(M1_V2, FieldSpec.DataType.INT)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME), null)
+        .build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
@@ -231,7 +235,9 @@ public class TransformQueriesTest extends BaseQueriesTest {
     GroupByOperator groupByOperator = getOperator(query);
     AggregationGroupByResult aggregationGroupByResult = groupByOperator.nextBlock().getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
-    List<GroupKeyGenerator.GroupKey> groupKeys = ImmutableList.copyOf(aggregationGroupByResult.getGroupKeyIterator());
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+    List<GroupKeyGenerator.GroupKey> groupKeys = List.of(groupKeyIterator.next());
+    assertFalse(groupKeyIterator.hasNext());
     assertEquals(groupKeys.size(), 1);
     assertEquals(groupKeys.get(0)._keys, expectedGroupKey);
     Object resultForKey = aggregationGroupByResult.getResultForGroupId(groupKeys.get(0)._groupId, 0);
@@ -262,10 +268,8 @@ public class TransformQueriesTest extends BaseQueriesTest {
     runAndVerifyInterSegmentQuery(query, 1.0);
   }
 
-  /**
-   * This test checks the groovy transform when generic raw data could have some values that can be used to
-   * ingest values into pinot column with a different name.
-   */
+  /// This test checks the groovy transform when generic raw data could have some values that can be used to
+  /// ingest values into pinot column with a different name.
   @Test
   public void testGroovyTransformQuery() {
     String query = "SELECT INT_COL1, INT_COL1_V2 FROM testTable";

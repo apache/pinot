@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datatable.StatMap;
@@ -30,9 +33,14 @@ import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -47,6 +55,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -75,16 +84,16 @@ public class AggregateOperatorTest {
     List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
     List<Integer> filterArgs = List.of(-1);
     List<Integer> groupKeys = List.of(0);
-    when(_input.nextBlock()).thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("foo!")));
+    when(_input.nextBlock()).thenReturn(ErrorMseBlock.fromException(new Exception("foo!")));
     DataSchema resultSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys);
 
     // When:
-    TransferableBlock block = operator.nextBlock();
+    MseBlock block = operator.nextBlock();
 
     // Then:
     verify(_input, times(1)).nextBlock();
-    assertTrue(block.isErrorBlock(), "Input errors should propagate immediately");
+    assertTrue(block.isError(), "Input errors should propagate immediately");
   }
 
   @Test
@@ -93,16 +102,16 @@ public class AggregateOperatorTest {
     List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
     List<Integer> filterArgs = List.of(-1);
     List<Integer> groupKeys = List.of(0);
-    when(_input.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_input.nextBlock()).thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys);
 
     // When:
-    TransferableBlock block = operator.nextBlock();
+    MseBlock block = operator.nextBlock();
 
     // Then:
     verify(_input, times(1)).nextBlock();
-    assertTrue(block.isEndOfStreamBlock(), "EOS blocks should propagate");
+    assertTrue(block.isEos(), "EOS blocks should propagate");
   }
 
   @Test
@@ -113,18 +122,18 @@ public class AggregateOperatorTest {
     List<Integer> groupKeys = List.of(0);
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, DOUBLE});
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1.0}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{2, 1.0},
         "Expected two columns (group by key, agg value), agg value is final result");
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -136,18 +145,23 @@ public class AggregateOperatorTest {
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, DOUBLE});
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1.0}, new Object[]{2, 2.0}))
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 3.0}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
+    when(_input.calculateStats()).thenReturn(MultiStageQueryStats.emptyStats(0));
     DataSchema resultSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{2, 6.0},
         "Expected two columns (group by key, agg value), agg value is final result");
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+    MultiStageQueryStats stats = operator.calculateStats();
+    StatMap<AggregateOperator.StatKey> statMap = OperatorTestUtil.getStatMap(AggregateOperator.StatKey.class, stats);
+    assertEquals(statMap.getLong(AggregateOperator.StatKey.NUM_GROUPS), 1,
+        "Num groups should equal the number of distinct group keys");
   }
 
   @Test
@@ -162,19 +176,47 @@ public class AggregateOperatorTest {
     when(_input.nextBlock()).thenReturn(
             OperatorTestUtil.block(inSchema, new Object[]{2, 1.0, 0}, new Object[]{2, 2.0, 1}))
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 3.0, 1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "sum", "sumWithFilter"}, new ColumnDataType[]{INT, DOUBLE, DOUBLE});
     AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{2, 6.0, 5.0},
         "Expected three columns (group by key, agg value, agg value with filter), agg value is final result");
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testFilteredAggregateWithNullValues() {
+    // Given:
+    List<RexExpression.FunctionCall> aggCalls =
+        List.of(getSum(new RexExpression.InputRef(1)), getSum(new RexExpression.InputRef(1)));
+    List<Integer> filterArgs = List.of(-1, 2);
+    List<Integer> groupKeys = List.of(0);
+    DataSchema inSchema =
+        new DataSchema(new String[]{"group", "arg", "filterArg"}, new ColumnDataType[]{INT, DOUBLE, BOOLEAN});
+    // null for the filterArg should be treated as false
+    when(_input.nextBlock()).thenReturn(
+            OperatorTestUtil.block(inSchema, new Object[]{2, 1.0, null}, new Object[]{2, 2.0, 1}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 3.0, 1}))
+        .thenReturn(SuccessMseBlock.INSTANCE);
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "sum", "sumWithFilter"}, new ColumnDataType[]{INT, DOUBLE, DOUBLE});
+    AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{2, 6.0, 5.0},
+        "Expected three columns (group by key, agg value, agg value with filter), agg value is final result");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -188,7 +230,7 @@ public class AggregateOperatorTest {
     DataSchema resultSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{STRING, DOUBLE});
     AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys);
 
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 2);
     if (resultRows.get(0)[0].equals("Aa")) {
       assertEquals(resultRows.get(0), new Object[]{"Aa", 1.0});
@@ -197,14 +239,14 @@ public class AggregateOperatorTest {
       assertEquals(resultRows.get(0), new Object[]{"BB", 5.0});
       assertEquals(resultRows.get(1), new Object[]{"Aa", 1.0});
     }
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
+    assertTrue(operator.nextBlock().isSuccess());
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*AVERAGE.*")
   public void shouldThrowOnUnknownAggFunction() {
     // Given:
     List<RexExpression.FunctionCall> aggCalls =
-        List.of(new RexExpression.FunctionCall(ColumnDataType.INT, "AVERAGE", List.of()));
+        List.of(new RexExpression.FunctionCall(INT, "AVERAGE", List.of()));
     List<Integer> filterArgs = List.of(-1);
     List<Integer> groupKeys = List.of(0);
     DataSchema resultSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
@@ -224,16 +266,17 @@ public class AggregateOperatorTest {
         // TODO: it is necessary to produce two values here, the operator only throws on second
         // (see the comment in Aggregate operator)
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "foo"}, new Object[]{2, "foo"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
     AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys);
 
     // When:
-    TransferableBlock block = operator.nextBlock();
+    MseBlock block = operator.nextBlock();
 
     // Then:
-    assertTrue(block.isErrorBlock(), "expected ERROR block from invalid computation");
-    assertTrue(block.getExceptions().get(1000).contains("cannot be cast to class"),
+    assertTrue(block.isError(), "expected ERROR block from invalid computation");
+    assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.UNKNOWN)
+            .contains("cannot be cast to class"),
         "expected it to fail with class cast exception");
   }
 
@@ -246,23 +289,108 @@ public class AggregateOperatorTest {
     PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.AGGREGATE_HINT_OPTIONS,
         Map.of(PinotHintOptions.AggregateOptions.NUM_GROUPS_LIMIT, "1")));
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, DOUBLE});
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1.0}, new Object[]{3, 2.0}))
-        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{3, 3.0}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+
+    _input = new BlockListMultiStageOperator.Builder(inSchema)
+        .spied()
+        .addRow(2, 1.0)
+        .addRow(3, 2.0)
+        .finishBlock()
+        .addRow(3, 3.0)
+        .buildWithEos();
     DataSchema resultSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
-    AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys, nodeHint);
+    Map<String, String> opChainMetadata = new HashMap<>();
+    opChainMetadata.put(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT, "1");
+    AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys, nodeHint, opChainMetadata);
 
     // When:
-    TransferableBlock block1 = operator.nextBlock();
-    TransferableBlock block2 = operator.nextBlock();
+    MseBlock block1 = operator.nextBlock();
+    MseBlock block2 = operator.nextBlock();
 
     // Then:
     verify(_input).earlyTerminate();
-    assertEquals(block1.getNumRows(), 1, "when group limit reach it should only return that many groups");
-    assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
-    StatMap<AggregateOperator.StatKey> statMap = OperatorTestUtil.getStatMap(AggregateOperator.StatKey.class, block2);
+    assertEquals(((MseBlock.Data) block1).getNumRows(), 1,
+        "when group limit reach it should only return that many groups");
+    assertTrue(block2.isEos(), "Second block is EOS (done processing)");
+
+    MultiStageQueryStats stats = operator.calculateStats();
+    StatMap<AggregateOperator.StatKey> statMap = OperatorTestUtil.getStatMap(AggregateOperator.StatKey.class, stats);
     assertTrue(statMap.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED),
         "num groups limit should be reached");
+    assertTrue(statMap.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED),
+        "num groups warning limit should be reached");
+    assertEquals(statMap.getLong(AggregateOperator.StatKey.NUM_GROUPS), 1,
+        "Num groups should equal the limit since only one group was accepted");
+  }
+
+  @Test
+  public void testDefaultGroupTrimSize() {
+    OpChainExecutionContext context = OperatorTestUtil.getTracingContext();
+
+    assertEquals(getAggregateOperator(context, null, 0, null).getGroupTrimSize(), Integer.MAX_VALUE);
+    assertEquals(getAggregateOperator(context, null, 10, null).getGroupTrimSize(), 10);
+
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(1));
+    assertEquals(getAggregateOperator(context, null, 0, collations).getGroupTrimSize(), Integer.MAX_VALUE);
+    assertEquals(getAggregateOperator(context, null, 10, collations).getGroupTrimSize(),
+        Server.DEFAULT_MSE_MIN_GROUP_TRIM_SIZE);
+  }
+
+  @Test
+  public void testGroupTrimSizeDependsOnContextValue() {
+    OpChainExecutionContext context =
+        OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "100"));
+    assertEquals(getAggregateOperator(context, null, 5, List.of(new RelFieldCollation(1))).getGroupTrimSize(), 100);
+  }
+
+  @Test
+  public void testGroupTrimHintOverridesContextValue() {
+    PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.AGGREGATE_HINT_OPTIONS,
+        Map.of(PinotHintOptions.AggregateOptions.MSE_MIN_GROUP_TRIM_SIZE, "30")));
+    OpChainExecutionContext context =
+        OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "100"));
+    assertEquals(getAggregateOperator(context, nodeHint, 5, List.of(new RelFieldCollation(1))).getGroupTrimSize(), 30);
+  }
+
+  private AggregateOperator getAggregateOperator(OpChainExecutionContext context, PlanNode.NodeHint nodeHint, int limit,
+      @Nullable List<RelFieldCollation> collations) {
+    List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
+    List<Integer> filterArgs = List.of(-1);
+    List<Integer> groupKeys = List.of(0);
+    DataSchema resultSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
+    return new AggregateOperator(context, _input,
+        new AggregateNode(-1, resultSchema, nodeHint, List.of(), aggCalls, filterArgs, groupKeys, AggType.DIRECT, false,
+            collations, limit));
+  }
+
+  @Test
+  public void shouldRecordNumGroupsBelowLimit() {
+    // Given: 1 distinct group key, limit = 2 — below limit, no overflow
+    List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
+    List<Integer> filterArgs = List.of(-1);
+    List<Integer> groupKeys = List.of(0);
+    PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.AGGREGATE_HINT_OPTIONS,
+        Map.of(PinotHintOptions.AggregateOptions.NUM_GROUPS_LIMIT, "2")));
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, DOUBLE});
+
+    _input = new BlockListMultiStageOperator.Builder(inSchema)
+        .addRow(2, 1.0)
+        .addRow(2, 2.0)
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
+    AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys, nodeHint, Map.of());
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    assertEquals(resultRows.size(), 1);
+    assertTrue(operator.nextBlock().isEos());
+    MultiStageQueryStats stats = operator.calculateStats();
+    StatMap<AggregateOperator.StatKey> statMap = OperatorTestUtil.getStatMap(AggregateOperator.StatKey.class, stats);
+    assertFalse(statMap.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED),
+        "Num groups limit should not be reached when groups are below limit");
+    assertEquals(statMap.getLong(AggregateOperator.StatKey.NUM_GROUPS), 1,
+        "Num groups should equal 1");
   }
 
   private static RexExpression.FunctionCall getSum(RexExpression arg) {
@@ -270,14 +398,15 @@ public class AggregateOperatorTest {
   }
 
   private AggregateOperator getOperator(DataSchema resultSchema, List<RexExpression.FunctionCall> aggCalls,
-      List<Integer> filterArgs, List<Integer> groupKeys, PlanNode.NodeHint nodeHint) {
-    return new AggregateOperator(OperatorTestUtil.getTracingContext(), _input,
+      List<Integer> filterArgs, List<Integer> groupKeys, PlanNode.NodeHint nodeHint,
+      Map<String, String> opChainMetadata) {
+    return new AggregateOperator(OperatorTestUtil.getContext(opChainMetadata), _input,
         new AggregateNode(-1, resultSchema, nodeHint, List.of(), aggCalls, filterArgs, groupKeys, AggType.DIRECT,
-            false));
+            false, null, 0));
   }
 
   private AggregateOperator getOperator(DataSchema resultSchema, List<RexExpression.FunctionCall> aggCalls,
       List<Integer> filterArgs, List<Integer> groupKeys) {
-    return getOperator(resultSchema, aggCalls, filterArgs, groupKeys, PlanNode.NodeHint.EMPTY);
+    return getOperator(resultSchema, aggCalls, filterArgs, groupKeys, PlanNode.NodeHint.EMPTY, Map.of());
   }
 }

@@ -22,13 +22,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
 import com.google.common.base.Splitter;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,12 +37,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -50,9 +55,15 @@ import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils.SqlOptionsMode;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -64,8 +75,15 @@ import org.slf4j.LoggerFactory;
 public class RequestUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(RequestUtils.class);
   private static final JsonNode EMPTY_OBJECT_NODE = new ObjectMapper().createObjectNode();
+  // This class will only be loaded when a query request comes in, which should only be after the server startup has
+  // completed and the global instance config context is initialized.
+  private static boolean _useLegacyLiteralUnescaping = CommonConstants.Helix.DEFAULT_SSE_LEGACY_LITERAL_UNESCAPING;
 
   private RequestUtils() {
+  }
+
+  public static void setUseLegacyLiteralUnescaping(boolean useLegacyLiteralUnescaping) {
+    _useLegacyLiteralUnescaping = useLegacyLiteralUnescaping;
   }
 
   public static SqlNodeAndOptions parseQuery(String query)
@@ -82,23 +100,34 @@ public class RequestUtils {
     return sqlNodeAndOptions;
   }
 
-  /**
-   * Sets extra options for the given query.
-   */
+  /// Merges the request payload options (`queryOptions` and `trace`) into the options parsed from the SQL. The SQL
+  /// options take precedence, unless the request sets [Request.QueryOptionKey#SQL_OPTIONS_MODE] to `IGNORE` (the SQL
+  /// options are dropped) or `REJECT` (the query fails when it carries any).
   @VisibleForTesting
   public static void setOptions(SqlNodeAndOptions sqlNodeAndOptions, JsonNode jsonRequest) {
-    Map<String, String> queryOptions = new HashMap<>();
+    Map<String, String> requestOptions = new HashMap<>();
     if (jsonRequest.has(Request.QUERY_OPTIONS)) {
-      queryOptions.putAll(getOptionsFromString(jsonRequest.get(Request.QUERY_OPTIONS).asText()));
+      requestOptions.putAll(getOptionsFromString(jsonRequest.get(Request.QUERY_OPTIONS).asText()));
     }
     if (jsonRequest.has(Request.TRACE) && jsonRequest.get(Request.TRACE).asBoolean()) {
-      queryOptions.put(Request.TRACE, "true");
+      requestOptions.put(Request.TRACE, "true");
     }
-    if (!queryOptions.isEmpty()) {
-      LOGGER.debug("Query options are set to: {}", queryOptions);
+    if (requestOptions.isEmpty()) {
+      return;
     }
-    // Setting all query options back into SqlNodeAndOptions. The above ordering matters due to priority overwrite rule
-    sqlNodeAndOptions.setExtraOptions(queryOptions);
+    LOGGER.debug("Query options are set to: {}", requestOptions);
+    requestOptions = QueryOptionsUtils.resolveCaseInsensitiveOptions(requestOptions);
+    SqlOptionsMode sqlOptionsMode = QueryOptionsUtils.getSqlOptionsMode(requestOptions);
+    Map<String, String> sqlOptions = sqlNodeAndOptions.getOptions();
+    if (sqlOptionsMode != SqlOptionsMode.ALLOW && !sqlOptions.isEmpty()) {
+      if (sqlOptionsMode == SqlOptionsMode.REJECT) {
+        throw QueryErrorCode.QUERY_VALIDATION.asException(
+            "Query options are not allowed in the SQL for this request, found: " + sqlOptions.keySet());
+      }
+      sqlOptions.clear();
+    }
+    // SQL options take precedence over request options
+    requestOptions.forEach(sqlOptions::putIfAbsent);
   }
 
   public static Expression getIdentifierExpression(String identifier) {
@@ -167,6 +196,14 @@ public class RequestUtils {
     return Literal.stringArrayValue(Arrays.asList(value));
   }
 
+  public static Literal getLiteral(byte[][] value) {
+    List<ByteBuffer> bytesArray = new ArrayList<>(value.length);
+    for (byte[] bytes : value) {
+      bytesArray.add(ByteBuffer.wrap(bytes.clone()));
+    }
+    return Literal.bytesArrayValue(bytesArray);
+  }
+
   public static Literal getLiteral(@Nullable Object object) {
     if (object == null) {
       return getNullLiteral();
@@ -198,6 +235,9 @@ public class RequestUtils {
     if (object instanceof byte[]) {
       return getLiteral((byte[]) object);
     }
+    if (object instanceof UUID) {
+      return getLiteral(UuidUtils.toBytes((UUID) object));
+    }
     if (object instanceof int[]) {
       return getLiteral((int[]) object);
     }
@@ -213,6 +253,9 @@ public class RequestUtils {
     if (object instanceof String[]) {
       return getLiteral((String[]) object);
     }
+    if (object instanceof byte[][]) {
+      return getLiteral((byte[][]) object);
+    }
     return getLiteral(object.toString());
   }
 
@@ -222,6 +265,8 @@ public class RequestUtils {
       BigDecimal bigDecimalValue = node.bigDecimalValue();
       assert bigDecimalValue != null;
       SqlNumericLiteral sqlNumericLiteral = (SqlNumericLiteral) node;
+      // TODO: this check doesn't protect from overflow during big decimal -> long conversion!
+      // e.g. 92233720368547758071 literal produces -9 of INT type
       if (sqlNumericLiteral.isExact() && sqlNumericLiteral.isInteger()) {
         long longValue = bigDecimalValue.longValue();
         if (longValue <= Integer.MAX_VALUE && longValue >= Integer.MIN_VALUE) {
@@ -238,11 +283,15 @@ public class RequestUtils {
         case BOOLEAN:
           literal.setBoolValue(node.booleanValue());
           break;
+        case BINARY:
+          literal.setBinaryValue(node.getValueAs(byte[].class));
+          break;
         case NULL:
           literal.setNullValue(true);
           break;
         default:
-          literal.setStringValue(StringUtils.replace(node.toValue(), "''", "'"));
+          literal.setStringValue(
+              _useLegacyLiteralUnescaping ? Strings.CS.replace(node.toValue(), "''", "'") : node.toValue());
           break;
       }
     }
@@ -311,6 +360,10 @@ public class RequestUtils {
     return getLiteralExpression(getLiteral(value));
   }
 
+  public static Expression getLiteralExpression(byte[][] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
   public static Expression getLiteralExpression(SqlLiteral node) {
     return getLiteralExpression(getLiteral(node));
   }
@@ -319,9 +372,7 @@ public class RequestUtils {
     return getLiteralExpression(getLiteral(object));
   }
 
-  /**
-   * Returns the value of the given literal.
-   */
+  /// Returns the value of the given literal.
   @Nullable
   public static Object getLiteralValue(Literal literal) {
     Literal._Fields type = literal.getSetField();
@@ -354,6 +405,8 @@ public class RequestUtils {
         return getDoubleArrayValue(literal);
       case STRING_ARRAY_VALUE:
         return getStringArrayValue(literal);
+      case BYTES_ARRAY_VALUE:
+        return getBytesArrayValue(literal);
       default:
         throw new IllegalStateException("Unsupported field type: " + type);
     }
@@ -403,6 +456,19 @@ public class RequestUtils {
     return literal.getStringArrayValue().toArray(new String[0]);
   }
 
+  public static byte[][] getBytesArrayValue(Literal literal) {
+    List<ByteBuffer> list = literal.getBytesArrayValue();
+    int size = list.size();
+    byte[][] array = new byte[size][];
+    for (int i = 0; i < size; i++) {
+      ByteBuffer buffer = list.get(i).duplicate();
+      byte[] bytes = new byte[buffer.remaining()];
+      buffer.get(bytes);
+      array[i] = bytes;
+    }
+    return array;
+  }
+
   public static Pair<ColumnDataType, Object> getLiteralTypeAndValue(Literal literal) {
     Literal._Fields type = literal.getSetField();
     switch (type) {
@@ -434,14 +500,14 @@ public class RequestUtils {
         return Pair.of(ColumnDataType.DOUBLE_ARRAY, getDoubleArrayValue(literal));
       case STRING_ARRAY_VALUE:
         return Pair.of(ColumnDataType.STRING_ARRAY, getStringArrayValue(literal));
+      case BYTES_ARRAY_VALUE:
+        return Pair.of(ColumnDataType.BYTES_ARRAY, getBytesArrayValue(literal));
       default:
         throw new IllegalStateException("Unsupported field type: " + type);
     }
   }
 
-  /**
-   * Returns the string representation of the given literal.
-   */
+  /// Returns the string representation of the given literal.
   public static String getLiteralString(Literal literal) {
     Literal._Fields type = literal.getSetField();
     switch (type) {
@@ -472,9 +538,16 @@ public class RequestUtils {
     return getLiteralString(literal);
   }
 
+  /// Creates a `Function` with the given operands. The operand list stored in the returned function
+  /// is always a mutable `ArrayList`: if `operands` is not already an `ArrayList` (e.g. an immutable
+  /// `List.of(...)`), it is copied into one. Downstream query rewriters and filter optimizers mutate
+  /// operands in place (via `getOperands().replaceAll(...)`, `set(...)`, or `add(...)`), so an
+  /// immutable list would otherwise throw `UnsupportedOperationException` far from where it was
+  /// created.
   public static Function getFunction(String canonicalName, List<Expression> operands) {
     Function function = new Function(canonicalName);
-    function.setOperands(operands);
+    // Ensure a mutable ArrayList so downstream rewriters can modify operands in place.
+    function.setOperands(operands instanceof ArrayList ? operands : new ArrayList<>(operands));
     return function;
   }
 
@@ -508,39 +581,75 @@ public class RequestUtils {
     return getFunctionExpression(getFunction(canonicalName, operands));
   }
 
-  @Deprecated
-  public static Expression getFunctionExpression(String canonicalName) {
-    assert canonicalName.equalsIgnoreCase(canonicalizeFunctionNamePreservingSpecialKey(canonicalName));
-    Expression expression = new Expression(ExpressionType.FUNCTION);
-    Function function = new Function(canonicalName);
-    expression.setFunctionCall(function);
-    return expression;
-  }
-
-  /**
-   * Converts the function name into its canonical form.
-   */
+  /// Converts the function name into its canonical form.
   public static String canonicalizeFunctionName(String functionName) {
     return StringUtils.remove(functionName, '_').toLowerCase();
   }
 
-  private static final Map<String, String> CANONICAL_NAME_TO_SPECIAL_KEY_MAP;
+  private static final Map<String, String> CANONICAL_NAME_TO_SPECIAL_KEY_MAP =
+      Map.copyOf(Arrays.stream(FilterKind.values())
+          .collect(Collectors.toMap(f -> canonicalizeFunctionName(f.name()), Enum::name)));
 
-  static {
-    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
-    for (FilterKind filterKind : FilterKind.values()) {
-      builder.put(canonicalizeFunctionName(filterKind.name()), filterKind.name());
-    }
-    CANONICAL_NAME_TO_SPECIAL_KEY_MAP = builder.build();
-  }
-
-  /**
-   * Converts the function name into its canonical form, but preserving the special keys.
-   * - Keep FilterKind.name() as is because we need to read the FilterKind via FilterKind.valueOf().
-   */
+  /// Converts the function name into its canonical form, but preserving the special keys.
+  /// - Keep FilterKind.name() as is because we need to read the FilterKind via FilterKind.valueOf().
   public static String canonicalizeFunctionNamePreservingSpecialKey(String functionName) {
     String canonicalName = canonicalizeFunctionName(functionName);
     return CANONICAL_NAME_TO_SPECIAL_KEY_MAP.getOrDefault(canonicalName, canonicalName);
+  }
+
+  /// Returns true iff `expression` is an `AS`-wrapped function call
+  /// (i.e. shaped like `expr AS alias` after Calcite parsing).
+  ///
+  /// Centralises the shape check that was previously open-coded in several places
+  /// (alias appliers, MV analyzer, query-context converters).  Callers that need the
+  /// alias name or the underlying expression should use [#unwrapAlias(Expression)]
+  /// or [#extractAliasOrIdentifierName(Expression)] rather than re-implementing
+  /// this check inline.
+  public static boolean isAliased(@Nullable Expression expression) {
+    if (expression == null) {
+      return false;
+    }
+    Function function = expression.getFunctionCall();
+    return function != null && SqlKind.AS.lowerName.equals(function.getOperator());
+  }
+
+  /// Strips the `AS alias` wrapper from a SELECT-list expression and returns the
+  /// underlying source expression.  When `expression` is not aliased the original
+  /// expression is returned unchanged, so this method is safe to call unconditionally
+  /// while iterating SELECT items.
+  ///
+  /// Mirrors the local helper that previously lived in
+  /// `MaterializedViewAnalyzer#extractSourceExpression`; callers that walk a
+  /// SELECT list to inspect the aggregate / transform under each alias should use this
+  /// method instead of re-implementing the same operand-zero indirection.
+  public static Expression unwrapAlias(Expression expression) {
+    return isAliased(expression) ? expression.getFunctionCall().getOperands().get(0) : expression;
+  }
+
+  /// Extracts the user-facing column name a SELECT-list expression resolves to:
+  ///
+  ///   - `expr AS alias` ⇒ `alias`
+  ///   - bare identifier (`col`) ⇒ `col`
+  ///   - any other shape (function/literal without an alias) ⇒
+  ///     [IllegalStateException]
+  ///
+  /// Used by callers that need to map SELECT items to schema columns (e.g. MV schema
+  /// coverage checks, MV column inference).  The error message lists the offending
+  /// expression in pretty-printed form so the operator can fix their SQL without
+  /// reaching for AST internals.
+  public static String extractAliasOrIdentifierName(Expression expression) {
+    if (isAliased(expression)) {
+      Expression aliasExpr = expression.getFunctionCall().getOperands().get(1);
+      Preconditions.checkState(aliasExpr.getType() == ExpressionType.IDENTIFIER,
+          "AS alias must be an identifier, got: %s", prettyPrint(aliasExpr));
+      return aliasExpr.getIdentifier().getName();
+    }
+    if (expression.getType() == ExpressionType.IDENTIFIER) {
+      return expression.getIdentifier().getName();
+    }
+    throw new IllegalStateException(
+        "Expression '" + prettyPrint(expression)
+            + "' must be a bare column or use AS <alias> to map to a schema column");
   }
 
   public static String prettyPrint(@Nullable Expression expression) {
@@ -602,6 +711,9 @@ public class RequestUtils {
       case STRING_ARRAY_VALUE:
         return literal.getStringArrayValue().stream().map(value -> "'" + value + "'").collect(Collectors.toList())
             .toString();
+      case BYTES_ARRAY_VALUE:
+        return Arrays.stream(getBytesArrayValue(literal)).map(value -> "X'" + BytesUtils.toHexString(value) + "'")
+            .collect(Collectors.toList()).toString();
       default:
         throw new IllegalStateException("Unsupported field type: " + type);
     }
@@ -623,12 +735,35 @@ public class RequestUtils {
     return getTableNames(pinotQuery.getDataSource());
   }
 
-  @Deprecated
-  public static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
-    return getOptionsFromString(request.get(optionsKey).asText());
-  }
-
   public static Map<String, String> getOptionsFromString(String optionStr) {
     return Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=').split(optionStr);
+  }
+
+  public static void applyTimestampIndexOverrideHints(Expression expression, PinotQuery query) {
+    applyTimestampIndexOverrideHints(expression, query, timeColumnWithGranularity -> true);
+  }
+
+  public static void applyTimestampIndexOverrideHints(
+      Expression expression, PinotQuery query, Predicate<String> timeColumnWithGranularityPredicate
+  ) {
+    if (!expression.isSetFunctionCall()) {
+      return;
+    }
+    Function function = expression.getFunctionCall();
+    if (!function.getOperator().equalsIgnoreCase(TransformFunctionType.DATE_TRUNC.getName())) {
+      return;
+    }
+    String granularString = function.getOperands().get(0).getLiteral().getStringValue().toUpperCase();
+    Expression timeExpression = function.getOperands().get(1);
+    if (((function.getOperandsSize() == 2) || (function.getOperandsSize() == 3 && "MILLISECONDS".equalsIgnoreCase(
+        function.getOperands().get(2).getLiteral().getStringValue()))) && TimestampIndexUtils.isValidGranularity(
+        granularString) && timeExpression.getIdentifier() != null) {
+      String timeColumn = timeExpression.getIdentifier().getName();
+      String timeColumnWithGranularity = TimestampIndexUtils.getColumnWithGranularity(timeColumn, granularString);
+
+      if (timeColumnWithGranularityPredicate.test(timeColumnWithGranularity)) {
+        query.putToExpressionOverrideHints(expression, getIdentifierExpression(timeColumnWithGranularity));
+      }
+    }
   }
 }

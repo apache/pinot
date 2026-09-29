@@ -68,10 +68,10 @@ public class DefaultFetchPlannerTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     // No Bloomfilter for those columns.
     DataSource ds0 = mock(DataSource.class);
-    when(indexSegment.getDataSource("c0")).thenReturn(ds0);
+    when(indexSegment.getDataSourceNullable("c0")).thenReturn(ds0);
     when(ds0.getBloomFilter()).thenReturn(null);
     DataSource ds2 = mock(DataSource.class);
-    when(indexSegment.getDataSource("c2")).thenReturn(ds2);
+    when(indexSegment.getDataSourceNullable("c2")).thenReturn(ds2);
     when(ds2.getBloomFilter()).thenReturn(null);
     FetchContext fetchContext = planner.planFetchForPruning(indexSegment, queryContext);
     assertTrue(fetchContext.isEmpty());

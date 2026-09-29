@@ -23,7 +23,6 @@ import java.nio.ByteOrder;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.spi.memory.ByteBufferPinotBufferFactory;
-import org.apache.pinot.segment.spi.memory.LArrayPinotBufferFactory;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.SmallWithFallbackPinotBufferFactory;
 import org.apache.pinot.segment.spi.memory.unsafe.UnsafePinotBufferFactory;
@@ -61,7 +60,7 @@ public class BenchmarkPinotDataBuffer {
 
   @Param({"1", "32", "1024"})
   private int _valueLength;
-  @Param({"bytebuffer", "larray", "unsafe", "wrapper+unsafe"})
+  @Param({"bytebuffer", "unsafe", "wrapper+unsafe"})
   private String _bufferLibrary;
   private byte[] _bytes;
   private PinotDataBuffer _buffer;
@@ -96,15 +95,8 @@ public class BenchmarkPinotDataBuffer {
       case "bytebuffer":
         PinotDataBuffer.useFactory(new ByteBufferPinotBufferFactory());
         break;
-      case "larray":
-        PinotDataBuffer.useFactory(new LArrayPinotBufferFactory());
-        break;
       case "unsafe":
         PinotDataBuffer.useFactory(new UnsafePinotBufferFactory());
-        break;
-      case "wrapper+larray":
-        PinotDataBuffer.useFactory(new SmallWithFallbackPinotBufferFactory(
-            new ByteBufferPinotBufferFactory(), new LArrayPinotBufferFactory()));
         break;
       case "wrapper+unsafe":
         PinotDataBuffer.useFactory(new SmallWithFallbackPinotBufferFactory(

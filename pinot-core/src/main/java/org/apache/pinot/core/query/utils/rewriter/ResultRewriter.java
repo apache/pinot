@@ -22,9 +22,7 @@ import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 
 
-/**
- * Interface for rewriting the result of a query
- */
+/// Interface for rewriting the result of a query
 public interface ResultRewriter {
   RewriterResult rewrite(DataSchema dataSchema, List<Object[]> rows);
 }

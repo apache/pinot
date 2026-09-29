@@ -24,9 +24,7 @@ import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
 
-/**
- * Test for GroupByResultHolder class.
- */
+/// Test for GroupByResultHolder class.
 @Test
 public class DoubleGroupByResultHolderTest {
   private static final long RANDOM_SEED = System.nanoTime();
@@ -36,10 +34,8 @@ public class DoubleGroupByResultHolderTest {
 
   double[] _expected;
 
-  /**
-   * Initial setup:
-   * - Initialize the '_expected' array with random double values.
-   */
+  /// Initial setup:
+  /// - Initialize the '\_expected' array with random double values.
   @BeforeSuite
   void setup() {
     Random random = new Random(RANDOM_SEED);
@@ -51,11 +47,9 @@ public class DoubleGroupByResultHolderTest {
     }
   }
 
-  /**
-   * This test is for the GroupByResultHolder.SetValueForKey() api.
-   * - Sets a random set of values in the result holder.
-   * - Asserts that the values returned by the result holder are as expected.
-   */
+  /// This test is for the GroupByResultHolder.SetValueForKey() api.
+  /// - Sets a random set of values in the result holder.
+  /// - Asserts that the values returned by the result holder are as expected.
   @Test
   void testSetValueForKey() {
     GroupByResultHolder resultHolder = new DoubleGroupByResultHolder(INITIAL_CAPACITY, MAX_CAPACITY, DEFAULT_VALUE);
@@ -66,13 +60,11 @@ public class DoubleGroupByResultHolderTest {
     testValues(resultHolder, _expected, 0, INITIAL_CAPACITY);
   }
 
-  /**
-   * This test is for the GroupByResultHolder.EnsureCapacity api.
-   * - Fills the the result holder with a set of values.
-   * - Calls ensureCapacity to expand the result holder size.
-   * - Checks that the expanded unfilled portion of the result holder contains {@ref #DEFAULT_VALUE}
-   * - Fills the rest of the resultHolder, and ensures all values are returned as expected.
-   */
+  /// This test is for the GroupByResultHolder.EnsureCapacity api.
+  /// - Fills the result holder with a set of values.
+  /// - Calls ensureCapacity to expand the result holder size.
+  /// - Checks that the expanded unfilled portion of the result holder contains {@ref #DEFAULT_VALUE}
+  /// - Fills the rest of the resultHolder, and ensures all values are returned as expected.
   @Test
   void testEnsureCapacity() {
     GroupByResultHolder resultHolder = new DoubleGroupByResultHolder(INITIAL_CAPACITY, MAX_CAPACITY, DEFAULT_VALUE);
@@ -94,14 +86,12 @@ public class DoubleGroupByResultHolderTest {
     testValues(resultHolder, _expected, 0, MAX_CAPACITY);
   }
 
-  /**
-   * Helper method to test values within resultHolder against the provided expected values array.
-   *
-   * @param resultHolder
-   * @param expected
-   * @param start
-   * @param end
-   */
+  /// Helper method to test values within resultHolder against the provided expected values array.
+  ///
+  /// @param resultHolder
+  /// @param expected
+  /// @param start
+  /// @param end
   private void testValues(GroupByResultHolder resultHolder, double[] expected, int start, int end) {
     for (int i = start; i < end; i++) {
       double actual = resultHolder.getDoubleResult(i);

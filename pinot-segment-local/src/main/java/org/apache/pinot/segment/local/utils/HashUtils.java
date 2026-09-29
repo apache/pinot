@@ -18,13 +18,19 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.dynatrace.hash4j.hashing.HashValue128;
+import com.dynatrace.hash4j.hashing.Hasher128;
 import com.google.common.hash.Hashing;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.UUID;
+import net.jpountz.xxhash.XXHashFactory;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 public class HashUtils {
@@ -39,10 +45,17 @@ public class HashUtils {
     return Hashing.md5().hashBytes(bytes).asBytes();
   }
 
-  /**
-   * Returns a byte array that is a concatenation of the binary representation of each of the passed UUID values.
-   * If any of the values is not a valid UUID, then we return the result of {@link PrimaryKey#asBytes()}.
-   */
+  /// Returns a byte array that is a concatenation of the binary representation of each of the passed UUID values.
+  /// If any of the values is not a valid UUID, then we return the result of [PrimaryKey#asBytes()].
+  ///
+  /// String inputs are parsed via [UUID#fromString(String)] (lenient — accepts non-canonical short
+  /// forms like `"1-2-3-4-5"`) for backward compatibility with tables that have been hashed under the
+  /// pre-UUID-type `HashFunction.UUID` contract. Binary inputs (`byte[]` or [UUID]) go
+  /// through [UuidUtils#toBytes(Object)] since they carry no parse ambiguity. Un-parseable strings
+  /// (and any other invalid value) still fall through to [PrimaryKey#asBytes()] via the outer
+  /// `catch (RuntimeException)` below — matching master's behavior. Newly-declared
+  /// `DataType.UUID` primary-key columns are independently constrained to canonical form at ingest
+  /// time by `DataTypeTransformer.validateCanonicalUuidPrimaryKey`.
   public static byte[] hashUUID(PrimaryKey primaryKey) {
     Object[] values = primaryKey.getValues();
     byte[] result = new byte[values.length * 16];
@@ -51,16 +64,40 @@ public class HashUtils {
       if (value == null) {
         throw new IllegalArgumentException("Found null value in primary key");
       }
-      UUID uuid;
       try {
-        uuid = UUID.fromString(value.toString());
-      } catch (Throwable t) {
+        if (value instanceof CharSequence) {
+          UUID uuid = UUID.fromString(value.toString());
+          byteBuffer.putLong(uuid.getMostSignificantBits());
+          byteBuffer.putLong(uuid.getLeastSignificantBits());
+        } else {
+          byteBuffer.put(UuidUtils.toBytes(value));
+        }
+      } catch (RuntimeException e) {
         return primaryKey.asBytes();
       }
-      byteBuffer.putLong(uuid.getMostSignificantBits());
-      byteBuffer.putLong(uuid.getLeastSignificantBits());
     }
     return result;
+  }
+
+  /// Compute 64-bit xxHash (XXH64) with seed=0, returned as big-endian 8-byte array.
+  public static byte[] hashXXHash(byte[] bytes) {
+    XXHashFactory xxhFactory = XXHashFactory.fastestInstance();
+    long hash64 = xxhFactory.hash64().hash(bytes, 0, bytes.length, 0L);
+    ByteBuffer buf = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN);
+    buf.putLong(hash64);
+    return buf.array();
+  }
+
+  /// Compute xxh128 using hash4j (XXH3-128). Returns a 16-byte array (big-endian order for each 64-bit half).
+  public static byte[] hashXXH128(byte[] bytes) {
+    Hasher128 hasher = com.dynatrace.hash4j.hashing.Hashing.xxh3_128();
+    HashValue128 hashValue128 = hasher.hashBytesTo128Bits(bytes);
+
+    // Encode as big-endian 16 bytes
+    ByteBuffer buf = ByteBuffer.allocate(16).order(ByteOrder.BIG_ENDIAN);
+    buf.putLong(hashValue128.getMostSignificantBits());
+    buf.putLong(hashValue128.getLeastSignificantBits());
+    return buf.array();
   }
 
   public static Object hashPrimaryKey(PrimaryKey primaryKey, HashFunction hashFunction) {
@@ -68,11 +105,19 @@ public class HashUtils {
       case NONE:
         return primaryKey;
       case MD5:
+        if (PinotMd5Mode.isPinotMd5Disabled()) {
+          throw new IllegalStateException(String.format("Hash function MD5 is disabled via '%s=true'",
+              CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
+        }
         return new ByteArray(HashUtils.hashMD5(primaryKey.asBytes()));
       case MURMUR3:
         return new ByteArray(HashUtils.hashMurmur3(primaryKey.asBytes()));
       case UUID:
         return new ByteArray(HashUtils.hashUUID(primaryKey));
+      case XXHASH:
+        return new ByteArray(HashUtils.hashXXHash(primaryKey.asBytes()));
+      case XXH128:
+        return new ByteArray(HashUtils.hashXXH128(primaryKey.asBytes()));
       default:
         throw new IllegalArgumentException(String.format("Unrecognized hash function %s", hashFunction));
     }

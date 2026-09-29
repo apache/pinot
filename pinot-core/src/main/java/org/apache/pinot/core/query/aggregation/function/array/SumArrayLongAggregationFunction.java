@@ -21,9 +21,12 @@ package org.apache.pinot.core.query.aggregation.function.array;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
@@ -32,10 +35,11 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class SumArrayLongAggregationFunction extends BaseSingleInputAggregationFunction<LongArrayList, LongArrayList> {
+public class SumArrayLongAggregationFunction
+    extends BaseSingleInputAggregationFunction<LongArrayList, LongArrayList> {
 
-  public SumArrayLongAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "SUM_ARRAY"));
+  public SumArrayLongAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "SUM_ARRAY"), nullHandlingEnabled);
   }
 
   @Override
@@ -56,39 +60,47 @@ public class SumArrayLongAggregationFunction extends BaseSingleInputAggregationF
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    long[][] values = blockValSetMap.get(_expression).getLongValuesMV();
-    if (aggregationResultHolder.getResult() == null) {
-      aggregationResultHolder.setValue(new LongArrayList());
-    }
-    LongArrayList result = aggregationResultHolder.getResult();
-    for (int i = 0; i < length; i++) {
-      long[] value = values[i];
-      aggregateMerge(value, result);
-    }
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    long[][] values = blockValSet.getLongValuesMV();
+    // The accumulator is created inside the range, so a block with no non-null row leaves the holder untouched and
+    // extractFinalResult sees the null that means nothing was aggregated
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      LongArrayList result = aggregationResultHolder.getResult();
+      if (result == null) {
+        result = new LongArrayList();
+        aggregationResultHolder.setValue(result);
+      }
+      for (int i = from; i < to; i++) {
+        aggregateMerge(values[i], result);
+      }
+    });
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    long[][] valuesArray = blockValSetMap.get(_expression).getLongValuesMV();
-    for (int i = 0; i < length; i++) {
-      long[] values = valuesArray[i];
-      int groupKey = groupKeyArray[i];
-      setGroupByResult(groupByResultHolder, values, groupKey);
-    }
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    long[][] valuesArray = blockValSet.getLongValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        setGroupByResult(groupByResultHolder, valuesArray[i], groupKeyArray[i]);
+      }
+    });
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    long[][] valuesArray = blockValSetMap.get(_expression).getLongValuesMV();
-    for (int i = 0; i < length; i++) {
-      long[] values = valuesArray[i];
-      int[] groupKeys = groupKeysArray[i];
-      for (int groupKey : groupKeys) {
-        setGroupByResult(groupByResultHolder, values, groupKey);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    long[][] valuesArray = blockValSet.getLongValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        long[] values = valuesArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          setGroupByResult(groupByResultHolder, values, groupKey);
+        }
       }
-    }
+    });
   }
 
   private void setGroupByResult(GroupByResultHolder groupByResultHolder, long[] values, int groupKey) {
@@ -109,11 +121,13 @@ public class SumArrayLongAggregationFunction extends BaseSingleInputAggregationF
     }
   }
 
+  @Nullable
   @Override
   public LongArrayList extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public LongArrayList extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -134,8 +148,22 @@ public class SumArrayLongAggregationFunction extends BaseSingleInputAggregationF
   }
 
   @Override
+  public SerializedIntermediateResult serializeIntermediateResult(LongArrayList longArrayList) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.LongArrayList.getValue(),
+        ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.serialize(longArrayList));
+  }
+
+  @Override
+  public LongArrayList deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
+  }
+
+  @Override
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.LONG_ARRAY;
+    // AggregationResultsBlock#setIntermediateResult and AggregationFunctionUtils#getIntermediateResult only support
+    // INT/LONG/DOUBLE/STRING/OBJECT stored types, so LongArrayList must use OBJECT to piggyback on the custom ser-de
+    // implemented in ObjectSerDeUtils.
+    return DataSchema.ColumnDataType.OBJECT;
   }
 
   @Override
@@ -143,8 +171,9 @@ public class SumArrayLongAggregationFunction extends BaseSingleInputAggregationF
     return DataSchema.ColumnDataType.LONG_ARRAY;
   }
 
+  @Nullable
   @Override
-  public LongArrayList extractFinalResult(LongArrayList result) {
+  public LongArrayList extractFinalResult(@Nullable LongArrayList result) {
     return result;
   }
 }

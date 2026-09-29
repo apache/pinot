@@ -19,9 +19,10 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.io.File;
-import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.URL;
-import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
@@ -33,9 +34,12 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
@@ -50,6 +54,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 
@@ -57,6 +63,14 @@ import static org.testng.Assert.assertEquals;
 public class MutableSegmentImplTest {
   private static final String AVRO_FILE = "data/test_data-mv.avro";
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "MutableSegmentImplTest");
+  /// Virtual columns describing the segment itself, which are expected to differ between a mutable segment and an
+  /// immutable segment built from the same records.
+  private static final Set<String> SEGMENT_LEVEL_VIRTUAL_COLUMNS =
+      Set.of(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME,
+          CommonConstants.Segment.BuiltInVirtualColumn.CREATIONTIME,
+          CommonConstants.Segment.BuiltInVirtualColumn.STARTTIME,
+          CommonConstants.Segment.BuiltInVirtualColumn.ENDTIME,
+          CommonConstants.Segment.BuiltInVirtualColumn.CRC);
 
   private Schema _schema;
   private MutableSegmentImpl _mutableSegmentImpl;
@@ -76,6 +90,7 @@ public class MutableSegmentImplTest {
 
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, TEMP_DIR, "testTable");
+    config.setInstanceType(InstanceType.SERVER);
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
@@ -83,18 +98,17 @@ public class MutableSegmentImplTest {
 
     _schema = config.getSchema();
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(_schema, "testSegment");
-    _mutableSegmentImpl = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false);
-    _lastIngestionTimeMs = System.currentTimeMillis();
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(_lastIngestionTimeMs, new GenericRow());
-    _startTimeMs = System.currentTimeMillis();
-
-    try (RecordReader recordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, avroFile, _schema.getColumnNames(), null)) {
+    _mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema);
+    long currentTimeMs = System.currentTimeMillis();
+    StreamMessageMetadata metadata = mock(StreamMessageMetadata.class);
+    when(metadata.getRecordIngestionTimeMs()).thenReturn(currentTimeMs);
+    _lastIngestionTimeMs = currentTimeMs;
+    _startTimeMs = currentTimeMs;
+    try (RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.AVRO, avroFile,
+        _schema.getColumnNames(), null)) {
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
-        _mutableSegmentImpl.index(recordReader.next(reuse), defaultMetadata);
+        _mutableSegmentImpl.index(recordReader.next(reuse), metadata);
         _lastIndexedTs = System.currentTimeMillis();
       }
     }
@@ -127,9 +141,31 @@ public class MutableSegmentImplTest {
     }
   }
 
+  /// The segment metadata virtual columns are skipped in the mutable-vs-immutable comparisons above because they
+  /// legitimately differ, so their values on a real mutable segment are pinned here instead. This mutable segment is
+  /// built from ZK metadata without a creation time and never gets a time range or a CRC, which is exactly the shape
+  /// of a CONSUMING segment.
   @Test
-  public void testDataSourceForSVColumns()
-      throws IOException {
+  public void testSegmentMetadataVirtualColumnsOnMutableSegment() {
+    for (String column : Set.of(CommonConstants.Segment.BuiltInVirtualColumn.CREATIONTIME,
+        CommonConstants.Segment.BuiltInVirtualColumn.STARTTIME,
+        CommonConstants.Segment.BuiltInVirtualColumn.ENDTIME,
+        CommonConstants.Segment.BuiltInVirtualColumn.CRC)) {
+      DataSource dataSource = _mutableSegmentImpl.getDataSource(column);
+      NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
+      Assert.assertNotNull(nullValueVector, "Expecting a null value vector for virtual column: " + column);
+      assertEquals(nullValueVector.getNullBitmap().getCardinality(), _mutableSegmentImpl.getNumDocsIndexed());
+    }
+
+    // $totalDocs tracks the documents indexed so far, and is never null
+    DataSource totalDocsDataSource =
+        _mutableSegmentImpl.getDataSource(CommonConstants.Segment.BuiltInVirtualColumn.TOTALDOCS);
+    assertEquals(totalDocsDataSource.getDictionary().getIntValue(0), _mutableSegmentImpl.getNumDocsIndexed());
+    Assert.assertNull(totalDocsDataSource.getNullValueVector());
+  }
+
+  @Test
+  public void testDataSourceForSVColumns() {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       if (fieldSpec.isSingleValueField()) {
         String column = fieldSpec.getName();
@@ -144,8 +180,9 @@ public class MutableSegmentImplTest {
         Dictionary expectedDictionary = expectedDataSource.getDictionary();
         assertEquals(actualDictionary.length(), expectedDictionary.length());
 
-        // Allow the segment name to be different
-        if (column.equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME)) {
+        // Allow the segment level metadata to be different between the mutable segment and the immutable segment
+        // built from the same records
+        if (SEGMENT_LEVEL_VIRTUAL_COLUMNS.contains(column)) {
           continue;
         }
 
@@ -164,8 +201,7 @@ public class MutableSegmentImplTest {
   }
 
   @Test
-  public void testDataSourceForMVColumns()
-      throws IOException {
+  public void testDataSourceForMVColumns() {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       if (!fieldSpec.isSingleValueField()) {
         String column = fieldSpec.getName();
@@ -202,8 +238,79 @@ public class MutableSegmentImplTest {
     }
   }
 
+  @Test
+  public void testUpdateIngestionTimestampWithoutIndexing() {
+    // Create a fresh mutable segment with no indexed rows
+    MutableSegmentImpl freshSegment = MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema);
+    try {
+      // Before any updates, minimum ingestion lag should be Long.MAX_VALUE (no events seen)
+      assertEquals(freshSegment.getSegmentMetadata().getMinimumIngestionLagMs(), Long.MAX_VALUE);
+
+      // Simulate consuming a message whose ingestion timestamp is "now" but all rows were filtered
+      long ingestionTimeMs = System.currentTimeMillis();
+      freshSegment.updateIngestionTimestamp(ingestionTimeMs);
+
+      // After the update, the minimum ingestion lag should no longer be Long.MAX_VALUE
+      long lagMs = freshSegment.getSegmentMetadata().getMinimumIngestionLagMs();
+      Assert.assertNotEquals(lagMs, Long.MAX_VALUE,
+          "Expected ingestion lag to be updated from Long.MAX_VALUE after updateIngestionTimestamp()");
+
+      // The latest ingestion timestamp should match what we provided
+      assertEquals(freshSegment.getSegmentMetadata().getLatestIngestionTimestamp(), ingestionTimeMs);
+    } finally {
+      freshSegment.destroy();
+    }
+  }
+
+  @Test
+  public void testVectorIndexConfigOnMutableSegmentWithoutMutableVectorReader() {
+    Schema vectorSchema = new Schema.SchemaBuilder().setSchemaName("vectorSchema")
+        .addSingleValueDimension("id", FieldSpec.DataType.INT)
+        .addMultiValueDimension("embedding", FieldSpec.DataType.FLOAT)
+        .build();
+    VectorIndexConfig vectorIndexConfig =
+        new VectorIndexConfig(false, "IVF_PQ", 4, 1, VectorIndexConfig.VectorDistanceFunction.COSINE,
+            Map.of("nlist", "1", "pqM", "2", "pqNbits", "8", "trainSampleSize", "4"));
+    MutableSegmentImpl mutableSegment =
+        MutableSegmentImplTestUtils.createMutableSegmentImplWithVectorIndexConfigs(vectorSchema, Set.of(), Set.of(),
+            Set.of(),
+            Map.of("embedding", vectorIndexConfig), null);
+    try {
+      DataSource dataSource = mutableSegment.getDataSource("embedding");
+      Assert.assertNull(dataSource.getVectorIndex(),
+          "IVF-based vector indexes should not build a mutable vector reader for consuming segments");
+      assertEquals(dataSource.getVectorIndexConfig(), vectorIndexConfig);
+    } finally {
+      mutableSegment.destroy();
+    }
+  }
+
+  @Test
+  public void testDestroyClearsIndexContainerMap()
+      throws ReflectiveOperationException {
+    MutableSegmentImpl freshSegment = MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema);
+    boolean destroyed = false;
+    try {
+      Field indexContainerMapField = MutableSegmentImpl.class.getDeclaredField("_indexContainerMap");
+      indexContainerMapField.setAccessible(true);
+      Map<?, ?> indexContainerMap = (Map<?, ?>) indexContainerMapField.get(freshSegment);
+      Assert.assertFalse(indexContainerMap.isEmpty());
+
+      freshSegment.destroy();
+      destroyed = true;
+
+      Assert.assertTrue(indexContainerMap.isEmpty());
+    } finally {
+      if (!destroyed) {
+        freshSegment.destroy();
+      }
+    }
+  }
+
   @AfterClass
   public void tearDown() {
+    _mutableSegmentImpl.destroy();
+    _immutableSegment.destroy();
     FileUtils.deleteQuietly(TEMP_DIR);
   }
 }

@@ -18,24 +18,26 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.objects.AbstractObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import java.util.Arrays;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.function.NullableSingleInputAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class ListAggFunction
-    extends NullableSingleInputAggregationFunction<AbstractObjectCollection<String>, String> {
+public class ListAggFunction extends BaseSingleInputAggregationFunction<ObjectCollection<String>, String> {
 
   private final String _separator;
 
@@ -62,15 +64,26 @@ public class ListAggFunction
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    AbstractObjectCollection<String> valueSet = getObjectCollection(aggregationResultHolder);
+    ObjectCollection<String> valueSet = getObjectCollection(aggregationResultHolder);
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    String[] values = blockValSet.getStringValuesSV();
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      valueSet.addAll(Arrays.asList(values).subList(from, to));
-    });
+    if (blockValSet.isSingleValue()) {
+      String[] values = blockValSet.getStringValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        valueSet.addAll(Arrays.asList(values).subList(from, to));
+      });
+    } else {
+      String[][] valuesArray = blockValSet.getStringValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (String v : valuesArray[i]) {
+            valueSet.add(v);
+          }
+        }
+      });
+    }
   }
 
-  protected AbstractObjectCollection<String> getObjectCollection(AggregationResultHolder aggregationResultHolder) {
+  protected ObjectCollection<String> getObjectCollection(AggregationResultHolder aggregationResultHolder) {
     ObjectArrayList<String> valueSet = aggregationResultHolder.getResult();
     if (valueSet == null) {
       valueSet = new ObjectArrayList<>();
@@ -79,7 +92,7 @@ public class ListAggFunction
     return valueSet;
   }
 
-  protected AbstractObjectCollection<String> getObjectCollection(GroupByResultHolder groupByResultHolder,
+  protected ObjectCollection<String> getObjectCollection(GroupByResultHolder groupByResultHolder,
       int groupKey) {
     ObjectArrayList<String> valueSet = groupByResultHolder.getResult(groupKey);
     if (valueSet == null) {
@@ -93,65 +106,101 @@ public class ListAggFunction
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    String[] values = blockValSet.getStringValuesSV();
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        AbstractObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKeyArray[i]);
-        groupValueList.add(values[i]);
-      }
-    });
+    if (blockValSet.isSingleValue()) {
+      String[] values = blockValSet.getStringValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          ObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKeyArray[i]);
+          groupValueList.add(values[i]);
+        }
+      });
+    } else {
+      String[][] valuesArray = blockValSet.getStringValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          ObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKeyArray[i]);
+          for (String v : valuesArray[i]) {
+            groupValueList.add(v);
+          }
+        }
+      });
+    }
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    String[] values = blockValSet.getStringValuesSV();
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        for (int groupKey : groupKeysArray[i]) {
-          AbstractObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKey);
-          groupValueList.add(values[i]);
+    if (blockValSet.isSingleValue()) {
+      String[] values = blockValSet.getStringValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            ObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKey);
+            groupValueList.add(values[i]);
+          }
         }
-      }
-    });
+      });
+    } else {
+      String[][] valuesArray = blockValSet.getStringValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int[] groupKeys = groupKeysArray[i];
+          for (int groupKey : groupKeys) {
+            ObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKey);
+            for (String v : valuesArray[i]) {
+              groupValueList.add(v);
+            }
+          }
+        }
+      });
+    }
   }
 
+  @Nullable
   @Override
-  public AbstractObjectCollection<String> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+  public ObjectCollection<String> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
-  public AbstractObjectCollection<String> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+  public ObjectCollection<String> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
-  public AbstractObjectCollection<String> merge(AbstractObjectCollection<String> intermediateResult1,
-      AbstractObjectCollection<String> intermediateResult2) {
-    if (intermediateResult1 == null) {
-      return intermediateResult2;
-    }
-    if (intermediateResult2 == null) {
-      return intermediateResult1;
-    }
+  public ObjectCollection<String> merge(ObjectCollection<String> intermediateResult1,
+      ObjectCollection<String> intermediateResult2) {
     intermediateResult1.addAll(intermediateResult2);
     return intermediateResult1;
   }
 
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.OBJECT;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
   }
 
   @Override
-  public DataSchema.ColumnDataType getFinalResultColumnType() {
-    return DataSchema.ColumnDataType.STRING;
+  public SerializedIntermediateResult serializeIntermediateResult(ObjectCollection<String> strings) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.StringArrayList.getValue(),
+        ObjectSerDeUtils.STRING_ARRAY_LIST_SER_DE.serialize((ObjectArrayList<String>) strings));
   }
 
   @Override
-  public String extractFinalResult(AbstractObjectCollection<String> strings) {
+  public ObjectCollection<String> deserializeIntermediateResult(CustomObject customObject) {
+    //noinspection unchecked
+    return ObjectSerDeUtils.STRING_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
+  }
+
+  @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.STRING;
+  }
+
+  @Nullable
+  @Override
+  public String extractFinalResult(@Nullable ObjectCollection<String> strings) {
     if (strings == null) {
       return null;
     }

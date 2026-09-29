@@ -26,6 +26,7 @@ import java.util.function.DoubleSupplier;
 import java.util.function.LongSupplier;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.BitSlicedRangeIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -44,7 +45,7 @@ import static org.apache.pinot.spi.data.FieldSpec.DataType.*;
 import static org.testng.Assert.assertEquals;
 
 
-public class BitSlicedIndexCreatorTest {
+public class BitSlicedIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
 
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "BitSlicedIndexCreatorTest");
   private static final String COLUMN_NAME = "testColumn";

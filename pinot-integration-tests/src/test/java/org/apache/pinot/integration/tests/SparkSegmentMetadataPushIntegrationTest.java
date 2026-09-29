@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -36,8 +35,6 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.apache.spark.SparkContext;
@@ -153,7 +150,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
 
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(_testTableWithType);
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(_testTableWithType));
+    tableSpec.setTableConfigURI(getControllerBaseApiUrl() + "/tables/" + _testTableWithType);
     jobSpec.setTableSpec(tableSpec);
 
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
@@ -164,9 +161,9 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     runner.run();
 
     // Check that the segment is pushed and loaded
-    JsonNode segmentsList = getSegmentsList();
+    List<String> segmentsList = getSegmentsList();
     Assert.assertEquals(segmentsList.size(), 1);
-    String segmentName = segmentsList.get(0).asText();
+    String segmentName = segmentsList.get(0);
     Assert.assertTrue(segmentName.endsWith("_no_consistent_push"));
     long numDocs = getNumDocs(segmentName);
     testCountStar(numDocs);
@@ -252,7 +249,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
 
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(_testTableWithType);
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(_testTableWithType));
+    tableSpec.setTableConfigURI(getControllerBaseApiUrl() + "/tables/" + _testTableWithType);
     jobSpec.setTableSpec(tableSpec);
 
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
@@ -263,19 +260,19 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     runner.run();
 
     // Check that the segment is pushed and loaded
-    JsonNode segmentsList = getSegmentsList();
+    List<String> segmentsList = getSegmentsList();
     Assert.assertEquals(segmentsList.size(), numSegments);
     long numDocs = 0;
     for (int i = 0; i < numSegments; i++) {
-      String segmentName = segmentsList.get(i).asText();
+      String segmentName = segmentsList.get(i);
       Assert.assertTrue(segmentName.endsWith(firstTimeStamp));
       numDocs += getNumDocs(segmentName);
     }
     testCountStar(numDocs);
 
     // Fetch segment lineage entry after running segment metadata push with consistent push enabled
-    String segmentLineageResponse = sendGetRequest(ControllerRequestURLBuilder.baseUrl(getControllerBaseApiUrl())
-        .forListAllSegmentLineages(_testTableWithType, TableType.OFFLINE.toString()));
+    String segmentLineageResponse =
+        getOrCreateAdminClient().getSegmentClient().listSegmentLineage(_testTable, TableType.OFFLINE.toString());
     // Segment lineage should be in completed state
     Assert.assertTrue(segmentLineageResponse.contains("\"state\":\"COMPLETED\""));
     // SegmentsFrom should be empty as we started with a blank table
@@ -283,7 +280,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     // SegmentsTo should contain uploaded segments
     String segmentsTo = extractSegmentsFromLineageKey("segmentsTo", segmentLineageResponse);
     for (int i = 0; i < numSegments; i++) {
-      String segmentName = segmentsList.get(i).asText();
+      String segmentName = segmentsList.get(i);
       Assert.assertTrue(segmentsTo.contains(segmentName));
     }
 
@@ -291,7 +288,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     // the additional segment is pushed as part of a new push job
     List<String> previousSegmentNames = Lists.newArrayList();
     for (int i = 0; i < numSegments; i++) {
-      previousSegmentNames.add(segmentsList.get(i).asText());
+      previousSegmentNames.add(segmentsList.get(i));
     }
 
     // Create and push the additional segment using SparkSegmentMetadataPushJobRunner
@@ -310,27 +307,25 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     // but we expect only the 1 additional pushed to be queryable only.
     segmentsList = getSegmentsList();
     Assert.assertEquals(segmentsList.size(), numSegments + 1);
-    String additionalSegmentName = segmentsList.get(numSegments).asText();
+    String additionalSegmentName = segmentsList.get(numSegments);
     Assert.assertTrue(additionalSegmentName.endsWith(secondTimeStamp));
 
     // Check that the count is now only the count of the additional segment
     testCountStar(getNumDocs(additionalSegmentName));
   }
 
-  /**
-   * Extracts a list of segments from a given lineage response based on a provided key.
-   *
-   * This method searches for the specified key within the lineage response and extracts the
-   * segment list enclosed in square brackets following the key. The list is returned as a substring.
-   *
-   * Example keys are "segmentsTo" and "segmentsFrom".
-   *
-   * @param key The key to search for within the lineage response. It is expected to be a JSON
-   *            key that maps to an array of segments, formatted as "key":[...].
-   * @param lineageResponse The JSON-formatted lineage response containing the key and segments.
-   * @return A substring containing the list of segments associated with the provided key. If the
-   *         key is not found, or if there are no segments, an empty string is returned.
-   */
+  /// Extracts a list of segments from a given lineage response based on a provided key.
+  ///
+  /// This method searches for the specified key within the lineage response and extracts the
+  /// segment list enclosed in square brackets following the key. The list is returned as a substring.
+  ///
+  /// Example keys are "segmentsTo" and "segmentsFrom".
+  ///
+  /// @param key The key to search for within the lineage response. It is expected to be a JSON
+  ///            key that maps to an array of segments, formatted as "key":\[...\].
+  /// @param lineageResponse The JSON-formatted lineage response containing the key and segments.
+  /// @return A substring containing the list of segments associated with the provided key. If the
+  ///         key is not found, or if there are no segments, an empty string is returned.
   private static String extractSegmentsFromLineageKey(String key, String lineageResponse) {
     String segmentKey = "\"" + key + "\":[";
     int startIndex = lineageResponse.indexOf(segmentKey);
@@ -356,27 +351,21 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
   }
 
   private long getNumDocs(String segmentName)
-      throws IOException {
-    return JsonUtils.stringToJsonNode(
-            sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(_testTable, segmentName)))
-        .get("segment.total.docs").asLong();
+      throws Exception {
+    Map<String, Object> segmentMetadata = getOrCreateAdminClient().getSegmentClient()
+        .getSegmentMetadata(TableNameBuilder.OFFLINE.tableNameWithType(_testTable), segmentName, null);
+    Object totalDocs = segmentMetadata.get("segment.total.docs");
+    return totalDocs == null ? 0L : Long.parseLong(totalDocs.toString());
   }
 
-  private JsonNode getSegmentsList()
-      throws IOException {
-    return JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forSegmentListAPI(_testTable, TableType.OFFLINE.toString()))).get(0)
-        .get("OFFLINE");
+  private List<String> getSegmentsList()
+      throws Exception {
+    return getOrCreateAdminClient().getSegmentClient().listSegments(_testTable, TableType.OFFLINE.toString(), false);
   }
 
-  protected void testCountStar(final long countStarResult) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        return getCurrentCountStarResult() == countStarResult;
-      } catch (Exception e) {
-        return null;
-      }
-    }, 100L, 300_000, "Failed to load " + countStarResult + " documents", true);
+  protected void testCountStar(long countStarResult) {
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult() == countStarResult, 100L, 300_000L,
+        "Failed to load " + countStarResult + " documents", null);
   }
 
   @AfterMethod

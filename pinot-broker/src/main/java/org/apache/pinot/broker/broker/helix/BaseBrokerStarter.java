@@ -18,15 +18,22 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
+import javax.annotation.Nullable;
+import javax.net.ssl.SSLContext;
+import nl.altindag.ssl.SSLFactory;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants.ChangeType;
@@ -39,70 +46,116 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
+import org.apache.pinot.broker.grpc.BrokerGrpcServer;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
+import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
+import org.apache.pinot.broker.requesthandler.BrokerRequestIdGenerator;
+import org.apache.pinot.broker.requesthandler.BrokerWarmupConfig;
 import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageQueryThrottler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
+import org.apache.pinot.broker.routing.tablesampler.TableSamplerFactory;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.audit.AuditServiceBinder;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.ZkTableCache;
+import org.apache.pinot.common.cursors.AbstractResponseStore;
+import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
+import org.apache.pinot.common.failuredetector.FailureDetector;
+import org.apache.pinot.common.failuredetector.FailureDetectorFactory;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
+import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.config.QueryOptionConfigListener;
+import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
+import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
+import org.apache.pinot.core.instance.context.BrokerContext;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
+import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.transport.NettyInspector;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
-import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.service.dispatch.QueryDispatcher;
+import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
+import org.apache.pinot.materializedview.handler.MaterializedViewHandler;
+import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
+import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
+import org.apache.pinot.spi.cursors.ResponseStoreService;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base class for broker startable implementations
- */
+/// Base class for broker startable implementations
 @SuppressWarnings("unused")
 public abstract class BaseBrokerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerStarter.class);
+
+  /// When [CommonConstants.CursorConfigs#RESPONSE_STORE_CLEANER_INITIAL_DELAY] is unset, the first cleanup run
+  /// is scheduled after one full frequency period plus jitter in `[0, frequencyMs / this value)`, to
+  /// desynchronize brokers on shared storage.
+  private static final int RESPONSE_STORE_CLEANUP_INITIAL_DELAY_JITTER_DIVISOR = 4;
+
+  /// How often the pre-connect thread re-checks whether Helix has converged. Short enough not to add
+  /// meaningful delay to a fast startup, long enough not to hammer the Helix data accessor.
+  private static final long HELIX_CONVERGENCE_POLL_INTERVAL_MS = 200L;
+  /// How long shutdown waits for the interrupted warmup thread to unwind before
+  /// giving up on it. Bounds the teardown race without letting a stuck thread hold up shutdown.
+  private static final long STARTUP_THREAD_JOIN_TIMEOUT_MS = 1_000L;
+  /// Readiness description reported while the warmup gate holds the broker at STARTING. Shared with tests so
+  /// the exact gate transition can be asserted.
+  @VisibleForTesting
+  static final String WARMUP_GATE_STARTING_DESCRIPTION = "Warming up broker data plane";
 
   protected PinotConfiguration _brokerConf;
   protected List<ListenerConfig> _listenerConfigs;
@@ -111,10 +164,16 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected String _hostname;
   protected int _port;
   protected int _tlsPort;
+  protected int _grpcPort;
   protected String _instanceId;
   private volatile boolean _isStarting = false;
   private volatile boolean _isShuttingDown = false;
+  // Dedicated handler for listening to cluster config changes
+  protected final DefaultClusterConfigChangeHandler _clusterConfigChangeHandler =
+      new DefaultClusterConfigChangeHandler();
 
+  // TODO To be removed in favor of _clusterConfigChangeHandler to manage config related changes.
+  //      Please use this only if you are reliant specifically on the ClusterChangeMediator infra.
   protected final List<ClusterChangeHandler> _clusterConfigChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _idealStateChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _externalViewChangeHandlers = new ArrayList<>();
@@ -125,6 +184,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
   protected HelixDataAccessor _helixDataAccessor;
+  protected TableCache _tableCache;
   protected PinotMetricsRegistry _metricsRegistry;
   protected BrokerMetrics _brokerMetrics;
   protected BrokerRoutingManager _routingManager;
@@ -139,19 +199,47 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected ServerRoutingStatsManager _serverRoutingStatsManager;
   protected HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
   protected MultiStageQueryThrottler _multiStageQueryThrottler;
+  protected AbstractResponseStore _responseStore;
+  protected ScheduledExecutorService _responseStoreCleanupExecutor;
+  protected BrokerGrpcServer _brokerGrpcServer;
+  protected FailureDetector _failureDetector;
+  protected ThreadAccountant _threadAccountant;
+  /// Startup data-plane warmup config. Read once in `start()`.
+  protected BrokerWarmupConfig _warmupConfig =
+      new BrokerWarmupConfig(false, 0L, 0, 1);
+  /// Whether the data plane has been warmed. Gates readiness when warmup is enabled; always true
+  /// otherwise, so the status callback behaves exactly as before for existing deployments.
+  private volatile boolean _isWarm;
+  @Nullable
+  private volatile Thread _warmupThread;
+  /// The Helix-convergence half of the service-status composite, held so startup pre-connect can wait
+  /// on exactly that signal -- convergence is the point at which routing, and the servers it
+  /// references, first exist.
+  @Nullable
+  private volatile ServiceStatus.ServiceStatusCallback _helixConvergenceCallback;
+  /// The background pre-connect thread, tracked so shutdown can interrupt it.
+  @Nullable
+  private volatile Thread _preConnectThread;
+  /// Whether startup pre-connect is enabled, and its budget. Read once in `start()`.
+  private boolean _preConnectEnabled;
+  private long _preConnectTimeoutMs;
 
   @Override
   public void init(PinotConfiguration brokerConf)
       throws Exception {
     _brokerConf = brokerConf;
     // Remove all white-spaces from the list of zkServers (if any).
-    _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER).replaceAll("\\s+", "");
+    _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER).replaceAll("\\s+", "");
     _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_brokerConf, _zkServers, _clusterName, ServiceRole.BROKER);
+    applyCustomConfigs(brokerConf);
+    TableSamplerFactory.init(_brokerConf.subset(CommonConstants.Broker.TABLE_SAMPLER_CONFIG_PREFIX));
+    BrokerContext.getInstance().setQueryOperatorFactoryProvider(createQueryOperatorFactoryProvider(_brokerConf));
 
-    PinotInsecureMode.setPinotInInsecureMode(Boolean.valueOf(
-        _brokerConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
-            CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
+    PinotInsecureMode.setPinotInInsecureMode(
+        _brokerConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
+    PinotMd5Mode.setPinotMd5Disabled(_brokerConf.getProperty(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED,
+        PinotMd5Mode.isPinotMd5Disabled()));
 
     if (_brokerConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
         MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT) == 0) {
@@ -171,6 +259,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
     _port = _listenerConfigs.get(0).getPort();
     _tlsPort = ListenerConfigUtil.findLastTlsPort(_listenerConfigs, -1);
+    _grpcPort = _brokerConf.getProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_PORT, -1);
 
     _instanceId = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ID);
     if (_instanceId == null) {
@@ -184,6 +273,70 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         Helix.PREFIX_OF_BROKER_INSTANCE, _instanceId);
 
     _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _instanceId);
+
+    NettyInspector.logAllChecks();
+  }
+
+  /// Can be overridden to apply custom configs to the broker conf.
+  protected void applyCustomConfigs(PinotConfiguration brokerConf) {
+  }
+
+  /// Override to customize the query operator factory provider used by the broker multi-stage engine.
+  protected QueryOperatorFactoryProvider createQueryOperatorFactoryProvider(PinotConfiguration brokerConf) {
+    return DefaultQueryOperatorFactoryProvider.INSTANCE;
+  }
+
+  /// Override to customize the [WorkerManager] used for multi-stage query engine worker assignment.
+  protected WorkerManager createWorkerManager(String brokerId, String hostname, int port,
+      RoutingManager routingManager) {
+    return new WorkerManager(brokerId, hostname, port, routingManager);
+  }
+
+  /// Override to supply a custom [SingleConnectionBrokerRequestHandler] subclass (e.g. one
+  /// that overrides `onQueryCompletion(RequestContext, BrokerResponse)` for async query
+  /// logging). Pass `null` for `materializedViewHandler` to skip MV rewrite.
+  protected SingleConnectionBrokerRequestHandler createSingleStageBrokerRequestHandler(
+      PinotConfiguration config, String brokerId, BrokerRequestIdGenerator requestIdGenerator,
+      RoutingManager routingManager, AccessControlFactory accessControlFactory,
+      QueryQuotaManager queryQuotaManager, TableCache tableCache, NettyConfig nettyConfig,
+      TlsConfig tlsConfig, ServerRoutingStatsManager serverRoutingStatsManager,
+      FailureDetector failureDetector, ThreadAccountant threadAccountant,
+      MultiClusterRoutingContext multiClusterRoutingContext,
+      @Nullable MaterializedViewHandler materializedViewHandler) {
+    return new SingleConnectionBrokerRequestHandler(config, brokerId, requestIdGenerator, routingManager,
+        accessControlFactory, queryQuotaManager, tableCache, nettyConfig, tlsConfig,
+        serverRoutingStatsManager, failureDetector, threadAccountant, multiClusterRoutingContext,
+        materializedViewHandler);
+  }
+
+  /// Override to supply a custom [GrpcBrokerRequestHandler] subclass. Pass `null` for
+  /// `materializedViewHandler` to skip MV rewrite.
+  protected GrpcBrokerRequestHandler createGrpcBrokerRequestHandler(
+      PinotConfiguration config, String brokerId, BrokerRequestIdGenerator requestIdGenerator,
+      RoutingManager routingManager, AccessControlFactory accessControlFactory,
+      QueryQuotaManager queryQuotaManager, TableCache tableCache, FailureDetector failureDetector,
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext,
+      @Nullable MaterializedViewHandler materializedViewHandler) {
+    return new GrpcBrokerRequestHandler(config, brokerId, requestIdGenerator, routingManager,
+        accessControlFactory, queryQuotaManager, tableCache, failureDetector, threadAccountant,
+        multiClusterRoutingContext, materializedViewHandler);
+  }
+
+  /// Override to supply a custom [MultiStageBrokerRequestHandler] subclass (e.g. one that
+  /// overrides `onQueryCompletion(RequestContext, BrokerResponse)` for async query logging).
+  /// The default implementation returns a plain [MultiStageBrokerRequestHandler].
+  protected MultiStageBrokerRequestHandler createMultiStageBrokerRequestHandler(
+      PinotConfiguration config, String brokerId, BrokerRequestIdGenerator requestIdGenerator,
+      RoutingManager routingManager, AccessControlFactory accessControlFactory,
+      QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      MultiStageQueryThrottler multiStageQueryThrottler, FailureDetector failureDetector,
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext,
+      WorkerManager workerManager, WorkerManager multiClusterWorkerManager,
+      ServerRoutingStatsManager serverRoutingStatsManager) {
+    return new MultiStageBrokerRequestHandler(config, brokerId, requestIdGenerator, routingManager,
+        accessControlFactory, queryQuotaManager, tableCache, multiStageQueryThrottler, failureDetector,
+        threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
+        serverRoutingStatsManager);
   }
 
   private void setupHelixSystemProperties() {
@@ -198,47 +351,42 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     return _port;
   }
 
-  /**
-   * Adds an ideal state change handler to handle Helix ideal state change callbacks.
-   * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
-   * handlers from running. For slow change handler, make it asynchronous.
-   */
+  /// Adds an ideal state change handler to handle Helix ideal state change callbacks.
+  ///
+  /// NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
+  /// handlers from running. For slow change handler, make it asynchronous.
   public void addIdealStateChangeHandler(ClusterChangeHandler idealStateChangeHandler) {
     _idealStateChangeHandlers.add(idealStateChangeHandler);
   }
 
-  /**
-   * Adds an external view change handler to handle Helix external view change callbacks.
-   * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
-   * handlers from running. For slow change handler, make it asynchronous.
-   */
+  /// Adds an external view change handler to handle Helix external view change callbacks.
+  ///
+  /// NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
+  /// handlers from running. For slow change handler, make it asynchronous.
   public void addExternalViewChangeHandler(ClusterChangeHandler externalViewChangeHandler) {
     _externalViewChangeHandlers.add(externalViewChangeHandler);
   }
 
-  /**
-   * Adds an instance config change handler to handle Helix instance config change callbacks.
-   * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
-   * handlers from running. For slow change handler, make it asynchronous.
-   */
+  /// Adds an instance config change handler to handle Helix instance config change callbacks.
+  ///
+  /// NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
+  /// handlers from running. For slow change handler, make it asynchronous.
   public void addInstanceConfigChangeHandler(ClusterChangeHandler instanceConfigChangeHandler) {
     _instanceConfigChangeHandlers.add(instanceConfigChangeHandler);
   }
 
-  /**
-   * Adds a cluster config change handler to handle Helix cluster config change callbacks.
-   * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
-   * handlers from running. For slow change handler, make it asynchronous.
-   */
+  /// Adds a cluster config change handler to handle Helix cluster config change callbacks.
+  ///
+  /// NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
+  /// handlers from running. For slow change handler, make it asynchronous.
   public void addClusterConfigChangeHandler(ClusterChangeHandler clusterConfigChangeHandler) {
     _clusterConfigChangeHandlers.add(clusterConfigChangeHandler);
   }
 
-  /**
-   * Adds a live instance change handler to handle Helix live instance change callbacks.
-   * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
-   * handlers from running. For slow change handler, make it asynchronous.
-   */
+  /// Adds a live instance change handler to handle Helix live instance change callbacks.
+  ///
+  /// NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
+  /// handlers from running. For slow change handler, make it asynchronous.
   public void addLiveInstanceChangeHandler(ClusterChangeHandler liveInstanceChangeHandler) {
     _liveInstanceChangeHandlers.add(liveInstanceChangeHandler);
   }
@@ -267,14 +415,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _isStarting = true;
     Utils.logVersions();
 
-    LOGGER.info("Connecting spectator Helix manager");
-    _spectatorHelixManager =
-        HelixManagerFactory.getZKHelixManager(_clusterName, _instanceId, InstanceType.SPECTATOR, _zkServers);
-    _spectatorHelixManager.connect();
-    _helixAdmin = _spectatorHelixManager.getClusterManagmentTool();
-    _propertyStore = _spectatorHelixManager.getHelixPropertyStore();
-    _helixDataAccessor = _spectatorHelixManager.getHelixDataAccessor();
-
     LOGGER.info("Setting up broker request handler");
     // Set up metric registry and broker metrics
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(_brokerConf.subset(Broker.METRICS_CONFIG_PREFIX));
@@ -282,18 +422,25 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Broker.CONFIG_OF_METRICS_NAME_PREFIX, Broker.DEFAULT_METRICS_NAME_PREFIX),
         _metricsRegistry,
         _brokerConf.getProperty(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS),
-        _brokerConf.getProperty(Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, Collections.emptyList()));
+        getAllowedTablesForEmittingMetrics(_brokerConf));
     _brokerMetrics.initializeGlobalMeters();
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
+    _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ZK_JUTE_MAX_BUFFER,
+        Integer.getInteger(ZkSystemPropertyKeys.JUTE_MAXBUFFER, 0xfffff));
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ADAPTIVE_SERVER_SELECTOR_TYPE,
         _brokerConf.getProperty(Broker.AdaptiveServerSelector.CONFIG_OF_TYPE,
             Broker.AdaptiveServerSelector.DEFAULT_TYPE), 1);
     BrokerMetrics.register(_brokerMetrics);
+    MseMetrics.registerFromConfig(_brokerConf, _metricsRegistry);
+
+    LOGGER.info("Connecting spectator Helix manager");
+    initSpectatorHelixManager();
+
     // Set up request handling classes
     _serverRoutingStatsManager = new ServerRoutingStatsManager(_brokerConf, _brokerMetrics);
     _serverRoutingStatsManager.init();
-    _routingManager = new BrokerRoutingManager(_brokerMetrics, _serverRoutingStatsManager, _brokerConf);
-    _routingManager.init(_spectatorHelixManager);
+    initRoutingManager();
+
     final PinotConfiguration factoryConf = _brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX);
     // Adding cluster name to the config so that it can be used by the AccessControlFactory
     factoryConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, _brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME));
@@ -305,58 +452,23 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     QueryRewriterFactory.init(_brokerConf.getProperty(Broker.CONFIG_OF_BROKER_QUERY_REWRITER_CLASS_NAMES));
     LOGGER.info("Initializing ResultRewriterFactory");
     ResultRewriterFactory.init(_brokerConf.getProperty(Broker.CONFIG_OF_BROKER_RESULT_REWRITER_CLASS_NAMES));
-    // Initialize FunctionRegistry before starting the broker request handler
+    // Initialize FunctionRegistry and PartitionFunctionFactory before starting the broker request handler
     FunctionRegistry.init();
+    PartitionFunctionFactory.init();
     boolean caseInsensitive =
         _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
-    TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
+    _tableCache = new ZkTableCache(_propertyStore, caseInsensitive);
 
     LOGGER.info("Initializing Broker Event Listener Factory");
     BrokerQueryEventListenerFactory.init(_brokerConf.subset(Broker.EVENT_LISTENER_CONFIG_PREFIX));
 
-    // Create Broker request handler.
-    String brokerId = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
-    String brokerRequestHandlerType =
-        _brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE);
-    BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler;
-    if (brokerRequestHandlerType.equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
-      singleStageBrokerRequestHandler = new GrpcBrokerRequestHandler(_brokerConf, brokerId, _routingManager,
-          _accessControlFactory, _queryQuotaManager, tableCache);
-    } else {
-      // Default request handler type, i.e. netty
-      NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
-      // Configure TLS for netty connection to server
-      TlsConfig tlsDefaults = null;
-      if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
-        tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
-      }
-      singleStageBrokerRequestHandler =
-          new SingleConnectionBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory,
-              _queryQuotaManager, tableCache, nettyDefaults, tlsDefaults, _serverRoutingStatsManager);
-    }
-    MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
-    QueryDispatcher queryDispatcher = null;
-    if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
-      _multiStageQueryThrottler = new MultiStageQueryThrottler();
-      _multiStageQueryThrottler.init(_spectatorHelixManager);
-      // multi-stage request handler uses both Netty and GRPC ports.
-      // worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport.
-      // TODO: decouple protocol and engine selection.
-      queryDispatcher = createQueryDispatcher(_brokerConf);
-      multiStageBrokerRequestHandler =
-          new MultiStageBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory,
-              _queryQuotaManager, tableCache, _multiStageQueryThrottler);
-    }
-    TimeSeriesRequestHandler timeSeriesRequestHandler = null;
-    if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
-      Preconditions.checkNotNull(queryDispatcher, "Multistage Engine should be enabled to use time-series engine");
-      timeSeriesRequestHandler = new TimeSeriesRequestHandler(_brokerConf, brokerId, _routingManager,
-          _accessControlFactory, _queryQuotaManager, tableCache, queryDispatcher);
-    }
-    _brokerRequestHandler =
-        new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
-            timeSeriesRequestHandler);
-    _brokerRequestHandler.start();
+    // Initialize the failure detector that removes servers from the broker routing table if they are not healthy
+    _failureDetector = FailureDetectorFactory.getFailureDetector(_brokerConf, _brokerMetrics);
+    _failureDetector.registerHealthyServerNotifier(
+        instanceId -> _routingManager.includeServerToRouting(instanceId));
+    _failureDetector.registerUnhealthyServerNotifier(
+        instanceId -> _routingManager.excludeServerFromRouting(instanceId));
+    _failureDetector.start();
 
     // Enable/disable thread CPU time measurement through instance config.
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(
@@ -366,8 +478,194 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
         _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
             CommonConstants.Broker.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(
-        _brokerConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId);
+    // Initialize workload budget manager and thread resource usage accountant. Workload budget manager must be
+    // initialized first because it might be used by the accountant.
+    PinotConfiguration accountingConfig = ThreadAccountantUtils.extractAccountingConfig(_brokerConf,
+        org.apache.pinot.spi.config.instance.InstanceType.BROKER);
+    WorkloadBudgetManagerFactory.register(accountingConfig);
+    _threadAccountant = ThreadAccountantUtils.createAccountant(accountingConfig, _instanceId,
+        org.apache.pinot.spi.config.instance.InstanceType.BROKER);
+    _threadAccountant.startWatcherTask();
+    // Get all workload budgets this instance should support
+    QueryWorkloadConfigUtils.getAndUpdateWorkloadBudgets(_instanceId, _spectatorHelixManager,
+        status -> _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.WORKLOAD_CONFIG_FETCH_STATUS, status));
+    PinotClusterConfigChangeListener threadAccountantListener = _threadAccountant.getClusterConfigChangeListener();
+    if (threadAccountantListener != null) {
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(threadAccountantListener);
+    }
+
+    // TODO: Hook multiClusterRoutingContext into request handlers subsequently.
+    MultiClusterRoutingContext multiClusterRoutingContext = getMultiClusterRoutingContext();
+
+    // Create Broker request handler.
+    String brokerId = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
+    BrokerRequestIdGenerator requestIdGenerator = new BrokerRequestIdGenerator();
+    String brokerRequestHandlerType =
+        _brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE);
+    boolean mvRewriteEnabled = _brokerConf.getProperty(
+        Broker.CONFIG_OF_BROKER_QUERY_ENABLE_MATERIALIZED_VIEW_REWRITE,
+        Broker.DEFAULT_BROKER_QUERY_ENABLE_MATERIALIZED_VIEW_REWRITE);
+    boolean isGrpcBroker = brokerRequestHandlerType.equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE);
+    MaterializedViewHandler materializedViewHandler = null;
+    if (mvRewriteEnabled) {
+      /// The handler class is configurable via
+      /// `pinot.broker.materialized.view.handler.class` (default: `DefaultMaterializedViewHandler`).
+      /// gRPC streaming reduce cannot merge dual scatter-gather, so the gRPC broker variant passes
+      /// `supportsSplitRewrite=false`; the configured handler must honor that signal so split-rewrite
+      /// plans are suppressed at compile time on gRPC brokers.
+      PinotConfiguration mvHandlerConf = _brokerConf.subset(Broker.MATERIALIZED_VIEW_HANDLER_CONFIG_PREFIX);
+      materializedViewHandler =
+          MaterializedViewHandler.loadHandler(mvHandlerConf, _propertyStore, !isGrpcBroker);
+      /// Expose the MV metadata cache size as a global gauge so operators can monitor
+      /// unbounded growth — a cluster with K MVs should plateau near K; sustained growth would
+      /// indicate a leak in the ZK listener / drop path.  Handlers that don't track a cache
+      /// return -1 from `getCacheEntryCount()` and we skip the gauge for those.
+      final MaterializedViewHandler handlerForGauge = materializedViewHandler;
+      if (handlerForGauge.getCacheEntryCount() >= 0) {
+        _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MATERIALIZED_VIEW_CACHE_ENTRY_COUNT,
+            () -> (long) handlerForGauge.getCacheEntryCount());
+      }
+    }
+    BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler;
+    if (isGrpcBroker) {
+      singleStageBrokerRequestHandler =
+          createGrpcBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
+              _accessControlFactory, _queryQuotaManager, _tableCache, _failureDetector, _threadAccountant,
+              multiClusterRoutingContext, materializedViewHandler);
+    } else {
+      // Default request handler type, i.e. netty
+      NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
+      // Configure TLS for netty connection to server
+      TlsConfig tlsDefaults = null;
+      if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
+        tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
+        SSLFactory sslFactory =
+            RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsDefaults,
+                PinotInsecureMode::isPinotInInsecureMode);
+        SSLContext sslContext = sslFactory.getSslContext();
+        BrokerContext brokerContext = BrokerContext.getInstance();
+        if (brokerContext.getClientHttpsContext() != null) {
+          LOGGER.warn("Overriding broker client HTTPS context during startup");
+        }
+        brokerContext.setClientHttpsContext(sslContext);
+        if (brokerContext.getServerHttpsContext() != null) {
+          LOGGER.warn("Overriding broker server HTTPS context during startup");
+        }
+        brokerContext.setServerHttpsContext(sslContext);
+      }
+      singleStageBrokerRequestHandler =
+          createSingleStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
+              _accessControlFactory, _queryQuotaManager, _tableCache, nettyDefaults, tlsDefaults,
+              _serverRoutingStatsManager, _failureDetector, _threadAccountant, multiClusterRoutingContext,
+              materializedViewHandler);
+    }
+
+    MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
+    if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
+      _multiStageQueryThrottler = new MultiStageQueryThrottler(_brokerConf);
+      _multiStageQueryThrottler.init(_spectatorHelixManager);
+      // multi-stage request handler uses both Netty and GRPC ports.
+      // worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport.
+      // TODO: decouple protocol and engine selection.
+      String queryRunnerHostname = _brokerConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
+      int queryRunnerPort = Integer.parseInt(_brokerConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
+      WorkerManager workerManager =
+          createWorkerManager(brokerId, queryRunnerHostname, queryRunnerPort, _routingManager);
+      WorkerManager multiClusterWorkerManager;
+      if (multiClusterRoutingContext != null) {
+        multiClusterWorkerManager = createWorkerManager(brokerId, queryRunnerHostname, queryRunnerPort,
+            multiClusterRoutingContext.getMultiClusterRoutingManager());
+      } else {
+        multiClusterWorkerManager = workerManager;
+      }
+      multiStageBrokerRequestHandler =
+          createMultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
+              _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
+              _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
+              _serverRoutingStatsManager);
+      MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
+      _routingManager.setServerReenableCallback(
+          serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));
+      // Lets an operator turn the proto segment list encoding on and off through cluster config, without a restart.
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+          multiStageBrokerRequestHandler.getQueryDispatcher());
+    }
+    TimeSeriesRequestHandler timeSeriesRequestHandler = null;
+    if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
+      timeSeriesRequestHandler =
+          new TimeSeriesRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
+              _accessControlFactory, _queryQuotaManager, _tableCache, _threadAccountant,
+              multiClusterRoutingContext);
+    }
+
+    LOGGER.info("Initializing PinotFSFactory");
+    PinotFSFactory.init(_brokerConf.subset(CommonConstants.Broker.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY));
+
+    LOGGER.info("Initialize ResponseStore");
+    PinotConfiguration responseStoreConfiguration =
+        _brokerConf.subset(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE);
+
+    String expirationTime = _brokerConf.getProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL,
+        CommonConstants.CursorConfigs.DEFAULT_RESULTS_EXPIRATION_INTERVAL);
+
+    _responseStore = (AbstractResponseStore) ResponseStoreService.getInstance().getResponseStore(
+        responseStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_TYPE,
+            CommonConstants.CursorConfigs.DEFAULT_RESPONSE_STORE_TYPE));
+    _responseStore.init(responseStoreConfiguration.subset(_responseStore.getType()), _hostname, _port, brokerId,
+        _brokerMetrics, expirationTime);
+
+    LOGGER.info("Starting ResponseStore cleanup scheduler");
+    _responseStoreCleanupExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+      Thread t = new Thread(runnable, "ResponseStoreCleanup");
+      t.setDaemon(true);
+      return t;
+    });
+    long cleanupFrequencyMs = TimeUtils.convertPeriodToMillis(
+        _brokerConf.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD,
+            CommonConstants.CursorConfigs.DEFAULT_RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD));
+    Preconditions.checkArgument(cleanupFrequencyMs > 0,
+        "Invalid config '%s': cleanup frequency must be positive, got %s ms",
+        CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD, cleanupFrequencyMs);
+    String initialDelayStr =
+        _brokerConf.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_INITIAL_DELAY);
+
+    long cleanupInitialDelayMs;
+    if (initialDelayStr != null) {
+      cleanupInitialDelayMs = TimeUtils.convertPeriodToMillis(initialDelayStr);
+      Preconditions.checkArgument(cleanupInitialDelayMs >= 0,
+          "Invalid config '%s': cleanup initial delay must be non-negative, got %s ms",
+          CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_INITIAL_DELAY, cleanupInitialDelayMs);
+    } else {
+      long jitterUpperBound = Math.max(1L, cleanupFrequencyMs / RESPONSE_STORE_CLEANUP_INITIAL_DELAY_JITTER_DIVISOR);
+      cleanupInitialDelayMs =
+          cleanupFrequencyMs + ThreadLocalRandom.current().nextLong(jitterUpperBound);
+    }
+
+    _responseStoreCleanupExecutor.scheduleWithFixedDelay(() -> {
+      try {
+        int deleted = _responseStore.deleteExpiredResponses(System.currentTimeMillis());
+        if (deleted > 0) {
+          LOGGER.info("Cleaned up {} expired cursor response(s) from local ResponseStore", deleted);
+        }
+      } catch (Exception e) {
+        LOGGER.error("Failed to clean up expired cursor responses from local ResponseStore", e);
+      }
+    }, cleanupInitialDelayMs, cleanupFrequencyMs, TimeUnit.MILLISECONDS);
+
+    _brokerRequestHandler =
+        new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
+            timeSeriesRequestHandler, _responseStore);
+    // Lets the approximate-function rewrite defaults be changed from the cluster config without a broker restart.
+    // Registering here is a no-op in itself, because the cluster config handler is not wired to Helix yet, so the
+    // snapshot it hands the listener is empty. The real values arrive from that handler's first Helix callback,
+    // which is set up below and still runs before the broker starts serving traffic.
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        singleStageBrokerRequestHandler.getApproximateFunctionOverrideProvider());
+    if (multiStageBrokerRequestHandler != null) {
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+          multiStageBrokerRequestHandler.getApproximateFunctionOverrideProvider());
+    }
+    _brokerRequestHandler.start();
 
     String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
     if (controllerUrl != null) {
@@ -375,16 +673,102 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     } else {
       _sqlQueryExecutor = new SqlQueryExecutor(_spectatorHelixManager);
     }
+
+    LOGGER.info("Wiring up cluster config change handler with helix");
+    _spectatorHelixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
+    // Registered before the query endpoints start so that the cluster configs are applied before the first query
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_serverRoutingStatsManager);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(new QueryOptionConfigListener());
+
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _brokerAdminApplication = createBrokerAdminApp();
     _brokerAdminApplication.start(_listenerConfigs);
 
+    if (BrokerGrpcServer.isEnabled(_brokerConf)) {
+      LOGGER.info("Initializing BrokerGrpcServer");
+      _brokerGrpcServer = new BrokerGrpcServer(_brokerConf, brokerId, _brokerMetrics, _brokerRequestHandler);
+      _brokerGrpcServer.start();
+    } else {
+      LOGGER.info("BrokerGrpcServer is not enabled");
+    }
+
     LOGGER.info("Initializing cluster change mediator");
+    initClusterChangeMediator();
+
+    LOGGER.info("Connecting participant Helix manager");
+    _participantHelixManager =
+      HelixManagerFactory.getZKHelixManager(_clusterName, _instanceId, InstanceType.PARTICIPANT, _zkServers);
+    // Register state model factory
+    _participantHelixManager.getStateMachineEngine()
+        .registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
+          new BrokerResourceOnlineOfflineStateModelFactory(_propertyStore, _helixDataAccessor, _routingManager,
+          _queryQuotaManager, materializedViewHandler));
+    // Register user-define message handler factory
+    _participantHelixManager.getMessagingService()
+        .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
+          new BrokerUserDefinedMessageHandlerFactory(_routingManager, _queryQuotaManager));
+    _participantHelixManager.connect();
+    updateInstanceConfigAndBrokerResourceIfNeeded();
+    _brokerMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME,
+        () -> _participantHelixManager.isConnected() ? 1L : 0L);
+    _participantHelixManager.addPreConnectCallback(
+        () -> _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
+
+    // Initializing Groovy execution security
+    GroovyFunctionEvaluator.configureGroovySecurity(
+        _brokerConf.getProperty(CommonConstants.Groovy.GROOVY_QUERY_STATIC_ANALYZER_CONFIG,
+        _brokerConf.getProperty(CommonConstants.Groovy.GROOVY_ALL_STATIC_ANALYZER_CONFIG)));
+
+    // Only the Netty single-stage transport has broker-to-server channels to open; the gRPC single-stage
+    // handler, the multi-stage engine and the time-series path all use different transports and are
+    // unaffected by this flag.
+    _preConnectEnabled = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_STARTUP_PRECONNECT_ENABLED,
+        Broker.DEFAULT_BROKER_STARTUP_PRECONNECT_ENABLED);
+    _preConnectTimeoutMs = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS,
+        Broker.DEFAULT_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS);
+    // Read the warmup config before registering the status handler: the handler adds the warmup readiness
+    // gate only when warmup is enabled, and the gate must be in place before the handler is registered so
+    // there is no window where readiness is granted un-gated.
+    _warmupConfig = BrokerWarmupConfig.from(_brokerConf);
+    // Register the service status handler
+    registerServiceStatusHandler();
+    if (_preConnectEnabled) {
+      // Startup is not finished until the broker-to-server channels are open, so `_isStarting` stays set
+      // and the existing lifecycle callback keeps reporting STARTING -- no query is routed here before the
+      // connect and TLS handshake have been paid. "Still pre-connecting" is not a new kind of statement,
+      // it is the same one, so it reuses the same flag rather than a second parallel gate. The flag was
+      // set before the status handler was registered, so there is structurally no window in which
+      // readiness is granted un-gated. The pre-connect thread clears it when it finishes.
+      startPreConnect();
+    } else {
+      _isStarting = false;
+    }
+    // Warmup gates readiness on its own _isWarm flag (added to the status handler above when enabled), so
+    // it composes with pre-connect's _isStarting gate: readiness is granted only once both are satisfied.
+    startWarmup();
+    _brokerMetrics.addTimedValue(BrokerTimer.STARTUP_SUCCESS_DURATION_MS,
+        System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
+
+    NettyInspector.registerMetrics(_brokerMetrics);
+
+    LOGGER.info("Finish starting Pinot broker");
+  }
+
+  /// Returns the tables that emit table-level metrics even when table-level metrics are disabled.
+  @VisibleForTesting
+  static List<String> getAllowedTablesForEmittingMetrics(PinotConfiguration brokerConf) {
+    return brokerConf.getCommaSeparatedList(Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, List.of());
+  }
+
+  protected void initClusterChangeMediator() throws Exception {
     for (ClusterChangeHandler clusterConfigChangeHandler : _clusterConfigChangeHandlers) {
       clusterConfigChangeHandler.init(_spectatorHelixManager);
     }
     _clusterConfigChangeHandlers.add(_queryQuotaManager);
-    _clusterConfigChangeHandlers.add(_multiStageQueryThrottler);
+    if (_multiStageQueryThrottler != null) {
+      _clusterConfigChangeHandlers.add(_multiStageQueryThrottler);
+    }
     for (ClusterChangeHandler idealStateChangeHandler : _idealStateChangeHandlers) {
       idealStateChangeHandler.init(_spectatorHelixManager);
     }
@@ -394,7 +778,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
     _externalViewChangeHandlers.add(_routingManager);
     _externalViewChangeHandlers.add(_queryQuotaManager);
-    _externalViewChangeHandlers.add(_multiStageQueryThrottler);
+    if (_multiStageQueryThrottler != null) {
+      _externalViewChangeHandlers.add(_multiStageQueryThrottler);
+    }
     for (ClusterChangeHandler instanceConfigChangeHandler : _instanceConfigChangeHandlers) {
       instanceConfigChangeHandler.init(_spectatorHelixManager);
     }
@@ -420,50 +806,33 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     if (!_liveInstanceChangeHandlers.isEmpty()) {
       _spectatorHelixManager.addLiveInstanceChangeListener(_clusterChangeMediator);
     }
-
-    LOGGER.info("Connecting participant Helix manager");
-    _participantHelixManager =
-        HelixManagerFactory.getZKHelixManager(_clusterName, _instanceId, InstanceType.PARTICIPANT, _zkServers);
-    // Register state model factory
-    _participantHelixManager.getStateMachineEngine()
-        .registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
-            new BrokerResourceOnlineOfflineStateModelFactory(_propertyStore, _helixDataAccessor, _routingManager,
-                _queryQuotaManager));
-    // Register user-define message handler factory
-    _participantHelixManager.getMessagingService()
-        .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
-            new BrokerUserDefinedMessageHandlerFactory(_routingManager, _queryQuotaManager));
-    _participantHelixManager.connect();
-    updateInstanceConfigAndBrokerResourceIfNeeded();
-    _brokerMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME,
-        () -> _participantHelixManager.isConnected() ? 1L : 0L);
-    _participantHelixManager.addPreConnectCallback(
-        () -> _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
-
-    // Register the service status handler
-    registerServiceStatusHandler();
-
-    _isStarting = false;
-    _brokerMetrics.addTimedValue(BrokerTimer.STARTUP_SUCCESS_DURATION_MS,
-        System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
-    LOGGER.info("Finish starting Pinot broker");
   }
 
-  /**
-   * @deprecated Use {@link #createBrokerAdminApp()} instead.
-   * This method is called after initialization of BrokerAdminApiApplication object
-   * and before calling start to allow custom broker starters to register additional
-   * components.
-   * @param brokerAdminApplication is the application
-   */
+  protected void initRoutingManager() throws Exception {
+    _routingManager = new BrokerRoutingManager(_brokerMetrics, _serverRoutingStatsManager, _brokerConf);
+    _routingManager.init(_spectatorHelixManager);
+  }
+
+  protected void initSpectatorHelixManager() throws Exception {
+    _spectatorHelixManager =
+      HelixManagerFactory.getZKHelixManager(_clusterName, _instanceId, InstanceType.SPECTATOR, _zkServers);
+    _spectatorHelixManager.connect();
+    _helixAdmin = _spectatorHelixManager.getClusterManagmentTool();
+    _propertyStore = _spectatorHelixManager.getHelixPropertyStore();
+    _helixDataAccessor = _spectatorHelixManager.getHelixDataAccessor();
+  }
+
+  /// Can be overridden to inject a custom MultiClusterRoutingContext from MultiClusterBrokerStarter.
+  protected MultiClusterRoutingContext getMultiClusterRoutingContext() {
+    return null;
+  }
+
+  /// @deprecated Use [#createBrokerAdminApp()] instead.
+  /// This method is called after initialization of BrokerAdminApiApplication object
+  /// and before calling start to allow custom broker starters to register additional
+  /// components.
+  /// @param brokerAdminApplication is the application
   protected void registerExtraComponents(BrokerAdminApiApplication brokerAdminApplication) {
-  }
-
-  private QueryDispatcher createQueryDispatcher(PinotConfiguration brokerConf) {
-    String hostname = _brokerConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
-    int port = Integer.parseInt(_brokerConf.getProperty(
-        CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
-    return new QueryDispatcher(new MailboxService(hostname, port, _brokerConf));
   }
 
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {
@@ -475,6 +844,20 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     if (_tlsPort > 0) {
       HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
     }
+
+    // Update admin port
+    String adminApiPortString = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ADMIN_API_PORT);
+    if (adminApiPortString != null) {
+      updated |= updatePortIfNeeded(simpleFields, Helix.Instance.ADMIN_PORT_KEY, Integer.parseInt(adminApiPortString));
+    }
+    // Update GRPC query engine port
+    if (BrokerGrpcServer.isEnabled(_brokerConf)) {
+      int grpcPort = BrokerGrpcServer.getGrpcPort(_brokerConf);
+      updated |= updatePortIfNeeded(simpleFields, Helix.Instance.GRPC_PORT_KEY, grpcPort);
+    } else {
+      updated |= updatePortIfNeeded(simpleFields, Helix.Instance.GRPC_PORT_KEY, -1);
+    }
+
     // Update multi-stage query engine ports
     if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
       updated |= updatePortIfNeeded(simpleFields, Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY,
@@ -486,26 +869,33 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     boolean shouldUpdateBrokerResource = false;
     List<String> instanceTags = instanceConfig.getTags();
     if (instanceTags.isEmpty()) {
-      // This is a new broker (first time joining the cluster)
-      if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
+      // This is a new broker (first time joining the cluster). We allow configuring initial broker tags regardless of
+      // tenant isolation mode since it defaults to true and is relatively obscure.
+      String instanceTagsConfig = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS);
+      if (StringUtils.isNotEmpty(instanceTagsConfig)) {
+        for (String instanceTag : StringUtils.split(instanceTagsConfig, ',')) {
+          Preconditions.checkArgument(TagNameUtils.isBrokerTag(instanceTag), "Illegal broker instance tag: %s",
+              instanceTag);
+          instanceConfig.addTag(instanceTag);
+        }
+        shouldUpdateBrokerResource = true;
+      } else if (_brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ENFORCE_INSTANCE_TAGS,
+          Broker.DEFAULT_BROKER_ENFORCE_INSTANCE_TAGS)) {
+        throw new IllegalStateException(String.format(
+            "Broker instance tags enforcement is enabled ('%s' = true), but '%s' is not configured. "
+                + "Please set it for this broker or disable enforcement to allow startup.",
+            Broker.CONFIG_OF_BROKER_ENFORCE_INSTANCE_TAGS,
+            Broker.CONFIG_OF_BROKER_INSTANCE_TAGS));
+      } else if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
         instanceConfig.addTag(TagNameUtils.getBrokerTagForTenant(null));
         shouldUpdateBrokerResource = true;
       } else {
-        String instanceTagsConfig = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS);
-        if (StringUtils.isNotEmpty(instanceTagsConfig)) {
-          for (String instanceTag : StringUtils.split(instanceTagsConfig, ',')) {
-            Preconditions.checkArgument(TagNameUtils.isBrokerTag(instanceTag), "Illegal broker instance tag: %s",
-                instanceTag);
-            instanceConfig.addTag(instanceTag);
-          }
-          shouldUpdateBrokerResource = true;
-        } else {
-          instanceConfig.addTag(Helix.UNTAGGED_BROKER_INSTANCE);
-        }
+        instanceConfig.addTag(Helix.UNTAGGED_BROKER_INSTANCE);
       }
       instanceTags = instanceConfig.getTags();
       updated = true;
     }
+    updated |= HelixHelper.updatePinotVersion(instanceConfig);
     if (updated) {
       HelixHelper.updateInstanceConfig(_participantHelixManager, instanceConfig);
     }
@@ -519,10 +909,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
   }
 
-  /**
-   * Fetches the resources to monitor and registers the
-   * {@link org.apache.pinot.common.utils.ServiceStatus.ServiceStatusCallback}s
-   */
+  /// Fetches the resources to monitor and registers the
+  /// [org.apache.pinot.common.utils.ServiceStatus.ServiceStatusCallback]s
   private void registerServiceStatusHandler() {
     List<String> resourcesToMonitor = new ArrayList<>(1);
     IdealState brokerResourceIdealState =
@@ -541,12 +929,201 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
             Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
 
     LOGGER.info("Registering service status handler");
-    ServiceStatus.setServiceStatusCallback(_instanceId, new ServiceStatus.MultipleCallbackServiceStatusCallback(
-        ImmutableList.of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
-                _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup),
-            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
-                _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup),
-            new ServiceStatus.LifecycleServiceStatusCallback(this::isStarting, this::isShuttingDown))));
+    // The two Helix callbacks are grouped into their own composite so startup pre-connect can wait on
+    // exactly the "Helix has converged" signal. CurrentState only reports ONLINE once the
+    // OFFLINE->ONLINE transition has returned, and that transition is what builds routing -- so
+    // convergence is the precondition for routing entries, and the servers they reference, existing.
+    // Behaviour is unchanged: MultipleCallbackServiceStatusCallback surfaces the first non-GOOD
+    // callback, so nesting the two Helix callbacks reports the same status as listing them flat.
+    _helixConvergenceCallback = new ServiceStatus.MultipleCallbackServiceStatusCallback(List.of(
+        new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
+            _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup),
+        new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
+            _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup)));
+
+    List<ServiceStatus.ServiceStatusCallback> callbacks = new ArrayList<>(3);
+    callbacks.add(new ServiceStatus.LifecycleServiceStatusCallback(this::isStarting, this::isShuttingDown));
+    callbacks.add(_helixConvergenceCallback);
+    if (_warmupConfig.enabled()) {
+      // The warmup readiness gate. Reports STARTING (not a new status value) until warmup completes:
+      // callers throughout the codebase test for GOOD, and a new enum constant would be visible to older
+      // mixed-version peers. MultipleCallbackServiceStatusCallback surfaces the first non-GOOD callback, so
+      // this composes without touching the Helix or lifecycle callbacks.
+      //
+      // Scope: this gates HTTP readiness only -- the /health endpoint (getBrokerHealth -> ServiceStatus)
+      // that a load balancer or Kubernetes readiness probe polls, so a warming broker is not put into
+      // rotation there. It does NOT change Helix discovery: the broker is already ONLINE in the broker
+      // resource's external view by this point, so a client that resolves brokers straight from Helix could
+      // still route to it while it warms. That is acceptable -- warmup only makes the first queries faster,
+      // never wrong -- and keeping the broker in Helix is deliberate, since removing it would be a
+      // routing/discovery change far beyond a startup latency optimization.
+      callbacks.add(warmupGateCallback(() -> _isWarm));
+    }
+    ServiceStatus.setServiceStatusCallback(_instanceId,
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(callbacks));
+  }
+
+  /// The startup-warmup readiness gate as a standalone callback: reports STARTING with the "warming up"
+  /// description until `isWarm` turns true, then GOOD with no description. Extracted and package-private so
+  /// the STARTING -> GOOD transition can be unit-tested deterministically, without standing up a broker or
+  /// racing an actual warmup to observe it mid-flight.
+  @VisibleForTesting
+  static ServiceStatus.ServiceStatusCallback warmupGateCallback(BooleanSupplier isWarm) {
+    return new ServiceStatus.ServiceStatusCallback() {
+      @Override
+      public ServiceStatus.Status getServiceStatus() {
+        return isWarm.getAsBoolean() ? ServiceStatus.Status.GOOD : ServiceStatus.Status.STARTING;
+      }
+
+      @Override
+      public String getStatusDescription() {
+        return isWarm.getAsBoolean() ? ServiceStatus.STATUS_DESCRIPTION_NONE : WARMUP_GATE_STARTING_DESCRIPTION;
+      }
+    };
+  }
+
+  /// Runs the data-plane warmup on a background thread and flips [#_isWarm] when it finishes.
+  ///
+  /// Asynchronous so `start()` still returns promptly -- the gate is enforced through `ServiceStatus`, not
+  /// by blocking startup. The flag is set in a `finally` so the gate opens even if warmup throws:
+  /// readiness held open indefinitely would stall a rolling restart, a worse failure than serving a cold
+  /// broker. When disabled this is a no-op and readiness behaves exactly as before.
+  private void startWarmup() {
+    // The gauge is published in both branches so dashboards can rely on it always existing; with warmup
+    // disabled it simply reads 1 from the start, matching pre-change behaviour.
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.STARTUP_WARMUP_COMPLETE, () -> _isWarm ? 1L : 0L);
+    if (!_warmupConfig.enabled()) {
+      _isWarm = true;
+      return;
+    }
+    _warmupThread = new Thread(() -> {
+      // Set once Helix converges. Both the budget and the duration metric are measured from here, not from
+      // thread start, so the deliberately unbounded convergence wait is charged against neither: readiness
+      // is already withheld until convergence by the Helix callbacks, so it costs nothing.
+      long warmStartMs = 0L;
+      try {
+        long threadStartMs = System.currentTimeMillis();
+        awaitHelixConvergence();
+        warmStartMs = System.currentTimeMillis();
+        LOGGER.info("Helix converged after {} ms; starting data-plane warmup", warmStartMs - threadStartMs);
+        // Saturating add: a pathologically large budgetMs must not overflow the deadline negative (which
+        // would make warmup a silent no-op). A negative/zero budget still yields a past deadline (no-op),
+        // which is the intended fail-open behaviour.
+        long budgetMs = _warmupConfig.budgetMs();
+        long deadlineMs = budgetMs > Long.MAX_VALUE - warmStartMs ? Long.MAX_VALUE : warmStartMs + budgetMs;
+        boolean reachedFloor = _brokerRequestHandler.warmUp(_warmupConfig, deadlineMs);
+        LOGGER.info("Broker warmup finished in {} ms (reachedFloor={})", System.currentTimeMillis() - warmStartMs,
+            reachedFloor);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        LOGGER.info("Broker warmup interrupted before completion");
+      } catch (Throwable t) {
+        LOGGER.warn("Broker warmup threw; opening readiness anyway", t);
+      } finally {
+        _isWarm = true;
+        // Record the duration only if convergence was reached, so the metric measures the warmup work
+        // itself and never the (unbounded) convergence wait -- e.g. when shutdown interrupts the wait.
+        if (warmStartMs > 0L) {
+          _brokerMetrics.addTimedValue(BrokerTimer.STARTUP_WARMUP_DURATION_MS,
+              System.currentTimeMillis() - warmStartMs, TimeUnit.MILLISECONDS);
+        }
+      }
+    }, "broker-startup-warmup");
+    _warmupThread.setDaemon(true);
+    _warmupThread.start();
+  }
+
+  /// Runs startup server pre-connect on a background thread and ends startup ([#_isStarting]) when it
+  /// finishes. Asynchronous so `start()` still returns promptly -- readiness is withheld through
+  /// `ServiceStatus`, not by blocking startup. The flag is cleared in a `finally` so startup ends even if
+  /// pre-connect throws or is interrupted: readiness withheld indefinitely would stall a rolling restart,
+  /// a worse failure than serving a broker whose channels are not yet warm.
+  ///
+  /// Only called when pre-connect is enabled; otherwise `start()` ends startup itself and readiness
+  /// behaves exactly as before.
+  private void startPreConnect() {
+    _preConnectThread = new Thread(() -> {
+      // Set once Helix converges. Both the budget and the duration metric are measured from here, not
+      // from thread start, so the deliberately unbounded convergence wait is charged against neither: the
+      // Helix callbacks withhold readiness until convergence anyway, so it costs nothing.
+      long preConnectStartMs = 0L;
+      try {
+        long threadStartMs = System.currentTimeMillis();
+        awaitHelixConvergence();
+        preConnectStartMs = System.currentTimeMillis();
+        LOGGER.info("Helix converged after {} ms; pre-connecting server channels",
+            preConnectStartMs - threadStartMs);
+        int connected = _brokerRequestHandler.preConnectServers(preConnectStartMs + _preConnectTimeoutMs);
+        LOGGER.info("Startup server pre-connect opened {} channel(s); ending startup", connected);
+      } catch (InterruptedException e) {
+        // Normal on shutdown; stopPreConnect() interrupts us.
+        Thread.currentThread().interrupt();
+        LOGGER.info("Startup server pre-connect interrupted before completion; ending startup");
+      } catch (Throwable t) {
+        LOGGER.warn("Startup server pre-connect threw; ending startup anyway", t);
+      } finally {
+        _isStarting = false;
+        // Record the duration only if convergence was reached, so the metric measures the pre-connect work
+        // itself and never the (unbounded) convergence wait -- e.g. when shutdown interrupts the wait.
+        if (preConnectStartMs > 0L) {
+          _brokerMetrics.addTimedValue(BrokerTimer.STARTUP_PRECONNECT_DURATION_MS,
+              System.currentTimeMillis() - preConnectStartMs, TimeUnit.MILLISECONDS);
+        }
+      }
+    }, "broker-startup-preconnect");
+    _preConnectThread.setDaemon(true);
+    _preConnectThread.start();
+  }
+
+  /// Blocks until the Helix-convergence callbacks report GOOD -- the point at which routing entries and
+  /// the servers they reference exist. Deliberately **unbounded** and interruptible: a broker that never
+  /// converges is never Ready regardless of pre-connect, and shutdown interrupts this thread. Monitors
+  /// `brokerResource` only (partitions in {OFFLINE, ONLINE, DROPPED}); segment states live in the table
+  /// resources that servers monitor and cannot hold this up.
+  private void awaitHelixConvergence()
+      throws InterruptedException {
+    ServiceStatus.ServiceStatusCallback callback = _helixConvergenceCallback;
+    if (callback == null) {
+      return;
+    }
+    while (callback.getServiceStatus() != ServiceStatus.Status.GOOD) {
+      Thread.sleep(HELIX_CONVERGENCE_POLL_INTERVAL_MS);
+    }
+  }
+
+  /// Interrupts an in-flight warmup so a broker stopped mid-warmup does not keep issuing probe queries
+  /// against a request handler being torn down, then joins briefly so an in-flight probe unwinds before the
+  /// handler is shut down (avoiding a probe racing a closing [QueryRouter]). Bounded: the thread is a daemon
+  /// whose `finally` opens the gate regardless, so shutdown never waits on it beyond the short join.
+  private void stopWarmup() {
+    interruptAndJoin(_warmupThread, "broker warmup");
+  }
+
+  /// Interrupts an in-flight pre-connect so shutdown never waits on it. Interrupt-only (no join) so this
+  /// PR leaves the already-merged pre-connect feature's shutdown behaviour unchanged; the join added for
+  /// warmup applies to the warmup thread only. Best effort: the thread is a daemon that records its metric
+  /// in a `finally` regardless.
+  private void stopPreConnect() {
+    Thread thread = _preConnectThread;
+    if (thread != null && thread.isAlive()) {
+      LOGGER.info("Interrupting in-flight startup server pre-connect for shutdown");
+      thread.interrupt();
+    }
+  }
+
+  /// Interrupts `thread` (if alive) and waits up to [#STARTUP_THREAD_JOIN_TIMEOUT_MS] for it to unwind.
+  /// Best effort: a thread that does not stop in time is left to its daemon `finally` and shutdown proceeds.
+  private static void interruptAndJoin(@Nullable Thread thread, String what) {
+    if (thread == null || !thread.isAlive()) {
+      return;
+    }
+    LOGGER.info("Interrupting in-flight {} for shutdown", what);
+    thread.interrupt();
+    try {
+      thread.join(STARTUP_THREAD_JOIN_TIMEOUT_MS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   private String getDefaultBrokerId() {
@@ -558,7 +1135,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
   }
 
-  private boolean updatePortIfNeeded(Map<String, String> instanceConfigSimpleFields, String key, int port) {
+  protected boolean updatePortIfNeeded(Map<String, String> instanceConfigSimpleFields, String key, int port) {
     String existingPortStr = instanceConfigSimpleFields.get(key);
     if (port > 0) {
       String portStr = Integer.toString(port);
@@ -581,12 +1158,16 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   public void stop() {
     LOGGER.info("Shutting down Pinot broker");
     _isShuttingDown = true;
+    stopWarmup();
+    stopPreConnect();
 
     LOGGER.info("Disconnecting participant Helix manager");
     _participantHelixManager.disconnect();
 
     LOGGER.info("Stopping cluster change mediator");
     _clusterChangeMediator.stop();
+
+    _failureDetector.stop();
 
     // Delay shutdown of request handler so that the pending queries can be finished. The participant Helix manager has
     // been disconnected, so instance should disappear from ExternalView soon and stop getting new queries.
@@ -600,9 +1181,45 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       LOGGER.error("Caught exception while waiting for shutdown delay of {}ms", delayShutdownTimeMs, e);
     }
 
+    if (_brokerGrpcServer != null) {
+      LOGGER.info("Stopping broker grpc server");
+      _brokerGrpcServer.shutdown();
+    }
+
+    if (_responseStoreCleanupExecutor != null) {
+      LOGGER.info("Stopping ResponseStore cleanup scheduler");
+      _responseStoreCleanupExecutor.shutdown();
+      try {
+        if (!_responseStoreCleanupExecutor.awaitTermination(30, TimeUnit.SECONDS)) {
+          _responseStoreCleanupExecutor.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        _responseStoreCleanupExecutor.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
+    }
+
     LOGGER.info("Shutting down request handler and broker admin application");
     _brokerRequestHandler.shutDown();
+    /// Deregister the MV-cache-size gauge after the handler shut down (and called
+    /// `MaterializedViewHandler.close()`).  Without removal, the gauge supplier remains in the
+    /// metrics registry and the reporter keeps polling — the closed handler's `getCacheEntryCount`
+    /// returns 0 (the entry map is cleared on close), which silently masks the shutdown state
+    /// rather than removing the gauge.  Removing here also avoids a stale-supplier conflict on
+    /// hot reload / re-init in tests.
+    _brokerMetrics.removeGauge(BrokerGauge.MATERIALIZED_VIEW_CACHE_ENTRY_COUNT.getGaugeName());
+    _threadAccountant.stopWatcherTask();
     _brokerAdminApplication.stop();
+
+    LOGGER.info("Stopping the broker routing manager");
+    _routingManager.stop();
+
+    LOGGER.info("Close PinotFs");
+    try {
+      PinotFSFactory.shutdown();
+    } catch (IOException e) {
+      LOGGER.error("Caught exception when shutting down PinotFsFactory", e);
+    }
 
     LOGGER.info("Disconnecting spectator Helix manager");
     _spectatorHelixManager.disconnect();
@@ -646,11 +1263,17 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     return _brokerRequestHandler;
   }
 
+  public ThreadAccountant getThreadAccountant() {
+    return _threadAccountant;
+  }
+
   protected BrokerAdminApiApplication createBrokerAdminApp() {
     BrokerAdminApiApplication brokerAdminApiApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
-            _queryQuotaManager);
+            _queryQuotaManager, _threadAccountant, _responseStore);
+    brokerAdminApiApplication.register(
+        new AuditServiceBinder(_clusterConfigChangeHandler, getServiceRole(), _brokerMetrics));
     registerExtraComponents(brokerAdminApiApplication);
     return brokerAdminApiApplication;
   }

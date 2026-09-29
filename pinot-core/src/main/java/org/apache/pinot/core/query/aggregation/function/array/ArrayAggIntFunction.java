@@ -20,15 +20,17 @@ package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class ArrayAggIntFunction extends BaseArrayAggIntFunction<IntArrayList> {
-  public ArrayAggIntFunction(ExpressionContext expression, FieldSpec.DataType dataType, boolean nullHandlingEnabled) {
+  public ArrayAggIntFunction(ExpressionContext expression, DataType dataType, boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
   }
 
@@ -36,14 +38,26 @@ public class ArrayAggIntFunction extends BaseArrayAggIntFunction<IntArrayList> {
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    int[] value = blockValSet.getIntValuesSV();
-    IntArrayList valueArray = new IntArrayList(length);
-
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        valueArray.add(value[i]);
-      }
-    });
+    IntArrayList valueArray =
+        aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult() : new IntArrayList(length);
+    if (blockValSet.isSingleValue()) {
+      int[] values = blockValSet.getIntValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueArray.add(values[i]);
+        }
+      });
+    } else {
+      int[][] valuesArray = blockValSet.getIntValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int[] values = valuesArray[i];
+          for (int v : values) {
+            valueArray.add(v);
+          }
+        }
+      });
+    }
     aggregationResultHolder.setValue(valueArray);
   }
 
@@ -55,5 +69,16 @@ public class ArrayAggIntFunction extends BaseArrayAggIntFunction<IntArrayList> {
       resultHolder.setValueForKey(groupKey, valueArray);
     }
     valueArray.add(value);
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(IntArrayList intArrayList) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.IntArrayList.getValue(),
+        ObjectSerDeUtils.INT_ARRAY_LIST_SER_DE.serialize(intArrayList));
+  }
+
+  @Override
+  public IntArrayList deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.INT_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
   }
 }

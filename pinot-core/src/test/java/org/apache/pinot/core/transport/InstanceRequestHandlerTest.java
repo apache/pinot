@@ -22,61 +22,141 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.LongAccumulator;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.testng.Assert;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.util.TestUtils;
+import org.mockito.ArgumentCaptor;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class InstanceRequestHandlerTest {
+
+  @BeforeClass
+  public void setUp() {
+    PinotMetricUtils.init(new PinotConfiguration());
+    PinotMetricsRegistry registry = PinotMetricUtils.getPinotMetricsRegistry();
+    ServerMetrics.register(new ServerMetrics(registry));
+  }
+
   @Test
-  public void testCancelQuery() {
+  public void testCancelQuery()
+      throws InterruptedException {
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty("pinot.server.enable.query.cancellation", "true");
-    QueryScheduler qs = createQueryScheduler(config);
+    CountDownLatch queryFinishLatch = new CountDownLatch(1);
+    QueryScheduler queryScheduler = createQueryScheduler(config, queryFinishLatch);
     InstanceRequestHandler handler =
-        new InstanceRequestHandler("server01", config, qs, mock(ServerMetrics.class), mock(AccessControl.class));
+        new InstanceRequestHandler("server01", config, queryScheduler, mock(AccessControl.class),
+            ThreadAccountantUtils.getNoOpAccountant());
 
     Set<String> queryIds = new HashSet<>();
     queryIds.add("foo");
     queryIds.add("bar");
     queryIds.add("baz");
-    for (String id : queryIds) {
+    for (String queryId : queryIds) {
       ServerQueryRequest query = mock(ServerQueryRequest.class);
-      when(query.getQueryId()).thenReturn(id);
+      when(query.getQueryId()).thenReturn(queryId);
+      when(query.getTableNameWithType()).thenReturn("testTable_OFFLINE");
+      QueryExecutionContext executionContext = mock(QueryExecutionContext.class);
+      when(executionContext.getCid()).thenReturn(queryId);
+      when(query.toExecutionContext(any())).thenReturn(executionContext);
       ChannelHandlerContext ctx = mock(ChannelHandlerContext.class);
       ChannelFuture chFu = mock(ChannelFuture.class);
       when(ctx.writeAndFlush(any())).thenReturn(chFu);
-      handler.submitQuery(query, ctx, "myTable01", System.currentTimeMillis(), mock(InstanceRequest.class));
+      handler.submitQuery(query, ctx, System.currentTimeMillis());
     }
-    Assert.assertEquals(handler.getRunningQueryIds(), queryIds);
+    assertEquals(handler.getRunningQueryIds(), queryIds);
     for (String id : queryIds) {
       handler.cancelQuery(id);
     }
-    Assert.assertTrue(handler.getRunningQueryIds().isEmpty());
-    Assert.assertFalse(handler.cancelQuery("unknown"));
+    Thread.sleep(100L);
+    assertEquals(handler.getRunningQueryIds(), queryIds);
+    queryFinishLatch.countDown();
+    // Wait for the queries to finish and execute the callback
+    TestUtils.waitForCondition((aVoid) -> handler.getRunningQueryIds().isEmpty(), 10_000L,
+        "Timed out waiting for queries to finish");
+    assertTrue(handler.getRunningQueryIds().isEmpty());
+    assertFalse(handler.cancelQuery("unknown"));
   }
 
-  private QueryScheduler createQueryScheduler(PinotConfiguration config) {
-    return new QueryScheduler(config, mock(QueryExecutor.class), mock(ResourceManager.class), mock(ServerMetrics.class),
-        new LongAccumulator(Long::max, 0)) {
+  @SuppressWarnings("unchecked")
+  @Test
+  public void testWriteFailureClosesChannel()
+      throws Exception {
+    PinotConfiguration config = new PinotConfiguration();
+    CountDownLatch queryFinishLatch = new CountDownLatch(1);
+    QueryScheduler queryScheduler = createQueryScheduler(config, queryFinishLatch);
+    InstanceRequestHandler handler =
+        new InstanceRequestHandler("server01", config, queryScheduler, mock(AccessControl.class),
+            ThreadAccountantUtils.getNoOpAccountant());
+
+    ServerQueryRequest query = mock(ServerQueryRequest.class);
+    when(query.getQueryId()).thenReturn("test-query");
+    when(query.getTableNameWithType()).thenReturn("testTable_OFFLINE");
+    when(query.getRequestId()).thenReturn(1L);
+    QueryExecutionContext executionContext = mock(QueryExecutionContext.class);
+    when(executionContext.getCid()).thenReturn("test-query");
+    when(query.toExecutionContext(any())).thenReturn(executionContext);
+
+    ChannelHandlerContext ctx = mock(ChannelHandlerContext.class);
+    ChannelFuture writeFuture = mock(ChannelFuture.class);
+    when(ctx.writeAndFlush(any())).thenReturn(writeFuture);
+
+    ArgumentCaptor<GenericFutureListener> listenerCaptor = ArgumentCaptor.forClass(GenericFutureListener.class);
+    when(writeFuture.addListener(listenerCaptor.capture())).thenReturn(writeFuture);
+
+    handler.submitQuery(query, ctx, System.currentTimeMillis());
+    queryFinishLatch.countDown();
+
+    TestUtils.waitForCondition((aVoid) -> !listenerCaptor.getAllValues().isEmpty(), 10_000L,
+        "Timed out waiting for write listener to be registered");
+
+    Future<Void> failedFuture = mock(Future.class);
+    when(failedFuture.isSuccess()).thenReturn(false);
+    when(failedFuture.cause()).thenReturn(new OutOfMemoryError("Direct buffer memory"));
+
+    listenerCaptor.getValue().operationComplete(failedFuture);
+
+    verify(ctx).close();
+  }
+
+  private QueryScheduler createQueryScheduler(PinotConfiguration config, CountDownLatch queryFinishLatch) {
+    ResourceManager resourceManager = new UnboundedResourceManager(config);
+    return new QueryScheduler(config, "serverId", mock(QueryExecutor.class), ThreadAccountantUtils.getNoOpAccountant(),
+        new LongAccumulator(Long::max, 0), resourceManager) {
       @Override
       public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
         // Create a FutureTask does nothing but waits to be cancelled and trigger callbacks.
-        return ListenableFutureTask.create(() -> null);
+        ListenableFutureTask<byte[]> task = ListenableFutureTask.create(() -> {
+          queryFinishLatch.await();
+          return null;
+        });
+        resourceManager.getQueryRunners().submit(task);
+        return task;
       }
 
       @Override

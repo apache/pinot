@@ -18,17 +18,13 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
-/**
- * Maps query request to scheduler group based on table name.
- * This maintains per table query queues.
- */
+/// Maps query request to scheduler group based on table name.
+/// This maintains per table query queues.
 public class TableBasedGroupMapper implements SchedulerGroupMapper {
 
-  /**
-   * Maps query to per-table {@link SchedulerGroup}
-   * @param query
-   * @return table name (per-table) SchedulerGroup
-   */
+  /// Maps query to per-table [SchedulerGroup]
+  /// @param query
+  /// @return table name (per-table) SchedulerGroup
   @Override
   public String getSchedulerGroupName(SchedulerQueryContext query) {
     return query.getQueryRequest().getTableNameWithType();

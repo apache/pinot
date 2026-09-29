@@ -19,7 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.creator;
 
-import com.google.common.collect.ImmutableList;
+import java.util.List;
 import java.util.Random;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -37,67 +37,64 @@ public class Fixtures {
   //@formatter:off
   public static final String TABLE_CONFIG_JSON_TEMPLATE =
       "{"
-    + "  \"metadata\":{},"
-    + "  \"segmentsConfig\":{"
-    + "    \"replicasPerPartition\":\"3\","
-    + "    \"replication\":\"3\","
-    + "    \"replicationNumber\":3,"
-    + "    \"retentionTimeUnit\":\"DAYS\","
-    + "    \"retentionTimeValue\":\"3\","
-    + "    \"schemaName\":\"testSchema\","
-    + "    \"segmentAssignmentStrategy\":\"BalanceNumSegmentAssignmentStrategy\","
-    + "    \"segmentPushFrequency\":\"daily\","
-    + "    \"segmentPushType\":\"APPEND\","
-    + "    \"timeColumnName\":\"minutesSinceEpoch\","
-    + "    \"timeType\":\"MINUTES\""
-    + "  },"
-    + "  \"tableIndexConfig\":{"
-    + "    \"invertedIndexColumns\":[],"
-    + "    \"lazyLoad\":\"false\","
-    + "    \"loadMode\":\"HEAP\","
-    + "    \"segmentFormatVersion\":null,"
-    + "    \"sortedColumn\":[],"
-    + "    \"streamConfigs\":{"
-    + "      \"realtime.segment.flush.threshold.rows\":\"" + MAX_ROWS_IN_SEGMENT + "\","
-    + "      \"realtime.segment.flush.threshold.time\":\"" + MAX_TIME_FOR_SEGMENT_CLOSE_MS + "\","
-    + "      \"stream.fakeStream.broker.list\":\"broker:7777\","
-    + "      \"stream.fakeStream.consumer.prop.auto.offset.reset\":\"smallest\","
-    + "      \"stream.fakeStream.consumer.type\":\"simple\","
-    + "      \"stream.fakeStream.consumer.factory.class.name\":\"%s\","
-    + "      \"stream.fakeStream.decoder.class.name\":\"%s\","
-    + "      \"stream.fakeStream.decoder.prop.schema.registry.rest.url\":\"http://1.2.3.4:1766/schemas\","
-    + "      \"stream.fakeStream.decoder.prop.schema.registry.schema.name\":\"UnknownSchema\","
-    + "      \"stream.fakeStream.hlc.zk.connect.string\":\"zoo:2181/kafka-queuing\","
-    + "      \"stream.fakeStream.topic.name\":\"" + TOPIC_NAME + "\","
-    + "      \"stream.fakeStream.zk.broker.url\":\"kafka-broker:2181/kafka-queuing\","
-    + "      \"streamType\":\"fakeStream\""
-    + "    }"
-    + "  },"
-    + "  \"tableName\":\"Coffee_REALTIME\","
-    + "  \"tableType\":\"realtime\","
-    + "  \"tenants\":{"
-    + "    \"broker\":\"shared\","
-    + "    \"server\":\"server-1\""
-    + "  },"
-    + "  \"upsertConfig\":{"
-    + "    \"mode\":\"FULL\""
-    + "  }"
-    + "}";
+      + "  \"metadata\":{},"
+      + "  \"segmentsConfig\":{"
+      + "    \"replicasPerPartition\":\"3\","
+      + "    \"replication\":\"3\","
+      + "    \"replicationNumber\":3,"
+      + "    \"retentionTimeUnit\":\"DAYS\","
+      + "    \"retentionTimeValue\":\"3\","
+      + "    \"schemaName\":\"testSchema\","
+      + "    \"segmentAssignmentStrategy\":\"BalanceNumSegmentAssignmentStrategy\","
+      + "    \"segmentPushFrequency\":\"daily\","
+      + "    \"segmentPushType\":\"APPEND\","
+      + "    \"timeColumnName\":\"minutesSinceEpoch\","
+      + "    \"timeType\":\"MINUTES\""
+      + "  },"
+      + "  \"tableIndexConfig\":{"
+      + "    \"invertedIndexColumns\":[],"
+      + "    \"lazyLoad\":\"false\","
+      + "    \"loadMode\":\"HEAP\","
+      + "    \"segmentFormatVersion\":null,"
+      + "    \"sortedColumn\":[],"
+      + "    \"streamConfigs\":{"
+      + "      \"realtime.segment.flush.threshold.rows\":\"" + MAX_ROWS_IN_SEGMENT + "\","
+      + "      \"realtime.segment.flush.threshold.time\":\"" + MAX_TIME_FOR_SEGMENT_CLOSE_MS + "\","
+      + "      \"stream.fakeStream.broker.list\":\"broker:7777\","
+      + "      \"stream.fakeStream.consumer.prop.auto.offset.reset\":\"smallest\","
+      + "      \"stream.fakeStream.consumer.factory.class.name\":\"%s\","
+      + "      \"stream.fakeStream.decoder.class.name\":\"%s\","
+      + "      \"stream.fakeStream.decoder.prop.schema.registry.rest.url\":\"http://1.2.3.4:1766/schemas\","
+      + "      \"stream.fakeStream.decoder.prop.schema.registry.schema.name\":\"UnknownSchema\","
+      + "      \"stream.fakeStream.topic.name\":\"" + TOPIC_NAME + "\","
+      + "      \"streamType\":\"fakeStream\""
+      + "    }"
+      + "  },"
+      + "  \"tableName\":\"Coffee_REALTIME\","
+      + "  \"tableType\":\"realtime\","
+      + "  \"tenants\":{"
+      + "    \"broker\":\"shared\","
+      + "    \"server\":\"server-1\""
+      + "  },"
+      + "  \"upsertConfig\":{"
+      + "    \"mode\":\"FULL\""
+      + "  }"
+      + "}";
   public static final String SCHEMA_JSON =
       "{"
-    + "  \"schemaName\":\"testSchema\","
-    + "  \"metricFieldSpecs\":[{\"name\":\"m\",\"dataType\":\"LONG\"}],"
-    + "  \"dimensionFieldSpecs\":[{\"name\":\"d\",\"dataType\":\"STRING\",\"singleValueField\":true}],"
-    + "  \"timeFieldSpec\":{"
-    + "    \"incomingGranularitySpec\":{"
-    + "      \"dataType\":\"LONG\","
-    + "      \"timeType\":\"MINUTES\","
-    + "      \"name\":\"minutesSinceEpoch\""
-    + "    },"
-    + "    \"defaultNullValue\":12345"
-    + "  },"
-    + "  \"primaryKeyColumns\": [\"event_id\"]"
-    + "}";
+      + "  \"schemaName\":\"testSchema\","
+      + "  \"metricFieldSpecs\":[{\"name\":\"m\",\"dataType\":\"LONG\"}],"
+      + "  \"dimensionFieldSpecs\":[{\"name\":\"d\",\"dataType\":\"STRING\",\"singleValueField\":true}],"
+      + "  \"timeFieldSpec\":{"
+      + "    \"incomingGranularitySpec\":{"
+      + "      \"dataType\":\"LONG\","
+      + "      \"timeType\":\"MINUTES\","
+      + "      \"name\":\"minutesSinceEpoch\""
+      + "    },"
+      + "    \"defaultNullValue\":12345"
+      + "  },"
+      + "  \"primaryKeyColumns\": [\"event_id\"]"
+      + "}";
   //@formatter:on
   public static TableConfig createTableConfig(String consumerFactoryClass, String decoderFactoryClass)
       throws Exception {
@@ -137,7 +134,7 @@ public class Fixtures {
     GenericRow secondRow = createSingleRow(rand.nextInt(Integer.MAX_VALUE));
     GenericRow thirdRow = createSingleRow(rand.nextInt(Integer.MAX_VALUE));
     GenericRow retVal = new GenericRow();
-    retVal.putValue(GenericRow.MULTIPLE_RECORDS_KEY, ImmutableList.of(firstRow, secondRow, thirdRow));
+    retVal.putValue(GenericRow.MULTIPLE_RECORDS_KEY, List.of(firstRow, secondRow, thirdRow));
     return retVal;
   }
 
@@ -147,7 +144,7 @@ public class Fixtures {
     GenericRow secondRow = createInvalidSingleRow(rand.nextInt(Integer.MAX_VALUE));
     GenericRow thirdRow = createSingleRow(rand.nextInt(Integer.MAX_VALUE));
     GenericRow retVal = new GenericRow();
-    retVal.putValue(GenericRow.MULTIPLE_RECORDS_KEY, ImmutableList.of(firstRow, secondRow, thirdRow));
+    retVal.putValue(GenericRow.MULTIPLE_RECORDS_KEY, List.of(firstRow, secondRow, thirdRow));
     return retVal;
   }
 }

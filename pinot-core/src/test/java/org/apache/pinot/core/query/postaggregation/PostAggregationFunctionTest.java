@@ -26,8 +26,8 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
-import static org.testng.AssertJUnit.assertNull;
 
 
 public class PostAggregationFunctionTest {
@@ -128,5 +128,25 @@ public class PostAggregationFunctionTest {
     assertEquals(function.getResultType(), ColumnDataType.OBJECT);
     assertNull(function.invoke(new Object[]{null, null, null, null, null, null, null, null, null, null}));
     assertEquals(function.invoke(new Object[]{null, null, null, null, null, null, null, null, null, 10}), 10);
+
+    // Test null handling
+    function = new PostAggregationFunction("plus", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
+    // The function returns null if any argument is null
+    assertNull(function.invoke(new Object[]{null, 1}));
+  }
+
+  /// Regression test for the single-stage post-aggregation path: arithmetic on whole-number operands - for example
+  /// `COUNT(DISTINCT ...) * 60`, which reaches here as `times(INT, INT)` because DISTINCTCOUNT is typed
+  /// INT and a small integer literal is typed INT - must return LONG rather than silently widening to DOUBLE.
+  @Test
+  public void testWholeNumberArithmeticReturnsLong() {
+    for (String functionName : new String[]{"plus", "minus", "times"}) {
+      PostAggregationFunction function =
+          new PostAggregationFunction(functionName, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
+      assertEquals(function.getResultType(), ColumnDataType.LONG, functionName + "(INT, INT) should return LONG");
+    }
+    // 100000 * 100000 overflows int but fits long; the result must be a Long, not a Double.
+    assertEquals(new PostAggregationFunction("times", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT})
+        .invoke(new Object[]{100000, 100000}), 10_000_000_000L);
   }
 }

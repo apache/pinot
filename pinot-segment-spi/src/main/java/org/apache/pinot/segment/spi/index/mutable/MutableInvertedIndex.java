@@ -18,29 +18,28 @@
  */
 package org.apache.pinot.segment.spi.index.mutable;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public interface MutableInvertedIndex extends InvertedIndexReader<MutableRoaringBitmap>, MutableIndex {
+
   @Override
-  default void add(@Nonnull Object value, int dictId, int docId) {
+  default void add(Object value, int dictId, int docId) {
+    assert dictId >= 0;
     add(dictId, docId);
   }
 
   @Override
-  default void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId) {
+  default void add(Object[] values, int[] dictIds, int docId) {
+    assert dictIds != null;
     for (int dictId : dictIds) {
       add(dictId, docId);
     }
   }
 
-  /**
-   * Add the docId to the posting list for the dictionary id.
-   * @param dictId dictionary id
-   * @param docId document id
-   */
+  /// Add the docId to the posting list for the dictionary id.
+  /// @param dictId dictionary id
+  /// @param docId document id
   void add(int dictId, int docId);
 }

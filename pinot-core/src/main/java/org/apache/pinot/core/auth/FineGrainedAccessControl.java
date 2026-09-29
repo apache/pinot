@@ -23,45 +23,46 @@ import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 
 
-/**
- * Interface for fine-grained access control.
- */
+/// Interface for fine-grained access control.
 public interface FineGrainedAccessControl {
-  /**
-   * Checks whether the user has access to perform action on the particular resource
-   *
-   * @param httpHeaders HTTP headers
-   * @param targetType type of resource being accessed
-   * @param targetId id of the resource
-   * @param action type to validate
-   * @return true if user is allowed to perform the action
-   */
+  /// Checks whether the user has access to perform action on the particular resource
+  ///
+  /// @param httpHeaders HTTP headers
+  /// @param targetType type of resource being accessed
+  /// @param targetId id of the resource
+  /// @param action type to validate
+  /// @return true if user is allowed to perform the action
   default boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
     return true;
   }
 
-  /**
-   * Verifies if the user has access to perform a specific action on a particular resource.
-   * The default implementation returns a {@link BasicAuthorizationResultImpl} with the result of the hasAccess() of
-   * the implementation
-   *
-   * @param httpHeaders HTTP headers
-   * @param targetType type of resource being accessed
-   * @param targetId id of the resource
-   * @param action type to validate
-   * @return An AuthorizationResult object, encapsulating whether the access is granted or not.
-   */
+  /// Checks whether the user has access to perform action on the particular resource type.
+  ///
+  /// @param httpHeaders HTTP headers
+  /// @param targetType type of resource being accessed
+  /// @return true if user is allowed to perform the action
+  default boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType) {
+    return true;
+  }
+
+  /// Verifies if the user has access to perform a specific action on a particular resource.
+  /// The default implementation returns a [BasicAuthorizationResultImpl] with the result of the hasAccess() of
+  /// the implementation
+  ///
+  /// @param httpHeaders HTTP headers
+  /// @param targetType type of resource being accessed
+  /// @param targetId id of the resource
+  /// @param action type to validate
+  /// @return An AuthorizationResult object, encapsulating whether the access is granted or not.
   default AuthorizationResult authorize(HttpHeaders httpHeaders, TargetType targetType, String targetId,
       String action) {
     return new BasicAuthorizationResultImpl(hasAccess(httpHeaders, targetType, targetId, action));
   }
 
-  /**
-   * If an API is neither annotated with Authorize nor ManualAuthorization,
-   * this method will be called to check the default authorization.
-   * If the return is false, then API will be terminated by the filter.
-   * @return true to allow
-   */
+  /// If an API is neither annotated with Authorize nor ManualAuthorization,
+  /// this method will be called to check the default authorization.
+  /// If the return is false, then API will be terminated by the filter.
+  /// @return true to allow
   default boolean defaultAccess(HttpHeaders httpHeaders) {
     return true;
   }

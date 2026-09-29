@@ -30,6 +30,7 @@ import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlOperandCountRanges;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
+import org.apache.calcite.sql.type.SqlSingleOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeTransforms;
@@ -37,11 +38,9 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 
 
-/**
- * The {@code TransformFunctionType} enum represents all the transform functions supported by Calcite SQL parser in
- * v2 engine.
- * TODO: Add support for scalar functions auto registration.
- */
+/// The `TransformFunctionType` enum represents all the transform functions supported by Calcite SQL parser in
+/// v2 engine.
+/// TODO: Add support for scalar functions auto registration.
 public enum TransformFunctionType {
   // arithmetic functions for single-valued columns
   ADD("add", "plus"),
@@ -94,23 +93,30 @@ public enum TransformFunctionType {
 
   // CASE WHEN function parsed as 'CASE_WHEN'
   CASE("case"),
+  TEXT_MATCH("textMatch", ReturnTypes.BOOLEAN, OperandTypes.family(
+      List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+      i -> i >= 2)),
 
   // date type conversion functions
   CAST("cast"),
 
   // JSON extract functions
   JSON_EXTRACT_SCALAR("jsonExtractScalar",
-      opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2, SqlTypeName.VARCHAR),
-      OperandTypes.family(
-          List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
-          i -> i == 3)),
+      TransformFunctionType::jsonExtractScalarReturnTypeInference, jsonExtractScalarOperandTypeChecker()),
+  JSON_EXTRACT_SCALAR_FAST("jsonExtractScalarFast",
+      TransformFunctionType::jsonExtractScalarReturnTypeInference, jsonExtractScalarOperandTypeChecker()),
+  JSON_EXTRACT_SCALAR_FIRST_MATCH("jsonExtractScalarFirstMatch",
+      TransformFunctionType::jsonExtractScalarReturnTypeInference, jsonExtractScalarOperandTypeChecker()),
+  JSON_EXTRACT_SCALAR_FORY("jsonExtractScalarFory",
+      TransformFunctionType::jsonExtractScalarReturnTypeInference, jsonExtractScalarOperandTypeChecker()),
   JSON_EXTRACT_INDEX("jsonExtractIndex",
       opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2, SqlTypeName.VARCHAR),
       OperandTypes.family(
           List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
               SqlTypeFamily.CHARACTER), i -> i > 2)),
   JSON_EXTRACT_KEY("jsonExtractKey", ReturnTypes.TO_ARRAY,
-      OperandTypes.family(List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER))),
+      OperandTypes.family(
+          List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER), i -> i > 1)),
 
   // Date time functions
   TIME_CONVERT("timeConvert", ReturnTypes.BIGINT,
@@ -126,18 +132,30 @@ public enum TransformFunctionType {
   DATE_TRUNC("dateTrunc", ReturnTypes.BIGINT, OperandTypes.family(
       List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
           SqlTypeFamily.CHARACTER), i -> i > 1)),
-  YEAR("year"),
-  YEAR_OF_WEEK("yearOfWeek", "yow"),
-  QUARTER("quarter"),
-  MONTH_OF_YEAR("monthOfYear", "month"),
-  WEEK_OF_YEAR("weekOfYear", "week"),
-  DAY_OF_YEAR("dayOfYear", "doy"),
-  DAY_OF_MONTH("dayOfMonth", "day"),
-  DAY_OF_WEEK("dayOfWeek", "dow"),
-  HOUR("hour"),
-  MINUTE("minute"),
-  SECOND("second"),
-  MILLISECOND("millisecond"),
+  YEAR("year", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
+  YEAR_OF_WEEK("yearOfWeek", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "yow"),
+  QUARTER("quarter", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
+  MONTH_OF_YEAR("monthOfYear", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "month"),
+  WEEK_OF_YEAR("weekOfYear", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "week"),
+  DAY_OF_YEAR("dayOfYear", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "doy"),
+  DAY_OF_MONTH("dayOfMonth", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "day"),
+  DAY_OF_WEEK("dayOfWeek", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "dow"),
+  HOUR("hour", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
+  MINUTE("minute", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
+  SECOND("second", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
+  MILLISECOND("millisecond", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
   EXTRACT("extract"),
 
   // Array functions
@@ -153,6 +171,8 @@ public enum TransformFunctionType {
 
   // Special functions
   VALUE_IN("valueIn", ReturnTypes.ARG0, OperandTypes.variadic(SqlOperandCountRanges.from(2))),
+  FILTER_MV("filterMv", ReturnTypes.ARG0,
+      OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.CHARACTER))),
   MAP_VALUE("mapValue",
       ReturnTypes.cascade(opBinding -> positionalComponentType(opBinding, 2), SqlTypeTransforms.FORCE_NULLABLE),
       OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ANY, SqlTypeFamily.ARRAY))),
@@ -207,6 +227,8 @@ public enum TransformFunctionType {
   GEO_TO_H3("geoToH3", ReturnTypes.BIGINT,
       OperandTypes.or(OperandTypes.family(SqlTypeFamily.BINARY, SqlTypeFamily.INTEGER),
           OperandTypes.family(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER))),
+  GRID_DISTANCE("gridDistance", ReturnTypes.BIGINT, OperandTypes.NUMERIC_NUMERIC),
+  GRID_DISK("gridDisk", ReturnTypes.BIGINT, OperandTypes.NUMERIC_NUMERIC),
 
   // Vector functions
   // TODO: Once VECTOR type is defined, we should update here.
@@ -232,9 +254,10 @@ public enum TransformFunctionType {
   TANH("tanh"),
   DEGREES("degrees"),
   RADIANS("radians"),
-
   // Complex type handling
-  ITEM("item");
+  ITEM("item"),
+  // Time series functions
+  TIME_SERIES_BUCKET("timeSeriesBucket");
 
   private final String _name;
   private final List<String> _names;
@@ -269,11 +292,6 @@ public enum TransformFunctionType {
     return _names;
   }
 
-  @Deprecated
-  public List<String> getAlternativeNames() {
-    return _names;
-  }
-
   public SqlReturnTypeInference getReturnTypeInference() {
     return _returnTypeInference;
   }
@@ -282,7 +300,7 @@ public enum TransformFunctionType {
     return _operandTypeChecker;
   }
 
-  /** Returns the optional explicit returning type specification. */
+  /// Returns the optional explicit returning type specification.
   private static RelDataType positionalReturnTypeInferenceFromStringLiteral(SqlOperatorBinding opBinding, int pos) {
     return positionalReturnTypeInferenceFromStringLiteral(opBinding, pos, SqlTypeName.ANY);
   }
@@ -294,6 +312,50 @@ public enum TransformFunctionType {
       return inferTypeFromStringLiteral(operandType, opBinding.getTypeFactory());
     }
     return opBinding.getTypeFactory().createSqlType(defaultSqlType);
+  }
+
+  private static RelDataType jsonExtractScalarReturnTypeInference(SqlOperatorBinding opBinding) {
+    if (opBinding.getOperandCount() > 2 && opBinding.isOperandLiteral(2, false)) {
+      String resultsType = opBinding.getOperandLiteralValue(2, String.class).toUpperCase();
+      RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
+      switch (resultsType) {
+        case "JSON":
+          return typeFactory.createSqlType(SqlTypeName.VARCHAR);
+        case "BOOLEAN_ARRAY":
+          return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.BOOLEAN), -1);
+        case "TIMESTAMP_ARRAY":
+          return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.TIMESTAMP), -1);
+        default:
+          break;
+      }
+    }
+    return positionalReturnTypeInferenceFromStringLiteral(opBinding, 2, SqlTypeName.VARCHAR);
+  }
+
+  /// Operand checker shared by `jsonExtractScalar` and its `Fast` / `FirstMatch` variants.
+  ///
+  /// `jsonPath` deliberately does **not** require [OperandTypes#LITERAL]. Operand checking runs on the raw
+  /// `SqlNode` tree, before `PinotEvaluateLiteralRule` folds constant expressions, so demanding a literal here
+  /// would reject `jsonExtractScalar(col, CONCAT('$.', 'foo'), 'INT')` and other constant-foldable paths that fold
+  /// to a literal and run correctly. A genuinely non-literal `jsonPath` is rejected later, when the leaf stage
+  /// converts the folded call back into a Pinot expression.
+  ///
+  /// `resultsType` **does** require a literal, because [#jsonExtractScalarReturnTypeInference] reads it during
+  /// validation — also before folding — to derive the return type. Accepting a foldable `resultsType` there would
+  /// silently infer `VARCHAR` while the leaf stage extracts the real type, producing a plan whose schema disagrees
+  /// with its data.
+  private static SqlOperandTypeChecker jsonExtractScalarOperandTypeChecker() {
+    SqlSingleOperandTypeChecker jsonInputTypeChecker = OperandTypes.or(OperandTypes.CHARACTER, OperandTypes.BINARY);
+    SqlSingleOperandTypeChecker resultsTypeChecker = OperandTypes.and(OperandTypes.CHARACTER, OperandTypes.LITERAL);
+    return OperandTypes.or(
+        OperandTypes.sequence(
+            (operator, ignored) -> "'" + operator.getName()
+                + "(<CHARACTER_OR_BINARY>, <CHARACTER>, <CHARACTER_LITERAL>)'",
+            jsonInputTypeChecker, OperandTypes.CHARACTER, resultsTypeChecker),
+        OperandTypes.sequence(
+            (operator, ignored) -> "'" + operator.getName()
+                + "(<CHARACTER_OR_BINARY>, <CHARACTER>, <CHARACTER_LITERAL>, <LITERAL>)'",
+            jsonInputTypeChecker, OperandTypes.CHARACTER, resultsTypeChecker, OperandTypes.NULLABLE_LITERAL));
   }
 
   private static RelDataType componentType(SqlOperatorBinding opBinding) {
@@ -341,6 +403,8 @@ public enum TransformFunctionType {
         return typeFactory.createSqlType(SqlTypeName.VARBINARY);
       case "BIG_DECIMAL":
         return typeFactory.createSqlType(SqlTypeName.DECIMAL);
+      case "BIG_DECIMAL_ARRAY":
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.DECIMAL), -1);
       default:
         SqlTypeName sqlTypeName = SqlTypeName.get(operandTypeStr);
         if (sqlTypeName == null) {

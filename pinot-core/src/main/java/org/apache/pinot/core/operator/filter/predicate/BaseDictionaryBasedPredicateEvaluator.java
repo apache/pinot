@@ -124,6 +124,11 @@ public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicat
   }
 
   @Override
+  public final boolean applyMV(BigDecimal[] values, int length) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public final boolean applySV(String value) {
     throw new UnsupportedOperationException();
   }
@@ -143,22 +148,18 @@ public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicat
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Apply a single-value entry to the predicate.
-   *
-   * @param dictId Dictionary id
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a single-value entry to the predicate.
+  ///
+  /// @param dictId Dictionary id
+  /// @return Whether the entry matches the predicate
   @Override
   public abstract boolean applySV(int dictId);
 
-  /**
-   * Apply a multi-value entry to the predicate.
-   *
-   * @param dictIds Array of dictionary ids
-   * @param length Number of dictionary ids in the entry
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a multi-value entry to the predicate.
+  ///
+  /// @param dictIds Array of dictionary ids
+  /// @param length Number of dictionary ids in the entry
+  /// @return Whether the entry matches the predicate
   @SuppressWarnings("Duplicates")
   @Override
   public boolean applyMV(int[] dictIds, int length) {

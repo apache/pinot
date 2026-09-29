@@ -41,7 +41,7 @@ import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
-import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
+import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -53,15 +53,12 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
-import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A {@link SegmentWriter} implementation that uses a buffer. The {@link GenericRow} are written to
- * the buffer as AVRO records.
- */
+/// A [SegmentWriter] implementation that uses a buffer. The [GenericRow] are written to
+/// the buffer as AVRO records.
 @SuppressWarnings("NullAway")
 @NotThreadSafe
 public class FlinkSegmentWriter implements SegmentWriter {
@@ -80,12 +77,12 @@ public class FlinkSegmentWriter implements SegmentWriter {
   private String _outputDirURI;
   private Schema _schema;
   private Set<String> _fieldsToRead;
-  private RecordTransformer _recordTransformer;
+  private TransformPipeline _transformPipeline;
 
   private File _stagingDir;
   private File _bufferFile;
   private int _rowCount;
-  /** A sequence ID that increments each time a segment is flushed */
+  /// A sequence ID that increments each time a segment is flushed
   private int _seqId;
 
   private final String _segmentNamePrefix;
@@ -165,7 +162,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
 
     _schema = schema;
     _fieldsToRead = _schema.getColumnNames();
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
+    _transformPipeline = new TransformPipeline(_tableConfig, _schema);
     _avroSchema = SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(_schema);
     _reusableRecord = new GenericData.Record(_avroSchema);
 
@@ -192,41 +189,42 @@ public class FlinkSegmentWriter implements SegmentWriter {
       throws IOException {
     FileUtils.deleteQuietly(_bufferFile);
     _rowCount = 0;
-    _recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
+    _recordWriter =
+        new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema, SegmentProcessorAvroUtils.getAvroDataModel()));
     _recordWriter.create(_avroSchema, _bufferFile);
   }
 
   @Override
   public void collect(GenericRow row)
-      throws IOException {
+      throws Exception {
     long startTime = System.currentTimeMillis();
     // TODO: Revisit whether we should transform the row
-    GenericRow transform = _recordTransformer.transform(row);
-    SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(transform, _reusableRecord, _fieldsToRead);
-    _rowCount++;
-    _recordWriter.append(_reusableRecord);
+    TransformPipeline.Result result = _transformPipeline.processRow(row);
+    for (GenericRow transformedRow : result.getTransformedRows()) {
+      SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(transformedRow, _reusableRecord, _fieldsToRead);
+      _rowCount++;
+      _recordWriter.append(_reusableRecord);
+    }
     _lastRecordProcessingTimeMs = System.currentTimeMillis() - startTime;
     _processedRecords.inc();
   }
 
-  /**
-   * Creates one Pinot segment using the {@link GenericRow}s collected in the AVRO file buffer, at
-   * the outputDirUri as specified in the tableConfig->batchConfigs. Successful invocation of this
-   * method means that the {@link GenericRow}s collected so far, are now available in the Pinot
-   * segment and not available in the buffer anymore.
-   *
-   * <p>Successful completion of segment will return the segment URI, and the URI includes a
-   * sequence id indicating the part number. The sequence id is initialized to 0 and each successful
-   * flush will increment the sequence id by 1. The segment name will be in the format of
-   * tableName_indexOfSubTask_sequenceId (e.g. starbucksStores_1_0). The buffer will be reset and
-   * ready to accept further records via <code>collect()</code> If an exception is thrown, the buffer
-   * will not be reset and so, <code>flush()</code> can be invoked repeatedly in a retry loop. If a
-   * successful invocation is not achieved,<code>close()</code> followed by <code>init </code> will
-   * have to be called in order to reset the buffer and resume record writing.
-   *
-   * @return URI of the generated segment
-   * @throws IOException
-   */
+  /// Creates one Pinot segment using the [GenericRow]s collected in the AVRO file buffer, at
+  /// the outputDirUri as specified in the tableConfig->batchConfigs. Successful invocation of this
+  /// method means that the [GenericRow]s collected so far, are now available in the Pinot
+  /// segment and not available in the buffer anymore.
+  ///
+  /// Successful completion of segment will return the segment URI, and the URI includes a
+  /// sequence id indicating the part number. The sequence id is initialized to 0 and each successful
+  /// flush will increment the sequence id by 1. The segment name will be in the format of
+  /// tableName_indexOfSubTask_sequenceId (e.g. starbucksStores_1_0). The buffer will be reset and
+  /// ready to accept further records via `collect()` If an exception is thrown, the buffer
+  /// will not be reset and so, `flush()` can be invoked repeatedly in a retry loop. If a
+  /// successful invocation is not achieved,`close()` followed by `init` will
+  /// have to be called in order to reset the buffer and resume record writing.
+  ///
+  /// @return URI of the generated segment
+  /// @throws IOException
   @Override
   public URI flush()
       throws IOException {
@@ -292,5 +290,6 @@ public class FlinkSegmentWriter implements SegmentWriter {
     resetBuffer();
     _seqId = 0;
     FileUtils.deleteQuietly(_stagingDir);
+    _transformPipeline.reportStats();
   }
 }

@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.time.Clock;
@@ -35,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -43,13 +42,15 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.HybridSelector;
-import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.BrokerGauge;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.TestClock;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -61,9 +62,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.broker.routing.instanceselector.InstanceSelector.NEW_SEGMENT_EXPIRATION_MILLIS;
 import static org.apache.pinot.spi.config.table.RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE;
 import static org.apache.pinot.spi.config.table.RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.ORDERED_PREFERRED_POOLS;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ERROR;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE;
@@ -71,11 +72,17 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.Segmen
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
 
 
 @SuppressWarnings("unchecked")
@@ -99,6 +106,8 @@ public class InstanceSelectorTest {
 
   private TestClock _mutableClock;
 
+  private static final Map<String, ServerInstance> EMPTY_SERVER_MAP = Collections.EMPTY_MAP;
+
   private static final String TABLE_NAME = "testTable_OFFLINE";
 
   private static final String BALANCED_INSTANCE_SELECTOR = "balanced";
@@ -110,6 +119,10 @@ public class InstanceSelectorTest {
   private final static List<String> SEGMENTS =
       Arrays.asList("segment0", "segment1", "segment2", "segment3", "segment4", "segment5", "segment6", "segment7",
           "segment8", "segment9", "segment10", "segment11");
+  private static final long NEW_SEGMENT_EXPIRATION_SECONDS = 300;
+  private static final long NEW_SEGMENT_EXPIRATION_MILLIS = TimeUnit.SECONDS.toMillis(NEW_SEGMENT_EXPIRATION_SECONDS);
+  private final static InstanceSelectorConfig INSTANCE_SELECTOR_CONFIG =
+      new InstanceSelectorConfig(false, NEW_SEGMENT_EXPIRATION_SECONDS, false);
 
   private void createSegments(List<Pair<String, Long>> segmentCreationTimeMsPairs) {
     List<String> segmentZKMetadataPaths = new ArrayList<>();
@@ -158,18 +171,19 @@ public class InstanceSelectorTest {
         STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
   }
 
-  private InstanceSelector createTestInstanceSelector(String selectorType) {
+  private InstanceSelector createTestInstanceSelector(String selectorType, Set<String> enabledInstances,
+      IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     RoutingConfig config = new RoutingConfig(null, null, selectorType, false);
     when(_tableConfig.getRoutingConfig()).thenReturn(config);
     return InstanceSelectorFactory.getInstanceSelector(_tableConfig, _propertyStore, _brokerMetrics, null,
-        _mutableClock, new PinotConfiguration());
+        _mutableClock, new PinotConfiguration(), enabledInstances, EMPTY_SERVER_MAP, idealState, externalView,
+        onlineSegments);
   }
 
   @DataProvider(name = "selectorType")
   public Object[] getSelectorType() {
     return new Object[]{
-        REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
-        BALANCED_INSTANCE_SELECTOR
+        REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, BALANCED_INSTANCE_SELECTOR
     };
   }
 
@@ -197,37 +211,68 @@ public class InstanceSelectorTest {
     when(tableConfig.getTableName()).thenReturn("testTable_OFFLINE");
 
     // Routing config is missing
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
-        new PinotConfiguration()) instanceof BalancedInstanceSelector);
+    assertTrue(
+        InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics, new PinotConfiguration(),
+            Set.of(), Map.of(), new IdealState("testTable_OFFLINE"), new ExternalView("testTable_OFFLINE"),
+            Set.of()) instanceof BalancedInstanceSelector);
 
     // Instance selector type is not configured
     RoutingConfig routingConfig = mock(RoutingConfig.class);
     when(tableConfig.getRoutingConfig()).thenReturn(routingConfig);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
-        new PinotConfiguration()) instanceof BalancedInstanceSelector);
+    assertTrue(
+        InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics, new PinotConfiguration(),
+            Set.of(), Map.of(), new IdealState("testTable_OFFLINE"), new ExternalView("testTable_OFFLINE"),
+            Set.of()) instanceof BalancedInstanceSelector);
 
     // Replica-group instance selector should be returned
     when(routingConfig.getInstanceSelectorType()).thenReturn(REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
-        new PinotConfiguration()) instanceof ReplicaGroupInstanceSelector);
+    assertTrue(
+        InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics, new PinotConfiguration(),
+            Set.of(), Map.of(), new IdealState("testTable_OFFLINE"), new ExternalView("testTable_OFFLINE"),
+            Set.of()) instanceof ReplicaGroupInstanceSelector);
 
     // Strict replica-group instance selector should be returned
     when(routingConfig.getInstanceSelectorType()).thenReturn(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
-        new PinotConfiguration()) instanceof StrictReplicaGroupInstanceSelector);
+    assertTrue(
+        InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics, new PinotConfiguration(),
+            Set.of(), Map.of(), new IdealState("testTable_OFFLINE"), new ExternalView("testTable_OFFLINE"),
+            Set.of()) instanceof StrictReplicaGroupInstanceSelector);
 
     // Should be backward-compatible with legacy config
     when(routingConfig.getInstanceSelectorType()).thenReturn(null);
     when(tableConfig.getTableType()).thenReturn(TableType.OFFLINE);
     when(routingConfig.getRoutingTableBuilderName()).thenReturn(
         InstanceSelectorFactory.LEGACY_REPLICA_GROUP_OFFLINE_ROUTING);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
-        new PinotConfiguration()) instanceof ReplicaGroupInstanceSelector);
+    assertTrue(
+        InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics, new PinotConfiguration(),
+            Set.of(), Map.of(), new IdealState("testTable_OFFLINE"), new ExternalView("testTable_OFFLINE"),
+            Set.of()) instanceof ReplicaGroupInstanceSelector);
     when(tableConfig.getTableType()).thenReturn(TableType.REALTIME);
     when(routingConfig.getRoutingTableBuilderName()).thenReturn(
         InstanceSelectorFactory.LEGACY_REPLICA_GROUP_REALTIME_ROUTING);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
-        new PinotConfiguration()) instanceof ReplicaGroupInstanceSelector);
+    assertTrue(
+        InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics, new PinotConfiguration(),
+            Set.of(), Map.of(), new IdealState("testTable_OFFLINE"), new ExternalView("testTable_OFFLINE"),
+            Set.of()) instanceof ReplicaGroupInstanceSelector);
+  }
+
+  @Test
+  public void testFactoryDisablesAdaptiveRoutingForLegacyUpsertReplicaGroupSelector() {
+    TableConfig tableConfig = mock(TableConfig.class);
+    RoutingConfig routingConfig = mock(RoutingConfig.class);
+    HybridSelector hybridSelector = mock(HybridSelector.class);
+    when(tableConfig.getTableName()).thenReturn("legacyUpsert_REALTIME");
+    when(tableConfig.getRoutingConfig()).thenReturn(routingConfig);
+    when(tableConfig.isUpsertEnabled()).thenReturn(true);
+    when(routingConfig.getInstanceSelectorType()).thenReturn(REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
+
+    ReplicaGroupInstanceSelector instanceSelector =
+        (ReplicaGroupInstanceSelector) InstanceSelectorFactory.getInstanceSelector(tableConfig, _propertyStore,
+            _brokerMetrics, hybridSelector, new PinotConfiguration(), Set.of(), Map.of(),
+            new IdealState("legacyUpsert_REALTIME"), new ExternalView("legacyUpsert_REALTIME"), Set.of());
+
+    assertNull(instanceSelector._adaptiveServerSelector);
+    assertNull(instanceSelector._priorityPoolInstanceSelector);
   }
 
   @Test
@@ -235,15 +280,9 @@ public class InstanceSelectorTest {
     String offlineTableName = "testTable_OFFLINE";
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
-    BalancedInstanceSelector balancedInstanceSelector =
-        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
-    ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
-    StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
-        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
+    BalancedInstanceSelector balancedInstanceSelector = new BalancedInstanceSelector();
+    ReplicaGroupInstanceSelector replicaGroupInstanceSelector = new ReplicaGroupInstanceSelector();
+    StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector = new StrictReplicaGroupInstanceSelector();
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -307,9 +346,12 @@ public class InstanceSelectorTest {
     onlineSegments.add(segment3);
     List<String> segments = Arrays.asList(segment0, segment1, segment2, segment3);
 
-    balancedInstanceSelector.init(enabledInstances, idealState, externalView, onlineSegments);
-    replicaGroupInstanceSelector.init(enabledInstances, idealState, externalView, onlineSegments);
-    strictReplicaGroupInstanceSelector.init(enabledInstances, idealState, externalView, onlineSegments);
+    balancedInstanceSelector.init(_tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
+    replicaGroupInstanceSelector.init(_tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
+    strictReplicaGroupInstanceSelector.init(_tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
 
     int requestId = 0;
 
@@ -383,9 +425,9 @@ public class InstanceSelectorTest {
 
     // Disable instance0
     enabledInstances.remove(instance0);
-    balancedInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance0));
-    replicaGroupInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance0));
-    strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance0));
+    balancedInstanceSelector.onInstancesChange(enabledInstances, List.of(instance0));
+    replicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of(instance0));
+    strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of(instance0));
 
     // For the 3rd request:
     //   BalancedInstanceSelector:
@@ -595,9 +637,9 @@ public class InstanceSelectorTest {
 
     // Re-enable instance0
     enabledInstances.add(instance0);
-    balancedInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance0));
-    replicaGroupInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance0));
-    strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance0));
+    balancedInstanceSelector.onInstancesChange(enabledInstances, List.of(instance0));
+    replicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of(instance0));
+    strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of(instance0));
 
     // For the 9th request:
     //   BalancedInstanceSelector:
@@ -762,9 +804,7 @@ public class InstanceSelectorTest {
     when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
-    ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
+    ReplicaGroupInstanceSelector replicaGroupInstanceSelector = new ReplicaGroupInstanceSelector();
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -799,7 +839,8 @@ public class InstanceSelectorTest {
       onlineSegments.add(segment);
     }
 
-    replicaGroupInstanceSelector.init(enabledInstances, idealState, externalView, onlineSegments);
+    replicaGroupInstanceSelector.init(_tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
     //   ReplicaGroupInstanceSelector
     //     segment0 -> instance0
     //     segment2 -> instance0
@@ -845,9 +886,7 @@ public class InstanceSelectorTest {
     when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
-    ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
+    ReplicaGroupInstanceSelector replicaGroupInstanceSelector = new ReplicaGroupInstanceSelector();
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -883,7 +922,8 @@ public class InstanceSelectorTest {
       onlineSegments.add(segment);
     }
 
-    replicaGroupInstanceSelector.init(enabledInstances, idealState, externalView, onlineSegments);
+    replicaGroupInstanceSelector.init(_tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
     //   ReplicaGroupInstanceSelector
     //     segment0 -> instance0
     //     segment3 -> instance0
@@ -928,9 +968,7 @@ public class InstanceSelectorTest {
     when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
-    ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
+    ReplicaGroupInstanceSelector replicaGroupInstanceSelector = new ReplicaGroupInstanceSelector();
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -966,7 +1004,8 @@ public class InstanceSelectorTest {
       onlineSegments.add(segment);
     }
 
-    replicaGroupInstanceSelector.init(enabledInstances, idealState, externalView, onlineSegments);
+    replicaGroupInstanceSelector.init(_tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
     // since numReplicaGroupsToQuery is not set, first query should go to first replica group,
     // 2nd query should go to next replica group
 
@@ -985,126 +1024,13 @@ public class InstanceSelectorTest {
   }
 
   @Test
-  public void testMultiStageStrictReplicaGroupSelector() {
-    String offlineTableName = "testTable_OFFLINE";
-    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
-    BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
-    // Create instance-partitions with two replica-groups and 1 partition. Each replica-group has 2 instances.
-    List<String> replicaGroup0 = ImmutableList.of("instance-0", "instance-1");
-    List<String> replicaGroup1 = ImmutableList.of("instance-2", "instance-3");
-    Map<String, List<String>> partitionToInstances = ImmutableMap.of("0_0", replicaGroup0, "0_1", replicaGroup1);
-    InstancePartitions instancePartitions = new InstancePartitions(offlineTableName);
-    instancePartitions.setInstances(0, 0, partitionToInstances.get("0_0"));
-    instancePartitions.setInstances(0, 1, partitionToInstances.get("0_1"));
-    BrokerRequest brokerRequest = mock(BrokerRequest.class);
-    PinotQuery pinotQuery = mock(PinotQuery.class);
-    Map<String, String> queryOptions = new HashMap<>();
-    when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
-    when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
-
-    MultiStageReplicaGroupSelector multiStageSelector =
-        new MultiStageReplicaGroupSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
-    multiStageSelector = spy(multiStageSelector);
-    doReturn(instancePartitions).when(multiStageSelector).getInstancePartitions();
-
-    List<String> enabledInstances = new ArrayList<>();
-    IdealState idealState = new IdealState(offlineTableName);
-    Map<String, Map<String, String>> idealStateSegmentAssignment = idealState.getRecord().getMapFields();
-    ExternalView externalView = new ExternalView(offlineTableName);
-    Map<String, Map<String, String>> externalViewSegmentAssignment = externalView.getRecord().getMapFields();
-    Set<String> onlineSegments = new HashSet<>();
-
-    // Mark all instances as enabled
-    for (int i = 0; i < 4; i++) {
-      enabledInstances.add(String.format("instance-%d", i));
-    }
-
-    List<String> segments = getSegments();
-
-    // Create two idealState and externalView maps. One is used for segments with replica-group=0 and the other for rg=1
-    Map<String, String> idealStateInstanceStateMap0 = new TreeMap<>();
-    Map<String, String> externalViewInstanceStateMap0 = new TreeMap<>();
-    Map<String, String> idealStateInstanceStateMap1 = new TreeMap<>();
-    Map<String, String> externalViewInstanceStateMap1 = new TreeMap<>();
-
-    // instance-0 and instance-2 mirror each other in the two replica-groups. Same for instance-1 and instance-3.
-    for (int i = 0; i < 4; i++) {
-      String instance = enabledInstances.get(i);
-      if (i % 2 == 0) {
-        idealStateInstanceStateMap0.put(instance, ONLINE);
-        externalViewInstanceStateMap0.put(instance, ONLINE);
-      } else {
-        idealStateInstanceStateMap1.put(instance, ONLINE);
-        externalViewInstanceStateMap1.put(instance, ONLINE);
-      }
-    }
-
-    // Even numbered segments get assigned to [instance-0, instance-2], and odd numbered segments get assigned to
-    // [instance-1,instance-3].
-    for (int segmentNum = 0; segmentNum < segments.size(); segmentNum++) {
-      String segment = segments.get(segmentNum);
-      if (segmentNum % 2 == 0) {
-        idealStateSegmentAssignment.put(segment, idealStateInstanceStateMap0);
-        externalViewSegmentAssignment.put(segment, externalViewInstanceStateMap0);
-      } else {
-        idealStateSegmentAssignment.put(segment, idealStateInstanceStateMap1);
-        externalViewSegmentAssignment.put(segment, externalViewInstanceStateMap1);
-      }
-      onlineSegments.add(segment);
-    }
-
-    multiStageSelector.init(new HashSet<>(enabledInstances), idealState, externalView, onlineSegments);
-
-    // Using requestId=0 should select replica-group 0. Even segments get assigned to instance-0 and odd segments get
-    // assigned to instance-1.
-    Map<String, String> expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
-    for (int segmentNum = 0; segmentNum < segments.size(); segmentNum++) {
-      expectedReplicaGroupInstanceSelectorResult.put(segments.get(segmentNum), replicaGroup0.get(segmentNum % 2));
-    }
-    InstanceSelector.SelectionResult selectionResult = multiStageSelector.select(brokerRequest, segments, 0);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
-
-    // Using same requestId again should return the same selection
-    selectionResult = multiStageSelector.select(brokerRequest, segments, 0);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
-
-    // Using requestId=1 should select replica-group 1
-    expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
-    for (int segmentNum = 0; segmentNum < segments.size(); segmentNum++) {
-      expectedReplicaGroupInstanceSelectorResult.put(segments.get(segmentNum), replicaGroup1.get(segmentNum % 2));
-    }
-    selectionResult = multiStageSelector.select(brokerRequest, segments, 1);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
-
-    // If instance-0 is down, replica-group 1 should be picked even with requestId=0
-    enabledInstances.remove("instance-0");
-    multiStageSelector.init(new HashSet<>(enabledInstances), idealState, externalView, onlineSegments);
-    selectionResult = multiStageSelector.select(brokerRequest, segments, 0);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
-
-    // If instance-2 also goes down, no replica-group is eligible
-    enabledInstances.remove("instance-2");
-    multiStageSelector.init(new HashSet<>(enabledInstances), idealState, externalView, onlineSegments);
-    try {
-      multiStageSelector.select(brokerRequest, segments, 0);
-      fail("Method call above should have failed");
-    } catch (Exception ignored) {
-    }
-  }
-
-  @Test
   public void testUnavailableSegments() {
     String offlineTableName = "testTable_OFFLINE";
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
-    BalancedInstanceSelector balancedInstanceSelector =
-        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
+    BalancedInstanceSelector balancedInstanceSelector = new BalancedInstanceSelector();
     // ReplicaGroupInstanceSelector has the same behavior as BalancedInstanceSelector for the unavailable segments
-    StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
-        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
+    StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector = new StrictReplicaGroupInstanceSelector();
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -1145,8 +1071,10 @@ public class InstanceSelectorTest {
     //     (disabled) errorInstance: ERROR
     //   }
     // }
-    balancedInstanceSelector.init(enabledInstances, idealState, externalView, onlineSegments);
-    strictReplicaGroupInstanceSelector.init(enabledInstances, idealState, externalView, onlineSegments);
+    balancedInstanceSelector.init(_tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
+    strictReplicaGroupInstanceSelector.init(_tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
     BrokerRequest brokerRequest = mock(BrokerRequest.class);
     PinotQuery pinotQuery = mock(PinotQuery.class);
     when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
@@ -1173,8 +1101,8 @@ public class InstanceSelectorTest {
       //   }
       // }
       enabledInstances.add(errorInstance);
-      balancedInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(errorInstance));
-      strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(errorInstance));
+      balancedInstanceSelector.onInstancesChange(enabledInstances, List.of(errorInstance));
+      strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of(errorInstance));
       selectionResult = balancedInstanceSelector.select(brokerRequest, segments, 0);
       assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
       assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
@@ -1194,8 +1122,8 @@ public class InstanceSelectorTest {
       //   }
       // }
       enabledInstances.add(instance);
-      balancedInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance));
-      strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance));
+      balancedInstanceSelector.onInstancesChange(enabledInstances, List.of(instance));
+      strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of(instance));
       selectionResult = balancedInstanceSelector.select(brokerRequest, segments, 0);
       assertEquals(selectionResult.getSegmentToInstanceMap().size(), 2);
       assertTrue(selectionResult.getUnavailableSegments().isEmpty());
@@ -1308,8 +1236,8 @@ public class InstanceSelectorTest {
       //   }
       // }
       enabledInstances.remove(instance);
-      balancedInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance));
-      strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance));
+      balancedInstanceSelector.onInstancesChange(enabledInstances, List.of(instance));
+      strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of(instance));
       selectionResult = balancedInstanceSelector.select(brokerRequest, segments, 0);
       assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
       assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
@@ -1335,7 +1263,7 @@ public class InstanceSelectorTest {
       strictReplicaGroupInstanceSelector.onAssignmentChange(idealState, externalView, onlineSegments);
       selectionResult = balancedInstanceSelector.select(brokerRequest, segments, 0);
       assertEquals(selectionResult.getSegmentToInstanceMap().size(), 1);
-      assertEquals(selectionResult.getUnavailableSegments(), Collections.singletonList(segment1));
+      assertEquals(selectionResult.getUnavailableSegments(), List.of(segment1));
       selectionResult = strictReplicaGroupInstanceSelector.select(brokerRequest, segments, 0);
       assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
       assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
@@ -1352,8 +1280,8 @@ public class InstanceSelectorTest {
       //   }
       // }
       enabledInstances.remove(errorInstance);
-      balancedInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(errorInstance));
-      strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(errorInstance));
+      balancedInstanceSelector.onInstancesChange(enabledInstances, List.of(errorInstance));
+      strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of(errorInstance));
       selectionResult = balancedInstanceSelector.select(brokerRequest, segments, 0);
       assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
       assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
@@ -1392,7 +1320,7 @@ public class InstanceSelectorTest {
     String oldSeg = "segment0";
     String newSeg = "segment1";
     List<Pair<String, Long>> segmentCreationTimeMsPairs =
-        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+        List.of(Pair.of(newSeg, _mutableClock.millis() - 100));
     createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
@@ -1405,8 +1333,8 @@ public class InstanceSelectorTest {
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
     Map<String, List<Pair<String, String>>> idealSateMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
-            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+        Map.of(oldSeg, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
     IdealState idealState = createIdealState(idealSateMap);
 
     // Set up external view:
@@ -1414,13 +1342,12 @@ public class InstanceSelectorTest {
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance1:online]
     Map<String, List<Pair<String, String>>> externalViewMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
-            ImmutableList.of(Pair.of(instance1, ONLINE)));
+        Map.of(oldSeg, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            List.of(Pair.of(instance1, ONLINE)));
 
     ExternalView externalView = createExternalView(externalViewMap);
-    InstanceSelector selector = createTestInstanceSelector(selectorType);
-
-    selector.init(enabledInstances, idealState, externalView, onlineSegments);
+    InstanceSelector selector =
+        createTestInstanceSelector(selectorType, enabledInstances, idealState, externalView, onlineSegments);
 
     {
       int requestId = 0;
@@ -1430,10 +1357,10 @@ public class InstanceSelectorTest {
       InstanceSelector.SelectionResult selectionResult =
           selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
       if (isReplicaGroupType(selectorType)) {
-        assertEquals(selectionResult.getSegmentToInstanceMap(), ImmutableMap.of(oldSeg, instance0));
-        assertEquals(selectionResult.getOptionalSegmentToInstanceMap(), ImmutableMap.of(newSeg, instance0));
+        assertEquals(selectionResult.getSegmentToInstanceMap(), Map.of(oldSeg, instance0));
+        assertEquals(selectionResult.getOptionalSegmentToInstanceMap(), Map.of(newSeg, instance0));
       } else {
-        assertEquals(selectionResult.getSegmentToInstanceMap(), ImmutableMap.of(oldSeg, instance0, newSeg, instance1));
+        assertEquals(selectionResult.getSegmentToInstanceMap(), Map.of(oldSeg, instance0, newSeg, instance1));
         assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
       }
       assertTrue(selectionResult.getUnavailableSegments().isEmpty());
@@ -1447,13 +1374,13 @@ public class InstanceSelectorTest {
           selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
       switch (selectorType) {
         case BALANCED_INSTANCE_SELECTOR:
-          assertEquals(selectionResult.getSegmentToInstanceMap(), ImmutableMap.of(oldSeg, instance1));
-          assertEquals(selectionResult.getOptionalSegmentToInstanceMap(), ImmutableMap.of(newSeg, instance0));
+          assertEquals(selectionResult.getSegmentToInstanceMap(), Map.of(oldSeg, instance1));
+          assertEquals(selectionResult.getOptionalSegmentToInstanceMap(), Map.of(newSeg, instance0));
           break;
         case STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE: // fall through
         case REPLICA_GROUP_INSTANCE_SELECTOR_TYPE:
           assertEquals(selectionResult.getSegmentToInstanceMap(),
-              ImmutableMap.of(oldSeg, instance1, newSeg, instance1));
+              Map.of(oldSeg, instance1, newSeg, instance1));
           assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
           break;
         default:
@@ -1464,7 +1391,8 @@ public class InstanceSelectorTest {
     // Advance the clock to make newSeg to old segment.
     _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS + 10));
     // Upon re-initialization, newly old segments can only be served from online instances: instance1
-    selector.init(enabledInstances, idealState, externalView, onlineSegments);
+    selector.init(_tableConfig, _propertyStore, _brokerMetrics, null, _mutableClock,
+        INSTANCE_SELECTOR_CONFIG, enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
     {
       int requestId = 0;
       InstanceSelector.SelectionResult selectionResult =
@@ -1473,11 +1401,11 @@ public class InstanceSelectorTest {
         case BALANCED_INSTANCE_SELECTOR: // fall through
         case REPLICA_GROUP_INSTANCE_SELECTOR_TYPE:
           assertEquals(selectionResult.getSegmentToInstanceMap(),
-              ImmutableMap.of(oldSeg, instance0, newSeg, instance1));
+              Map.of(oldSeg, instance0, newSeg, instance1));
           break;
         case STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE:
           assertEquals(selectionResult.getSegmentToInstanceMap(),
-              ImmutableMap.of(oldSeg, instance1, newSeg, instance1));
+              Map.of(oldSeg, instance1, newSeg, instance1));
           break;
         default:
           throw new RuntimeException("unsupported selector type:" + selectorType);
@@ -1487,7 +1415,7 @@ public class InstanceSelectorTest {
     }
     {
       int requestId = 1;
-      Map<String, String> expectedSelectionResult = ImmutableMap.of(oldSeg, instance1, newSeg, instance1);
+      Map<String, String> expectedSelectionResult = Map.of(oldSeg, instance1, newSeg, instance1);
       InstanceSelector.SelectionResult selectionResult =
           selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
       assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectionResult);
@@ -1503,7 +1431,7 @@ public class InstanceSelectorTest {
     String newSeg = "segment0";
     String oldSeg = "segment1";
     List<Pair<String, Long>> segmentCreationTimeMsPairs =
-        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100),
+        List.of(Pair.of(newSeg, _mutableClock.millis() - 100),
             Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100));
     createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(newSeg, oldSeg);
@@ -1517,8 +1445,8 @@ public class InstanceSelectorTest {
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
     Map<String, List<Pair<String, String>>> idealSateMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
-            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+        Map.of(oldSeg, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     IdealState idealState = createIdealState(idealSateMap);
 
@@ -1527,30 +1455,30 @@ public class InstanceSelectorTest {
     //   [segment0] -> []
     //   [segment1] -> [instance0: online]
     Map<String, List<Pair<String, String>>> externalViewMap =
-        ImmutableMap.of(newSeg, ImmutableList.of(), oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE)));
+        Map.of(newSeg, List.of(), oldSeg, List.of(Pair.of(instance0, ONLINE)));
 
     ExternalView externalView = createExternalView(externalViewMap);
 
-    InstanceSelector selector = createTestInstanceSelector(selectorType);
-    selector.init(enabledInstances, idealState, externalView, onlineSegments);
+    InstanceSelector selector =
+        createTestInstanceSelector(selectorType, enabledInstances, idealState, externalView, onlineSegments);
     // We don't mark segment as unavailable.
     int requestId = 0;
-    Map<String, String> expectedResult = ImmutableMap.of(oldSeg, instance0);
+    Map<String, String> expectedResult = Map.of(oldSeg, instance0);
     InstanceSelector.SelectionResult selectionResult =
         selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedResult);
-    assertEquals(selectionResult.getOptionalSegmentToInstanceMap(), ImmutableMap.of(newSeg, instance0));
+    assertEquals(selectionResult.getOptionalSegmentToInstanceMap(), Map.of(newSeg, instance0));
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // Advance the clock to make newSeg to old segment and we see newSeg is reported as unavailable segment.
     _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS + 10));
-    selector.init(enabledInstances, idealState, externalView, onlineSegments);
+    selector = createTestInstanceSelector(selectorType, enabledInstances, idealState, externalView, onlineSegments);
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     if (STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equals(selectorType)) {
-      expectedResult = ImmutableMap.of();
-      assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(newSeg, oldSeg));
+      expectedResult = Map.of();
+      assertEquals(selectionResult.getUnavailableSegments(), List.of(newSeg, oldSeg));
     } else {
-      assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(newSeg));
+      assertEquals(selectionResult.getUnavailableSegments(), List.of(newSeg));
     }
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedResult);
     assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
@@ -1563,7 +1491,7 @@ public class InstanceSelectorTest {
     // Set segment1 as new segment
     String newSeg = "segment1";
     List<Pair<String, Long>> segmentCreationTimeMsPairs =
-        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+        List.of(Pair.of(newSeg, _mutableClock.millis() - 100));
     createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
@@ -1576,8 +1504,8 @@ public class InstanceSelectorTest {
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
     Map<String, List<Pair<String, String>>> idealSateMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
-            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+        Map.of(oldSeg, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     IdealState idealState = createIdealState(idealSateMap);
 
@@ -1586,17 +1514,17 @@ public class InstanceSelectorTest {
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> []
     Map<String, List<Pair<String, String>>> externalViewMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
-            ImmutableList.of());
+        Map.of(oldSeg, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            List.of());
 
     ExternalView externalView = createExternalView(externalViewMap);
 
-    InstanceSelector selector = createTestInstanceSelector(selectorType);
-    selector.init(enabledInstances, idealState, externalView, onlineSegments);
+    InstanceSelector selector =
+        createTestInstanceSelector(selectorType, enabledInstances, idealState, externalView, onlineSegments);
 
     // We don't mark segment as unavailable.
     int requestId = 0;
-    Map<String, String> expectedResult = ImmutableMap.of(oldSeg, instance0);
+    Map<String, String> expectedResult = Map.of(oldSeg, instance0);
 
     InstanceSelector.SelectionResult selectionResult =
         selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
@@ -1605,31 +1533,31 @@ public class InstanceSelectorTest {
 
     // Report error instance for segment1 since segment1 becomes old and we should report it as unavailable.
     externalViewMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
-            ImmutableList.of(Pair.of(instance0, ERROR)));
+        Map.of(oldSeg, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            List.of(Pair.of(instance0, ERROR)));
 
     externalView = createExternalView(externalViewMap);
     selector.onAssignmentChange(idealState, externalView, onlineSegments);
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     if (selectorType == STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE) {
-      expectedResult = ImmutableMap.of();
-      assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(oldSeg, newSeg));
+      expectedResult = Map.of();
+      assertEquals(selectionResult.getUnavailableSegments(), List.of(oldSeg, newSeg));
     } else {
-      assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(newSeg));
+      assertEquals(selectionResult.getUnavailableSegments(), List.of(newSeg));
     }
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedResult);
 
     // Get segment1 back online in instance1
     externalViewMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
-            ImmutableList.of(Pair.of(instance0, ERROR), Pair.of(instance1, ONLINE)));
+        Map.of(oldSeg, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            List.of(Pair.of(instance0, ERROR), Pair.of(instance1, ONLINE)));
 
     externalView = createExternalView(externalViewMap);
     selector.onAssignmentChange(idealState, externalView, onlineSegments);
     if (selectorType == STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE) {
-      expectedResult = ImmutableMap.of(oldSeg, instance1, newSeg, instance1);
+      expectedResult = Map.of(oldSeg, instance1, newSeg, instance1);
     } else {
-      expectedResult = ImmutableMap.of(oldSeg, instance0, newSeg, instance1);
+      expectedResult = Map.of(oldSeg, instance0, newSeg, instance1);
     }
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedResult);
@@ -1644,7 +1572,7 @@ public class InstanceSelectorTest {
     // Set segment1 as new segment
     String newSeg = "segment1";
     List<Pair<String, Long>> segmentCreationTimeMsPairs =
-        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+        List.of(Pair.of(newSeg, _mutableClock.millis() - 100));
     createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
@@ -1657,8 +1585,8 @@ public class InstanceSelectorTest {
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
     Map<String, List<Pair<String, String>>> idealSateMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
-            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+        Map.of(oldSeg, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     IdealState idealState = createIdealState(idealSateMap);
 
@@ -1667,17 +1595,17 @@ public class InstanceSelectorTest {
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> []
     Map<String, List<Pair<String, String>>> externalViewMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
-            ImmutableList.of());
+        Map.of(oldSeg, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            List.of());
 
     ExternalView externalView = createExternalView(externalViewMap);
 
-    InstanceSelector selector = createTestInstanceSelector(selectorType);
-    selector.init(enabledInstances, idealState, externalView, onlineSegments);
+    InstanceSelector selector =
+        createTestInstanceSelector(selectorType, enabledInstances, idealState, externalView, onlineSegments);
 
     // We don't mark segment as unavailable.
     int requestId = 0;
-    Map<String, String> expectedBalancedInstanceSelectorResult = ImmutableMap.of(oldSeg, instance0);
+    Map<String, String> expectedBalancedInstanceSelectorResult = Map.of(oldSeg, instance0);
 
     InstanceSelector.SelectionResult selectionResult =
         selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
@@ -1686,16 +1614,16 @@ public class InstanceSelectorTest {
 
     // Segment1 is not old anymore with state converge.
     externalViewMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
-            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+        Map.of(oldSeg, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     externalView = createExternalView(externalViewMap);
     selector.onAssignmentChange(idealState, externalView, onlineSegments);
 
     // Segment1 becomes unavailable.
     externalViewMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
-            ImmutableList.of());
+        Map.of(oldSeg, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            List.of());
 
     externalView = createExternalView(externalViewMap);
     selector.onAssignmentChange(idealState, externalView, onlineSegments);
@@ -1703,10 +1631,10 @@ public class InstanceSelectorTest {
     selector.onAssignmentChange(idealState, externalView, onlineSegments);
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     if (selectorType == STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE) {
-      expectedBalancedInstanceSelectorResult = ImmutableMap.of();
-      assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(oldSeg, newSeg));
+      expectedBalancedInstanceSelectorResult = Map.of();
+      assertEquals(selectionResult.getUnavailableSegments(), List.of(oldSeg, newSeg));
     } else {
-      assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(newSeg));
+      assertEquals(selectionResult.getUnavailableSegments(), List.of(newSeg));
     }
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
   }
@@ -1726,8 +1654,8 @@ public class InstanceSelectorTest {
     Set<String> enabledInstances = ImmutableSet.of(instance0, instance1);
 
     Map<String, List<Pair<String, String>>> idealSateMap =
-        ImmutableMap.of(oldSeg0, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), oldSeg1,
-            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+        Map.of(oldSeg0, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), oldSeg1,
+            List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     IdealState idealState = createIdealState(idealSateMap);
 
@@ -1736,26 +1664,26 @@ public class InstanceSelectorTest {
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
     Map<String, List<Pair<String, String>>> externalViewMap =
-        ImmutableMap.of(oldSeg0, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), oldSeg1,
-            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+        Map.of(oldSeg0, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), oldSeg1,
+            List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     ExternalView externalView = createExternalView(externalViewMap);
 
-    InstanceSelector selector = createTestInstanceSelector(selectorType);
-    selector.init(enabledInstances, idealState, externalView, onlineSegments);
+    InstanceSelector selector =
+        createTestInstanceSelector(selectorType, enabledInstances, idealState, externalView, onlineSegments);
 
     // Add a new segment to ideal state with missing external view.
     String newSeg = "segment2";
     onlineSegments = ImmutableSet.of(oldSeg0, oldSeg1, newSeg);
     idealSateMap =
-        ImmutableMap.of(oldSeg0, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), oldSeg1,
-            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
-            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+        Map.of(oldSeg0, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), oldSeg1,
+            List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     idealState = createIdealState(idealSateMap);
     externalViewMap =
-        ImmutableMap.of(oldSeg0, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), oldSeg1,
-            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+        Map.of(oldSeg0, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), oldSeg1,
+            List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     externalView = createExternalView(externalViewMap);
     selector.onAssignmentChange(idealState, externalView, onlineSegments);
@@ -1764,11 +1692,11 @@ public class InstanceSelectorTest {
     Map<String, String> expectedResult;
     switch (selectorType) {
       case BALANCED_INSTANCE_SELECTOR:
-        expectedResult = ImmutableMap.of(oldSeg0, instance0, oldSeg1, instance1);
+        expectedResult = Map.of(oldSeg0, instance0, oldSeg1, instance1);
         break;
       case REPLICA_GROUP_INSTANCE_SELECTOR_TYPE: // fall through
       case STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE:
-        expectedResult = ImmutableMap.of(oldSeg0, instance0, oldSeg1, instance0);
+        expectedResult = Map.of(oldSeg0, instance0, oldSeg1, instance0);
         break;
       default:
         throw new RuntimeException("unsupported type:" + selectorType);
@@ -1785,9 +1713,9 @@ public class InstanceSelectorTest {
     selector.onAssignmentChange(idealState, externalView, onlineSegments);
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     if (selectorType == STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE) {
-      assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(oldSeg0, oldSeg1, newSeg));
+      assertEquals(selectionResult.getUnavailableSegments(), List.of(oldSeg0, oldSeg1, newSeg));
     } else {
-      assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(newSeg));
+      assertEquals(selectionResult.getUnavailableSegments(), List.of(newSeg));
     }
   }
 
@@ -1799,7 +1727,7 @@ public class InstanceSelectorTest {
     // Set segment1 as new segment
     String newSeg = "segment1";
     List<Pair<String, Long>> segmentCreationTimeMsPairs =
-        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+        List.of(Pair.of(newSeg, _mutableClock.millis() - 100));
     createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
@@ -1812,8 +1740,8 @@ public class InstanceSelectorTest {
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
     Map<String, List<Pair<String, String>>> idealSateMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
-            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+        Map.of(oldSeg, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     IdealState idealState = createIdealState(idealSateMap);
 
@@ -1822,24 +1750,24 @@ public class InstanceSelectorTest {
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online]
     Map<String, List<Pair<String, String>>> externalViewMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
-            ImmutableList.of(Pair.of(instance0, ONLINE)));
+        Map.of(oldSeg, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            List.of(Pair.of(instance0, ONLINE)));
 
     ExternalView externalView = createExternalView(externalViewMap);
 
-    InstanceSelector selector = createTestInstanceSelector(selectorType);
-    selector.init(enabledInstances, idealState, externalView, onlineSegments);
+    InstanceSelector selector =
+        createTestInstanceSelector(selectorType, enabledInstances, idealState, externalView, onlineSegments);
 
     // First selection, we select instance1 for newSeg.
     int requestId = 0;
     Map<String, String> expectedResult;
     switch (selectorType) {
       case BALANCED_INSTANCE_SELECTOR:
-        expectedResult = ImmutableMap.of(oldSeg, instance0);
+        expectedResult = Map.of(oldSeg, instance0);
         break;
       case REPLICA_GROUP_INSTANCE_SELECTOR_TYPE:
       case STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE:
-        expectedResult = ImmutableMap.of(oldSeg, instance0, newSeg, instance0);
+        expectedResult = Map.of(oldSeg, instance0, newSeg, instance0);
         break;
       default:
         throw new RuntimeException("Unsupported type:" + selectorType);
@@ -1852,11 +1780,11 @@ public class InstanceSelectorTest {
 
     // Remove instance0 from enabledInstances.
     enabledInstances = ImmutableSet.of(instance1);
-    List<String> changeInstance = ImmutableList.of(instance0);
+    List<String> changeInstance = List.of(instance0);
     selector.onInstancesChange(enabledInstances, changeInstance);
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     // We don't include instance0 in selection anymore.
-    expectedResult = ImmutableMap.of(oldSeg, instance1);
+    expectedResult = Map.of(oldSeg, instance1);
 
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedResult);
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
@@ -1869,7 +1797,7 @@ public class InstanceSelectorTest {
     // Set segment1 as new segment
     String newSeg = "segment1";
     List<Pair<String, Long>> segmentCreationTimeMsPairs =
-        ImmutableList.of(Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100),
+        List.of(Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100),
             Pair.of(newSeg, _mutableClock.millis() - 100));
     createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
@@ -1884,8 +1812,8 @@ public class InstanceSelectorTest {
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
     Map<String, List<Pair<String, String>>> idealSateMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
-            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+        Map.of(oldSeg, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     IdealState idealState = createIdealState(idealSateMap);
 
@@ -1894,21 +1822,21 @@ public class InstanceSelectorTest {
     //   [segment0] -> [instance2: online]
     //   [segment1] -> [instance2: online]
     Map<String, List<Pair<String, String>>> externalViewMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance2, ONLINE)), newSeg,
-            ImmutableList.of(Pair.of(instance2, ONLINE)));
+        Map.of(oldSeg, List.of(Pair.of(instance2, ONLINE)), newSeg,
+            List.of(Pair.of(instance2, ONLINE)));
 
     ExternalView externalView = createExternalView(externalViewMap);
 
-    InstanceSelector selector = createTestInstanceSelector(selectorType);
-    selector.init(enabledInstances, idealState, externalView, onlineSegments);
+    InstanceSelector selector =
+        createTestInstanceSelector(selectorType, enabledInstances, idealState, externalView, onlineSegments);
 
     // No selection because the external view is not in ideal state.
     int requestId = 0;
-    Map<String, String> expectedBalancedInstanceSelectorResult = ImmutableMap.of();
+    Map<String, String> expectedBalancedInstanceSelectorResult = Map.of();
     InstanceSelector.SelectionResult selectionResult =
         selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
-    assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(oldSeg));
+    assertEquals(selectionResult.getUnavailableSegments(), List.of(oldSeg));
   }
 
   @Test(dataProvider = "selectorType")
@@ -1918,7 +1846,7 @@ public class InstanceSelectorTest {
     String oldSeg = "segment1";
 
     List<Pair<String, Long>> segmentCreationTimeMsPairs =
-        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100),
+        List.of(Pair.of(newSeg, _mutableClock.millis() - 100),
             Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100));
     createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(newSeg, oldSeg);
@@ -1931,9 +1859,8 @@ public class InstanceSelectorTest {
     // Ideal states for two segments
     //   [segment0] -> [instance0:online, instance1:offline]
     Map<String, List<Pair<String, String>>> idealSateMap =
-        ImmutableMap.of(
-            newSeg, ImmutableList.of(Pair.of(instance0, OFFLINE), Pair.of(instance1, ONLINE)),
-            oldSeg, ImmutableList.of(Pair.of(instance0, OFFLINE), Pair.of(instance1, ONLINE)));
+        Map.of(newSeg, List.of(Pair.of(instance0, OFFLINE), Pair.of(instance1, ONLINE)), oldSeg,
+            List.of(Pair.of(instance0, OFFLINE), Pair.of(instance1, ONLINE)));
 
     IdealState idealState = createIdealState(idealSateMap);
 
@@ -1941,18 +1868,17 @@ public class InstanceSelectorTest {
     // External view for two segments
     //   [segment0] -> [instance0:offline, instance1:online]
     Map<String, List<Pair<String, String>>> externalViewMap =
-        ImmutableMap.of(
-            newSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)),
-            oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+        Map.of(newSeg, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), oldSeg,
+            List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     ExternalView externalView = createExternalView(externalViewMap);
 
-    InstanceSelector selector = createTestInstanceSelector(selectorType);
-    selector.init(enabledInstances, idealState, externalView, onlineSegments);
+    InstanceSelector selector =
+        createTestInstanceSelector(selectorType, enabledInstances, idealState, externalView, onlineSegments);
 
     // We don't mark segment as unavailable.
     int requestId = 0;
-    Map<String, String> expectedBalancedInstanceSelectorResult = ImmutableMap.of(oldSeg, instance1, newSeg, instance1);
+    Map<String, String> expectedBalancedInstanceSelectorResult = Map.of(oldSeg, instance1, newSeg, instance1);
 
     InstanceSelector.SelectionResult selectionResult =
         selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
@@ -1960,61 +1886,524 @@ public class InstanceSelectorTest {
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
   }
 
+  // Replica health metrics
+  //
+  // The scenarios below all use the same three instances and assert on the TableReplicaHealth the
+  // selector derives, since that is what the gauges are emitted from. Each segment's percentage is
+  // measured against the replicas its own ideal state assigns, so segments do not have to be uniformly
+  // replicated for the numbers to make sense.
+
+  private static final String REPLICA_INSTANCE_0 = "instance0";
+  private static final String REPLICA_INSTANCE_1 = "instance1";
+  private static final String REPLICA_INSTANCE_2 = "instance2";
+  private static final Set<String> REPLICA_INSTANCES =
+      ImmutableSet.of(REPLICA_INSTANCE_0, REPLICA_INSTANCE_1, REPLICA_INSTANCE_2);
+
+  /// Returns the ideal state assignment placing the segment on all three instances as ONLINE.
+  private static List<Pair<String, String>> allOnline() {
+    return List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, ONLINE), new ImmutablePair<>(REPLICA_INSTANCE_1, ONLINE),
+        new ImmutablePair<>(REPLICA_INSTANCE_2, ONLINE));
+  }
+
+  /// Returns an assignment placing the segment on two of the three instances as ONLINE.
+  private static List<Pair<String, String>> twoReplicas() {
+    return List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, ONLINE), new ImmutablePair<>(REPLICA_INSTANCE_1, ONLINE));
+  }
+
+  /// Returns an external view assignment where the first `numOnline` of the three instances are ONLINE
+  /// and the rest are OFFLINE, so the segment looks partially loaded.
+  private static List<Pair<String, String>> partiallyOnline(int numOnline) {
+    List<String> instances = List.of(REPLICA_INSTANCE_0, REPLICA_INSTANCE_1, REPLICA_INSTANCE_2);
+    List<Pair<String, String>> assignment = new ArrayList<>(instances.size());
+    for (int i = 0; i < instances.size(); i++) {
+      assignment.add(new ImmutablePair<>(instances.get(i), i < numOnline ? ONLINE : OFFLINE));
+    }
+    return assignment;
+  }
+
+  /// Returns an external view assignment where every instance but `offlineInstance` is ONLINE, so that
+  /// different segments can be made to lose different replicas.
+  private static List<Pair<String, String>> onlineExcept(String offlineInstance) {
+    List<Pair<String, String>> assignment = new ArrayList<>(REPLICA_INSTANCES.size());
+    for (String instance : List.of(REPLICA_INSTANCE_0, REPLICA_INSTANCE_1, REPLICA_INSTANCE_2)) {
+      assignment.add(new ImmutablePair<>(instance, instance.equals(offlineInstance) ? OFFLINE : ONLINE));
+    }
+    return assignment;
+  }
+
+  private BaseInstanceSelector createReplicaHealthSelector(String selectorType, Set<String> enabledInstances,
+      Map<String, List<Pair<String, String>>> idealStateAssignment,
+      Map<String, List<Pair<String, String>>> externalViewAssignment) {
+    // Sorted so that the order the selector looks up segment metadata in is deterministic, which is what
+    // the stub set up by createSegmentCreationTimes matches on
+    return (BaseInstanceSelector) createTestInstanceSelector(selectorType, enabledInstances,
+        createIdealState(idealStateAssignment), createExternalView(externalViewAssignment),
+        new TreeSet<>(externalViewAssignment.keySet()));
+  }
+
+  /// Stubs the segment metadata lookup with the given creation times, in the order the selector reads them.
+  private void createSegmentCreationTimes(Map<String, Long> creationTimeMsBySegment) {
+    List<Pair<String, Long>> creationTimes = new ArrayList<>(creationTimeMsBySegment.size());
+    for (String segment : new TreeSet<>(creationTimeMsBySegment.keySet())) {
+      creationTimes.add(new ImmutablePair<>(segment, creationTimeMsBySegment.get(segment)));
+    }
+    createSegments(creationTimes);
+  }
+
+  /// Marks the given segments as created long enough ago that they are no longer treated as new, so that
+  /// they count towards the replica health even though their external view has not converged.
+  private void createOldSegments(List<String> segments) {
+    long creationTimeMs = _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 1;
+    Map<String, Long> creationTimes = new HashMap<>();
+    for (String segment : segments) {
+      creationTimes.put(segment, creationTimeMs);
+    }
+    createSegmentCreationTimes(creationTimes);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthFullyReplicated(String selectorType) {
+    // Every segment is ONLINE everywhere the ideal state assigns it
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline(), "segment1", allOnline()),
+        Map.of("segment0", allOnline(), "segment1", allOnline()));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+    assertEquals(replicaHealth.getNumUnavailableSegments(), 0);
+    // Every measured segment sits at the minimum when the minimum is 100, so the count is the measured
+    // population rather than 0 - it counts what the percentage speaks for, not what is wrong
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 2);
+    // Nothing is degraded, so no expected replica count has to be remembered
+    assertTrue(selector._oldSegmentExpectedReplicasMap.isEmpty());
+  }
+
+  /// Returns an external view assignment with the first `numOnline` of the three instances ONLINE and the
+  /// rest in ERROR, i.e. replicas that failed their state transition rather than merely being offline.
+  private static List<Pair<String, String>> partiallyOnlineRestInError(int numOnline) {
+    List<String> instances = List.of(REPLICA_INSTANCE_0, REPLICA_INSTANCE_1, REPLICA_INSTANCE_2);
+    List<Pair<String, String>> assignment = new ArrayList<>(instances.size());
+    for (int i = 0; i < instances.size(); i++) {
+      assignment.add(new ImmutablePair<>(instances.get(i), i < numOnline ? ONLINE : ERROR));
+    }
+    return assignment;
+  }
+
+  private static List<Pair<String, String>> singleReplica(String state) {
+    return List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, state));
+  }
+
+  /// Returns an ideal state assignment placing the segment on all three instances as CONSUMING, i.e. a
+  /// segment the controller still considers in progress.
+  private static List<Pair<String, String>> allConsuming() {
+    return List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, CONSUMING),
+        new ImmutablePair<>(REPLICA_INSTANCE_1, CONSUMING), new ImmutablePair<>(REPLICA_INSTANCE_2, CONSUMING));
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testConsumingSegmentMeasuredLikeAnyOther(String selectorType) {
+    // Consuming segments are deliberately not special-cased. A partition whose replicas are all gone will also
+    // raise an ingestion alert, and reconciling that overlap belongs in the alerting pipeline rather than in a
+    // metric that would otherwise stop meaning what its name says.
+    createOldSegments(List.of("segment0"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allConsuming()), Map.of("segment0", partiallyOnline(0)));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 0);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+    assertEquals(replicaHealth.getNumUnavailableSegments(), 1);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testHealthyConsumingSegmentReportsFullyReplicated(String selectorType) {
+    // The flip side of not excluding them: a partition consuming normally on every replica must read 100%, or
+    // every real-time table would look permanently degraded. CONSUMING counts as serving for routing.
+    createOldSegments(List.of("segment0"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allConsuming()), Map.of("segment0", allConsuming()));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+    assertEquals(replicaHealth.getNumUnavailableSegments(), 0);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testCommittedSegmentCountedWhilePeersStillDownloading(String selectorType) {
+    // The exclusion has to end at the commit, not when the last replica finishes downloading. The ideal state
+    // turns ONLINE at commit while peers still report CONSUMING, and that segment is an ordinary immutable
+    // one whose replicas are genuinely missing.
+    createOldSegments(List.of("segment0"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        // Committed: ideal state ONLINE everywhere
+        Map.of("segment0", allOnline()),
+        // Only the committer has it; the peers have dropped out rather than reporting CONSUMING
+        Map.of("segment0", partiallyOnline(1)));
+
+    _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS + 1));
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 33);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testCommittingSegmentStillRoutableFromPeersReportingConsuming(String selectorType) {
+    // The normal commit window: ideal state ONLINE, peers still CONSUMING in the external view. They remain
+    // routable, so nothing is short of replicas and no clock starts.
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline()),
+        Map.of("segment0", List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, ONLINE),
+            new ImmutablePair<>(REPLICA_INSTANCE_1, CONSUMING), new ImmutablePair<>(REPLICA_INSTANCE_2, CONSUMING))));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testSegmentsAtMinPercentIgnoresSingleReplicaSegments(String selectorType) {
+    // The count is drawn from the same population as the percentage, so a segment the ideal state assigns one
+    // replica is left out of it too - otherwise a table that is single-replica by design would report every
+    // one of its segments as sitting at the worst level.
+    createOldSegments(List.of("segment0"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", singleReplica(ONLINE)), Map.of("segment0", singleReplica(OFFLINE)));
+
+    _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS * 2));
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+    // Nothing measured at all, which is the only way the count reaches 0
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 0);
+  }
+
   @Test
-  public void testReplicaGroupAdaptiveServerSelector() {
-    // Arrange
-    String offlineTableName = "testTable_OFFLINE";
-    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
-    BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
-    HybridSelector hybridSelector = mock(HybridSelector.class);
-    ReplicaGroupInstanceSelector instanceSelector = new ReplicaGroupInstanceSelector(
-        offlineTableName, propertyStore, brokerMetrics, hybridSelector, Clock.systemUTC(), false, 300);
+  public void testSegmentsAtMinPercentCountsOnlyTheWorstLevel() {
+    // segment0 is at 2 of 3 and segment1 at 1 of 3. The count belongs to the percentage that is reported, so
+    // only segment1 is in it - a segment that is degraded but better off than the worst must not inflate the
+    // blast radius the minimum is describing.
+    // Balanced routing only: under strict replica groups segment1's gaps would exclude those groups for
+    // segment0 as well, taking both segments to 1 of 3 and hiding the distinction this asserts on.
+    createOldSegments(List.of("segment0", "segment1"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(BALANCED_INSTANCE_SELECTOR, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline(), "segment1", allOnline()),
+        Map.of("segment0", partiallyOnline(2), "segment1", partiallyOnline(1)));
 
-    // Define instances and segments
-    String instance0 = "instance0";
-    String instance1 = "instance1";
-    String instance2 = "instance2";
-    String instance3 = "instance3";
-    String instance4 = "instance4";
-    String segment0 = "segment0";
-    String segment1 = "segment1";
-    String segment2 = "segment2";
-    List<String> segments = Arrays.asList(segment0, segment1, segment2);
+    _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS * 2));
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 33);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+  }
 
-    // Define candidates for each segment
-    Map<String, List<SegmentInstanceCandidate>> instanceCandidatesMap = new HashMap<>();
-    // segment0 -> instance0, instance1
-    instanceCandidatesMap.put(segment0, Arrays.asList(new SegmentInstanceCandidate(instance0, true),
-        new SegmentInstanceCandidate(instance1, true)));
-    // segment1 -> instance2, instance3
-    instanceCandidatesMap.put(segment1, Arrays.asList(new SegmentInstanceCandidate(instance2, true),
-        new SegmentInstanceCandidate(instance3, true)));
-    // segment2 -> instance3, instance4 // instance4 is not in the hybrid selector's server ranking
-    instanceCandidatesMap.put(segment2, Arrays.asList(new SegmentInstanceCandidate(instance4, true),
-        new SegmentInstanceCandidate(instance3, true)));
+  @Test(dataProvider = "selectorType")
+  public void testSegmentsAtMinPercentComparesUnevenlyReplicatedSegments(String selectorType) {
+    // segment0 is down to 1 of its 2 assigned replicas and segment1 to 1 of its 3. Both have lost all but one
+    // replica, yet the percentages differ - 50 against 33 - and it is the percentage that decides membership,
+    // so only segment1 is counted. Measuring each segment against its own assignment is what makes the two
+    // comparable in the first place.
+    createOldSegments(List.of("segment0", "segment1"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", twoReplicas(), "segment1", allOnline()),
+        Map.of("segment0", List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, ONLINE),
+            new ImmutablePair<>(REPLICA_INSTANCE_1, OFFLINE)), "segment1", partiallyOnline(1)));
 
-    // Define the segment states
-    SegmentStates segmentStates = new SegmentStates(instanceCandidatesMap, new HashSet<>(segments), null);
+    _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS * 2));
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    // The percentage reports the worse of the two, which is the 1-of-3 segment
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 33);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+  }
 
-    // Define server rankings
-    List<Pair<String, Double>> serverRanks = Arrays.asList(
-        new ImmutablePair<>(instance3, 1.0),
-        new ImmutablePair<>(instance2, 2.0),
-        new ImmutablePair<>(instance1, 3.0),
-        new ImmutablePair<>(instance0, 4.0)
-    );
-    when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(serverRanks);
+  @Test(dataProvider = "selectorType")
+  public void testSegmentsAtMinPercentCountsTwoReplicaSegmentWithNoReplicaLeft(String selectorType) {
+    // A two-replica segment is measured like any other, so losing both takes it to 0% and counts it. A rule
+    // keyed on "three or more assigned" would miss a total loss on a two-replica table entirely.
+    createOldSegments(List.of("segment0"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", twoReplicas()),
+        Map.of("segment0", List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, OFFLINE),
+            new ImmutablePair<>(REPLICA_INSTANCE_1, OFFLINE))));
 
-    // Act
-    Pair<Map<String, String>, Map<String, String>> selectedResult = instanceSelector.select(segments, 0,
-        segmentStates, null);
+    _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS * 2));
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 0);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+  }
 
-    // Assert
-    Map<String, String> expectedSelection = new HashMap<>();
-    expectedSelection.put(segment0, instance1);
-    expectedSelection.put(segment1, instance3);
-    expectedSelection.put(segment2, instance4);
+  @Test
+  public void testSegmentsAtMinPercentWatchesReplicatedPartOfMixedTable() {
+    // A real-time table whose consuming segment lives on one replica while its completed segments live on
+    // three. Losing two replicas of the completed segment has to be reported, and the thinly replicated
+    // consuming segment must neither stop that from happening nor be counted alongside it.
+    createOldSegments(List.of("completed"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(BALANCED_INSTANCE_SELECTOR, REPLICA_INSTANCES,
+        Map.of("consuming", List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, CONSUMING)), "completed", allOnline()),
+        Map.of("consuming", List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, CONSUMING)), "completed",
+            partiallyOnline(1)));
 
-    assertEquals(selectedResult.getLeft(), expectedSelection);
+    _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS * 2));
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 33);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthPartiallyReplicated(String selectorType) {
+    // segment0 is only loaded on 1 of its 3 replicas, which is the threshold the low replica alert fires on
+    createOldSegments(List.of("segment0"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline()), Map.of("segment0", partiallyOnline(1)));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 33);
+    assertEquals(replicaHealth.getNumUnavailableSegments(), 0);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthUnavailableSegment(String selectorType) {
+    // segment0 is loaded nowhere
+    createOldSegments(List.of("segment0"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline()), Map.of("segment0", partiallyOnline(0)));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 0);
+    assertEquals(replicaHealth.getNumUnavailableSegments(), 1);
+    // A replicated segment that is unavailable is at 0%, which is as low as the minimum goes, so it is
+    // counted by both gauges rather than moving from one to the other
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+  }
+
+  @Test
+  public void testReplicaHealthReportsWorstSegmentNotAverage() {
+    // segment0 is loaded nowhere while the other two are fully loaded. Reporting the minimum is what keeps
+    // a single unservable segment from being diluted by a large healthy table, and the count says how much
+    // of the table that minimum is speaking for - here one segment out of the three measured.
+    createOldSegments(List.of("segment0"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(BALANCED_INSTANCE_SELECTOR, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline(), "segment1", allOnline(), "segment2", allOnline()),
+        Map.of("segment0", partiallyOnline(0), "segment1", allOnline(), "segment2", allOnline()));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 0);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+    assertEquals(replicaHealth.getNumUnavailableSegments(), 1);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthIgnoresNewSegments(String selectorType) {
+    // segment0 was just created and is only loaded on 1 replica. That is expected right after a push, so
+    // it must not drag the percentage down.
+    createSegmentCreationTimes(Map.of("segment0", _mutableClock.millis()));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline()), Map.of("segment0", partiallyOnline(1)));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthAccountsForDisabledInstance(String selectorType) {
+    // A disabled instance reduces the replicas the broker can route to just as much as a missing external
+    // view entry does, and it arrives through onInstancesChange rather than an assignment change.
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline()), Map.of("segment0", allOnline()));
+    assertEquals(selector.getReplicaHealth().getMinPercentOfReplicas(), 100);
+
+    selector.onInstancesChange(ImmutableSet.of(REPLICA_INSTANCE_0, REPLICA_INSTANCE_1),
+        List.of(REPLICA_INSTANCE_2));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 66);
+    assertEquals(replicaHealth.getNumUnavailableSegments(), 0);
+  }
+
+  @Test
+  public void testReplicaHealthReflectsStrictReplicaGroupKnockout() {
+    // The two segments share an ideal state assignment but are each missing a different instance: segment0
+    // is not loaded on instance2, segment1 is not loaded on instance1. Strict replica group routing takes
+    // both instances out of service for every segment in the group, so each segment is left with instance0
+    // alone. The external view on its own only ever shows two of three replicas missing per segment, so the
+    // group-wide knockout is degradation a metric computed from the external view cannot see.
+    createOldSegments(List.of("segment0", "segment1"));
+    Map<String, List<Pair<String, String>>> idealStateAssignment =
+        Map.of("segment0", allOnline(), "segment1", allOnline());
+    Map<String, List<Pair<String, String>>> externalViewAssignment =
+        Map.of("segment0", onlineExcept(REPLICA_INSTANCE_2), "segment1", onlineExcept(REPLICA_INSTANCE_1));
+
+    BaseInstanceSelector strictSelector =
+        createReplicaHealthSelector(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, REPLICA_INSTANCES,
+            idealStateAssignment, externalViewAssignment);
+    TableReplicaHealth strictReplicaHealth = strictSelector.getReplicaHealth();
+    // 1 of 3, not the 2 of 3 the external view would suggest, and both segments are down to a single replica
+    assertEquals(strictReplicaHealth.getMinPercentOfReplicas(), 33);
+    assertEquals(strictReplicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 2);
+
+    // Without the strict guarantee each segment only loses the replica its own external view is missing
+    BaseInstanceSelector balancedSelector =
+        createReplicaHealthSelector(BALANCED_INSTANCE_SELECTOR, REPLICA_INSTANCES, idealStateAssignment,
+            externalViewAssignment);
+    TableReplicaHealth balancedReplicaHealth = balancedSelector.getReplicaHealth();
+    assertEquals(balancedReplicaHealth.getMinPercentOfReplicas(), 66);
+    // Both segments tie at the milder minimum, so the count stays 2 while the percentage improves: it tracks
+    // whatever level is currently worst, and is only ever read together with that level
+    assertEquals(balancedReplicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 2);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthWithUnevenlyReplicatedSegments(String selectorType) {
+    // segment0 is deliberately assigned a single replica, as happens when only part of a table's data sits
+    // on a tier with fewer replicas. Measuring it against its own ideal state keeps it at 100 instead of
+    // permanently reporting it as under-replicated.
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, ONLINE)), "segment1", allOnline()),
+        Map.of("segment0", List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, ONLINE)), "segment1", allOnline()));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthIgnoresIdealStateOfflineReplicas(String selectorType) {
+    // An instance the ideal state marks OFFLINE is not expected to serve the segment, so it must not count
+    // against the segment either.
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0",
+            List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, ONLINE), new ImmutablePair<>(REPLICA_INSTANCE_1, ONLINE),
+                new ImmutablePair<>(REPLICA_INSTANCE_2, OFFLINE))),
+        Map.of("segment0", allOnline()));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthWithNoOldSegments(String selectorType) {
+    // The state right after a table is created: every segment is new, so there is nothing to measure. It
+    // has to read as fully replicated, otherwise it would trip the very alert the gauge exists for.
+    createSegmentCreationTimes(Map.of("segment0", _mutableClock.millis()));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline()), Map.of("segment0", partiallyOnline(0)));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+    // The 100 above is the "nothing to measure" default rather than a measurement, and the count is what
+    // tells the two apart
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 0);
+    assertEquals(replicaHealth.getNumUnavailableSegments(), 0);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthRecoversOnAssignmentChange(String selectorType) {
+    // The expected replica counts are cached until the next assignment change rebuilds them, so a segment
+    // that converges has to stop being reported as degraded.
+    createOldSegments(List.of("segment0"));
+    Map<String, List<Pair<String, String>>> idealStateAssignment = Map.of("segment0", allOnline());
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        idealStateAssignment, Map.of("segment0", partiallyOnline(1)));
+    assertEquals(selector.getReplicaHealth().getMinPercentOfReplicas(), 33);
+
+    selector.onAssignmentChange(createIdealState(idealStateAssignment),
+        createExternalView(Map.of("segment0", allOnline())), Set.of("segment0"));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+    // The cached counts have to be dropped on rebuild, or the segment stays degraded forever
+    assertEquals(selector._oldSegmentExpectedReplicasMap, Map.of());
+  }
+
+  @Test
+  public void testReplicaHealthWithUpsertTableAppliesStrictReplicaGroupRules() {
+    // An upsert table gets the strict replica-group treatment even under the plain replica-group selector,
+    // so the group-wide knockout has to be reflected there too.
+    when(_tableConfig.isUpsertEnabled()).thenReturn(true);
+    createOldSegments(List.of("segment0", "segment1"));
+    // Same setup as testReplicaHealthReflectsStrictReplicaGroupKnockout: a different instance missing per
+    // segment, so 33 can only come from the group-wide knockout and not from either segment's own view
+    BaseInstanceSelector selector =
+        createReplicaHealthSelector(REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, REPLICA_INSTANCES,
+            Map.of("segment0", allOnline(), "segment1", allOnline()),
+            Map.of("segment0", onlineExcept(REPLICA_INSTANCE_2), "segment1", onlineExcept(REPLICA_INSTANCE_1)));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 33);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 2);
+  }
+
+  @Test
+  public void testReplicaHealthMeasuredForDisabledTable() {
+    // The selector measures a disabled table like any other - it cannot tell the difference, and it is the
+    // routing manager that decides a disabled table's gauges should be dropped rather than reported.
+    createOldSegments(List.of("segment0"));
+    IdealState disabledIdealState = createIdealState(Map.of("segment0", allOnline()));
+    disabledIdealState.enable(false);
+    BalancedInstanceSelector selector = new BalancedInstanceSelector();
+    selector.init(_tableConfig, _propertyStore, _brokerMetrics, null, _mutableClock, INSTANCE_SELECTOR_CONFIG,
+        REPLICA_INSTANCES, EMPTY_SERVER_MAP, disabledIdealState,
+        createExternalView(Map.of("segment0", partiallyOnline(0))), Set.of("segment0"));
+
+    assertEquals(selector.getReplicaHealth().getNumUnavailableSegments(), 1);
+    // The selector never touches the replica health gauges itself
+    verify(_brokerMetrics, never()).setValueOfTableGauge(eq(TABLE_NAME), any(BrokerGauge.class), anyLong());
+    verify(_brokerMetrics, never()).removeTableGauge(eq(TABLE_NAME), any(BrokerGauge.class));
+  }
+
+  @DataProvider(name = "poolMetricsSelector")
+  public Object[] getPoolMetricsSelector() {
+    return new Object[]{BALANCED_INSTANCE_SELECTOR, REPLICA_GROUP_INSTANCE_SELECTOR_TYPE};
+  }
+
+  @Test(dataProvider = "poolMetricsSelector")
+  public void testSelectedPoolMetricsAndRequestIsolation(String selectorType) {
+    BaseInstanceSelector selector = selectorType.equals(BALANCED_INSTANCE_SELECTOR)
+        ? new BalancedInstanceSelector()
+        : new ReplicaGroupInstanceSelector();
+    selector._brokerMetrics = _brokerMetrics;
+    selector._config = INSTANCE_SELECTOR_CONFIG;
+    Map<String, List<SegmentInstanceCandidate>> candidates = new HashMap<>();
+    Map<String, String> expectedInstances = new HashMap<>();
+    List<String> segments = new ArrayList<>();
+    // Exercise the fallback pool, the primitive-map zero key, and IDs/counts outside the Integer cache.
+    for (int pool : new int[]{-1, 0, 128}) {
+      String instance = "instance" + pool;
+      for (int i = 0; i < 129; i++) {
+        String segment = "segment_" + pool + "_" + i;
+        candidates.put(segment, List.of(new SegmentInstanceCandidate(instance, true, pool, 0)));
+        expectedInstances.put(segment, instance);
+        // Routing matches segment names by value, even when query and metadata use different String objects.
+        segments.add(new String(segment));
+      }
+    }
+    candidates.put("optional", List.of(new SegmentInstanceCandidate("instance128", false, 128, 0)));
+    segments.addAll(List.of("optional", "unavailable", "pending"));
+    selector._segmentStates = new SegmentStates(candidates, Set.of("instance-1", "instance0", "instance128"),
+        Set.of("unavailable", "unrequestedUnavailable"));
+    Map<String, String> queryOptions = Map.of(ORDERED_PREFERRED_POOLS, "128|0");
+    when(_pinotQuery.getQueryOptions()).thenReturn(queryOptions);
+
+    InstanceSelector.SelectionResult first = selector.select(_brokerRequest, segments, 0L);
+
+    assertEquals(first.getSegmentToInstanceMap(), expectedInstances);
+    assertEquals(first.getOptionalSegmentToInstanceMap(), Map.of("optional", "instance128"));
+    assertEquals(first.getUnavailableSegments(), List.of("unavailable"));
+    String preferredPoolTag = BrokerMetrics.getTagForPreferredPool(queryOptions);
+    verify(_brokerMetrics).addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, 129L, preferredPoolTag, "-1");
+    verify(_brokerMetrics).addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, 129L, preferredPoolTag, "0");
+    // Optional segments count as selected; unavailable segments and metadata not yet present do not.
+    verify(_brokerMetrics).addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, 130L, preferredPoolTag, "128");
+    verifyNoMoreInteractions(_brokerMetrics);
+
+    clearInvocations(_brokerMetrics);
+    when(_pinotQuery.getQueryOptions()).thenReturn(Map.of());
+    InstanceSelector.SelectionResult second = selector.select(_brokerRequest, List.of("segment_0_0"), 1L);
+
+    assertEquals(second.getSegmentToInstanceMap(), Map.of("segment_0_0", "instance0"));
+    assertTrue(second.getOptionalSegmentToInstanceMap().isEmpty());
+    assertTrue(second.getUnavailableSegments().isEmpty());
+    verify(_brokerMetrics).addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, 1L,
+        BrokerMetrics.getTagForPreferredPool(Map.of()), "0");
+    verifyNoMoreInteractions(_brokerMetrics);
+    assertEquals(first.getSegmentToInstanceMap(), expectedInstances);
+    assertEquals(first.getOptionalSegmentToInstanceMap(), Map.of("optional", "instance128"));
   }
 }

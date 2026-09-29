@@ -18,18 +18,23 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.longs.AbstractLongCollection;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongCollection;
+import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
+import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public abstract class BaseArrayAggLongFunction<I extends AbstractLongCollection>
+public abstract class BaseArrayAggLongFunction<I extends LongCollection>
     extends BaseArrayAggFunction<I, LongArrayList> {
-  public BaseArrayAggLongFunction(ExpressionContext expression, FieldSpec.DataType dataType,
+  public BaseArrayAggLongFunction(ExpressionContext expression, DataType dataType,
       boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
   }
@@ -40,29 +45,90 @@ public abstract class BaseArrayAggLongFunction<I extends AbstractLongCollection>
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    long[] values = blockValSet.getLongValuesSV();
-
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        setGroupByResult(groupByResultHolder, groupKeyArray[i], values[i]);
-      }
-    });
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set; add each of its
+    // elements to the group's accumulator.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int groupKey = groupKeyArray[i];
+          LongSet set = ObjectSerDeUtils.LONG_SET_SER_DE.deserialize(starTreeSetPayload(bytesValues[i],
+              ElementType.LONG));
+          LongIterator iterator = set.iterator();
+          while (iterator.hasNext()) {
+            setGroupByResult(groupByResultHolder, groupKey, iterator.nextLong());
+          }
+        }
+      });
+      return;
+    }
+    if (blockValSet.isSingleValue()) {
+      long[] values = blockValSet.getLongValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          setGroupByResult(groupByResultHolder, groupKeyArray[i], values[i]);
+        }
+      });
+    } else {
+      long[][] valuesArray = blockValSet.getLongValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int groupKey = groupKeyArray[i];
+          long[] values = valuesArray[i];
+          for (long v : values) {
+            setGroupByResult(groupByResultHolder, groupKey, v);
+          }
+        }
+      });
+    }
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    long[] values = blockValSet.getLongValuesSV();
-
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        int[] groupKeys = groupKeysArray[i];
-        for (int groupKey : groupKeys) {
-          setGroupByResult(groupByResultHolder, groupKey, values[i]);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set; add each of its
+    // elements to every group the row belongs to.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          LongSet set = ObjectSerDeUtils.LONG_SET_SER_DE.deserialize(starTreeSetPayload(bytesValues[i],
+              ElementType.LONG));
+          for (int groupKey : groupKeysArray[i]) {
+            LongIterator iterator = set.iterator();
+            while (iterator.hasNext()) {
+              setGroupByResult(groupByResultHolder, groupKey, iterator.nextLong());
+            }
+          }
         }
-      }
-    });
+      });
+      return;
+    }
+    if (blockValSet.isSingleValue()) {
+      long[] values = blockValSet.getLongValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int[] groupKeys = groupKeysArray[i];
+          for (int groupKey : groupKeys) {
+            setGroupByResult(groupByResultHolder, groupKey, values[i]);
+          }
+        }
+      });
+    } else {
+      long[][] valuesArray = blockValSet.getLongValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int[] groupKeys = groupKeysArray[i];
+          long[] values = valuesArray[i];
+          for (int groupKey : groupKeys) {
+            for (long v : values) {
+              setGroupByResult(groupByResultHolder, groupKey, v);
+            }
+          }
+        }
+      });
+    }
   }
 
   @Override
@@ -78,10 +144,10 @@ public abstract class BaseArrayAggLongFunction<I extends AbstractLongCollection>
   }
 
   @Override
-  public LongArrayList extractFinalResult(I arrayList) {
-    if (arrayList == null) {
+  public LongArrayList extractFinalResult(I longs) {
+    if (longs == null) {
       return new LongArrayList();
     }
-    return new LongArrayList(arrayList);
+    return new LongArrayList(longs);
   }
 }

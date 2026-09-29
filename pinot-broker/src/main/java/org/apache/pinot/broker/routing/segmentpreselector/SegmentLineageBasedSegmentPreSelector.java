@@ -26,12 +26,10 @@ import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
 
 
-/**
- * Segment lineage based segment pre-selector
- *
- * This pre-selector reads the segment lineage metadata and filters out either merged segments or original segments
- * to make sure that the final segments contain no duplicate data.
- */
+/// Segment lineage based segment pre-selector
+///
+/// This pre-selector reads the segment lineage metadata and filters out either merged segments or original segments
+/// to make sure that the final segments contain no duplicate data.
 public class SegmentLineageBasedSegmentPreSelector implements SegmentPreSelector {
   private final String _tableNameWithType;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers;
 
+import com.google.common.base.Utf8;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -26,16 +27,23 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.IntStream;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -49,7 +57,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-public class ImmutableDictionaryTest {
+public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule {
   private static final FALFInterner<String> STRING_INTERNER = new FALFInterner<>(500);
   private static final FALFInterner<byte[]> BYTE_INTERNER = new FALFInterner<>(500, Arrays::hashCode);
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "ImmutableDictionaryTest");
@@ -120,7 +128,7 @@ public class ImmutableDictionaryTest {
 
     Set<String> stringSet = new HashSet<>();
     while (stringSet.size() < NUM_VALUES) {
-      stringSet.add(RandomStringUtils.random(RANDOM.nextInt(MAX_STRING_LENGTH)).replace('\0', ' '));
+      stringSet.add(RandomStringUtils.secure().next(RANDOM.nextInt(MAX_STRING_LENGTH)).replace('\0', ' '));
     }
     _stringValues = stringSet.toArray(new String[NUM_VALUES]);
     Arrays.sort(_stringValues);
@@ -179,9 +187,9 @@ public class ImmutableDictionaryTest {
   @Test
   public void testIntDictionary()
       throws Exception {
-    try (IntDictionary intDictionary = new IntDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(new File(TEMP_DIR, INT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
-        NUM_VALUES)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, INT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        IntDictionary intDictionary = new IntDictionary(buffer, NUM_VALUES)) {
       testIntDictionary(intDictionary);
     }
   }
@@ -189,9 +197,9 @@ public class ImmutableDictionaryTest {
   @Test
   public void testOnHeapIntDictionary()
       throws Exception {
-    try (OnHeapIntDictionary onHeapIntDictionary = new OnHeapIntDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(new File(TEMP_DIR, INT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
-        NUM_VALUES)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, INT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapIntDictionary onHeapIntDictionary = new OnHeapIntDictionary(buffer, NUM_VALUES)) {
       testIntDictionary(onHeapIntDictionary);
     }
   }
@@ -204,6 +212,7 @@ public class ImmutableDictionaryTest {
       assertEquals(intDictionary.getFloatValue(i), (float) _intValues[i]);
       assertEquals(intDictionary.getDoubleValue(i), (double) _intValues[i]);
       Assert.assertEquals(Integer.parseInt(intDictionary.getStringValue(i)), _intValues[i]);
+      assertEquals(intDictionary.getValueSize(i), Integer.BYTES);
 
       assertEquals(intDictionary.indexOf(String.valueOf(_intValues[i])), i);
 
@@ -216,8 +225,9 @@ public class ImmutableDictionaryTest {
   @Test
   public void testLongDictionary()
       throws Exception {
-    try (LongDictionary longDictionary = new LongDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, LONG_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, LONG_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        LongDictionary longDictionary = new LongDictionary(buffer, NUM_VALUES)) {
       testLongDictionary(longDictionary);
     }
   }
@@ -225,8 +235,9 @@ public class ImmutableDictionaryTest {
   @Test
   public void testOnHeapLongDictionary()
       throws Exception {
-    try (OnHeapLongDictionary onHeapLongDictionary = new OnHeapLongDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, LONG_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, LONG_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapLongDictionary onHeapLongDictionary = new OnHeapLongDictionary(buffer, NUM_VALUES)) {
       testLongDictionary(onHeapLongDictionary);
     }
   }
@@ -239,6 +250,7 @@ public class ImmutableDictionaryTest {
       assertEquals(longDictionary.getFloatValue(i), (float) _longValues[i]);
       assertEquals(longDictionary.getDoubleValue(i), (double) _longValues[i]);
       Assert.assertEquals(Long.parseLong(longDictionary.getStringValue(i)), _longValues[i]);
+      assertEquals(longDictionary.getValueSize(i), Long.BYTES);
 
       assertEquals(longDictionary.indexOf(String.valueOf(_longValues[i])), i);
 
@@ -251,8 +263,9 @@ public class ImmutableDictionaryTest {
   @Test
   public void testFloatDictionary()
       throws Exception {
-    try (FloatDictionary floatDictionary = new FloatDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, FLOAT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, FLOAT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        FloatDictionary floatDictionary = new FloatDictionary(buffer, NUM_VALUES)) {
       testFloatDictionary(floatDictionary);
     }
   }
@@ -260,9 +273,9 @@ public class ImmutableDictionaryTest {
   @Test
   public void testOnHeapFloatDictionary()
       throws Exception {
-    try (OnHeapFloatDictionary onHeapFloatDictionary = new OnHeapFloatDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, FLOAT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, FLOAT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapFloatDictionary onHeapFloatDictionary = new OnHeapFloatDictionary(buffer, NUM_VALUES)) {
       testFloatDictionary(onHeapFloatDictionary);
     }
   }
@@ -275,6 +288,7 @@ public class ImmutableDictionaryTest {
       assertEquals(floatDictionary.getFloatValue(i), _floatValues[i]);
       assertEquals(floatDictionary.getDoubleValue(i), (double) _floatValues[i]);
       Assert.assertEquals(Float.parseFloat(floatDictionary.getStringValue(i)), _floatValues[i], 0.0f);
+      assertEquals(floatDictionary.getValueSize(i), Float.BYTES);
 
       assertEquals(floatDictionary.indexOf(String.valueOf(_floatValues[i])), i);
 
@@ -287,8 +301,9 @@ public class ImmutableDictionaryTest {
   @Test
   public void testDoubleDictionary()
       throws Exception {
-    try (DoubleDictionary doubleDictionary = new DoubleDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, DOUBLE_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, DOUBLE_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        DoubleDictionary doubleDictionary = new DoubleDictionary(buffer, NUM_VALUES)) {
       testDoubleDictionary(doubleDictionary);
     }
   }
@@ -296,9 +311,9 @@ public class ImmutableDictionaryTest {
   @Test
   public void testOnHeapDoubleDictionary()
       throws Exception {
-    try (OnHeapDoubleDictionary onHeapDoubleDictionary = new OnHeapDoubleDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, DOUBLE_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, DOUBLE_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapDoubleDictionary onHeapDoubleDictionary = new OnHeapDoubleDictionary(buffer, NUM_VALUES)) {
       testDoubleDictionary(onHeapDoubleDictionary);
     }
   }
@@ -311,6 +326,7 @@ public class ImmutableDictionaryTest {
       assertEquals(doubleDictionary.getFloatValue(i), (float) _doubleValues[i]);
       assertEquals(doubleDictionary.getDoubleValue(i), _doubleValues[i]);
       Assert.assertEquals(Double.parseDouble(doubleDictionary.getStringValue(i)), _doubleValues[i], 0.0);
+      assertEquals(doubleDictionary.getValueSize(i), Double.BYTES);
 
       assertEquals(doubleDictionary.indexOf(String.valueOf(_doubleValues[i])), i);
 
@@ -323,9 +339,10 @@ public class ImmutableDictionaryTest {
   @Test
   public void testBigDecimalDictionary()
       throws Exception {
-    try (BigDecimalDictionary bigDecimalDictionary = new BigDecimalDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
-        _bigDecimalByteLength)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        BigDecimalDictionary bigDecimalDictionary = new BigDecimalDictionary(buffer, NUM_VALUES,
+            _bigDecimalByteLength)) {
       testBigDecimalDictionary(bigDecimalDictionary);
     }
   }
@@ -333,10 +350,10 @@ public class ImmutableDictionaryTest {
   @Test
   public void testOnHeapBigDecimalDictionary()
       throws Exception {
-    try (OnHeapBigDecimalDictionary onHeapBigDecimalDictionary = new OnHeapBigDecimalDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
-        _bigDecimalByteLength)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapBigDecimalDictionary onHeapBigDecimalDictionary = new OnHeapBigDecimalDictionary(buffer, NUM_VALUES,
+            _bigDecimalByteLength)) {
       testBigDecimalDictionary(onHeapBigDecimalDictionary);
     }
   }
@@ -350,6 +367,7 @@ public class ImmutableDictionaryTest {
       assertEquals(bigDecimalDictionary.getDoubleValue(i), _bigDecimalValues[i].doubleValue());
       assertEquals(bigDecimalDictionary.getBigDecimalValue(i), _bigDecimalValues[i]);
       Assert.assertEquals(new BigDecimal(bigDecimalDictionary.getStringValue(i)), _bigDecimalValues[i]);
+      assertEquals(bigDecimalDictionary.getValueSize(i), BigDecimalUtils.byteSize(_bigDecimalValues[i]));
 
       assertEquals(bigDecimalDictionary.indexOf(String.valueOf(_bigDecimalValues[i])), i);
 
@@ -357,14 +375,41 @@ public class ImmutableDictionaryTest {
       assertEquals(bigDecimalDictionary.insertionIndexOf(String.valueOf(randomBigDecimal)),
           Arrays.binarySearch(_bigDecimalValues, randomBigDecimal));
     }
+    testMurmur3HashValues(bigDecimalDictionary);
+  }
+
+  /// Verifies the murmur3 hash reads of a fixed-byte BIG_DECIMAL dictionary. Scale 0 values serialize with leading
+  /// `0x00` scale bytes, which are data rather than padding in the fixed-byte layout.
+  @Test
+  public void testFixedByteBigDecimalDictionaryMurmur3Hash()
+      throws Exception {
+    String columnName = "fixedByteBigDecimalColumn";
+    BigDecimal[] values = new BigDecimal[]{
+        BigDecimal.valueOf(-2), BigDecimal.valueOf(-1), BigDecimal.ZERO, BigDecimal.ONE, BigDecimal.valueOf(2)
+    };
+    MetricFieldSpec fieldSpec = new MetricFieldSpec(columnName, DataType.BIG_DECIMAL);
+    fieldSpec.setSingleValueField(true);
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(fieldSpec, TEMP_DIR, false)) {
+      dictionaryCreator.build(values);
+      assertEquals(dictionaryCreator.getNumBytesPerEntry(), 3);
+    }
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, columnName + V1Constants.Dict.FILE_EXTENSION));
+        BigDecimalDictionary bigDecimalDictionary = new BigDecimalDictionary(buffer, values.length, 3)) {
+      for (int i = 0; i < values.length; i++) {
+        assertEquals(bigDecimalDictionary.get(i), values[i]);
+      }
+      testMurmur3HashValues(bigDecimalDictionary);
+      testDistinctMurmur3HashValues(bigDecimalDictionary);
+    }
   }
 
   @Test
   public void testStringDictionary()
       throws Exception {
-    try (StringDictionary stringDictionary = new StringDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
-        _numBytesPerStringValue)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        StringDictionary stringDictionary = new StringDictionary(buffer, NUM_VALUES, _numBytesPerStringValue)) {
       testStringDictionary(stringDictionary);
     }
   }
@@ -372,10 +417,10 @@ public class ImmutableDictionaryTest {
   @Test
   public void testOnHeapStringDictionary()
       throws Exception {
-    try (OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
-        _numBytesPerStringValue, null, null)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(buffer, NUM_VALUES,
+            _numBytesPerStringValue, null, null)) {
       testStringDictionary(onHeapStringDictionary);
     }
   }
@@ -383,10 +428,10 @@ public class ImmutableDictionaryTest {
   @Test
   public void testOnHeapStringDictionaryWithInterning()
       throws Exception {
-    try (OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
-        _numBytesPerStringValue, STRING_INTERNER, BYTE_INTERNER)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(buffer, NUM_VALUES,
+            _numBytesPerStringValue, STRING_INTERNER, BYTE_INTERNER)) {
       testStringDictionary(onHeapStringDictionary);
     }
   }
@@ -395,20 +440,23 @@ public class ImmutableDictionaryTest {
     for (int i = 0; i < NUM_VALUES; i++) {
       assertEquals(stringDictionary.get(i), _stringValues[i]);
       assertEquals(stringDictionary.getStringValue(i), _stringValues[i]);
+      assertEquals(stringDictionary.getValueSize(i), Utf8.encodedLength(_stringValues[i]));
 
       assertEquals(stringDictionary.indexOf(_stringValues[i]), i);
 
       // Test String longer than MAX_STRING_LENGTH
-      String randomString = RandomStringUtils.random(RANDOM.nextInt(2 * MAX_STRING_LENGTH)).replace('\0', ' ');
+      String randomString = RandomStringUtils.secure().next(RANDOM.nextInt(2 * MAX_STRING_LENGTH)).replace('\0', ' ');
       assertEquals(stringDictionary.insertionIndexOf(randomString), Arrays.binarySearch(_stringValues, randomString));
     }
+    testMurmur3HashValues(stringDictionary);
   }
 
   @Test
   public void testBytesDictionary()
       throws Exception {
-    try (BytesDictionary bytesDictionary = new BytesDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, BYTES_LENGTH)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        BytesDictionary bytesDictionary = new BytesDictionary(buffer, NUM_VALUES, BYTES_LENGTH)) {
       testBytesDictionary(bytesDictionary);
     }
   }
@@ -416,9 +464,10 @@ public class ImmutableDictionaryTest {
   @Test
   public void testOnHeapBytesDictionary()
       throws Exception {
-    try (OnHeapBytesDictionary onHeapBytesDictionary = new OnHeapBytesDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, BYTES_LENGTH, null)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapBytesDictionary onHeapBytesDictionary = new OnHeapBytesDictionary(buffer, NUM_VALUES, BYTES_LENGTH,
+            null)) {
       testBytesDictionary(onHeapBytesDictionary);
     }
   }
@@ -427,10 +476,10 @@ public class ImmutableDictionaryTest {
   public void testOnHeapBytesDictionaryWithInterning()
       throws Exception {
 
-    try (OnHeapBytesDictionary onHeapBytesDictionary = new OnHeapBytesDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, BYTES_LENGTH,
-        BYTE_INTERNER)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapBytesDictionary onHeapBytesDictionary = new OnHeapBytesDictionary(buffer, NUM_VALUES, BYTES_LENGTH,
+            BYTE_INTERNER)) {
       testBytesDictionary(onHeapBytesDictionary);
     }
   }
@@ -440,6 +489,7 @@ public class ImmutableDictionaryTest {
       assertEquals(bytesDictionary.get(i), _bytesValues[i].getBytes());
       assertEquals(bytesDictionary.getStringValue(i), _bytesValues[i].toHexString());
       assertEquals(bytesDictionary.getBytesValue(i), _bytesValues[i].getBytes());
+      assertEquals(bytesDictionary.getValueSize(i), BYTES_LENGTH);
 
       assertEquals(bytesDictionary.indexOf(_bytesValues[i].toHexString()), i);
 
@@ -447,6 +497,115 @@ public class ImmutableDictionaryTest {
       RANDOM.nextBytes(randomBytes);
       assertEquals(bytesDictionary.insertionIndexOf(BytesUtils.toHexString(randomBytes)),
           Arrays.binarySearch(_bytesValues, new ByteArray(randomBytes)));
+    }
+    testMurmur3HashValues(bytesDictionary);
+  }
+
+  /// Verifies the murmur3 hash reads of a fixed-byte BYTES dictionary whose values contain leading, interior and
+  /// trailing `0x00` bytes, which are data rather than padding in the fixed-byte layout.
+  @Test
+  public void testFixedByteBytesDictionaryMurmur3Hash()
+      throws Exception {
+    String columnName = "fixedByteBytesColumn";
+    ByteArray[] values = new ByteArray[]{
+        new ByteArray(new byte[]{0, 0, 0, 0}),
+        new ByteArray(new byte[]{0, 0, 0, 1}),
+        new ByteArray(new byte[]{0, 1, 0, 0}),
+        new ByteArray(new byte[]{1, 0, 0, 0}),
+        new ByteArray(new byte[]{1, 0, 0, 1}),
+        new ByteArray(new byte[]{1, 2, 3, 4})
+    };
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
+        new DimensionFieldSpec(columnName, DataType.BYTES, true), TEMP_DIR, false)) {
+      dictionaryCreator.build(values);
+      assertEquals(dictionaryCreator.getNumBytesPerEntry(), 4);
+    }
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, columnName + V1Constants.Dict.FILE_EXTENSION));
+        BytesDictionary bytesDictionary = new BytesDictionary(buffer, values.length, 4)) {
+      for (int i = 0; i < values.length; i++) {
+        assertEquals(bytesDictionary.get(i), values[i].getBytes());
+      }
+      testMurmur3HashValues(bytesDictionary);
+      testDistinctMurmur3HashValues(bytesDictionary);
+    }
+  }
+
+  /// Asserts that the batch murmur3 hash reads match the single-value reads for every dict id.
+  private static void testMurmur3HashValues(BaseImmutableDictionary dictionary) {
+    int length = dictionary.length();
+    int[] dictIds = IntStream.range(0, length).toArray();
+    int[] hashValues32 = new int[length];
+    dictionary.read32BitsMurmur3HashValues(dictIds, length, hashValues32);
+    long[] hashValues64 = new long[length];
+    dictionary.read64BitsMurmur3HashValues(dictIds, length, hashValues64);
+    long[][] hashValues128 = new long[length][];
+    dictionary.read128BitsMurmur3HashValues(dictIds, length, hashValues128);
+    for (int i = 0; i < length; i++) {
+      assertEquals(hashValues32[i], dictionary.get32BitsMurmur3HashValue(i));
+      assertEquals(hashValues64[i], dictionary.get64BitsMurmur3HashValue(i));
+      assertEquals(hashValues128[i], dictionary.get128BitsMurmur3HashValue(i));
+    }
+  }
+
+  /// Asserts that the batch murmur3 hash reads return a distinct hash for every dict id.
+  private static void testDistinctMurmur3HashValues(BaseImmutableDictionary dictionary) {
+    int length = dictionary.length();
+    int[] dictIds = IntStream.range(0, length).toArray();
+    int[] hashValues32 = new int[length];
+    dictionary.read32BitsMurmur3HashValues(dictIds, length, hashValues32);
+    long[] hashValues64 = new long[length];
+    dictionary.read64BitsMurmur3HashValues(dictIds, length, hashValues64);
+    long[][] hashValues128 = new long[length][];
+    dictionary.read128BitsMurmur3HashValues(dictIds, length, hashValues128);
+    assertEquals(new IntOpenHashSet(hashValues32).size(), length);
+    assertEquals(new LongOpenHashSet(hashValues64).size(), length);
+    Set<List<Long>> hashSet128 = new HashSet<>();
+    for (long[] hashValue : hashValues128) {
+      hashSet128.add(List.of(hashValue[0], hashValue[1]));
+    }
+    assertEquals(hashSet128.size(), length);
+  }
+
+  /// Regression test for old segments (pre-1.6.0) that have a STRING column with all-empty values:
+  /// the segment lacks LENGTH_OF_LONGEST_ELEMENT (introduced in 1.6.0) and has DICTIONARY_ELEMENT_SIZE=0
+  /// (the longest entry length is zero when every entry is empty). The metadata loader must canonicalize
+  /// the longest-element length to 0 here; otherwise it leaves the field at the UNAVAILABLE sentinel
+  /// (-1), which propagates into StringDictionary.getBuffer() as `new byte\[-1\]` and fails query
+  /// execution with NegativeArraySizeException.
+  @Test
+  public void testStringDictionaryReadOnPre16OldSegmentMetadata()
+      throws Exception {
+    String columnName = "emptyStringCol";
+    // Build a real var-length string dictionary on disk holding a single empty value.
+    try (SegmentDictionaryCreator dictCreator = new SegmentDictionaryCreator(
+        new DimensionFieldSpec(columnName, DataType.STRING, true), TEMP_DIR, true)) {
+      dictCreator.build(new String[]{""});
+      assertEquals(dictCreator.getNumBytesPerEntry(), 0);
+    }
+
+    // Simulate pre-1.6.0 metadata: HAS_DICTIONARY=true, DICTIONARY_ELEMENT_SIZE=0, no LENGTH_OF_LONGEST_ELEMENT.
+    PropertiesConfiguration config = new PropertiesConfiguration();
+    config.setProperty(Column.getKeyFor(columnName, Column.COLUMN_NAME), columnName);
+    config.setProperty(Column.getKeyFor(columnName, Column.COLUMN_TYPE), FieldType.DIMENSION.name());
+    config.setProperty(Column.getKeyFor(columnName, Column.DATA_TYPE), DataType.STRING.name());
+    config.setProperty(Column.getKeyFor(columnName, Column.IS_SINGLE_VALUED), true);
+    config.setProperty(Column.getKeyFor(columnName, Column.CARDINALITY), 1);
+    config.setProperty(Column.getKeyFor(columnName, Column.HAS_DICTIONARY), true);
+    config.setProperty(Column.getKeyFor(columnName, Column.DICTIONARY_ELEMENT_SIZE), 0);
+    // LENGTH_OF_LONGEST_ELEMENT intentionally NOT set.
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, columnName);
+
+    // Reproduce the production code path: DictionaryIndexType passes metadata.getLengthOfLongestElement()
+    // as numBytesPerValue. Without the canonicalization fix this is -1, and StringDictionary.readStringValues
+    // throws NegativeArraySizeException at BaseImmutableDictionary.getBuffer().
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, columnName + V1Constants.Dict.FILE_EXTENSION));
+        StringDictionary dict = new StringDictionary(buffer, 1, metadata.getLengthOfLongestElement())) {
+      String[] outValues = new String[1];
+      dict.readStringValues(new int[]{0}, 1, outValues);
+      assertEquals(outValues[0], "");
     }
   }
 

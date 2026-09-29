@@ -18,20 +18,22 @@
  */
 package org.apache.pinot.sql.parsers;
 
-/**
- * Exceptions that occur while compiling SQL.
- */
-public class SqlCompilationException extends RuntimeException {
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
+
+
+/// Exceptions that occur while compiling SQL.
+public class SqlCompilationException extends QueryException {
 
   public SqlCompilationException(String msg) {
-    super(msg);
+    super(QueryErrorCode.SQL_PARSING, msg);
   }
 
   public SqlCompilationException(Throwable throwable) {
-    super(throwable);
+    super(QueryErrorCode.SQL_PARSING, throwable);
   }
 
   public SqlCompilationException(String msg, Throwable throwable) {
-    super(msg, throwable);
+    super(QueryErrorCode.SQL_PARSING, msg, throwable);
   }
 }

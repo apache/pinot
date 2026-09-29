@@ -22,9 +22,7 @@ import java.util.Objects;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
-/**
- * Predicate for IS_NULL.
- */
+/// Predicate for IS_NULL.
 public class IsNullPredicate extends BasePredicate {
 
   public IsNullPredicate(ExpressionContext lhs) {

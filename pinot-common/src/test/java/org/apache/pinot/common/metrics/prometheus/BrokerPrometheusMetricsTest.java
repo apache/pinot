@@ -20,11 +20,15 @@ package org.apache.pinot.common.metrics.prometheus;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
+import org.apache.pinot.common.metrics.MseMeter;
+import org.apache.pinot.common.metrics.MseMetrics;
+import org.apache.pinot.common.metrics.MseMetricsMode;
+import org.apache.pinot.common.metrics.MseTimer;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -52,12 +56,22 @@ public abstract class BrokerPrometheusMetricsTest extends PinotPrometheusMetrics
 
   private static final List<BrokerGauge> GAUGES_ACCEPTING_RAW_TABLE_NAME = List.of(BrokerGauge.REQUEST_SIZE);
 
+  // pinot.mse.* metrics share the role-agnostic prefix and must be exported from every JVM role
+  // that registers MseMetrics; on broker JVMs this exercises the broker.yml catch-all rule.
+  private static final String EXPORTED_MSE_METRIC_PREFIX = "pinot_mse_";
+
   private BrokerMetrics _brokerMetrics;
+
+  private MseMetrics _mseMetrics;
 
   @BeforeClass
   public void setup()
       throws Exception {
     _brokerMetrics = new BrokerMetrics(_pinotMetricsFactory.getPinotMetricsRegistry());
+    // MSE mode so emissions land in this JVM's PinotMetricsRegistry (the one the JMX exporter is
+    // scraping). MseMetrics is constructed with the shared registry, mirroring how broker JVMs
+    // running in MSE/DUAL mode emit pinot.mse.* beans alongside pinot.broker.*.
+    _mseMetrics = new MseMetrics(MseMetricsMode.MSE, _pinotMetricsFactory.getPinotMetricsRegistry());
   }
 
   @Test(dataProvider = "brokerTimers")
@@ -97,7 +111,7 @@ public abstract class BrokerPrometheusMetricsTest extends PinotPrometheusMetrics
       _brokerMetrics.addMeteredGlobalValue(meter, 5L);
       if (GLOBAL_METERS_WITH_EXCEPTIONS_PREFIX.contains(meter)) {
         String exportedMeterPrefix = String.format("%s_%s", EXPORTED_METRIC_PREFIX_EXCEPTIONS,
-            StringUtils.remove(meter.getMeterName(), "Exceptions"));
+            Strings.CS.remove(meter.getMeterName(), "Exceptions"));
         assertMeterExportedCorrectly(exportedMeterPrefix, EXPORTED_METRIC_PREFIX);
       } else {
         assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_METRIC_PREFIX);
@@ -115,6 +129,18 @@ public abstract class BrokerPrometheusMetricsTest extends PinotPrometheusMetrics
     }
   }
 
+  @Test(dataProvider = "mseMeters")
+  public void mseMeterExportedFromBrokerJmx(MseMeter meter) {
+    _mseMetrics.addMeteredGlobalValue(meter, 1L);
+    assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_MSE_METRIC_PREFIX);
+  }
+
+  @Test(dataProvider = "mseTimers")
+  public void mseTimerExportedFromBrokerJmx(MseTimer timer) {
+    _mseMetrics.addTimedValue(timer, 30_000, TimeUnit.MILLISECONDS);
+    assertTimerExportedCorrectly(timer.getTimerName(), EXPORTED_MSE_METRIC_PREFIX);
+  }
+
   @DataProvider(name = "brokerTimers")
   public Object[] brokerTimers() {
     return BrokerTimer.values();
@@ -128,5 +154,15 @@ public abstract class BrokerPrometheusMetricsTest extends PinotPrometheusMetrics
   @DataProvider(name = "brokerGauges")
   public Object[] brokerGauges() {
     return BrokerGauge.values();
+  }
+
+  @DataProvider(name = "mseMeters")
+  public Object[] mseMeters() {
+    return MseMeter.values();
+  }
+
+  @DataProvider(name = "mseTimers")
+  public Object[] mseTimers() {
+    return MseTimer.values();
   }
 }

@@ -30,28 +30,31 @@ import javax.inject.Provider;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.FineGrainedAuthUtils;
 import org.apache.pinot.core.auth.ManualAuthorization;
+import org.apache.pinot.core.auth.TargetType;
 import org.glassfish.grizzly.http.server.Request;
 
 
-/**
- * A container filter class responsible for automatic authentication of REST endpoints. Any rest endpoints annotated
- * with {@link Authenticate} annotation, will go through authentication.
- */
+/// A container filter class responsible for automatic authentication of REST endpoints. Any rest endpoints annotated
+/// with [Authenticate] annotation, will go through authentication.
 @javax.ws.rs.ext.Provider
 public class AuthenticationFilter implements ContainerRequestFilter {
   private static final Set<String> UNPROTECTED_PATHS =
-      new HashSet<>(Arrays.asList("", "help", "auth/info", "auth/verify", "health"));
+      new HashSet<>(Arrays.asList("", "help", "auth/info", "auth/verify", "auth/verify/v2", "health"));
   private static final String KEY_TABLE_NAME = "tableName";
   private static final String KEY_TABLE_NAME_WITH_TYPE = "tableNameWithType";
   private static final String KEY_SCHEMA_NAME = "schemaName";
@@ -98,11 +101,20 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     //     - "tableName",
     //     - "tableNameWithType", or
     //     - "schemaName"
-    // If table name is not available, it means the endpoint is not a table-level endpoint.
-    String tableName = extractTableName(uriInfo.getPathParameters(), uriInfo.getQueryParameters());
+    // A declared table target can identify a custom parameter name. For cluster-targeted annotations, retain the
+    // parameter-name heuristics because several legacy table-scoped endpoints use cluster actions for fine-grained
+    // authorization. If table name is not available, it means the endpoint is not a table-level endpoint.
+    String tableName = extractTableName(endpointMethod, uriInfo.getPathParameters(), uriInfo.getQueryParameters());
     if (tableName != null) {
+      if (StringUtils.isBlank(tableName)) {
+        throw new WebApplicationException("Table name must not be blank", Response.Status.BAD_REQUEST);
+      }
       // If table name is present, translate it to the fully qualified name based on database header.
-      tableName = DatabaseUtils.translateTableName(tableName, _httpHeaders);
+      try {
+        tableName = DatabaseUtils.translateTableName(tableName, _httpHeaders);
+      } catch (RuntimeException e) {
+        throw new WebApplicationException("Invalid table name: " + e.getMessage(), e, Response.Status.BAD_REQUEST);
+      }
     }
     AccessType accessType = extractAccessType(endpointMethod);
     AccessControlUtils.validatePermission(tableName, accessType, _httpHeaders, endpointUrl, accessControl);
@@ -126,6 +138,16 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     }
 
     return AccessType.READ;
+  }
+
+  @VisibleForTesting
+  static String extractTableName(Method endpointMethod, MultivaluedMap<String, String> pathParameters,
+      MultivaluedMap<String, String> queryParameters) {
+    Authorize authorize = endpointMethod.getAnnotation(Authorize.class);
+    if (authorize != null && authorize.targetType() == TargetType.TABLE) {
+      return FineGrainedAuthUtils.findRawTargetId(authorize, pathParameters, queryParameters);
+    }
+    return extractTableName(pathParameters, queryParameters);
   }
 
   @VisibleForTesting

@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
+import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.calcite.plan.Contexts;
 import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
@@ -28,12 +33,24 @@ import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.core.TableScan;
+import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexLiteral;
+import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexUtil;
+import org.apache.calcite.rex.RexVisitorImpl;
+import org.apache.calcite.rex.RexWindowBound;
+import org.apache.calcite.rex.RexWindowBounds;
+import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.apache.calcite.util.Util;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
+import org.apache.pinot.common.function.sql.PinotSqlFunction;
 
 
 public class PinotRuleUtils {
@@ -46,10 +63,15 @@ public class PinotRuleUtils {
   public static final RelBuilderFactory PINOT_REL_FACTORY =
       RelBuilder.proto(Contexts.of(RelFactories.DEFAULT_STRUCT, PINOT_REL_CONFIG));
 
-  public static final SqlToRelConverter.Config PINOT_SQL_TO_REL_CONFIG =
-      SqlToRelConverter.config().withHintStrategyTable(PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE)
-          .withTrimUnusedFields(true).withExpand(true).withInSubQueryThreshold(Integer.MAX_VALUE)
-          .withRelBuilderFactory(PINOT_REL_FACTORY);
+  public static final SqlToRelConverter.Config PINOT_SQL_TO_REL_CONFIG = SqlToRelConverter.config()
+      .withHintStrategyTable(PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE)
+      .withTrimUnusedFields(true)
+      // TODO: expansion is deprecated in Calcite; we need to move to the default value of false here which will be the
+      //       only supported option in Calcite going forward. This will probably require some changes in the planner
+      //       rules in order to support things like scalar query filters.
+      .withExpand(true)
+      .withInSubQueryThreshold(Integer.MAX_VALUE)
+      .withRelBuilderFactory(PINOT_REL_FACTORY);
 
   public static RelNode unboxRel(RelNode rel) {
     if (rel instanceof HepRelVertex) {
@@ -75,18 +97,15 @@ public class PinotRuleUtils {
     return unboxRel(rel) instanceof Aggregate;
   }
 
-  /**
-   * utility logic to determine if a JOIN can be pushed down to the leaf-stage execution and leverage the
-   * segment-local info (indexing and others) to speed up the execution.
-   *
-   * <p>The logic here is that the "row-representation" of the relation must not have changed. E.g. </p>
-   * <ul>
-   *   <li>`RelNode` that are single-in, single-out are possible (Project/Filter/)</li>
-   *   <li>`Join` can be stacked on top if we only consider SEMI-JOIN</li>
-   *   <li>`Window` should be allowed but we dont have impl for Window on leaf, so not yet included.</li>
-   *   <li>`Sort` should be allowed but we need to reorder Sort and Join first, so not yet included.</li>
-   * </ul>
-   */
+  /// utility logic to determine if a JOIN can be pushed down to the leaf-stage execution and leverage the
+  /// segment-local info (indexing and others) to speed up the execution.
+  ///
+  /// The logic here is that the "row-representation" of the relation must not have changed. E.g.
+  ///
+  /// - `RelNode` that are single-in, single-out are possible (Project/Filter/)
+  /// - `Join` can be stacked on top if we only consider SEMI-JOIN
+  /// - `Window` should be allowed but we don't have impl for Window on leaf, so not yet included.
+  /// - `Sort` should be allowed but we need to reorder Sort and Join first, so not yet included.
   public static boolean canPushDynamicBroadcastToLeaf(RelNode relNode) {
     // TODO 1: optimize this part out as it is not efficient to scan the entire subtree for exchanges;
     //    we should cache the stats in the node (potentially using Trait, e.g. marking LeafTrait & IntermediateTrait)
@@ -116,5 +135,171 @@ public class PinotRuleUtils {
   public static String extractFunctionName(RexCall function) {
     SqlKind funcSqlKind = function.getOperator().getKind();
     return funcSqlKind == SqlKind.OTHER_FUNCTION ? function.getOperator().getName() : funcSqlKind.name();
+  }
+
+  /// Returns whether `node` evaluates to the same result no matter where in the plan it sits, and can therefore be
+  /// relocated -- pushed below a join, duplicated onto another input, and so on.
+  ///
+  /// An expression must be clear of three axes of variability:
+  ///
+  /// - [SqlOperator#isDeterministic()] -- `false` for `rand()`, `UUID_V4`, `UUID_V7` and Calcite's own `RAND` /
+  ///   `RAND_INTEGER`. Delegated to `RexUtil#isDeterministic` so this half tracks upstream automatically.
+  /// - [SqlOperator#isDynamicFunction()] -- Calcite's own "fold once per query, never re-evaluate" marker, used by
+  ///   `CURRENT_TIMESTAMP` and friends.
+  /// - [PinotSqlFunction#isVolatile()] -- Pinot's equivalent marker, `true` for `FunctionVolatility.VOLATILE`
+  ///   functions such as `now()`, `ago()` and `stageId()`. These deliberately stay `isDeterministic() == true` so that
+  ///   [PinotEvaluateLiteralRule] can still fold them once at plan time, which is precisely why
+  ///   `RexUtil#isDeterministic` alone does not catch them.
+  ///
+  /// Relocating an expression that fails this check changes how many times, and in what context, it is evaluated --
+  /// which changes query results. `FunctionVolatility.STABLE` deliberately passes: it is constant within a single
+  /// query, so moving it is safe.
+  ///
+  /// Note this is a predicate that callers must apply; it is not enforced globally. Only [PinotFilterJoinRule]
+  /// consults it today, so other rules that relocate expressions can still move volatile ones.
+  public static boolean isRelocatable(RexNode node) {
+    if (!RexUtil.isDeterministic(node)) {
+      return false;
+    }
+    try {
+      node.accept(new RexVisitorImpl<Void>(true) {
+        @Override
+        public Void visitCall(RexCall call) {
+          SqlOperator operator = call.getOperator();
+          if (operator.isDynamicFunction()
+              || (operator instanceof PinotSqlFunction && ((PinotSqlFunction) operator).isVolatile())) {
+            throw Util.FoundOne.NULL;
+          }
+          return super.visitCall(call);
+        }
+      });
+      return true;
+    } catch (Util.FoundOne e) {
+      Util.swallow(e, null);
+      return false;
+    }
+  }
+
+  public static class WindowUtils {
+    // Supported window functions
+    // OTHER_FUNCTION supported are: BOOL_AND, BOOL_OR
+    private static final EnumSet<SqlKind> SUPPORTED_WINDOW_FUNCTION_KIND =
+        EnumSet.of(SqlKind.SUM, SqlKind.SUM0, SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT, SqlKind.AVG, SqlKind.ROW_NUMBER,
+            SqlKind.RANK, SqlKind.DENSE_RANK, SqlKind.NTILE, SqlKind.LAG, SqlKind.LEAD, SqlKind.FIRST_VALUE,
+            SqlKind.LAST_VALUE, SqlKind.OTHER_FUNCTION);
+
+    public static void validateWindows(Window window) {
+      int numGroups = window.groups.size();
+      // For Phase 1 we only handle single window groups
+      Preconditions.checkState(numGroups == 1,
+          String.format("Currently only 1 window group is supported, query has %d groups", numGroups));
+
+      // Validate that only supported window aggregation functions are present
+      Window.Group windowGroup = window.groups.get(0);
+      validateWindowAggCallsSupported(windowGroup);
+
+      // Validate the frame
+      validateWindowFrames(windowGroup);
+    }
+
+    /// Replaces the reference to literal arguments in the window group with the actual literal values.
+    /// NOTE: [Window] has a field called "constants" which contains the literal values. If the input reference is
+    /// beyond the window input size, it is a reference to the constants.
+    public static Window.Group updateLiteralArgumentsInWindowGroup(Window window) {
+      Window.Group oldWindowGroup = window.groups.get(0);
+      RelNode input = unboxRel(window.getInput());
+      int numInputFields = input.getRowType().getFieldCount();
+      List<RexNode> projects = input instanceof Project ? ((Project) input).getProjects() : null;
+
+      List<Window.RexWinAggCall> newAggCallWindow = new ArrayList<>(oldWindowGroup.aggCalls.size());
+      boolean windowChanged = false;
+      for (Window.RexWinAggCall oldAggCall : oldWindowGroup.aggCalls) {
+        boolean changed = false;
+        List<RexNode> oldOperands = oldAggCall.getOperands();
+        List<RexNode> newOperands = new ArrayList<>(oldOperands.size());
+        for (RexNode oldOperand : oldOperands) {
+          RexLiteral literal = getLiteral(oldOperand, numInputFields, window.constants, projects);
+          if (literal != null) {
+            newOperands.add(literal);
+            changed = true;
+            windowChanged = true;
+          } else {
+            newOperands.add(oldOperand);
+          }
+        }
+        if (changed) {
+          newAggCallWindow.add(
+              new Window.RexWinAggCall((SqlAggFunction) oldAggCall.getOperator(), oldAggCall.type, newOperands,
+                  oldAggCall.ordinal, oldAggCall.distinct, oldAggCall.ignoreNulls));
+        } else {
+          newAggCallWindow.add(oldAggCall);
+        }
+      }
+
+      RexWindowBound lowerBound = oldWindowGroup.lowerBound;
+      RexNode offset = lowerBound.getOffset();
+      if (offset != null) {
+        RexLiteral literal = getLiteral(offset, numInputFields, window.constants, projects);
+        if (literal == null) {
+          throw new IllegalStateException(
+              "Could not read window lower bound literal value from window group: " + oldWindowGroup);
+        }
+        lowerBound = lowerBound.isPreceding() ? RexWindowBounds.preceding(literal) : RexWindowBounds.following(literal);
+        windowChanged = true;
+      }
+      RexWindowBound upperBound = oldWindowGroup.upperBound;
+      offset = upperBound.getOffset();
+      if (offset != null) {
+        RexLiteral literal = getLiteral(offset, numInputFields, window.constants, projects);
+        if (literal == null) {
+          throw new IllegalStateException(
+              "Could not read window upper bound literal value from window group: " + oldWindowGroup);
+        }
+        upperBound = upperBound.isFollowing() ? RexWindowBounds.following(literal) : RexWindowBounds.preceding(literal);
+        windowChanged = true;
+      }
+
+      return windowChanged ? new Window.Group(oldWindowGroup.keys, oldWindowGroup.isRows, lowerBound, upperBound,
+          oldWindowGroup.exclude, oldWindowGroup.orderKeys, newAggCallWindow) : oldWindowGroup;
+    }
+
+    private static void validateWindowAggCallsSupported(Window.Group windowGroup) {
+      for (Window.RexWinAggCall aggCall : windowGroup.aggCalls) {
+        SqlKind aggKind = aggCall.getKind();
+        Preconditions.checkState(SUPPORTED_WINDOW_FUNCTION_KIND.contains(aggKind),
+            String.format("Unsupported Window function kind: %s. Only aggregation functions are supported!", aggKind));
+      }
+    }
+
+    private static void validateWindowFrames(Window.Group windowGroup) {
+      RexWindowBound lowerBound = windowGroup.lowerBound;
+      RexWindowBound upperBound = windowGroup.upperBound;
+
+      boolean hasOffset = (lowerBound.isPreceding() && !lowerBound.isUnbounded()) || (upperBound.isFollowing()
+          && !upperBound.isUnbounded());
+
+      if (!windowGroup.isRows) {
+        Preconditions.checkState(!hasOffset, "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+      }
+    }
+
+    @Nullable
+    private static RexLiteral getLiteral(RexNode rexNode, int numInputFields, List<RexLiteral> constants,
+        @Nullable List<RexNode> projects) {
+      if (!(rexNode instanceof RexInputRef)) {
+        return null;
+      }
+      int index = ((RexInputRef) rexNode).getIndex();
+      if (index >= numInputFields) {
+        return constants.get(index - numInputFields);
+      }
+      if (projects != null) {
+        RexNode project = projects.get(index);
+        if (project instanceof RexLiteral) {
+          return (RexLiteral) project;
+        }
+      }
+      return null;
+    }
   }
 }

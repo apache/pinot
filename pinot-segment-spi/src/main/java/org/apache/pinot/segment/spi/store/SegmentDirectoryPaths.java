@@ -24,6 +24,8 @@ import java.io.File;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 
 
 public class SegmentDirectoryPaths {
@@ -71,12 +73,10 @@ public class SegmentDirectoryPaths {
     return findFormatFile(indexDir, V1Constants.SEGMENT_CREATION_META);
   }
 
-  /**
-   * Find text index file in top-level segment index directory
-   * @param indexDir top-level segment index directory
-   * @param column text column name
-   * @return text index directory (if exists in V3, V1 or V2 format), null if index file does not exit
-   */
+  /// Find text index file in top-level segment index directory
+  /// @param indexDir top-level segment index directory
+  /// @param column text column name
+  /// @return text index directory (if exists in V3, V1 or V2 format), null if index file does not exit
   @Nullable
   public static File findTextIndexIndexFile(File indexDir, String column) {
     String luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION;
@@ -97,18 +97,6 @@ public class SegmentDirectoryPaths {
       indexFormatFile = findFormatFile(indexDir, luceneIndexDirectory);
     }
     return indexFormatFile;
-  }
-
-  /**
-   * Find native text index file in top-level segment index directory
-   * @param indexDir top-level segment index directory
-   * @param column text column name
-   * @return text index directory (if existst), null if index file does not exit
-   */
-  @Nullable
-  public static File findNativeTextIndexIndexFile(File indexDir, String column) {
-    String nativeIndexDirectory = column + V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION;
-    return findFormatFile(indexDir, nativeIndexDirectory);
   }
 
   public static File findFSTIndexIndexFile(File indexDir, String column) {
@@ -142,28 +130,69 @@ public class SegmentDirectoryPaths {
   @Nullable
   @VisibleForTesting
   public static File findVectorIndexIndexFile(File segmentIndexDir, String column) {
-    String vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION;
-    File formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
-
-    // check for V99 version, if null
+    File formatFile = findHnswVectorIndexFile(segmentIndexDir, column);
     if (formatFile == null) {
-      vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION;
-      formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
+      formatFile = findIvfVectorIndexFile(segmentIndexDir, column,
+          V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION,
+          V1Constants.Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION);
     }
-
-    // check for V90 version, if null
     if (formatFile == null) {
-      vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION;
-      formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
+      formatFile = findIvfVectorIndexFile(segmentIndexDir, column,
+          V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION,
+          V1Constants.Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION);
     }
     return formatFile;
   }
 
-  /**
-   * Find a file in any segment version.
-   * <p>Index directory passed in should be top level segment directory.
-   * <p>If file exists in multiple segment version, return the one in highest segment version.
-   */
+  @Nullable
+  public static File findVectorIndexIndexFile(File segmentIndexDir, String column,
+      @Nullable VectorIndexConfig vectorIndexConfig) {
+    if (vectorIndexConfig == null || vectorIndexConfig.isDisabled()) {
+      return findVectorIndexIndexFile(segmentIndexDir, column);
+    }
+
+    return findVectorIndexIndexFile(segmentIndexDir, column, vectorIndexConfig.resolveBackendType());
+  }
+
+  @Nullable
+  public static File findVectorIndexIndexFile(File segmentIndexDir, String column, VectorBackendType backendType) {
+    switch (backendType) {
+      case HNSW:
+        return findHnswVectorIndexFile(segmentIndexDir, column);
+      case IVF_FLAT:
+        return findIvfVectorIndexFile(segmentIndexDir, column,
+            V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION,
+            V1Constants.Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION);
+      case IVF_PQ:
+        return findIvfVectorIndexFile(segmentIndexDir, column,
+            V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION,
+            V1Constants.Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION);
+      case IVF_ON_DISK:
+        // IVF_ON_DISK reuses the IVF_FLAT file format with FileChannel random-access reads
+        return findIvfVectorIndexFile(segmentIndexDir, column,
+            V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION,
+            V1Constants.Indexes.VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION);
+      default:
+        throw new IllegalStateException("Unsupported vector backend type: " + backendType);
+    }
+  }
+
+  /// Probes for an IVF vector index file under either the legacy extension (sidecar layout) or
+  /// the combined extension (transient single-file form left on disk when a build with
+  /// `storeInSegmentFile=true` has not yet been absorbed into `columns.psf`). Legacy
+  /// wins if both are present so the caller's behaviour is stable for unchanged segments.
+  @Nullable
+  private static File findIvfVectorIndexFile(File segmentIndexDir, String column, String legacyExtension,
+      String combinedExtension) {
+    File legacy = findFlatVectorIndexFile(segmentIndexDir, column, legacyExtension);
+    return legacy != null ? legacy : findFlatVectorIndexFile(segmentIndexDir, column, combinedExtension);
+  }
+
+  /// Find a file in any segment version.
+  ///
+  /// Index directory passed in should be top level segment directory.
+  ///
+  /// If file exists in multiple segment version, return the one in highest segment version.
   @Nullable
   private static File findFormatFile(File indexDir, String fileName) {
     Preconditions.checkArgument(indexDir.isDirectory(), "Path: %s is not a directory", indexDir);
@@ -182,5 +211,32 @@ public class SegmentDirectoryPaths {
     }
 
     return null;
+  }
+
+  @Nullable
+  private static File findHnswVectorIndexFile(File segmentIndexDir, String column) {
+    String vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION;
+    File formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
+    if (formatFile == null) {
+      vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION;
+      formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
+    }
+    if (formatFile == null) {
+      vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION;
+      formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
+    }
+    // Combined-form: a single packed file built by HnswVectorIndexCombined that bundles the
+    // Lucene HNSW directory's contents. Probed after the legacy directories so existing segments
+    // keep the pre-existing behaviour when a directory and a combined file coexist.
+    if (formatFile == null) {
+      vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION;
+      formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
+    }
+    return formatFile;
+  }
+
+  @Nullable
+  private static File findFlatVectorIndexFile(File segmentIndexDir, String column, String suffix) {
+    return findFormatFile(segmentIndexDir, column + suffix);
   }
 }

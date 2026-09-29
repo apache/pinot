@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -38,27 +37,30 @@ import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGeneratorFactory;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
+import org.apache.pinot.spi.tasks.MinionTaskBaseObserverStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A framework to process "m" given segments and convert them into "n" segments
- * The phases of the Segment Processor are
- * 1. Map - record transformation, partitioning, partition filtering
- * 2. Reduce - rollup, concat, split etc
- * 3. Segment generation
- *
- * This will typically be used by minion tasks, which want to perform some processing on segments
- * (eg task which merges segments, tasks which aligns segments per time boundaries etc)
- */
+/// A framework to process "m" given segments and convert them into "n" segments
+/// The phases of the Segment Processor are
+/// 1. Map - record transformation, partitioning, partition filtering
+/// 2. Reduce - rollup, concat, split etc
+/// 3. Segment generation
+///
+/// This will typically be used by minion tasks, which want to perform some processing on segments
+/// (eg task which merges segments, tasks which aligns segments per time boundaries etc)
 public class SegmentProcessorFramework {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentProcessorFramework.class);
+  public static final String MAP_STAGE = "MAP";
+  public static final String REDUCE_STAGE = "REDUCE";
+  public static final String GENERATE_STAGE = "GENERATE_SEGMENT";
 
   private final List<RecordReaderFileConfig> _recordReaderFileConfigs;
   private final List<RecordTransformer> _customRecordTransformers;
@@ -69,18 +71,19 @@ public class SegmentProcessorFramework {
   private final File _segmentsOutputDir;
   private final SegmentNumRowProvider _segmentNumRowProvider;
   private int _segmentSequenceId = 0;
+  private int _incompleteRowsFound = 0;
+  private int _skippedRowsFound = 0;
+  private int _sanitizedRowsFound = 0;
 
-  /**
-   * Initializes the SegmentProcessorFramework with record readers, config and working directory. We will now rely on
-   * users passing RecordReaderFileConfig, since that also allows us to do lazy initialization of RecordReaders.
-   * Please use the other constructor that uses RecordReaderFileConfig.
-   */
+  /// Initializes the SegmentProcessorFramework with record readers, config and working directory. We will now rely on
+  /// users passing RecordReaderFileConfig, since that also allows us to do lazy initialization of RecordReaders.
+  /// Please use the other constructor that uses RecordReaderFileConfig.
   @Deprecated
   public SegmentProcessorFramework(List<RecordReader> recordReaders, SegmentProcessorConfig segmentProcessorConfig,
       File workingDir)
       throws IOException {
     this(segmentProcessorConfig, workingDir, convertRecordReadersToRecordReaderFileConfig(recordReaders),
-        Collections.emptyList(), null);
+        List.of(), null);
   }
 
   public SegmentProcessorFramework(SegmentProcessorConfig segmentProcessorConfig, File workingDir,
@@ -133,9 +136,7 @@ public class SegmentProcessorFramework {
     return recordReaderFileConfigs;
   }
 
-  /**
-   * Processes records from record readers per the provided config, returns the directories for the generated segments.
-   */
+  /// Processes records from record readers per the provided config, returns the directories for the generated segments.
   public List<File> process()
       throws Exception {
     try {
@@ -157,9 +158,10 @@ public class SegmentProcessorFramework {
     int numRecordReaders = _recordReaderFileConfigs.size();
     int nextRecordReaderIndexToBeProcessed = 0;
     int iterationCount = 1;
-    Consumer<Object> observer = _segmentProcessorConfig.getProgressObserver();
-    boolean isMapperOutputSizeThresholdEnabled =
-        _segmentProcessorConfig.getSegmentConfig().getIntermediateFileSizeThreshold() != Long.MAX_VALUE;
+    boolean canMapperBeEarlyTerminated =
+        _segmentProcessorConfig.getSegmentConfig().getIntermediateFileSizeThreshold() != Long.MAX_VALUE
+            || _segmentProcessorConfig.getSegmentConfig().getMaxDiskUsagePercentage() < 100;
+    String logMessage;
 
     while (nextRecordReaderIndexToBeProcessed < numRecordReaders) {
       // Initialise the mapper. Eliminate the record readers that have been processed in the previous iterations.
@@ -167,35 +169,46 @@ public class SegmentProcessorFramework {
           getSegmentMapper(_recordReaderFileConfigs.subList(nextRecordReaderIndexToBeProcessed, numRecordReaders));
 
       // Log start of iteration details only if intermediate file size threshold is set.
-      if (isMapperOutputSizeThresholdEnabled) {
-        String logMessage =
+      if (canMapperBeEarlyTerminated) {
+        logMessage =
             String.format("Starting iteration %d with %d record readers. Starting index = %d, end index = %d",
                 iterationCount,
                 _recordReaderFileConfigs.subList(nextRecordReaderIndexToBeProcessed, numRecordReaders).size(),
                 nextRecordReaderIndexToBeProcessed + 1, numRecordReaders);
         LOGGER.info(logMessage);
-        observer.accept(logMessage);
+        logToObserver(MAP_STAGE, logMessage);
       }
 
       // Map phase.
       long mapStartTimeInMs = System.currentTimeMillis();
+      logToObserver(MAP_STAGE, "Starting Map phase for iteration " + iterationCount);
       Map<String, GenericRowFileManager> partitionToFileManagerMap = mapper.map();
+      _incompleteRowsFound += mapper.getIncompleteRowsFound();
+      _skippedRowsFound += mapper.getSkippedRowsFound();
+      _sanitizedRowsFound += mapper.getSanitizedRowsFound();
 
       // Log the time taken to map.
-      LOGGER.info("Finished iteration {} in {}ms", iterationCount, System.currentTimeMillis() - mapStartTimeInMs);
+      logMessage = "Finished Map phase for iteration " + iterationCount + " in "
+          + (System.currentTimeMillis() - mapStartTimeInMs) + "ms";
+      LOGGER.info(logMessage);
+      logToObserver(MAP_STAGE, logMessage);
 
       // Check for mapper output files, if no files are generated, skip the reducer phase and move on to the next
       // iteration.
       if (partitionToFileManagerMap.isEmpty()) {
-        LOGGER.info("No mapper output files generated, skipping reduce phase");
+        logMessage = "No mapper output files generated, skipping reduce phase";
+        LOGGER.info(logMessage);
+        logToObserver(MAP_STAGE, logMessage);
         nextRecordReaderIndexToBeProcessed = getNextRecordReaderIndexToBeProcessed(nextRecordReaderIndexToBeProcessed);
         continue;
       }
 
       // Reduce phase.
+      logToObserver(REDUCE_STAGE, "Starting Reduce phase for iteration " + iterationCount);
       doReduce(partitionToFileManagerMap);
 
       // Segment creation phase. Add the created segments to the final list.
+      logToObserver(GENERATE_STAGE, "Generating segments for iteration " + iterationCount);
       outputSegmentDirs.addAll(generateSegment(partitionToFileManagerMap));
 
       // Store the starting index of the record readers that were processed in this iteration for logging purposes.
@@ -205,7 +218,7 @@ public class SegmentProcessorFramework {
       nextRecordReaderIndexToBeProcessed = getNextRecordReaderIndexToBeProcessed(nextRecordReaderIndexToBeProcessed);
 
       // Log the details between iteration only if intermediate file size threshold is set.
-      if (isMapperOutputSizeThresholdEnabled) {
+      if (canMapperBeEarlyTerminated) {
         // Take care of logging the proper RecordReader index in case of the last iteration.
         int boundaryIndexToLog =
             nextRecordReaderIndexToBeProcessed == numRecordReaders ? nextRecordReaderIndexToBeProcessed
@@ -213,7 +226,6 @@ public class SegmentProcessorFramework {
 
         // We are sure that the last RecordReader is completely processed in the last iteration else it may or may not
         // have completed processing. Log it accordingly.
-        String logMessage;
         if (nextRecordReaderIndexToBeProcessed == numRecordReaders) {
           logMessage = String.format("Finished processing all of %d RecordReaders", numRecordReaders);
         } else {
@@ -222,14 +234,20 @@ public class SegmentProcessorFramework {
                   + "iteration %d", startingProcessedRecordReaderIndex + 1, boundaryIndexToLog,
               nextRecordReaderIndexToBeProcessed + 1, numRecordReaders, iterationCount);
         }
-
-        observer.accept(logMessage);
         LOGGER.info(logMessage);
+        logToObserver(GENERATE_STAGE, logMessage);
       }
-
       iterationCount++;
     }
     return outputSegmentDirs;
+  }
+
+  private void logToObserver(String stage, String logMessage) {
+    _segmentProcessorConfig.getProgressObserver()
+        .accept(new MinionTaskBaseObserverStats.StatusEntry.Builder()
+            .withStage(stage)
+            .withStatus(logMessage)
+            .build());
   }
 
   protected SegmentMapper getSegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs) {
@@ -278,6 +296,7 @@ public class SegmentProcessorFramework {
     String segmentNamePostfix = _segmentProcessorConfig.getSegmentConfig().getSegmentNamePostfix();
     String fixedSegmentName = _segmentProcessorConfig.getSegmentConfig().getFixedSegmentName();
     SegmentGeneratorConfig generatorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    generatorConfig.setInstanceType(InstanceType.MINION);
     generatorConfig.setOutDir(_segmentsOutputDir.getPath());
     Consumer<Object> observer = _segmentProcessorConfig.getProgressObserver();
     generatorConfig.setCreationTime(String.valueOf(_segmentProcessorConfig.getCustomCreationTime()));
@@ -318,8 +337,11 @@ public class SegmentProcessorFramework {
           GenericRowFileRecordReader recordReaderForRange = recordReader.getRecordReaderForRange(startRowId, endRowId);
           SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
           driver.init(generatorConfig, new RecordReaderSegmentCreationDataSource(recordReaderForRange),
-              TransformPipeline.getPassThroughPipeline());
+              TransformPipeline.getPassThroughPipeline(tableConfig.getTableName()));
           driver.build();
+          _incompleteRowsFound += driver.getIncompleteRowsFound();
+          _skippedRowsFound += driver.getSkippedRowsFound();
+          _sanitizedRowsFound += driver.getSanitizedRowsFound();
           outputSegmentDirs.add(driver.getOutputDirectory());
           _segmentNumRowProvider.updateSegmentInfo(driver.getSegmentStats().getTotalDocCount(),
               FileUtils.sizeOfDirectory(driver.getOutputDirectory()));
@@ -330,5 +352,17 @@ public class SegmentProcessorFramework {
     }
     LOGGER.info("Successfully created segments: {}", outputSegmentDirs);
     return outputSegmentDirs;
+  }
+
+  public int getIncompleteRowsFound() {
+    return _incompleteRowsFound;
+  }
+
+  public int getSkippedRowsFound() {
+    return _skippedRowsFound;
+  }
+
+  public int getSanitizedRowsFound() {
+    return _sanitizedRowsFound;
   }
 }

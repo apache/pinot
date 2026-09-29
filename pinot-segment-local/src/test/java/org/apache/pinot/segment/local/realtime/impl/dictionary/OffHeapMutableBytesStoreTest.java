@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.dictionary;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -25,9 +26,11 @@ import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -35,7 +38,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-public class OffHeapMutableBytesStoreTest {
+public class OffHeapMutableBytesStoreTest implements PinotBuffersAfterMethodCheckRule {
   private static final int NUM_VALUES = 100_000;
   private static final int MAX_NUM_BYTES_PER_VALUE = 512;
   private static final long RANDOM_SEED = System.currentTimeMillis();
@@ -54,6 +57,12 @@ public class OffHeapMutableBytesStoreTest {
       RANDOM.nextBytes(value);
       _values[i] = value;
     }
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws IOException {
+    _memoryManager.close();
   }
 
   @Test

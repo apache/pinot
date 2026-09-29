@@ -20,13 +20,11 @@ package org.apache.pinot.query.routing;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 
 
-/**
- * {@code StageMetadata} is used to send plan fragment-level info about how to execute a stage physically.
- */
+/// `StageMetadata` is used to send plan fragment-level info about how to execute a stage physically.
 public class StageMetadata {
   private final int _stageId;
   private final List<WorkerMetadata> _workerMetadataList;

@@ -26,23 +26,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Configuration for the CLPLogRecordExtractor. It contains the following properties:
- * <p></p>
- * <ul>
- *   <li><b>fieldsForClpEncoding</b> - A comma-separated list of fields that should be encoded using CLP. Each field
- *   encoded by {@link CLPLogRecordExtractor} will result in three output fields prefixed with the original field's
- *   name. See {@link CLPLogRecordExtractor} for details. If <b>fieldsForCLPEncoding</b> is empty, no fields will be
- *   encoded.</li>
- *   <li><b>unencodableFieldSuffix</b> - A suffix to apply to fields that could not be encoded with CLP.</li>
- *   <li><b>unencodableFieldError</b> - An error message to replace the field's original value so that users know that
- *   there was a problem encoding their field.</li>
- * </ul>
- *
- * <p></p>
- * Each property can be set as part of a table's indexing configuration by adding
- * {@code stream.kafka.decoder.prop.[configurationKeyName]} to {@code streamConfigs}.
- */
+/// Configuration for the CLPLogRecordExtractor. It contains the following properties:
+///
+/// - **fieldsForClpEncoding** - A comma-separated list of fields that should be encoded using CLP. Each field
+///   encoded by [CLPLogRecordExtractor] will result in three output fields prefixed with the original field's
+///   name. See [CLPLogRecordExtractor] for details. If **fieldsForCLPEncoding** is empty, no fields will be
+///   encoded.
+/// - **unencodableFieldSuffix** - A suffix to apply to fields that could not be encoded with CLP.
+/// - **unencodableFieldError** - An error message to replace the field's original value so that users know that
+///   there was a problem encoding their field.
+///
+/// Each property can be set as part of a table's indexing configuration by adding
+/// `stream.kafka.decoder.prop.[configurationKeyName]` to `streamConfigs`.
 public class CLPLogRecordExtractorConfig implements RecordExtractorConfig {
   public static final String FIELDS_FOR_CLP_ENCODING_CONFIG_KEY = "fieldsForClpEncoding";
   public static final String FIELDS_FOR_CLP_ENCODING_SEPARATOR = ",";

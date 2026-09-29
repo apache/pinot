@@ -90,60 +90,46 @@ public class Pairs {
     }
   }
 
-  /**
-   * Utility class to store a primitive 'int' and 'double' pair.
-   */
+  /// Utility class to store a primitive 'int' and 'double' pair.
   public static class IntDoublePair {
     int _intValue;
     double _doubleValue;
 
-    /**
-     * Constructor for the class
-     *
-     * @param intVal 'int' value
-     * @param doubleVal 'double' value
-     */
+    /// Constructor for the class
+    ///
+    /// @param intVal 'int' value
+    /// @param doubleVal 'double' value
     public IntDoublePair(int intVal, double doubleVal) {
       _intValue = intVal;
       _doubleValue = doubleVal;
     }
 
-    /**
-     * Sets the provided value into the 'int' field.
-     * @param intVal Value to set
-     */
+    /// Sets the provided value into the 'int' field.
+    /// @param intVal Value to set
     public void setIntValue(int intVal) {
       _intValue = intVal;
     }
 
-    /**
-     * Returns the int value of the pair
-     * @return 'int' value
-     */
+    /// Returns the int value of the pair
+    /// @return 'int' value
     public int getIntValue() {
       return _intValue;
     }
 
-    /**
-     * Sets the provided value into the 'double' field.
-     * @param doubleVal Value to set
-     */
+    /// Sets the provided value into the 'double' field.
+    /// @param doubleVal Value to set
     public void setDoubleValue(double doubleVal) {
       _doubleValue = doubleVal;
     }
 
-    /**
-     * Returns the double value of the pair
-     * @return 'double' value
-     */
+    /// Returns the double value of the pair
+    /// @return 'double' value
     public double getDoubleValue() {
       return _doubleValue;
     }
   }
 
-  /**
-   * Comparator class for comparing {@link IntDoublePair}.
-   */
+  /// Comparator class for comparing [IntDoublePair].
   public static class IntDoubleComparator implements Comparator<IntDoublePair> {
     private final boolean _descending;
 
@@ -166,58 +152,44 @@ public class Pairs {
     }
   }
 
-  /**
-   * Utility class to store a primitive 'int' and 'Object' pair.
-   */
+  /// Utility class to store a primitive 'int' and 'Object' pair.
   public static class IntObjectPair<T extends Comparable> {
     int _intValue;
     T _objectValue;
 
-    /**
-     * Constructor for the class
-     *
-     * @param intVal 'int' value
-     * @param objectVal 'Object' value
-     */
+    /// Constructor for the class
+    ///
+    /// @param intVal 'int' value
+    /// @param objectVal 'Object' value
     public IntObjectPair(int intVal, T objectVal) {
       _intValue = intVal;
       _objectValue = objectVal;
     }
 
-    /**
-     * Sets the provided value into the 'int' field.
-     */
+    /// Sets the provided value into the 'int' field.
     public void setIntValue(int intValue) {
       _intValue = intValue;
     }
 
-    /**
-     * Returns the int value of the pair
-     * @return 'int' value
-     */
+    /// Returns the int value of the pair
+    /// @return 'int' value
     public int getIntValue() {
       return _intValue;
     }
 
-    /**
-     * Sets the specified object value into the 'object' field.
-     */
+    /// Sets the specified object value into the 'object' field.
     public void setObjectValue(T objectValue) {
       _objectValue = objectValue;
     }
 
-    /**
-     * Returns the object value of the pair
-     * @return 'Object' value
-     */
+    /// Returns the object value of the pair
+    /// @return 'Object' value
     public T getObjectValue() {
       return _objectValue;
     }
   }
 
-  /**
-   * Comparator for {@link IntObjectComparator} class
-   */
+  /// Comparator for [IntObjectComparator] class
   public static class IntObjectComparator implements Comparator<IntObjectPair> {
     private final boolean _descending;
 

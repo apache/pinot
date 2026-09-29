@@ -21,36 +21,46 @@ package org.apache.pinot.spi.recordtransformer;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
-import javax.annotation.Nullable;
+import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * The record transformer which takes a {@link GenericRow} and transform it based on some custom rules.
- */
+/// The record transformer which takes [GenericRow]s and transform them based on some custom rules.
 public interface RecordTransformer extends Serializable {
 
-  /**
-   * Returns {@code true} if the transformer is no-op (can be skipped), {@code false} otherwise.
-   */
+  /// Returns `true` if the transformer is no-op (can be skipped), `false` otherwise.
   default boolean isNoOp() {
     return false;
   }
 
-  /**
-   * Returns the input columns required for the transformer. This is used to make sure the required input fields are
-   * extracted.
-   */
+  /// Returns the input columns required for the transformer. This is used to make sure the required input fields are
+  /// extracted.
   default Collection<String> getInputColumns() {
     return List.of();
   }
 
-  /**
-   * Transforms a record based on some custom rules.
-   *
-   * @param record Record to transform
-   * @return Transformed record, or {@code null} if the record does not follow certain rules.
-   */
-  @Nullable
-  GenericRow transform(GenericRow record);
+  /// Provides a hint to the transformer about which columns are required as input across all downstream transformers
+  /// in the TransformPipeline. This can be used for optimization or to ensure necessary fields are available.
+  ///
+  /// @param inputColumns Set of column names that are required by all downstream transformers as their input columns.
+  ///                     This set is mutable, implementations should make a copy if they need to preserve the set.
+  default void withInputColumnsForDownstreamTransformers(Set<String> inputColumns) {
+  }
+
+  /// Transforms and returns records based on some custom rules. Implement this method when the transformer can produce
+  /// more records (e.g. unnesting) or fewer records (e.g. filtering).
+  default List<GenericRow> transform(List<GenericRow> records) {
+    records.forEach(this::transform);
+    return records;
+  }
+
+  /// Transforms a record in-place based on some custom rules. Implement this method when the transform can be applied
+  /// in-place (e.g. type conversion, enrichment).
+  default void transform(GenericRow record) {
+    throw new UnsupportedOperationException();
+  }
+
+  /// Can be overridden to report stats after all records are processed.
+  default void reportStats() {
+  }
 }

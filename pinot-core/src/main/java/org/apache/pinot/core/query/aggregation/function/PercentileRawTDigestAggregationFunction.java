@@ -20,19 +20,20 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.tdunning.math.stats.TDigest;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.SerializedTDigest;
+import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * The {@code PercentileRawTDigestAggregationFunction} returns the serialized {@code TDigest} data structure of the
- * {@code PercentileEstAggregationFunction}.
- */
+/// The `PercentileRawTDigestAggregationFunction` returns the serialized `TDigest` data structure of the
+/// `PercentileEstAggregationFunction`.
 public class PercentileRawTDigestAggregationFunction
     extends BaseSingleInputAggregationFunction<TDigest, SerializedTDigest> {
   private final PercentileTDigestAggregationFunction _percentileTDigestAggregationFunction;
@@ -57,7 +58,8 @@ public class PercentileRawTDigestAggregationFunction
 
   protected PercentileRawTDigestAggregationFunction(ExpressionContext expression,
       PercentileTDigestAggregationFunction percentileTDigestAggregationFunction) {
-    super(expression);
+    // This wrapper only serializes what the delegate produced, so the delegate owns the option
+    super(expression, percentileTDigestAggregationFunction._nullHandlingEnabled);
     _percentileTDigestAggregationFunction = percentileTDigestAggregationFunction;
   }
 
@@ -130,12 +132,32 @@ public class PercentileRawTDigestAggregationFunction
   }
 
   @Override
+  public SerializedIntermediateResult serializeIntermediateResult(TDigest tDigest) {
+    return _percentileTDigestAggregationFunction.serializeIntermediateResult(tDigest);
+  }
+
+  @Override
+  public TDigest deserializeIntermediateResult(CustomObject customObject) {
+    return _percentileTDigestAggregationFunction.deserializeIntermediateResult(customObject);
+  }
+
+  @Override
   public ColumnDataType getFinalResultColumnType() {
     return ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
-  public SerializedTDigest extractFinalResult(TDigest intermediateResult) {
+  public SerializedTDigest extractFinalResult(@Nullable TDigest intermediateResult) {
+    // A null intermediate result means nothing was aggregated. With null handling enabled that is NULL; with it
+    // disabled the answer has to stay what it has always been, which is an empty digest serialized, so the empty
+    // accumulator the delegate no longer substitutes is built here where it is rendered.
+    if (intermediateResult == null) {
+      return _percentileTDigestAggregationFunction._nullHandlingEnabled ? null
+          : new SerializedTDigest(
+              TDigestUtils.createMergingDigest(_percentileTDigestAggregationFunction._compressionFactor),
+              _percentileTDigestAggregationFunction._percentile);
+    }
     return new SerializedTDigest(intermediateResult, _percentileTDigestAggregationFunction._percentile);
   }
 }

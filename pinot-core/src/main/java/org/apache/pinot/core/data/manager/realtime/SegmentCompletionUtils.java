@@ -29,12 +29,10 @@ public class SegmentCompletionUtils {
   // Used to create temporary segment file names
   private static final String TMP = ".tmp.";
 
-  /**
-   * Takes in a segment name, and returns a file name prefix that is used to store all attempted uploads of this
-   * segment when a segment is uploaded using split commit. Each attempt has a unique file name suffix
-   * @param segmentName segment name
-   * @return
-   */
+  /// Takes in a segment name, and returns a file name prefix that is used to store all attempted uploads of this
+  /// segment when a segment is uploaded using split commit. Each attempt has a unique file name suffix
+  /// @param segmentName segment name
+  /// @return
   public static String getTmpSegmentNamePrefix(String segmentName) {
     return segmentName + TMP;
   }

@@ -19,52 +19,72 @@
 package org.apache.pinot.core.query.scheduler;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
 import com.google.common.util.concurrent.MoreExecutors;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.LongAccumulator;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Schedules queries from a {@link SchedulerGroup} with highest number of tokens on priority
- */
+/// Schedules queries from a [SchedulerGroup] with highest number of tokens on priority
 public abstract class PriorityScheduler extends QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PriorityScheduler.class);
+
+  /// A [Semaphore] subclass that supports adjusting the number of permits at runtime.
+  /// This is needed because [Semaphore#reducePermits(int)] is protected.
+  @VisibleForTesting
+  static class ResizableSemaphore extends Semaphore {
+    ResizableSemaphore(int permits) {
+      super(permits);
+    }
+
+    void resize(int oldPermits, int newPermits) {
+      int delta = newPermits - oldPermits;
+      if (delta > 0) {
+        release(delta);
+      } else if (delta < 0) {
+        reducePermits(-delta);
+      }
+    }
+  }
 
   protected final SchedulerPriorityQueue _queryQueue;
 
   @VisibleForTesting
-  protected final Semaphore _runningQueriesSemaphore;
-  private final int _numRunners;
+  protected final ResizableSemaphore _runningQueriesSemaphore;
+  private volatile int _numRunners;
   @VisibleForTesting
   Thread _scheduler;
 
-  public PriorityScheduler(PinotConfiguration config, ResourceManager resourceManager, QueryExecutor queryExecutor,
-      SchedulerPriorityQueue queue, ServerMetrics metrics, LongAccumulator latestQueryTime) {
-    super(config, queryExecutor, resourceManager, metrics, latestQueryTime);
-    Preconditions.checkNotNull(queue);
+  public PriorityScheduler(PinotConfiguration config, String instanceId, QueryExecutor queryExecutor,
+      ThreadAccountant threadAccountant, LongAccumulator latestQueryTime, ResourceManager resourceManager,
+      SchedulerPriorityQueue queue) {
+    super(config, instanceId, queryExecutor, threadAccountant, latestQueryTime, resourceManager);
     _queryQueue = queue;
     _numRunners = resourceManager.getNumQueryRunnerThreads();
-    _runningQueriesSemaphore = new Semaphore(_numRunners);
+    _runningQueriesSemaphore = new ResizableSemaphore(_numRunners);
+    resourceManager.addThreadPoolResizeListener((newRunnerThreads, newWorkerThreads) -> {
+      int oldRunners = _numRunners;
+      _runningQueriesSemaphore.resize(oldRunners, newRunnerThreads);
+      _numRunners = newRunnerThreads;
+      LOGGER.info("Resized running queries semaphore: {} -> {}", oldRunners, newRunnerThreads);
+    });
   }
 
   @Override
   public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
     if (!_isRunning) {
-      return immediateErrorResponse(queryRequest, QueryException.SERVER_SCHEDULER_DOWN_ERROR);
+      return shuttingDown(queryRequest);
     }
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     final SchedulerQueryContext schedQueryContext = new SchedulerQueryContext(queryRequest);
@@ -72,7 +92,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
       _queryQueue.put(schedQueryContext);
     } catch (OutOfCapacityException e) {
       LOGGER.error("Out of capacity for table {}, message: {}", queryRequest.getTableNameWithType(), e.getMessage());
-      return immediateErrorResponse(queryRequest, QueryException.SERVER_OUT_OF_CAPACITY_ERROR);
+      return outOfCapacity(queryRequest);
     }
     return schedQueryContext.getResultFuture();
   }
@@ -95,19 +115,19 @@ public abstract class PriorityScheduler extends QueryScheduler {
             break;
           }
           try {
-            final SchedulerQueryContext request = _queryQueue.take();
+            SchedulerQueryContext request = _queryQueue.take();
             if (request == null) {
               continue;
             }
             ServerQueryRequest queryRequest = request.getQueryRequest();
-            final QueryExecutorService executor =
-                _resourceManager.getExecutorService(queryRequest, request.getSchedulerGroup());
-            final ListenableFutureTask<byte[]> queryFutureTask = createQueryFutureTask(queryRequest, executor);
+            SchedulerGroup schedulerGroup = request.getSchedulerGroup();
+            QueryExecutorService executorService = _resourceManager.getExecutorService(queryRequest, schedulerGroup);
+            ListenableFutureTask<byte[]> queryFutureTask = createQueryFutureTask(queryRequest, executorService);
             queryFutureTask.addListener(new Runnable() {
               @Override
               public void run() {
-                executor.releaseWorkers();
-                request.getSchedulerGroup().endQuery();
+                executorService.releaseWorkers();
+                schedulerGroup.endQuery();
                 _runningQueriesSemaphore.release();
                 checkStopResourceManager();
                 if (!_isRunning && _runningQueriesSemaphore.availablePermits() == _numRunners) {
@@ -116,7 +136,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
               }
             }, MoreExecutors.directExecutor());
             request.setResultFuture(queryFutureTask);
-            request.getSchedulerGroup().startQuery();
+            schedulerGroup.startQuery();
             queryRequest.getTimerContext().getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT).stopAndRecord();
             _resourceManager.getQueryRunners().submit(queryFutureTask);
           } catch (Throwable t) {
@@ -150,8 +170,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
   synchronized private void failAllPendingQueries() {
     List<SchedulerQueryContext> pending = _queryQueue.drain();
     for (SchedulerQueryContext queryContext : pending) {
-      queryContext.setResultFuture(
-          immediateErrorResponse(queryContext.getQueryRequest(), QueryException.SERVER_SCHEDULER_DOWN_ERROR));
+      queryContext.setResultFuture(shuttingDown(queryContext.getQueryRequest()));
     }
   }
 

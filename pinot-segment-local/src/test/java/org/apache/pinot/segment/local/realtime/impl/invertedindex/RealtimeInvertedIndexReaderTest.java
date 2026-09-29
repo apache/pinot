@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
+import java.lang.reflect.Field;
+import java.util.List;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -102,5 +105,47 @@ public class RealtimeInvertedIndexReaderTest {
     assertFalse(docIds.contains(0));
     assertFalse(docIds.contains(1));
     assertTrue(docIds.contains(2));
+  }
+
+  @Test
+  public void testCloseClearsBitmaps()
+      throws ReflectiveOperationException {
+    RealtimeInvertedIndex realtimeInvertedIndex = new RealtimeInvertedIndex();
+    realtimeInvertedIndex.add(0, 0);
+    realtimeInvertedIndex.add(1, 1);
+
+    realtimeInvertedIndex.close();
+
+    assertTrue(realtimeInvertedIndex.getDocIds(0).isEmpty());
+    assertTrue(realtimeInvertedIndex.getDocIds(1).isEmpty());
+
+    Field bitmapsField = RealtimeInvertedIndex.class.getDeclaredField("_bitmaps");
+    bitmapsField.setAccessible(true);
+    List<?> bitmaps = (List<?>) bitmapsField.get(realtimeInvertedIndex);
+    assertEquals(bitmaps.size(), 0);
+  }
+
+  @Test
+  public void testReserveNextDictIdOnEmptyIndex() {
+    RealtimeInvertedIndex realtimeInvertedIndex = new RealtimeInvertedIndex();
+    realtimeInvertedIndex.reserveNextDictId();
+
+    // Reserved dictId 0 has an empty bitmap until a doc is added to it.
+    MutableRoaringBitmap docIds = realtimeInvertedIndex.getDocIds(0);
+    assertNotNull(docIds);
+    assertTrue(docIds.isEmpty());
+
+    // Subsequent adds stay aligned: dictId 0 gets doc 0, dictId 1 is a fresh bitmap.
+    realtimeInvertedIndex.add(0, 0);
+    realtimeInvertedIndex.add(1, 1);
+    assertTrue(realtimeInvertedIndex.getDocIds(0).contains(0));
+    assertTrue(realtimeInvertedIndex.getDocIds(1).contains(1));
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testReserveNextDictIdOnNonEmptyIndexThrows() {
+    RealtimeInvertedIndex realtimeInvertedIndex = new RealtimeInvertedIndex();
+    realtimeInvertedIndex.add(0, 0);
+    realtimeInvertedIndex.reserveNextDictId();
   }
 }

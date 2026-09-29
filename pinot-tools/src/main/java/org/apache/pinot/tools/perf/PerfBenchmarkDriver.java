@@ -93,7 +93,6 @@ public class PerfBenchmarkDriver {
 
   // TODO: read from configuration.
   private final int _numReplicas = 1;
-  private final String _segmentAssignmentStrategy = "BalanceNumSegmentAssignmentStrategy";
   private final String _brokerTenantName = "DefaultTenant";
   private final String _serverTenantName = "DefaultTenant";
 
@@ -212,7 +211,7 @@ public class PerfBenchmarkDriver {
   private Map<String, Object> getControllerProperties() {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
-    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
     properties.put(ControllerConf.CONTROLLER_HOST, _controllerHost);
     properties.put(ControllerConf.CONTROLLER_PORT, String.valueOf(_controllerPort));
     properties.put(ControllerConf.DATA_DIR, _controllerDataDir);
@@ -247,7 +246,7 @@ public class PerfBenchmarkDriver {
     properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_ID, brokerInstanceName);
     properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS, BROKER_TIMEOUT_MS);
     properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
-    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
 
     LOGGER.info("Starting broker instance: {}", brokerInstanceName);
 
@@ -269,7 +268,7 @@ public class PerfBenchmarkDriver {
     properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, "localhost");
     properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, _serverInstanceName);
     properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
-    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
     if (_segmentFormatVersion != null) {
       properties.put(CommonConstants.Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, _segmentFormatVersion);
     }
@@ -310,9 +309,7 @@ public class PerfBenchmarkDriver {
     }
   }
 
-  /**
-   * Register and connect to Helix cluster as Spectator role.
-   */
+  /// Register and connect to Helix cluster as Spectator role.
   private HelixManager registerAndConnectAsHelixSpectator(String instanceId) {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(_clusterName, instanceId, InstanceType.SPECTATOR, _zkAddress);
@@ -321,8 +318,7 @@ public class PerfBenchmarkDriver {
       helixManager.connect();
       return helixManager;
     } catch (Exception e) {
-      String errorMsg =
-          String.format("Exception when connecting the instance %s as Spectator role to Helix.", instanceId);
+      String errorMsg = "Exception when connecting the instance " + instanceId + " as Spectator role to Helix.";
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg);
     }
@@ -346,18 +342,16 @@ public class PerfBenchmarkDriver {
   public void configureTable(String tableName, List<String> invertedIndexColumns, List<String> bloomFilterColumns)
       throws Exception {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
-        .setSegmentAssignmentStrategy(_segmentAssignmentStrategy).setNumReplicas(_numReplicas)
+        .setNumReplicas(_numReplicas)
         .setBrokerTenant(_brokerTenantName).setServerTenant(_serverTenantName).setLoadMode(_loadMode)
         .setSegmentVersion(_segmentFormatVersion).setInvertedIndexColumns(invertedIndexColumns)
         .setBloomFilterColumns(bloomFilterColumns).build();
     _helixResourceManager.addTable(tableConfig);
   }
 
-  /**
-   * Add segment while segment data is already in server data directory.
-   *
-   * @param segmentMetadata segment metadata.
-   */
+  /// Add segment while segment data is already in server data directory.
+  ///
+  /// @param segmentMetadata segment metadata.
   public void addSegment(String tableNameWithType, SegmentMetadata segmentMetadata) {
     _helixResourceManager.addNewSegment(tableNameWithType, segmentMetadata,
         "http://" + _controllerAddress + "/" + segmentMetadata.getName());
@@ -464,16 +458,14 @@ public class PerfBenchmarkDriver {
     }
   }
 
-  /**
-   * Start cluster components with default configuration.
-   *
-   * @param isStartZookeeper whether to start zookeeper.
-   * @param isStartController whether to start controller.
-   * @param isStartBroker whether to start broker.
-   * @param isStartServer whether to start server.
-   * @return perf benchmark driver.
-   * @throws Exception
-   */
+  /// Start cluster components with default configuration.
+  ///
+  /// @param isStartZookeeper whether to start zookeeper.
+  /// @param isStartController whether to start controller.
+  /// @param isStartBroker whether to start broker.
+  /// @param isStartServer whether to start server.
+  /// @return perf benchmark driver.
+  /// @throws Exception
   public static PerfBenchmarkDriver startComponents(boolean isStartZookeeper, boolean isStartController,
       boolean isStartBroker, boolean isStartServer, @Nullable String serverDataDir)
       throws Exception {

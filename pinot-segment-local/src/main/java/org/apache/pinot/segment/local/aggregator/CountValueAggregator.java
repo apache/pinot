@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -36,8 +37,19 @@ public class CountValueAggregator implements ValueAggregator<Object, Long> {
   }
 
   @Override
-  public Long getInitialAggregatedValue(Object rawValue) {
-    return 1L;
+  public Long getInitialAggregatedValue(@Nullable Object rawValue) {
+    return rawValue != null ? 1L : 0L;
+  }
+
+  /// The only aggregator that still answers a group with no non-null input itself.
+  ///
+  /// `COUNT` is read back from the pre-aggregated column by summing it rather than through the null vector, which
+  /// [org.apache.pinot.core.query.aggregation.function.CountAggregationFunction] recognizes from the `__STAR__`
+  /// identifier. Returning `0` is also exactly the placeholder a null would leave behind, so recording the group in
+  /// the null vector would cost a bit per group and buy nothing.
+  @Override
+  public Long getAllNullAggregatedValue() {
+    return 0L;
   }
 
   @Override
@@ -53,6 +65,11 @@ public class CountValueAggregator implements ValueAggregator<Object, Long> {
   @Override
   public Long cloneAggregatedValue(Long value) {
     return value;
+  }
+
+  @Override
+  public boolean isAggregatedValueFixedSize() {
+    return true;
   }
 
   @Override

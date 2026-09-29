@@ -19,38 +19,27 @@
 package org.apache.pinot.core.segment.processing.partitioner;
 
 import com.google.common.base.Preconditions;
+import java.util.List;
 
 
-/**
- * Factory for Partitioner and PartitionFilter
- */
+/// Factory for Partitioner and PartitionFilter
 public final class PartitionerFactory {
   private PartitionerFactory() {
   }
 
   public enum PartitionerType {
     NO_OP,
-    /**
-     * Creates not more than the configured fixed number of partitions
-     */
+    /// Creates not more than the configured fixed number of partitions
     ROUND_ROBIN,
-    /**
-     * Partitions using a column value
-     */
+    /// Partitions using a column value
     COLUMN_VALUE,
-    /**
-     * Evaluates a function expression to determine partition value
-     */
+    /// Evaluates a function expression to determine partition value
     TRANSFORM_FUNCTION,
-    /**
-     * Partitions using {@link org.apache.pinot.spi.config.table.ColumnPartitionConfig} as defined in the table config
-     */
+    /// Partitions using [org.apache.pinot.spi.config.table.ColumnPartitionConfig] as defined in the table config
     TABLE_PARTITION_CONFIG
   }
 
-  /**
-   * Construct a Partitioner using the PartitioningConfig
-   */
+  /// Construct a Partitioner using the PartitioningConfig
   public static Partitioner getPartitioner(PartitionerConfig config) {
 
     Partitioner partitioner = null;
@@ -84,5 +73,17 @@ public final class PartitionerFactory {
         break;
     }
     return partitioner;
+  }
+
+  /// Create partitioner array from configuration.
+  ///
+  /// @return Array of partitioners
+  public static Partitioner[] getPartitioners(List<PartitionerConfig> partitionerConfigs) {
+    int numPartitioners = partitionerConfigs.size();
+    Partitioner[] partitioners = new Partitioner[numPartitioners];
+    for (int i = 0; i < numPartitioners; i++) {
+      partitioners[i] = PartitionerFactory.getPartitioner(partitionerConfigs.get(i));
+    }
+    return partitioners;
   }
 }

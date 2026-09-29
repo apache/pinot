@@ -20,6 +20,8 @@ package org.apache.pinot.segment.local.segment.index.creator;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,22 +31,26 @@ import java.util.UUID;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
-public class MultiValueVarByteRawIndexCreatorTest {
+
+public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
 
   private static final File OUTPUT_DIR =
       new File(FileUtils.getTempDirectory(), MultiValueVarByteRawIndexCreatorTest.class.getSimpleName());
@@ -57,10 +63,14 @@ public class MultiValueVarByteRawIndexCreatorTest {
 
   @DataProvider
   public Object[][] params() {
-    return Arrays.stream(ChunkCompressionType.values()).flatMap(chunkCompressionType -> IntStream.of(2, 4).boxed()
-            .flatMap(writerVersion -> IntStream.of(10, 15, 20, 1000).boxed().flatMap(maxLength -> Stream.of(true, false)
-                .flatMap(
-                    useFullSize -> IntStream.range(1, 20).map(i -> i * 2 - 1).boxed().map(maxNumEntries -> new Object[]{
+    return Arrays.stream(ChunkCompressionType.values())
+        .filter(t -> t != ChunkCompressionType.DELTA && t != ChunkCompressionType.DELTADELTA)
+        .flatMap(chunkCompressionType -> IntStream.rangeClosed(2, 6)
+            .boxed()
+            .flatMap(writerVersion -> IntStream.of(10, 100)
+                .boxed()
+                .flatMap(maxLength -> Stream.of(true, false)
+                    .flatMap(useFullSize -> IntStream.of(1, 10, 20).boxed().map(maxNumEntries -> new Object[]{
                         chunkCompressionType, useFullSize, writerVersion, maxLength, maxNumEntries
                     })))))
         .toArray(Object[][]::new);
@@ -74,16 +84,72 @@ public class MultiValueVarByteRawIndexCreatorTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testOverflowElementCount()
       throws IOException {
-    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH,
-        "column", 10000, DataType.STRING, 1, Integer.MAX_VALUE / 2);
+    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH, "column", 10000,
+        DataType.STRING, 1, Integer.MAX_VALUE / 2);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testOverflowMaxLengthInBytes()
       throws IOException {
-    // contrived to produce a positive chunk size > Integer.MAX_VALUE but not fail num elements checks
-    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH,
-        "column", 10000, DataType.STRING, Integer.MAX_VALUE - Integer.BYTES - 2 * Integer.BYTES, 2);
+    // Contrived to produce a positive chunk size > Integer.MAX_VALUE but not fail num elements checks
+    // This check only applies to v2/v3
+    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH, "column", 10000,
+        DataType.STRING, 2, Integer.MAX_VALUE - Integer.BYTES - 2 * Integer.BYTES, 2,
+        ForwardIndexConfig.getDefaultTargetMaxChunkSizeBytes(), ForwardIndexConfig.getDefaultTargetDocsPerChunk());
+  }
+
+  @Test(dataProvider = "params")
+  public void testMVBigDecimal(ChunkCompressionType compressionType, boolean useFullSize, int writerVersion,
+      int maxLength, int maxNumEntries)
+      throws IOException {
+    String column = "testCol-" + UUID.randomUUID();
+    int numDocs = 1000;
+    File file = new File(OUTPUT_DIR, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
+    List<BigDecimal[]> inputs = new ArrayList<>();
+    Random random = new Random();
+    int maxTotalLength = 0;
+    int maxElements = 0;
+    for (int i = 0; i < numDocs; i++) {
+      int numEntries = useFullSize ? maxNumEntries : random.nextInt(maxNumEntries + 1);
+      maxElements = Math.max(numEntries, maxElements);
+      BigDecimal[] values = new BigDecimal[numEntries];
+      int serializedLength = 0;
+      for (int j = 0; j < numEntries; j++) {
+        // BigDecimal serialized size = 2 bytes (scale) + N bytes (unscaled). Bound the unscaled byte length by
+        // maxLength so we exercise the maxRowLengthInBytes accounting.
+        int maxUnscaledBytes = Math.max(1, maxLength - 2);
+        int unscaledByteLength = useFullSize ? maxUnscaledBytes : random.nextInt(maxUnscaledBytes) + 1;
+        byte[] unscaledBytes = new byte[unscaledByteLength];
+        random.nextBytes(unscaledBytes);
+        BigInteger unscaled = new BigInteger(unscaledBytes);
+        int scale = random.nextInt(10);
+        values[j] = new BigDecimal(unscaled, scale);
+        serializedLength += 2 + unscaledByteLength;
+      }
+      maxTotalLength = Math.max(serializedLength, maxTotalLength);
+      inputs.add(values);
+    }
+    try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, compressionType,
+        column, numDocs, DataType.BIG_DECIMAL, writerVersion, maxTotalLength, maxElements, 1024 * 1024, 1000)) {
+      for (BigDecimal[] input : inputs) {
+        creator.putBigDecimalMV(input);
+      }
+    }
+
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
+        ForwardIndexReader reader = ForwardIndexReaderFactory.getInstance()
+            .createRawIndexReader(buffer, DataType.BIG_DECIMAL, false);
+        ForwardIndexReaderContext context = reader.createContext()) {
+      BigDecimal[] values = new BigDecimal[maxElements];
+      for (int i = 0; i < numDocs; i++) {
+        BigDecimal[] input = inputs.get(i);
+        assertEquals(reader.getNumValuesMV(i, context), input.length);
+        int length = reader.getBigDecimalMV(i, values, context);
+        assertEquals(Arrays.copyOf(values, length), input);
+        // Exercise the alternate getter that allocates the result array too.
+        assertEquals(reader.getBigDecimalMV(i, context), input);
+      }
+    }
   }
 
   @Test(dataProvider = "params")
@@ -125,15 +191,16 @@ public class MultiValueVarByteRawIndexCreatorTest {
       }
     }
 
-    //read
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
-        ForwardIndexReader reader = ForwardIndexReaderFactory.createRawIndexReader(buffer, DataType.STRING, false);
+        ForwardIndexReader reader = ForwardIndexReaderFactory.getInstance()
+            .createRawIndexReader(buffer, DataType.STRING, false);
         ForwardIndexReaderContext context = reader.createContext()) {
       String[] values = new String[maxElements];
       for (int i = 0; i < numDocs; i++) {
+        String[] input = inputs.get(i);
+        assertEquals(reader.getNumValuesMV(i, context), input.length);
         int length = reader.getStringMV(i, values, context);
-        String[] readValue = Arrays.copyOf(values, length);
-        Assert.assertEquals(inputs.get(i), readValue);
+        assertEquals(Arrays.copyOf(values, length), input);
       }
     }
   }
@@ -177,18 +244,47 @@ public class MultiValueVarByteRawIndexCreatorTest {
       }
     }
 
-    //read
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
-        ForwardIndexReader reader = ForwardIndexReaderFactory.createRawIndexReader(buffer, DataType.BYTES, false);
+        ForwardIndexReader reader = ForwardIndexReaderFactory.getInstance()
+            .createRawIndexReader(buffer, DataType.BYTES, false);
         ForwardIndexReaderContext context = reader.createContext()) {
       byte[][] values = new byte[maxElements][];
       for (int i = 0; i < numDocs; i++) {
+        byte[][] input = inputs.get(i);
+        assertEquals(reader.getNumValuesMV(i, context), input.length);
         int length = reader.getBytesMV(i, values, context);
-        byte[][] readValue = Arrays.copyOf(values, length);
-        for (int j = 0; j < length; j++) {
-          Assert.assertTrue(Arrays.equals(inputs.get(i)[j], readValue[j]));
-        }
+        assertEquals(Arrays.copyOf(values, length), input);
       }
+    }
+  }
+
+  @Test
+  public void testUncompressedValueSizeTrackingEnabled()
+      throws IOException {
+    String column = "mvVarTrackingEnabled";
+    try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(
+        OUTPUT_DIR, ChunkCompressionType.LZ4, column, 100, DataType.STRING, 100, 3)) {
+      creator.enableRawForwardIndexUncompressedValueSizeTracking();
+      for (int i = 0; i < 100; i++) {
+        creator.putStringMV(new String[]{"val" + i, "extra" + i});
+      }
+      assertTrue(creator.getRawForwardIndexUncompressedValueSizeInBytes() > 0,
+          "MV var-byte creator should report > 0 uncompressed size when tracking enabled");
+    }
+  }
+
+  @Test
+  public void testUncompressedValueSizeTrackingDisabled()
+      throws IOException {
+    String column = "mvVarTrackingDisabled";
+    try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(
+        OUTPUT_DIR, ChunkCompressionType.LZ4, column, 100, DataType.STRING, 100, 3)) {
+      // tracking off by default
+      for (int i = 0; i < 100; i++) {
+        creator.putStringMV(new String[]{"val" + i});
+      }
+      assertEquals(creator.getRawForwardIndexUncompressedValueSizeInBytes(), -1L,
+          "MV var-byte creator should report unavailable when tracking is disabled");
     }
   }
 }

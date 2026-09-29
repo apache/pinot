@@ -20,16 +20,16 @@ package org.apache.pinot.common.function;
 
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
-import org.apache.pinot.common.utils.PinotDataType;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/**
- * The {@code FunctionInvoker} is a wrapper on a java method which supports arguments type conversion and method
- * invocation via reflection.
- */
+/// The `FunctionInvoker` is a wrapper on a java method which supports arguments type conversion and method
+/// invocation via reflection.
 public class FunctionInvoker {
   private final Method _method;
   // If true, the function should return null if any of its argument is null
@@ -65,32 +65,24 @@ public class FunctionInvoker {
     }
   }
 
-  /**
-   * Returns the underlying java method.
-   */
+  /// Returns the underlying java method.
   public Method getMethod() {
     return _method;
   }
 
-  /**
-   * Returns the class of the parameters.
-   */
+  /// Returns the class of the parameters.
   public Class<?>[] getParameterClasses() {
     return _parameterClasses;
   }
 
-  /**
-   * Returns the PinotDataType of the parameters for type conversion purpose. Puts {@code null} for the parameter class
-   * that does not support type conversion.
-   */
+  /// Returns the PinotDataType of the parameters for type conversion purpose. Puts `null` for the parameter class
+  /// that does not support type conversion.
   public PinotDataType[] getParameterTypes() {
     return _parameterTypes;
   }
 
-  /**
-   * Converts the type of the given arguments to match the parameter classes. Leaves the argument as is if type
-   * conversion is not needed or supported.
-   */
+  /// Converts the type of the given arguments to match the parameter classes. Leaves the argument as is if type
+  /// conversion is not needed or supported.
   public void convertTypes(Object[] arguments) {
     int numParameters = _parameterClasses.length;
     Preconditions.checkArgument(arguments.length == numParameters,
@@ -109,25 +101,39 @@ public class FunctionInvoker {
       }
 
       PinotDataType parameterType = _parameterTypes[i];
-      PinotDataType argumentType = FunctionUtils.getArgumentType(argumentClass);
-      Preconditions.checkArgument(parameterType != null && argumentType != null,
+      Preconditions.checkArgument(parameterType != null,
           "Cannot convert value from class: %s to class: %s", argumentClass, parameterClass);
-      arguments[i] = parameterType.convert(argument, argumentType);
+      arguments[i] = parameterType.convert(argument, FunctionUtils.getArgumentType(argument));
     }
   }
 
-  /**
-   * Returns the class of the result value.
-   */
+  /// Returns the class of the result value.
   public Class<?> getResultClass() {
     return _method.getReturnType();
   }
 
-  /**
-   * Invoke the function with the given arguments. The arguments should match the parameter classes. Use
-   * {@link #convertTypes(Object[])} to convert the argument types if needed before calling this method.
-   */
+  /// Invoke the function with the given arguments. The arguments should match the parameter classes. Use
+  /// [#convertTypes(Object[])] to convert the argument types if needed before calling this method.
+  ///
+  /// @throws IllegalStateException if any exception is thrown during the invocation.
+  @Nullable
   public Object invoke(Object[] arguments) {
+    try {
+      return invokeDirectly(arguments);
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "Caught exception while invoking method: " + _method.getName() + " with arguments: "
+              + Arrays.toString(arguments), e);
+    }
+  }
+
+  /// Like [#invoke], but does not catch exceptions.
+  ///
+  /// @throws InvocationTargetException if the underlying method throws an exception.
+  /// @throws IllegalAccessException if the underlying method is inaccessible.
+  @Nullable
+  public Object invokeDirectly(Object[] arguments)
+      throws InvocationTargetException, IllegalAccessException {
     if (_isNullIntolerant) {
       for (Object arg : arguments) {
         if (arg == null) {
@@ -135,11 +141,6 @@ public class FunctionInvoker {
         }
       }
     }
-    try {
-      return _method.invoke(_instance, arguments);
-    } catch (Exception e) {
-      throw new IllegalStateException(
-          "Caught exception while invoking method: " + _method + " with arguments: " + Arrays.toString(arguments), e);
-    }
+    return _method.invoke(_instance, arguments);
   }
 }

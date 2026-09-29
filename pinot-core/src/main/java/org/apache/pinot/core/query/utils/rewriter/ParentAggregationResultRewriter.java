@@ -29,18 +29,16 @@ import org.apache.pinot.core.query.aggregation.utils.ParentAggregationFunctionRe
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * Used in aggregation and group-by queries with aggregation functions.
- * Use the result of parent aggregation functions to populate the result of child aggregation functions.
- * This implementation is based on the column names of the result schema.
- * The result column name of a parent aggregation function has the following format:
- * CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + aggregationFunctionType + FunctionID
- * The result column name of corresponding child aggregation function has the following format:
- * CHILD_AGGREGATION_NAME_PREFIX + aggregationFunctionType + operands + CHILD_AGGREGATION_SEPERATOR
- * + aggregationFunctionType + parent FunctionID + CHILD_KEY_SEPERATOR + column key in parent function
- * This approach will not work with `AS` clauses as they alter the column names.
- * TODO: Add support for `AS` clauses.
- */
+/// Used in aggregation and group-by queries with aggregation functions.
+/// Use the result of parent aggregation functions to populate the result of child aggregation functions.
+/// This implementation is based on the column names of the result schema.
+/// The result column name of a parent aggregation function has the following format:
+/// CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + aggregationFunctionType + FunctionID
+/// The result column name of corresponding child aggregation function has the following format:
+/// CHILD_AGGREGATION_NAME_PREFIX + aggregationFunctionType + operands + CHILD_AGGREGATION_SEPERATOR
+/// + aggregationFunctionType + parent FunctionID + CHILD_KEY_SEPERATOR + column key in parent function
+/// This approach will not work with `AS` clauses as they alter the column names.
+/// TODO: Add support for `AS` clauses.
 public class ParentAggregationResultRewriter implements ResultRewriter {
   public ParentAggregationResultRewriter() {
   }
@@ -166,7 +164,10 @@ public class ParentAggregationResultRewriter implements ResultRewriter {
                 (ParentAggregationFunctionResultObject) row[offset];
             // If the parent result has more rows than the current row, extract the value from the row
             if (rowIter < parentAggregationFunctionResultObject.getNumberOfRows()) {
-              newRow[fieldIter] = parentAggregationFunctionResultObject.getField(rowIter, nestedOffset);
+              // getField returns the value in internal form; convert to external form so downstream format() works
+              // (e.g. ByteArray -> byte[] for BYTES).
+              Object value = parentAggregationFunctionResultObject.getField(rowIter, nestedOffset);
+              newRow[fieldIter] = value != null ? newColumnDataTypes[fieldIter].convert(value) : null;
             } else {
               newRow[fieldIter] = null;
             }
@@ -181,21 +182,19 @@ public class ParentAggregationResultRewriter implements ResultRewriter {
     return new RewriterResult(newDataSchema, newRows);
   }
 
-  /**
-   * Mapping from child function key to
-   * 1. the parent result object,
-   * 2. offset of the parent result column in original result row,
-   * 3. the nested offset of the child function result in the parent data block
-   *
-   * For example, for a list of aggregation functions result:
-   *            0                      1                    2                   3
-   *            |                      |                    |                   |
-   * "child_exprmin(a, b, x) ,child_exprmin(a, b, y), child_exprmin(a, b, z), parent_exprmin(a, b, x, y, z)"
-   *                                                                                           |  |  |
-   *                                                                                           0  1  2
-   * offset of the parent of child_exprmin(a, b, y) is 3
-   * nested offset is child_exprmin(a, b, y) is 1
-   */
+  /// Mapping from child function key to
+  /// 1. the parent result object,
+  /// 2. offset of the parent result column in original result row,
+  /// 3. the nested offset of the child function result in the parent data block
+  ///
+  /// For example, for a list of aggregation functions result:
+  ///            0                      1                    2                   3
+  ///            |                      |                    |                   |
+  /// "child_exprmin(a, b, x) ,child_exprmin(a, b, y), child_exprmin(a, b, z), parent_exprmin(a, b, x, y, z)"
+  ///                                                                                           |  |  |
+  ///                                                                                           0  1  2
+  /// offset of the parent of child_exprmin(a, b, y) is 3
+  /// nested offset is child_exprmin(a, b, y) is 1
   private static class ChildFunctionMapping {
     private final ParentAggregationFunctionResultObject _parent;
     private final int _nestedOffset;

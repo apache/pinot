@@ -19,15 +19,14 @@
 package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.sql.Timestamp;
+import java.util.List;
 import java.util.TimeZone;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -52,6 +51,7 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
   private static final String TIMESTAMP_ONE_MONTH_AFTER = "tsOneMonthAfter"; // 1 month after TIMESTAMP_BASE
   private static final String TIMESTAMP_ONE_QUARTER_AFTER = "tsOneQuarterAfter"; // 1 quarter after TIMESTAMP_BASE
   private static final String TIMESTAMP_ONE_YEAR_AFTER = "tsOneYearAfter"; // 1 year after TIMESTAMP_BASE
+  private static final String TIMESTAMP_SUB_SECOND = "tsSubSecond"; // TIMESTAMP_BASE + 482 millis (sub-second)
   private static final String LONG_BASE = "longBase";
   private static final String LONG_HALF_DAY_AFTER = "longHalfDayAfter";
   private static final String LONG_ONE_DAY_AFTER = "longOneDayAfter";
@@ -89,8 +89,8 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query =
-        String.format("SELECT tsBase, tsHalfDayAfter, longBase,longHalfDayAfter FROM %s LIMIT %d", getTableName(),
-            getCountStarResult());
+        String.format("SELECT tsBase, tsHalfDayAfter, longBase,longHalfDayAfter FROM %s ORDER BY tsBase LIMIT %d",
+            getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
     long expectedTsBase = DateTimeFunctions.fromDateTime("2019-01-01 00:00:00", "yyyy-MM-dd HH:mm:ss");
     long expectedTsHalfDayAfter = DateTimeFunctions.fromDateTime("2019-01-01 12:00:00", "yyyy-MM-dd HH:mm:ss");
@@ -434,6 +434,27 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).longValue(), 1546300800000L);
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testSubSecondTimestampEqualityQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Regression test for issue #18881: equality between a TIMESTAMP column and a sub-second epoch-millis literal must
+    // match rows. 1546300800482 == 2019-01-01 00:00:00.482 UTC, the tsSubSecond value of the first ingested row
+    // (tsBase + 482 ms). Before the fix, the multi-stage planner cast the literal to a precision-0 TIMESTAMP and
+    // constant folding truncated it to whole seconds (1546300800000), so this query returned 0 rows.
+    String matchQuery =
+        String.format("SELECT COUNT(*) FROM %s WHERE %s = 1546300800482", getTableName(), TIMESTAMP_SUB_SECOND);
+    JsonNode jsonNode = postQuery(matchQuery);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), 1L);
+
+    // The whole-second (truncated) literal must NOT match the sub-second row - guards against a regression to the old
+    // precision-0 truncation behavior.
+    String truncatedQuery =
+        String.format("SELECT COUNT(*) FROM %s WHERE %s = 1546300800000", getTableName(), TIMESTAMP_SUB_SECOND);
+    jsonNode = postQuery(truncatedQuery);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), 0L);
+  }
+
   @Override
   public String getTableName() {
     return DEFAULT_TABLE_NAME;
@@ -449,6 +470,7 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         .addSingleValueDimension(TIMESTAMP_ONE_MONTH_AFTER, FieldSpec.DataType.TIMESTAMP)
         .addSingleValueDimension(TIMESTAMP_ONE_QUARTER_AFTER, FieldSpec.DataType.TIMESTAMP)
         .addSingleValueDimension(TIMESTAMP_ONE_YEAR_AFTER, FieldSpec.DataType.TIMESTAMP)
+        .addSingleValueDimension(TIMESTAMP_SUB_SECOND, FieldSpec.DataType.TIMESTAMP)
         .addSingleValueDimension(LONG_BASE, FieldSpec.DataType.LONG)
         .addSingleValueDimension(LONG_HALF_DAY_AFTER, FieldSpec.DataType.LONG)
         .addSingleValueDimension(LONG_ONE_DAY_AFTER, FieldSpec.DataType.LONG)
@@ -461,11 +483,11 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  public List<File> createAvroFiles()
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(
+    avroSchema.setFields(List.of(
         new Field(TIMESTAMP_BASE, create(Type.LONG), null, null),
         new Field(TIMESTAMP_HALF_DAY_AFTER, create(Type.LONG), null, null),
         new Field(TIMESTAMP_ONE_DAY_AFTER, create(Type.LONG), null, null),
@@ -473,6 +495,7 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         new Field(TIMESTAMP_ONE_MONTH_AFTER, create(Type.LONG), null, null),
         new Field(TIMESTAMP_ONE_QUARTER_AFTER, create(Type.LONG), null, null),
         new Field(TIMESTAMP_ONE_YEAR_AFTER, create(Type.LONG), null, null),
+        new Field(TIMESTAMP_SUB_SECOND, create(Type.LONG), null, null),
         new Field(LONG_BASE, create(Type.LONG), null, null),
         new Field(LONG_HALF_DAY_AFTER, create(Type.LONG), null, null),
         new Field(LONG_ONE_DAY_AFTER, create(Type.LONG), null, null),
@@ -489,12 +512,10 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         new Field(YYYY_MM_DD_ONE_YEAR_AFTER, create(Type.STRING), null, null)
     ));
 
-    // create avro file
-    File avroFile = new File(_tempDir, "data.avro");
     ISOChronology chronology = ISOChronology.getInstanceUTC();
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
-      long tsBaseLong = DateTimeFunctions.fromDateTime("2019-01-01 00:00:00", "yyyy-MM-dd HH:mm:ss");
+    long tsBaseLong = DateTimeFunctions.fromDateTime("2019-01-01 00:00:00", "yyyy-MM-dd HH:mm:ss");
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < getCountStarResult(); i++) {
         // Generate data
         long tsHalfDayAfter = DateTimeUtils.getTimestampField(chronology, "HOUR").add(tsBaseLong, 12);
@@ -513,6 +534,8 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         record.put(TIMESTAMP_ONE_MONTH_AFTER, tsOneMonthAfter);
         record.put(TIMESTAMP_ONE_QUARTER_AFTER, tsOneQuarterAfter);
         record.put(TIMESTAMP_ONE_YEAR_AFTER, tsOneYearAfter);
+        // Sub-second value (tsBase + 482 ms) for the issue #18881 millisecond-precision regression test.
+        record.put(TIMESTAMP_SUB_SECOND, tsBaseLong + 482);
         record.put(LONG_BASE, tsBaseLong);
         record.put(LONG_HALF_DAY_AFTER, tsHalfDayAfter);
         record.put(LONG_ONE_DAY_AFTER, tsOneDayAfter);
@@ -529,10 +552,10 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         record.put(YYYY_MM_DD_ONE_YEAR_AFTER, DateTimeFunctions.toDateTime(tsOneYearAfter, "yyyy-MM-dd"));
 
         // add avro record to file
-        fileWriter.append(record);
+        writers.get(i % getNumAvroFiles()).append(record);
         tsBaseLong += 86400000;
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return avroFile;
   }
 }

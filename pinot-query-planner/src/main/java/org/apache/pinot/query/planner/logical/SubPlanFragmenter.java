@@ -26,6 +26,7 @@ import org.apache.calcite.runtime.ImmutablePairList;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.SubPlanMetadata;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -38,19 +39,18 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
-/**
- * SubPlanFragmenter is an implementation of {@link PlanNodeVisitor} to fragment a query plan into multiple sub-plans.
- * TODO: Currently it is not hooked up because we don't support multiple sub-plans yet.
- *
- * The fragmenting process is as follows:
- * 1. Traverse the plan tree in a depth-first manner;
- * 2. For each node, if it is a SubPlan splittable ExchangeNode, switch it to a {@link LiteralValueNode};
- * 3. Increment current SubPlan ID by one and keep traverse the tree.
- */
+/// SubPlanFragmenter is an implementation of [PlanNodeVisitor] to fragment a query plan into multiple sub-plans.
+/// TODO: Currently it is not hooked up because we don't support multiple sub-plans yet.
+///
+/// The fragmenting process is as follows:
+/// 1. Traverse the plan tree in a depth-first manner;
+/// 2. For each node, if it is a SubPlan splittable ExchangeNode, switch it to a [LiteralValueNode];
+/// 3. Increment current SubPlan ID by one and keep traverse the tree.
 public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragmenter.Context> {
   public static final SubPlanFragmenter INSTANCE = new SubPlanFragmenter();
 
@@ -77,6 +77,12 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
   @Override
   public PlanNode visitJoin(JoinNode node, Context context) {
     return process(node, context);
+  }
+
+  @Deprecated(forRemoval = true, since = "1.6.0")
+  @Override
+  public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Context context) {
+    return visitJoin(node, context);
   }
 
   @Override
@@ -143,6 +149,11 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
         new SubPlanMetadata(node.getTableNames(), ImmutablePairList.of()));
     PlanNode literalValueNode = new LiteralValueNode(nextStageRoot.getDataSchema());
     return literalValueNode;
+  }
+
+  @Override
+  public PlanNode visitUnnest(UnnestNode node, Context context) {
+    return process(node, context);
   }
 
   private boolean isSubPlanSplitter(PlanNode node) {

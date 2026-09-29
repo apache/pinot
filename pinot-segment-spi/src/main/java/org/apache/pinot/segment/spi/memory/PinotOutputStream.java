@@ -28,26 +28,20 @@ import java.nio.charset.StandardCharsets;
 
 public abstract class PinotOutputStream extends OutputStream implements DataOutput {
 
-  /**
-   * Return the current position in the OutputStream.
-   *
-   * @return current position in bytes from the start of the stream
-   */
+  /// Return the current position in the OutputStream.
+  ///
+  /// @return current position in bytes from the start of the stream
   public abstract long getCurrentOffset();
 
-  /**
-   * Seek to a new position in the OutputStream.
-   *
-   * @param newPos the new position to seek to
-   * @throws IllegalArgumentException If the new position is negative
-   */
+  /// Seek to a new position in the OutputStream.
+  ///
+  /// @param newPos the new position to seek to
+  /// @throws IllegalArgumentException If the new position is negative
   public abstract void seek(long newPos);
 
-  /**
-   * Moves the current offset, applying the given change.
-   * @param change the change to apply to the current offset
-   * @throws IllegalArgumentException if the new position is negative
-   */
+  /// Moves the current offset, applying the given change.
+  /// @param change the change to apply to the current offset
+  /// @throws IllegalArgumentException if the new position is negative
   public void moveCurrentOffset(long change) {
     long newOffset = getCurrentOffset() + change;
     seek(newOffset);
@@ -100,12 +94,10 @@ public abstract class PinotOutputStream extends OutputStream implements DataOutp
     write(0xFF & v);
   }
 
-  /**
-   * This method is commonly used in Pinot to write a string with a 4-byte length prefix.
-   * <p>
-   * <b>Note</b>: This method is incompatible with {@link DataOutput#writeUTF(String)}. It is recommended to use
-   * this method instead of the one in {@link DataOutput} to write strings.
-   */
+  /// This method is commonly used in Pinot to write a string with a 4-byte length prefix.
+  ///
+  /// **Note**: This method is incompatible with [DataOutput#writeUTF(String)]. It is recommended to use
+  /// this method instead of the one in [DataOutput] to write strings.
   public void writeInt4String(String v) throws IOException {
     byte[] bytes = v.getBytes(StandardCharsets.UTF_8);
     writeInt(bytes.length);

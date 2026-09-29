@@ -22,6 +22,7 @@ package org.apache.pinot.segment.local.segment.index.forward;
 import java.util.Arrays;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV6;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV2;
 import org.apache.pinot.segment.local.segment.index.readers.forward.CLPForwardIndexReaderV1;
@@ -31,9 +32,11 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVFo
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReaderV7;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBytePower2ChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV5;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV6;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
@@ -45,6 +48,7 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -71,8 +75,8 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
     return createIndexReader(dataBuffer, metadata);
   }
 
-  public static ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
-    if (metadata.hasDictionary()) {
+  public ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
+    if (metadata.getForwardIndexEncoding() == FieldConfig.EncodingType.DICTIONARY) {
       if (metadata.isSingleValue()) {
         if (metadata.isSorted()) {
           return new SortedIndexReaderImpl(dataBuffer, metadata.getCardinality());
@@ -104,20 +108,44 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
           return new CLPForwardIndexReaderV2(dataBuffer, metadata.getTotalDocs());
         }
       }
-      return createRawIndexReader(dataBuffer, metadata.getDataType().getStoredType(), metadata.isSingleValue());
+      return createRawIndexReader(dataBuffer, metadata.getDataType().getStoredType(), metadata.isSingleValue(),
+          metadata.getTotalDocs());
     }
   }
 
-  public static ForwardIndexReader createRawIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
+  public ForwardIndexReader createRawIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
       boolean isSingleValue) {
+    return createRawIndexReader(dataBuffer, storedType, isSingleValue, -1);
+  }
+
+  private ForwardIndexReader createRawIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
+      boolean isSingleValue, int expectedTotalDocs) {
+    if (dataBuffer.size() < Integer.BYTES) {
+      throw new IllegalArgumentException(
+          "Raw forward index is truncated: " + dataBuffer.size() + " bytes; cannot read format version");
+    }
     int version = dataBuffer.getInt(0);
     if (isSingleValue && storedType.isFixedWidth()) {
-      return version == FixedBytePower2ChunkSVForwardIndexReader.VERSION
-          ? new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType)
-          : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
+      // The codec-pipeline V7 format is discriminated by its explicit header magic, not by the
+      // version integer: legacy fixed-byte writers accept arbitrary versions >= 4, so the
+      // power-of-2 fallback below must only be reached when the V7 marker is absent.
+      if (FixedByteChunkSVForwardIndexReaderV7.hasCodecPipelineHeader(dataBuffer)) {
+        if (storedType != DataType.INT && storedType != DataType.LONG) {
+          throw new UnsupportedOperationException(
+              "V7 codec pipeline does not yet support " + storedType + " columns");
+        }
+        return new FixedByteChunkSVForwardIndexReaderV7(dataBuffer, storedType, expectedTotalDocs);
+      }
+      if (version >= FixedBytePower2ChunkSVForwardIndexReader.VERSION) {
+        return new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType);
+      }
+      return new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
     }
 
-    if (version == VarByteChunkForwardIndexWriterV5.VERSION) {
+    if (version == VarByteChunkForwardIndexWriterV6.VERSION) {
+      // V6 delta-encodes chunk header (sizes instead of offsets) for better compression
+      return new VarByteChunkForwardIndexReaderV6(dataBuffer, storedType, isSingleValue);
+    } else if (version == VarByteChunkForwardIndexWriterV5.VERSION) {
       // V5 is the same as V4 except the multi-value docs have implicit value count rather than explicit
       return new VarByteChunkForwardIndexReaderV5(dataBuffer, storedType, isSingleValue);
     } else if (version == VarByteChunkForwardIndexWriterV4.VERSION) {
@@ -128,7 +156,7 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
     }
   }
 
-  private static ForwardIndexReader createNonV4RawIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
+  private ForwardIndexReader createNonV4RawIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
       boolean isSingleValue) {
     // Only reach here if SV + raw + var byte + non v4 or MV + non v4
     if (isSingleValue) {

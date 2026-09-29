@@ -19,12 +19,15 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Server.Dedup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,15 +38,20 @@ public class TableDedupMetadataManagerFactory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableDedupMetadataManagerFactory.class);
 
-  public static TableDedupMetadataManager create(TableConfig tableConfig, Schema schema,
-      TableDataManager tableDataManager, ServerMetrics serverMetrics) {
+  public static TableDedupMetadataManager create(PinotConfiguration instanceDedupConfig, TableConfig tableConfig,
+      Schema schema, TableDataManager tableDataManager,
+      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet) {
     String tableNameWithType = tableConfig.getTableName();
+    Preconditions.checkArgument(tableConfig.isDedupEnabled(), "Dedup must be enabled for table: %s", tableNameWithType);
     DedupConfig dedupConfig = tableConfig.getDedupConfig();
-    Preconditions.checkArgument(dedupConfig != null, "Must provide dedup config for table: %s", tableNameWithType);
+    assert dedupConfig != null;
 
     TableDedupMetadataManager metadataManager;
     String metadataManagerClass = dedupConfig.getMetadataManagerClass();
-    if (StringUtils.isNotEmpty(metadataManagerClass)) {
+    if (metadataManagerClass == null) {
+      metadataManagerClass = instanceDedupConfig.getProperty(Dedup.DEFAULT_METADATA_MANAGER_CLASS);
+    }
+    if (StringUtils.isNotBlank(metadataManagerClass)) {
       LOGGER.info("Creating TableDedupMetadataManager with class: {} for table: {}", metadataManagerClass,
           tableNameWithType);
       try {
@@ -58,8 +66,7 @@ public class TableDedupMetadataManagerFactory {
       LOGGER.info("Creating ConcurrentMapTableDedupMetadataManager for table: {}", tableNameWithType);
       metadataManager = new ConcurrentMapTableDedupMetadataManager();
     }
-
-    metadataManager.init(tableConfig, schema, tableDataManager, serverMetrics);
+    metadataManager.init(instanceDedupConfig, tableConfig, schema, tableDataManager, segmentOperationsThrottlerSet);
     return metadataManager;
   }
 }

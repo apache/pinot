@@ -22,9 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Arrays;
 
 
-/**
- * Result Holder implemented using DoubleArray.
- */
+/// Result Holder implemented using DoubleArray.
 public class DoubleGroupByResultHolder implements GroupByResultHolder {
   private final int _maxCapacity;
   private final double _defaultValue;
@@ -32,13 +30,11 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
   private int _resultHolderCapacity;
   private double[] _resultArray;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param initialCapacity Initial capacity of the result holder
-   * @param maxCapacity Maximum capacity of the result holder
-   * @param defaultValue Default value of un-initialized results
-   */
+  /// Constructor for the class.
+  ///
+  /// @param initialCapacity Initial capacity of the result holder
+  /// @param maxCapacity Maximum capacity of the result holder
+  /// @param defaultValue Default value of un-initialized results
   public DoubleGroupByResultHolder(int initialCapacity, int maxCapacity, double defaultValue) {
     _maxCapacity = maxCapacity;
     _defaultValue = defaultValue;
@@ -86,6 +82,11 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
   }
 
   @Override
+  public long getLongResult(int groupKey) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public <T> T getResult(int groupKey) {
     throw new UnsupportedOperationException();
   }
@@ -99,6 +100,11 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
 
   @Override
   public void setValueForKey(int groupKey, int value) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void setValueForKey(int groupKey, long value) {
     throw new UnsupportedOperationException();
   }
 

@@ -19,33 +19,67 @@
 package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
+import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public class ArrayAggDistinctLongFunction extends BaseArrayAggLongFunction<LongOpenHashSet> {
-  public ArrayAggDistinctLongFunction(ExpressionContext expression, FieldSpec.DataType dataType,
+public class ArrayAggDistinctLongFunction extends BaseArrayAggLongFunction<LongSet> {
+  public ArrayAggDistinctLongFunction(ExpressionContext expression, DataType dataType,
       boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
+  }
+
+  @Override
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    return true;
   }
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    long[] value = blockValSet.getLongValuesSV();
-    LongOpenHashSet valueArray = new LongOpenHashSet(length);
-
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        valueArray.add(value[i]);
-      }
-    });
-    aggregationResultHolder.setValue(valueArray);
+    LongOpenHashSet valueSet =
+        aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult() : new LongOpenHashSet(length);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set to merge in.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueSet.addAll(ObjectSerDeUtils.LONG_SET_SER_DE.deserialize(starTreeSetPayload(bytesValues[i],
+              ElementType.LONG)));
+        }
+      });
+      aggregationResultHolder.setValue(valueSet);
+      return;
+    }
+    if (blockValSet.isSingleValue()) {
+      long[] values = blockValSet.getLongValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueSet.add(values[i]);
+        }
+      });
+    } else {
+      long[][] valuesArray = blockValSet.getLongValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          long[] values = valuesArray[i];
+          for (long v : values) {
+            valueSet.add(v);
+          }
+        }
+      });
+    }
+    aggregationResultHolder.setValue(valueSet);
   }
 
   @Override
@@ -56,5 +90,16 @@ public class ArrayAggDistinctLongFunction extends BaseArrayAggLongFunction<LongO
       resultHolder.setValueForKey(groupKey, valueSet);
     }
     valueSet.add(value);
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(LongSet longSet) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.LongSet.getValue(),
+        ObjectSerDeUtils.LONG_SET_SER_DE.serialize(longSet));
+  }
+
+  @Override
+  public LongSet deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.LONG_SET_SER_DE.deserialize(customObject.getBuffer());
   }
 }

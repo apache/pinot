@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,9 +35,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Test for the service status.
- */
+/// Test for the service status.
 public class ServiceStatusTest {
   private static final ServiceStatus.ServiceStatusCallback ALWAYS_GOOD = new ServiceStatus.ServiceStatusCallback() {
     @Override
@@ -96,32 +92,32 @@ public class ServiceStatusTest {
   public void testMultipleServiceStatusCallback() {
     // Only good should return good
     ServiceStatus.MultipleCallbackServiceStatusCallback onlyGood =
-        new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(ALWAYS_GOOD));
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(List.of(ALWAYS_GOOD));
 
     assertEquals(onlyGood.getServiceStatus(), ServiceStatus.Status.GOOD);
 
     // Only bad should return bad
     ServiceStatus.MultipleCallbackServiceStatusCallback onlyBad =
-        new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(ALWAYS_BAD));
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(List.of(ALWAYS_BAD));
 
     assertEquals(onlyBad.getServiceStatus(), ServiceStatus.Status.BAD);
 
     // Only starting should return starting
     ServiceStatus.MultipleCallbackServiceStatusCallback onlyStarting =
-        new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(ALWAYS_STARTING));
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(List.of(ALWAYS_STARTING));
 
     assertEquals(onlyStarting.getServiceStatus(), ServiceStatus.Status.STARTING);
 
     // Good + starting = starting
     ServiceStatus.MultipleCallbackServiceStatusCallback goodAndStarting =
-        new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(ALWAYS_GOOD, ALWAYS_STARTING));
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(List.of(ALWAYS_GOOD, ALWAYS_STARTING));
 
     assertEquals(goodAndStarting.getServiceStatus(), ServiceStatus.Status.STARTING);
 
     // Good + starting + bad = starting (check for left-to-right evaluation)
     ServiceStatus.MultipleCallbackServiceStatusCallback goodStartingAndBad =
         new ServiceStatus.MultipleCallbackServiceStatusCallback(
-            ImmutableList.of(ALWAYS_GOOD, ALWAYS_STARTING, ALWAYS_BAD));
+            List.of(ALWAYS_GOOD, ALWAYS_STARTING, ALWAYS_BAD));
 
     assertEquals(goodStartingAndBad.getServiceStatus(), ServiceStatus.Status.STARTING);
   }
@@ -228,7 +224,7 @@ public class ServiceStatusTest {
 
   private TestIdealStateAndExternalViewMatchServiceStatusCallback buildTestISEVCallback() {
     return new TestIdealStateAndExternalViewMatchServiceStatusCallback("potato", INSTANCE_NAME,
-        Collections.singletonList(TABLE_NAME));
+        List.of(TABLE_NAME));
   }
 
   private String generateRandomString(int len) {

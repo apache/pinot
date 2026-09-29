@@ -19,17 +19,22 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
-import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.client.admin.InstanceAdminClient;
+import org.apache.pinot.core.accounting.ResourceUsageAccountantFactory;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.FailureDetector;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,9 +46,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-/**
- * Integration test that extends OfflineClusterIntegrationTest but start multiple brokers and servers.
- */
+/// Integration test that extends OfflineClusterIntegrationTest but start multiple brokers and servers.
 public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiNodesOfflineClusterIntegrationTest.class);
   private static final int NUM_BROKERS = 2;
@@ -66,12 +69,37 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    super.overrideBrokerConf(brokerConf);
+
     brokerConf.setProperty(FailureDetector.CONFIG_OF_TYPE, FailureDetector.Type.CONNECTION.name());
+    brokerConf.setProperty(Broker.CONFIG_OF_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE, true);
+
+    // Enable thread CPU/memory tracking but not killing queries
+    brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+    String prefix = Accounting.BROKER_PREFIX + ".";
+    brokerConf.setProperty(prefix + Accounting.Keys.FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
+    brokerConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, true);
+    brokerConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING, true);
+  }
+
+  @Override
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    super.overrideServerConf(serverConf);
+
+    // Enable thread CPU/memory tracking but not killing queries
+    serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+    String prefix = Accounting.SERVER_PREFIX + ".";
+    serverConf.setProperty(prefix + Accounting.Keys.FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
+    serverConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, true);
+    serverConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING, true);
   }
 
   @Test
   public void testUpdateBrokerResource()
       throws Exception {
+    InstanceAdminClient instanceClient = getOrCreateAdminClient().getInstanceClient();
     // Add a new broker to the cluster
     BaseBrokerStarter brokerStarter = startOneBroker(NUM_BROKERS);
 
@@ -79,13 +107,13 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     String clusterName = getHelixClusterName();
     String brokerId = brokerStarter.getInstanceId();
     IdealState brokerResourceIdealState =
-        _helixAdmin.getResourceIdealState(clusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+        _helixAdmin.getResourceIdealState(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
     for (Map<String, String> brokerAssignment : brokerResourceIdealState.getRecord().getMapFields().values()) {
       assertEquals(brokerAssignment.get(brokerId), BrokerResourceStateModel.ONLINE);
     }
     TestUtils.waitForCondition(aVoid -> {
       ExternalView brokerResourceExternalView =
-          _helixAdmin.getResourceExternalView(clusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+          _helixAdmin.getResourceExternalView(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
       for (Map<String, String> brokerAssignment : brokerResourceExternalView.getRecord().getMapFields().values()) {
         if (!brokerAssignment.containsKey(brokerId)) {
           return false;
@@ -100,24 +128,23 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
     // Dropping the broker should fail because it is still in the broker resource
     try {
-      sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+      instanceClient.dropInstance(brokerId);
       fail("Dropping instance should fail because it is still in the broker resource");
     } catch (Exception e) {
       // Expected
     }
 
     // Untag the broker and update the broker resource so that it is removed from the broker resource
-    sendPutRequest(_controllerRequestURLBuilder.forInstanceUpdateTags(brokerId, Collections.emptyList(), true));
+    instanceClient.updateInstanceTags(brokerId, List.of(), true);
 
     // Check if broker is removed from all the tables in broker resource
-    brokerResourceIdealState =
-        _helixAdmin.getResourceIdealState(clusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    brokerResourceIdealState = _helixAdmin.getResourceIdealState(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
     for (Map<String, String> brokerAssignment : brokerResourceIdealState.getRecord().getMapFields().values()) {
       assertFalse(brokerAssignment.containsKey(brokerId));
     }
     TestUtils.waitForCondition(aVoid -> {
       ExternalView brokerResourceExternalView =
-          _helixAdmin.getResourceExternalView(clusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+          _helixAdmin.getResourceExternalView(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
       for (Map<String, String> brokerAssignment : brokerResourceExternalView.getRecord().getMapFields().values()) {
         if (brokerAssignment.containsKey(brokerId)) {
           return false;
@@ -127,7 +154,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     }, 60_000L, "Failed to remove broker from broker resource ExternalView");
 
     // Dropping the broker should success now
-    sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+    instanceClient.dropInstance(brokerId);
 
     // Check if broker is dropped from the cluster
     assertFalse(_helixAdmin.getInstancesInCluster(clusterName).contains(brokerId));
@@ -183,9 +210,9 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
       // - Connection refused
       // - Connection reset
       // - Channel is inactive
-      assertEquals(firstException.get("errorCode").intValue(), QueryException.BROKER_REQUEST_SEND_ERROR_CODE);
+      assertEquals(firstException.get("errorCode").intValue(), QueryErrorCode.BROKER_REQUEST_SEND.getId());
       JsonNode secondException = exceptions.get(1);
-      assertEquals(secondException.get("errorCode").intValue(), QueryException.SERVER_NOT_RESPONDING_ERROR_CODE);
+      assertEquals(secondException.get("errorCode").intValue(), QueryErrorCode.SERVER_NOT_RESPONDING.getId());
     } else {
       assertEquals(queryResult.get("resultTable").get("rows").get(0).get(0).longValue(), getCountStarResult());
       assertTrue(queryResult.get("exceptions").isEmpty());
@@ -256,19 +283,19 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     assertTrue(row.get(1).intValue() < 253);
 
     // Should fail when merging final results that cannot be merged.
-    try {
-      postQuery("SET serverReturnFinalResult = true; SELECT AVG(DaysSinceEpoch) FROM mytable");
-      fail();
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Cannot merge final results for function: AVG"));
-    }
-    try {
-      postQuery("SET serverReturnFinalResultKeyUnpartitioned = true; "
-          + "SELECT CRSArrTime, AVG(DaysSinceEpoch) FROM mytable GROUP BY 1 ORDER BY 2 DESC LIMIT 1");
-      fail();
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Cannot merge final results for function: AVG"));
-    }
+    result = postQuery("SET serverReturnFinalResult = true; SELECT AVG(DaysSinceEpoch) FROM mytable");
+    JsonNode exceptionNode = result.get("exceptions").get(0);
+    int errorCode = exceptionNode.get("errorCode").asInt();
+    assertEquals(errorCode, QueryErrorCode.MERGE_RESPONSE.getId());
+    String errorMessage = exceptionNode.get("message").asText();
+    assertTrue(errorMessage.contains("Cannot merge final results for function: AVG"));
+    result = postQuery("SET serverReturnFinalResultKeyUnpartitioned = true; "
+        + "SELECT CRSArrTime, AVG(DaysSinceEpoch) FROM mytable GROUP BY 1 ORDER BY 2 DESC LIMIT 1");
+    exceptionNode = result.get("exceptions").get(0);
+    errorCode = exceptionNode.get("errorCode").asInt();
+    assertEquals(errorCode, QueryErrorCode.MERGE_RESPONSE.getId());
+    errorMessage = exceptionNode.get("message").asText();
+    assertTrue(errorMessage.contains("Cannot merge final results for function: AVG"));
 
     // Should not fail when group keys are partitioned because there is no need to merge final results.
     result = postQuery("SELECT DaysSinceEpoch, AVG(CRSArrTime) FROM mytable GROUP BY 1 ORDER BY 2 DESC LIMIT 1");
@@ -287,47 +314,19 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     assertEquals(row.get(1).doubleValue(), 725560.0 / 444);
   }
 
-  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
-  @Test(enabled = false)
-  public void testStarTreeTriggering() {
-    // Ignored
-  }
-
-  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
-  @Test(enabled = false)
-  @Override
-  public void testDefaultColumns(boolean useMultiStageQueryEngine) {
-    // Ignored
-  }
-
-  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
-  @Test(enabled = false)
-  @Override
-  public void testForwardIndexTriggering() {
-    // Ignored
-  }
-
-  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
-  @Test(enabled = false)
-  public void testBloomFilterTriggering() {
-    // Ignored
-  }
-
-  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
-  @Test(enabled = false)
-  @Override
-  public void testRangeIndexTriggering(boolean useMultiStageQueryEngine)
+  @Test
+  public void testConstantExpressionQuery()
       throws Exception {
-    // Ignored
+    setUseMultiStageQueryEngine(true);
+
+    JsonNode result = postQuery("SELECT 1");
+    assertEquals(result.get("numServersQueried").intValue(), 1);
+
+    result = postQuery("SELECT DaysSinceEpoch, AVG(CRSArrTime) FROM mytable WHERE false GROUP BY 1 ORDER BY 2 DESC");
+    assertEquals(result.get("numServersQueried").intValue(), 1);
   }
 
-  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
-  @Test(enabled = false)
-  @Override
-  public void testInvertedIndexTriggering() {
-    // Ignored
-  }
-
+  // Disabled because segments might not be server partitioned with multiple servers
   @Test(enabled = false)
   @Override
   public void testHardcodedServerPartitionedSqlQueries() {

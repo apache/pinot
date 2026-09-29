@@ -25,27 +25,24 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 
-/**
- * PatternMixtureGenerator enables combination of multiple Generators in alternating and additive patterns, including
- * nested mixture models. This is typically used to generate similar (but not exact copies of) time series for different
- * dimension values of series or to simulate anomalous behavior in a otherwise regular time series.
- *
- * Generator example:
- * <pre>
- *     generator bins = [
- *       [ { type = "SEASONAL", mean = 10, ... } ],
- *       [ { type = "SEASONAL", mean = 30, ... }, { type = "SPIKE", arrivalMean = 2, ... } ],
- *       [ { type = "SEASONAL", mean = 50, ... } ],
- *     ]
- *
- *     returns [ 10, 30, 50, 11, 29, 52, 10, 114, 51, 9, 64, 50, 10, 35, 49, ... ]
- * </pre>
- *
- * Configuration examples:
- * <ul>
- *     <li>./pinot-tools/src/main/resources/generator/complexWebsite_generator.json</li>
- * </ul>
- */
+/// PatternMixtureGenerator enables combination of multiple Generators in alternating and additive patterns, including
+/// nested mixture models. This is typically used to generate similar (but not exact copies of) time series for
+/// different dimension values of series or to simulate anomalous behavior in a otherwise regular time series.
+///
+/// Generator example:
+///
+/// ```
+/// generator bins = [
+///   [ { type = "SEASONAL", mean = 10, ... } ],
+///   [ { type = "SEASONAL", mean = 30, ... }, { type = "SPIKE", arrivalMean = 2, ... } ],
+///   [ { type = "SEASONAL", mean = 50, ... } ],
+/// ]
+///
+/// returns [ 10, 30, 50, 11, 29, 52, 10, 114, 51, 9, 64, 50, 10, 35, 49, ... ]
+/// ```
+///
+/// Configuration examples:
+///   - ./pinot-tools/src/main/resources/generator/complexWebsite_generator.json
 public class PatternMixtureGenerator implements Generator {
   private final List<List<Generator>> _generatorBins;
 

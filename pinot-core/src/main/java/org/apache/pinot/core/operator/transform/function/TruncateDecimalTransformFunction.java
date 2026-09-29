@@ -98,7 +98,22 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
       }
     } else {
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = Math.signum(leftValues[i]) * Math.floor(Math.abs(leftValues[i]));
+        double value = leftValues[i];
+        if (!Double.isFinite(value)) {
+          // Preserve historical behavior for NaN and infinities.
+          _doubleValuesSV[i] = value;
+          continue;
+        }
+        double truncated;
+        if (value > 0.0d) {
+          truncated = Math.floor(value);
+        } else if (value < 0.0d) {
+          truncated = Math.ceil(value);
+        } else {
+          truncated = 0.0d;
+        }
+        // Normalize -0.0 to +0.0 for deterministic output and test stability.
+        _doubleValuesSV[i] = truncated == 0.0d ? 0.0d : truncated;
       }
     }
     return _doubleValuesSV;

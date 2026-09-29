@@ -20,12 +20,11 @@ package org.apache.pinot.segment.local.io.util;
 
 import java.io.Closeable;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
-/**
- * Interface for value readers, which read a value at a given index.
- */
+/// Interface for value readers, which read a value at a given index.
 public interface ValueReader extends Closeable {
 
   int getInt(int index);
@@ -40,34 +39,42 @@ public interface ValueReader extends Closeable {
     return BigDecimalUtils.deserialize(getBytes(index, numBytesPerValue));
   }
 
-  /**
-   * Returns un-padded bytes for string.
-   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
-   */
-  byte[] getUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer);
+  /// Reads the unpadded bytes into the given buffer and returns the length. Applicable to STRING only.
+  /// NOTE: The passed in reusable buffer should have capacity of at least `numBytesPerValue`.
+  int readUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer);
 
-  /**
-   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
-   */
-  String getUnpaddedString(int index, int numBytesPerValue, byte[] buffer);
+  /// Returns un-padded bytes for string.
+  /// NOTE: The passed in reusable buffer should have capacity of at least `numBytesPerValue`.
+  default byte[] getUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer) {
+    int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
+    byte[] value = new byte[length];
+    System.arraycopy(buffer, 0, value, 0, length);
+    return value;
+  }
 
-  /**
-   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
-   */
-  String getPaddedString(int index, int numBytesPerValue, byte[] buffer);
+  /// NOTE: The passed in reusable buffer should have capacity of at least `numBytesPerValue`.
+  default String getUnpaddedString(int index, int numBytesPerValue, byte[] buffer) {
+    int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
+    return new String(buffer, 0, length, StandardCharsets.UTF_8);
+  }
 
-  /**
-   * NOTE: Do not reuse buffer for BYTES because the return value can have variable length.
-   */
+  /// Reads the bytes into the given buffer and returns the length. Applicable to variable sized types other than
+  /// STRING, i.e. BIG_DECIMAL, BYTES.
+  /// NOTE: The passed in reusable buffer should have capacity of at least `numBytesPerValue`.
+  int readBytes(int index, int numBytesPerValue, byte[] buffer);
+
+  /// NOTE: Do not reuse buffer for BYTES because the return value can have variable length.
   byte[] getBytes(int index, int numBytesPerValue);
 
-  /**
-   * Returns the comparison result of the UTF-8 decoded values.
-   */
+  /// Applicable to STRING only.
+  int getUnpaddedByteSize(int index, int numBytesPerValue);
+
+  /// Applicable to variable sized types other than STRING, i.e. BIG_DECIMAL, BYTES.
+  int getByteSize(int index, int numBytesPerValue);
+
+  /// Returns the comparison result of the UTF-8 decoded values.
   int compareUtf8Bytes(int index, int numBytesPerValue, byte[] bytes);
 
-  /**
-   * Returns the comparison result of the bytes values.
-   */
+  /// Returns the comparison result of the bytes values.
   int compareBytes(int index, int numBytesPerValue, byte[] bytes);
 }

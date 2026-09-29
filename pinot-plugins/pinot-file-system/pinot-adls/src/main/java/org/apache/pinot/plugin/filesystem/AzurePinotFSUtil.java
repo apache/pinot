@@ -24,23 +24,19 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 
 
-/**
- * Util class for Azure related PinotFS
- */
+/// Util class for Azure related PinotFS
 public class AzurePinotFSUtil {
   private static final String DIRECTORY_DELIMITER = File.separator;
 
   private AzurePinotFSUtil() {
   }
 
-  /**
-   * Extract Azure Data Lake Gen2 style path from uri
-   *
-   * NOTE: returning path 'should not be' url encoded. (e.g. should return 'a/segment' instead of 'a%2Fsegment')
-   *
-   * @param uri a uri path
-   * @return path in Azure Data Lake Gen2 format
-   */
+  /// Extract Azure Data Lake Gen2 style path from uri
+  ///
+  /// NOTE: returning path 'should not be' url encoded. (e.g. should return 'a/segment' instead of 'a%2Fsegment')
+  ///
+  /// @param uri a uri path
+  /// @return path in Azure Data Lake Gen2 format
   public static String convertUriToAzureStylePath(URI uri) {
     // Pinot side code uses `URLEncoder` when building uri
     String path = URLDecoder.decode(uri.getRawPath(), StandardCharsets.UTF_8);
@@ -53,14 +49,12 @@ public class AzurePinotFSUtil {
     return path;
   }
 
-  /**
-   * Convert Azure Data Lake Gen2 style path into uri format.
-   *
-   * NOTE: returning path 'should not be' url encoded. (e.g. should return 'a/segment' instead of 'a%2Fsegment')
-   *
-   * @param path Azure data lake gen2 style path
-   * @return path in uri format
-   */
+  /// Convert Azure Data Lake Gen2 style path into uri format.
+  ///
+  /// NOTE: returning path 'should not be' url encoded. (e.g. should return 'a/segment' instead of 'a%2Fsegment')
+  ///
+  /// @param path Azure data lake gen2 style path
+  /// @return path in uri format
   public static String convertAzureStylePathToUriStylePath(String path) {
     if (!path.startsWith(DIRECTORY_DELIMITER)) {
       path = DIRECTORY_DELIMITER + path;

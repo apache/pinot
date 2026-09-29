@@ -21,52 +21,52 @@ package org.apache.pinot.segment.local.segment.index.loader;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.CompressionStatsMetadata;
 import org.apache.pinot.segment.local.segment.index.inverted.InvertedIndexType;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
-import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
-import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 
 
-/**
- * Helper classed used by the {@link SegmentPreProcessor} to generate the forward index from inverted index and
- * dictionary when the forward index is enabled for columns where it was previously disabled. This is also invoked by
- * the {@link IndexHandler} code in scenarios where the forward index needs to be temporarily created to generate other
- * indexes for the given column. In such cases the forward index will be cleaned up after the {@link IndexHandler} code
- * completes.
- *
- * For multi-value columns the following invariants cannot be maintained:
- * - Ordering of elements within a given multi-value row. This will always be a limitation.
- *
- * TODO: Currently for multi-value columns generating the forward index can lead to a data loss as frequency information
- *       is not available for repeats within a given row. This needs to be addressed by tracking the frequency data
- *       as part of an on-disk structure when forward index is disabled for a column.
- *
- * TODO (index-spi): Rename this class, as it is not an implementation of
- * {@link org.apache.pinot.segment.spi.index.IndexCreator}.
- */
+/// Helper classed used by the [SegmentPreProcessor] to generate the forward index from inverted index and
+/// dictionary when the forward index is enabled for columns where it was previously disabled. This is also invoked by
+/// the [org.apache.pinot.segment.spi.index.IndexHandler] code in scenarios where the forward index needs to be
+/// temporarily created to generate other indexes for the given column. In such cases the forward index will be cleaned
+/// up after the [org.apache.pinot.segment.spi.index.IndexHandler] code completes.
+///
+/// For multi-value columns the following invariants cannot be maintained:
+/// - Ordering of elements within a given multi-value row. This will always be a limitation.
+///
+/// TODO: Currently for multi-value columns generating the forward index can lead to a data loss as frequency
+///       information is not available for repeats within a given row. This needs to be addressed by tracking the
+///       frequency data as part of an on-disk structure when forward index is disabled for a column.
+///
+/// TODO (index-spi): Rename this class, as it is not an implementation of
+/// [org.apache.pinot.segment.spi.index.IndexCreator].
 public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoCloseable {
   private static final Logger LOGGER =
       LoggerFactory.getLogger(InvertedIndexAndDictionaryBasedForwardIndexCreator.class);
@@ -78,21 +78,24 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private static final String FORWARD_INDEX_LENGTH_BUFFER_SUFFIX = ".fwd.idx.len.buf";
   private static final String FORWARD_INDEX_MAX_SIZE_BUFFER_SUFFIX = ".fwd.idx.maxsize.buf";
 
-  private final String _columnName;
-  private final ForwardIndexConfig _forwardIndexConfig;
+  private final SegmentDirectory _segmentDirectory;
   private final SegmentDirectory.Writer _segmentWriter;
+  private final TableConfig _tableConfig;
+  private final String _columnName;
+  /// `true` when the post-rebuild config keeps a standalone dictionary file for the column. Set to `false` only
+  /// when the dictionary is being dropped as part of the rebuild — independent of whether the new forward index
+  /// is dict-encoded or raw, since a raw forward index can also share an existing dictionary.
+  private final boolean _keepDictionary;
+  private final ForwardIndexConfig _forwardIndexConfig;
   private final boolean _isTemporaryForwardIndex;
 
   // Metadata
-  private final SegmentDirectory _segmentDirectory;
   private final ColumnMetadata _columnMetadata;
   private final boolean _singleValue;
   private final int _cardinality;
   private final int _numDocs;
   private final int _maxNumberOfMultiValues;
-  private final FieldSpec.DataType _storedType;
   private final int _totalNumberOfEntries;
-  private final boolean _dictionaryEnabled;
   private final boolean _useMMapBuffer;
 
   // Files and temporary buffers
@@ -112,39 +115,39 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   // For multi-valued column only to track max row size
   private PinotDataBuffer _forwardIndexMaxSizeBuffer;
 
-  public InvertedIndexAndDictionaryBasedForwardIndexCreator(String columnName, SegmentDirectory segmentDirectory,
-      boolean dictionaryEnabled, ForwardIndexConfig fwdConf, SegmentDirectory.Writer segmentWriter,
-      boolean isTemporaryForwardIndex)
+  public InvertedIndexAndDictionaryBasedForwardIndexCreator(SegmentDirectory segmentDirectory,
+      SegmentDirectory.Writer segmentWriter, TableConfig tableConfig, String columnName,
+      FieldIndexConfigs fieldIndexConfigs, boolean isTemporaryForwardIndex)
       throws IOException {
-    _columnName = columnName;
     _segmentDirectory = segmentDirectory;
-    _segmentMetadata = segmentDirectory.getSegmentMetadata();
     _segmentWriter = segmentWriter;
+    _tableConfig = tableConfig;
+    _columnName = columnName;
+    _keepDictionary = fieldIndexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled();
+    _forwardIndexConfig = fieldIndexConfigs.getConfig(StandardIndexes.forward());
     _isTemporaryForwardIndex = isTemporaryForwardIndex;
 
+    _segmentMetadata = segmentDirectory.getSegmentMetadata();
     _columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
     _singleValue = _columnMetadata.isSingleValue();
-    _cardinality = _columnMetadata.getCardinality();
     _numDocs = _columnMetadata.getTotalDocs();
+    _cardinality = _columnMetadata.getCardinality();
+    assert _numDocs > 0 && _cardinality > 0;
     _totalNumberOfEntries = _columnMetadata.getTotalNumberOfEntries();
     _maxNumberOfMultiValues = _columnMetadata.getMaxNumberOfMultiValues();
-    _storedType = _columnMetadata.getFieldSpec().getDataType().getStoredType();
-    _dictionaryEnabled = dictionaryEnabled;
-    int numValues = _singleValue ? _numDocs : _totalNumberOfEntries;
-    _useMMapBuffer = numValues > NUM_VALUES_THRESHOLD_FOR_MMAP_BUFFER;
+    _useMMapBuffer = _totalNumberOfEntries > NUM_VALUES_THRESHOLD_FOR_MMAP_BUFFER;
 
     // Sorted columns should never need recreation of the forward index as the forwardIndexDisabled flag is treated as
     // a no-op for sorted columns
     File indexDir = _segmentMetadata.getIndexDir();
     String fileExtension;
-    if (_dictionaryEnabled) {
+    if (_forwardIndexConfig.getEncodingType() == EncodingType.DICTIONARY) {
       fileExtension = _singleValue ? V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION
           : V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
     } else {
       fileExtension = _singleValue ? V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION
           : V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION;
     }
-    _forwardIndexConfig = fwdConf;
     _forwardIndexFile = new File(indexDir, columnName + fileExtension);
     _forwardIndexValueBufferFile = new File(indexDir, columnName + FORWARD_INDEX_VALUE_BUFFER_SUFFIX);
     _forwardIndexLengthBufferFile = new File(indexDir, columnName + FORWARD_INDEX_LENGTH_BUFFER_SUFFIX);
@@ -152,7 +155,8 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
 
     // Create the temporary buffers needed
     try {
-      _forwardIndexValueBuffer = createTempBuffer((long) numValues * Integer.BYTES, _forwardIndexValueBufferFile);
+      _forwardIndexValueBuffer =
+          createTempBuffer((long) _totalNumberOfEntries * Integer.BYTES, _forwardIndexValueBufferFile);
       if (!_singleValue) {
         _forwardIndexLengthBuffer = createTempBuffer((long) _numDocs * Integer.BYTES, _forwardIndexLengthBufferFile);
         for (int i = 0; i < _numDocs; i++) {
@@ -212,9 +216,11 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       // MV columns, in addition to dictionary related metadata, MAX_MULTI_VALUE_ELEMENTS and TOTAL_NUMBER_OF_ENTRIES
       // may be modified which can be left behind in the modified state even on forward index deletion.
       LOGGER.info("Created forward index from inverted index and dictionary. Updating metadata properties for "
-          + "segment: {}, column: {}, property list: {}, is temporary: {}", segmentName, _columnName,
+              + "segment: {}, column: {}, property list: {}, is temporary: {}", segmentName, _columnName,
           metadataProperties, _isTemporaryForwardIndex);
-      _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
+      if (!metadataProperties.isEmpty()) {
+        _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
+      }
     } catch (Exception e) {
       throw new IOException(
           String.format("Failed to update metadata properties for segment: %s, column: %s", segmentName, _columnName),
@@ -225,7 +231,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       // Only cleanup the other indexes if the forward index to be created is permanent. If the forward index is
       // temporary, it is meant to be used only for construction of other indexes and will be deleted once all the
       // IndexHandlers have completed.
-      if (!_dictionaryEnabled) {
+      if (!_keepDictionary) {
         LOGGER.info("Clean up indexes no longer needed or which need to be rewritten for segment: {}, column: {}",
             segmentName, _columnName);
         // Delete the dictionary
@@ -250,33 +256,69 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         (BitmapInvertedIndexReader) InvertedIndexType.ReaderFactory
             .INSTANCE.createSkippingForward(_segmentWriter, _columnMetadata);
         Dictionary dictionary = DictionaryIndexType.read(_segmentWriter, _columnMetadata)) {
-      boolean isFixedWidth = _columnMetadata.getFieldSpec().getDataType().isFixedWidth();
-      int lengthOfLongestEntry = isFixedWidth ? -1 : 0;
-      // Construct the forward index in the values buffer
+      // Construct the forward index in the values buffer. For var-length columns, also gather per-element stats
+      // (lengthOfShortest/Longest, isAscii for STRING) inline when the source segment is missing them, so the
+      // backfill happens without a second dictionary scan.
+      DataType storedType = _columnMetadata.getStoredType();
+      boolean backfillStats =
+          !storedType.isFixedWidth() && _columnMetadata.getLengthOfShortestElement() < 0;
+      boolean compressionStatsEnabled = isCompressionStatsEnabled();
+      int lengthOfShortestElement = Integer.MAX_VALUE;
+      int lengthOfLongestElement = 0;
+      boolean isAscii = storedType == DataType.STRING;
+      long dictionaryUncompressedValueSize = compressionStatsEnabled && storedType.isFixedWidth()
+          ? (long) _numDocs * storedType.size() : 0;
       for (int dictId = 0; dictId < _cardinality; dictId++) {
         ImmutableRoaringBitmap docIdsBitmap = invertedIndexReader.getDocIds(dictId);
         int finalDictId = dictId;
         docIdsBitmap.stream().forEach(docId -> putInt(_forwardIndexValueBuffer, docId, finalDictId));
-        if (!isFixedWidth) {
-          lengthOfLongestEntry = trackLengthOfLongestEntry(dictionary, lengthOfLongestEntry, dictId);
+        int valueSize = backfillStats || (compressionStatsEnabled && !storedType.isFixedWidth())
+            ? dictionary.getValueSize(dictId) : 0;
+        if (backfillStats) {
+          lengthOfShortestElement = Math.min(lengthOfShortestElement, valueSize);
+          lengthOfLongestElement = Math.max(lengthOfLongestElement, valueSize);
+          if (isAscii) {
+            isAscii = valueSize == dictionary.getStringValue(dictId).length();
+          }
+        }
+        if (compressionStatsEnabled && !storedType.isFixedWidth()) {
+          dictionaryUncompressedValueSize += (long) valueSize * docIdsBitmap.getCardinality();
         }
       }
 
-      IndexCreationContext context = IndexCreationContext.builder()
-          .withIndexDir(_segmentMetadata.getIndexDir())
-          .withColumnMetadata(_columnMetadata)
-          .withForwardIndexDisabled(false)
-          .withDictionary(_dictionaryEnabled)
-          .withLengthOfLongestEntry(lengthOfLongestEntry)
-          .build();
+      IndexCreationContext.Builder builder =
+          new IndexCreationContext.Builder(_segmentMetadata.getIndexDir(), _tableConfig, _columnMetadata)
+              .withCompressionStatsEnabled(compressionStatsEnabled);
+      if (backfillStats) {
+        builder.withLengthOfShortestElement(lengthOfShortestElement);
+        builder.withLengthOfLongestElement(lengthOfLongestElement);
+        builder.withAscii(isAscii);
+      }
 
-      writeToForwardIndex(dictionary, context);
+      // NOTE: this method closes buffers and removes files
+      CompressionStatsMetadata rawCompressionMetadata = writeToForwardIndex(dictionary, builder.build());
 
       // Setup and return the metadata properties to update
       Map<String, String> metadataProperties = new HashMap<>();
-      metadataProperties.put(getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(_dictionaryEnabled));
-      metadataProperties.put(getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE),
-          String.valueOf(_dictionaryEnabled ? _columnMetadata.getColumnMaxLength() : 0));
+      metadataProperties.put(getKeyFor(_columnName, FORWARD_INDEX_ENCODING),
+          _forwardIndexConfig.getEncodingType().name());
+      if (!_keepDictionary) {
+        metadataProperties.put(getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(false));
+        metadataProperties.put(getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
+        // TODO: See https://github.com/apache/pinot/pull/16921 for details
+        // TODO: Remove the property after 1.6.0 release
+        // metadataProperties.put(getKeyFor(_columnName, BITS_PER_ELEMENT), null);
+      }
+      if (backfillStats) {
+        metadataProperties.put(getKeyFor(_columnName, LENGTH_OF_SHORTEST_ELEMENT),
+            String.valueOf(lengthOfShortestElement));
+        metadataProperties.put(getKeyFor(_columnName, LENGTH_OF_LONGEST_ELEMENT),
+            String.valueOf(lengthOfLongestElement));
+        if (storedType == DataType.STRING) {
+          metadataProperties.put(getKeyFor(_columnName, IS_ASCII), String.valueOf(isAscii));
+        }
+      }
+      addCompressionMetadata(metadataProperties, rawCompressionMetadata, dictionaryUncompressedValueSize);
       return metadataProperties;
     }
   }
@@ -288,21 +330,16 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
             .createSkippingForward(_segmentWriter, _columnMetadata);
         Dictionary dictionary = DictionaryIndexType.read(_segmentWriter, _columnMetadata)) {
       // Construct the forward index length buffer and create the inverted index values and length buffers
-      int[] maxNumberOfMultiValues = new int[]{0};
-      final boolean isFixedWidth = _columnMetadata.getFieldSpec().getDataType().isFixedWidth();
-      int lengthOfLongestEntry = isFixedWidth ? -1 : 0;
-      int[] maxRowLengthInBytes = isFixedWidth ? new int[]{-1} : new int[]{0};
+      int maxNumberOfMultiValues = 0;
       for (int dictId = 0; dictId < _cardinality; dictId++) {
         ImmutableRoaringBitmap docIdsBitmap = invertedIndexReader.getDocIds(dictId);
-        docIdsBitmap.stream().forEach(docId -> {
-          int newRowLength = getInt(_forwardIndexLengthBuffer, docId) + 1;
-          maxNumberOfMultiValues[0] = Math.max(maxNumberOfMultiValues[0], newRowLength);
-          putInt(_forwardIndexLengthBuffer, docId, newRowLength);
+        PeekableIntIterator intIterator = docIdsBitmap.getIntIterator();
+        while (intIterator.hasNext()) {
+          int docId = intIterator.next();
+          int numMultiValues = getInt(_forwardIndexLengthBuffer, docId) + 1;
+          putInt(_forwardIndexLengthBuffer, docId, numMultiValues);
+          maxNumberOfMultiValues = Math.max(maxNumberOfMultiValues, numMultiValues);
           _nextValueId++;
-        });
-
-        if (!isFixedWidth) {
-          lengthOfLongestEntry = trackLengthOfLongestEntry(dictionary, lengthOfLongestEntry, dictId);
         }
       }
 
@@ -310,14 +347,14 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         LOGGER.warn("Total number of entries: {} less than expected total number of entries: {}, multi-value column: "
                 + "{} duplicates detected, duplicate entries within each row lost! Expected maxNumberOfMultiValues: "
                 + "{}, actual maxNumberOfMultiValues: {}", _nextValueId, _totalNumberOfEntries, _columnName,
-            _maxNumberOfMultiValues, maxNumberOfMultiValues[0]);
+            _maxNumberOfMultiValues, maxNumberOfMultiValues);
       } else {
         Preconditions.checkState(_nextValueId == _totalNumberOfEntries,
             String.format("Number of entries found %d cannot be higher than expected total number of entries: %d for "
                     + "column: %s", _nextValueId, _totalNumberOfEntries, _columnName));
-        Preconditions.checkState(maxNumberOfMultiValues[0] == _maxNumberOfMultiValues,
+        Preconditions.checkState(maxNumberOfMultiValues == _maxNumberOfMultiValues,
             String.format("Actual maxNumberOfMultiValues: %d doesn't match expected maxNumberOfMultiValues: %d for "
-                    + "column %s", maxNumberOfMultiValues[0], _maxNumberOfMultiValues, _columnName));
+                + "column %s", maxNumberOfMultiValues, _maxNumberOfMultiValues, _columnName));
       }
 
       // Calculate value index for each docId in the forward index value buffer
@@ -330,97 +367,98 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         forwardValueIndex += length;
       }
 
-      // Construct the forward index values buffer from the inverted index using the length buffer for index tracking
+      // Construct the forward index values buffer from the inverted index using the length buffer for index tracking.
+      // For var-length columns, also tracks per-element stats (lengthOfShortest/Longest, isAscii for STRING) when
+      // the source segment is missing them, so we can backfill those metadata keys without a second dictionary scan.
+      DataType storedType = _columnMetadata.getStoredType();
+      boolean isFixedWidth = storedType.isFixedWidth();
+      boolean compressionStatsEnabled = isCompressionStatsEnabled();
+      int fixedSize = isFixedWidth ? storedType.size() : 0;
+      int maxRowLengthInBytes = isFixedWidth ? maxNumberOfMultiValues * fixedSize : 0;
+      boolean backfillStats = !isFixedWidth && _columnMetadata.getLengthOfShortestElement() < 0;
+      int lengthOfShortestElement = Integer.MAX_VALUE;
+      int lengthOfLongestElement = 0;
+      boolean isAscii = storedType == DataType.STRING;
+      long dictionaryUncompressedValueSize = 0;
       for (int dictId = 0; dictId < _cardinality; dictId++) {
         ImmutableRoaringBitmap docIdsBitmap = invertedIndexReader.getDocIds(dictId);
-        int finalDictId = dictId;
-        docIdsBitmap.stream().forEach(docId -> {
+        PeekableIntIterator intIterator = docIdsBitmap.getIntIterator();
+        int valueSize = isFixedWidth ? fixedSize : dictionary.getValueSize(dictId);
+        if (compressionStatsEnabled) {
+          dictionaryUncompressedValueSize += (long) valueSize * docIdsBitmap.getCardinality();
+        }
+        if (backfillStats) {
+          lengthOfShortestElement = Math.min(lengthOfShortestElement, valueSize);
+          lengthOfLongestElement = Math.max(lengthOfLongestElement, valueSize);
+          if (isAscii) {
+            isAscii = valueSize == dictionary.getStringValue(dictId).length();
+          }
+        }
+        while (intIterator.hasNext()) {
+          int docId = intIterator.next();
           int index = getInt(_forwardIndexLengthBuffer, docId);
-          putInt(_forwardIndexValueBuffer, index, finalDictId);
+          putInt(_forwardIndexValueBuffer, index, dictId);
           putInt(_forwardIndexLengthBuffer, docId, index + 1);
           if (!isFixedWidth) {
-            trackMaxRowLengthInBytes(dictionary, maxRowLengthInBytes, docId, finalDictId);
+            int currentRowLength = getInt(_forwardIndexMaxSizeBuffer, docId);
+            int newRowLength = currentRowLength + valueSize;
+            putInt(_forwardIndexMaxSizeBuffer, docId, newRowLength);
+            maxRowLengthInBytes = Math.max(maxRowLengthInBytes, newRowLength);
           }
-        });
+        }
       }
 
-      IndexCreationContext context = IndexCreationContext.builder()
-          .withIndexDir(_segmentMetadata.getIndexDir())
-          .withColumnMetadata(_columnMetadata)
-          .withForwardIndexDisabled(false)
-          .withDictionary(_dictionaryEnabled)
+      // When the duplicate-detection branch above fires, `_nextValueId` and `maxNumberOfMultiValues` are the new
+      // post-dedup values and differ from the source metadata; override so the forward index creator sees the correct
+      // sizes (consistent with the persisted metadata properties below).
+      File indexDir = _segmentMetadata.getIndexDir();
+      IndexCreationContext.Builder builder = new IndexCreationContext.Builder(indexDir, _tableConfig, _columnMetadata)
           .withTotalNumberOfEntries(_nextValueId)
-          .withMaxNumberOfMultiValueElements(maxNumberOfMultiValues[0])
-          .withMaxRowLengthInBytes(maxRowLengthInBytes[0])
-          .withLengthOfLongestEntry(lengthOfLongestEntry)
-          .build();
+          .withMaxNumberOfMultiValues(maxNumberOfMultiValues)
+          .withMaxRowLengthInBytes(maxRowLengthInBytes)
+          .withCompressionStatsEnabled(compressionStatsEnabled);
+      if (backfillStats) {
+        builder.withLengthOfShortestElement(lengthOfShortestElement);
+        builder.withLengthOfLongestElement(lengthOfLongestElement);
+        builder.withAscii(isAscii);
+      }
 
-      writeToForwardIndex(dictionary, context);
+      CompressionStatsMetadata rawCompressionMetadata = writeToForwardIndex(dictionary, builder.build());
 
       // Setup and return the metadata properties to update
       Map<String, String> metadataProperties = new HashMap<>();
-      metadataProperties.put(getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(_dictionaryEnabled));
-      metadataProperties.put(getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE),
-          String.valueOf(_dictionaryEnabled ? _columnMetadata.getColumnMaxLength() : 0));
-      metadataProperties.put(getKeyFor(_columnName, MAX_MULTI_VALUE_ELEMENTS),
-          String.valueOf(maxNumberOfMultiValues[0]));
-      metadataProperties.put(getKeyFor(_columnName, TOTAL_NUMBER_OF_ENTRIES),
-          String.valueOf(_nextValueId));
+      metadataProperties.put(getKeyFor(_columnName, FORWARD_INDEX_ENCODING),
+          _forwardIndexConfig.getEncodingType().name());
+      if (!_keepDictionary) {
+        metadataProperties.put(getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(false));
+        metadataProperties.put(getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
+        // TODO: See https://github.com/apache/pinot/pull/16921 for details
+        // TODO: Remove the property after 1.6.0 release
+        // metadataProperties.put(getKeyFor(_columnName, BITS_PER_ELEMENT), null);
+      }
+      metadataProperties.put(getKeyFor(_columnName, TOTAL_NUMBER_OF_ENTRIES), String.valueOf(_nextValueId));
+      metadataProperties.put(getKeyFor(_columnName, MAX_MULTI_VALUE_ELEMENTS), String.valueOf(maxNumberOfMultiValues));
+      if (!isFixedWidth) {
+        metadataProperties.put(getKeyFor(_columnName, MAX_ROW_LENGTH_IN_BYTES), String.valueOf(maxRowLengthInBytes));
+        if (backfillStats) {
+          metadataProperties.put(getKeyFor(_columnName, LENGTH_OF_SHORTEST_ELEMENT),
+              String.valueOf(lengthOfShortestElement));
+          metadataProperties.put(getKeyFor(_columnName, LENGTH_OF_LONGEST_ELEMENT),
+              String.valueOf(lengthOfLongestElement));
+          if (storedType == DataType.STRING) {
+            metadataProperties.put(getKeyFor(_columnName, IS_ASCII), String.valueOf(isAscii));
+          }
+        }
+      }
+      addCompressionMetadata(metadataProperties, rawCompressionMetadata, dictionaryUncompressedValueSize);
       return metadataProperties;
     }
   }
 
-  private int trackLengthOfLongestEntry(Dictionary dictionary, int lengthOfLongestEntry, int dictId) {
-    int updatedLengthOfLongestEntry;
-    switch (_storedType) {
-      case STRING:
-        updatedLengthOfLongestEntry = Math.max(dictionary.getStringValue(dictId).getBytes(UTF_8).length,
-            lengthOfLongestEntry);
-        break;
-      case BYTES:
-        ByteArray value = new ByteArray(dictionary.getBytesValue(dictId));
-        updatedLengthOfLongestEntry = Math.max(value.length(), lengthOfLongestEntry);
-        break;
-      case BIG_DECIMAL:
-        updatedLengthOfLongestEntry = Math.max(
-            BigDecimalUtils.byteSize(dictionary.getBigDecimalValue(dictId)), lengthOfLongestEntry);
-        break;
-      default:
-        throw new IllegalStateException("Trying to calculate lengthOfLongestEntry for invalid stored type: "
-            + _storedType);
-    }
-    return updatedLengthOfLongestEntry;
-  }
-
-  private void trackMaxRowLengthInBytes(Dictionary dictionary, int[] maxRowLengthInBytes, int docId, int dictId) {
-    int curSizeOfRow = getInt(_forwardIndexMaxSizeBuffer, docId);
-    switch (_storedType) {
-      case STRING:
-        int newSizeOfEntry = dictionary.getStringValue(dictId).length() + curSizeOfRow;
-        putInt(_forwardIndexMaxSizeBuffer, docId, newSizeOfEntry);
-        maxRowLengthInBytes[0] = Math.max(newSizeOfEntry, maxRowLengthInBytes[0]);
-        break;
-      case BYTES:
-        ByteArray value = new ByteArray(dictionary.getBytesValue(dictId));
-        newSizeOfEntry = value.length() + curSizeOfRow;
-        putInt(_forwardIndexMaxSizeBuffer, docId, newSizeOfEntry);
-        maxRowLengthInBytes[0] = Math.max(newSizeOfEntry, maxRowLengthInBytes[0]);
-        break;
-      case BIG_DECIMAL:
-        newSizeOfEntry = BigDecimalUtils.byteSize(dictionary.getBigDecimalValue(dictId)) + curSizeOfRow;
-        putInt(_forwardIndexMaxSizeBuffer, docId, newSizeOfEntry);
-        maxRowLengthInBytes[0] = Math.max(newSizeOfEntry, maxRowLengthInBytes[0]);
-        break;
-      default:
-        throw new IllegalStateException("Trying to calculate maxRowLengthInBytes for invalid stored type: "
-            + _storedType);
-    }
-  }
-
-  private void writeToForwardIndex(Dictionary dictionary, IndexCreationContext context)
+  private CompressionStatsMetadata writeToForwardIndex(Dictionary dictionary, IndexCreationContext context)
       throws IOException {
     try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, _forwardIndexConfig)) {
-      if (_dictionaryEnabled) {
+      if (creator.isDictionaryEncoded()) {
         if (_singleValue) {
           for (int docId = 0; docId < _numDocs; docId++) {
             creator.putDictId(getInt(_forwardIndexValueBuffer, docId));
@@ -516,6 +554,25 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
               }
             }
             break;
+          case BIG_DECIMAL:
+            if (_singleValue) {
+              for (int docId = 0; docId < _numDocs; docId++) {
+                creator.putBigDecimal(dictionary.getBigDecimalValue(getInt(_forwardIndexValueBuffer, docId)));
+              }
+            } else {
+              int startIdx = 0;
+              for (int docId = 0; docId < _numDocs; docId++) {
+                int endIdx = getInt(_forwardIndexLengthBuffer, docId);
+                BigDecimal[] values = new BigDecimal[endIdx - startIdx];
+                int valuesIdx = 0;
+                for (int i = startIdx; i < endIdx; i++) {
+                  values[valuesIdx++] = dictionary.getBigDecimalValue(getInt(_forwardIndexValueBuffer, i));
+                }
+                creator.putBigDecimalMV(values);
+                startIdx = endIdx;
+              }
+            }
+            break;
           case STRING:
             if (_singleValue) {
               for (int docId = 0; docId < _numDocs; docId++) {
@@ -554,16 +611,14 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
               }
             }
             break;
-          case BIG_DECIMAL:
-            Preconditions.checkState(_singleValue, "BIG_DECIMAL type not supported for multi-value columns");
-            for (int docId = 0; docId < _numDocs; docId++) {
-              creator.putBigDecimal(dictionary.getBigDecimalValue(getInt(_forwardIndexValueBuffer, docId)));
-            }
-            break;
           default:
             throw new IllegalStateException("Invalid type" + creator.getValueType() + " cannot create forward index");
         }
       }
+      return creator.isDictionaryEncoded() ? CompressionStatsMetadata.unavailable()
+          : CompressionStatsMetadata.forRawForwardIndex(
+              creator.getRawForwardIndexUncompressedValueSizeInBytes(),
+              creator.getRawForwardIndexChunkCompressionType());
     } catch (Exception e) {
       throw new IOException(String.format(
           "Cannot create the forward index from inverted index for column %s", _columnName), e);
@@ -572,6 +627,29 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       destroyBuffer(_forwardIndexLengthBuffer, _forwardIndexLengthBufferFile);
       destroyBuffer(_forwardIndexMaxSizeBuffer, _forwardIndexMaxSizeBufferFile);
     }
+  }
+
+  private boolean isCompressionStatsEnabled() {
+    return _tableConfig.getIndexingConfig() != null
+        && _tableConfig.getIndexingConfig().isCompressionStatsEnabled();
+  }
+
+  private void addCompressionMetadata(Map<String, String> metadataProperties,
+      CompressionStatsMetadata rawCompressionMetadata, long dictionaryUncompressedValueSizeInBytes) {
+    if (_isTemporaryForwardIndex) {
+      return;
+    }
+    CompressionStatsMetadata compressionMetadata = CompressionStatsMetadata.unavailable();
+    if (!isCompressionStatsEnabled()) {
+      compressionMetadata.applyTo(metadataProperties, _columnName);
+      return;
+    }
+    if (_forwardIndexConfig.getEncodingType() == EncodingType.DICTIONARY) {
+      compressionMetadata = CompressionStatsMetadata.forDictionary(dictionaryUncompressedValueSizeInBytes);
+    } else {
+      compressionMetadata = rawCompressionMetadata;
+    }
+    compressionMetadata.applyTo(metadataProperties, _columnName);
   }
 
   private static void putInt(PinotDataBuffer buffer, long index, int value) {

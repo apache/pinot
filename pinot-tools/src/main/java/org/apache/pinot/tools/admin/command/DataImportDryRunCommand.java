@@ -33,10 +33,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class for command to do a dry run of data ingestion so that we can see how transformation functions and
- * complex config will be applied.
- */
+/// Class for command to do a dry run of data ingestion so that we can see how transformation functions and
+/// complex config will be applied.
 @CommandLine.Command(name = "DataImportDryRun", mixinStandardHelpOptions = true)
 public class DataImportDryRunCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataImportDryRunCommand.class);
@@ -60,13 +58,11 @@ public class DataImportDryRunCommand extends AbstractBaseAdminCommand implements
 
     // Gather the stats
     GenericRow reuse = new GenericRow();
-    TransformPipeline.Result reusedResult = new TransformPipeline.Result();
     while (jsonRecordReader.hasNext()) {
       reuse.clear();
-
       reuse = jsonRecordReader.next(reuse);
-      transformPipeline.processRow(reuse, reusedResult);
-      for (GenericRow row : reusedResult.getTransformedRows()) {
+      TransformPipeline.Result result = transformPipeline.processRow(reuse);
+      for (GenericRow row : result.getTransformedRows()) {
         System.out.println("Available Fields: " + JsonUtils.objectToPrettyString(
             new TreeMap<>(row.getFieldToValueMap())));
       }

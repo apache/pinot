@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.minion.MinionConf;
+import org.apache.pinot.minion.MinionTestUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
@@ -38,7 +39,7 @@ public class MinionEventObserversTest {
     MinionConf config = new MinionConf();
     MinionEventObservers.init(config, null);
     for (String taskId : new String[]{"t01", "t02", "t03"}) {
-      MinionEventObserver observer = new MinionProgressObserver();
+      MinionEventObserver observer = MinionTestUtils.getMinionProgressObserver();
       MinionEventObservers.getInstance().addMinionEventObserver(taskId, observer);
       assertSame(MinionEventObservers.getInstance().getMinionEventObserver(taskId), observer);
       MinionEventObservers.getInstance().removeMinionEventObserver(taskId);
@@ -54,7 +55,7 @@ public class MinionEventObserversTest {
     MinionEventObservers.init(config, executor);
     String[] taskIds = new String[]{"t01", "t02", "t03"};
     for (String taskId : taskIds) {
-      MinionEventObserver observer = new MinionProgressObserver();
+      MinionEventObserver observer = MinionTestUtils.getMinionProgressObserver();
       MinionEventObservers.getInstance().addMinionEventObserver(taskId, observer);
       assertSame(MinionEventObservers.getInstance().getMinionEventObserver(taskId), observer);
       MinionEventObservers.getInstance().removeMinionEventObserver(taskId);
@@ -69,16 +70,18 @@ public class MinionEventObserversTest {
 
   @Test
   public void testGetMinionEventObserverWithGivenState() {
-    MinionEventObserver observer1 = new MinionProgressObserver();
-    observer1.notifyTaskStart(null);
+    MinionEventObserver observer1 = MinionTestUtils.getMinionProgressObserver();
+    observer1.notifyTaskStart(MinionTestUtils.getPinotTaskConfig("t01"));
     MinionEventObservers.getInstance().addMinionEventObserver("t01", observer1);
 
-    MinionEventObserver observer2 = new MinionProgressObserver();
-    observer2.notifyProgress(null, "");
+    MinionEventObserver observer2 = MinionTestUtils.getMinionProgressObserver();
+    observer2.notifyTaskStart(MinionTestUtils.getPinotTaskConfig("t02"));
+    observer2.notifyProgress(MinionTestUtils.getPinotTaskConfig("t02"), "");
     MinionEventObservers.getInstance().addMinionEventObserver("t02", observer2);
 
-    MinionEventObserver observer3 = new MinionProgressObserver();
-    observer3.notifyTaskSuccess(null, "");
+    MinionEventObserver observer3 = MinionTestUtils.getMinionProgressObserver();
+    observer3.notifyTaskStart(MinionTestUtils.getPinotTaskConfig("t03"));
+    observer3.notifyTaskSuccess(MinionTestUtils.getPinotTaskConfig("t03"), "");
     MinionEventObservers.getInstance().addMinionEventObserver("t03", observer3);
 
     Map<String, MinionEventObserver> minionEventObserverWithGivenState =

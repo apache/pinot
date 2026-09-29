@@ -63,6 +63,7 @@ public class PredicateTest {
 
     // RegexpLikePredicate
     assertEquals(testSerDe("ReGexP_lIKe(foo,\t\t'bar')"), "regexp_like(foo,'bar')");
+    assertEquals(testSerDe("ReGexP_lIKe(foo,\t\t'bar','i')"), "regexp_like(foo,'bar','i')");
 
     // TextMatchPredicate
     assertEquals(testSerDe("TEXT_MATCH(foo\t ,\t'bar')"), "text_match(foo,'bar')");
@@ -88,10 +89,8 @@ public class PredicateTest {
     assertEquals(children.get(1).toString(), "foo < '456'");
   }
 
-  /**
-   * Tests that the serialized predicate can be parsed and converted back to the same predicate, and returns the
-   * serialized predicate (standardized string representation of the predicate expression).
-   */
+  /// Tests that the serialized predicate can be parsed and converted back to the same predicate, and returns the
+  /// serialized predicate (standardized string representation of the predicate expression).
   private String testSerDe(String predicateExpression) {
     // Parse and convert the string predicate expression into Predicate
     Expression thriftExpression = CalciteSqlParser.compileToExpression(predicateExpression);

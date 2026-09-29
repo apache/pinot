@@ -24,14 +24,14 @@ import java.util.Arrays;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
-import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.FunctionUtils;
+import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
 /*
@@ -39,8 +39,9 @@ import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
  */
 public class FunctionOperand implements TransformOperand {
   private final ColumnDataType _resultType;
-  private final FunctionInvoker _functionInvoker;
+  private final QueryFunctionInvoker _functionInvoker;
   private final ColumnDataType _functionInvokerResultType;
+  private final boolean _needsConversion;
   private final List<TransformOperand> _operands;
   private final Object[] _reusableOperandHolder;
 
@@ -74,14 +75,28 @@ public class FunctionOperand implements TransformOperand {
         throw new IllegalArgumentException(String.format("Unsupported function: %s", functionName));
       }
     }
-    _functionInvoker = new FunctionInvoker(functionInfo);
+    _functionInvoker = new QueryFunctionInvoker(functionInfo);
     if (!_functionInvoker.getMethod().isVarArgs()) {
       Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
       PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
+      boolean needsConversion = false;
       for (int i = 0; i < numOperands; i++) {
         Preconditions.checkState(parameterTypes[i] != null, "Unsupported parameter class: %s for method: %s",
             parameterClasses[i], functionInfo.getMethod());
+        if (!needsConversion) {
+          // For array-typed parameters, always require conversion: the runtime Java class may
+          // differ from the canonical stored type (e.g. Double[] vs double[] after DataBlock
+          // deserialization in the multi-stage engine), and Method.invoke does not autobox arrays.
+          ColumnDataType parameterColumnType = FunctionUtils.getColumnDataType(parameterClasses[i]);
+          if (parameterColumnType == null || argumentTypes[i] != parameterColumnType
+              || parameterClasses[i].isArray()) {
+            needsConversion = true;
+          }
+        }
       }
+      _needsConversion = needsConversion;
+    } else {
+      _needsConversion = false;
     }
     ColumnDataType functionInvokerResultType = FunctionUtils.getColumnDataType(_functionInvoker.getResultClass());
     // Handle unrecognized result class with STRING
@@ -100,18 +115,19 @@ public class FunctionOperand implements TransformOperand {
 
   @Nullable
   @Override
-  public Object apply(Object[] row) {
+  public Object apply(List<Object> row) {
     for (int i = 0; i < _operands.size(); i++) {
       TransformOperand operand = _operands.get(i);
       Object value = operand.apply(row);
       _reusableOperandHolder[i] = value != null ? operand.getResultType().toExternal(value) : null;
     }
-    // TODO: Optimize per record conversion
     Object result;
     if (_functionInvoker.getMethod().isVarArgs()) {
       result = _functionInvoker.invoke(new Object[]{_reusableOperandHolder});
     } else {
-      _functionInvoker.convertTypes(_reusableOperandHolder);
+      if (_needsConversion) {
+        _functionInvoker.convertTypes(_reusableOperandHolder);
+      }
       result = _functionInvoker.invoke(_reusableOperandHolder);
     }
     return result != null ? TypeUtils.convert(_functionInvokerResultType.toInternal(result),

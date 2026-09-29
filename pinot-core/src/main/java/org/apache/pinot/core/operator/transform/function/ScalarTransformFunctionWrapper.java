@@ -23,26 +23,26 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.function.FunctionInfo;
-import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionUtils;
+import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
+import org.apache.pinot.spi.utils.PinotDataType;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
-/**
- * Wrapper transform function on the annotated scalar function.
- */
+/// Wrapper transform function on the annotated scalar function.
 public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   private final String _name;
-  private final FunctionInvoker _functionInvoker;
+  private final QueryFunctionInvoker _functionInvoker;
   private final ColumnDataType _resultType;
   private final TransformResultMetadata _resultMetadata;
 
@@ -54,7 +54,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
 
   public ScalarTransformFunctionWrapper(FunctionInfo functionInfo) {
     _name = functionInfo.getMethod().getName();
-    _functionInvoker = new FunctionInvoker(functionInfo);
+    _functionInvoker = new QueryFunctionInvoker(functionInfo);
     Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
     PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
     int numParameters = parameterClasses.length;
@@ -103,7 +103,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
             break;
           case INT:
             _scalarArguments[i] =
-                parameterTypes[i].convert(literalTransformFunction.getIntLiteral(), PinotDataType.INTEGER);
+                parameterTypes[i].convert(literalTransformFunction.getIntLiteral(), PinotDataType.INT);
             break;
           case LONG:
             _scalarArguments[i] =
@@ -374,16 +374,14 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     return _stringValuesMV;
   }
 
-  /**
-   * Helper method to fetch values for the non-literal transform functions based on the parameter types.
-   */
+  /// Helper method to fetch values for the non-literal transform functions based on the parameter types.
   private void getNonLiteralValues(ValueBlock valueBlock) {
     PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
     for (int i = 0; i < _numNonLiteralArguments; i++) {
       PinotDataType parameterType = parameterTypes[_nonLiteralIndices[i]];
       TransformFunction transformFunction = _nonLiteralFunctions[i];
       switch (parameterType) {
-        case INTEGER:
+        case INT:
           _nonLiteralValues[i] = ArrayUtils.toObject(transformFunction.transformToIntValuesSV(valueBlock));
           break;
         case LONG:
@@ -424,6 +422,16 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case BYTES:
           _nonLiteralValues[i] = transformFunction.transformToBytesValuesSV(valueBlock);
           break;
+        case UUID: {
+          byte[][] bytesValues = transformFunction.transformToBytesValuesSV(valueBlock);
+          int numValues = bytesValues.length;
+          UUID[] uuidValues = new UUID[numValues];
+          for (int j = 0; j < numValues; j++) {
+            uuidValues[j] = UuidUtils.toUUID(bytesValues[j]);
+          }
+          _nonLiteralValues[i] = uuidValues;
+          break;
+        }
         case PRIMITIVE_INT_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToIntValuesMV(valueBlock);
           break;
@@ -436,8 +444,46 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case PRIMITIVE_DOUBLE_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToDoubleValuesMV(valueBlock);
           break;
+        case BIG_DECIMAL_ARRAY:
+          _nonLiteralValues[i] = transformFunction.transformToBigDecimalValuesMV(valueBlock);
+          break;
+        case PRIMITIVE_BOOLEAN_ARRAY: {
+          int[][] intValuesMV = transformFunction.transformToIntValuesMV(valueBlock);
+          int numRows = intValuesMV.length;
+          boolean[][] booleanValuesMV = new boolean[numRows][];
+          for (int j = 0; j < numRows; j++) {
+            int[] intValues = intValuesMV[j];
+            int numValues = intValues.length;
+            boolean[] booleanValues = new boolean[numValues];
+            for (int k = 0; k < numValues; k++) {
+              booleanValues[k] = intValues[k] == 1;
+            }
+            booleanValuesMV[j] = booleanValues;
+          }
+          _nonLiteralValues[i] = booleanValuesMV;
+          break;
+        }
+        case TIMESTAMP_ARRAY: {
+          long[][] longValuesMV = transformFunction.transformToLongValuesMV(valueBlock);
+          int numRows = longValuesMV.length;
+          Timestamp[][] timestampValuesMV = new Timestamp[numRows][];
+          for (int j = 0; j < numRows; j++) {
+            long[] longValues = longValuesMV[j];
+            int numValues = longValues.length;
+            Timestamp[] timestampValues = new Timestamp[numValues];
+            for (int k = 0; k < numValues; k++) {
+              timestampValues[k] = new Timestamp(longValues[k]);
+            }
+            timestampValuesMV[j] = timestampValues;
+          }
+          _nonLiteralValues[i] = timestampValuesMV;
+          break;
+        }
         case STRING_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToStringValuesMV(valueBlock);
+          break;
+        case BYTES_ARRAY:
+          _nonLiteralValues[i] = transformFunction.transformToBytesValuesMV(valueBlock);
           break;
         default:
           throw new IllegalStateException("Unsupported parameter type: " + parameterType);

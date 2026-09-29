@@ -19,8 +19,8 @@
 
 package org.apache.pinot.segment.local.segment.index.range;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,8 +47,10 @@ import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -56,7 +58,7 @@ public class RangeIndexType
     extends AbstractIndexType<RangeIndexConfig, RangeIndexReader, CombinedInvertedIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "range";
   private static final List<String> EXTENSIONS =
-      Collections.singletonList(V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION);
+      List.of(V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION);
 
   protected RangeIndexType() {
     super(StandardIndexes.RANGE_ID);
@@ -73,47 +75,79 @@ public class RangeIndexType
   }
 
   @Override
+  public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
+    RangeIndexConfig rangeIndexConfig = indexConfigs.getConfig(StandardIndexes.range());
+    if (rangeIndexConfig.isEnabled()) {
+      String column = fieldSpec.getName();
+      DataType storedType = fieldSpec.getDataType().getStoredType();
+      Preconditions.checkState(
+          storedType.isNumeric() || indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
+          "Cannot create range index on non-numeric column: %s without dictionary", column);
+      Preconditions.checkState(storedType != DataType.MAP, "Cannot create range index on MAP column: %s", column);
+      // Legacy range index (version 1) over dict IDs is non-exact: query-time partial matches fall back to
+      // ScanBasedFilterOperator, which on a RAW forward column would have to apply a dict-based evaluator
+      // against raw values — silently producing wrong results. Reject this combination upfront and require
+      // the BitSliced range index (version 2) for shared-dict + RAW forward columns.
+      boolean rawForward = indexConfigs.getConfig(StandardIndexes.forward()).getEncodingType()
+          == FieldConfig.EncodingType.RAW;
+      boolean dictionaryEnabled = indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled();
+      Preconditions.checkState(
+          !(rawForward && dictionaryEnabled && rangeIndexConfig.getVersion() == RangeIndexCreator.VERSION),
+          "Cannot create range index version %s on column: %s with RAW forward index and dictionary; "
+              + "use BitSliced range index version %s instead",
+          RangeIndexCreator.VERSION, column, BitSlicedRangeIndexCreator.VERSION);
+    }
+  }
+
+  @Override
   public String getPrettyName() {
     return INDEX_DISPLAY_NAME;
   }
 
   @Override
-  public ColumnConfigDeserializer<RangeIndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
-        .withExclusiveAlternative((tableConfig, schema) -> {
-          if (tableConfig.getIndexingConfig() == null) {
-            return Collections.emptyMap();
-          }
-          List<String> rangeIndexColumns = tableConfig.getIndexingConfig().getRangeIndexColumns();
-          if (rangeIndexColumns == null) {
-            return Collections.emptyMap();
-          }
-          int rangeVersion = tableConfig.getIndexingConfig().getRangeIndexVersion();
-          if (rangeVersion == 0) {
-            rangeVersion = RangeIndexConfig.DEFAULT.getVersion();
-          }
-          Map<String, RangeIndexConfig> result = new HashMap<>();
-          for (String col : rangeIndexColumns) {
-            result.put(col, new RangeIndexConfig(rangeVersion));
-          }
-          return result;
-        });
+  protected ColumnConfigDeserializer<RangeIndexConfig> createDeserializerForLegacyConfigs() {
+    ColumnConfigDeserializer<RangeIndexConfig> fromRangeIndexColumns = (tableConfig, schema) -> {
+      List<String> rangeIndexColumns = tableConfig.getIndexingConfig().getRangeIndexColumns();
+      if (rangeIndexColumns == null) {
+        return Map.of();
+      }
+      int rangeVersion = tableConfig.getIndexingConfig().getRangeIndexVersion();
+      if (rangeVersion == 0) {
+        rangeVersion = RangeIndexConfig.DEFAULT.getVersion();
+      }
+      Map<String, RangeIndexConfig> result = new HashMap<>();
+      for (String col : rangeIndexColumns) {
+        result.put(col, new RangeIndexConfig(rangeVersion));
+      }
+      return result;
+    };
+    ColumnConfigDeserializer<RangeIndexConfig> fromIndexTypes =
+        IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.RANGE,
+            (tableConfig, fieldConfig) -> new RangeIndexConfig(getRangeIndexVersion(tableConfig)));
+    return fromRangeIndexColumns.withFallbackAlternative(fromIndexTypes);
+  }
+
+  private static int getRangeIndexVersion(TableConfig tableConfig) {
+    int rangeIndexVersion = tableConfig.getIndexingConfig().getRangeIndexVersion();
+    return rangeIndexVersion > 0 ? rangeIndexVersion : RangeIndexConfig.DEFAULT.getVersion();
   }
 
   @Override
-  public CombinedInvertedIndexCreator createIndexCreator(IndexCreationContext context, RangeIndexConfig indexConfig)
+  public CombinedInvertedIndexCreator createIndexCreator(IndexCreationContext context,
+      RangeIndexConfig rangeIndexConfig)
       throws IOException {
-    if (indexConfig.getVersion() == BitSlicedRangeIndexCreator.VERSION && context.getFieldSpec().isSingleValueField()) {
+    FieldSpec fieldSpec = context.getFieldSpec();
+    if (rangeIndexConfig.getVersion() == BitSlicedRangeIndexCreator.VERSION && fieldSpec.isSingleValueField()) {
       if (context.hasDictionary()) {
-        return new BitSlicedRangeIndexCreator(context.getIndexDir(), context.getFieldSpec(), context.getCardinality());
+        return new BitSlicedRangeIndexCreator(context.getIndexDir(), fieldSpec, context.getCardinality());
       }
-      return new BitSlicedRangeIndexCreator(context.getIndexDir(), context.getFieldSpec(), context.getMinValue(),
+      return new BitSlicedRangeIndexCreator(context.getIndexDir(), fieldSpec, context.getMinValue(),
           context.getMaxValue());
     }
     // default to RangeIndexCreator for the time being
-    return new RangeIndexCreator(context.getIndexDir(), context.getFieldSpec(),
-        context.hasDictionary() ? FieldSpec.DataType.INT : context.getFieldSpec().getDataType(), -1,
-        -1, context.getTotalDocs(), context.getTotalNumberOfEntries());
+    return new RangeIndexCreator(context.getIndexDir(), fieldSpec,
+        context.hasDictionary() ? DataType.INT : fieldSpec.getDataType().getStoredType(), -1, -1,
+        context.getTotalDocs(), context.getTotalNumberOfEntries());
   }
 
   @Override
@@ -133,8 +167,21 @@ public class RangeIndexType
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    return new RangeIndexHandler(segmentDirectory, configsByCol, tableConfig);
+      Schema schema, TableConfig tableConfig) {
+    return new RangeIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
+  }
+
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, RangeIndexConfig indexConfig) {
+    // Range index supports both dict-encoded (range over dict IDs) and raw (range over values) columns.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, RangeIndexConfig indexConfig) {
+    // The on-disk format differs: dict-encoded ranges use dict IDs while raw ranges use raw values. Transitioning
+    // between the two states requires rebuilding the index against the new domain.
+    return true;
   }
 
   private static class ReaderFactory extends IndexReaderFactory.Default<RangeIndexConfig, RangeIndexReader> {

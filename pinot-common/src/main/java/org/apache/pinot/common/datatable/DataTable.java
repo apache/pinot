@@ -25,20 +25,20 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Data table is used to transfer data from server to broker.
- */
+/// Data table is used to transfer data from server to broker.
 public interface DataTable {
 
-  void addException(ProcessingException processingException);
-
   void addException(int exceptionCode, String exceptionMsg);
+
+  default void addException(QueryErrorCode exceptionCode, String exceptionMsg) {
+    addException(exceptionCode.getId(), exceptionMsg);
+  }
 
   Map<Integer, String> getExceptions();
 
@@ -75,7 +75,11 @@ public interface DataTable {
 
   double[] getDoubleArray(int rowId, int colId);
 
+  BigDecimal[] getBigDecimalArray(int rowId, int colId);
+
   String[] getStringArray(int rowId, int colId);
+
+  ByteArray[] getBytesArray(int rowId, int colId);
 
   @Nullable
   Map<String, Object> getMap(int rowId, int colId);
@@ -91,7 +95,7 @@ public interface DataTable {
   DataTable toDataOnlyDataTable();
 
   enum MetadataValueType {
-    INT, LONG, STRING
+    INT, LONG, STRING, BOOLEAN
   }
 
   /* The MetadataKey is used since V3, where we present metadata as Map<MetadataKey, String>
@@ -139,11 +143,28 @@ public interface DataTable {
     OPERATOR_ID(31, "operatorId", MetadataValueType.STRING),
     OPERATOR_EXEC_START_TIME_MS(32, "operatorExecStartTimeMs", MetadataValueType.LONG),
     OPERATOR_EXEC_END_TIME_MS(33, "operatorExecEndTimeMs", MetadataValueType.LONG),
-    MAX_ROWS_IN_JOIN_REACHED(34, "maxRowsInJoinReached", MetadataValueType.STRING);
+    MAX_ROWS_IN_JOIN_REACHED(34, "maxRowsInJoinReached", MetadataValueType.STRING),
+    NUM_GROUPS_WARNING_LIMIT_REACHED(35, "numGroupsWarningLimitReached", MetadataValueType.STRING),
+    THREAD_MEM_ALLOCATED_BYTES(36, "threadMemAllocatedBytes", MetadataValueType.LONG),
+    RESPONSE_SER_MEM_ALLOCATED_BYTES(37, "responseSerMemAllocatedBytes", MetadataValueType.LONG),
+    // NOTE: for server after release 1.3.0 this flag is always set to true since servers now perform sorting
+    SORTED(38, "sorted", MetadataValueType.BOOLEAN),
+    GROUPS_TRIMMED(39, "groupsTrimmed", MetadataValueType.STRING),
+    // Needed so that we can track workload name in Netty channel response.
+    WORKLOAD_NAME(40, "workloadName", MetadataValueType.STRING),
+    // Needed so that we can track query id in Netty channel response.
+    QUERY_ID(41, "queryId", MetadataValueType.STRING),
+    EARLY_TERMINATION_REASON(42, "earlyTerminationReason", MetadataValueType.STRING),
+    // Set on a merged-only DataTable when one or more input server DataTables were dropped during
+    // the merge (e.g., due to a schema conflict), so the merge ran over a strict subset of the
+    // inputs. How a downstream consumer reacts (skip, retry, accept with annotation) is the
+    // consumer's policy.
+    INCOMPLETE_MERGE(43, "incompleteMerge", MetadataValueType.STRING),
+    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(44, "liteModeLeafStageLimitReached", MetadataValueType.STRING);
 
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!
-    private static final int MAX_ID = 34;
+    private static final int MAX_ID = LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getId();
 
     private static final MetadataKey[] ID_TO_ENUM_KEY_MAP = new MetadataKey[MAX_ID + 1];
     private static final Map<String, MetadataKey> NAME_TO_ENUM_KEY_MAP = new HashMap<>();
@@ -158,9 +179,7 @@ public interface DataTable {
       _valueType = valueType;
     }
 
-    /**
-     * Returns the MetadataKey for the given id, or {@code null} if the id does not exist.
-     */
+    /// Returns the MetadataKey for the given id, or `null` if the id does not exist.
     @Nullable
     public static MetadataKey getById(int id) {
       if (id >= 0 && id < ID_TO_ENUM_KEY_MAP.length) {
@@ -169,9 +188,7 @@ public interface DataTable {
       return null;
     }
 
-    /**
-     * Returns the MetadataKey for the given name, or {@code null} if the name does not exist.
-     */
+    /// Returns the MetadataKey for the given name, or `null` if the name does not exist.
     @Nullable
     public static MetadataKey getByName(String name) {
       return NAME_TO_ENUM_KEY_MAP.get(name);

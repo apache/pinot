@@ -19,9 +19,11 @@
 
 package org.apache.pinot.segment.spi.index;
 
-import com.google.common.collect.ImmutableMap;
+import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.objects.Object2ShortOpenHashMap;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -29,73 +31,113 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.concurrent.ThreadSafe;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-/**
- * This is the entry point of the Index SPI, containing all index types that can be used.
- *
- * A caller can get a specific index type by calling {@link #get(String)} with their id or list all indexes by invoking
- * {@link IndexService#getAllIndexes()}.
- *
- * In production, there should be a single instance of this class and that instance should be returned by
- * {@link #getInstance()}. By default, this instance will be created by calling {@link #fromServiceLoader()}, which
- * reads all ServiceLoader SPI services that implement {@link IndexPlugin}, adding all the {@link IndexType} that can be
- * found in that way. In case we need to change the default behavior, the static instance can be changed with
- * {@link #setInstance(IndexService)}.
- *
- * Thread safety: All methods in this class, including static ones, are thread safe.
- *
- * Note: This class offers a singleton interface, but callers are encouraged to receive a IndexService instance in their
- * constructor and use that instance instead of using the static {@link #getInstance()} method directly. This is
- * specially important when callers want to test the behavior when dealing with different index type sets.
- *
- */
+/// This is the entry point of the Index SPI, containing all index types that can be used.
+///
+/// A caller can get a specific index type by calling [#get(String)] with their id or list all indexes by invoking
+/// [IndexService#getAllIndexes()].
+///
+/// In production, there should be a single instance of this class and that instance should be returned by
+/// [#getInstance()]. By default, this instance will be created by calling [#fromServiceLoader()], which
+/// reads all ServiceLoader SPI services that implement [IndexPlugin], adding all the [IndexType] that can
+/// be found in that way. In case we need to change the default behavior, the static instance can be changed with
+/// [#setInstance(IndexService)].
+///
+/// Every index type gets a numeric id ([#getNumericId(IndexType)]): its position in [#getAllIndexes()]. An
+/// IndexService holds at most [#MAX_INDEX_TYPES] index types, so numeric ids are always in `[0, MAX_INDEX_TYPES)`.
+///
+/// Thread safety: All methods in this class, including static ones, are thread safe.
+///
+/// Note: This class offers a singleton interface, but callers are encouraged to receive a IndexService instance in
+/// their constructor and use that instance instead of using the static [#getInstance()] method directly. This is
+/// specially important when callers want to test the behavior when dealing with different index type sets.
 @ThreadSafe
 public class IndexService {
+  private static final Logger LOGGER = LoggerFactory.getLogger(IndexService.class);
+
+  public static final short UNKNOWN_INDEX = (short) -1;
+
+  /// Maximum number of index types across all registered [IndexPlugin]s, which bounds numeric ids to `[0, 64)`.
+  ///
+  /// The limit comes from `PhysicalColumnIndexContainer` in `pinot-segment-local`, which records the index readers of
+  /// each (segment, column) as bits of one `long`. The constructor rejects a larger plugin set, so an oversized set
+  /// fails when the index plugins are loaded rather than on every segment load. Raising the limit needs a code change
+  /// in that class, for example a `long[]` mask or a fallback layout.
+  public static final int MAX_INDEX_TYPES = Long.SIZE;
 
   private static volatile IndexService _instance = fromServiceLoader();
 
   private final List<IndexType<?, ?, ?>> _allIndexes;
   private final Map<String, IndexType<?, ?, ?>> _allIndexesById;
+  private final Object2ShortOpenHashMap<String> _allIndexPosById;
 
-  private IndexService(Set<IndexPlugin<?>> allPlugins) {
-    ImmutableMap.Builder<String, IndexType<?, ?, ?>> builder = ImmutableMap.builder();
+  /// @throws IllegalArgumentException if the plugins register more than [#MAX_INDEX_TYPES] distinct index types.
+  public IndexService(Set<IndexPlugin<?>> allPlugins) {
+    HashMap<String, IndexPlugin<?>> pluginsById = new HashMap<>();
 
     for (IndexPlugin<?> plugin : allPlugins) {
       IndexType<?, ?, ?> indexType = plugin.getIndexType();
-      builder.put(indexType.getId().toLowerCase(Locale.US), indexType);
+      pluginsById.merge(indexType.getId().toLowerCase(Locale.US), plugin, (older, newer) -> {
+        if (older == newer) {
+          return older;
+        }
+        IndexPlugin<?> winner;
+        IndexPlugin<?> loser;
+        if (older.getPriority() >= newer.getPriority()) {
+          winner = older;
+          loser = newer;
+        } else {
+          winner = newer;
+          loser = older;
+        }
+        LOGGER.info("Two index plugins found for index type {}. "
+                + "Using {} with priority {} instead of {} with priority {}",
+            indexType.getId(), winner.getClass().getCanonicalName(), winner.getPriority(),
+            loser.getClass().getCanonicalName(), loser.getPriority());
+        return winner;
+      });
     }
-    _allIndexesById = builder.build();
+    _allIndexesById = Map.copyOf(
+        pluginsById.entrySet().stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getIndexType()))
+    );
     // Sort index types so that servers can loop over and process them in a more deterministic order.
     List<String> allIndexIds = new ArrayList<>(_allIndexesById.keySet());
     Collections.sort(allIndexIds);
+    Preconditions.checkArgument(allIndexIds.size() <= MAX_INDEX_TYPES,
+        "Cannot register %s index types, at most %s are supported: %s", allIndexIds.size(), MAX_INDEX_TYPES,
+        allIndexIds);
     _allIndexes = new ArrayList<>();
     allIndexIds.forEach(id -> _allIndexes.add(_allIndexesById.get(id)));
+
+    _allIndexPosById = new Object2ShortOpenHashMap(allIndexIds.size());
+    _allIndexPosById.defaultReturnValue(UNKNOWN_INDEX);
+    for (short i = 0; i < _allIndexes.size(); i++) {
+      _allIndexPosById.put(_allIndexes.get(i).getId(), i);
+    }
   }
 
-  /**
-   * Get the static IndexService instance that Pinot should use.
-   */
+  /// Get the static IndexService instance that Pinot should use.
   public static IndexService getInstance() {
     return _instance;
   }
 
-  /**
-   * Sets the static IndexService.
-   *
-   * This is the instance that will be used by most of the code.
-   */
+  /// Sets the static IndexService.
+  ///
+  /// This is the instance that will be used by most of the code.
   public static void setInstance(IndexService other) {
     _instance = other;
   }
 
-  /**
-   * Creates an IndexService by looking for all {@link IndexPlugin} defined as services by {@link ServiceLoader}.
-   *
-   * This is the default way to create an IndexService. In case more tuning is needed,
-   * {@link IndexService#IndexService(Set)}} can be used.
-   */
+  /// Creates an IndexService by looking for all [IndexPlugin] defined as services by [ServiceLoader].
+  ///
+  /// This is the default way to create an IndexService. In case more tuning is needed,
+  /// [IndexService#IndexService(Set)]} can be used.
   public static IndexService fromServiceLoader() {
     Set<IndexPlugin<?>> pluginList = new HashSet<>();
     for (IndexPlugin indexPlugin : ServiceLoader.load(IndexPlugin.class)) {
@@ -104,51 +146,80 @@ public class IndexService {
     return new IndexService(pluginList);
   }
 
-  /**
-   * Returns a set with all the index types stored by this index service.
-   *
-   * @return an immutable list with all index types known by this instance.
-   */
+  /// Returns a set with all the index types stored by this index service.
+  ///
+  /// The list is sorted by index id, and the position of an index type in it is its numeric id
+  /// ([#getNumericId(IndexType)]). It holds at most [#MAX_INDEX_TYPES] entries.
+  ///
+  /// @return an immutable list with all index types known by this instance.
   public List<IndexType<?, ?, ?>> getAllIndexes() {
     return _allIndexes;
   }
 
-  /**
-   * Get the IndexType that is identified by the given index id.
-   *
-   * All IndexType references must be obtained using the {@link IndexService} class (directly or indirectly). Even
-   * if the callers have a compile time dependency to the actual IndexType class. Otherwise problems may arise when
-   * using index overriding.
-   *
-   * In order to have a typesafe access to standard indexes, it is recommended to use {@link StandardIndexes} whenever
-   * it is possible.
-   *
-   * @param indexId the index id, as defined in {@link IndexType#getId()}.
-   * @return An optional which will be empty in case there is no index identified by that id.
-   */
+  /// Get the IndexType that is identified by the given index id.
+  ///
+  /// All IndexType references must be obtained using the [IndexService] class (directly or indirectly). Even
+  /// if the callers have a compile time dependency to the actual IndexType class. Otherwise problems may arise when
+  /// using index overriding.
+  ///
+  /// In order to have a typesafe access to standard indexes, it is recommended to use [StandardIndexes] whenever
+  /// it is possible.
+  ///
+  /// @param indexId the index id, as defined in [IndexType#getId()].
+  /// @return An optional which will be empty in case there is no index identified by that id.
   public Optional<IndexType<?, ?, ?>> getOptional(String indexId) {
     return Optional.ofNullable(_allIndexesById.get(indexId.toLowerCase(Locale.US)));
   }
 
-  /**
-   * Get the IndexType that is identified by the given index id.
-   *
-   * All IndexType references must be obtained using the {@link IndexService} class (directly or indirectly). Even
-   * if the callers have a compile time dependency to the actual IndexType class. Otherwise problems may arise when
-   * using index overriding.
-   *
-   * In order to have a typesafe access to standard indexes, it is recommended to use {@link StandardIndexes} whenever
-   * it is possible.
-   *
-   * @param indexId the index id, as defined in {@link IndexType#getId()}.
-   * @return The index type that is identified by the given id.
-   * @throws IllegalArgumentException in case there is not index type identified by the given id.
-   */
+  /// Get the IndexType that is identified by the given index id.
+  ///
+  /// All IndexType references must be obtained using the [IndexService] class (directly or indirectly). Even
+  /// if the callers have a compile time dependency to the actual IndexType class. Otherwise problems may arise when
+  /// using index overriding.
+  ///
+  /// In order to have a typesafe access to standard indexes, it is recommended to use [StandardIndexes] whenever
+  /// it is possible.
+  ///
+  /// @param indexId the index id, as defined in [IndexType#getId()].
+  /// @return The index type that is identified by the given id.
+  /// @throws IllegalArgumentException in case there is not index type identified by the given id.
   public IndexType<?, ?, ?> get(String indexId) {
     IndexType<?, ?, ?> indexType = _allIndexesById.get(indexId.toLowerCase(Locale.US));
     if (indexType == null) {
       throw new IllegalArgumentException("Unknown index id: " + indexId);
     }
     return indexType;
+  }
+
+  public short getNumericId(String indexId) {
+    short id = _allIndexPosById.getShort(indexId.toLowerCase(Locale.US));
+    if (id == UNKNOWN_INDEX) {
+      throw new IllegalArgumentException("Unknown index id: " + indexId);
+    }
+    return id;
+  }
+
+  /// Returns the numeric id of the given index type: its position in [#getAllIndexes()], in
+  /// `[0, getAllIndexes().size())` and therefore below [#MAX_INDEX_TYPES].
+  ///
+  /// @throws IllegalArgumentException if the index type is not registered in this instance.
+  public short getNumericId(IndexType indexType) {
+    short id = _allIndexPosById.getShort(indexType.getId());
+    if (id == UNKNOWN_INDEX) {
+      throw new IllegalArgumentException("Unknown index type: " + indexType);
+    }
+    return id;
+  }
+
+  public IndexType<?, ?, ?> get(long indexId) {
+    return get((int) indexId);
+  }
+
+  public IndexType<?, ?, ?> get(int indexId) {
+    if (indexId < 0 || indexId >= _allIndexes.size()) {
+      throw new IllegalArgumentException("Unknown index id: " + indexId);
+    }
+
+    return _allIndexes.get(indexId);
   }
 }

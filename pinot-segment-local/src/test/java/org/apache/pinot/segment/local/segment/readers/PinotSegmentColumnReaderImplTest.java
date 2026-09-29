@@ -1,0 +1,570 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.segment.local.segment.readers;
+
+import java.io.File;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.function.Function;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.ColumnarSegmentBuildingTestBase;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.ColumnReader;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.MultiValueResult;
+import org.apache.pinot.spi.utils.ReadMode;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
+import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
+
+
+/// Comprehensive tests for [PinotSegmentColumnReaderImpl].
+///
+/// This test validates:
+/// - Single-value accessor methods (getInt, getLong, getFloat, getDouble, getBigDecimal, getString, getBytes)
+/// - Multi-value accessor methods (getIntMV, getLongMV, getFloatMV, getDoubleMV, getStringMV, getBytesMV)
+/// - Value type reporting (getValueType)
+/// - Metadata methods (getTotalDocs, isNull)
+/// - Boundary conditions and exception handling
+/// - Multiple readers for the same column
+/// - Dictionary-encoded, raw forward index, and nullable columns
+public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTestBase {
+
+  /// Enum representing different segment index configurations for testing.
+  enum IndexType {
+    DICT_ENCODED, RAW_INDEX, NULLABLE
+  }
+
+  /// Functional interface for single-value getters that can throw IOException.
+  @FunctionalInterface
+  interface SingleValueGetter {
+    Object get(PinotSegmentColumnReaderImpl reader, int docId)
+        throws IOException;
+  }
+
+  /// Functional interface for multi-value getters that can throw IOException.
+  @FunctionalInterface
+  interface MultiValueGetter {
+    Object get(PinotSegmentColumnReaderImpl reader, int docId)
+        throws IOException;
+  }
+
+  private ImmutableSegment _dictEncodedSegment;
+  private ImmutableSegment _rawIndexSegment;
+  private ImmutableSegment _nullableSegment;
+
+  @BeforeClass
+  @Override
+  public void setUp()
+      throws IOException {
+    super.setUp();
+    // Create test segments with different configurations
+    try {
+      // Dictionary-encoded segment (default)
+      File dictEncodedSegmentDir = createRowMajorSegment();
+      _dictEncodedSegment = ImmutableSegmentLoader.load(dictEncodedSegmentDir, ReadMode.mmap);
+
+      // Raw forward index segment (no dictionary)
+      TableConfig noDictConfig = createTableConfigWithNoDictionary();
+      File rawIndexSegmentDir = createRowMajorSegmentWithConfig(noDictConfig, _originalSchema, "rawIndexSegment");
+      _rawIndexSegment = ImmutableSegmentLoader.load(rawIndexSegmentDir, ReadMode.mmap);
+
+      // Nullable segment (allows null values)
+      Schema nullableSchema = createNullableSchema();
+      File nullableSegmentDir = createRowMajorSegmentWithConfig(_tableConfig, nullableSchema, "nullableSegment");
+      _nullableSegment = ImmutableSegmentLoader.load(nullableSegmentDir, ReadMode.mmap);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @AfterClass
+  public void tearDownTest()
+      throws Exception {
+    if (_dictEncodedSegment != null) {
+      _dictEncodedSegment.destroy();
+    }
+    if (_rawIndexSegment != null) {
+      _rawIndexSegment.destroy();
+    }
+    if (_nullableSegment != null) {
+      _nullableSegment.destroy();
+    }
+    super.tearDown();
+  }
+
+  @Test
+  public void testGetTotalDocs()
+      throws Exception {
+    PinotSegmentColumnReaderImpl reader = new PinotSegmentColumnReaderImpl(_dictEncodedSegment, INT_COL_1);
+
+    assertEquals(reader.getTotalDocs(), _testData.size());
+    assertEquals(reader.getTotalDocs(), _dictEncodedSegment.getSegmentMetadata().getTotalDocs());
+
+    reader.close();
+  }
+
+  /// Helper method to get the appropriate segment and schema based on IndexType.
+  private ImmutableSegment getSegment(IndexType indexType) {
+    switch (indexType) {
+      case DICT_ENCODED:
+        return _dictEncodedSegment;
+      case RAW_INDEX:
+        return _rawIndexSegment;
+      case NULLABLE:
+        return _nullableSegment;
+      default:
+        throw new IllegalArgumentException("Unknown index type: " + indexType);
+    }
+  }
+
+  /// Helper method to get the appropriate schema based on IndexType.
+  private Schema getSchema(IndexType indexType) {
+    switch (indexType) {
+      case DICT_ENCODED:
+      case RAW_INDEX:
+        return _originalSchema;
+      case NULLABLE:
+        return createNullableSchema();
+      default:
+        throw new IllegalArgumentException("Unknown index type: " + indexType);
+    }
+  }
+
+  /// Data provider for single-value accessor methods.
+  ///
+  /// @return test parameters: column name, random access getter, value converter function (required for float), index
+  ///     type
+  @DataProvider(name = "singleValueAccessorProvider")
+  public Object[][] singleValueAccessorProvider() {
+    // Base column configurations
+    Object[][] baseConfigs = new Object[][]{
+        {INT_COL_1, (SingleValueGetter) PinotSegmentColumnReaderImpl::getInt, null},
+        {LONG_COL, (SingleValueGetter) PinotSegmentColumnReaderImpl::getLong, null},
+        {
+            FLOAT_COL, (SingleValueGetter) PinotSegmentColumnReaderImpl::getFloat,
+            (Function<Object, Object>) val -> val instanceof Double ? ((Double) val).floatValue() : val
+        },
+        {DOUBLE_COL, (SingleValueGetter) PinotSegmentColumnReaderImpl::getDouble, null},
+        {BIG_DECIMAL_COL, (SingleValueGetter) PinotSegmentColumnReaderImpl::getBigDecimal, null},
+        {STRING_COL_1, (SingleValueGetter) PinotSegmentColumnReaderImpl::getString, null},
+        {BYTES_COL, (SingleValueGetter) PinotSegmentColumnReaderImpl::getBytes, null}
+    };
+
+    // Create test cases for all index types
+    IndexType[] indexTypes = IndexType.values();
+    Object[][] result = new Object[baseConfigs.length * indexTypes.length][];
+    int idx = 0;
+    for (Object[] baseConfig : baseConfigs) {
+      for (IndexType indexType : indexTypes) {
+        result[idx++] = new Object[]{baseConfig[0], baseConfig[1], baseConfig[2], indexType};
+      }
+    }
+    return result;
+  }
+
+  @Test(dataProvider = "singleValueAccessorProvider")
+  public void testSingleValueAccessors(String columnName, SingleValueGetter randomAccessGetter,
+      Function<Object, Object> valueConverter, IndexType indexType)
+      throws Exception {
+    ImmutableSegment segment = getSegment(indexType);
+    Schema schema = getSchema(indexType);
+    PinotSegmentColumnReaderImpl reader = new PinotSegmentColumnReaderImpl(segment, columnName);
+
+    try {
+      int totalDocs = reader.getTotalDocs();
+      assertEquals(totalDocs, _testData.size());
+
+      // Get field spec and data type for the column
+      FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+      Object defaultValue = fieldSpec.getDefaultNullValue();
+      DataType dataType = fieldSpec.getDataType();
+
+      // Test the reported value type
+      assertEquals(reader.getValueType(), ColumnReader.toValueType(dataType, true),
+          "getValueType() should be the single-value type for " + columnName);
+
+      // Test reading all documents using random access
+      for (int docId = 0; docId < totalDocs; docId++) {
+        GenericRow expectedRow = _testData.get(docId);
+        Object expectedValue = expectedRow.getValue(columnName);
+
+        // For nullable segments, check if the value is actually null
+        if (indexType == IndexType.NULLABLE && expectedValue == null) {
+          assertTrue(reader.isNull(docId), "isNull() should return true for null value at docId " + docId);
+          continue;
+        }
+
+        Object actualValue = randomAccessGetter.get(reader, docId);
+
+        if (expectedValue == null) {
+          // Null values are replaced with default during segment creation (non-nullable)
+          if (actualValue instanceof byte[]) {
+            assertEquals(actualValue, defaultValue, "Null should be replaced with default at docId " + docId);
+          } else if (actualValue instanceof Double) {
+            assertEquals((Double) actualValue, (Double) defaultValue, 0.0001,
+                "Null should be replaced with default at docId " + docId);
+          } else if (actualValue instanceof Float) {
+            assertEquals((Float) actualValue, (Float) defaultValue, 0.0001f,
+                "Null should be replaced with default at docId " + docId);
+          } else if (actualValue instanceof BigDecimal) {
+            assertEquals(((BigDecimal) actualValue).compareTo((BigDecimal) defaultValue), 0,
+                "Null should be replaced with default at docId " + docId);
+          } else {
+            assertEquals(actualValue, defaultValue, "Null should be replaced with default at docId " + docId);
+          }
+        } else {
+          // Convert expected value if converter is provided
+          Object convertedExpectedValue = valueConverter != null ? valueConverter.apply(expectedValue) : expectedValue;
+          if (actualValue instanceof Double) {
+            assertEquals((Double) actualValue, (Double) convertedExpectedValue, 0.0001,
+                "Value mismatch at docId " + docId);
+          } else if (actualValue instanceof Float) {
+            assertEquals((Float) actualValue, (Float) convertedExpectedValue, 0.0001f,
+                "Value mismatch at docId " + docId);
+          } else if (actualValue instanceof BigDecimal) {
+            assertEquals(((BigDecimal) actualValue).compareTo((BigDecimal) convertedExpectedValue), 0,
+                "Value mismatch at docId " + docId);
+          } else {
+            assertEquals(actualValue, convertedExpectedValue, "Value mismatch at docId " + docId);
+          }
+        }
+      }
+    } finally {
+      reader.close();
+    }
+  }
+
+  /// Data provider for multi-value accessor methods.
+  ///
+  /// @return test parameters: column name, random access getter function, array converter function, index type
+  @DataProvider(name = "multiValueAccessorProvider")
+  public Object[][] multiValueAccessorProvider() {
+    // Base column configurations
+    // For primitive MV types, we need to extract .getValues() from MultiValueResult
+    // and verify that hasNulls() is false (nulls are removed by NullValueTransformer for MV primitive types)
+    Object[][] baseConfigs = new Object[][]{
+        {
+            MV_INT_COL,
+            (MultiValueGetter) (reader, docId) -> {
+              MultiValueResult<int[]> result = reader.getIntMV(docId);
+              assertFalse(result.hasNulls(), "Multi-value primitive types should not have nulls");
+              return result.getValues();
+            },
+            null
+        },
+        {
+            MV_LONG_COL,
+            (MultiValueGetter) (reader, docId) -> {
+              MultiValueResult<long[]> result = reader.getLongMV(docId);
+              assertFalse(result.hasNulls(), "Multi-value primitive types should not have nulls");
+              return result.getValues();
+            },
+            null
+        },
+        {
+            MV_FLOAT_COL,
+            (MultiValueGetter) (reader, docId) -> {
+              MultiValueResult<float[]> result = reader.getFloatMV(docId);
+              assertFalse(result.hasNulls(), "Multi-value primitive types should not have nulls");
+              return result.getValues();
+            },
+            (Function<Object[], Object>) expectedArray -> {
+              float[] expectedFloatArray = new float[expectedArray.length];
+              for (int i = 0; i < expectedArray.length; i++) {
+                expectedFloatArray[i] = (Float) expectedArray[i];
+              }
+              return expectedFloatArray;
+            }
+        },
+        {
+            MV_DOUBLE_COL,
+            (MultiValueGetter) (reader, docId) -> {
+              MultiValueResult<double[]> result = reader.getDoubleMV(docId);
+              assertFalse(result.hasNulls(), "Multi-value primitive types should not have nulls");
+              return result.getValues();
+            },
+            null
+        },
+        {MV_BIG_DECIMAL_COL, (MultiValueGetter) PinotSegmentColumnReaderImpl::getBigDecimalMV, null},
+        {MV_STRING_COL, (MultiValueGetter) PinotSegmentColumnReaderImpl::getStringMV, null},
+        {MV_BYTES_COL, (MultiValueGetter) PinotSegmentColumnReaderImpl::getBytesMV, null},
+    };
+
+    // Create test cases for all index types
+    IndexType[] indexTypes = IndexType.values();
+    Object[][] result = new Object[baseConfigs.length * indexTypes.length][];
+    int idx = 0;
+    for (Object[] baseConfig : baseConfigs) {
+      for (IndexType indexType : indexTypes) {
+        result[idx++] = new Object[]{baseConfig[0], baseConfig[1], baseConfig[2], indexType};
+      }
+    }
+    return result;
+  }
+
+  @Test(dataProvider = "multiValueAccessorProvider")
+  public void testMultiValueAccessors(String columnName, MultiValueGetter randomAccessGetter,
+      Function<Object[], Object> arrayConverter, IndexType indexType)
+      throws Exception {
+    ImmutableSegment segment = getSegment(indexType);
+    Schema schema = getSchema(indexType);
+    PinotSegmentColumnReaderImpl reader = new PinotSegmentColumnReaderImpl(segment, columnName);
+
+    try {
+      int totalDocs = reader.getTotalDocs();
+
+      // Get default value for MV type (wrapped in array)
+      FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+      Object defaultNullValue = fieldSpec.getDefaultNullValue();
+      DataType dataType = fieldSpec.getDataType();
+      Object defaultValue;
+
+      // Test the reported value type
+      assertEquals(reader.getValueType(), ColumnReader.toValueType(dataType, false),
+          "getValueType() should be the multi-value type for " + columnName);
+
+      // Create default array based on type
+      switch (fieldSpec.getDataType()) {
+        case INT:
+          defaultValue = new int[]{((Number) defaultNullValue).intValue()};
+          break;
+        case LONG:
+          defaultValue = new long[]{((Number) defaultNullValue).longValue()};
+          break;
+        case FLOAT:
+          defaultValue = new float[]{((Number) defaultNullValue).floatValue()};
+          break;
+        case DOUBLE:
+          defaultValue = new double[]{((Number) defaultNullValue).doubleValue()};
+          break;
+        case BIG_DECIMAL:
+          defaultValue = new BigDecimal[]{(BigDecimal) defaultNullValue};
+          break;
+        case STRING:
+          defaultValue = new String[]{(String) defaultNullValue};
+          break;
+        case BYTES:
+          defaultValue = new byte[][]{(byte[]) defaultNullValue};
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported data type: " + fieldSpec.getDataType());
+      }
+
+      // Test reading all documents using random access
+      for (int docId = 0; docId < totalDocs; docId++) {
+        GenericRow expectedRow = _testData.get(docId);
+        Object expectedValue = expectedRow.getValue(columnName);
+
+        // For nullable segments, check if the value is actually null
+        if (indexType == IndexType.NULLABLE && expectedValue == null) {
+          assertTrue(reader.isNull(docId), "isNull() should return true for null value at docId " + docId);
+          continue;
+        }
+
+        Object actualValue = randomAccessGetter.get(reader, docId);
+
+        if (expectedValue == null) {
+          // Null values are replaced with default array during segment creation (non-nullable)
+          assertEquals(actualValue, defaultValue, "Null should be replaced with default array at docId " + docId);
+        } else {
+          // Convert expected Object[] to appropriate type array for comparison
+          Object[] expectedArray = (Object[]) expectedValue;
+          Object expectedConvertedArray = arrayConverter != null ? arrayConverter.apply(expectedArray) : expectedArray;
+
+          assertEquals(actualValue, expectedConvertedArray, "MV array mismatch at docId " + docId);
+        }
+      }
+    } finally {
+      reader.close();
+    }
+  }
+
+  @Test
+  public void testIsNull()
+      throws Exception {
+    PinotSegmentColumnReaderImpl reader = new PinotSegmentColumnReaderImpl(_dictEncodedSegment, STRING_COL_1);
+
+    try {
+      int totalDocs = reader.getTotalDocs();
+
+      // In Pinot segments, nulls are replaced with defaults, so isNull should always return false
+      for (int docId = 0; docId < totalDocs; docId++) {
+        boolean actualNull = reader.isNull(docId);
+        assertFalse(actualNull, "isNull() should return false (nulls replaced with defaults) at docId " + docId);
+      }
+    } finally {
+      reader.close();
+    }
+  }
+
+  @Test
+  public void testBoundaryConditions()
+      throws Exception {
+    PinotSegmentColumnReaderImpl reader = new PinotSegmentColumnReaderImpl(_dictEncodedSegment, INT_COL_1);
+
+    try {
+      int totalDocs = reader.getTotalDocs();
+      assertTrue(totalDocs > 0, "Expected non-empty segment");
+
+      // Test first document (docId = 0)
+      int firstValue = reader.getInt(0);
+      Object expectedFirst = _testData.get(0).getValue(INT_COL_1);
+      if (expectedFirst != null) {
+        assertEquals(firstValue, expectedFirst, "First document value mismatch");
+      }
+
+      // Test last document (docId = totalDocs - 1)
+      int lastDocId = totalDocs - 1;
+      int lastValue = reader.getInt(lastDocId);
+      Object expectedLast = _testData.get(lastDocId).getValue(INT_COL_1);
+      if (expectedLast != null) {
+        assertEquals(lastValue, expectedLast, "Last document value mismatch");
+      }
+
+      // Test docId = -1 (should throw IndexOutOfBoundsException)
+      try {
+        reader.getInt(-1);
+        fail("Expected IndexOutOfBoundsException for docId = -1");
+      } catch (IndexOutOfBoundsException e) {
+        // Expected
+      }
+
+      // Test docId = totalDocs (should throw IndexOutOfBoundsException)
+      try {
+        reader.getInt(totalDocs);
+        fail("Expected IndexOutOfBoundsException for docId = totalDocs");
+      } catch (IndexOutOfBoundsException e) {
+        // Expected
+      }
+
+      // Test docId = totalDocs + 100 (should throw IndexOutOfBoundsException)
+      try {
+        reader.getInt(totalDocs + 100);
+        fail("Expected IndexOutOfBoundsException for docId > totalDocs");
+      } catch (IndexOutOfBoundsException e) {
+        // Expected
+      }
+
+      // Test isNull with out of bounds docId
+      try {
+        reader.isNull(-1);
+        fail("Expected IndexOutOfBoundsException for isNull(-1)");
+      } catch (IndexOutOfBoundsException e) {
+        // Expected
+      }
+
+      try {
+        reader.isNull(totalDocs);
+        fail("Expected IndexOutOfBoundsException for isNull(totalDocs)");
+      } catch (IndexOutOfBoundsException e) {
+        // Expected
+      }
+    } finally {
+      reader.close();
+    }
+  }
+
+  @Test
+  public void testGetValueAndTypedAccessorConsistency()
+      throws Exception {
+    PinotSegmentColumnReaderImpl reader = new PinotSegmentColumnReaderImpl(_dictEncodedSegment, INT_COL_1);
+
+    try {
+      int totalDocs = reader.getTotalDocs();
+
+      for (int docId = 0; docId < totalDocs; docId++) {
+        Object value = reader.getValue(docId);
+        assertEquals(value, reader.getInt(docId), "getValue() and getInt() differ at docId " + docId);
+      }
+    } finally {
+      reader.close();
+    }
+  }
+
+  @Test
+  public void testGetValueAndTypedAccessorConsistencyMV()
+      throws Exception {
+    PinotSegmentColumnReaderImpl reader = new PinotSegmentColumnReaderImpl(_dictEncodedSegment, MV_INT_COL);
+
+    try {
+      int totalDocs = reader.getTotalDocs();
+
+      for (int docId = 0; docId < totalDocs; docId++) {
+        int[] typedValues = reader.getIntMV(docId).getValues();
+
+        // getValue() returns the boxed Integer[] representation
+        Integer[] boxedValues = (Integer[]) reader.getValue(docId);
+        int[] unboxedValues = new int[boxedValues.length];
+        for (int j = 0; j < boxedValues.length; j++) {
+          unboxedValues[j] = boxedValues[j];
+        }
+
+        assertEquals(unboxedValues, typedValues, "getValue() and getIntMV() differ at docId " + docId);
+      }
+    } finally {
+      reader.close();
+    }
+  }
+
+  @Test
+  public void testMultipleReadersForSameColumn()
+      throws Exception {
+    // Test that multiple readers can be created for the same column and read independently
+    PinotSegmentColumnReaderImpl reader1 = new PinotSegmentColumnReaderImpl(_dictEncodedSegment, INT_COL_1);
+    PinotSegmentColumnReaderImpl reader2 = new PinotSegmentColumnReaderImpl(_dictEncodedSegment, INT_COL_1);
+
+    try {
+      int totalDocs = reader1.getTotalDocs();
+      assertEquals(reader2.getTotalDocs(), totalDocs);
+
+      // Read from both readers at different positions
+      for (int docId = 0; docId < Math.min(10, totalDocs); docId++) {
+        int value1 = reader1.getInt(docId);
+        int value2 = reader2.getInt(docId);
+        assertEquals(value1, value2, "Values should match at docId " + docId);
+      }
+    } finally {
+      reader1.close();
+      reader2.close();
+    }
+  }
+
+  @Test
+  public void testColumnName()
+      throws Exception {
+    PinotSegmentColumnReaderImpl reader = new PinotSegmentColumnReaderImpl(_dictEncodedSegment, STRING_COL_1);
+
+    try {
+      assertEquals(reader.getColumnName(), STRING_COL_1);
+    } finally {
+      reader.close();
+    }
+  }
+}

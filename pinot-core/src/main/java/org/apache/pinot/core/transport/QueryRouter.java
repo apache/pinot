@@ -18,15 +18,11 @@
  */
 package org.apache.pinot.core.transport;
 
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.DataTable;
@@ -36,62 +32,60 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.routing.ImplicitHybridTableRouteInfo;
+import org.apache.pinot.core.routing.SegmentsToQuery;
+import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code QueryRouter} class provides methods to route the query based on the routing table, and returns a
- * {@link AsyncQueryResponse} so that caller can handle the query response asynchronously.
- * <p>It works on {@link ServerChannels} which maintains only a single connection between the broker and each server.
- */
+/// The `QueryRouter` class provides methods to route the query based on the routing table, and returns a
+/// [AsyncQueryResponse] so that caller can handle the query response asynchronously.
+///
+/// It works on [ServerChannels] which maintains only a single connection between the broker and each server.
 @ThreadSafe
 public class QueryRouter {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRouter.class);
 
   private final String _brokerId;
-  private final BrokerMetrics _brokerMetrics;
   private final ServerChannels _serverChannels;
   private final ServerChannels _serverChannelsTls;
-  private final ConcurrentHashMap<Long, AsyncQueryResponse> _asyncQueryResponseMap = new ConcurrentHashMap<>();
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
 
-  /**
-   * Creates an unsecured query router.
-   * @param brokerId broker id
-   * @param brokerMetrics broker metrics
-   * @param serverRoutingStatsManager
-   */
-  public QueryRouter(String brokerId, BrokerMetrics brokerMetrics,
-      ServerRoutingStatsManager serverRoutingStatsManager) {
-    this(brokerId, brokerMetrics, null, null, serverRoutingStatsManager);
-  }
+  private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
+  private final ConcurrentHashMap<Long, AsyncQueryResponse> _asyncQueryResponseMap = new ConcurrentHashMap<>();
 
-  /**
-   * Creates a query router with TLS config.
-   *
-   * @param brokerId broker id
-   * @param brokerMetrics broker metrics
-   * @param nettyConfig configurations for netty library
-   * @param tlsConfig TLS config
-   */
-  public QueryRouter(String brokerId, BrokerMetrics brokerMetrics, @Nullable NettyConfig nettyConfig,
-      @Nullable TlsConfig tlsConfig, ServerRoutingStatsManager serverRoutingStatsManager) {
+  /// Creates a query router with TLS config.
+  ///
+  /// @param brokerId broker id
+  /// @param nettyConfig configurations for netty library
+  /// @param tlsConfig TLS config
+  public QueryRouter(String brokerId, @Nullable NettyConfig nettyConfig, @Nullable TlsConfig tlsConfig,
+      ServerRoutingStatsManager serverRoutingStatsManager, ThreadAccountant threadAccountant) {
     _brokerId = brokerId;
-    _brokerMetrics = brokerMetrics;
-    _serverChannels = new ServerChannels(this, brokerMetrics, nettyConfig, null);
-    _serverChannelsTls = tlsConfig != null ? new ServerChannels(this, brokerMetrics, nettyConfig, tlsConfig) : null;
+    _serverChannels = new ServerChannels(this, nettyConfig, null, threadAccountant);
+    _serverChannelsTls = tlsConfig != null ? new ServerChannels(this, nettyConfig, tlsConfig, threadAccountant) : null;
     _serverRoutingStatsManager = serverRoutingStatsManager;
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
       @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
+      @Nullable Map<ServerInstance, SegmentsToQuery> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs) {
+      @Nullable Map<ServerInstance, SegmentsToQuery> realtimeRoutingTable, long timeoutMs) {
+    TableRouteInfo tableRouteInfo = new ImplicitHybridTableRouteInfo(offlineBrokerRequest, realtimeBrokerRequest,
+        offlineRoutingTable, realtimeRoutingTable);
+
+    return submitQuery(requestId, rawTableName, tableRouteInfo, timeoutMs);
+  }
+
+  public AsyncQueryResponse submitQuery(long requestId, String rawTableName, TableRouteInfo route, long timeoutMs) {
+    BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();
+    BrokerRequest realtimeBrokerRequest = route.getRealtimeBrokerRequest();
+
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
     // can prefer but not require TLS until all servers guaranteed to be on TLS
@@ -101,30 +95,12 @@ public class QueryRouter {
     boolean skipUnavailableServers = isSkipUnavailableServers(offlineBrokerRequest, realtimeBrokerRequest);
 
     // Build map from server to request based on the routing table
-    Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
-    if (offlineBrokerRequest != null) {
-      assert offlineRoutingTable != null;
-      for (Map.Entry<ServerInstance, Pair<List<String>, List<String>>> entry : offlineRoutingTable.entrySet()) {
-        ServerRoutingInstance serverRoutingInstance =
-            entry.getKey().toServerRoutingInstance(TableType.OFFLINE, preferTls);
-        InstanceRequest instanceRequest = getInstanceRequest(requestId, offlineBrokerRequest, entry.getValue());
-        requestMap.put(serverRoutingInstance, instanceRequest);
-      }
-    }
-    if (realtimeBrokerRequest != null) {
-      assert realtimeRoutingTable != null;
-      for (Map.Entry<ServerInstance, Pair<List<String>, List<String>>> entry : realtimeRoutingTable.entrySet()) {
-        ServerRoutingInstance serverRoutingInstance =
-            entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
-        InstanceRequest instanceRequest = getInstanceRequest(requestId, realtimeBrokerRequest, entry.getValue());
-        requestMap.put(serverRoutingInstance, instanceRequest);
-      }
-    }
+    Map<ServerRoutingInstance, InstanceRequest> requestMap = route.getRequestMap(requestId, _brokerId, preferTls);
 
     // Create the asynchronous query response with the request map
     AsyncQueryResponse asyncQueryResponse =
         new AsyncQueryResponse(this, requestId, requestMap.keySet(), System.currentTimeMillis(), timeoutMs,
-            _serverRoutingStatsManager);
+            _serverRoutingStatsManager, skipUnavailableServers);
     _asyncQueryResponseMap.put(requestId, asyncQueryResponse);
     for (Map.Entry<ServerRoutingInstance, InstanceRequest> entry : requestMap.entrySet()) {
       ServerRoutingInstance serverRoutingInstance = entry.getKey();
@@ -142,7 +118,7 @@ public class QueryRouter {
       } catch (Exception e) {
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_SEND_EXCEPTIONS, 1);
         if (skipUnavailableServers) {
-          asyncQueryResponse.skipServerResponse();
+          asyncQueryResponse.skipServerResponse(serverRoutingInstance);
         } else {
           markQueryFailed(requestId, serverRoutingInstance, asyncQueryResponse, e);
           break;
@@ -170,19 +146,55 @@ public class QueryRouter {
     asyncQueryResponse.markQueryFailed(serverRoutingInstance, e);
   }
 
-  /**
-   * Connects to the given server, returns {@code true} if the server is successfully connected.
-   */
+  public boolean hasChannel(ServerInstance serverInstance) {
+    if (_serverChannelsTls != null) {
+      return _serverChannelsTls.hasChannel(
+          serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY_TLS));
+    } else {
+      return _serverChannels.hasChannel(
+          serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY));
+    }
+  }
+
+  /// Connects to the given server, returns `true` if the server is successfully connected.
+  ///
+  /// Unchanged: this is the reachability probe the failure detector uses, opening the OFFLINE channel
+  /// with a TCP connect only. Startup pre-connect uses [#preConnect] instead.
   public boolean connect(ServerInstance serverInstance) {
     try {
       if (_serverChannelsTls != null) {
-        _serverChannelsTls.connect(serverInstance.toServerRoutingInstance(TableType.OFFLINE, true));
+        _serverChannelsTls.connect(
+            serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY_TLS));
       } else {
-        _serverChannels.connect(serverInstance.toServerRoutingInstance(TableType.OFFLINE, false));
+        _serverChannels.connect(
+            serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY));
       }
       return true;
     } catch (Exception e) {
       LOGGER.debug("Failed to connect to server: {}", serverInstance, e);
+      return false;
+    }
+  }
+
+  /// Opens the channel used for the given table type ahead of query traffic, including the TLS
+  /// handshake, bounded by `timeoutMs`. Returns `true` if it is connected.
+  ///
+  /// [ServerRoutingInstance] includes the table type in its `equals`/`hashCode`, so OFFLINE and REALTIME
+  /// map to **separate** channels for the same physical server; the caller decides which of them this
+  /// broker actually routes to. Whatever is left out is still established lazily by the first query that
+  /// needs it.
+  public boolean preConnect(ServerInstance serverInstance, TableType tableType, long timeoutMs) {
+    try {
+      if (_serverChannelsTls != null) {
+        _serverChannelsTls.preConnect(
+            serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.NETTY_TLS), timeoutMs);
+      } else {
+        _serverChannels.preConnect(
+            serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.NETTY), timeoutMs);
+      }
+      return true;
+    } catch (Exception e) {
+      LOGGER.debug("Failed to pre-connect to server: {} for table type: {}", serverInstance, tableType, e);
       return false;
     }
   }
@@ -202,33 +214,27 @@ public class QueryRouter {
     }
   }
 
-  void markServerDown(ServerRoutingInstance serverRoutingInstance, Exception exception) {
+  /// Marks a server as unavailable for every in-flight query. Called when a server's channel goes inactive
+  /// ([DataTableHandler]) or a request write to it fails ([ServerChannels]). Queries submitted with
+  /// `skipUnavailableServers=true` degrade to partial results for this genuine unavailability; others are failed.
+  void markServerUnavailable(ServerRoutingInstance serverRoutingInstance, Exception exception) {
     for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
-      asyncQueryResponse.markServerDown(serverRoutingInstance, exception);
+      if (asyncQueryResponse.markServerUnavailable(serverRoutingInstance, exception)) {
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.SERVER_MARKED_DOWN_SKIPPED, 1);
+      }
+    }
+  }
+
+  /// Cancels every in-flight query. Unlike
+  /// [#markServerUnavailable], this always fails the queries even under `skipUnavailableServers`: all
+  /// channels are being closed so there is no partial data to return.
+  void cancelQuery(ServerRoutingInstance serverRoutingInstance, Exception exception) {
+    for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
+      asyncQueryResponse.cancelQuery(serverRoutingInstance, exception);
     }
   }
 
   void markQueryDone(long requestId) {
     _asyncQueryResponseMap.remove(requestId);
-  }
-
-  private InstanceRequest getInstanceRequest(long requestId, BrokerRequest brokerRequest,
-      Pair<List<String>, List<String>> segments) {
-    InstanceRequest instanceRequest = new InstanceRequest();
-    instanceRequest.setRequestId(requestId);
-    instanceRequest.setQuery(brokerRequest);
-    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
-    if (queryOptions != null) {
-      instanceRequest.setEnableTrace(Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE)));
-    }
-    instanceRequest.setSearchSegments(segments.getLeft());
-    instanceRequest.setBrokerId(_brokerId);
-    if (CollectionUtils.isNotEmpty(segments.getRight())) {
-      // Don't set this field, i.e. leave it as null, if there is no optional segment at all, to be more backward
-      // compatible, as there are places like in multi-stage query engine where this field is not set today when
-      // creating the InstanceRequest.
-      instanceRequest.setOptionalSegments(segments.getRight());
-    }
-    return instanceRequest;
   }
 }

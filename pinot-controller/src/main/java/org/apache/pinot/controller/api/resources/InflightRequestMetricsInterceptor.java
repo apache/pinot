@@ -33,14 +33,12 @@ import javax.ws.rs.ext.WriterInterceptorContext;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 
 
-/**
- * A class that implements a JXRS request filter and writer interceptor to track the number of in progress requests
- * using the gauge specified by the {@link TrackedByGauge} method annotation.
- * The gauge specified by this annotation will be incremented when the request starts and decremented once the
- * request has completed processing.
- *
- * See {@link PinotSegmentUploadDownloadRestletResource#downloadSegment} for an example of its usage.
- */
+/// A class that implements a JXRS request filter and writer interceptor to track the number of in progress requests
+/// using the gauge specified by the [TrackedByGauge] method annotation.
+/// The gauge specified by this annotation will be incremented when the request starts and decremented once the
+/// request has completed processing.
+///
+/// See [PinotSegmentUploadDownloadRestletResource#downloadSegment] for an example of its usage.
 @Singleton
 @Provider
 @TrackInflightRequestMetrics

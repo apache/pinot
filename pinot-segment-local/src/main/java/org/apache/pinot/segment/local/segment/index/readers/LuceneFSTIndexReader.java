@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.readers;
 
 import java.io.IOException;
-import java.util.List;
 import org.apache.lucene.util.fst.FST;
 import org.apache.lucene.util.fst.OffHeapFSTStore;
 import org.apache.lucene.util.fst.PositiveIntOutputs;
@@ -27,34 +26,27 @@ import org.apache.pinot.segment.local.utils.fst.PinotBufferIndexInput;
 import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.exception.QueryException;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class loads FST index from PinotDataBuffer and creates a FST reader which
- * is used in finding matching results for regexp queries. Since FST index currently
- * stores dict ids as values this class only implements getDictIds method.
- *
- */
+/// This class loads FST index from PinotDataBuffer and creates a FST reader which
+/// is used in finding matching results for regexp queries. Since FST index currently
+/// stores dict ids as values this class only implements getDictIds method.
 public class LuceneFSTIndexReader implements TextIndexReader {
   public static final Logger LOGGER = LoggerFactory.getLogger(LuceneFSTIndexReader.class);
 
-  private final PinotDataBuffer _dataBuffer;
-  private final PinotBufferIndexInput _dataBufferIndexInput;
-  private final FST<Long> _readFST;
+  private final FST<Long> _fst;
 
   public LuceneFSTIndexReader(PinotDataBuffer pinotDataBuffer)
       throws IOException {
-    _dataBuffer = pinotDataBuffer;
-    _dataBufferIndexInput = new PinotBufferIndexInput(_dataBuffer, 0L, _dataBuffer.size());
-
-    FST.FSTMetadata<Long> metadata = FST.readMetadata(_dataBufferIndexInput, PositiveIntOutputs.getSingleton());
-    OffHeapFSTStore fstStore =
-        new OffHeapFSTStore(_dataBufferIndexInput, _dataBufferIndexInput.getFilePointer(), metadata);
-    _readFST = FST.fromFSTReader(metadata, fstStore);
+    PinotBufferIndexInput indexInput = new PinotBufferIndexInput(pinotDataBuffer, 0L, pinotDataBuffer.size());
+    FST.FSTMetadata<Long> metadata = FST.readMetadata(indexInput, PositiveIntOutputs.getSingleton());
+    OffHeapFSTStore fstStore = new OffHeapFSTStore(indexInput, indexInput.getFilePointer(), metadata);
+    _fst = FST.fromFSTReader(metadata, fstStore);
   }
 
   @Override
@@ -66,11 +58,11 @@ public class LuceneFSTIndexReader implements TextIndexReader {
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
     try {
       MutableRoaringBitmap dictIds = new MutableRoaringBitmap();
-      List<Long> matchingIds = RegexpMatcher.regexMatch(searchQuery, _readFST);
-      for (Long matchingId : matchingIds) {
-        dictIds.add(matchingId.intValue());
-      }
+      RegexpMatcher.regexMatch(searchQuery, _fst, dictIds::add);
       return dictIds.toImmutableRoaringBitmap();
+    } catch (QueryException ex) {
+      // Let query termination exceptions (timeout, OOM-protection kill) propagate as-is.
+      throw ex;
     } catch (Exception ex) {
       LOGGER.error("Error getting matching Ids from FST", ex);
       throw new RuntimeException(ex);

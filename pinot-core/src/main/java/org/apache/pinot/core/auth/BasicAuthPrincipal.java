@@ -18,24 +18,36 @@
  */
 package org.apache.pinot.core.auth;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 
-/**
- * Container object for basic auth principal
- */
+/// Container object for basic auth principal
 public class BasicAuthPrincipal {
   private final String _name;
   private final String _token;
   private final Set<String> _tables;
+  private final Set<String> _excludeTables;
   private final Set<String> _permissions;
+  //key: table name, val: list of RLS filters applicable for that table.
+  private final Map<String, List<String>> _rlsFilters;
 
-  public BasicAuthPrincipal(String name, String token, Set<String> tables, Set<String> permissions) {
+  public BasicAuthPrincipal(String name, String token, Set<String> tables, Set<String> excludeTables,
+      Set<String> permissions) {
+    this(name, token, tables, excludeTables, permissions, null);
+  }
+
+  public BasicAuthPrincipal(String name, String token, Set<String> tables, Set<String> excludeTables,
+      Set<String> permissions, Map<String, List<String>> rlsFilters) {
     _name = name;
     _token = token;
     _tables = tables;
+    _excludeTables = excludeTables;
     _permissions = permissions.stream().map(s -> s.toLowerCase()).collect(Collectors.toSet());
+    _rlsFilters = rlsFilters;
   }
 
   public String getName() {
@@ -47,11 +59,35 @@ public class BasicAuthPrincipal {
   }
 
   public boolean hasTable(String tableName) {
+    return isTableIncluded(tableName) && isTableNotExcluded(tableName);
+  }
+
+  private boolean isTableIncluded(String tableName) {
     return _tables.isEmpty() || _tables.contains(tableName);
+  }
+
+  private boolean isTableNotExcluded(String tableName) {
+    return !_excludeTables.contains(tableName);
   }
 
   public boolean hasPermission(String permission) {
     return _permissions.isEmpty() || _permissions.contains(permission.toLowerCase());
+  }
+
+  /// Returns whether this principal was explicitly granted the given permission.
+  public boolean hasExplicitPermission(String permission) {
+    return _permissions.contains(permission.toLowerCase());
+  }
+
+  /// Gets the Row-Level Security (RLS) filter configured for the given table.
+  /// The RLS filter is applied only if the user has access to the table
+  /// (as determined by [#hasTable(String)]).
+  ///
+  /// @param tableName The name of the table.
+  /// @return An [java.util.Optional] containing the RLS filter string if configured for this principal and table,
+  /// otherwise [java.util.Optional#empty()].
+  public Optional<List<String>> getRLSFilters(String tableName) {
+    return Optional.ofNullable(_rlsFilters.get(tableName));
   }
 
   @Override
@@ -59,8 +95,9 @@ public class BasicAuthPrincipal {
     return "BasicAuthPrincipal{"
         + "_name='" + _name + '\''
         + ", _token='" + _token + '\''
-        + ", _tables=" + _tables
-        + ", _permissions=" + _permissions
+        + ", _tables=" + _tables + '\''
+        + ", _permissions=" + _permissions + '\''
+        + ",_rlsFilters=" + _rlsFilters
         + '}';
   }
 }

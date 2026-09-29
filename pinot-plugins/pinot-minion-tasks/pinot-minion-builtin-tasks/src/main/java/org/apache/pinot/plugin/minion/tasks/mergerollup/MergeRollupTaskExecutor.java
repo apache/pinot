@@ -39,13 +39,12 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
+import org.apache.pinot.spi.utils.Obfuscator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Task executor that provides merge and rollup service.
- */
+/// Task executor that provides merge and rollup service.
 public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(MergeRollupTaskExecutor.class);
 
@@ -61,7 +60,9 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     _eventObserver.notifyProgress(pinotTaskConfig, "Converting segments: " + numInputSegments);
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
-    LOGGER.info("Starting task: {} with configs: {}", taskType, configs);
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Starting task: {} with configs: {}", taskType, Obfuscator.DEFAULT.toJsonString(configs));
+    }
     long startMillis = System.currentTimeMillis();
 
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
@@ -93,7 +94,7 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
 
     // Aggregation function parameters
     segmentProcessorConfigBuilder.setAggregationFunctionParameters(
-        MergeTaskUtils.getAggregationFunctionParameters(configs));
+        MergeRollupTaskUtils.getAggregationFunctionParameters(configs));
 
     // Segment config
     segmentProcessorConfigBuilder.setSegmentConfig(MergeTaskUtils.getSegmentConfig(configs));
@@ -106,8 +107,8 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     List<RecordReader> recordReaders = new ArrayList<>(numInputSegments);
     int count = 1;
     for (File segmentDir : segmentDirs) {
-      _eventObserver.notifyProgress(_pinotTaskConfig,
-          String.format("Creating RecordReader for: %s (%d out of %d)", segmentDir, count++, numInputSegments));
+      _eventObserver.notifyProgress(_pinotTaskConfig, "Creating RecordReader for: " + segmentDir + " (" + (count++)
+          + " out of " + numInputSegments + ")");
       PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
       // NOTE: Do not fill null field with default value to be consistent with other record readers
       recordReader.init(segmentDir, null, null, true);
@@ -116,9 +117,13 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     List<File> outputSegmentDirs;
     try {
       _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segments");
-      outputSegmentDirs = new SegmentProcessorFramework(segmentProcessorConfig, workingDir,
+      SegmentProcessorFramework framework = new SegmentProcessorFramework(segmentProcessorConfig, workingDir,
           SegmentProcessorFramework.convertRecordReadersToRecordReaderFileConfig(recordReaders),
-          customRecordTransformers, null).process();
+          customRecordTransformers, null);
+      outputSegmentDirs = framework.process();
+      _eventObserver.notifyProgress(pinotTaskConfig,
+          "Segment processing stats - incomplete rows:" + framework.getIncompleteRowsFound() + ", dropped rows:"
+              + framework.getSkippedRowsFound() + ", sanitized rows:" + framework.getSanitizedRowsFound());
     } finally {
       for (RecordReader recordReader : recordReaders) {
         recordReader.close();
@@ -126,7 +131,10 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     }
 
     long endMillis = System.currentTimeMillis();
-    LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType, configs, (endMillis - startMillis));
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType,
+          Obfuscator.DEFAULT.toJsonString(configs), (endMillis - startMillis));
+    }
     List<SegmentConversionResult> results = new ArrayList<>();
     for (File outputSegmentDir : outputSegmentDirs) {
       String outputSegmentName = outputSegmentDir.getName();

@@ -73,7 +73,7 @@ public class BenchmarkDictionaryLookup {
     FileUtils.deleteDirectory(INDEX_DIR);
     Set<String> uniqueValues = new HashSet<>();
     while (uniqueValues.size() < _cardinality) {
-      uniqueValues.add(RandomStringUtils.randomAscii(MAX_LENGTH));
+      uniqueValues.add(RandomStringUtils.secure().nextAscii(MAX_LENGTH));
     }
     String[] sortedValues = uniqueValues.toArray(new String[0]);
     Arrays.sort(sortedValues);

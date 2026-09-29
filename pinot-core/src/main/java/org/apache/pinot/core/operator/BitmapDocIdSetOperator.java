@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
@@ -27,47 +26,70 @@ import org.roaringbitmap.ImmutableBitmapDataProvider;
 import org.roaringbitmap.IntIterator;
 
 
-/**
- * The <code>BitmapDocIdSetOperator</code> takes a bitmap of document ids and returns blocks of document ids.
- * <p>Should call {@link #nextBlock()} multiple times until it returns <code>null</code> (already exhausts all the
- * documents) or already gathered enough documents (for selection queries).
- */
-public class BitmapDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
-
+/// The `BitmapDocIdSetOperator` takes a bitmap of document ids and returns blocks of document ids.
+///
+/// Should call [#nextBlock()] multiple times until it returns `null` (already exhausts all the
+/// documents) or already gathered enough documents (for selection queries).
+///
+/// The same document id buffer (caller-supplied, or allocated internally by the factory methods) is reused for every
+/// returned block: each [#nextBlock()] call overwrites the contents of the previously returned
+/// [org.apache.pinot.core.operator.blocks.DocIdSetBlock]. A caller-supplied buffer is additionally shared with the
+/// caller.
+public class BitmapDocIdSetOperator extends BaseDocIdSetOperator {
   private static final String EXPLAIN_NAME = "DOC_ID_SET_BITMAP";
+
+  private final ImmutableBitmapDataProvider _docIds;
+  private final int[] _docIdBuffer;
+  private final DocIdOrder _docIdOrder;
 
   // TODO: Consider using BatchIterator to fill the document ids. Currently BatchIterator only reads bits for one
   //       container instead of trying to fill up the buffer with bits from multiple containers. If in the future
   //       BatchIterator provides an API to fill up the buffer, switch to BatchIterator.
-  private final IntIterator _intIterator;
-  private final int[] _docIdBuffer;
+  private IntIterator _docIdIterator;
 
-  public BitmapDocIdSetOperator(ImmutableBitmapDataProvider bitmap) {
-    _intIterator = bitmap.getIntIterator();
-    _docIdBuffer = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-  }
-
-  public BitmapDocIdSetOperator(ImmutableBitmapDataProvider bitmap, int numDocs) {
-    _intIterator = bitmap.getIntIterator();
-    _docIdBuffer = new int[Math.min(numDocs, DocIdSetPlanNode.MAX_DOC_PER_CALL)];
-  }
-
-  public BitmapDocIdSetOperator(IntIterator intIterator, int[] docIdBuffer) {
-    _intIterator = intIterator;
+  public BitmapDocIdSetOperator(ImmutableBitmapDataProvider docIds, int[] docIdBuffer, DocIdOrder docIdOrder) {
+    _docIds = docIds;
     _docIdBuffer = docIdBuffer;
+    _docIdOrder = docIdOrder;
   }
 
-  public BitmapDocIdSetOperator(ImmutableBitmapDataProvider bitmap, int[] docIdBuffer) {
-    _intIterator = bitmap.getIntIterator();
+  public BitmapDocIdSetOperator(IntIterator docIdIterator, int[] docIdBuffer, DocIdOrder docIdOrder) {
+    _docIds = null;
+    _docIdIterator = docIdIterator;
     _docIdBuffer = docIdBuffer;
+    _docIdOrder = docIdOrder;
+  }
+
+  public static BitmapDocIdSetOperator ascending(ImmutableBitmapDataProvider docIds) {
+    return ascending(docIds, new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
+  }
+
+  public static BitmapDocIdSetOperator ascending(ImmutableBitmapDataProvider docIds, int numDocs) {
+    return ascending(docIds, new int[Math.min(numDocs, DocIdSetPlanNode.MAX_DOC_PER_CALL)]);
+  }
+
+  public static BitmapDocIdSetOperator ascending(ImmutableBitmapDataProvider docIds, int[] docIdBuffer) {
+    return new BitmapDocIdSetOperator(docIds, docIdBuffer, DocIdOrder.ASC);
+  }
+
+  public static BitmapDocIdSetOperator descending(ImmutableBitmapDataProvider docIds, int numDocs) {
+    return descending(docIds, new int[Math.min(numDocs, DocIdSetPlanNode.MAX_DOC_PER_CALL)]);
+  }
+
+  public static BitmapDocIdSetOperator descending(ImmutableBitmapDataProvider bitmap, int[] docIdBuffer) {
+    return new BitmapDocIdSetOperator(bitmap, docIdBuffer, DocIdOrder.DESC);
   }
 
   @Override
   protected DocIdSetBlock getNextBlock() {
+    if (_docIdIterator == null) {
+      assert _docIds != null;
+      _docIdIterator = _docIdOrder == DocIdOrder.ASC ? _docIds.getIntIterator() : _docIds.getReverseIntIterator();
+    }
     int bufferSize = _docIdBuffer.length;
     int index = 0;
-    while (index < bufferSize && _intIterator.hasNext()) {
-      _docIdBuffer[index++] = _intIterator.next();
+    while (index < bufferSize && _docIdIterator.hasNext()) {
+      _docIdBuffer[index++] = _docIdIterator.next();
     }
     if (index > 0) {
       return new DocIdSetBlock(_docIdBuffer, index);
@@ -76,7 +98,6 @@ public class BitmapDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
     }
   }
 
-
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
@@ -84,6 +105,23 @@ public class BitmapDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
+  }
+
+  @Override
+  public boolean isCompatibleWith(DocIdOrder order) {
+    return _docIdOrder == order;
+  }
+
+  @Override
+  public BaseDocIdSetOperator withOrder(DocIdOrder order)
+      throws UnsupportedOperationException {
+    if (isCompatibleWith(order)) {
+      return this;
+    }
+    if (_docIds == null) {
+      throw new UnsupportedOperationException(EXPLAIN_NAME + " doesn't support changing its order");
+    }
+    return new BitmapDocIdSetOperator(_docIds, _docIdBuffer, order);
   }
 }

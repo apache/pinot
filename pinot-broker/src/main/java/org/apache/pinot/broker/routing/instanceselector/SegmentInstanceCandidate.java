@@ -18,20 +18,37 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import com.google.common.annotations.VisibleForTesting;
 import javax.annotation.concurrent.Immutable;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID;
 
-/**
- * Represents an instance candidate for a segment.
- */
+
+/// Represents an instance candidate for a segment.
 @Immutable
 public class SegmentInstanceCandidate {
   private final String _instance;
   private final boolean _online;
+  private final int _pool;
+  // Represents the index of the server in the ideal state assignment for the segment. For example, if the ideal state
+  // assignment for a segment is [server1, server2, server3] and this candidate represents server2, then the
+  // idealStateReplicaId will be 1 (regardless of which replicas are available/online).
+  private final int _idealStateReplicaId;
 
+  @VisibleForTesting
   public SegmentInstanceCandidate(String instance, boolean online) {
     _instance = instance;
     _online = online;
+    // no group
+    _pool = FALLBACK_POOL_ID;
+    _idealStateReplicaId = -1;
+  }
+
+  public SegmentInstanceCandidate(String instance, boolean online, int pool, int idealStateReplicaId) {
+    _instance = instance;
+    _online = online;
+    _pool = pool;
+    _idealStateReplicaId = idealStateReplicaId;
   }
 
   public String getInstance() {
@@ -40,5 +57,19 @@ public class SegmentInstanceCandidate {
 
   public boolean isOnline() {
     return _online;
+  }
+
+  public int getPool() {
+    return _pool;
+  }
+
+  public int getIdealStateReplicaId() {
+    return _idealStateReplicaId;
+  }
+
+  @Override
+  public String toString() {
+    return "SegmentInstanceCandidate{" + "_instance='" + _instance + '\'' + ", _online=" + _online + ", _pool=" + _pool
+        + ", _idealStateReplicaId=" + _idealStateReplicaId + '}';
   }
 }

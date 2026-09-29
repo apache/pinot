@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -33,6 +34,7 @@ import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -47,12 +49,14 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 public abstract class DistinctFromTransformFunctionTest {
   private static final String SEGMENT_NAME = "testSegment";
+  private static final String INDEX_DIR_SUFFIX = "-" + UUID.randomUUID();
   private static final String INT_SV_COLUMN = "intSV";
   private static final String INT_SV_NULL_COLUMN = "intSV2";
   private static final Random RANDOM = new Random();
@@ -64,6 +68,7 @@ public abstract class DistinctFromTransformFunctionTest {
   private final int[] _intSVValues = new int[NUM_ROWS];
 
   private Map<String, DataSource> _dataSourceMap;
+  private IndexSegment _indexSegment;
   private ProjectionBlock _projectionBlock;
 
   DistinctFromTransformFunctionTest(boolean isDistinctFrom) {
@@ -72,10 +77,10 @@ public abstract class DistinctFromTransformFunctionTest {
   }
 
   private static String getIndexDirPath(String segmentName) {
-    return FileUtils.getTempDirectoryPath() + File.separator + segmentName;
+    return FileUtils.getTempDirectoryPath() + File.separator + segmentName + INDEX_DIR_SUFFIX;
   }
 
-  private static Map<String, DataSource> getDataSourceMap(Schema schema, List<GenericRow> rows, String segmentName)
+  private Map<String, DataSource> getDataSourceMap(Schema schema, List<GenericRow> rows, String segmentName)
       throws Exception {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(segmentName).setNullHandlingEnabled(true).build();
@@ -85,19 +90,19 @@ public abstract class DistinctFromTransformFunctionTest {
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
-    IndexSegment indexSegment =
-        ImmutableSegmentLoader.load(new File(getIndexDirPath(segmentName), segmentName), ReadMode.heap);
-    Set<String> columnNames = indexSegment.getPhysicalColumnNames();
+    _indexSegment = ImmutableSegmentLoader.load(new File(getIndexDirPath(segmentName), segmentName), ReadMode.heap);
+    Set<String> columnNames = _indexSegment.getPhysicalColumnNames();
     Map<String, DataSource> enableNullDataSourceMap = new HashMap<>(columnNames.size());
     for (String columnName : columnNames) {
-      enableNullDataSourceMap.put(columnName, indexSegment.getDataSource(columnName));
+      enableNullDataSourceMap.put(columnName, _indexSegment.getDataSource(columnName));
     }
     return enableNullDataSourceMap;
   }
 
   private static ProjectionBlock getProjectionBlock(Map<String, DataSource> dataSourceMap) {
     return new ProjectionOperator(dataSourceMap,
-        new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
+        new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL),
+        new QueryContext.Builder().build()).nextBlock();
   }
 
   private static boolean isEqualRow(int i) {
@@ -123,17 +128,15 @@ public abstract class DistinctFromTransformFunctionTest {
     }
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Map<String, Object> map = new HashMap<>();
-      map.put(INT_SV_COLUMN, _intSVValues[i]);
-      if (isEqualRow(i)) {
-        map.put(INT_SV_NULL_COLUMN, _intSVValues[i]);
-      } else if (isNotEqualRow(i)) {
-        map.put(INT_SV_NULL_COLUMN, _intSVValues[i] + 1);
-      } else if (isNullRow(i)) {
-        map.put(INT_SV_NULL_COLUMN, null);
-      }
       GenericRow row = new GenericRow();
-      row.init(map);
+      row.putValue(INT_SV_COLUMN, _intSVValues[i]);
+      if (isEqualRow(i)) {
+        row.putValue(INT_SV_NULL_COLUMN, _intSVValues[i]);
+      } else if (isNotEqualRow(i)) {
+        row.putValue(INT_SV_NULL_COLUMN, _intSVValues[i] + 1);
+      } else if (isNullRow(i)) {
+        row.putValue(INT_SV_NULL_COLUMN, null);
+      }
       rows.add(row);
     }
 
@@ -141,6 +144,17 @@ public abstract class DistinctFromTransformFunctionTest {
         .addSingleValueDimension(INT_SV_NULL_COLUMN, FieldSpec.DataType.INT).build();
     _dataSourceMap = getDataSourceMap(schema, rows, SEGMENT_NAME);
     _projectionBlock = getProjectionBlock(_dataSourceMap);
+  }
+
+  @AfterClass
+  public void tearDown() {
+    try {
+      if (_indexSegment != null) {
+        _indexSegment.destroy();
+      }
+    } finally {
+      FileUtils.deleteQuietly(new File(getIndexDirPath(SEGMENT_NAME)));
+    }
   }
 
   protected void testTransformFunction(ExpressionContext expression, boolean[] expectedValues,

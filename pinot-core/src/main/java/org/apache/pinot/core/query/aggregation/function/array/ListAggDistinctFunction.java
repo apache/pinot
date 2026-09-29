@@ -18,17 +18,17 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.objects.AbstractObjectCollection;
+import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 
-/**
- * The {@code ListAggDistinctFunction} extends the {@link ListAggFunction} to use {@link ObjectLinkedOpenHashSet} as
- * the intermediate result to hold distinct values for aggregation.
- */
+/// The `ListAggDistinctFunction` extends the [ListAggFunction] to use [ObjectLinkedOpenHashSet] as
+/// the intermediate result to hold distinct values for aggregation.
 public class ListAggDistinctFunction extends ListAggFunction {
 
   public ListAggDistinctFunction(ExpressionContext expression, String separator, boolean nullHandlingEnabled) {
@@ -36,7 +36,7 @@ public class ListAggDistinctFunction extends ListAggFunction {
   }
 
   @Override
-  protected AbstractObjectCollection<String> getObjectCollection(AggregationResultHolder aggregationResultHolder) {
+  protected ObjectLinkedOpenHashSet<String> getObjectCollection(AggregationResultHolder aggregationResultHolder) {
     ObjectLinkedOpenHashSet<String> valueSet = aggregationResultHolder.getResult();
     if (valueSet == null) {
       valueSet = new ObjectLinkedOpenHashSet<>();
@@ -46,7 +46,7 @@ public class ListAggDistinctFunction extends ListAggFunction {
   }
 
   @Override
-  protected AbstractObjectCollection<String> getObjectCollection(GroupByResultHolder groupByResultHolder,
+  protected ObjectLinkedOpenHashSet<String> getObjectCollection(GroupByResultHolder groupByResultHolder,
       int groupKey) {
     ObjectLinkedOpenHashSet<String> valueSet = groupByResultHolder.getResult(groupKey);
     if (valueSet == null) {
@@ -54,5 +54,16 @@ public class ListAggDistinctFunction extends ListAggFunction {
       groupByResultHolder.setValueForKey(groupKey, valueSet);
     }
     return valueSet;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(ObjectCollection<String> strings) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.OrderedStringSet.getValue(),
+        ObjectSerDeUtils.ORDERED_STRING_SET_SER_DE.serialize((ObjectLinkedOpenHashSet<String>) strings));
+  }
+
+  @Override
+  public ObjectLinkedOpenHashSet<String> deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.ORDERED_STRING_SET_SER_DE.deserialize(customObject.getBuffer());
   }
 }

@@ -23,10 +23,9 @@ import java.util.Objects;
 import java.util.Set;
 
 
-/**
- * The {@code FunctionContext} class represents the function in the expression.
- * <p>Pinot currently supports 2 types of functions: Aggregation (e.g. SUM, MAX) and Transform (e.g. ADD, SUB).
- */
+/// The {@code FunctionContext} class represents the function in the expression.
+///
+/// Pinot currently supports 2 types of functions: Aggregation (e.g. SUM, MAX) and Transform (e.g. ADD, SUB).
 public class FunctionContext {
   public enum Type {
     AGGREGATION, TRANSFORM
@@ -60,9 +59,7 @@ public class FunctionContext {
     return _arguments;
   }
 
-  /**
-   * Adds the columns (IDENTIFIER expressions) in the function to the given set.
-   */
+  /// Adds the columns (IDENTIFIER expressions) in the function to the given set.
   public void getColumns(Set<String> columns) {
     for (ExpressionContext argument : _arguments) {
       argument.getColumns(columns);

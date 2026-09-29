@@ -30,13 +30,26 @@ github:
     merge: false
     rebase: false
   collaborators:
-    - sullis
-    - yashmayya
-    - shounakmk219
-    - itschrispeck
-    - zhtaoxiang
-    - soumitra-st
-    - suddendust
-    - vrajat
+    - Akanksha-kedia
     - deepthi912
-    - timveil
+    - J-HowHuang
+    - suvodeep-pyne
+    - hongkunxu
+    - shounakmk219
+    - jadami10
+    - arunkumarucet
+    - dang-stripe
+    - jineshparakh
+  rulesets:
+    - name: "Default Branch Protection"
+      type: branch
+      branches:
+        includes:
+          - "~DEFAULT_BRANCH"
+          - "release/*"
+          - "rel/*"
+        excludes: []
+      bypass_teams:
+        - root
+      restrict_deletion: true
+      restrict_force_push: true

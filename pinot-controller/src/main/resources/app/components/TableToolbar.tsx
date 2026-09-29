@@ -18,7 +18,7 @@
  */
 
 import * as React from 'react';
-import { Typography, Toolbar, Tooltip } from '@material-ui/core';
+import { Typography, Toolbar, Tooltip, Box } from '@material-ui/core';
 import {
   makeStyles
 } from '@material-ui/core/styles';
@@ -32,7 +32,8 @@ type Props = {
   handleSearch?: Function;
   recordCount?: number;
   showTooltip?: boolean;
-  tooltipText?: string;
+  tooltipText?: React.ReactNode;
+  additionalControls?: React.ReactNode;
 };
 
 const useToolbarStyles = makeStyles((theme) => ({
@@ -40,7 +41,9 @@ const useToolbarStyles = makeStyles((theme) => ({
     paddingLeft: '15px',
     paddingRight: '15px',
     minHeight: 48,
-    backgroundColor: 'rgba(66, 133, 244, 0.1)'
+    backgroundColor: 'rgba(66, 133, 244, 0.1)',
+    display: 'flex',
+    alignItems: 'center',
   },
   title: {
     flex: '1 1 auto',
@@ -49,6 +52,16 @@ const useToolbarStyles = makeStyles((theme) => ({
     fontSize: '1rem',
     color: '#4285f4'
   },
+  controlsContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(1),
+  },
+  recordCount: {
+    fontWeight: 600,
+    color: '#666',
+    fontSize: '0.875rem',
+  }
 }));
 
 export default function TableToolbar({
@@ -58,7 +71,8 @@ export default function TableToolbar({
   handleSearch,
   recordCount,
   showTooltip,
-  tooltipText
+  tooltipText,
+  additionalControls
 }: Props) {
   const classes = useToolbarStyles();
 
@@ -72,15 +86,25 @@ export default function TableToolbar({
       >
         {name.toUpperCase()}
       </Typography>
-      {showSearchBox ? <SearchBar
-        value={searchValue}
-        onChange={(e) => handleSearch(e.target.value)}
-      /> : <strong>{(recordCount)}</strong>}
-      {showTooltip &&
-        <Tooltip title={tooltipText}>
-          <HelpOutlineIcon />
-        </Tooltip>
-      }
+
+      <div className={classes.controlsContainer}>
+        {additionalControls}
+
+        {showSearchBox ? (
+          <SearchBar
+            value={searchValue}
+            onChange={(e) => handleSearch(e.target.value)}
+          />
+        ) : (
+          <span className={classes.recordCount}>{recordCount}</span>
+        )}
+
+        {showTooltip && (
+          <Tooltip title={tooltipText} interactive>
+            <HelpOutlineIcon />
+          </Tooltip>
+        )}
+      </div>
     </Toolbar>
   );
 }

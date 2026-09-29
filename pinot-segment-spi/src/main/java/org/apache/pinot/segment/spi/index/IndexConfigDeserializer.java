@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,9 +40,7 @@ public class IndexConfigDeserializer {
   private IndexConfigDeserializer() {
   }
 
-  /**
-   * Returns a {@link ColumnConfigDeserializer} that always returns the same config object
-   */
+  /// Returns a [ColumnConfigDeserializer] that always returns the same config object
   public static <C extends IndexConfig> ColumnConfigDeserializer<C> always(C config) {
     return (tableConfig, schema) -> {
       Map<String, C> result = new HashMap<>();
@@ -58,10 +55,8 @@ public class IndexConfigDeserializer {
     return always(indexType.getDefaultConfig());
   }
 
-  /**
-   * Returns a {@link ColumnConfigDeserializer} that always returns whatever is returned by the function given as
-   * parameter.
-   */
+  /// Returns a [ColumnConfigDeserializer] that always returns whatever is returned by the function given as
+  /// parameter.
   public static <C extends IndexConfig> ColumnConfigDeserializer<C> alwaysCall(BiFunction<TableConfig, Schema, C> map) {
     return (tableConfig, schema) -> {
       C config = map.apply(tableConfig, schema);
@@ -73,10 +68,14 @@ public class IndexConfigDeserializer {
     };
   }
 
-  /**
-   * Returns a {@link ColumnConfigDeserializer} that reads a specific fieldName of the <pre>indexes</pre> attribute on
-   * each FieldConfig.
-   */
+  /// Returns a [ColumnConfigDeserializer] that reads a specific fieldName of the
+  ///
+  /// ```
+  /// indexes
+  /// ```
+  ///
+  /// attribute on
+  /// each FieldConfig.
   public static <C extends IndexConfig> ColumnConfigDeserializer<C> fromIndexes(String fieldName, Class<C> aClass) {
     return (tableConfig, schema) -> {
       Map<String, C> result = new HashMap<>();
@@ -108,7 +107,7 @@ public class IndexConfigDeserializer {
     return (tableConfig, schema) -> {
       List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
       if (fieldConfigList == null) {
-        return Collections.emptyMap();
+        return Map.of();
       }
       Map<String, C> result = new HashMap<>();
       for (FieldConfig fieldConfig : fieldConfigList) {
@@ -126,7 +125,7 @@ public class IndexConfigDeserializer {
     return (tableConfig, schema) -> {
       Collection<T> col = extract.apply(tableConfig);
       if (col == null) {
-        return Collections.emptyMap();
+        return Map.of();
       }
       Map<String, C> result = new HashMap<>();
       for (T temp : col) {
@@ -141,7 +140,7 @@ public class IndexConfigDeserializer {
     return (tableConfig, schema) -> {
       Map<K, T> map = extract.apply(tableConfig);
       if (map == null) {
-        return Collections.emptyMap();
+        return Map.of();
       }
       Map<String, C> result = new HashMap<>();
       for (Map.Entry<K, T> entry : map.entrySet()) {
@@ -161,7 +160,7 @@ public class IndexConfigDeserializer {
     return (tableConfig, schema) -> {
       Map<String, C> result = extract.apply(tableConfig);
       if (result == null) {
-        return Collections.emptyMap();
+        return Map.of();
       }
       return result;
     };

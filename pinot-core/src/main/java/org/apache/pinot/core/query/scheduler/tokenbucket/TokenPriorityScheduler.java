@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.scheduler.tokenbucket;
 
 import java.util.concurrent.atomic.LongAccumulator;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.MultiLevelPriorityQueue;
 import org.apache.pinot.core.query.scheduler.PriorityScheduler;
@@ -28,23 +27,22 @@ import org.apache.pinot.core.query.scheduler.SchedulerGroupFactory;
 import org.apache.pinot.core.query.scheduler.TableBasedGroupMapper;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Schedules queries from a {@link SchedulerGroup} with highest number of tokens on priority.
- * This is a thin wrapper factory class that configures {@link PriorityScheduler} with
- * the right concrete classes. All the priority based scheduling logic is in {@link PriorityScheduler}
- */
+/// Schedules queries from a [SchedulerGroup] with highest number of tokens on priority.
+/// This is a thin wrapper factory class that configures [PriorityScheduler] with
+/// the right concrete classes. All the priority based scheduling logic is in [PriorityScheduler]
 public class TokenPriorityScheduler extends PriorityScheduler {
   public static final String TOKENS_PER_MS_KEY = "tokens_per_ms";
   public static final String TOKEN_LIFETIME_MS_KEY = "token_lifetime_ms";
   private static final int DEFAULT_TOKEN_LIFETIME_MS = 100;
 
-  public static TokenPriorityScheduler create(PinotConfiguration config, QueryExecutor queryExecutor,
-      ServerMetrics metrics, LongAccumulator latestQueryTime) {
-    final ResourceManager rm = new PolicyBasedResourceManager(config);
-    final SchedulerGroupFactory groupFactory = new SchedulerGroupFactory() {
+  public static TokenPriorityScheduler create(PinotConfiguration config, String instanceId, QueryExecutor queryExecutor,
+      ThreadAccountant threadAccountant, LongAccumulator latestQueryTime) {
+    ResourceManager rm = new PolicyBasedResourceManager(config);
+    SchedulerGroupFactory groupFactory = new SchedulerGroupFactory() {
       @Override
       public SchedulerGroup create(PinotConfiguration config, String groupName) {
         // max available tokens per millisecond equals number of threads (total execution capacity)
@@ -58,13 +56,13 @@ public class TokenPriorityScheduler extends PriorityScheduler {
     };
 
     MultiLevelPriorityQueue queue = new MultiLevelPriorityQueue(config, rm, groupFactory, new TableBasedGroupMapper());
-    return new TokenPriorityScheduler(config, rm, queryExecutor, queue, metrics, latestQueryTime);
+    return new TokenPriorityScheduler(config, instanceId, queryExecutor, threadAccountant, latestQueryTime, rm, queue);
   }
 
-  private TokenPriorityScheduler(PinotConfiguration config, ResourceManager resourceManager,
-      QueryExecutor queryExecutor, MultiLevelPriorityQueue queue, ServerMetrics metrics,
-      LongAccumulator latestQueryTime) {
-    super(config, resourceManager, queryExecutor, queue, metrics, latestQueryTime);
+  private TokenPriorityScheduler(PinotConfiguration config, String instanceId, QueryExecutor queryExecutor,
+      ThreadAccountant threadAccountant, LongAccumulator latestQueryTime, ResourceManager resourceManager,
+      MultiLevelPriorityQueue queue) {
+    super(config, instanceId, queryExecutor, threadAccountant, latestQueryTime, resourceManager, queue);
   }
 
   @Override

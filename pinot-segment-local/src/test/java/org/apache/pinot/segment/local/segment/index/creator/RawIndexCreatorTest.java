@@ -26,11 +26,11 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -55,10 +55,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Class for testing Raw index creators.
- */
-public class RawIndexCreatorTest {
+/// Class for testing Raw index creators.
+public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), RawIndexCreatorTest.class.getSimpleName());
 
@@ -95,7 +93,8 @@ public class RawIndexCreatorTest {
       .build();
   //@formatter:on
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-      .setNoDictionaryColumns(SCHEMA.getDimensionNames()).build();
+      .setNoDictionaryColumns(SCHEMA.getDimensionNames())
+      .build();
   private static final Random RANDOM = new Random();
 
   private RecordReader _recordReader;
@@ -120,56 +119,46 @@ public class RawIndexCreatorTest {
     FileUtils.deleteQuietly(TEMP_DIR);
   }
 
-  /**
-   * Test for int raw index creator.
-   * Compares values read from the raw index against expected value.
-   */
+  /// Test for int raw index creator.
+  /// Compares values read from the raw index against expected value.
   @Test
   public void testIntRawIndexCreator()
       throws Exception {
     testFixedLengthRawIndexCreator(INT_COLUMN, DataType.INT);
   }
 
-  /**
-   * Test for long raw index creator.
-   * Compares values read from the raw index against expected value.
-   */
+  /// Test for long raw index creator.
+  /// Compares values read from the raw index against expected value.
   @Test
   public void testLongRawIndexCreator()
       throws Exception {
     testFixedLengthRawIndexCreator(LONG_COLUMN, DataType.LONG);
   }
 
-  /**
-   * Test for float raw index creator.
-   * Compares values read from the raw index against expected value.
-   */
+  /// Test for float raw index creator.
+  /// Compares values read from the raw index against expected value.
   @Test
   public void testFloatRawIndexCreator()
       throws Exception {
     testFixedLengthRawIndexCreator(FLOAT_COLUMN, DataType.FLOAT);
   }
 
-  /**
-   * Test for double raw index creator.
-   * Compares values read from the raw index against expected value.
-   */
+  /// Test for double raw index creator.
+  /// Compares values read from the raw index against expected value.
   @Test
   public void testDoubleRawIndexCreator()
       throws Exception {
     testFixedLengthRawIndexCreator(DOUBLE_COLUMN, DataType.DOUBLE);
   }
 
-  /**
-   * Test for string raw index creator.
-   * Compares values read from the raw index against expected value.
-   */
+  /// Test for string raw index creator.
+  /// Compares values read from the raw index against expected value.
   @Test
   public void testStringRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_COLUMN);
-    try (
-        ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.createRawIndexReader(indexBuffer, DataType.STRING,
+    try (ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.getInstance()
+        .createRawIndexReader(indexBuffer, DataType.STRING,
             true); ForwardIndexReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       for (int row = 0; row < NUM_ROWS; row++) {
@@ -179,12 +168,10 @@ public class RawIndexCreatorTest {
     }
   }
 
-  /**
-   * Helper method to perform actual tests for a given column.
-   *
-   * @param column Column for which to perform the test
-   * @param dataType Data type of the column
-   */
+  /// Helper method to perform actual tests for a given column.
+  ///
+  /// @param column Column for which to perform the test
+  /// @param dataType Data type of the column
   private void testFixedLengthRawIndexCreator(String column, DataType dataType)
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(column);
@@ -198,16 +185,15 @@ public class RawIndexCreatorTest {
     }
   }
 
-  /**
-   * Test for multi value string raw index creator.
-   * Compares values read from the raw index against expected value.
-   */
+  /// Test for multi value string raw index creator.
+  /// Compares values read from the raw index against expected value.
   @Test
   public void testStringMVRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_MV_COLUMN);
-    try (VarByteChunkMVForwardIndexReader rawIndexReader = new VarByteChunkMVForwardIndexReader(indexBuffer,
-        DataType.STRING); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+    try (ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.getInstance()
+        .createRawIndexReader(indexBuffer, DataType.STRING,
+            false); ForwardIndexReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       int maxNumberOfMultiValues =
           _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(STRING_MV_COLUMN).getMaxNumberOfMultiValues();
@@ -230,16 +216,15 @@ public class RawIndexCreatorTest {
     }
   }
 
-  /**
-   * Test for multi value string raw index creator.
-   * Compares values read from the raw index against expected value.
-   */
+  /// Test for multi value string raw index creator.
+  /// Compares values read from the raw index against expected value.
   @Test
   public void testBytesMVRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(BYTES_MV_COLUMN);
-    try (VarByteChunkMVForwardIndexReader rawIndexReader = new VarByteChunkMVForwardIndexReader(indexBuffer,
-        DataType.BYTES); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+    try (ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.getInstance()
+        .createRawIndexReader(indexBuffer, DataType.BYTES,
+        false); ForwardIndexReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       int maxNumberOfMultiValues =
           _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(BYTES_MV_COLUMN).getMaxNumberOfMultiValues();
@@ -262,22 +247,18 @@ public class RawIndexCreatorTest {
     }
   }
 
-  /**
-   * Helper method that returns index file name for a given column name.
-   *
-   * @param column Column name for which to get the index file name
-   * @return Name of index file for the given column name
-   */
+  /// Helper method that returns index file name for a given column name.
+  ///
+  /// @param column Column name for which to get the index file name
+  /// @return Name of index file for the given column name
   private PinotDataBuffer getIndexBufferForColumn(String column)
       throws IOException {
     return _segmentReader.getIndexFor(column, StandardIndexes.forward());
   }
 
-  /**
-   * Helper method to build a segment containing a single valued string column with RAW (no-dictionary) index.
-   *
-   * @return Array of string values for the rows in the generated index.
-   */
+  /// Helper method to build a segment containing a single valued string column with RAW (no-dictionary) index.
+  ///
+  /// @return Array of string values for the rows in the generated index.
   private RecordReader buildIndex()
       throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
@@ -315,12 +296,10 @@ public class RawIndexCreatorTest {
     return recordReader;
   }
 
-  /**
-   * Helper method that generates a random value for a given data type.
-   *
-   * @param dataType Data type for which to generate the random value
-   * @return Random value for the data type
-   */
+  /// Helper method that generates a random value for a given data type.
+  ///
+  /// @param dataType Data type for which to generate the random value
+  /// @return Random value for the data type
   public static Object getRandomValue(Random random, DataType dataType) {
     switch (dataType) {
       case INT:
@@ -332,24 +311,22 @@ public class RawIndexCreatorTest {
       case DOUBLE:
         return random.nextDouble();
       case STRING:
-        return StringUtil.sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)),
+        return StringUtil.sanitizeStringValue(RandomStringUtils.secure().next(random.nextInt(MAX_STRING_LENGTH)),
             Integer.MAX_VALUE);
       case BYTES:
-        return StringUtil.sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)),
+        return StringUtil.sanitizeStringValue(RandomStringUtils.secure().next(random.nextInt(MAX_STRING_LENGTH)),
             Integer.MAX_VALUE).getBytes();
       default:
         throw new UnsupportedOperationException("Unsupported data type for random value generator: " + dataType);
     }
   }
 
-  /**
-   * Helper method to reader value for the given row.
-   *
-   * @param rawIndexReader Index reader
-   * @param readerContext Reader context
-   * @param docId Document id
-   * @return Value read from index
-   */
+  /// Helper method to reader value for the given row.
+  ///
+  /// @param rawIndexReader Index reader
+  /// @param readerContext Reader context
+  /// @param docId Document id
+  /// @return Value read from index
   private Object readValueFromIndex(FixedByteChunkSVForwardIndexReader rawIndexReader, ChunkReaderContext readerContext,
       int docId) {
     switch (rawIndexReader.getStoredType()) {

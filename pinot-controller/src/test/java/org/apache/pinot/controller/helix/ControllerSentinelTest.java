@@ -46,13 +46,12 @@ public class ControllerSentinelTest extends ControllerTest {
   public void testOfflineTableLifeCycle()
       throws IOException {
     // Create schema
-    sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forSchemaCreate(),
-        createDummySchema(TABLE_NAME).toPrettyJsonString());
+    addSchema(createDummySchema(TABLE_NAME));
     // Create offline table creation request
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(DEFAULT_MIN_NUM_REPLICAS)
             .build();
-    sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableCreate(), tableConfig.toJsonString());
+    addTableConfig(tableConfig);
     assertEquals(DEFAULT_INSTANCE.getHelixAdmin()
         .getResourceIdealState(DEFAULT_INSTANCE.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
         .getPartitionSet().size(), 1);
@@ -73,7 +72,11 @@ public class ControllerSentinelTest extends ControllerTest {
     }
 
     // Delete table
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(TABLE_NAME));
+    try {
+      getOrCreateAdminClient().getTableClient().deleteTable(TABLE_NAME);
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
     assertEquals(DEFAULT_INSTANCE.getHelixAdmin()
         .getResourceIdealState(DEFAULT_INSTANCE.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
         .getPartitionSet().size(), 0);

@@ -19,11 +19,10 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import javax.annotation.Nullable;
 
 
-/**
- * Reimplementation of BrokerResponse from pinot-common, so that pinot-api does not depend on pinot-common.
- */
+/// Reimplementation of BrokerResponse from pinot-common, so that pinot-api does not depend on pinot-common.
 public class BrokerResponse {
   private String _requestId;
   private String _brokerId;
@@ -36,13 +35,14 @@ public class BrokerResponse {
   private BrokerResponse() {
   }
 
-  private BrokerResponse(JsonNode brokerResponse) {
-    _requestId = brokerResponse.get("requestId") != null ? brokerResponse.get("requestId").asText() : "unknown";
-    _brokerId = brokerResponse.get("brokerId") != null ? brokerResponse.get("brokerId").asText() : "unknown";
-    _aggregationResults = brokerResponse.get("aggregationResults");
-    _exceptions = brokerResponse.get("exceptions");
-    _selectionResults = brokerResponse.get("selectionResults");
-    _resultTable = brokerResponse.get("resultTable");
+  protected BrokerResponse(JsonNode brokerResponse) {
+    // Use helper methods for consistent null handling
+    _requestId = getTextOrDefault(brokerResponse, "requestId", "unknown");
+    _brokerId = getTextOrDefault(brokerResponse, "brokerId", "unknown");
+    _aggregationResults = getJsonNodeOrNull(brokerResponse, "aggregationResults");
+    _exceptions = getJsonNodeOrNull(brokerResponse, "exceptions");
+    _selectionResults = getJsonNodeOrNull(brokerResponse, "selectionResults");
+    _resultTable = getJsonNodeOrNull(brokerResponse, "resultTable");
     _executionStats = ExecutionStats.fromJson(brokerResponse);
   }
 
@@ -50,18 +50,22 @@ public class BrokerResponse {
     return _exceptions != null && !_exceptions.isEmpty();
   }
 
+  @Nullable
   public JsonNode getExceptions() {
     return _exceptions;
   }
 
+  @Nullable
   public JsonNode getAggregationResults() {
     return _aggregationResults;
   }
 
+  @Nullable
   public JsonNode getSelectionResults() {
     return _selectionResults;
   }
 
+  @Nullable
   public JsonNode getResultTable() {
     return _resultTable;
   }
@@ -92,5 +96,22 @@ public class BrokerResponse {
 
   public String getBrokerId() {
     return _brokerId;
+  }
+
+  // Helper methods for extracting values from JsonNode with null checks
+  private static String getTextOrDefault(JsonNode node, String fieldName, String defaultValue) {
+    if (node == null) {
+      return defaultValue;
+    }
+    JsonNode valueNode = node.get(fieldName);
+    return (valueNode != null && !valueNode.isNull()) ? valueNode.asText() : defaultValue;
+  }
+
+  @Nullable
+  private static JsonNode getJsonNodeOrNull(JsonNode node, String fieldName) {
+    if (node == null) {
+      return null;
+    }
+    return node.get(fieldName);
   }
 }

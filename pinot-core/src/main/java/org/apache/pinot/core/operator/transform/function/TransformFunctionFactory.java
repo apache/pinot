@@ -20,6 +20,8 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -32,8 +34,11 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.LiteralContext;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.geospatial.transform.function.GeoToH3Function;
+import org.apache.pinot.core.geospatial.transform.function.GridDiskFunction;
+import org.apache.pinot.core.geospatial.transform.function.GridDistanceFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAreaFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAsBinaryFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAsGeoJsonFunction;
@@ -52,6 +57,7 @@ import org.apache.pinot.core.geospatial.transform.function.StPointFunction;
 import org.apache.pinot.core.geospatial.transform.function.StPolygonFunction;
 import org.apache.pinot.core.geospatial.transform.function.StWithinFunction;
 import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.AbsTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.CeilTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.ExpTransformFunction;
@@ -89,9 +95,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Factory class for transformation functions.
- */
+/// Factory class for transformation functions.
 public class TransformFunctionFactory {
   private TransformFunctionFactory() {
   }
@@ -124,6 +128,12 @@ public class TransformFunctionFactory {
 
     typeToImplementation.put(TransformFunctionType.CAST, CastTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_SCALAR, JsonExtractScalarTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_SCALAR_FAST,
+        JsonExtractScalarTransformFunction.Fast.class);
+    typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_SCALAR_FIRST_MATCH,
+        JsonExtractScalarTransformFunction.FirstMatch.class);
+    typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_SCALAR_FORY,
+        JsonExtractScalarTransformFunction.Fory.class);
     typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_KEY, JsonExtractKeyTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.TIME_CONVERT, TimeConversionTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.DATE_TIME_CONVERT, DateTimeConversionTransformFunction.class);
@@ -145,6 +155,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.MILLISECOND, DateTimeTransformFunction.Millisecond.class);
     typeToImplementation.put(TransformFunctionType.ARRAY_LENGTH, ArrayLengthTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.VALUE_IN, ValueInTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.FILTER_MV, FilterMvTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.MAP_VALUE, MapValueTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.IN_ID_SET, InIdSetTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOOKUP, LookupTransformFunction.class);
@@ -164,6 +175,7 @@ public class TransformFunctionFactory {
 
     typeToImplementation.put(TransformFunctionType.GROOVY, GroovyTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.CASE, CaseTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.TEXT_MATCH, TextMatchTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.EQUALS, EqualsTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.NOT_EQUALS, NotEqualsTransformFunction.class);
@@ -209,6 +221,8 @@ public class TransformFunctionFactory {
 
     // geo indexing
     typeToImplementation.put(TransformFunctionType.GEO_TO_H3, GeoToH3Function.class);
+    typeToImplementation.put(TransformFunctionType.GRID_DISTANCE, GridDistanceFunction.class);
+    typeToImplementation.put(TransformFunctionType.GRID_DISK, GridDiskFunction.class);
 
     // tuple selection
     typeToImplementation.put(TransformFunctionType.LEAST, LeastTransformFunction.class);
@@ -251,6 +265,9 @@ public class TransformFunctionFactory {
     // Item functions
     typeToImplementation.put(TransformFunctionType.ITEM, ItemTransformFunction.class);
 
+    // Time Series functions
+    typeToImplementation.put(TransformFunctionType.TIME_SERIES_BUCKET, TimeSeriesBucketTransformFunction.class);
+
     Map<String, Class<? extends TransformFunction>> registry =
         new HashMap<>(HashUtil.getHashMapCapacity(typeToImplementation.size()));
     for (Map.Entry<TransformFunctionType, Class<? extends TransformFunction>> entry : typeToImplementation.entrySet()) {
@@ -261,12 +278,11 @@ public class TransformFunctionFactory {
     return registry;
   }
 
-  /**
-   * Initializes the factory with a set of transform function classes.
-   * <p>Should be called only once before using the factory.
-   *
-   * @param transformFunctionClasses Set of transform function classes
-   */
+  /// Initializes the factory with a set of transform function classes.
+  ///
+  /// Should be called only once before using the factory.
+  ///
+  /// @param transformFunctionClasses Set of transform function classes
   public static void init(Set<Class<TransformFunction>> transformFunctionClasses) {
     for (Class<TransformFunction> transformFunctionClass : transformFunctionClasses) {
       TransformFunction transformFunction;
@@ -285,22 +301,18 @@ public class TransformFunctionFactory {
     }
   }
 
-  /**
-   * Returns an instance of transform function for the given expression.
-   *
-   * @param expression       Transform expression
-   * @param columnContextMap Map from column name to context
-   * @param queryContext     Query context
-   * @return Transform function
-   */
+  /// Returns an instance of transform function for the given expression.
+  ///
+  /// @param expression       Transform expression
+  /// @param columnContextMap Map from column name to context
+  /// @param queryContext     Query context
+  /// @return Transform function
   public static TransformFunction get(ExpressionContext expression, Map<String, ColumnContext> columnContextMap,
       QueryContext queryContext) {
     switch (expression.getType()) {
       case FUNCTION:
         FunctionContext function = expression.getFunction();
         String functionName = canonicalize(function.getFunctionName());
-        List<ExpressionContext> arguments = function.getArguments();
-        int numArguments = arguments.size();
 
         // Check if the function is ArrayValueConstructor transform function
         if (functionName.equalsIgnoreCase(ArrayLiteralTransformFunction.FUNCTION_NAME)) {
@@ -315,6 +327,15 @@ public class TransformFunctionFactory {
               GenerateArrayTransformFunction::new);
         }
 
+        List<ExpressionContext> arguments = function.getArguments();
+        int numArguments = arguments.size();
+
+        // Build child transform functions first to derive argument data types for scalar function polymorphism
+        List<TransformFunction> transformFunctionArguments = new ArrayList<>(numArguments);
+        for (ExpressionContext argument : arguments) {
+          transformFunctionArguments.add(TransformFunctionFactory.get(argument, columnContextMap, queryContext));
+        }
+
         TransformFunction transformFunction;
         Class<? extends TransformFunction> transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);
         if (transformFunctionClass != null) {
@@ -327,11 +348,20 @@ public class TransformFunctionFactory {
         } else {
           // Scalar function
           String canonicalName = FunctionRegistry.canonicalize(functionName);
-          FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, numArguments);
+          // Get data types for the arguments
+          ColumnDataType[] argumentDataTypes = new ColumnDataType[numArguments];
+          for (int i = 0; i < numArguments; i++) {
+            TransformResultMetadata resultMetadata = transformFunctionArguments.get(i).getResultMetadata();
+            argumentDataTypes[i] =
+                ColumnDataType.fromDataType(resultMetadata.getDataType(), resultMetadata.isSingleValue());
+          }
+          FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentDataTypes);
           if (functionInfo == null) {
             if (FunctionRegistry.contains(canonicalName)) {
               throw new BadQueryRequestException(
-                  String.format("Unsupported function: %s with %d arguments", functionName, numArguments));
+                  numArguments > 0 ? String.format("Unsupported function: %s with arguments of type: %s", functionName,
+                      Arrays.toString(argumentDataTypes))
+                      : String.format("Unsupported function: %s with 0 arguments", functionName));
             } else {
               throw new BadQueryRequestException(String.format("Unsupported function: %s", functionName));
             }
@@ -339,15 +369,11 @@ public class TransformFunctionFactory {
           transformFunction = new ScalarTransformFunctionWrapper(functionInfo);
         }
 
-        List<TransformFunction> transformFunctionArguments = new ArrayList<>(numArguments);
-        for (ExpressionContext argument : arguments) {
-          transformFunctionArguments.add(TransformFunctionFactory.get(argument, columnContextMap, queryContext));
-        }
         try {
           transformFunction.init(transformFunctionArguments, columnContextMap, queryContext.isNullHandlingEnabled());
         } catch (Exception e) {
-          throw new BadQueryRequestException("Caught exception while initializing transform function: " + functionName,
-              e);
+          throw new BadQueryRequestException("Caught exception while initializing transform function: "
+              + functionName + ": " + e.getMessage(), e);
         }
         return transformFunction;
       case IDENTIFIER:
@@ -388,13 +414,15 @@ public class TransformFunctionFactory {
     return get(expression, columnContextMap, dummy);
   }
 
-  /**
-   * Converts the transform function name into its canonical form
-   *
-   * @param functionName Name of the transform function
-   * @return canonicalized transform function name
-   */
+  /// Converts the transform function name into its canonical form
+  ///
+  /// @param functionName Name of the transform function
+  /// @return canonicalized transform function name
   public static String canonicalize(String functionName) {
     return StringUtils.remove(functionName, '_').toLowerCase();
+  }
+
+  public static Map<String, Class<? extends TransformFunction>> getAllFunctions() {
+    return Collections.unmodifiableMap(TRANSFORM_FUNCTION_MAP);
   }
 }

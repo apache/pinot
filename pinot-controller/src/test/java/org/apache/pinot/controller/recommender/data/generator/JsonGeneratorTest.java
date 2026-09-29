@@ -20,7 +20,7 @@ package org.apache.pinot.controller.recommender.data.generator;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -53,7 +53,7 @@ public class JsonGeneratorTest {
 
     // Remove escape characters from jsonString for verification purposes. Escape character were added before comma
     // since json string is written to a CSV file where comma is used as delimiter.
-    jsonString = StringUtils.remove(jsonString, "\\");
+    jsonString = Strings.CS.remove(jsonString, "\\");
 
     // Make sure we are generating JSON string that is close to the desired length. Length of JSON string should be 2
     // (length of opening and closing parentheses) + number of commas + size of all the elements.

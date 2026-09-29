@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.spi.config.table;
 
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.testng.annotations.Test;
 
@@ -34,17 +34,17 @@ public class UpsertConfigTest {
     assertEquals(upsertConfig1.getMode(), UpsertConfig.Mode.FULL);
 
     upsertConfig1.setComparisonColumn("comparison");
-    assertEquals(upsertConfig1.getComparisonColumns(), Collections.singletonList("comparison"));
+    assertEquals(upsertConfig1.getComparisonColumns(), List.of("comparison"));
 
     upsertConfig1.setHashFunction(HashFunction.MURMUR3);
     assertEquals(upsertConfig1.getHashFunction(), HashFunction.MURMUR3);
 
     UpsertConfig upsertConfig2 = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
-    Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
-    partialUpsertStratgies.put("myCol", UpsertConfig.Strategy.INCREMENT);
-    upsertConfig2.setPartialUpsertStrategies(partialUpsertStratgies);
+    Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
+    partialUpsertStrategies.put("myCol", UpsertConfig.Strategy.INCREMENT);
+    upsertConfig2.setPartialUpsertStrategies(partialUpsertStrategies);
     upsertConfig2.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
-    assertEquals(upsertConfig2.getPartialUpsertStrategies(), partialUpsertStratgies);
+    assertEquals(upsertConfig2.getPartialUpsertStrategies(), partialUpsertStrategies);
   }
 
   @Test

@@ -40,9 +40,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * TODO: add test for other logical types
- */
+/// TODO: add test for other logical types
 public class ParquetReaderLogicalTypesTest {
 
   @Test
@@ -52,6 +50,8 @@ public class ParquetReaderLogicalTypesTest {
         + "required int64 decimal_from_int64 (DECIMAL(18, 2));"
         + "required fixed_len_byte_array(16) decimal_from_fixed (DECIMAL(38, 9));"
         + "required binary decimal_from_binary (DECIMAL(38, 9));"
+        + "required binary decimal_trailing_zero (DECIMAL(10, 2));"
+        + "required binary decimal_precision18 (DECIMAL(18, 6));"
         + "}";
 
     byte[] byteArray = new BigDecimal("12345678901234567890123456789.012345678").unscaledValue().toByteArray();
@@ -62,6 +62,10 @@ public class ParquetReaderLogicalTypesTest {
     row.put("decimal_from_int64", new BigDecimal("1234567890123.45").unscaledValue().longValue());
     row.put("decimal_from_fixed", Binary.fromConstantByteArray(paddedArray));
     row.put("decimal_from_binary", Binary.fromConstantByteArray(byteArray));
+    row.put("decimal_trailing_zero",
+        Binary.fromConstantByteArray(new BigDecimal("1.10").unscaledValue().toByteArray()));
+    row.put("decimal_precision18",
+        Binary.fromConstantByteArray(new BigDecimal("123456789012.345678").unscaledValue().toByteArray()));
 
     String outputPath = null;
     try {
@@ -76,6 +80,8 @@ public class ParquetReaderLogicalTypesTest {
             new BigDecimal("12345678901234567890123456789.012345678"));
         assertEquals(genericRow.getValue("decimal_from_binary"),
             new BigDecimal("12345678901234567890123456789.012345678"));
+        assertEquals(genericRow.getValue("decimal_trailing_zero"), new BigDecimal("1.10"));
+        assertEquals(genericRow.getValue("decimal_precision18"), new BigDecimal("123456789012.345678"));
       }
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -86,9 +92,7 @@ public class ParquetReaderLogicalTypesTest {
     }
   }
 
-  /**
-   * Write the given row object to a random parquet file and return the path of the file
-   */
+  /// Write the given row object to a random parquet file and return the path of the file
   private String writeToFile(String schemaStr, Map<String, Object> rowObject)
       throws IOException {
     Path outputPath = new Path(FileUtils.getTempDirectory().toString(), "example.parquet");

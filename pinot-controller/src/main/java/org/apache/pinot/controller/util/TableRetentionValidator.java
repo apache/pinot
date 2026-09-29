@@ -21,7 +21,6 @@ package org.apache.pinot.controller.util;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
@@ -30,7 +29,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -40,27 +39,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>TableRetentionValidator</code> class validates the retention policy in table config, and the start/end
- * timestamp in segment metadata.
- * <p>Will validate the followings:
- * <ul>
- *   <li>
- *     Table Config
- *     <ul>
- *       <li>"segmentsConfig" is set.</li>
- *       <li>"segmentPushType" is set to APPEND or REFRESH.</li>
- *       <li>Retention setting is valid for APPEND push type.</li>
- *     </ul>
- *   </li>
- *   <li>
- *     Segment Metadata
- *     <ul>
- *       <li>For APPEND push type, offline segment start/end time and time unit is valid.</li>
- *     </ul>
- *   </li>
- * </ul>
- */
+/// The `TableRetentionValidator` class validates the retention policy in table config, and the start/end
+/// timestamp in segment metadata.
+///
+/// Will validate the followings:
+///
+/// - Table Config
+///   - "segmentsConfig" is set.
+///   - "segmentPushType" is set to APPEND or REFRESH.
+///   - Retention setting is valid for APPEND push type.
+/// - Segment Metadata
+///   - For APPEND push type, offline segment start/end time and time unit is valid.
 public class TableRetentionValidator {
   public static final long DEFAULT_DURATION_IN_DAYS_THRESHOLD = 365;
 
@@ -73,7 +62,7 @@ public class TableRetentionValidator {
   private String _tableNamePattern = null;
   private long _durationInDaysThreshold = DEFAULT_DURATION_IN_DAYS_THRESHOLD;
 
-  public TableRetentionValidator(@Nonnull String zkAddress, @Nonnull String clusterName) {
+  public TableRetentionValidator(String zkAddress, String clusterName) {
     _clusterName = clusterName;
     _helixAdmin = new ZKHelixAdmin(zkAddress);
     _propertyStore =
@@ -182,7 +171,7 @@ public class TableRetentionValidator {
 
   private TableConfig getTableConfig(String tableName)
       throws Exception {
-    return TableConfigUtils.fromZNRecord(
+    return TableConfigSerDeUtils.fromZNRecord(
         _propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableName), null, 0));
   }
 

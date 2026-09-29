@@ -35,17 +35,14 @@ package org.apache.pinot.common.utils;
  * limitations under the License.
  */
 
-import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
-/**
- * A default {@link ThreadFactory} implementation that accepts the name prefix
- * of the created threads as a constructor argument. Otherwise, this factory
- * yields the same semantics as the thread factory returned by
- * {@link Executors#defaultThreadFactory()}.
- */
+/// A default [ThreadFactory] implementation that accepts the name prefix
+/// of the created threads as a constructor argument. Otherwise, this factory
+/// yields the same semantics as the thread factory returned by
+/// [java.util.concurrent.Executors#defaultThreadFactory()].
 public class NamedThreadFactory implements ThreadFactory {
   private static final AtomicInteger THREAD_POOL_NUMBER = new AtomicInteger(1);
   private static final String NAME_PATTERN = "%s-%d-thread";
@@ -53,32 +50,38 @@ public class NamedThreadFactory implements ThreadFactory {
   private final ThreadGroup _group;
   private final AtomicInteger _threadNumber = new AtomicInteger(1);
   private final String _threadNamePrefix;
+  private final boolean _daemon;
 
-  /**
-   * Creates a new {@link NamedThreadFactory} instance
-   *
-   * @param threadNamePrefix the name prefix assigned to each thread created.
-   */
+  /// Creates a new [NamedThreadFactory] instance
+  ///
+  /// @param threadNamePrefix the name prefix assigned to each thread created.
   public NamedThreadFactory(String threadNamePrefix) {
+    this(threadNamePrefix, false);
+  }
+
+  /// Creates a new [NamedThreadFactory] instance
+  ///
+  /// @param threadNamePrefix the name prefix assigned to each thread created.
+  /// @param daemon if true, creates daemon threads
+  public NamedThreadFactory(String threadNamePrefix, boolean daemon) {
     final SecurityManager s = System.getSecurityManager();
     _group = (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
     _threadNamePrefix =
-        String.format(NAME_PATTERN, checkPrefix(threadNamePrefix), THREAD_POOL_NUMBER.getAndIncrement());
+            String.format(NAME_PATTERN, checkPrefix(threadNamePrefix), THREAD_POOL_NUMBER.getAndIncrement());
+    _daemon = daemon;
   }
 
   private static String checkPrefix(String prefix) {
     return prefix == null || prefix.isEmpty() ? "Pinot" : prefix;
   }
 
-  /**
-   * Creates a new {@link Thread}
-   *
-   * @see java.util.concurrent.ThreadFactory#newThread(java.lang.Runnable)
-   */
+  /// Creates a new [Thread]
+  ///
+  /// @see java.util.concurrent.ThreadFactory#newThread(java.lang.Runnable)
   public Thread newThread(Runnable r) {
     final Thread t =
         new Thread(_group, r, String.format("%s-%d", _threadNamePrefix, _threadNumber.getAndIncrement()), 0);
-    t.setDaemon(false);
+    t.setDaemon(_daemon);
     t.setPriority(Thread.NORM_PRIORITY);
     return t;
   }

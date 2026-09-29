@@ -31,12 +31,14 @@ import java.util.Set;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils.TreeNode;
@@ -44,10 +46,13 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,10 +60,8 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
 
 
-/**
- * The {@code BaseSingleTreeBuilder} class is the base class for star-tree builders that works on a single
- * {@link StarTreeV2BuilderConfig}s and provides common methods to build a single star-tree.
- */
+/// The `BaseSingleTreeBuilder` class is the base class for star-tree builders that works on a single
+/// [StarTreeV2BuilderConfig]s and provides common methods to build a single star-tree.
 @SuppressWarnings({"rawtypes", "unchecked"})
 abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleTreeBuilder.class);
@@ -72,6 +75,18 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   final String[] _dimensionsSplitOrder;
   final Set<Integer> _skipStarNodeCreationForDimensions;
   final PinotSegmentColumnReader[] _dimensionReaders;
+  // Cardinality of each dimension's segment dictionary. In a null-aware star-tree this doubles as the dictionary id
+  // reserved for null values while records are built and the tree is split: one past the last real id, so nulls sort
+  // after every real value and form their own tree node instead of folding into the column's default null value. The
+  // reserved id is mapped back to the default null value's id when the forward index is written.
+  final int[] _dimensionCardinalities;
+  /// Dictionary id of each dimension's default null value, or `null` when null handling is disabled.
+  ///
+  /// A null row is stored the way a regular column stores one: the default null value in the forward index, and the
+  /// row marked in the null vector. Only read for a dimension that has a null row, which is exactly when the segment
+  /// dictionary holds the default null value.
+  @Nullable
+  private final int[] _defaultNullValueDictIds;
 
   final int _numMetrics;
   // Name of the function-column pairs
@@ -80,17 +95,21 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   // Readers and data types for column in function-column pair
   final PinotSegmentColumnReader[] _metricReaders;
   final AggregationSpec[] _aggregationSpecs;
+  /// Whether each metric has produced an aggregated value. A null-aware star-tree leaves this `false` for a metric
+  /// whose every group aggregated over null input only, which is a metric with no value to size its column from.
+  ///
+  /// Set where raw values are first aggregated; a star record only re-aggregates values that already passed there.
+  private final boolean[] _metricHasAggregatedValue;
 
   final int _maxLeafRecords;
+  final boolean _nullHandlingEnabled;
 
   final TreeNode _rootNode = getNewNode();
 
   int _numDocs;
   int _numNodes;
 
-  /**
-   * The {@code Record} class represents a record (raw or aggregated) with dimension dictionary Ids and metric values.
-   */
+  /// The `Record` class represents a record (raw or aggregated) with dimension dictionary Ids and metric values.
   static class Record {
     final int[] _dimensions;
     final Object[] _metrics;
@@ -101,26 +120,27 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     }
   }
 
-  /**
-   * Constructor for the base single star-tree builder.
-   *
-   * @param builderConfig Builder config
-   * @param outputDir Directory to store the index files
-   * @param segment Index segment
-   * @param metadataProperties Segment metadata properties
-   */
+  /// Constructor for the base single star-tree builder.
+  ///
+  /// @param builderConfig Builder config
+  /// @param outputDir Directory to store the index files
+  /// @param segment Index segment
+  /// @param metadataProperties Segment metadata properties
   BaseSingleTreeBuilder(StarTreeV2BuilderConfig builderConfig, File outputDir, ImmutableSegment segment,
       Configuration metadataProperties) {
     _builderConfig = builderConfig;
     _outputDir = outputDir;
     _segment = segment;
     _metadataProperties = metadataProperties;
+    _nullHandlingEnabled = builderConfig.isNullHandlingEnabled();
 
     List<String> dimensionsSplitOrder = builderConfig.getDimensionsSplitOrder();
     _numDimensions = dimensionsSplitOrder.size();
     _dimensionsSplitOrder = new String[_numDimensions];
     _skipStarNodeCreationForDimensions = new HashSet<>();
     _dimensionReaders = new PinotSegmentColumnReader[_numDimensions];
+    _dimensionCardinalities = new int[_numDimensions];
+    _defaultNullValueDictIds = _nullHandlingEnabled ? new int[_numDimensions] : null;
     Set<String> skipStarNodeCreationForDimensions = builderConfig.getSkipStarNodeCreationForDimensions();
     for (int i = 0; i < _numDimensions; i++) {
       String dimension = dimensionsSplitOrder.get(i);
@@ -131,12 +151,19 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       _dimensionReaders[i] = new PinotSegmentColumnReader(segment, dimension);
       Preconditions.checkState(_dimensionReaders[i].hasDictionary(),
           "Dimension: " + dimension + " does not have dictionary");
+      Dictionary dictionary = segment.getDictionary(dimension);
+      _dimensionCardinalities[i] = dictionary.length();
+      if (_nullHandlingEnabled) {
+        FieldSpec fieldSpec = segment.getSegmentMetadata().getSchema().getFieldSpecFor(dimension);
+        _defaultNullValueDictIds[i] = dictionary.indexOf(FieldSpec.getStringValue(fieldSpec.getDefaultNullValue()));
+      }
     }
 
     TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = builderConfig.getAggregationSpecs();
     _numMetrics = aggregationSpecs.size();
     _metrics = new String[_numMetrics];
     _valueAggregators = new ValueAggregator[_numMetrics];
+    _metricHasAggregatedValue = new boolean[_numMetrics];
     _metricReaders = new PinotSegmentColumnReader[_numMetrics];
     _aggregationSpecs = new AggregationSpec[_numMetrics];
 
@@ -150,10 +177,20 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       _valueAggregators[index] =
           ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType(), arguments);
       _aggregationSpecs[index] = aggregationSpec;
-      // Ignore the column for COUNT aggregation function
-      if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT) {
-        String column = functionColumnPair.getColumn();
-        _metricReaders[index] = new PinotSegmentColumnReader(segment, column);
+      // COUNT(*) counts rows rather than values and needs no reader. Every other pair reads a real column, including
+      // the COUNT(column) a null-aware star-tree stores, which counts that column's non-null values. A non-COUNT
+      // pair on STAR is an invalid config, and is left to fail here on the missing column as it always has.
+      String column = functionColumnPair.getColumn();
+      if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT || !column.equals(
+          AggregationFunctionColumnPair.STAR)) {
+        PinotSegmentColumnReader metricReader = new PinotSegmentColumnReader(segment, column);
+        // The distinct arrayAgg star-tree aggregator only supports single-value source columns (dictionary-encoded or
+        // raw). See ArrayAggDistinctValueAggregator.
+        if (_valueAggregators[index].getAggregationType() == AggregationFunctionType.ARRAYAGG) {
+          Preconditions.checkState(metricReader.isSingleValue(),
+              "Star-tree arrayAgg does not support multi-value column: %s", column);
+        }
+        _metricReaders[index] = metricReader;
       }
 
       index++;
@@ -162,139 +199,181 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     _maxLeafRecords = builderConfig.getMaxLeafRecords();
   }
 
-  /**
-   * Appends a record to the star-tree.
-   *
-   * @param record Record to be appended
-   */
+  /// Appends a record to the star-tree.
+  ///
+  /// @param record Record to be appended
   abstract void appendRecord(Record record)
       throws IOException;
 
-  /**
-   * Returns the record of the given document Id in the star-tree.
-   *
-   * @param docId Document Id
-   * @return Star-tree record
-   */
+  /// Returns the record of the given document Id in the star-tree.
+  ///
+  /// @param docId Document Id
+  /// @return Star-tree record
   abstract Record getStarTreeRecord(int docId)
       throws IOException;
 
-  /**
-   * Returns the dimension value of the given document and dimension Id in the star-tree.
-   *
-   * @param docId Document Id
-   * @param dimensionId Dimension Id
-   * @return Dimension value
-   */
+  /// Returns the dimension value of the given document and dimension Id in the star-tree.
+  ///
+  /// @param docId Document Id
+  /// @param dimensionId Dimension Id
+  /// @return Dimension value
   abstract int getDimensionValue(int docId, int dimensionId)
       throws IOException;
 
-  /**
-   * Sorts and aggregates the records in the segment, and returns a record iterator for all the aggregated records.
-   * <p>This method reads records from segment and generates the initial records for the star-tree.
-   *
-   * @param numDocs Number of documents in the segment
-   * @return Iterator for the aggregated records
-   */
+  /// Sorts and aggregates the records in the segment, and returns a record iterator for all the aggregated records.
+  ///
+  /// This method reads records from segment and generates the initial records for the star-tree.
+  ///
+  /// @param numDocs Number of documents in the segment
+  /// @return Iterator for the aggregated records
   abstract Iterator<Record> sortAndAggregateSegmentRecords(int numDocs)
       throws IOException;
 
-  /**
-   * Generates aggregated records for star-node.
-   * <p>This method will do the following steps:
-   * <ul>
-   *   <li>Creates a temporary buffer for the given range of documents</li>
-   *   <li>Replaces the value for the given dimension Id to {@code STAR}</li>
-   *   <li>Sorts the records inside the temporary buffer</li>
-   *   <li>Aggregates the records with same dimensions</li>
-   *   <li>Returns an iterator for the aggregated records</li>
-   * </ul>
-   *
-   * @param startDocId Start document Id in the star-tree
-   * @param endDocId End document Id (exclusive) in the star-tree
-   * @param dimensionId Dimension Id of the star-node
-   * @return Iterator for the aggregated records
-   */
+  /// Generates aggregated records for star-node.
+  ///
+  /// This method will do the following steps:
+  ///
+  /// - Creates a temporary buffer for the given range of documents
+  /// - Replaces the value for the given dimension Id to `STAR`
+  /// - Sorts the records inside the temporary buffer
+  /// - Aggregates the records with same dimensions
+  /// - Returns an iterator for the aggregated records
+  ///
+  /// @param startDocId Start document Id in the star-tree
+  /// @param endDocId End document Id (exclusive) in the star-tree
+  /// @param dimensionId Dimension Id of the star-node
+  /// @return Iterator for the aggregated records
   abstract Iterator<Record> generateRecordsForStarNode(int startDocId, int endDocId, int dimensionId)
       throws IOException;
 
-  /**
-   * Reads the dimensions for a record of the given document Id in the segment.
-   *
-   * @param docId Document Id
-   * @return Dimensions (dictionary Ids) for a segment record
-   */
+  /// Reads the dimensions for a record of the given document Id in the segment.
+  ///
+  /// @param docId Document Id
+  /// @return Dimensions (dictionary Ids) for a segment record
   int[] getSegmentRecordDimensions(int docId) {
     int[] dimensions = new int[_numDimensions];
-    for (int i = 0; i < _numDimensions; i++) {
-      dimensions[i] = _dimensionReaders[i].getDictId(docId);
+    if (_nullHandlingEnabled) {
+      for (int i = 0; i < _numDimensions; i++) {
+        PinotSegmentColumnReader dimensionReader = _dimensionReaders[i];
+        // A null value is stored under the reserved dictionary id instead of the dictionary id of the column's
+        // default null value, so that null rows are not grouped together with rows holding that default value
+        dimensions[i] = dimensionReader.isNull(docId) ? _dimensionCardinalities[i] : dimensionReader.getDictId(docId);
+      }
+    } else {
+      for (int i = 0; i < _numDimensions; i++) {
+        dimensions[i] = _dimensionReaders[i].getDictId(docId);
+      }
     }
     return dimensions;
   }
 
-  /**
-   * Reads a record of the given document Id in the segment.
-   *
-   * @param docId Document Id
-   * @return Segment record
-   */
+  /// Reads a record of the given document Id in the segment.
+  ///
+  /// @param docId Document Id
+  /// @return Segment record
   Record getSegmentRecord(int docId) {
-    int[] dimensions = getSegmentRecordDimensions(docId);
-    Object[] metrics = new Object[_numMetrics];
-    for (int i = 0; i < _numMetrics; i++) {
-      // Ignore the column for COUNT aggregation function
-      if (_metricReaders[i] != null) {
-        metrics[i] = _metricReaders[i].getValue(docId);
-      }
-    }
-    return new Record(dimensions, metrics);
+    return new Record(getSegmentRecordDimensions(docId), getSegmentRecordMetrics(docId));
   }
 
-  /**
-   * Merges a segment record (raw) into the aggregated record.
-   * <p>Will create a new aggregated record if the current one is {@code null}.
-   *
-   * @param aggregatedRecord Aggregated record
-   * @param segmentRecord Segment record
-   * @return Merged record
-   */
+  /// Same as [#getSegmentRecord] but reads dims from `dimBuffer` (row-major, indexed by
+  /// `docId * _numDimensions * Integer.BYTES`) instead of re-fetching from the segment.
+  Record getSegmentRecordWithBufferDims(int docId, PinotDataBuffer dimBuffer) {
+    int[] dimensions = new int[_numDimensions];
+    long off = (long) docId * _numDimensions * Integer.BYTES;
+    for (int i = 0; i < _numDimensions; i++) {
+      dimensions[i] = dimBuffer.getInt(off);
+      off += Integer.BYTES;
+    }
+    return new Record(dimensions, getSegmentRecordMetrics(docId));
+  }
+
+  /// Returns the raw metric values of a segment record. `COUNT(*)` has no reader and leaves its slot `null`. In a
+  /// null-aware star-tree a null value is passed down as `null` rather than as the column's default null value, so
+  /// that the aggregation excludes it.
+  private Object[] getSegmentRecordMetrics(int docId) {
+    Object[] metrics = new Object[_numMetrics];
+    for (int i = 0; i < _numMetrics; i++) {
+      PinotSegmentColumnReader metricReader = _metricReaders[i];
+      if (metricReader != null) {
+        metrics[i] = _nullHandlingEnabled && metricReader.isNull(docId) ? null : metricReader.getValue(docId);
+      }
+    }
+    return metrics;
+  }
+
+  /// Merges a segment record (raw) into the aggregated record.
+  ///
+  /// Will create a new aggregated record if the current one is `null`.
+  ///
+  /// @param aggregatedRecord Aggregated record
+  /// @param segmentRecord Segment record
+  /// @return Merged record
   Record mergeSegmentRecord(@Nullable Record aggregatedRecord, Record segmentRecord) {
     if (aggregatedRecord == null) {
       int[] dimensions = Arrays.copyOf(segmentRecord._dimensions, _numDimensions);
       Object[] metrics = new Object[_numMetrics];
       for (int i = 0; i < _numMetrics; i++) {
-        metrics[i] = _valueAggregators[i].getInitialAggregatedValue(segmentRecord._metrics[i]);
+        if (_metricReaders[i] == null) {
+          // COUNT(*) has no reader and counts every row
+          assert _valueAggregators[i].getAggregationType() == AggregationFunctionType.COUNT;
+          metrics[i] = 1L;
+        } else {
+          // A null raw value only occurs in a null-aware star-tree, where it is excluded from the aggregation. The
+          // aggregated value stays null until the group sees its first non-null value.
+          Object rawValue = segmentRecord._metrics[i];
+          metrics[i] = rawValue != null ? _valueAggregators[i].getInitialAggregatedValue(rawValue) : null;
+        }
+        _metricHasAggregatedValue[i] |= metrics[i] != null;
       }
       return new Record(dimensions, metrics);
     } else {
       for (int i = 0; i < _numMetrics; i++) {
+        if (_metricReaders[i] == null) {
+          assert _valueAggregators[i].getAggregationType() == AggregationFunctionType.COUNT;
+          aggregatedRecord._metrics[i] = ((long) aggregatedRecord._metrics[i]) + 1;
+          continue;
+        }
+        Object rawValue = segmentRecord._metrics[i];
+        if (rawValue == null) {
+          continue;
+        }
+        Object aggregatedValue = aggregatedRecord._metrics[i];
         aggregatedRecord._metrics[i] =
-            _valueAggregators[i].applyRawValue(aggregatedRecord._metrics[i], segmentRecord._metrics[i]);
+            aggregatedValue != null ? _valueAggregators[i].applyRawValue(aggregatedValue, rawValue)
+                : _valueAggregators[i].getInitialAggregatedValue(rawValue);
+        _metricHasAggregatedValue[i] = true;
       }
       return aggregatedRecord;
     }
   }
 
-  /**
-   * Merges a star-tree record (aggregated) into the aggregated record.
-   * <p>Will create a new aggregated record if the current one is {@code null}.
-   *
-   * @param aggregatedRecord Aggregated record
-   * @param starTreeRecord Star-tree record
-   * @return Merged record
-   */
+  /// Merges a star-tree record (aggregated) into the aggregated record.
+  ///
+  /// Will create a new aggregated record if the current one is `null`.
+  ///
+  /// @param aggregatedRecord Aggregated record
+  /// @param starTreeRecord Star-tree record
+  /// @return Merged record
   Record mergeStarTreeRecord(@Nullable Record aggregatedRecord, Record starTreeRecord) {
     if (aggregatedRecord == null) {
       int[] dimensions = Arrays.copyOf(starTreeRecord._dimensions, _numDimensions);
       Object[] metrics = new Object[_numMetrics];
       for (int i = 0; i < _numMetrics; i++) {
-        metrics[i] = _valueAggregators[i].cloneAggregatedValue(starTreeRecord._metrics[i]);
+        // A null value means the group aggregated over no non-null input, which only occurs in a null-aware star-tree
+        Object value = starTreeRecord._metrics[i];
+        metrics[i] = value != null ? _valueAggregators[i].cloneAggregatedValue(value) : null;
       }
       return new Record(dimensions, metrics);
     } else {
       for (int i = 0; i < _numMetrics; i++) {
+        Object value = starTreeRecord._metrics[i];
+        if (value == null) {
+          continue;
+        }
+        Object aggregatedValue = aggregatedRecord._metrics[i];
         aggregatedRecord._metrics[i] =
-            _valueAggregators[i].applyAggregatedValue(aggregatedRecord._metrics[i], starTreeRecord._metrics[i]);
+            aggregatedValue != null ? _valueAggregators[i].applyAggregatedValue(aggregatedValue, value)
+                : _valueAggregators[i].cloneAggregatedValue(value);
       }
       return aggregatedRecord;
     }
@@ -465,10 +544,24 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     SingleValueUnsortedForwardIndexCreator[] dimensionIndexCreators =
         new SingleValueUnsortedForwardIndexCreator[_numDimensions];
     for (int i = 0; i < _numDimensions; i++) {
-      String dimension = _dimensionsSplitOrder[i];
-      int cardinality = _segment.getDictionary(dimension).length();
       dimensionIndexCreators[i] =
-          new SingleValueUnsortedForwardIndexCreator(_outputDir, _dimensionsSplitOrder[i], cardinality, _numDocs);
+          new SingleValueUnsortedForwardIndexCreator(_outputDir, _dimensionsSplitOrder[i], _dimensionCardinalities[i],
+              _numDocs);
+    }
+
+    // Null vectors are only created for a null-aware star-tree. Dimensions need one as well as metrics: a null row
+    // is stored as the column's default null value, which is indistinguishable from a row that holds that value.
+    NullValueVectorCreator[] dimensionNullValueVectorCreators = null;
+    NullValueVectorCreator[] metricNullValueVectorCreators = null;
+    if (_nullHandlingEnabled) {
+      dimensionNullValueVectorCreators = new NullValueVectorCreator[_numDimensions];
+      for (int i = 0; i < _numDimensions; i++) {
+        dimensionNullValueVectorCreators[i] = new NullValueVectorCreator(_outputDir, _dimensionsSplitOrder[i]);
+      }
+      metricNullValueVectorCreators = new NullValueVectorCreator[_numMetrics];
+      for (int i = 0; i < _numMetrics; i++) {
+        metricNullValueVectorCreators[i] = new NullValueVectorCreator(_outputDir, _metrics[i]);
+      }
     }
 
     ForwardIndexCreator[] metricIndexCreators = new ForwardIndexCreator[_numMetrics];
@@ -481,7 +574,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       if (valueType == BYTES) {
         metricIndexCreators[i] =
             new SingleValueVarByteRawIndexCreator(_outputDir, compressionType, metric, _numDocs, BYTES,
-                valueAggregator.getMaxAggregatedValueByteSize(), aggregationSpec.isDeriveNumDocsPerChunk(),
+                getMaxAggregatedValueByteSize(i), aggregationSpec.isDeriveNumDocsPerChunk(),
                 aggregationSpec.getIndexVersion(), aggregationSpec.getTargetMaxChunkSizeBytes(),
                 aggregationSpec.getTargetDocsPerChunk());
       } else {
@@ -496,30 +589,40 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       for (int docId = 0; docId < _numDocs; docId++) {
         Record record = getStarTreeRecord(docId);
         for (int i = 0; i < _numDimensions; i++) {
-          dimensionIndexCreators[i].putDictId(record._dimensions[i]);
+          int dictId = record._dimensions[i];
+          // The reserved null dictionary id is out of range for the segment dictionary the star-tree shares, so the
+          // column's default null value is stored in its place and the row is marked in the dimension's null vector,
+          // which is how a regular column stores a null. A value-based read of the forward index then resolves like
+          // any other. Star records hold STAR_IN_FORWARD_INDEX (0) for the starred dimension, which never collides
+          // with the reserved id, so they are correctly left out of the null vector.
+          if (dimensionNullValueVectorCreators != null && dictId == _dimensionCardinalities[i]) {
+            dimensionNullValueVectorCreators[i].setNull(docId);
+            dictId = _defaultNullValueDictIds[i];
+          }
+          dimensionIndexCreators[i].putDictId(dictId);
         }
         for (int i = 0; i < _numMetrics; i++) {
           ValueAggregator valueAggregator = _valueAggregators[i];
-          ForwardIndexCreator metricIndexCreator = metricIndexCreators[i];
-          switch (valueAggregator.getAggregatedValueType()) {
-            case INT:
-              metricIndexCreator.putInt((int) record._metrics[i]);
-              break;
-            case LONG:
-              metricIndexCreator.putLong((long) record._metrics[i]);
-              break;
-            case FLOAT:
-              metricIndexCreator.putFloat((float) record._metrics[i]);
-              break;
-            case DOUBLE:
-              metricIndexCreator.putDouble((double) record._metrics[i]);
-              break;
-            case BYTES:
-              metricIndexCreator.putBytes(valueAggregator.serializeAggregatedValue(record._metrics[i]));
-              break;
-            default:
-              throw new IllegalStateException();
+          Object value = record._metrics[i];
+          if (value == null) {
+            // The group aggregated over no non-null input. Only COUNT still has a well-defined result of its own
+            // (0); every other aggregator answers SQL NULL and gets a placeholder in the forward index masked by
+            // the null vector.
+            assert _nullHandlingEnabled;
+            value = valueAggregator.getAllNullAggregatedValue();
+            if (value == null) {
+              metricNullValueVectorCreators[i].setNull(docId);
+            }
           }
+          putMetricValue(metricIndexCreators[i], valueAggregator, value);
+        }
+      }
+      if (_nullHandlingEnabled) {
+        for (NullValueVectorCreator nullValueVectorCreator : dimensionNullValueVectorCreators) {
+          nullValueVectorCreator.seal();
+        }
+        for (NullValueVectorCreator nullValueVectorCreator : metricNullValueVectorCreators) {
+          nullValueVectorCreator.seal();
         }
       }
     } catch (Exception e) {
@@ -550,6 +653,50 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     }
     if (t != null) {
       throw t;
+    }
+  }
+
+  /// Returns the maximum serialized size of a metric's aggregated values.
+  ///
+  /// A null-aware star-tree can leave a metric with no aggregated value at all, when every one of its groups
+  /// aggregated over null input only. The aggregator then has no value to derive a size from, and some require one,
+  /// so the size comes from whatever stands in for a null instead: the aggregator's own answer for such a group, or
+  /// the empty placeholder when it has none.
+  private int getMaxAggregatedValueByteSize(int metricId) {
+    ValueAggregator valueAggregator = _valueAggregators[metricId];
+    if (_metricHasAggregatedValue[metricId]) {
+      return valueAggregator.getMaxAggregatedValueByteSize();
+    }
+    Object allNullValue = valueAggregator.getAllNullAggregatedValue();
+    return allNullValue != null ? valueAggregator.serializeAggregatedValue(allNullValue).length : 0;
+  }
+
+  /// Writes an aggregated metric value into the forward index.
+  ///
+  /// A `null` value is a group that aggregates to SQL `NULL`; it is recorded in the metric's null vector and stored
+  /// here as the aggregated type's zero value, which the query side never reads.
+  private static void putMetricValue(ForwardIndexCreator metricIndexCreator, ValueAggregator valueAggregator,
+      @Nullable Object value)
+      throws IOException {
+    switch (valueAggregator.getAggregatedValueType()) {
+      case INT:
+        metricIndexCreator.putInt(value != null ? (int) value : 0);
+        break;
+      case LONG:
+        metricIndexCreator.putLong(value != null ? (long) value : 0L);
+        break;
+      case FLOAT:
+        metricIndexCreator.putFloat(value != null ? (float) value : 0f);
+        break;
+      case DOUBLE:
+        metricIndexCreator.putDouble(value != null ? (double) value : 0d);
+        break;
+      case BYTES:
+        metricIndexCreator.putBytes(
+            value != null ? valueAggregator.serializeAggregatedValue(value) : ArrayUtils.EMPTY_BYTE_ARRAY);
+        break;
+      default:
+        throw new IllegalStateException();
     }
   }
 

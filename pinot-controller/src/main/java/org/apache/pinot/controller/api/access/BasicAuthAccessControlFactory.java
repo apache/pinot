@@ -24,26 +24,24 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
-import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Basic Authentication based on http headers. Configured via the "controller.admin.access.control" family of
- * properties.
- *
- * <pre>
- *     Example:
- *     controller.admin.access.control.principals=admin123,user456
- *     controller.admin.access.control.principals.admin123.password=verysecret
- *     controller.admin.access.control.principals.user456.password=kindasecret
- *     controller.admin.access.control.principals.user456.tables=stuff,lessImportantStuff
- *     controller.admin.access.control.principals.user456.permissions=read,update
- * </pre>
- */
+/// Basic Authentication based on http headers. Configured via the "controller.admin.access.control" family of
+/// properties.
+///
+/// ```
+/// Example:
+/// controller.admin.access.control.principals=admin123,user456
+/// controller.admin.access.control.principals.admin123.password=verysecret
+/// controller.admin.access.control.principals.user456.password=kindasecret
+/// controller.admin.access.control.principals.user456.tables=stuff,lessImportantStuff
+/// controller.admin.access.control.principals.user456.permissions=read,update
+/// ```
 public class BasicAuthAccessControlFactory implements AccessControlFactory {
   private static final String PREFIX = "controller.admin.access.control.principals";
 
@@ -53,7 +51,8 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
 
   @Override
   public void init(PinotConfiguration configuration) {
-    _accessControl = new BasicAuthAccessControl(BasicAuthUtils.extractBasicAuthPrincipals(configuration, PREFIX));
+    _accessControl = new BasicAuthAccessControl(
+        BasicAuthPrincipalUtils.extractBasicAuthPrincipals(configuration, PREFIX));
   }
 
   @Override
@@ -61,10 +60,8 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
     return _accessControl;
   }
 
-  /**
-   * Access Control using header-based basic http authentication
-   */
-  private static class BasicAuthAccessControl implements AccessControl {
+  /// Access Control using header-based basic http authentication
+  private static class BasicAuthAccessControl extends BaseBasicAuthAccessControl<BasicAuthPrincipal> {
     private final Map<String, BasicAuthPrincipal> _token2principal;
 
     public BasicAuthAccessControl(Collection<BasicAuthPrincipal> principals) {
@@ -72,25 +69,7 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
     }
 
     @Override
-    public boolean protectAnnotatedOnly() {
-      return false;
-    }
-
-    @Override
-    public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      return getPrincipal(httpHeaders)
-          .filter(p -> p.hasTable(tableName) && p.hasPermission(Objects.toString(accessType))).isPresent();
-    }
-
-    @Override
-    public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      if (getPrincipal(httpHeaders).isEmpty()) {
-        throw new NotAuthorizedException("Basic");
-      }
-      return true;
-    }
-
-    private Optional<BasicAuthPrincipal> getPrincipal(HttpHeaders headers) {
+    protected Optional<BasicAuthPrincipal> getPrincipal(HttpHeaders headers) {
       if (headers == null) {
         return Optional.empty();
       }
@@ -100,14 +79,9 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
         return Optional.empty();
       }
 
-      return authHeaders.stream().map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
+      return authHeaders.stream().map(BasicAuthTokenUtils::normalizeBase64Token)
           .map(_token2principal::get)
           .filter(Objects::nonNull).findFirst();
-    }
-
-    @Override
-    public AuthWorkflowInfo getAuthWorkflowInfo() {
-      return new AuthWorkflowInfo(AccessControl.WORKFLOW_BASIC);
     }
   }
 }

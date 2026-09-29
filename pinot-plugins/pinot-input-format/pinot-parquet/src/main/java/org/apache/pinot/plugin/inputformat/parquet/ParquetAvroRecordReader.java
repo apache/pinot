@@ -25,19 +25,21 @@ import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.ParquetReader;
+import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractorConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordFetchException;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 
-/**
- * Avro Record reader for Parquet file. This reader doesn't read parquet file with incompatible Avro schemas,
- * e.g. INT96, DECIMAL. Please use {@link org.apache.pinot.plugin.inputformat.parquet.ParquetNativeRecordReader}
- * instead.<p><p>
- * For More info on Avro to Parquet schema conversion:
- * <a href="https://javadoc.io/doc/org.apache.parquet/parquet-avro/latest/index.html">
- *   https://javadoc.io/doc/org.apache.parquet/parquet-avro/latest/index.html</a>
- */
+/// Avro Record reader for Parquet file. This reader doesn't read parquet file with incompatible Avro schemas,
+/// e.g. INT96, DECIMAL. Please use [org.apache.pinot.plugin.inputformat.parquet.ParquetNativeRecordReader]
+/// instead.
+///
+/// For More info on Avro to Parquet schema conversion:
+/// [https://javadoc.io/doc/org.apache.parquet/parquet-avro/latest/index.html][ref1]
+///
+/// [ref1]: https://javadoc.io/doc/org.apache.parquet/parquet-avro/latest/index.html
 public class ParquetAvroRecordReader implements RecordReader {
   private static final String EXTENSION = "parquet";
 
@@ -52,8 +54,13 @@ public class ParquetAvroRecordReader implements RecordReader {
     File parquetFile = RecordReaderUtils.unpackIfRequired(dataFile, EXTENSION);
     _dataFilePath = new Path(parquetFile.getAbsolutePath());
     _parquetReader = ParquetUtils.getParquetAvroReader(_dataFilePath);
+    AvroRecordExtractorConfig extractorConfig = new AvroRecordExtractorConfig();
+    if (recordReaderConfig instanceof ParquetRecordReaderConfig) {
+      extractorConfig.setExtractRawTimeValues(
+          ((ParquetRecordReaderConfig) recordReaderConfig).isExtractRawTimeValues());
+    }
     _recordExtractor = new ParquetAvroRecordExtractor();
-    _recordExtractor.init(fieldsToRead, null);
+    _recordExtractor.init(fieldsToRead, extractorConfig);
     _nextRecord = _parquetReader.read();
   }
 
@@ -65,8 +72,14 @@ public class ParquetAvroRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
+    // Data parsing: extract current record into GenericRow.
     _recordExtractor.extract(_nextRecord, reuse);
-    _nextRecord = _parquetReader.read();
+    // Record fetch: read next Parquet Avro record.
+    try {
+      _nextRecord = _parquetReader.read();
+    } catch (IOException e) {
+      throw new RecordFetchException("Failed to read next Parquet Avro record", e);
+    }
     return reuse;
   }
 

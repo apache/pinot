@@ -18,13 +18,9 @@
  */
 package org.apache.pinot.spi.metrics;
 
-/**
- * Listeners for events from the registry.  Listeners must be thread-safe.
- */
+/// Listeners for events from the registry.  Listeners must be thread-safe.
 public interface PinotMetricsRegistryListener {
 
-  /**
-   * Returned the actual object of MetricsRegistryListener.
-   */
+  /// Returned the actual object of MetricsRegistryListener.
   Object getMetricsRegistryListener();
 }

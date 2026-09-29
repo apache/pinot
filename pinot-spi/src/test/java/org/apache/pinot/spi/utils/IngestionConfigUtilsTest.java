@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.spi.utils;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -36,17 +36,13 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for helper methods in {@link IngestionConfigUtils}
- */
+/// Tests for helper methods in [IngestionConfigUtils]
 public class IngestionConfigUtilsTest {
 
   @Test
   public void testGetStreamConfigMap() {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
     try {
-      IngestionConfigUtils.getStreamConfigMaps(tableConfig);
-      Assert.fail("Should fail for OFFLINE table");
       IngestionConfigUtils.getStreamConfigMaps(tableConfig);
       Assert.fail("Should fail for OFFLINE table");
     } catch (IllegalStateException e) {
@@ -57,9 +53,9 @@ public class IngestionConfigUtilsTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTimeColumnName("timeColumn").build();
 
     // get from ingestion config (when not present in indexing config)
-    Map<String, String> streamConfigMap = Collections.singletonMap("streamType", "kafka");
+    Map<String, String> streamConfigMap = Map.of("streamType", "kafka");
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(Collections.singletonList(streamConfigMap)));
+    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigMap)));
     tableConfig.setIngestionConfig(ingestionConfig);
     Map<String, String> actualStreamConfigsMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
     Assert.assertEquals(actualStreamConfigsMap.size(), 1);
@@ -156,8 +152,79 @@ public class IngestionConfigUtilsTest {
 
   @Test
   public void testGetConfigMapWithPrefix() {
-    Map<String, String> testMap = ImmutableMap.of("k1", "v1", "k1.k2", "v2", "k1.k3", "v3", "k4", "v4");
+    Map<String, String> testMap = Map.of("k1", "v1", "k1.k2", "v2", "k1.k3", "v3", "k4", "v4");
     Assert.assertEquals(2, IngestionConfigUtils.getConfigMapWithPrefix(testMap, "k1").size());
     Assert.assertEquals(2, IngestionConfigUtils.getConfigMapWithPrefix(testMap, "k1.").size());
+  }
+
+  @Test
+  public void testHasMultipleStreams() {
+    // OFFLINE table — must not throw, must return false
+    TableConfig offlineTable = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    Assert.assertFalse(IngestionConfigUtils.hasMultipleStreams(offlineTable));
+
+    // REALTIME, no ingestionConfig
+    TableConfig realtimeTable =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTimeColumnName("timeColumn").build();
+    Assert.assertFalse(IngestionConfigUtils.hasMultipleStreams(realtimeTable));
+
+    // REALTIME, single stream
+    Map<String, String> streamConfigMap1 = Map.of("streamType", "kafka");
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigMap1)));
+    realtimeTable.setIngestionConfig(ingestionConfig);
+    Assert.assertFalse(IngestionConfigUtils.hasMultipleStreams(realtimeTable));
+
+    // REALTIME, two streams
+    Map<String, String> streamConfigMap2 = Map.of("streamType", "kinesis");
+    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigMap1, streamConfigMap2)));
+    Assert.assertTrue(IngestionConfigUtils.hasMultipleStreams(realtimeTable));
+  }
+
+  @Test
+  public void testGetStreamPartitionIdFromPinotPartitionId() {
+    // OFFLINE table — must return partitionId unchanged
+    TableConfig offlineTable = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    Assert.assertEquals(IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(offlineTable, 42), 42);
+
+    // REALTIME, single stream — must return partitionId unchanged
+    Map<String, String> streamConfigMap = Map.of("streamType", "kafka");
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigMap)));
+    TableConfig realtimeTable =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTimeColumnName("timeColumn").build();
+    realtimeTable.setIngestionConfig(ingestionConfig);
+    Assert.assertEquals(IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(realtimeTable, 42), 42);
+
+    // REALTIME, multi-stream — encoded partition id 10003 (stream 1, partition 3) must decode to 3
+    Map<String, String> streamConfigMap2 = Map.of("streamType", "kinesis");
+    ingestionConfig.setStreamIngestionConfig(
+        new StreamIngestionConfig(List.of(streamConfigMap, streamConfigMap2)));
+    int pinotPartitionId = IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(3, 1);
+    Assert.assertEquals(IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(realtimeTable, pinotPartitionId),
+        3);
+  }
+
+  @Test
+  public void testGetStreamConfigIndexToStreamPartitions() {
+    Set<Integer> pinotPartitionIds = new HashSet<>(2);
+    pinotPartitionIds.add(0);
+    pinotPartitionIds.add(1);
+    Map<Integer, Set<Integer>> streamConfigIndexToStreamPartitions =
+        IngestionConfigUtils.getStreamConfigIndexToStreamPartitions(pinotPartitionIds);
+    Assert.assertEquals(streamConfigIndexToStreamPartitions.size(), 1);
+    Assert.assertEquals(streamConfigIndexToStreamPartitions.get(0), new HashSet<>(Arrays.asList(0, 1)));
+
+    pinotPartitionIds = new HashSet<>(4);
+    pinotPartitionIds.add(2);
+    pinotPartitionIds.add(IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(100, 1));
+    pinotPartitionIds.add(IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(1, 1));
+    pinotPartitionIds.add(IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(400, 3));
+    streamConfigIndexToStreamPartitions =
+        IngestionConfigUtils.getStreamConfigIndexToStreamPartitions(pinotPartitionIds);
+    Assert.assertEquals(streamConfigIndexToStreamPartitions.size(), 3);
+    Assert.assertEquals(streamConfigIndexToStreamPartitions.get(0), new HashSet<>(Arrays.asList(2)));
+    Assert.assertEquals(streamConfigIndexToStreamPartitions.get(1), new HashSet<>(Arrays.asList(100, 1)));
+    Assert.assertEquals(streamConfigIndexToStreamPartitions.get(3), new HashSet<>(Arrays.asList(400)));
   }
 }

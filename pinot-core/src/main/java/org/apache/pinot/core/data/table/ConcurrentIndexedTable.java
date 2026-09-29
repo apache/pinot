@@ -19,28 +19,25 @@
 package org.apache.pinot.core.data.table;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-/**
- * Thread safe {@link Table} implementation for aggregating Records based on combination of keys
- */
+/// Thread safe [Table] implementation for aggregating Records based on combination of keys
 public class ConcurrentIndexedTable extends IndexedTable {
   private final AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
   private final ReentrantReadWriteLock _readWriteLock = new ReentrantReadWriteLock();
 
   public ConcurrentIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext, int resultSize,
-      int trimSize, int trimThreshold, int initialCapacity) {
+      int trimSize, int trimThreshold, int initialCapacity, ExecutorService executorService) {
     super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold,
-        new ConcurrentHashMap<>(initialCapacity));
+        new ConcurrentHashMap<>(initialCapacity), executorService);
   }
 
-  /**
-   * Thread safe implementation of upsert for inserting {@link Record} into {@link Table}
-   */
+  /// Thread safe implementation of upsert for inserting [Record] into [Table]
   @Override
   public boolean upsert(Key key, Record record) {
     if (_hasOrderBy) {

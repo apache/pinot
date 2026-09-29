@@ -29,13 +29,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * In the multistage engine, the leaf stage servers process the data in columnar fashion. By the time the
- * intermediate stage receives the projected column, they are converted to a row based format. This class provides
- * the capability to convert the row based representation into columnar blocks so that they can be used to process
- * aggregations using v1 aggregation functions.
- * TODO: Support MV
- */
+/// In the multistage engine, the leaf stage servers process the data in columnar fashion. By the time the
+/// intermediate stage receives the projected column, they are converted to a row based format. This class provides
+/// the capability to convert the row based representation into columnar blocks so that they can be used to process
+/// aggregations using v1 aggregation functions.
+/// TODO: Support MV
 public class DataBlockValSet implements BlockValSet {
   private final DataType _dataType;
   private final DataType _storedType;
@@ -72,6 +70,12 @@ public class DataBlockValSet implements BlockValSet {
   @Override
   public Dictionary getDictionary() {
     return null;
+  }
+
+  /// Data-block value sets never carry a dictionary; the dict-id read methods below always throw.
+  @Override
+  public boolean isDictionaryEncoded() {
+    return false;
   }
 
   @Override
@@ -136,6 +140,11 @@ public class DataBlockValSet implements BlockValSet {
 
   @Override
   public double[][] getDoubleValuesMV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public BigDecimal[][] getBigDecimalValuesMV() {
     throw new UnsupportedOperationException();
   }
 

@@ -30,14 +30,14 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The <code>TransformBlockValSet</code> class represents the block value set for a transform function in the transform
- * block.
- * <p>Caller is responsible for calling the correct method based on the data source metadata for the block value set.
- */
+/// The `TransformBlockValSet` class represents the block value set for a transform function in the transform
+/// block.
+///
+/// Caller is responsible for calling the correct method based on the data source metadata for the block value set.
 public class TransformBlockValSet implements BlockValSet {
   private final ValueBlock _valueBlock;
   private final TransformFunction _transformFunction;
@@ -76,6 +76,15 @@ public class TransformBlockValSet implements BlockValSet {
   @Override
   public Dictionary getDictionary() {
     return _transformFunction.getDictionary();
+  }
+
+  /// A transform function that exposes a dictionary always builds it itself (e.g.,
+  /// [org.apache.pinot.core.operator.transform.function.IdentifierTransformFunction] only exposes the
+  /// underlying column's dictionary when its forward index is dict-encoded), so the dict-id read path is callable
+  /// whenever the dictionary is present.
+  @Override
+  public boolean isDictionaryEncoded() {
+    return _transformFunction.getDictionary() != null;
   }
 
   @Override
@@ -143,6 +152,39 @@ public class TransformBlockValSet implements BlockValSet {
   }
 
   @Override
+  public int[] get32BitsMurmur3HashValuesSV() {
+    byte[][] bytes = getBytesValuesSV();
+    int length = bytes.length;
+    int[] hashValues = new int[length];
+    for (int i = 0; i < length; i++) {
+      hashValues[i] = MurmurHashFunctions.murmurHash3X64Bit32(bytes[i], 0);
+    }
+    return hashValues;
+  }
+
+  @Override
+  public long[] get64BitsMurmur3HashValuesSV() {
+    byte[][] bytes = getBytesValuesSV();
+    int length = bytes.length;
+    long[] hashValues = new long[length];
+    for (int i = 0; i < length; i++) {
+      hashValues[i] = MurmurHashFunctions.murmurHash3X64Bit64(bytes[i], 0);
+    }
+    return hashValues;
+  }
+
+  @Override
+  public long[][] get128BitsMurmur3HashValuesSV() {
+    byte[][] bytes = getBytesValuesSV();
+    int length = bytes.length;
+    long[][] hashValues = new long[length][];
+    for (int i = 0; i < length; i++) {
+      hashValues[i] = MurmurHashFunctions.murmurHash3X64Bit128AsLongs(bytes[i], 0);
+    }
+    return hashValues;
+  }
+
+  @Override
   public int[][] getDictionaryIdsMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.INT, false);
@@ -179,6 +221,14 @@ public class TransformBlockValSet implements BlockValSet {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.DOUBLE, false);
       return _transformFunction.transformToDoubleValuesMV(_valueBlock);
+    }
+  }
+
+  @Override
+  public BigDecimal[][] getBigDecimalValuesMV() {
+    try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
+      recordTransformValues(scope, DataType.BIG_DECIMAL, false);
+      return _transformFunction.transformToBigDecimalValuesMV(_valueBlock);
     }
   }
 
@@ -237,10 +287,22 @@ public class TransformBlockValSet implements BlockValSet {
             _numMVEntries[i] = doubleValues[i].length;
           }
           return _numMVEntries;
+        case BIG_DECIMAL:
+          BigDecimal[][] bigDecimalValues = getBigDecimalValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            _numMVEntries[i] = bigDecimalValues[i].length;
+          }
+          return _numMVEntries;
         case STRING:
           String[][] stringValues = getStringValuesMV();
           for (int i = 0; i < numDocs; i++) {
             _numMVEntries[i] = stringValues[i].length;
+          }
+          return _numMVEntries;
+        case BYTES:
+          byte[][][] bytesValues = getBytesValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            _numMVEntries[i] = bytesValues[i].length;
           }
           return _numMVEntries;
         default:

@@ -22,9 +22,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
 
 
-/**
- * Implementation of {@link ValueToIdMap} for Object.
- */
+/// Implementation of [ValueToIdMap] for Object.
 public class ObjectToIdMap implements ValueToIdMap {
   private final Object2IntOpenHashMap<Object> _valueToIdMap;
   private final ArrayList<Object> _idToValueMap;
@@ -38,9 +36,10 @@ public class ObjectToIdMap implements ValueToIdMap {
   @Override
   public int put(Object value) {
     int numValues = _valueToIdMap.size();
-    int id = _valueToIdMap.computeIntIfAbsent(value, k -> numValues);
-    if (id == numValues) {
+    int id = _valueToIdMap.putIfAbsent(value, numValues);
+    if (id == INVALID_KEY) {
       _idToValueMap.add(value);
+      return numValues;
     }
     return id;
   }

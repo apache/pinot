@@ -23,9 +23,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.math3.stat.correlation.Covariance;
 import org.apache.commons.math3.stat.descriptive.moment.Kurtosis;
@@ -35,11 +35,11 @@ import org.apache.commons.math3.stat.descriptive.moment.Variance;
 import org.apache.commons.math3.util.Precision;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
-import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.segment.local.customobject.CovarianceTuple;
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.segment.local.customobject.VarianceTuple;
@@ -65,11 +65,10 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for statistical queries (i.e Variance, Covariance, Standard Deviation etc)
- */
+/// Queries test for statistical queries (i.e Variance, Covariance, Standard Deviation etc)
 public class StatisticalQueriesTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "CovarianceQueriesTest");
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), "CovarianceQueriesTest-" + UUID.randomUUID());
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
 
@@ -170,7 +169,7 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
   @Override
   protected List<List<IndexSegment>> getDistinctInstances() {
     if (_useIdenticalSegment) {
-      return Collections.singletonList(_indexSegments);
+      return List.of(_indexSegments);
     }
     return _distinctInstances;
   }
@@ -389,10 +388,10 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 2, NUM_RECORDS);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    assertNotNull(aggregationGroupByResult);
+    List<IntermediateRecord> resultRecords = resultsBlock.getIntermediateRecords();
+    assertNotNull(resultRecords);
     for (int i = 0; i < NUM_GROUPS; i++) {
-      CovarianceTuple actualCovTuple = (CovarianceTuple) aggregationGroupByResult.getResultForGroupId(0, i);
+      CovarianceTuple actualCovTuple = (CovarianceTuple) resultRecords.get(i)._record.getValues()[1];
       CovarianceTuple expectedCovTuple = _expectedGroupByResultVer1[i];
       checkWithPrecisionForCovariance(actualCovTuple, expectedCovTuple);
     }
@@ -414,11 +413,11 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
     resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 3, NUM_RECORDS);
-    aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    assertNotNull(aggregationGroupByResult);
+    resultRecords = resultsBlock.getIntermediateRecords();
+    assertNotNull(resultRecords);
 
     for (int i = 0; i < NUM_GROUPS; i++) {
-      CovarianceTuple actualCovTuple = (CovarianceTuple) aggregationGroupByResult.getResultForGroupId(0, i);
+      CovarianceTuple actualCovTuple = (CovarianceTuple) resultRecords.get(i)._record.getValues()[1];
       CovarianceTuple expectedCovTuple = _expectedGroupByResultVer2[i];
       checkWithPrecisionForCovariance(actualCovTuple, expectedCovTuple);
     }
@@ -576,11 +575,11 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 2, NUM_RECORDS);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    assertNotNull(aggregationGroupByResult);
+    List<IntermediateRecord> resultRecords = resultsBlock.getIntermediateRecords();
+    assertNotNull(resultRecords);
     for (int i = 0; i < NUM_GROUPS; i++) {
 
-      VarianceTuple actualVarianceTuple = (VarianceTuple) aggregationGroupByResult.getResultForGroupId(0, i);
+      VarianceTuple actualVarianceTuple = (VarianceTuple) resultRecords.get(i)._record.getValues()[1];
       checkWithPrecisionForVariance(actualVarianceTuple, NUM_RECORDS / NUM_GROUPS, expectedSum[i],
           expectedGroupByResult[i].getResult(), false);
     }
@@ -699,10 +698,10 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 2, NUM_RECORDS);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    assertNotNull(aggregationGroupByResult);
+    List<IntermediateRecord> resultRecords = resultsBlock.getIntermediateRecords();
+    assertNotNull(resultRecords);
     for (int i = 0; i < NUM_GROUPS; i++) {
-      VarianceTuple actualVarianceTuple = (VarianceTuple) aggregationGroupByResult.getResultForGroupId(0, i);
+      VarianceTuple actualVarianceTuple = (VarianceTuple) resultRecords.get(i)._record.getValues()[1];
       checkWithPrecisionForStandardDeviation(actualVarianceTuple, NUM_RECORDS / NUM_GROUPS, expectedSum[i],
           expectedGroupByResult[i].getResult(), false);
     }
@@ -783,10 +782,10 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 2, NUM_RECORDS);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    assertNotNull(aggregationGroupByResult);
+    List<IntermediateRecord> resultRecords = resultsBlock.getIntermediateRecords();
+    assertNotNull(resultRecords);
     for (int i = 0; i < NUM_GROUPS; i++) {
-      PinotFourthMoment actual = (PinotFourthMoment) aggregationGroupByResult.getResultForGroupId(0, i);
+      PinotFourthMoment actual = (PinotFourthMoment) resultRecords.get(i)._record.getValues()[1];
       checkWithPrecisionForSkew(actual, NUM_RECORDS / NUM_GROUPS, expectedGroupByResult[i].getResult());
     }
   }
@@ -866,10 +865,10 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 2, NUM_RECORDS);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    assertNotNull(aggregationGroupByResult);
+    List<IntermediateRecord> resultRecords = resultsBlock.getIntermediateRecords();
+    assertNotNull(resultRecords);
     for (int i = 0; i < NUM_GROUPS; i++) {
-      PinotFourthMoment actual = (PinotFourthMoment) aggregationGroupByResult.getResultForGroupId(0, i);
+      PinotFourthMoment actual = (PinotFourthMoment) resultRecords.get(i)._record.getValues()[1];
       checkWithPrecisionForKurt(actual, NUM_RECORDS / NUM_GROUPS, expectedGroupByResult[i].getResult());
     }
   }

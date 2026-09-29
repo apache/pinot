@@ -18,15 +18,19 @@
  */
 package org.apache.pinot.query.runtime.operator.exchange;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
+import java.util.ArrayList;
 import java.util.Iterator;
-import org.apache.pinot.common.datablock.DataBlock;
+import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.BlockSplitter;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -44,14 +48,13 @@ public class HashExchangeTest {
   private SendingMailbox _mailbox1;
   @Mock
   private SendingMailbox _mailbox2;
-  @Mock
-  TransferableBlock _block;
+  private RowHeapDataBlock _block;
 
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_block.getType()).thenReturn(DataBlock.Type.ROW);
-    Mockito.when(_block.getDataSchema()).thenReturn(
+    _block = new RowHeapDataBlock(
+        List.<Object[]>of(new Object[]{0}, new Object[]{1}, new Object[]{2}),
         new DataSchema(new String[]{"col1"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
   }
 
@@ -62,25 +65,55 @@ public class HashExchangeTest {
   }
 
   @Test
+  public void routeRespectsTerminationMidBlock()
+      throws Exception {
+    // Given: a block larger than the termination-sample mask so the loop would iterate past multiple poll points.
+    int numRows = (QueryThreadContext.CHECK_TERMINATION_AND_SAMPLE_USAGE_RECORD_MASK + 1) * 2;
+    List<Object[]> rows = new ArrayList<>(numRows);
+    for (int i = 0; i < numRows; i++) {
+      rows.add(new Object[]{i});
+    }
+    RowHeapDataBlock largeBlock = new RowHeapDataBlock(rows,
+        new DataSchema(new String[]{"col1"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
+    List<SendingMailbox> destinations = List.of(_mailbox1, _mailbox2);
+    TestSelector selector = new TestSelector(Iterators.cycle(0, 1));
+
+    try (QueryThreadContext ctx = QueryThreadContext.openForMseTest()) {
+      // Flag the query for termination before route runs. The first poll at r=0 must observe this.
+      ctx.getExecutionContext().terminate(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED, "test");
+
+      // When: route is invoked while termination is already set.
+      // Then: a TerminationException is thrown and no rows are routed to any mailbox.
+      Assert.assertThrows(TerminationException.class,
+          () -> new HashExchange(destinations, selector, BlockSplitter.DEFAULT).route(destinations, largeBlock));
+      Mockito.verify(_mailbox1, Mockito.never()).send(Mockito.any(MseBlock.Data.class));
+      Mockito.verify(_mailbox2, Mockito.never()).send(Mockito.any(MseBlock.Data.class));
+    }
+  }
+
+  @Test
   public void shouldSplitAndRouteBlocksBasedOnPartitionKey()
       throws Exception {
     // Given:
     TestSelector selector = new TestSelector(Iterators.forArray(2, 0, 1));
-    Mockito.when(_block.getContainer()).thenReturn(ImmutableList.of(new Object[]{0}, new Object[]{1}, new Object[]{2}));
-    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
+    List<SendingMailbox> destinations = List.of(_mailbox1, _mailbox2);
 
     // When:
-    new HashExchange(destinations, selector, TransferableBlockUtils::splitBlock).route(destinations, _block);
+    new HashExchange(destinations, selector, BlockSplitter.DEFAULT).route(destinations, _block);
 
     // Then:
-    ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
+    ArgumentCaptor<MseBlock.Data> captor = ArgumentCaptor.forClass(MseBlock.Data.class);
 
     Mockito.verify(_mailbox1, Mockito.times(1)).send(captor.capture());
-    Assert.assertEquals(captor.getValue().getContainer().get(0), new Object[]{0});
-    Assert.assertEquals(captor.getValue().getContainer().get(1), new Object[]{1});
+    Assert.assertTrue(captor.getValue().isData(), "Expected data block");
+    MseBlock.Data mailbox1DataBlock = captor.getValue();
+    Assert.assertEquals(mailbox1DataBlock.asRowHeap().getRows().get(0), new Object[]{0});
+    Assert.assertEquals(mailbox1DataBlock.asRowHeap().getRows().get(1), new Object[]{1});
 
     Mockito.verify(_mailbox2, Mockito.times(1)).send(captor.capture());
-    Assert.assertEquals(captor.getValue().getContainer().get(0), new Object[]{2});
+    Assert.assertTrue(captor.getValue().isData(), "Expected data block");
+    MseBlock.Data mailbox2DataBlock = captor.getValue();
+    Assert.assertEquals(mailbox2DataBlock.asRowHeap().getRows().get(0), new Object[]{2});
   }
 
   private static class TestSelector implements KeySelector<Object> {

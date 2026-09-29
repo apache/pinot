@@ -19,25 +19,21 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.io.File;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.common.utils.config.TagNameUtils;
-import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.integration.tests.SharedHybridClusterIntegrationTestSuite.HybridScenarioLease;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -48,94 +44,60 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.fail;
 
 
-/**
- * Hybrid cluster integration test that uploads 8 months of data as offline and 6 months of data as realtime (with a
- * two month overlap).
- */
-public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet {
-  private static final String TENANT_NAME = "TestTenant";
-  private static final int NUM_OFFLINE_SEGMENTS = 8;
-  private static final int NUM_REALTIME_SEGMENTS = 6;
+public class HybridClusterIntegrationTest extends SharedHybridClusterIntegrationTestSuite {
+  private HybridScenarioLease _canonicalScenario;
 
-  @Override
-  protected String getBrokerTenant() {
-    return TENANT_NAME;
-  }
-
-  @Override
-  protected String getServerTenant() {
-    return TENANT_NAME;
-  }
-
-  @Override
-  protected void overrideControllerConf(Map<String, Object> properties) {
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-  }
-
-  protected void overrideBrokerConf(PinotConfiguration configuration) {
-    configuration.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_INSTANCE_TAGS,
-        TagNameUtils.getBrokerTagForTenant(TENANT_NAME));
-  }
-
-  @Override
-  protected void overrideServerConf(PinotConfiguration configuration) {
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, false);
-  }
-
-  @BeforeClass
+  @BeforeClass(alwaysRun = true)
   public void setUp()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
-
-    // Start Zk, Kafka and Pinot
-    startHybridCluster();
-
-    List<File> avroFiles = getAllAvroFiles();
-    List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
-    List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles, NUM_REALTIME_SEGMENTS);
-
-    // Create and upload the schema and table config
-    Schema schema = createSchema();
-    addSchema(schema);
-    TableConfig offlineTableConfig = createOfflineTableConfig();
-    addTableConfig(offlineTableConfig);
-    addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
-
-    // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir,
-        _tarDir);
-    uploadSegments(getTableName(), _tarDir);
-
-    // Push data into Kafka
-    pushAvroIntoKafka(realtimeAvroFiles);
-
-    // Set up the H2 connection
-    setUpH2Connection(avroFiles);
-
-    // Initialize the query generator
-    setUpQueryGenerator(avroFiles);
-
-    // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
+      throws Throwable {
+    _canonicalScenario = newScenario(getTableName(), getClass().getSimpleName());
+    Throwable primaryFailure = null;
+    try {
+      Schema schema = setUpStandardScenario(_canonicalScenario, null, DEFAULT_HYBRID_COUNT);
+      initializeCanonicalQueryState(getSharedAvroFiles(), schema);
+    } catch (Throwable t) {
+      primaryFailure = t;
+      throw t;
+    } finally {
+      if (primaryFailure != null) {
+        Throwable cleanupFailure = releaseCanonicalQueryState(null);
+        try {
+          closeScenario(_canonicalScenario, null);
+        } catch (Throwable t) {
+          cleanupFailure = appendCleanupFailure(cleanupFailure, t);
+        } finally {
+          _canonicalScenario = null;
+        }
+        if (cleanupFailure != null) {
+          primaryFailure.addSuppressed(cleanupFailure);
+        }
+      }
+    }
   }
 
-  protected void startHybridCluster()
-      throws Exception {
-    startZk();
-    startController();
-    startBroker();
-    startServers(2);
-    startKafka();
-
-    // Create tenants
-    createServerTenant(TENANT_NAME, 1, 1);
+  @AfterClass(alwaysRun = true)
+  public void tearDown()
+      throws Throwable {
+    Throwable cleanupFailure = releaseCanonicalQueryState(null);
+    if (_canonicalScenario != null) {
+      try {
+        closeScenario(_canonicalScenario, null);
+      } catch (Throwable t) {
+        cleanupFailure = appendCleanupFailure(cleanupFailure, t);
+      } finally {
+        _canonicalScenario = null;
+      }
+    }
+    if (cleanupFailure != null) {
+      throw cleanupFailure;
+    }
   }
 
   @Test
   public void testUpdateBrokerResource()
       throws Exception {
     // Add a new broker to the cluster
-    BaseBrokerStarter brokerStarter = startOneBroker(1);
+    BaseBrokerStarter brokerStarter = startTrackedBroker(1);
 
     // Check if broker is added to all the tables in broker resource
     String clusterName = getHelixClusterName();
@@ -157,19 +119,18 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     }, 60_000L, "Failed to find broker in broker resource ExternalView");
 
     // Stop the broker
-    brokerStarter.stop();
-    _brokerPorts.remove(_brokerPorts.size() - 1);
+    stopTrackedBrokerProcess();
 
     // Dropping the broker should fail because it is still in the broker resource
     try {
-      sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+      getOrCreateAdminClient().getInstanceClient().dropInstance(brokerId);
       fail("Dropping instance should fail because it is still in the broker resource");
     } catch (Exception e) {
       // Expected
     }
 
     // Untag the broker and update the broker resource so that it is removed from the broker resource
-    sendPutRequest(_controllerRequestURLBuilder.forInstanceUpdateTags(brokerId, Collections.emptyList(), true));
+    getOrCreateAdminClient().getInstanceClient().updateInstanceTags(brokerId, List.of(), true);
 
     // Check if broker is removed from all the tables in broker resource
     brokerResourceIdealState =
@@ -188,8 +149,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       return true;
     }, 60_000L, "Failed to remove broker from broker resource ExternalView");
 
-    // Dropping the broker should success now
-    sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+    // Dropping the broker should succeed now
+    removeTrackedBrokerFromCluster();
 
     // Check if broker is dropped from the cluster
     assertFalse(_helixAdmin.getInstancesInCluster(clusterName).contains(brokerId));
@@ -198,54 +159,89 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testSegmentMetadataApi()
       throws Exception {
-    String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName()));
-    JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
-    Assert.assertEquals(tableSegmentsMetadata.size(), 8);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    {
+      String jsonOutputStr = getOrCreateAdminClient().getSegmentClient()
+          .getSegmentsMetadata(getTableName(), null, null, TableType.OFFLINE.toString());
+      JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
+      Assert.assertEquals(tableSegmentsMetadata.size(), 8);
 
-    JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
-    String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
-    jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
-    JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
-    Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
-        segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
+      JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
+      String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
+      Map<String, Object> segmentMetadataFromDirectEndpoint = getOrCreateAdminClient().getSegmentClient()
+          .getSegmentMetadata(offlineTableName, segmentName, null);
+      Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
+          JsonUtils.objectToJsonNode(segmentMetadataFromDirectEndpoint).get("segment.total.docs"));
+    }
+    // get list of segment names to pass in query params for following tests
+    List<String> segments = getSegmentNames(getTableName(), TableType.OFFLINE.toString());
+    // with null column params
+    {
+      String jsonOutputStr = getOrCreateAdminClient().getSegmentClient()
+          .getSegmentsMetadata(getTableName(), null, segments, TableType.OFFLINE.toString());
+      JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
+      Assert.assertEquals(tableSegmentsMetadata.size(), segments.size());
+      JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
+      String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
+      Map<String, Object> segmentMetadataFromDirectEndpoint = getOrCreateAdminClient().getSegmentClient()
+          .getSegmentMetadata(offlineTableName, segmentName, null);
+      Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
+          JsonUtils.objectToJsonNode(segmentMetadataFromDirectEndpoint).get("segment.total.docs"));
+      Assert.assertEquals(tableSegmentsMetadata.get(segments.get(0)).get("columns").size(), 0);
+    }
+    // with * column param
+    {
+      String jsonOutputStr = getOrCreateAdminClient().getSegmentClient()
+          .getSegmentsMetadata(getTableName(), List.of("*"), segments, TableType.OFFLINE.toString());
+      JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
+      Assert.assertEquals(tableSegmentsMetadata.size(), segments.size());
+      JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
+      String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
+      Map<String, Object> segmentMetadataFromDirectEndpoint = getOrCreateAdminClient().getSegmentClient()
+          .getSegmentMetadata(offlineTableName, segmentName, null);
+      Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
+          JsonUtils.objectToJsonNode(segmentMetadataFromDirectEndpoint).get("segment.total.docs"));
+      Assert.assertEquals(tableSegmentsMetadata.get(segments.get(0)).get("columns").size(), 79);
+    }
+    // with specified column params
+    {
+      List<String> columns = List.of("Carrier", "FlightNum", "TailNum");
+      String jsonOutputStr = getOrCreateAdminClient().getSegmentClient()
+          .getSegmentsMetadata(getTableName(), columns, segments, TableType.OFFLINE.toString());
+      JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
+      Assert.assertEquals(tableSegmentsMetadata.size(), segments.size());
+      JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
+      String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
+      Map<String, Object> segmentMetadataFromDirectEndpoint = getOrCreateAdminClient().getSegmentClient()
+          .getSegmentMetadata(offlineTableName, segmentName, null);
+      Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
+          JsonUtils.objectToJsonNode(segmentMetadataFromDirectEndpoint).get("segment.total.docs"));
+      Assert.assertEquals(tableSegmentsMetadata.get(segments.get(0)).get("columns").size(), columns.size());
+    }
   }
 
   @Test
   public void testSegmentListApi()
       throws Exception {
-    {
-      String jsonOutputStr =
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName(), TableType.OFFLINE.toString()));
-      JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
-      // There should be one element in the array
-      JsonNode element = array.get(0);
-      JsonNode segments = element.get("OFFLINE");
-      Assert.assertEquals(segments.size(), 8);
-    }
-    {
-      String jsonOutputStr =
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName(), TableType.REALTIME.toString()));
-      JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
-      // There should be one element in the array
-      JsonNode element = array.get(0);
-      JsonNode segments = element.get("REALTIME");
-      Assert.assertEquals(segments.size(), 24);
-    }
-    {
-      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()));
-      JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
-      JsonNode offlineSegments = array.get(0).get("OFFLINE");
-      Assert.assertEquals(offlineSegments.size(), 8);
-      JsonNode realtimeSegments = array.get(1).get("REALTIME");
-      Assert.assertEquals(realtimeSegments.size(), 24);
-    }
+    List<String> offlineSegments =
+        getOrCreateAdminClient().getSegmentClient().listSegments(getTableName(), TableType.OFFLINE.toString(), false);
+    Assert.assertEquals(offlineSegments.size(), 8);
+
+    List<String> realtimeSegments =
+        getOrCreateAdminClient().getSegmentClient().listSegments(getTableName(), TableType.REALTIME.toString(), false);
+    Assert.assertEquals(realtimeSegments.size(), 24);
+
+    Assert.assertEquals(offlineSegments.size(), 8);
+    Assert.assertEquals(realtimeSegments.size(), 24);
   }
 
   // NOTE: Reload consuming segment will force commit it, so run this test after segment list api test
   @Test(dependsOnMethods = "testSegmentListApi")
   public void testReload()
       throws Exception {
+    markCanonicalSchemaMutation();
     super.testReload(true);
+    clearCanonicalSchemaMutation();
   }
 
   @Test
@@ -260,10 +256,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     Assert.assertNotNull(getDebugInfo("debug/routingTable/" + TableNameBuilder.REALTIME.tableNameWithType(tableName)));
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testBrokerDebugRoutingTableSQL(boolean useMultiStageQueryEngine)
+  @Test
+  public void testBrokerDebugRoutingTableSQL()
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String tableName = getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
@@ -274,12 +269,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     Assert.assertNotNull(getDebugInfo("debug/routingTable/sql?query=" + encodedSQL));
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testQueryTracing(boolean useMultiStageQueryEngine)
+  @Test
+  public void testQueryTracing()
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    // Tracing is a v1 only concept and the v2 query engine has separate multi-stage stats that are enabled by default
-    notSupportedInV2();
     JsonNode jsonNode = postQuery("SET trace = true; SELECT COUNT(*) FROM " + getTableName());
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
     Assert.assertTrue(jsonNode.get("exceptions").isEmpty());
@@ -289,12 +281,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     Assert.assertTrue(traceInfo.has("localhost_R"));
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testQueryTracingWithLiteral(boolean useMultiStageQueryEngine)
+  @Test
+  public void testQueryTracingWithLiteral()
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    // Tracing is a v1 only concept and the v2 query engine has separate multi-stage stats that are enabled by default
-    notSupportedInV2();
     JsonNode jsonNode =
         postQuery("SET trace = true; SELECT 1, \'test\', ArrDelay FROM " + getTableName() + " LIMIT 10");
     long countStarResult = 10;
@@ -329,19 +318,44 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testExplainDropResults(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String resultTag = "resultTable";
+    String query = String.format("EXPLAIN PLAN FOR SELECT * FROM %s limit 10", getTableName());
+
+    // dropResults=true - resultTable must be in the response (it is a query plan)
+    JsonNode jsonNode = postQueryWithOptions(query, "dropResults=true");
+    Assert.assertTrue(jsonNode.has(resultTag));
+    query = String.format("EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM %s limit 10", getTableName());
+
+    // dropResults=true - resultTable must be in the response (it is a query plan)
+    jsonNode = postQueryWithOptions(query, "dropResults=true");
+    Assert.assertTrue(jsonNode.has(resultTag));
+
+    query = String.format("EXPLAIN IMPLEMENTATION PLAN FOR SELECT * FROM %s limit 10", getTableName());
+
+    // dropResults=true - resultTable must be in the response (it is a query plan)
+    jsonNode = postQueryWithOptions(query, "dropResults=true");
+    Assert.assertTrue(jsonNode.has(resultTag));
+
+    query = String.format("EXPLAIN PLAN FOR SELECT 1 + 1 FROM %s limit 10", getTableName());
+
+    // dropResults=true - resultTable must be in the response (it is a query plan)
+    jsonNode = postQueryWithOptions(query, "dropResults=true");
+    Assert.assertTrue(jsonNode.has(resultTag));
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     super.testHardcodedQueries();
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testQueriesFromQueryFile(boolean useMultiStageQueryEngine)
+  @Test
+  public void testQueriesFromQueryFile()
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    // Some of the hardcoded queries in the query file need to be adapted for v2 (for instance, using the arrayToMV
-    // with multi-value columns in filters / aggregations)
-    notSupportedInV2();
     super.testQueriesFromQueryFile();
   }
 
@@ -352,17 +366,11 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     super.testGeneratedQueries(true, useMultiStageQueryEngine);
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testQueryExceptions(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    super.testQueryExceptions();
-  }
-
   @Test
   @Override
   public void testInstanceShutdown()
       throws Exception {
+    markCanonicalRoutingMutation();
     super.testInstanceShutdown();
   }
 
@@ -373,46 +381,67 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     super.testBrokerResponseMetadata();
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testVirtualColumnQueries(boolean useMultiStageQueryEngine)
-      throws Exception {
+  @Test
+  public void testVirtualColumnQueries() {
     super.testVirtualColumnQueries();
   }
 
-  @AfterClass
-  public void tearDown()
+  @Test(dataProvider = "useBothQueryEngines")
+  void testControllerQuerySubmit(boolean useMultiStageQueryEngine)
       throws Exception {
-    // Try deleting the tables and check that they have no routing table
-    String tableName = getTableName();
-    dropOfflineTable(tableName);
-    dropRealtimeTable(tableName);
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Hybrid Table
+    @Language("sql")
+    String query = "SELECT count(*) FROM " + getTableName();
+    JsonNode response = postQueryToController(query);
+    assertNoError(response);
 
-    // Routing should be removed after deleting all tables
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        getDebugInfo("debug/routingTable/" + tableName);
-        return false;
-      } catch (Exception e) {
-        // only return true if 404 not found error is thrown.
-        return e.getMessage().contains("Got error status code: 404");
-      }
-    }, 60_000L, "Routing table is not empty after dropping all tables");
+    // Offline table
+    String tableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    query = "SELECT count(*) FROM " + tableName;
+    response = postQueryToController(query);
+    assertNoError(response);
 
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    cleanupHybridCluster();
+    tableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    query = "SELECT count(*) FROM " + tableName;
+    response = postQueryToController(query);
+    assertNoError(response);
+
+    query = "SELECT count(*) FROM unknown";
+    response = postQueryToController(query);
+    if (useMultiStageQueryEngine) {
+      QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+          .containsMessage("TableDoesNotExistError");
+    } else {
+      QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.BROKER_RESOURCE_MISSING)
+          .containsMessage("BrokerResourceMissingError");
+    }
   }
 
-  /**
-   * Can be overridden to preserve segments.
-   *
-   * @throws Exception
-   */
-  protected void cleanupHybridCluster()
+  @Test
+  @Override
+  public void testQueriesDisabled()
       throws Exception {
-    FileUtils.deleteDirectory(_tempDir);
+    markCanonicalRoutingMutation();
+    super.testQueriesDisabled();
+  }
+
+  @Test
+  void testControllerJoinQuerySubmit()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    // Hybrid Table
+    @Language("sql")
+    String query = "SELECT count(*) FROM unknown JOIN " + getTableName()
+        + " ON unknown.FlightNum = " + getTableName() + ".FlightNum";
+    JsonNode response = postQueryToController(query);
+    QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+        .containsMessage("TableDoesNotExistError");
+
+    query = "SELECT count(*) FROM unknown_1 JOIN unknown_2  ON "
+        + "unknown_1.FlightNum = unknown_2.FlightNum";
+    response = postQueryToController(query);
+    QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+        .containsMessage("TableDoesNotExistError");
   }
 }

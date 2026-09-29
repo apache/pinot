@@ -37,7 +37,15 @@ public interface VarByteChunkWriter extends Closeable {
 
   void putDoubleMV(double[] values);
 
+  void putBigDecimalMV(BigDecimal[] values);
+
   void putStringMV(String[] values);
 
   void putBytesMV(byte[][] values);
+
+  /// Returns the total uncompressed size of data written so far, or `-1` when unavailable.
+  long getRawForwardIndexUncompressedValueSizeInBytes();
+
+  /// Enables uncompressed-size tracking before the first value is written.
+  void enableRawForwardIndexUncompressedValueSizeTracking();
 }

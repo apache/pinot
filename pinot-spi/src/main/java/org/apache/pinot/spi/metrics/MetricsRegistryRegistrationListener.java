@@ -20,10 +20,7 @@ package org.apache.pinot.spi.metrics;
 
 
 
-/**
- * Interface to implement operations that occur whenever a new MetricsRegistry is registered with the PinotMetricUtils.
- *
- */
+/// Interface to implement operations that occur whenever a new MetricsRegistry is registered with the PinotMetricUtils.
 public interface MetricsRegistryRegistrationListener {
   void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry);
 }

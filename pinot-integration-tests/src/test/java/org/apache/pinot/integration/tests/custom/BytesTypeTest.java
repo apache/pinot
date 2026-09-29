@@ -19,14 +19,13 @@
 package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.common.function.scalar.DataTypeConversionFunctions;
 import org.apache.pinot.common.function.scalar.StringFunctions;
@@ -38,9 +37,8 @@ import org.testng.annotations.Test;
 
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class BytesTypeTest extends CustomDataQueryClusterIntegrationTest {
-
-  protected static final String DEFAULT_TABLE_NAME = "BytesTypeTest";
-  private static final String FIXED_HEX_STRIING_VALUE = "968a3c6a5eeb42168bae0e895034a26f";
+  private static final String DEFAULT_TABLE_NAME = "BytesTypeTest";
+  private static final String FIXED_HEX_STRING_VALUE = "968a3c6a5eeb42168bae0e895034a26f";
 
   private static final int NUM_TOTAL_DOCS = 1000;
   private static final String HEX_STR = "hexStr";
@@ -88,11 +86,11 @@ public class BytesTypeTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  public List<File> createAvroFiles()
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(
+    avroSchema.setFields(List.of(
         new org.apache.avro.Schema.Field(HEX_STR, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
             null, null),
         new org.apache.avro.Schema.Field(HEX_BYTES, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BYTES),
@@ -124,9 +122,8 @@ public class BytesTypeTest extends CustomDataQueryClusterIntegrationTest {
 
     ));
 
-    File avroFile = new File(_tempDir, "data.avro");
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < NUM_TOTAL_DOCS; i++) {
         GenericData.Record record = new GenericData.Record(avroSchema);
         byte[] bytes = newRandomBytes(RANDOM.nextInt(100) * 2 + 2);
@@ -148,13 +145,12 @@ public class BytesTypeTest extends CustomDataQueryClusterIntegrationTest {
         byte[] randomBytes = newRandomBytes();
         record.put(RANDOM_STR, new String(randomBytes));
         record.put(RANDOM_BYTES, ByteBuffer.wrap(randomBytes));
-        record.put(FIXED_STRING, FIXED_HEX_STRIING_VALUE);
-        record.put(FIXED_BYTES, ByteBuffer.wrap(DataTypeConversionFunctions.hexToBytes(FIXED_HEX_STRIING_VALUE)));
-        fileWriter.append(record);
+        record.put(FIXED_STRING, FIXED_HEX_STRING_VALUE);
+        record.put(FIXED_BYTES, ByteBuffer.wrap(DataTypeConversionFunctions.hexToBytes(FIXED_HEX_STRING_VALUE)));
+        writers.get(i % getNumAvroFiles()).append(record);
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-
-    return avroFile;
   }
 
   private static String newRandomBase64String() {
@@ -284,7 +280,7 @@ public class BytesTypeTest extends CustomDataQueryClusterIntegrationTest {
 
     // String predicate
     String query =
-        String.format("Select count(*) from %s WHERE %s = '%s'", getTableName(), FIXED_STRING, FIXED_HEX_STRIING_VALUE);
+        String.format("Select count(*) from %s WHERE %s = '%s'", getTableName(), FIXED_STRING, FIXED_HEX_STRING_VALUE);
     JsonNode pinotResponse = postQuery(query);
     JsonNode rows = pinotResponse.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {
@@ -294,7 +290,7 @@ public class BytesTypeTest extends CustomDataQueryClusterIntegrationTest {
     // Bytes predicate, convert literal string to bytes
     query =
         String.format("Select count(*) from %s WHERE %s = hexToBytes('%s')", getTableName(), FIXED_BYTES,
-            FIXED_HEX_STRIING_VALUE);
+            FIXED_HEX_STRING_VALUE);
     pinotResponse = postQuery(query);
     rows = pinotResponse.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {
@@ -304,11 +300,32 @@ public class BytesTypeTest extends CustomDataQueryClusterIntegrationTest {
     // Bytes predicate, convert column to hex string to compare with a literal string
     query =
         String.format("Select count(*) from %s WHERE bytesToHex(%s) = '%s'", getTableName(), FIXED_BYTES,
-            FIXED_HEX_STRIING_VALUE);
+            FIXED_HEX_STRING_VALUE);
     pinotResponse = postQuery(query);
     rows = pinotResponse.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {
       Assert.assertEquals(rows.get(i).get(0).asLong(), NUM_TOTAL_DOCS);
+    }
+  }
+
+  /// Regression coverage for the PostgreSQL `::` cast binding to the whole expression on its left instead of just
+  /// the literal, which made a bytea constant unusable as the right operand of a comparison.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testPostgreSqlByteaLiteralAsPredicateOperand(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    for (String byteaLiteral : List.of("'\\x" + FIXED_HEX_STRING_VALUE + "'::bytea",
+        "CAST('\\x" + FIXED_HEX_STRING_VALUE + "' AS BYTEA)", "X'" + FIXED_HEX_STRING_VALUE + "'")) {
+      String query = String.format("SELECT count(*) FROM %s WHERE %s = %s", getTableName(), FIXED_BYTES,
+          byteaLiteral);
+      JsonNode rows = postQuery(query).get("resultTable").get("rows");
+      Assert.assertEquals(rows.get(0).get(0).asLong(), NUM_TOTAL_DOCS, query);
+
+      // Same literal on the right of a compound predicate, where the accumulated expression list is non-empty.
+      query = String.format("SELECT count(*) FROM %s WHERE %s IS NOT NULL AND %s = %s", getTableName(), FIXED_BYTES,
+          FIXED_BYTES, byteaLiteral);
+      rows = postQuery(query).get("resultTable").get("rows");
+      Assert.assertEquals(rows.get(0).get(0).asLong(), NUM_TOTAL_DOCS, query);
     }
   }
 }

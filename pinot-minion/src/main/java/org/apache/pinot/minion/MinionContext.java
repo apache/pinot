@@ -23,14 +23,11 @@ import javax.net.ssl.SSLContext;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.core.minion.SegmentPurger;
 import org.apache.pinot.spi.auth.AuthProvider;
 
 
-/**
- * The <code>MinionContext</code> class is a singleton class which contains all minion related context.
- */
+/// The `MinionContext` class is a singleton class which contains all minion related context.
 public class MinionContext {
   private static final MinionContext INSTANCE = new MinionContext();
 
@@ -42,7 +39,6 @@ public class MinionContext {
   }
 
   private File _dataDir;
-  private MinionMetrics _minionMetrics;
   private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
   private HelixManager _helixManager;
 
@@ -61,16 +57,6 @@ public class MinionContext {
 
   public void setDataDir(File dataDir) {
     _dataDir = dataDir;
-  }
-
-  @Deprecated
-  public MinionMetrics getMinionMetrics() {
-    return _minionMetrics;
-  }
-
-  @Deprecated
-  public void setMinionMetrics(MinionMetrics minionMetrics) {
-    _minionMetrics = minionMetrics;
   }
 
   public ZkHelixPropertyStore<ZNRecord> getHelixPropertyStore() {

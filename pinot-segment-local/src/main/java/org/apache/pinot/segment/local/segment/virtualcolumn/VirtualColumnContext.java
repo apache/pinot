@@ -18,20 +18,27 @@
  */
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Miscellaneous context information about the column.
- * It will be used to build various components (dictionary, reader, etc) in the virtual column provider.
- */
+/// Miscellaneous context information about the column.
+/// It will be used to build various components (dictionary, reader, etc) in the virtual column provider.
 public class VirtualColumnContext {
   private final FieldSpec _fieldSpec;
   private final int _totalDocCount;
+  @Nullable
+  private final SegmentMetadata _segmentMetadata;
 
   public VirtualColumnContext(FieldSpec fieldSpec, int totalDocCount) {
+    this(fieldSpec, totalDocCount, null);
+  }
+
+  public VirtualColumnContext(FieldSpec fieldSpec, int totalDocCount, @Nullable SegmentMetadata segmentMetadata) {
     _fieldSpec = fieldSpec;
     _totalDocCount = totalDocCount;
+    _segmentMetadata = segmentMetadata;
   }
 
   public FieldSpec getFieldSpec() {
@@ -40,5 +47,10 @@ public class VirtualColumnContext {
 
   public int getTotalDocCount() {
     return _totalDocCount;
+  }
+
+  @Nullable
+  public SegmentMetadata getSegmentMetadata() {
+    return _segmentMetadata;
   }
 }

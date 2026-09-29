@@ -18,22 +18,16 @@
  */
 package org.apache.pinot.client;
 
-import java.util.Arrays;
+import com.google.common.collect.Iterables;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
-import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.parser.TableNameExtractor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
-/**
- * A connection to Pinot, normally created through calls to the {@link ConnectionFactory}.
- */
+/// A connection to Pinot, normally created through calls to the [ConnectionFactory].
 public class Connection {
   public static final String FAIL_ON_EXCEPTIONS = "failOnExceptions";
   private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
@@ -63,42 +57,48 @@ public class Connection {
     _failOnExceptions = Boolean.parseBoolean(properties.getProperty(FAIL_ON_EXCEPTIONS, "TRUE"));
   }
 
-  /**
-   * Creates a prepared statement, to escape query parameters.
-   *
-   * @param query The query for which to create a prepared statement
-   * @return A prepared statement for this connection
-   */
+  /// Creates a prepared statement, to escape query parameters.
+  ///
+  /// @param query The query for which to create a prepared statement
+  /// @return A prepared statement for this connection
   public PreparedStatement prepareStatement(String query) {
     return new PreparedStatement(this, query);
   }
 
-  /**
-   * Executes a query.
-   *
-   * @param query The query to execute
-   * @return The result of the query
-   * @throws PinotClientException If an exception occurs while processing the query
-   */
+  /// Executes a query.
+  ///
+  /// @param query The query to execute
+  /// @return The result of the query
+  /// @throws PinotClientException If an exception occurs while processing the query
   public ResultSetGroup execute(String query) {
-    return execute(null, query);
+    return execute((Iterable<String>) null, query);
   }
 
-  /**
-   * Executes a query.
-   *
-   * @param tableName Name of the table to execute the query on
-   * @param query The query to execute
-   * @return The result of the query
-   * @throws PinotClientException If an exception occurs while processing the query
-   */
+  /// Executes a query.
+  ///
+  /// @param tableName Name of the table to execute the query on
+  /// @param query The query to execute
+  /// @return The result of the query
+  /// @throws PinotClientException If an exception occurs while processing the query
   public ResultSetGroup execute(@Nullable String tableName, String query)
       throws PinotClientException {
-    String[] tableNames = (tableName == null) ? resolveTableName(query) : new String[]{tableName};
-    String brokerHostPort = _brokerSelector.selectBroker(tableNames);
+    return execute(tableName == null ? null : List.of(tableName), query);
+  }
+
+  /// Executes a query.
+  ///
+  /// @param tableNames Names of all the tables to execute the query on
+  /// @param query The query to execute
+  /// @return The result of the query
+  /// @throws PinotClientException If an exception occurs while processing the query
+  public ResultSetGroup execute(@Nullable Iterable<String> tableNames, String query)
+      throws PinotClientException {
+    String[] resultTableNames = (tableNames == null) ? resolveTableName(query)
+        : Iterables.toArray(tableNames, String.class);
+    String brokerHostPort = _brokerSelector.selectBroker(resultTableNames);
     if (brokerHostPort == null) {
       throw new PinotClientException("Could not find broker to query " + ((tableNames == null) ? "with no tables"
-          : "for table(s): " + Arrays.asList(tableNames)));
+          : "for table(s): " + Iterables.toString(tableNames)));
     }
     BrokerResponse response = _transport.executeQuery(brokerHostPort, query);
     if (response.hasExceptions() && _failOnExceptions) {
@@ -107,82 +107,144 @@ public class Connection {
     return new ResultSetGroup(response);
   }
 
-  /**
-   * Executes a query asynchronously.
-   *
-   * @param query The query to execute
-   * @return A future containing the result of the query
-   * @throws PinotClientException If an exception occurs while processing the query
-   */
+  /// Executes a query asynchronously.
+  ///
+  /// @param query The query to execute
+  /// @return A future containing the result of the query
+  /// @throws PinotClientException If an exception occurs while processing the query
   public CompletableFuture<ResultSetGroup> executeAsync(String query)
       throws PinotClientException {
-    return executeAsync(null, query);
+    return executeAsync((Iterable<String>) null, query);
   }
 
-  /**
-   * Executes a query asynchronously.
-   *
-   * @param query The query to execute
-   * @return A future containing the result of the query
-   * @throws PinotClientException If an exception occurs while processing the query
-   */
+  /// Executes a query asynchronously.
+  ///
+  /// @param tableName Name of the table to execute the query on
+  /// @param query The query to execute
+  /// @return A future containing the result of the query
+  /// @throws PinotClientException If an exception occurs while processing the query
   public CompletableFuture<ResultSetGroup> executeAsync(@Nullable String tableName, String query)
       throws PinotClientException {
-    String[] tableNames = (tableName == null) ? resolveTableName(query) : new String[]{tableName};
-    String brokerHostPort = _brokerSelector.selectBroker(tableNames);
+    return executeAsync(tableName == null ? null : List.of(tableName), query);
+  }
+
+  /// Executes a query asynchronously.
+  ///
+  /// @param tableNames Names of all the tables to execute the query on
+  /// @param query The query to execute
+  /// @return A future containing the result of the query
+  /// @throws PinotClientException If an exception occurs while processing the query
+  public CompletableFuture<ResultSetGroup> executeAsync(@Nullable Iterable<String> tableNames, String query)
+      throws PinotClientException {
+    String[] resultTableNames = (tableNames == null) ? resolveTableName(query)
+        : Iterables.toArray(tableNames, String.class);
+    String brokerHostPort = _brokerSelector.selectBroker(resultTableNames);
     if (brokerHostPort == null) {
       throw new PinotClientException("Could not find broker to query for statement: " + query);
     }
     return _transport.executeQueryAsync(brokerHostPort, query).thenApply(ResultSetGroup::new);
   }
 
-  /**
-   * Returns the name of all the tables used in a sql query.
-   *
-   * @return name of all the tables used in a sql query.
-   */
+  /// Returns the name of all the tables used in a sql query.
+  ///
+  /// @return name of all the tables used in a sql query.
   @Nullable
-  private static String[] resolveTableName(String query) {
+  public static String[] resolveTableName(String query) {
     try {
-      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
-      Set<String> tableNames =
-          RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode()));
-      if (tableNames != null) {
-        return tableNames.toArray(new String[0]);
-      }
+      return TableNameExtractor.resolveTableName(query);
     } catch (Exception e) {
-      LOGGER.error("Cannot parse table name from query: {}. Fallback to broker selector default.", query, e);
+      LOGGER.warn("Failed to extract table names for query: {}, fall back to default broker selector", query, e);
+      return null;
     }
-    return null;
   }
 
-  /**
-   * Returns the list of brokers to which this connection can connect to.
-   *
-   * @return The list of brokers to which this connection can connect to.
-   */
+  /// Returns the list of brokers to which this connection can connect to.
+  ///
+  /// @return The list of brokers to which this connection can connect to.
   List<String> getBrokerList() {
     return _brokerSelector.getBrokers();
   }
 
-  /**
-   * Close the connection for further processing
-   *
-   * @throws PinotClientException when connection is already closed
-   */
+  /// Close the connection for further processing
+  ///
+  /// @throws PinotClientException when connection is already closed
   public void close()
       throws PinotClientException {
     _transport.close();
     _brokerSelector.close();
   }
 
-  /**
-   * Provides access to the underlying transport mechanism for this connection.
-   * There may be client metrics useful for monitoring and other observability goals.
-   *
-   * @return pinot client transport.
-   */
+  /// Provides access to the underlying transport mechanism for this connection.
+  /// There may be client metrics useful for monitoring and other observability goals.
+  ///
+  /// @return pinot client transport.
   public PinotClientTransport<?> getTransport() {
     return _transport;
+  }
+
+  /// Opens a cursor for the given query, enabling pagination through large result sets.
+  /// The returned cursor starts with the first page already loaded.
+  ///
+  /// @param query the query to execute
+  /// @param pageSize the number of rows per page
+  /// @return ResultCursor with the first page loaded and ready for navigation
+  /// @throws PinotClientException If an exception occurs while processing the query
+  public ResultCursor openCursor(String query, int pageSize) throws PinotClientException {
+    try {
+      return openCursorAsync(query, pageSize).get();
+    } catch (Exception e) {
+      if (e.getCause() instanceof PinotClientException) {
+        throw (PinotClientException) e.getCause();
+      } else if (e.getCause() instanceof UnsupportedOperationException) {
+        throw (UnsupportedOperationException) e.getCause();
+      } else {
+        throw new PinotClientException("Failed to open cursor", e);
+      }
+    }
+  }
+
+  /// Opens a cursor for the given query asynchronously, enabling pagination through large result sets.
+  /// The returned cursor starts with the first page already loaded.
+  ///
+  /// @param query the query to execute
+  /// @param pageSize the number of rows per page
+  /// @return CompletableFuture containing ResultCursor with the first page loaded and ready for navigation
+  public CompletableFuture<ResultCursor> openCursorAsync(String query, int pageSize) {
+    return validateCursorSupport()
+        .thenCompose(unused -> selectBrokerForCursor(query))
+        .thenCompose(brokerHostPort -> executeInitialCursorQuery(brokerHostPort, query, pageSize));
+  }
+
+  private CompletableFuture<Void> validateCursorSupport() {
+    if (!(_transport instanceof CursorCapable)) {
+      return CompletableFuture.failedFuture(
+          new UnsupportedOperationException("Cursor operations not supported by this connection type"));
+    }
+    return CompletableFuture.completedFuture(null);
+  }
+
+  private CompletableFuture<String> selectBrokerForCursor(String query) {
+    String[] tableNames = resolveTableName(query);
+    String brokerHostPort = _brokerSelector.selectBroker(tableNames);
+    if (brokerHostPort == null) {
+      return CompletableFuture.failedFuture(
+          new PinotClientException("Could not find broker to execute cursor query"));
+    }
+    return CompletableFuture.completedFuture(brokerHostPort);
+  }
+
+  private CompletableFuture<ResultCursor> executeInitialCursorQuery(String brokerHostPort, String query, int pageSize) {
+    try {
+      CursorCapable cursorTransport = (CursorCapable) _transport;
+      return cursorTransport.executeQueryWithCursorAsync(brokerHostPort, query, pageSize)
+          .thenApply(initialResponse -> {
+            if (initialResponse.hasExceptions() && _failOnExceptions) {
+              throw new PinotClientException("Query had processing exceptions: \n" + initialResponse.getExceptions());
+            }
+            return (ResultCursor) new ResultCursorImpl(_transport, brokerHostPort, initialResponse, _failOnExceptions);
+          });
+    } catch (Exception e) {
+      return CompletableFuture.failedFuture(new PinotClientException("Failed to open cursor", e));
+    }
   }
 }

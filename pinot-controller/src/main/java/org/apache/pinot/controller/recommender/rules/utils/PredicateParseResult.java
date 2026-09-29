@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.controller.recommender.rules.utils;
 
-/**
- * Class holding a candidate recommendation
- */
+/// Class holding a candidate recommendation
 public class PredicateParseResult {
   public static final class PredicateParseResultBuilder {
     // recommended set of dimensions (as a whole) to apply indices on

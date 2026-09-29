@@ -31,7 +31,6 @@ import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +57,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   // XXX MAX_NUM_ENTRIES should be a final variable, but we need to modify it for testing.
   private static int _maxNumEntries = 16;  // Max number of past segments for which stats are kept
 
-  // Fields to be serialzied.
+  // Fields to be serialized.
   private int _cursor = 0;
   private SegmentStats[] _entries;
   private boolean _isFull = false;
@@ -101,7 +100,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     // numRowsIndexed can be <= numRowsConsumed when aggregateMetrics is true.
     private int _numSeconds;        // Number of seconds taken to consume them
     private long _memUsedBytes;          // Memory used for consumption (bytes)
-    private Map<String, ColumnStats> _colNameToStats = new HashMap();
+    private Map<String, ColumnStats> _colNameToStats = new HashMap<>();
 
     public int getNumRowsConsumed() {
       return _numRowsConsumed;
@@ -135,7 +134,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
       _memUsedBytes = memUsedBytes;
     }
 
-    public void setColumnStats(@Nonnull String columnName, @Nonnull ColumnStats columnStats) {
+    public void setColumnStats(String columnName, ColumnStats columnStats) {
       _colNameToStats.put(columnName, columnStats);
     }
 
@@ -185,11 +184,9 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     }
   }
 
-  /**
-   * Constructor called when there is no file present.
-   *
-   * @param historyFilePath
-   */
+  /// Constructor called when there is no file present.
+  ///
+  /// @param historyFilePath
   private RealtimeSegmentStatsHistory(String historyFilePath) {
     _entries = new SegmentStats[_maxNumEntries];
     _historyFilePath = historyFilePath;
@@ -268,14 +265,12 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     save();
   }
 
-  /**
-   * Estimate the cardinality of a column based on past segments of a table
-   * For now, we return the average value.
-   *
-   * @param columnName
-   * @return estimated
-   */
-  public synchronized int getEstimatedCardinality(@Nonnull String columnName) {
+  /// Estimate the cardinality of a column based on past segments of a table
+  /// For now, we return the average value.
+  ///
+  /// @param columnName
+  /// @return estimated
+  public synchronized int getEstimatedCardinality(String columnName) {
     int numEntriesToScan = getNumEntriesToScan();
     if (numEntriesToScan == 0) {
       return DEFAULT_EST_CARDINALITY;
@@ -299,14 +294,12 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     return DEFAULT_EST_CARDINALITY;
   }
 
-  /**
-   * Estimate the average size of a string column based on the past segments of the table.
-   * For now, we return the average value.
-   *
-   * @param columnName
-   * @return estimated average string size
-   */
-  public synchronized int getEstimatedAvgColSize(@Nonnull String columnName) {
+  /// Estimate the average size of a string column based on the past segments of the table.
+  /// For now, we return the average value.
+  ///
+  /// @param columnName
+  /// @return estimated average string size
+  public synchronized int getEstimatedAvgColSize(String columnName) {
     int numEntriesToScan = getNumEntriesToScan();
     if (numEntriesToScan == 0) {
       return DEFAULT_EST_AVG_COL_SIZE;
@@ -375,7 +368,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     }
   }
 
-  public static synchronized RealtimeSegmentStatsHistory deserialzeFrom(File inFile)
+  public static synchronized RealtimeSegmentStatsHistory deserializeFrom(File inFile)
       throws IOException, ClassNotFoundException {
     if (inFile.exists()) {
       try (FileInputStream is = new FileInputStream(inFile); ObjectInputStream obis = new CustomObjectInputStream(is)) {
@@ -395,13 +388,11 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     return getCursor();
   }
 
-  /**
-   * This is a work-around to be able to de-serialize an object written by the same class
-   * before its move from {@value OLD_PACKAGE_FOR_CLASS} to the current package of
-   * "org.apache.pinot.segment.local.realtime.impl".
-   *
-   * We sub-class ObjectInputStream, and overwrite the old package name with the new one.
-   */
+  /// This is a work-around to be able to de-serialize an object written by the same class
+  /// before its move from {@value OLD_PACKAGE_FOR_CLASS} to the current package of
+  /// "org.apache.pinot.segment.local.realtime.impl".
+  ///
+  /// We sub-class ObjectInputStream, and overwrite the old package name with the new one.
   private static class CustomObjectInputStream extends ObjectInputStream {
 
     public CustomObjectInputStream(InputStream in)

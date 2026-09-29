@@ -30,16 +30,12 @@ import org.locationtech.jts.io.geojson.GeoJsonReader;
 import org.locationtech.jts.io.geojson.GeoJsonWriter;
 
 
-/**
- * Utility methods for the geometry.
- */
+/// Utility methods for the geometry.
 public class GeometryUtils {
   private GeometryUtils() {
   }
 
-  /**
-   * Coordinate system of lat/lng per https://epsg.io/4326
-   */
+  /// Coordinate system of lat/lng per https://epsg.io/4326
   public static final int GEOGRAPHY_SRID = 4326;
   public static final byte GEOGRAPHY_SET_MASK = (byte) 0x80;
   public static final byte GEOGRAPHY_GET_MASK = (byte) 0x7f;
@@ -65,27 +61,21 @@ public class GeometryUtils {
   public static final Joiner OR_JOINER = Joiner.on(" or ");
   public static final Geometry EMPTY_POINT = GEOMETRY_FACTORY.createPoint();
 
-  /**
-   * Checks if the given geo-spatial object is a geography object.
-   * @param geometry the given object to check
-   * @return <code>true</code> if the given geo-spatial object is a geography object, <code>false</code> otherwise
-   */
+  /// Checks if the given geo-spatial object is a geography object.
+  /// @param geometry the given object to check
+  /// @return `true` if the given geo-spatial object is a geography object, `false` otherwise
   public static boolean isGeography(Geometry geometry) {
     return geometry.getSRID() == GEOGRAPHY_SRID;
   }
 
-  /**
-   * Sets the geometry to geography.
-   * @param geometry the geometry to set
-   */
+  /// Sets the geometry to geography.
+  /// @param geometry the geometry to set
   public static void setGeography(Geometry geometry) {
     geometry.setSRID(GEOGRAPHY_SRID);
   }
 
-  /**
-   * Sets to geometry.
-   * @param geometry the geometry to set
-   */
+  /// Sets to geometry.
+  /// @param geometry the geometry to set
   public static void setGeometry(Geometry geometry) {
     geometry.setSRID(0);
   }

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.CaseFormat;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -33,6 +32,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.dociditerators.ExpressionScanDocIdIterator;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.ExpressionDocIdSet;
 import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -64,7 +64,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
     _dataSourceMap = new HashMap<>(mapCapacity);
     Map<String, ColumnContext> columnContextMap = new HashMap<>(mapCapacity);
     columns.forEach(column -> {
-      DataSource dataSource = segment.getDataSource(column);
+      DataSource dataSource = segment.getDataSource(column, queryContext.getSchema());
       _dataSourceMap.put(column, dataSource);
       columnContextMap.put(column, ColumnContext.fromDataSource(dataSource));
     });
@@ -75,43 +75,59 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
     } else {
       _predicateEvaluator =
           PredicateEvaluatorProvider.getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
-              _transformFunction.getResultMetadata().getDataType());
+              _transformFunction.getResultMetadata().getDataType(), _queryContext);
     }
   }
 
   @Override
   protected BlockDocIdSet getTrues() {
     if (_predicateType == Predicate.Type.IS_NULL) {
-      return getNulls();
+      return getExpressionNulls();
     } else if (_predicateType == Predicate.Type.IS_NOT_NULL) {
-      return new NotDocIdSet(getNulls(), _numDocs);
+      return new NotDocIdSet(getExpressionNulls(), _numDocs);
     } else {
       return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
-          _queryContext.isNullHandlingEnabled(), ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE);
+          ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE, _queryContext);
     }
   }
 
+  /// `IS NULL` and `IS NOT NULL` are two-valued: a null expression makes them true or false, never UNKNOWN. Every other
+  /// predicate is UNKNOWN where the expression is null.
   @Override
   protected BlockDocIdSet getNulls() {
+    return isNullCheck() ? EmptyDocIdSet.getInstance() : getExpressionNulls();
+  }
+
+  @Override
+  public boolean mayHaveNulls() {
+    return _nullHandlingEnabled && !isNullCheck();
+  }
+
+  private boolean isNullCheck() {
+    return _predicateType == Predicate.Type.IS_NULL || _predicateType == Predicate.Type.IS_NOT_NULL;
+  }
+
+  /// Returns the documents the expression evaluates to null for.
+  private BlockDocIdSet getExpressionNulls() {
     return new ExpressionDocIdSet(_transformFunction, null, _dataSourceMap, _numDocs,
-        _queryContext.isNullHandlingEnabled(), ExpressionScanDocIdIterator.PredicateEvaluationResult.NULL);
+        ExpressionScanDocIdIterator.PredicateEvaluationResult.NULL, _queryContext);
   }
 
   @Override
   protected BlockDocIdSet getFalses() {
     if (_predicateType == Predicate.Type.IS_NULL) {
-      return new NotDocIdSet(getNulls(), _numDocs);
+      return new NotDocIdSet(getExpressionNulls(), _numDocs);
     } else if (_predicateType == Predicate.Type.IS_NOT_NULL) {
-      return getNulls();
+      return getExpressionNulls();
     } else {
       return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
-          _queryContext.isNullHandlingEnabled(), ExpressionScanDocIdIterator.PredicateEvaluationResult.FALSE);
+          ExpressionScanDocIdIterator.PredicateEvaluationResult.FALSE, _queryContext);
     }
   }
 
   @Override
   public List<Operator<?>> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

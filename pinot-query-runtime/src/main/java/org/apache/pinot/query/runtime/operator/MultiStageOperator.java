@@ -18,103 +18,185 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.metrics.ServerTimer;
+import org.apache.pinot.common.metrics.MseMeter;
+import org.apache.pinot.common.metrics.MseMetrics;
+import org.apache.pinot.common.metrics.MseTimer;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.plan.ExplainInfo;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.operator.set.SetOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 
 
-public abstract class MultiStageOperator
-    implements Operator<TransferableBlock>, AutoCloseable {
-
+public abstract class MultiStageOperator implements Operator<MseBlock>, AutoCloseable {
   protected final OpChainExecutionContext _context;
   protected final String _operatorId;
+
   protected boolean _isEarlyTerminated;
 
   public MultiStageOperator(OpChainExecutionContext context) {
     _context = context;
     _operatorId = Joiner.on("_").join(getClass().getSimpleName(), _context.getStageId(), _context.getServer());
-    _isEarlyTerminated = false;
   }
 
-  /**
-   * Returns the logger for the operator.
-   * <p>
-   * This method is used to generic multi-stage operator messages using the name of the specific operator.
-   * Implementations should not allocate new loggers for each call but instead reuse some (probably static and final)
-   * attribute.
-   */
+  /// The [#getNextBlock()] call currently running, or null when none is. See [#registerExecutionSoFar()].
+  ///
+  /// A single thread runs an opchain at a time and an operator never re-enters its own [#nextBlock()], so this is
+  /// only ever read and written from inside the call it describes.
+  @Nullable
+  private BlockExecution _blockExecution;
+
+  /// Returns the logger for the operator.
+  ///
+  /// This method is used to generic multi-stage operator messages using the name of the specific operator.
+  /// Implementations should not allocate new loggers for each call but instead reuse some (probably static and final)
+  /// attribute.
   protected abstract Logger logger();
 
-  public abstract Type getOperatorType();
+  public abstract OperatorTypeDescriptor getOperatorType();
 
-  public abstract void registerExecution(long time, int numRows);
+  public abstract void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs);
 
-  // Samples resource usage of the operator. The operator should call this function for every block of data or
-  // assuming the block holds 10000 rows or more.
-  protected void sampleAndCheckInterruption() {
-    Tracing.ThreadAccountantOps.sampleMSE();
-    if (Tracing.ThreadAccountantOps.isInterrupted()) {
-      earlyTerminate();
+  /// Accounts everything this operator has spent so far in the [#getNextBlock()] call currently running.
+  ///
+  /// [#nextBlock()] normally registers a block's usage only once [#getNextBlock()] has returned, which is too late
+  /// for an operator that has to report its own stats from inside that call: [MailboxSendOperator] serializes them
+  /// into the end-of-stream block it is about to send. Without this, that operator reports less time, memory and GC
+  /// than the inputs whose calls it contains, and the stats tree renders a negative self time for the stage.
+  ///
+  /// Whatever is left when the call returns is registered as usual, so the totals an operator ends up with are the
+  /// same either way. No rows are attributed here; they are counted from the block the call returns.
+  ///
+  /// Does nothing when called outside a [#nextBlock()] call.
+  protected void registerExecutionSoFar() {
+    BlockExecution blockExecution = _blockExecution;
+    if (blockExecution != null) {
+      blockExecution.registerUnaccounted(0);
     }
   }
 
-  /**
-   * Returns the next block from the operator. It should return non-empty data blocks followed by an end-of-stream (EOS)
-   * block when all the data is processed, or an error block if an error occurred. After it returns EOS or error block,
-   * no more call should be made.
-   */
-  @Override
-  public TransferableBlock nextBlock() {
-    if (Tracing.ThreadAccountantOps.isInterrupted()) {
-      throw new EarlyTerminationException("Interrupted while processing next block");
+  /// What a single [#getNextBlock()] call has spent, and how much of that has already been handed to
+  /// [#registerExecution].
+  ///
+  /// The meters are created by [#nextBlock()] and passed in rather than created here, so that each of them keeps
+  /// measuring from exactly the point it always did.
+  private final class BlockExecution {
+    private final Stopwatch _stopwatch = Stopwatch.createStarted();
+    private final ThreadResourceSnapshot _resourceSnapshot;
+    private final long _preGcTimeMs;
+    private long _accountedTimeMs;
+    private long _accountedMemoryBytes;
+    private long _accountedGcTimeMs;
+
+    private BlockExecution(ThreadResourceSnapshot resourceSnapshot, long preGcTimeMs) {
+      _resourceSnapshot = resourceSnapshot;
+      _preGcTimeMs = preGcTimeMs;
     }
+
+    /// Hands whatever this call has spent and not yet registered to [MultiStageOperator#registerExecution],
+    /// attributing `numRows` rows to it. Each invocation registers only what accrued since the previous one, which
+    /// is what lets the call report from the inside and still end up with exact totals.
+    private void registerUnaccounted(int numRows) {
+      long timeMs = _stopwatch.elapsed(TimeUnit.MILLISECONDS);
+      long memoryBytes = _resourceSnapshot.getAllocatedBytes();
+      long gcTimeMs = getGcTimeMillis() - _preGcTimeMs;
+      registerExecution(timeMs - _accountedTimeMs, numRows, memoryBytes - _accountedMemoryBytes,
+          gcTimeMs - _accountedGcTimeMs);
+      _accountedTimeMs = timeMs;
+      _accountedMemoryBytes = memoryBytes;
+      _accountedGcTimeMs = gcTimeMs;
+    }
+  }
+
+  /// By default, it uses the active deadline, which is the one that should be used for most operators, but if the
+  /// operator does not actively process data (ie both mailbox operators), it should override this method to use the
+  /// passive deadline instead.
+  protected long getDeadlineMs() {
+    return _context.getActiveDeadlineMs();
+  }
+
+  protected void checkTermination() {
+    QueryThreadContext.checkTermination(this::getExplainName, getDeadlineMs());
+  }
+
+  protected void checkTerminationAndSampleUsage() {
+    QueryThreadContext.checkTerminationAndSampleUsage(this::getExplainName, getDeadlineMs());
+  }
+
+  protected void checkTerminationAndSampleUsagePeriodically(int numRecordsProcessed, String scope) {
+    QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRecordsProcessed, scope, getDeadlineMs());
+  }
+
+  /// Returns the next block from the operator. It should return non-empty data blocks followed by an end-of-stream
+  /// (EOS) block when all the data is processed, or an error block if an error occurred. After it returns EOS or error
+  /// block, no more call should be made.
+  @Override
+  public MseBlock nextBlock() {
     if (logger().isDebugEnabled()) {
       logger().debug("Operator {}: Reading next block", _operatorId);
     }
+
+    ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
+    long preBlockGcTime = getGcTimeMillis();
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
-      TransferableBlock nextBlock;
-      Stopwatch executeStopwatch = Stopwatch.createStarted();
+      MseBlock nextBlock;
+      BlockExecution blockExecution = new BlockExecution(resourceSnapshot, preBlockGcTime);
+      _blockExecution = blockExecution;
       try {
+        checkTermination();
         nextBlock = getNextBlock();
       } catch (Exception e) {
-        nextBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
+        logger().warn("Operator {}: Exception while processing next block", _operatorId, e);
+        nextBlock = ErrorMseBlock.fromException(e);
+      } finally {
+        // Cleared even when getNextBlock() throws, so a later registerExecutionSoFar() cannot read a finished call.
+        _blockExecution = null;
       }
-      registerExecution(executeStopwatch.elapsed(TimeUnit.MILLISECONDS), nextBlock.getNumRows());
+      int numRows = nextBlock instanceof MseBlock.Data ? ((MseBlock.Data) nextBlock).getNumRows() : 0;
+      // Only what registerExecutionSoFar() left unaccounted, so the totals are the same whether or not the operator
+      // reported from inside the call.
+      blockExecution.registerUnaccounted(numRows);
 
       if (logger().isDebugEnabled()) {
-        logger().debug("Operator {}. Block of type {} ready to send", _operatorId, nextBlock.getType());
+        logger().debug("Operator {}. Block {} ready to send", _operatorId, nextBlock);
       }
       return nextBlock;
     }
   }
 
   // Make it protected because we should always call nextBlock()
-  protected abstract TransferableBlock getNextBlock()
+  protected abstract MseBlock getNextBlock()
       throws Exception;
 
+  /// Signals the operator to terminate early.
+  ///
+  /// After this method is called, the operator should stop processing any more input and return a
+  /// [org.apache.pinot.query.runtime.blocks.SuccessMseBlock] block as soon as possible.
+  /// This method should be called when the consumer of the operator does not need any more data and wants to stop the
+  /// execution early to save resources.
   protected void earlyTerminate() {
     _isEarlyTerminated = true;
     for (MultiStageOperator child : getChildOperators()) {
@@ -122,24 +204,86 @@ public abstract class MultiStageOperator
     }
   }
 
-  /**
-   * Adds the current operator stats as the last operator in the open stats of the given holder.
-   *
-   * It is assumed that:
-   * <ol>
-   *   <li>The current stage of the holder is equal to the stage id of this operator.</li>
-   *   <li>The holder already contains the stats of the previous operators of the same stage in inorder</li>
-   * </ol>
-   */
-  protected void addStats(MultiStageQueryStats holder, StatMap<?> statMap) {
-    Preconditions.checkArgument(holder.getCurrentStageId() == _context.getStageId(),
-        "The holder's stage id should be the same as the current operator's stage id. Expected %s, got %s",
-        _context.getStageId(), holder.getCurrentStageId());
-    holder.getCurrentStats().addLastOperator(getOperatorType(), statMap);
-  }
-
   @Override
   public abstract List<MultiStageOperator> getChildOperators();
+
+  /// Calculates and returns the stats for the operator.
+  ///
+  /// Each time this method is called, a new instance of the stats is created. This is because the stats are mutable and
+  /// can be updated by the operator or the caller after the stats are returned.
+  public final MultiStageQueryStats calculateStats() {
+    MultiStageQueryStats upstreamStats = calculateUpstreamStats();
+
+    Preconditions.checkArgument(upstreamStats.getCurrentStageId() == _context.getStageId(),
+        "The holder's stage id should be the same as the current operator's stage id. Expected %s, got %s",
+        _context.getStageId(), upstreamStats.getCurrentStageId());
+    upstreamStats.getCurrentStats().addLastOperator(getOperatorType(), copyStatMaps());
+    return upstreamStats;
+  }
+
+  protected MultiStageQueryStats calculateUpstreamStats() {
+    return getChildOperators().stream()
+        .map(MultiStageOperator::calculateStats)
+        .reduce((s1, s2) -> {
+          s1.mergeSameStage(s2);
+          return s1;
+        })
+        .orElse(MultiStageQueryStats.emptyStats(_context.getStageId()));
+  }
+
+  /// Returns the stats to report for this operator, as a copy that the caller is free to merge into.
+  ///
+  /// Implementations may derive extra stats here instead of only copying the ones they accumulated while running,
+  /// but this method is called several times per opchain and every call must return the same values: deriving a
+  /// stat whose merge function is not idempotent (a sum, for instance) must be done on the returned copy, never on
+  /// the stat map the operator keeps.
+  public abstract StatMap<?> copyStatMaps();
+
+  /// Drops the per-query row and hash state this operator is holding — whatever it accumulated while running, plus
+  /// any input it is still pointing at — so that it becomes collectable even while the operator itself stays
+  /// reachable.
+  ///
+  /// Both [#close()] and [#cancel(Throwable)] call this, so the state is released on *every* termination path: end
+  /// of stream, error and cancellation alike. Operators that can release earlier (when they produce their
+  /// end-of-stream block, say) should keep doing that as well — this is the backstop, not the prompt path.
+  ///
+  /// **Threading.** Like the rest of teardown, this runs on the thread that executes the op chain (see [OpChain]) —
+  /// either the worker thread itself, via the scheduler's direct-executor callback, or a thread holding a chain that
+  /// never started. It is therefore safe to touch operator state without synchronization, and callers must not
+  /// invoke [#close()] or [#cancel(Throwable)] from anywhere else: nulling a field that a concurrently running
+  /// `getNextBlock()` is dereferencing would be a use-after-free, not a missed release.
+  ///
+  /// Rules for implementations:
+  ///
+  ///  1. **Be idempotent.** This can run more than once, and it runs after [#cancel(Throwable)] on the error path.
+  ///  2. **Leave the stats alone.** [#calculateStats()] and [#copyStatMaps()] are called after termination.
+  ///  3. **Never mutate something whose identity left the operator.** A block sitting in a local mailbox still
+  ///     points at the list it was built from, and emptying that list silently drops rows rather than failing.
+  ///     Drop or replace the reference; do not `clear()` in place. The same goes for state an external consumer
+  ///     reads after termination — see [org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator], whose
+  ///     buffer is its output and which therefore releases nothing.
+  ///  4. **Prefer replacing to clearing.** `clear()` drops the elements but keeps the backing table at whatever
+  ///     capacity it grew to — `HashMap`, `ObjectOpenHashSet`, `ArrayList` and `PriorityQueue` all behave this way,
+  ///     which for a large buffer leaves tens of megabytes of empty slots reachable. Assign a fresh, empty instance
+  ///     (or `null`) instead.
+  ///  5. **Do not let a released field double as control flow.** After release the operator is done, so a field that
+  ///     also serves as a mode discriminator or a "have I read the input yet" marker must not be the one being
+  ///     dropped. Keep the discriminator in a separate final field.
+  ///
+  /// An operator that overrides [#close()] or [#cancel(Throwable)] must chain to `super`, or its state is never
+  /// released — that is not a compile error, so it is on the implementer.
+  protected void releaseBuffers() {
+  }
+
+  /// Whether this operator is currently holding any of the state that [#releaseBuffers()] drops.
+  ///
+  /// The two are a pair: an operator that overrides one must override the other, and
+  /// `releaseBuffers(); assert !hasBufferedState();` must hold. It exists so the release invariant can be asserted
+  /// without reflecting into private fields; nothing in production reads it.
+  @VisibleForTesting
+  protected boolean hasBufferedState() {
+    return false;
+  }
 
   // TODO: Ideally close() call should finish within request deadline.
   // TODO: Consider passing deadline as part of the API.
@@ -153,6 +297,7 @@ public abstract class MultiStageOperator
         // Continue processing because even one operator failed to be close, we should still close the rest.
       }
     }
+    releaseBuffersSafely();
   }
 
   public void cancel(Throwable e) {
@@ -164,22 +309,18 @@ public abstract class MultiStageOperator
         // Continue processing because even one operator failed to be cancelled, we should still cancel the rest.
       }
     }
+    releaseBuffersSafely();
   }
 
-  /**
-   * Receives the EOS block from upstream operator and updates the stats.
-   * <p>
-   * The fact that the EOS belongs to the upstream operator is not an actual requirement. Actual requirements are listed
-   * in {@link #addStats(MultiStageQueryStats, StatMap)}
-   * @param upstreamEos
-   * @return
-   */
-  protected TransferableBlock updateEosBlock(TransferableBlock upstreamEos, StatMap<?> statMap) {
-    assert upstreamEos.isSuccessfulEndOfStreamBlock();
-    MultiStageQueryStats queryStats = upstreamEos.getQueryStats();
-    assert queryStats != null;
-    addStats(queryStats, statMap);
-    return upstreamEos;
+  private void releaseBuffersSafely() {
+    try {
+      releaseBuffers();
+    } catch (Throwable t) {
+      // Releasing buffers is best-effort cleanup; never let it break the rest of the teardown. Throwable rather than
+      // Exception so that an AssertionError from an implementation (tests run with -ea) cannot abort a parent's
+      // close loop and leave its siblings unclosed.
+      logger().error("Failed to release the buffers of operator: {}", this, t);
+    }
   }
 
   @Override
@@ -199,38 +340,44 @@ public abstract class MultiStageOperator
   }
 
   protected Map<String, Plan.ExplainNode.AttributeValue> getExplainAttributes() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 
-  /**
-   * This enum is used to identify the operation type.
-   * <p>
-   * This is mostly used in the context of stats collection, where we use this enum in the serialization form in order
-   * to identify the type of the stats in an efficient way.
-   * DO NOT change the order of the enum values, as the ordinal is used in serialization.
-   */
-  public enum Type {
-    AGGREGATE(AggregateOperator.StatKey.class) {
+  private long getGcTimeMillis() {
+    if (!QueryOptionsUtils.isCollectGcStats(_context.getOpChainMetadata())) {
+      return -1;
+    }
+    return ThreadResourceUsageProvider.getGcTime();
+  }
+
+  /// This enum is used to identify the operation type.
+  ///
+  /// This is mostly used in the context of stats collection, where we use this enum in the serialization form in order
+  /// to identify the type of the stats in an efficient way.
+  ///
+  /// IMPORTANT: Each enum entry has an explicit `id` used for serialization. When adding new operator types,
+  /// always append them at the end and assign the next available ID. Never reuse or change existing IDs as this
+  /// would break backward compatibility with older versions.
+  public enum Type implements OperatorTypeDescriptor {
+    AGGREGATE(0, AggregateOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<AggregateOperator.StatKey> stats = (StatMap<AggregateOperator.StatKey>) map;
+        response.mergeGroupsTrimmed(stats.getBoolean(AggregateOperator.StatKey.GROUPS_TRIMMED));
         response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED));
+        response.mergeNumGroupsWarningLimitReached(
+            stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED));
+        response.mergeNumGroups(stats.getLong(AggregateOperator.StatKey.NUM_GROUPS));
         response.mergeMaxRowsInOperator(stats.getLong(AggregateOperator.StatKey.EMITTED_ROWS));
       }
 
-      @Override
-      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
-        super.updateServerMetrics(map, serverMetrics);
-        @SuppressWarnings("unchecked")
-        StatMap<AggregateOperator.StatKey> stats = (StatMap<AggregateOperator.StatKey>) map;
-        boolean limitReached = stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED);
-        if (limitReached) {
-          serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED, 1);
-        }
-      }
+      /// So far this keys do not need to be modified from here because they are incremented in a per-worker basis:
+      /// ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED
+      /// ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED
+      /// public void updateMseMetrics(StatMap<?> map, MseMetrics mseMetrics);
     },
-    FILTER(FilterOperator.StatKey.class) {
+    FILTER(1, FilterOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -238,29 +385,30 @@ public abstract class MultiStageOperator
         response.mergeMaxRowsInOperator(stats.getLong(FilterOperator.StatKey.EMITTED_ROWS));
       }
     },
-    HASH_JOIN(HashJoinOperator.StatKey.class) {
+    HASH_JOIN(2, HashJoinOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<HashJoinOperator.StatKey> stats = (StatMap<HashJoinOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(HashJoinOperator.StatKey.EMITTED_ROWS));
         response.mergeMaxRowsInJoinReached(stats.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED));
+        response.mergeMaxRowsInJoin(stats.getLong(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN));
       }
 
       @Override
-      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
-        super.updateServerMetrics(map, serverMetrics);
+      public void updateMseMetrics(StatMap<?> map, MseMetrics mseMetrics) {
+        super.updateMseMetrics(map, mseMetrics);
         @SuppressWarnings("unchecked")
         StatMap<HashJoinOperator.StatKey> stats = (StatMap<HashJoinOperator.StatKey>) map;
         boolean maxRowsInJoinReached = stats.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED);
         if (maxRowsInJoinReached) {
-          serverMetrics.addMeteredGlobalValue(ServerMeter.HASH_JOIN_TIMES_MAX_ROWS_REACHED, 1);
+          mseMetrics.addMeteredGlobalValue(MseMeter.HASH_JOIN_TIMES_MAX_ROWS_REACHED, 1);
         }
-        serverMetrics.addTimedValue(ServerTimer.HASH_JOIN_BUILD_TABLE_CPU_TIME_MS,
+        mseMetrics.addTimedValue(MseTimer.HASH_JOIN_BUILD_TABLE_CPU_TIME_MS,
             stats.getLong(HashJoinOperator.StatKey.TIME_BUILDING_HASH_TABLE_MS), TimeUnit.MILLISECONDS);
       }
     },
-    INTERSECT(SetOperator.StatKey.class) {
+    INTERSECT(3, SetOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -268,28 +416,27 @@ public abstract class MultiStageOperator
         response.mergeMaxRowsInOperator(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
       }
     },
-    LEAF(LeafStageTransferableBlockOperator.StatKey.class) {
+    LEAF(4, LeafOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
-        StatMap<LeafStageTransferableBlockOperator.StatKey> stats =
-            (StatMap<LeafStageTransferableBlockOperator.StatKey>) map;
-        response.mergeMaxRowsInOperator(stats.getLong(LeafStageTransferableBlockOperator.StatKey.EMITTED_ROWS));
+        StatMap<LeafOperator.StatKey> stats = (StatMap<LeafOperator.StatKey>) map;
+        response.mergeMaxRowsInOperator(stats.getLong(LeafOperator.StatKey.EMITTED_ROWS));
 
         StatMap<BrokerResponseNativeV2.StatKey> brokerStats = new StatMap<>(BrokerResponseNativeV2.StatKey.class);
-        for (LeafStageTransferableBlockOperator.StatKey statKey : stats.keySet()) {
+        for (LeafOperator.StatKey statKey : stats.keySet()) {
           statKey.updateBrokerMetadata(brokerStats, stats);
         }
         response.addBrokerStats(brokerStats);
       }
     },
-    LITERAL(LiteralValueOperator.StatKey.class) {
+    LITERAL(5, LiteralValueOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         // Do nothing
       }
     },
-    MAILBOX_RECEIVE(BaseMailboxReceiveOperator.StatKey.class) {
+    MAILBOX_RECEIVE(6, BaseMailboxReceiveOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -298,27 +445,27 @@ public abstract class MultiStageOperator
       }
 
       @Override
-      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
-        super.updateServerMetrics(map, serverMetrics);
+      public void updateMseMetrics(StatMap<?> map, MseMetrics mseMetrics) {
+        super.updateMseMetrics(map, mseMetrics);
         @SuppressWarnings("unchecked")
         StatMap<BaseMailboxReceiveOperator.StatKey> stats = (StatMap<BaseMailboxReceiveOperator.StatKey>) map;
 
-        serverMetrics.addMeteredGlobalValue(ServerMeter.MULTI_STAGE_IN_MEMORY_MESSAGES,
+        mseMetrics.addMeteredGlobalValue(MseMeter.IN_MEMORY_MESSAGES,
             stats.getInt(BaseMailboxReceiveOperator.StatKey.IN_MEMORY_MESSAGES));
-        serverMetrics.addMeteredGlobalValue(ServerMeter.MULTI_STAGE_RAW_MESSAGES,
+        mseMetrics.addMeteredGlobalValue(MseMeter.RAW_MESSAGES,
             stats.getInt(BaseMailboxReceiveOperator.StatKey.RAW_MESSAGES));
-        serverMetrics.addMeteredGlobalValue(ServerMeter.MULTI_STAGE_RAW_BYTES,
+        mseMetrics.addMeteredGlobalValue(MseMeter.RAW_BYTES,
             stats.getLong(BaseMailboxReceiveOperator.StatKey.DESERIALIZED_BYTES));
 
-        serverMetrics.addTimedValue(ServerTimer.MULTI_STAGE_DESERIALIZATION_CPU_TIME_MS,
+        mseMetrics.addTimedValue(MseTimer.DESERIALIZATION_CPU_TIME_MS,
             stats.getLong(BaseMailboxReceiveOperator.StatKey.DESERIALIZATION_TIME_MS), TimeUnit.MILLISECONDS);
-        serverMetrics.addTimedValue(ServerTimer.RECEIVE_DOWNSTREAM_WAIT_CPU_TIME_MS,
+        mseMetrics.addTimedValue(MseTimer.RECEIVE_DOWNSTREAM_WAIT_CPU_TIME_MS,
             stats.getLong(BaseMailboxReceiveOperator.StatKey.DOWNSTREAM_WAIT_MS), TimeUnit.MILLISECONDS);
-        serverMetrics.addTimedValue(ServerTimer.RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS,
+        mseMetrics.addTimedValue(MseTimer.RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS,
             stats.getLong(BaseMailboxReceiveOperator.StatKey.UPSTREAM_WAIT_MS), TimeUnit.MILLISECONDS);
       }
     },
-    MAILBOX_SEND(MailboxSendOperator.StatKey.class) {
+    MAILBOX_SEND(7, MailboxSendOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -327,14 +474,14 @@ public abstract class MultiStageOperator
       }
 
       @Override
-      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
+      public void updateMseMetrics(StatMap<?> map, MseMetrics mseMetrics) {
         @SuppressWarnings("unchecked")
         StatMap<MailboxSendOperator.StatKey> stats = (StatMap<MailboxSendOperator.StatKey>) map;
-        serverMetrics.addTimedValue(ServerTimer.MULTI_STAGE_SERIALIZATION_CPU_TIME_MS,
+        mseMetrics.addTimedValue(MseTimer.SERIALIZATION_CPU_TIME_MS,
             stats.getLong(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS), TimeUnit.MILLISECONDS);
       }
     },
-    MINUS(SetOperator.StatKey.class) {
+    MINUS(8, SetOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -342,7 +489,7 @@ public abstract class MultiStageOperator
         response.mergeMaxRowsInOperator(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
       }
     },
-    PIPELINE_BREAKER(PipelineBreakerOperator.StatKey.class) {
+    PIPELINE_BREAKER(9, PipelineBreakerOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -350,7 +497,7 @@ public abstract class MultiStageOperator
         response.mergeMaxRowsInOperator(stats.getLong(PipelineBreakerOperator.StatKey.EMITTED_ROWS));
       }
     },
-    SORT_OR_LIMIT(SortOperator.StatKey.class) {
+    SORT_OR_LIMIT(10, SortOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -358,7 +505,7 @@ public abstract class MultiStageOperator
         response.mergeMaxRowsInOperator(stats.getLong(SortOperator.StatKey.EMITTED_ROWS));
       }
     },
-    TRANSFORM(TransformOperator.StatKey.class) {
+    TRANSFORM(11, TransformOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -366,7 +513,7 @@ public abstract class MultiStageOperator
         response.mergeMaxRowsInOperator(stats.getLong(TransformOperator.StatKey.EMITTED_ROWS));
       }
     },
-    UNION(SetOperator.StatKey.class) {
+    UNION(12, SetOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -374,7 +521,7 @@ public abstract class MultiStageOperator
         response.mergeMaxRowsInOperator(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
       }
     },
-    WINDOW(WindowAggregateOperator.StatKey.class) {
+    WINDOW(13, WindowAggregateOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
@@ -382,51 +529,102 @@ public abstract class MultiStageOperator
         response.mergeMaxRowsInOperator(stats.getLong(WindowAggregateOperator.StatKey.EMITTED_ROWS));
         response.mergeMaxRowsInWindowReached(
             stats.getBoolean(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW_REACHED));
+        response.mergeMaxRowsInWindow(stats.getLong(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW));
       }
 
       @Override
-      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
+      public void updateMseMetrics(StatMap<?> map, MseMetrics mseMetrics) {
         @SuppressWarnings("unchecked")
         StatMap<WindowAggregateOperator.StatKey> stats = (StatMap<WindowAggregateOperator.StatKey>) map;
         if (stats.getBoolean(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW_REACHED)) {
-          serverMetrics.addMeteredGlobalValue(ServerMeter.WINDOW_TIMES_MAX_ROWS_REACHED, 1);
+          mseMetrics.addMeteredGlobalValue(MseMeter.WINDOW_TIMES_MAX_ROWS_REACHED, 1);
         }
       }
     },
-    LOOKUP_JOIN(LookupJoinOperator.StatKey.class) {
+    LOOKUP_JOIN(14, LookupJoinOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<LookupJoinOperator.StatKey> stats = (StatMap<LookupJoinOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(LookupJoinOperator.StatKey.EMITTED_ROWS));
       }
+    },
+    UNNEST(15, UnnestOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<UnnestOperator.StatKey> stats = (StatMap<UnnestOperator.StatKey>) map;
+        response.mergeMaxRowsInOperator(stats.getLong(UnnestOperator.StatKey.EMITTED_ROWS));
+      }
+    },
+    REPEAT(16, RepeatOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<RepeatOperator.StatKey> stats = (StatMap<RepeatOperator.StatKey>) map;
+        response.mergeMaxRowsInOperator(stats.getLong(RepeatOperator.StatKey.EMITTED_ROWS));
+      }
     };
 
+    // When adding new operator types, update MAX_ID if the new ID exceeds the current max
+    private static final int MAX_ID = 16;
+    private static final Type[] ID_TO_TYPE = new Type[MAX_ID + 1];
+
+    static {
+      for (Type type : values()) {
+        int id = type._id;
+        if (id < 0 || id > Byte.MAX_VALUE) {
+          throw new IllegalStateException("Operator type id must fit in a signed byte (0-127), but " + type
+              + " has id " + id);
+        }
+        Preconditions.checkArgument(id <= MAX_ID,
+            "Operator type id %s exceeds MAX_ID %s. Please update MAX_ID.", id, MAX_ID);
+        Preconditions.checkArgument(ID_TO_TYPE[id] == null,
+            "Duplicate id %s for types %s and %s", id, ID_TO_TYPE[id], type);
+        ID_TO_TYPE[id] = type;
+      }
+    }
+
+    private final int _id;
     private final Class _statKeyClass;
 
-    Type(Class<? extends StatMap.Key> statKeyClass) {
+    Type(int id, Class<? extends StatMap.Key> statKeyClass) {
+      _id = id;
       _statKeyClass = statKeyClass;
     }
 
-    /**
-     * Gets the class of the stat key for this operator type.
-     * <p>
-     * Notice that this is not including the generic type parameter, because Java generic types are not expressive
-     * enough indicate what we want to say, so generics here are more problematic than useful.
-     */
+    /// Returns the stable ID used for serialization.
+    ///
+    /// This ID is guaranteed to remain constant across versions, unlike [#ordinal()] which can change
+    /// if enum entries are reordered.
+    public int getId() {
+      return _id;
+    }
+
+    /// Returns the Type for the given serialization ID, or null if no such type exists.
+    @Nullable
+    public static Type fromId(int id) {
+      if (id >= 0 && id < ID_TO_TYPE.length) {
+        return ID_TO_TYPE[id];
+      }
+      return null;
+    }
+
+    /// Gets the class of the stat key for this operator type.
+    ///
+    /// Notice that this is not including the generic type parameter, because Java generic types are not expressive
+    /// enough indicate what we want to say, so generics here are more problematic than useful.
     public Class getStatKeyClass() {
       return _statKeyClass;
     }
 
-    /**
-     * Merges the stats from the given map into the given broker response.
-     * <p>
-     * Each literal has its own implementation of this method, which assumes the given map is of the correct type
-     * (compatible with {@link #getStatKeyClass()}). This is a way to avoid casting in the caller.
-     */
+    /// Merges the stats from the given map into the given broker response.
+    ///
+    /// Each literal has its own implementation of this method, which assumes the given map is of the correct type
+    /// (compatible with [#getStatKeyClass()]). This is a way to avoid casting in the caller.
     public abstract void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map);
 
-    public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
+    public void updateMseMetrics(StatMap<?> map, MseMetrics mseMetrics) {
       // Do nothing by default
     }
   }

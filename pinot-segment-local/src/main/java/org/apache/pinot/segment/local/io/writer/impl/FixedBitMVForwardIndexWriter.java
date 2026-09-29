@@ -29,27 +29,25 @@ import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
-/**
- * Bit-compressed dictionary-encoded forward index writer for multi-value columns. The values written are dictionary
- * ids.
- *
- * Storage Layout
- * ==============
- * There will be three sections HEADER section, BITMAP and RAW DATA
- * CHUNK OFFSET HEADER will contain one line per chunk, each line corresponding to the start offset
- * and length of the chunk
- * BITMAP This will contain sequence of bits. The number of bits will be equal to the
- * totalNumberOfValues.A bit is set to 1 if its start of a new docId. The number of bits set to 1
- * will be equal to the number of docs.
- * RAWDATA This simply has the actual multivalued data stored in sequence of int's. The number of
- * ints is equal to the totalNumberOfValues
- * We divide all the documents into groups referred to as CHUNK. Each CHUNK will
- * - Have the same number of documents.
- * - Started Offset of each CHUNK in the BITMAP will stored in the HEADER section. This is to speed
- * the look up.
- * Over all each look up will take log(NUM CHUNKS) for binary search + CHUNK to linear scan on the
- * bitmap to find the right offset in the raw data section
- */
+/// Bit-compressed dictionary-encoded forward index writer for multi-value columns. The values written are dictionary
+/// ids.
+///
+/// Storage Layout
+/// \==============
+/// There will be three sections HEADER section, BITMAP and RAW DATA
+/// CHUNK OFFSET HEADER will contain one line per chunk, each line corresponding to the start offset
+/// and length of the chunk
+/// BITMAP This will contain sequence of bits. The number of bits will be equal to the
+/// totalNumberOfValues.A bit is set to 1 if its start of a new docId. The number of bits set to 1
+/// will be equal to the number of docs.
+/// RAWDATA This simply has the actual multivalued data stored in sequence of int's. The number of
+/// ints is equal to the totalNumberOfValues
+/// We divide all the documents into groups referred to as CHUNK. Each CHUNK will
+/// - Have the same number of documents.
+/// - Started Offset of each CHUNK in the BITMAP will stored in the HEADER section. This is to speed
+/// the look up.
+/// Over all each look up will take log(NUM CHUNKS) for binary search + CHUNK to linear scan on the
+/// bitmap to find the right offset in the raw data section
 public class FixedBitMVForwardIndexWriter implements Closeable {
   private static final int SIZE_OF_INT = 4;
   private static final int NUM_COLS_IN_HEADER = 1;

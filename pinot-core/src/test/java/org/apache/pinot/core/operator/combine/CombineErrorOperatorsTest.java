@@ -19,23 +19,26 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -49,9 +52,12 @@ public class CombineErrorOperatorsTest {
   private static final int NUM_THREADS = 2;
   private static final QueryContext QUERY_CONTEXT =
       QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
+  private static final QueryContext GROUP_BY_QUERY_CONTEXT =
+      QueryContextConverterUtils.getQueryContext("SELECT myColumn, COUNT(*) FROM testTable GROUP BY 1 ORDER BY 1");
 
   static {
     QUERY_CONTEXT.setEndTimeMs(Long.MAX_VALUE);
+    GROUP_BY_QUERY_CONTEXT.setEndTimeMs(Long.MAX_VALUE);
   }
 
   private ExecutorService _executorService;
@@ -61,23 +67,47 @@ public class CombineErrorOperatorsTest {
     _executorService = Executors.newFixedThreadPool(NUM_THREADS);
   }
 
-  @Test
-  public void testCombineExceptionOperator() {
+  @DataProvider(name = "getErrorCodes")
+  public static Object[][] getErrorCodes() {
+    return Arrays.stream(QueryErrorCode.values())
+        .map(queryErrorCode -> new Object[]{queryErrorCode})
+        .toArray(Object[][]::new);
+  }
+
+  @Test(dataProvider = "getErrorCodes")
+  public void testCombineExceptionOperator(QueryErrorCode queryErrorCode) {
     List<Operator> operators = new ArrayList<>(NUM_OPERATORS);
     for (int i = 0; i < NUM_OPERATORS - 1; i++) {
       operators.add(new RegularOperator());
     }
-    operators.add(new ExceptionOperator());
+    operators.add(new ExceptionOperator(queryErrorCode.asException("Test exception message")));
     SelectionOnlyCombineOperator combineOperator =
         new SelectionOnlyCombineOperator(operators, QUERY_CONTEXT, _executorService);
     BaseResultsBlock resultsBlock = combineOperator.nextBlock();
     assertTrue(resultsBlock instanceof ExceptionResultsBlock);
-    List<ProcessingException> processingExceptions = resultsBlock.getProcessingExceptions();
-    assertNotNull(processingExceptions);
-    assertEquals(processingExceptions.size(), 1);
-    ProcessingException processingException = processingExceptions.get(0);
-    assertEquals(processingException.getErrorCode(), QueryException.QUERY_EXECUTION_ERROR_CODE);
-    assertTrue(processingException.getMessage().contains("java.lang.RuntimeException: Exception"));
+    List<QueryErrorMessage> errorMsgs = resultsBlock.getErrorMessages();
+    assertNotNull(errorMsgs);
+    assertEquals(errorMsgs.size(), 1);
+    QueryErrorMessage errorMsg = errorMsgs.get(0);
+    assertEquals(errorMsg.getErrCode(), queryErrorCode);
+  }
+
+  @Test(dataProvider = "getErrorCodes")
+  public void testSequentialSortedGroupByCombineExceptionOperator(QueryErrorCode queryErrorCode) {
+    List<Operator> operators = new ArrayList<>(NUM_OPERATORS);
+    for (int i = 0; i < NUM_OPERATORS - 1; i++) {
+      operators.add(new RegularGroupByOperator());
+    }
+    operators.add(new ExceptionOperator(queryErrorCode.asException("Test exception message")));
+    SequentialSortedGroupByCombineOperator combineOperator =
+        new SequentialSortedGroupByCombineOperator(operators, GROUP_BY_QUERY_CONTEXT, _executorService);
+    BaseResultsBlock resultsBlock = combineOperator.nextBlock();
+    assertTrue(resultsBlock instanceof ExceptionResultsBlock);
+    List<QueryErrorMessage> errorMsgs = resultsBlock.getErrorMessages();
+    assertNotNull(errorMsgs);
+    assertEquals(errorMsgs.size(), 1);
+    QueryErrorMessage errorMsg = errorMsgs.get(0);
+    assertEquals(errorMsg.getErrCode(), queryErrorCode);
   }
 
   @Test
@@ -91,46 +121,62 @@ public class CombineErrorOperatorsTest {
         new SelectionOnlyCombineOperator(operators, QUERY_CONTEXT, _executorService);
     BaseResultsBlock resultsBlock = combineOperator.nextBlock();
     assertTrue(resultsBlock instanceof ExceptionResultsBlock);
-    List<ProcessingException> processingExceptions = resultsBlock.getProcessingExceptions();
-    assertNotNull(processingExceptions);
-    assertEquals(processingExceptions.size(), 1);
-    ProcessingException processingException = processingExceptions.get(0);
-    assertEquals(processingException.getErrorCode(), QueryException.QUERY_EXECUTION_ERROR_CODE);
-    assertTrue(processingException.getMessage().contains("java.lang.Error: Error"));
+    List<QueryErrorMessage> errorMsgs = resultsBlock.getErrorMessages();
+    assertNotNull(errorMsgs);
+    assertEquals(errorMsgs.size(), 1);
+    QueryErrorMessage errorMsg = errorMsgs.get(0);
+    assertEquals(errorMsg.getErrCode(), QueryErrorCode.QUERY_EXECUTION);
   }
 
   @Test
-  public void testCombineExceptionAndErrorOperator() {
+  public void testCombineExecutionStatisticsException() {
+    SelectionOnlyCombineOperator combineOperator =
+        new SelectionOnlyCombineOperator(List.of(new ExecutionStatisticsExceptionOperator()), QUERY_CONTEXT,
+            _executorService);
+    BaseResultsBlock resultsBlock = combineOperator.nextBlock();
+    assertTrue(resultsBlock instanceof ExceptionResultsBlock);
+    List<QueryErrorMessage> errorMsgs = resultsBlock.getErrorMessages();
+    assertNotNull(errorMsgs);
+    assertEquals(errorMsgs.size(), 1);
+    assertEquals(errorMsgs.get(0).getErrCode(), QueryErrorCode.INTERNAL);
+  }
+
+  @Test(dataProvider = "getErrorCodes")
+  public void testCombineExceptionAndErrorOperator(QueryErrorCode queryErrorCode) {
     List<Operator> operators = new ArrayList<>(NUM_OPERATORS);
     for (int i = 0; i < NUM_OPERATORS - 2; i++) {
       operators.add(new RegularOperator());
     }
-    operators.add(new ExceptionOperator());
+    operators.add(new ExceptionOperator(queryErrorCode.asException("Test exception message")));
     operators.add(new ErrorOperator());
     SelectionOnlyCombineOperator combineOperator =
         new SelectionOnlyCombineOperator(operators, QUERY_CONTEXT, _executorService);
     BaseResultsBlock resultsBlock = combineOperator.nextBlock();
     assertTrue(resultsBlock instanceof ExceptionResultsBlock);
-    List<ProcessingException> processingExceptions = resultsBlock.getProcessingExceptions();
-    assertNotNull(processingExceptions);
-    assertEquals(processingExceptions.size(), 1);
-    ProcessingException processingException = processingExceptions.get(0);
-    assertEquals(processingException.getErrorCode(), QueryException.QUERY_EXECUTION_ERROR_CODE);
-    String message = processingException.getMessage();
-    assertTrue(message.contains("java.lang.RuntimeException: Exception") || message.contains("java.lang.Error: Error"));
+    List<QueryErrorMessage> errorMsgs = resultsBlock.getErrorMessages();
+    assertNotNull(errorMsgs);
+    assertEquals(errorMsgs.size(), 1);
+    QueryErrorMessage errorMsg = errorMsgs.get(0);
+    assertTrue(errorMsg.getErrCode() == QueryErrorCode.QUERY_EXECUTION || errorMsg.getErrCode() == queryErrorCode,
+        "Expected error code to be either QUERY_EXECUTION or " + queryErrorCode + ", got " + errorMsg.getErrCode());
   }
 
   private static class ExceptionOperator extends BaseOperator {
     private static final String EXPLAIN_NAME = "EXCEPTION";
+    private final RuntimeException _exception;
+
+    private ExceptionOperator(RuntimeException exception) {
+      _exception = exception;
+    }
 
     @Override
     protected Block getNextBlock() {
-      throw new RuntimeException("Exception");
+      throw _exception;
     }
 
     @Override
     public List<Operator> getChildOperators() {
-      return Collections.emptyList();
+      return List.of();
     }
 
     @Override
@@ -154,7 +200,7 @@ public class CombineErrorOperatorsTest {
 
     @Override
     public List<Operator> getChildOperators() {
-      return Collections.emptyList();
+      return List.of();
     }
 
     @Override
@@ -174,13 +220,46 @@ public class CombineErrorOperatorsTest {
     @Override
     protected Block getNextBlock() {
       return new SelectionResultsBlock(
-          new DataSchema(new String[]{"myColumn"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}),
-          new ArrayList<>(), QUERY_CONTEXT);
+          new DataSchema(new String[]{"myColumn"}, new ColumnDataType[]{ColumnDataType.STRING}), new ArrayList<>(),
+          QUERY_CONTEXT);
     }
 
     @Override
     public List<Operator> getChildOperators() {
-      return Collections.emptyList();
+      return List.of();
+    }
+
+    @Override
+    public String toExplainString() {
+      return EXPLAIN_NAME;
+    }
+
+    @Override
+    public ExecutionStatistics getExecutionStatistics() {
+      return new ExecutionStatistics(0, 0, 0, 0);
+    }
+  }
+
+  /// Operator that successfully produces a block but fails while reporting execution statistics.
+  private static class ExecutionStatisticsExceptionOperator extends RegularOperator {
+    @Override
+    public ExecutionStatistics getExecutionStatistics() {
+      throw new RuntimeException("Failed to retrieve execution statistics");
+    }
+  }
+
+  private static class RegularGroupByOperator extends BaseOperator {
+    private static final String EXPLAIN_NAME = "REGULAR_GROUP_BY";
+
+    @Override
+    protected Block getNextBlock() {
+      return new GroupByResultsBlock(new DataSchema(new String[]{"myColumn", "count(*)"},
+          new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.LONG}), new ArrayList<>(), GROUP_BY_QUERY_CONTEXT);
+    }
+
+    @Override
+    public List<Operator> getChildOperators() {
+      return List.of();
     }
 
     @Override

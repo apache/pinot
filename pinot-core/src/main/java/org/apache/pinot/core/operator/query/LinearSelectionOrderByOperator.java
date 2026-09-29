@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -49,20 +48,18 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * A selection Operator used when the first expressions in the order by are identifier expressions of columns that are
- * already sorted (either ascendingly or descendingly), even if the tail of order by expressions are not sorted.
- *
- * ie: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column DESC LIMIT 10 OFFSET 5
- * or: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column, not_sorted LIMIT 10 OFFSET 5
- * but not SELECT ... FROM Table WHERE predicates ORDER BY not_sorted, sorted_column LIMIT 10 OFFSET 5
- *
- * Operators that derives from this class are going to have an almost linear cost instead of the usual NlogN when actual
- * sorting must be done, where N is the number of rows in the segment.
- * There is a degraded scenario when the cost is actually NlogL (where L is the limit of the query) when all the first L
- * rows have the exact same value for the prefix of the sorted columns. Even in that case, L should be quite smaller
- * than N, so this implementation is algorithmically better than the normal solution.
- */
+/// A selection Operator used when the first expressions in the order by are identifier expressions of columns that are
+/// already sorted (either ascendingly or descendingly), even if the tail of order by expressions are not sorted.
+///
+/// ie: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column DESC LIMIT 10 OFFSET 5
+/// or: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column, not_sorted LIMIT 10 OFFSET 5
+/// but not SELECT ... FROM Table WHERE predicates ORDER BY not_sorted, sorted_column LIMIT 10 OFFSET 5
+///
+/// Operators that derives from this class are going to have an almost linear cost instead of the usual NlogN when
+/// actual sorting must be done, where N is the number of rows in the segment. There is a degraded scenario when the
+/// cost is actually NlogL (where L is the limit of the query) when all the first L rows have the exact same value for
+/// the prefix of the sorted columns. Even in that case, L should be quite smaller than N, so this implementation is
+/// algorithmically better than the normal solution.
 public abstract class LinearSelectionOrderByOperator extends BaseOperator<SelectionResultsBlock> {
   protected final IndexSegment _indexSegment;
   protected final QueryContext _queryContext;
@@ -79,10 +76,8 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   protected final Comparator<Object[]> _comparator;
   protected final Supplier<ListBuilder> _listBuilderSupplier;
 
-  /**
-   * @param expressions          Order-by expressions must be at the head of the list.
-   * @param numSortedExpressions Number of expressions in the order-by expressions that are sorted.
-   */
+  /// @param expressions          Order-by expressions must be at the head of the list.
+  /// @param numSortedExpressions Number of expressions in the order-by expressions that are sorted.
   public LinearSelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
     _indexSegment = indexSegment;
@@ -164,32 +159,27 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
 
   protected abstract int getNumDocsScanned();
 
-  /**
-   * Returns a list of rows sorted that:
-   * <ul>
-   *   <li>At least contains all the rows that fulfill the predicate</li>
-   *   <li>Rows are sorted in a way that is compatible with the given list builder supplier</li>
-   * </ul>
-   *
-   * That means that the result may contain more rows than required.
-   *
-   * @param listBuilderSupplier a {@link ListBuilder} supplier that should be used to create the result. Each time is
-   *                            called a new {@link ListBuilder} will be returned. All returned instances use the same
-   *                            comparator logic.
-   */
+  /// Returns a list of rows sorted that:
+  ///
+  /// - At least contains all the rows that fulfill the predicate
+  /// - Rows are sorted in a way that is compatible with the given list builder supplier
+  ///
+  /// That means that the result may contain more rows than required.
+  ///
+  /// @param listBuilderSupplier a [ListBuilder] supplier that should be used to create the result. Each time is
+  ///                            called a new [ListBuilder] will be returned. All returned instances use the same
+  ///                            comparator logic.
   protected abstract List<Object[]> fetch(Supplier<ListBuilder> listBuilderSupplier);
 
   @Override
   public List<BaseProjectOperator<?>> getChildOperators() {
-    return Collections.singletonList(_projectOperator);
+    return List.of(_projectOperator);
   }
 
-  /**
-   * Returns the UPPER_CASE explain name.
-   *
-   * This will be used by both tree-structure explain plan (by converting it to UpperCamel) and
-   * the single-stage explain string.
-   */
+  /// Returns the UPPER_CASE explain name.
+  ///
+  /// This will be used by both tree-structure explain plan (by converting it to UpperCamel) and
+  /// the single-stage explain string.
   protected abstract String getUpperCaseExplainName();
 
   // remember this is called by the tree-structure line of explain.
@@ -263,47 +253,40 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     return new DataSchema(columnNames, columnDataTypes);
   }
 
-  /**
-   * A private class used to build a partially sorted list by adding partially sorted data.
-   *
-   * Specifically, this class has been designed to receive successive calls to {@link #add(Object[])} follow by a single
-   * call to {@link #build()}.
-   *
-   * Rows must be inserted in ascending order accordingly to the partial order specified by a comparator.
-   * This comparator will define <i>partitions</i> of rows. All the rows in the same partition are considered equal
-   * by that comparator.
-   *
-   * When calling {@link #add(Object[])} with a row that doesn't belong to the current partition, the previous partition
-   * is <em>closed</em> and a new one is started.
-   */
+  /// A private class used to build a partially sorted list by adding partially sorted data.
+  ///
+  /// Specifically, this class has been designed to receive successive calls to [#add(Object[])] follow by a
+  /// single call to [#build()].
+  ///
+  /// Rows must be inserted in ascending order accordingly to the partial order specified by a comparator.
+  /// This comparator will define _partitions_ of rows. All the rows in the same partition are considered equal
+  /// by that comparator.
+  ///
+  /// When calling [#add(Object[])] with a row that doesn't belong to the current partition, the previous
+  /// partition is _closed_ and a new one is started.
   protected interface ListBuilder {
 
-    /**
-     * Adds the given row to this object. The new column must be equal or higher than previous inserted elements
-     * according to the partition comparator. No more rows should be added once enough rows have been collected.
-     *
-     * @param row The row to add. The values of the already sorted columns must be equal or higher than the last added
-     *           row, if any.
-     * @return true if and only if enough rows have been collected
-     */
+    /// Adds the given row to this object. The new column must be equal or higher than previous inserted elements
+    /// according to the partition comparator. No more rows should be added once enough rows have been collected.
+    ///
+    /// @param row The row to add. The values of the already sorted columns must be equal or higher than the last added
+    ///           row, if any.
+    /// @return true if and only if enough rows have been collected
     boolean add(Object[] row);
 
-    /**
-     * Builds the sorted list. The current partition will be <em>closed</em>. Once this method is called, the builder
-     * should not be used.
-     */
+    /// Builds the sorted list. The current partition will be _closed_. Once this method is called, the builder
+    /// should not be used.
     List<Object[]> build();
   }
 
-  /**
-   * This is the faster {@link ListBuilder} but also the most restrictive one. It can only be used when data is inserted
-   * in total order and therefore each element belong to its own partition.
-   *
-   * This builder cannot be used to implement order-by queries where there is at least one expression
-   * that is not sorted. In such case {@link PartiallySortedListBuilder} should be used.
-   *
-   * This implementation is just a wrapper over an ArrayList and therefore the average costs of its methods is constant.
-   */
+  /// This is the faster [ListBuilder] but also the most restrictive one. It can only be used when data is
+  /// inserted in total order and therefore each element belong to its own partition.
+  ///
+  /// This builder cannot be used to implement order-by queries where there is at least one expression
+  /// that is not sorted. In such case [PartiallySortedListBuilder] should be used.
+  ///
+  /// This implementation is just a wrapper over an ArrayList and therefore the average costs of its methods is
+  /// constant.
   @VisibleForTesting
   static class TotallySortedListBuilder implements ListBuilder {
     private final ArrayList<Object[]> _list;
@@ -326,48 +309,37 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     }
   }
 
-  /**
-   * This {@link ListBuilder} is size bound and requires two comparators: The first defines the partitions and the
-   * second defines an order inside each partition.
-   *
-   * This class does never store more than the requested number of elements. In case more elements are inserted:
-   * <ul>
-   *   <li>If the new element belongs to a higher partition, it is discarded.</li>
-   *   <li>If the new element belongs to the last included partition, the last partition is treated as a priority queue
-   *   sorted by the in-partition comparator. If the new element is lower than some of the already inserted elements,
-   *   the new replace the older.</li>
-   * </ul>
-   *
-   * This class can be used to implement order-by queries that include one or more not sorted expressions.
-   * In cases where all expressions are sorted, {@link TotallySortedListBuilder} should be used because its performance
-   * is better.
-   *
-   * As usual, elements are sorted by partition and there is no order guarantee inside each partition. The second
-   * comparator is only used to keep the lower elements in the last partition.
-   */
+  /// This [ListBuilder] is size bound and requires two comparators: The first defines the partitions and the
+  /// second defines an order inside each partition.
+  ///
+  /// This class does never store more than the requested number of elements. In case more elements are inserted:
+  ///
+  /// - If the new element belongs to a higher partition, it is discarded.
+  /// - If the new element belongs to the last included partition, the last partition is treated as a priority queue
+  ///   sorted by the in-partition comparator. If the new element is lower than some of the already inserted elements,
+  ///   the new replace the older.
+  ///
+  /// This class can be used to implement order-by queries that include one or more not sorted expressions.
+  /// In cases where all expressions are sorted, [TotallySortedListBuilder] should be used because its performance
+  /// is better.
+  ///
+  /// As usual, elements are sorted by partition and there is no order guarantee inside each partition. The second
+  /// comparator is only used to keep the lower elements in the last partition.
   @VisibleForTesting
   static class PartiallySortedListBuilder implements ListBuilder {
 
     private final int _maxNumRows;
 
-    /**
-     * The comparator that defines the partitions and the one that impose in which order add has to be called.
-     */
+    /// The comparator that defines the partitions and the one that impose in which order add has to be called.
     private final Comparator<Object[]> _partitionComparator;
 
-    /**
-     * The comparator that sorts different rows on each partition.
-     */
+    /// The comparator that sorts different rows on each partition.
     private final Comparator<Object[]> _unsortedComparator;
 
-    /**
-     * List of rows, where the first _numSortedRows are sorted.
-     */
+    /// List of rows, where the first \_numSortedRows are sorted.
     private final ArrayList<Object[]> _rows;
 
-    /**
-     * This attribute is used to store the last partition when the builder already contains {@link #_maxNumRows} rows.
-     */
+    /// This attribute is used to store the last partition when the builder already contains [#_maxNumRows] rows.
     private PriorityQueue<Object[]> _lastPartitionQueue;
 
     private Object[] _lastPartitionRow;

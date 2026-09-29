@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.spi.index.creator;
 
 import java.io.IOException;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 
@@ -27,24 +26,21 @@ import org.apache.pinot.segment.spi.index.IndexCreator;
 public interface FSTIndexCreator extends IndexCreator {
 
   @Override
-  default void add(@Nonnull Object value, int dictId)
+  default void add(Object value, int dictId)
       throws IOException {
     // FST indexes should do nothing when called for each row
   }
 
   @Override
-  default void add(@Nonnull Object[] values, @Nullable int[] dictIds)
+  default void add(Object[] values, @Nullable int[] dictIds)
       throws IOException {
     // FST indexes should do nothing when called for each row
   }
 
-  /**
-   * Adds the next document.
-   */
-  void add(String document);
+  /// Adds the next document.
+  void add(String document)
+      throws IOException;
 
-  /**
-   * Adds a set of documents to the index
-   */
+  /// Adds a set of documents to the index
   void add(String[] document, int length);
 }

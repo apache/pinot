@@ -48,25 +48,23 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/**
- * The <code>ForwardIndexHandlerReloadQueriesTest</code> class sets up the index segment for the
- * no forward index multi-value queries test with reload.
- * <p>There are totally 14 columns, 100000 records inside the original Avro file where 10 columns are selected to build
- * the index segment. Selected columns information are as following:
- * <ul>
- *   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex, IsMultiValue, HasDictionary, RangeIndex
- *   <li>column1, METRIC, INT, 51594, F, F, F, F, F</li>
- *   <li>column2, METRIC, INT, 42242, F, F, F, F, F</li>
- *   <li>column3, DIMENSION, STRING, 5, F, F, F, F, F</li>
- *   <li>column5, DIMENSION, STRING, 9, F, F, F, F, F</li>
- *   <li>column6, DIMENSION, INT, 18499, F, F, T, T, F</li>
- *   <li>column7, DIMENSION, INT, 359, F, F, T, F, F</li>
- *   <li>column8, DIMENSION, INT, 850, F, T, F, T, F</li>
- *   <li>column9, METRIC, INT, 146, F, T, F, T, T</li>
- *   <li>column10, METRIC, INT, 3960, F, F, F, F, T</li>
- *   <li>daysSinceEpoch, TIME, INT, 1, T, F, F, T, F</li>
- * </ul>
- */
+/// The `ForwardIndexHandlerReloadQueriesTest` class sets up the index segment for the
+/// no forward index multi-value queries test with reload.
+///
+/// There are totally 14 columns, 100000 records inside the original Avro file where 10 columns are selected to build
+/// the index segment. Selected columns information are as following:
+///
+///   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex, IsMultiValue, HasDictionary, RangeIndex
+/// - column1, METRIC, INT, 51594, F, F, F, F, F
+/// - column2, METRIC, INT, 42242, F, F, F, F, F
+/// - column3, DIMENSION, STRING, 5, F, F, F, F, F
+/// - column5, DIMENSION, STRING, 9, F, F, F, F, F
+/// - column6, DIMENSION, INT, 18499, F, F, T, T, F
+/// - column7, DIMENSION, INT, 359, F, F, T, F, F
+/// - column8, DIMENSION, INT, 850, F, T, F, T, F
+/// - column9, METRIC, INT, 146, F, T, F, T, T
+/// - column10, METRIC, INT, 3960, F, F, F, F, T
+/// - daysSinceEpoch, TIME, INT, 1, T, F, F, T, F
 public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory(), ForwardIndexHandlerReloadQueriesTest.class.getSimpleName());
@@ -107,12 +105,10 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
 
     List<String> noDictionaryColumns = List.of("column1", "column2", "column3", "column5", "column7", "column10");
     List<String> invertedIndexColumns = List.of("column8", "column9");
-    List<FieldConfig> fieldConfigs = new ArrayList<>(noDictionaryColumns.size());
-    for (String column : noDictionaryColumns) {
-      fieldConfigs.add(
-          new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), FieldConfig.CompressionCodec.SNAPPY, null));
-    }
-    TableConfig tableConfig = createTableConfig(noDictionaryColumns, invertedIndexColumns, List.of(), fieldConfigs);
+    List<String> rangeIndexColumns = List.of();
+    List<FieldConfig> fieldConfigs = buildFieldConfigsForRawColumns(noDictionaryColumns);
+    TableConfig tableConfig = createTableConfig(noDictionaryColumns, invertedIndexColumns, rangeIndexColumns,
+        fieldConfigs);
 
     URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
     assertNotNull(resource);
@@ -150,11 +146,53 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     _indexSegments = List.of(segment, segment);
   }
 
+  private List<FieldConfig> buildFieldConfigsForRawColumns(List<String> rawColumns) {
+    return buildFieldConfigsForRawColumns(rawColumns, Map.of());
+  }
+
+  private List<FieldConfig> buildFieldConfigsForRawColumns(List<String> rawColumns,
+      Map<String, FieldConfig.CompressionCodec> compressionOverrides) {
+    List<FieldConfig> fieldConfigs = new ArrayList<>(rawColumns.size());
+    for (String column : rawColumns) {
+      FieldConfig.CompressionCodec compressionCodec =
+          compressionOverrides.getOrDefault(column, FieldConfig.CompressionCodec.SNAPPY);
+      fieldConfigs.add(new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), compressionCodec, null));
+    }
+    return fieldConfigs;
+  }
+
+  private ImmutableSegment reloadSegment(TableConfig tableConfig)
+      throws Exception {
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
+    File indexDir = new File(INDEX_DIR, SEGMENT_NAME);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
+    _indexSegment.destroy();
+    _indexSegment = segment;
+    _indexSegments = List.of(segment, segment);
+    return segment;
+  }
+
   private TableConfig createTableConfig(List<String> noDictionaryColumns, List<String> invertedIndexColumns,
       List<String> rangeIndexColumns, List<FieldConfig> fieldConfigs) {
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName("daysSinceEpoch")
         .setNoDictionaryColumns(noDictionaryColumns).setInvertedIndexColumns(invertedIndexColumns)
         .setRangeIndexColumns(rangeIndexColumns).setFieldConfigList(fieldConfigs).build();
+  }
+
+  private String getMostFrequentColumn5Value()
+      throws Exception {
+    BrokerResponseNative response =
+        getBrokerResponse("SELECT column5, COUNT(*) FROM testTable GROUP BY column5 ORDER BY COUNT(*) DESC LIMIT 1");
+    assertTrue(response.getExceptions() == null || response.getExceptions().isEmpty());
+    ResultTable resultTable = response.getResultTable();
+    assertNotNull(resultTable);
+    List<Object[]> rows = resultTable.getRows();
+    assertFalse(rows.isEmpty());
+    return String.valueOf(rows.get(0)[0]);
+  }
+
+  private String escapeSingleQuotes(String value) {
+    return value.replace("'", "''");
   }
 
   @AfterMethod
@@ -218,6 +256,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
     assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 1384L);
+    // After reload column7 gets a dictionary + inverted index; the NOT IN filter resolves to 0 forward-index scans.
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 250896L);
     assertNotNull(brokerResponseNative.getExceptions());
 
@@ -530,6 +569,8 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     changePropertiesAndReloadSegment();
 
     // TEST1 - After reload. Test where column7 is in filter.
+    // After reload column7 gets a dictionary + inverted index; the equality filter uses the inverted index
+    // and contributes 0 entries scanned in the filter phase.
     brokerResponseNative = getBrokerResponse(query1);
     assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     resultTable = brokerResponseNative.getResultTable();
@@ -598,6 +639,8 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
 
     changePropertiesAndReloadSegment();
 
+    // After reload column9 and column10 gain range indexes; the range predicates are resolved via range index
+    // bitmap lookups (0 forward-index entries scanned in the filter phase).
     brokerResponseNative = getBrokerResponse(query);
     assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     resultTable1 = brokerResponseNative.getResultTable();
@@ -621,29 +664,63 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     validateBeforeAfterQueryResults(resultRows1, resultRows2);
   }
 
-  private void validateBeforeAfterQueryResults(List<Object[]> beforeResults, List<Object[]> afterResults) {
-    assertEquals(beforeResults.size(), afterResults.size());
-    for (int i = 0; i < beforeResults.size(); i++) {
-      Object[] resultRow1 = beforeResults.get(i);
-      Object[] resultRow2 = afterResults.get(i);
-      assertEquals(resultRow1.length, resultRow2.length);
-      for (int j = 0; j < resultRow1.length; j++) {
-        assertEquals(resultRow1[j], resultRow2[j]);
-      }
-    }
+  @Test
+  public void testRawForwardColumnIndexAddAndRemove()
+      throws Exception {
+    String filterValue = escapeSingleQuotes(getMostFrequentColumn5Value());
+    String filterQuery = String.format("SELECT COUNT(*) FROM %s WHERE column5 = '%s'", RAW_TABLE_NAME, filterValue);
+
+    BrokerResponseNative baselineResponse = getBrokerResponse(filterQuery);
+    assertTrue(baselineResponse.getExceptions() == null || baselineResponse.getExceptions().size() == 0);
+    ResultTable baselineResultTable = baselineResponse.getResultTable();
+    assertNotNull(baselineResultTable);
+    List<Object[]> baselineRows = baselineResultTable.getRows();
+    assertEquals(baselineRows.size(), 1);
+    long baselineCount = ((Number) baselineRows.get(0)[0]).longValue();
+    long baselineEntriesScanned = baselineResponse.getNumEntriesScannedInFilter();
+    assertTrue(baselineEntriesScanned > 0);
+
+    List<String> invertedIndexColumns = List.of("column8", "column9");
+    List<String> rangeIndexColumns = List.of();
+
+    // Enable dictionary on column5.
+    List<String> noDictionaryColumns = List.of("column1", "column2", "column3", "column7", "column10");
+    TableConfig tableConfig = createTableConfig(noDictionaryColumns, invertedIndexColumns, rangeIndexColumns,
+        buildFieldConfigsForRawColumns(noDictionaryColumns));
+    ImmutableSegment segment = reloadSegment(tableConfig);
+    assertTrue(segment.getSegmentMetadata().getColumnMetadataFor("column5").hasDictionary());
+    BrokerResponseNative dictResponse = getBrokerResponse(filterQuery);
+    assertTrue(dictResponse.getExceptions() == null || dictResponse.getExceptions().size() == 0);
+    ResultTable dictResultTable = dictResponse.getResultTable();
+    assertNotNull(dictResultTable);
+    List<Object[]> dictRows = dictResultTable.getRows();
+    assertEquals(dictRows.size(), 1);
+    assertEquals(((Number) dictRows.get(0)[0]).longValue(), baselineCount);
+
+    // Disable dictionary on column5 again.
+    noDictionaryColumns = List.of("column1", "column2", "column3", "column5", "column7", "column10");
+    tableConfig = createTableConfig(noDictionaryColumns, invertedIndexColumns, rangeIndexColumns,
+        buildFieldConfigsForRawColumns(noDictionaryColumns));
+    segment = reloadSegment(tableConfig);
+    assertFalse(segment.getSegmentMetadata().getColumnMetadataFor("column5").hasDictionary());
+    BrokerResponseNative rawResponse = getBrokerResponse(filterQuery);
+    assertTrue(rawResponse.getExceptions() == null || rawResponse.getExceptions().size() == 0);
+    ResultTable rawResultTable = rawResponse.getResultTable();
+    assertNotNull(rawResultTable);
+    List<Object[]> rawRows = rawResultTable.getRows();
+    assertEquals(rawRows.size(), 1);
+    assertEquals(((Number) rawRows.get(0)[0]).longValue(), baselineCount);
   }
 
-  /**
-   * As a part of segmentReload, the ForwardIndexHandler will perform the following operations:
-   *
-   * column1 -> change compression.
-   * column6 -> disable dictionary
-   * column9 -> disable dictionary
-   * column3 -> Enable dictionary.
-   * column2 -> Enable dictionary. Add inverted index.
-   * column7 -> Enable dictionary. Add inverted index.
-   * column10 -> Enable dictionary.
-   */
+  /// As a part of segmentReload, the ForwardIndexHandler will perform the following operations:
+  ///
+  /// column1 -> change compression (SNAPPY -> ZSTANDARD).
+  /// column6 -> disable dictionary.
+  /// column9 -> disable dictionary. Add range index.
+  /// column3 -> enable dictionary.
+  /// column2 -> enable dictionary. Add inverted index.
+  /// column7 -> enable dictionary. Add inverted index.
+  /// column10 -> enable dictionary. Add range index.
   private void changePropertiesAndReloadSegment()
       throws Exception {
     List<String> noDictionaryColumns = List.of("column1", "column5", "column6", "column9");
@@ -657,16 +734,9 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
       }
       fieldConfigs.add(new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), compressionCodec, null));
     }
-    TableConfig tableConfig =
-        createTableConfig(noDictionaryColumns, invertedIndexColumns, rangeIndexColumns, fieldConfigs);
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
-
-    // Reload the segments to pick up the new configs
-    File indexDir = new File(INDEX_DIR, SEGMENT_NAME);
-    ImmutableSegment segment = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
-    _indexSegment.destroy();
-    _indexSegment = segment;
-    _indexSegments = List.of(segment, segment);
+    TableConfig tableConfig = createTableConfig(noDictionaryColumns, invertedIndexColumns, rangeIndexColumns,
+        fieldConfigs);
+    ImmutableSegment segment = reloadSegment(tableConfig);
 
     Map<String, ColumnMetadata> columnMetadataMap = segment.getSegmentMetadata().getColumnMetadataMap();
     for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {

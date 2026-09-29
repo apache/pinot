@@ -27,17 +27,17 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
-import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
-import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -54,14 +54,12 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Base queries test for FUNNEL_COUNT queries.
- * Each strategy gets its own test.
- */
+/// Base queries test for FUNNEL_COUNT queries.
+/// Each strategy gets its own test.
 @SuppressWarnings("rawtypes")
 abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
   protected static final File INDEX_DIR =
-      new File(FileUtils.getTempDirectory(), "FunnelCountQueriesTest");
+      new File(FileUtils.getTempDirectory(), "FunnelCountQueriesTest-" + UUID.randomUUID());
   protected static final String RAW_TABLE_NAME = "testTable";
   protected static final String SEGMENT_NAME = "testSegment";
   protected static final Random RANDOM = new Random();
@@ -213,16 +211,16 @@ abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(),
         expectedFilteredNumDocs, getExpectedNumEntriesScannedInFilter(), 2 * expectedFilteredNumDocs, NUM_RECORDS);
 
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    assertNotNull(aggregationGroupByResult);
+    List<IntermediateRecord> resultRecords = resultsBlock.getIntermediateRecords();
+    assertNotNull(resultRecords);
     int numGroups = 0;
-    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+    Iterator<IntermediateRecord> groupKeyIterator = resultRecords.iterator();
     while (groupKeyIterator.hasNext()) {
       numGroups++;
-      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-      int key = ((Double) groupKey._keys[0]).intValue();
+      IntermediateRecord record = groupKeyIterator.next();
+      int key = ((Double) record._key.getValues()[0]).intValue();
       assertIntermediateResult(
-            aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId),
+            record._record.getValues()[1],
             expectedResult[key]);
     }
     assertEquals(numGroups, expectedNumGroups);
@@ -234,7 +232,7 @@ abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
         continue;
       }
       for (int step = 0; step < 2; step++) {
-          expectedResult[i][step] = expectedResult[i][step] * getExpectedInterSegmentMultiplier();
+        expectedResult[i][step] = expectedResult[i][step] * getExpectedInterSegmentMultiplier();
       }
       Object[] expectedRow = { Double.valueOf(i), expectedResult[i] };
       expectedRows.add(expectedRow);

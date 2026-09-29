@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.roaringbitmap.ImmutableBitmapDataProvider;
+import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -51,5 +52,72 @@ public class RoaringBitmapUtils {
       throw new RuntimeException("Caught exception while deserializing RoaringBitmap", e);
     }
     return bitmap;
+  }
+
+  /// Iterates over the ranges of unset bits and calls the consumer for each range. This is more performant to
+  /// alternatives like calling [RoaringBitmap#contains(int)] in a loop or cloning and flipping the bitmap before
+  /// iterating, especially for sparse bitmaps.
+  ///
+  /// Kept deliberately parallel to [#foldUnset]; see the note there before unifying them.
+  /// @param nullIndexIterator an int iterator that returns values in ascending order whose min value is 0.
+  public static void forEachUnset(int length, IntIterator nullIndexIterator, BatchConsumer consumer) {
+    int prev = 0;
+    while (nullIndexIterator.hasNext() && prev < length) {
+      int nextNull = Math.min(nullIndexIterator.next(), length);
+      if (nextNull > prev) {
+        consumer.consume(prev, nextNull);
+      }
+      prev = nextNull + 1;
+    }
+    if (prev < length) {
+      consumer.consume(prev, length);
+    }
+  }
+
+  /// Folds over the same ranges [#forEachUnset] walks, threading an accumulator through them.
+  ///
+  /// The walk is written out again rather than sharing one implementation with [#forEachUnset]. Expressing the void
+  /// form in terms of this one would need an adapter lambda capturing the consumer, allocated on every call, and
+  /// expressing this one in terms of the void form would need a mutable box for the accumulator. Both sit on the
+  /// aggregation path, so the two loops are kept side by side here and must be changed together.
+  ///
+  /// @param nullIndexIterator ascending iterator whose emitted indexes are the ones to skip
+  /// @param initialAcum the initial value of the accumulator
+  /// @param <A> the type of the accumulator
+  public static <A> A foldUnset(int length, IntIterator nullIndexIterator, A initialAcum, Reducer<A> reducer) {
+    A acum = initialAcum;
+    int prev = 0;
+    while (nullIndexIterator.hasNext() && prev < length) {
+      int nextNull = Math.min(nullIndexIterator.next(), length);
+      if (nextNull > prev) {
+        acum = reducer.apply(acum, prev, nextNull);
+      }
+      prev = nextNull + 1;
+    }
+    if (prev < length) {
+      acum = reducer.apply(acum, prev, length);
+    }
+    return acum;
+  }
+
+  /// A reducer that folds over consecutive index ranges. The accumulating counterpart of [BatchConsumer].
+  /// @param <A> the type of the accumulator
+  @FunctionalInterface
+  public interface Reducer<A> {
+    /// Applies the reducer to the range of indexes.
+    /// @param acum the current value of the accumulator
+    /// @param fromInclusive the start index (inclusive)
+    /// @param toExclusive the end index (exclusive)
+    /// @return the next value of the accumulator (maybe the same as the input)
+    A apply(A acum, int fromInclusive, int toExclusive);
+  }
+
+  /// A consumer that is being used to consume batch of indexes.
+  @FunctionalInterface
+  public interface BatchConsumer {
+    /// Consumes a batch of indexes.
+    /// @param fromInclusive the start index (inclusive)
+    /// @param toExclusive the end index (exclusive)
+    void consume(int fromInclusive, int toExclusive);
   }
 }

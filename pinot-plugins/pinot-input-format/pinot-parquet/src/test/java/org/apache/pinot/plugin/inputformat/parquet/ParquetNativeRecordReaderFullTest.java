@@ -27,6 +27,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
+// TODO: Support the commented files
 public class ParquetNativeRecordReaderFullTest {
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), "ParquetNativeRecordReaderFullTest");
 
@@ -96,7 +97,7 @@ public class ParquetNativeRecordReaderFullTest {
     testParquetFile("test-data2/delta_byte_array.parquet");
     testParquetFile("test-data2/delta_encoding_optional_column.parquet");
     testParquetFile("test-data2/delta_encoding_required_column.parquet");
-    //testParquetFile("test-data2/delta_length_byte_array.parquet");
+    testParquetFile("test-data2/delta_length_byte_array.parquet");
     testParquetFile("test-data2/dict-page-offset-zero.parquet");
     //testParquetFile("test-data2/encrypt_columns_and_footer.parquet.encrypted");
     //testParquetFile("test-data2/encrypt_columns_and_footer_aad.parquet.encrypted");
@@ -105,17 +106,17 @@ public class ParquetNativeRecordReaderFullTest {
     //testParquetFile("test-data2/encrypt_columns_plaintext_footer.parquet.encrypted");
     testParquetFile("test-data2/fixed_length_decimal.parquet");
     testParquetFile("test-data2/fixed_length_decimal_legacy.parquet");
-    //testParquetFile("test-data2/hadoop_lz4_compressed.parquet");
-    //testParquetFile("test-data2/hadoop_lz4_compressed_larger.parquet");
+    testParquetFile("test-data2/hadoop_lz4_compressed.parquet");
+    testParquetFile("test-data2/hadoop_lz4_compressed_larger.parquet");
     testParquetFile("test-data2/int32_decimal.parquet");
     testParquetFile("test-data2/int64_decimal.parquet");
     testParquetFile("test-data2/list_columns.parquet");
-    //testParquetFile("test-data2/lz4_raw_compressed.parquet");
-    //testParquetFile("test-data2/lz4_raw_compressed_larger.parquet");
+    testParquetFile("test-data2/lz4_raw_compressed.parquet");
+    testParquetFile("test-data2/lz4_raw_compressed_larger.parquet");
     //testParquetFile("test-data2/nation.dict-malformed.parquet");
     testParquetFile("test-data2/nested_lists.snappy.parquet");
     testParquetFile("test-data2/nested_maps.snappy.parquet");
-    //testParquetFile("test-data2/nested_structs.rust.parquet");
+    testParquetFile("test-data2/nested_structs.rust.parquet");
     //testParquetFile("test-data2/non_hadoop_lz4_compressed.parquet");
     testParquetFile("test-data2/nonnullable.impala.parquet");
     testParquetFile("test-data2/null_list.parquet");

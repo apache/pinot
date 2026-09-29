@@ -38,12 +38,13 @@ public class MailboxSendNode extends BasePlanNode {
   private final boolean _prePartitioned;
   private final List<RelFieldCollation> _collations;
   private final boolean _sort;
+  private final String _hashFunction;
 
   // NOTE: null List is converted to empty List because there is no way to differentiate them in proto during ser/de.
   private MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
       BitSet receiverStages, PinotRelExchangeType exchangeType,
       RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
-      @Nullable List<RelFieldCollation> collations, boolean sort) {
+      @Nullable List<RelFieldCollation> collations, boolean sort, String hashFunction) {
     super(stageId, dataSchema, null, inputs);
     _receiverStages = receiverStages;
     _exchangeType = exchangeType;
@@ -52,14 +53,23 @@ public class MailboxSendNode extends BasePlanNode {
     _prePartitioned = prePartitioned;
     _collations = collations != null ? collations : List.of();
     _sort = sort;
+    _hashFunction = hashFunction;
+  }
+
+  public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
+      @Nullable List<Integer> receiverStages, PinotRelExchangeType exchangeType,
+      RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
+      @Nullable List<RelFieldCollation> collations, boolean sort, String hashFunction) {
+    this(stageId, dataSchema, inputs, toBitSet(receiverStages), exchangeType,
+        distributionType, keys, prePartitioned, collations, sort, hashFunction);
   }
 
   public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
       int receiverStage, PinotRelExchangeType exchangeType,
       RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
-      @Nullable List<RelFieldCollation> collations, boolean sort) {
+      @Nullable List<RelFieldCollation> collations, boolean sort, String hashFunction) {
     this(stageId, dataSchema, inputs, toBitSet(receiverStage), exchangeType, distributionType, keys, prePartitioned,
-        collations, sort);
+        collations, sort, hashFunction);
   }
 
   private static BitSet toBitSet(int receiverStage) {
@@ -79,20 +89,11 @@ public class MailboxSendNode extends BasePlanNode {
     return bitSet;
   }
 
-  public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
-      PinotRelExchangeType exchangeType, RelDistribution.Type distributionType, @Nullable List<Integer> keys,
-      boolean prePartitioned, @Nullable List<RelFieldCollation> collations, boolean sort) {
-    this(stageId, dataSchema, inputs, new BitSet(), exchangeType, distributionType, keys, prePartitioned, collations,
-        sort);
-  }
-
   public boolean sharesReceiverStages(MailboxSendNode other) {
     return _receiverStages.intersects(other._receiverStages);
   }
 
-  /**
-   * Returns the receiver stage ids, sorted in ascending order.
-   */
+  /// Returns the receiver stage ids, sorted in ascending order.
   public Iterable<Integer> getReceiverStageIds() {
     return () -> new Iterator<>() {
       int _next = _receiverStages.nextSetBit(0);
@@ -109,6 +110,11 @@ public class MailboxSendNode extends BasePlanNode {
         return current;
       }
     };
+  }
+
+  /// returns true if this node sends to multiple receivers
+  public boolean isMultiSend() {
+    return _receiverStages.cardinality() > 1;
   }
 
   @Deprecated
@@ -152,6 +158,10 @@ public class MailboxSendNode extends BasePlanNode {
     return _sort;
   }
 
+  public String getHashFunction() {
+    return _hashFunction;
+  }
+
   @Override
   public String explain() {
     StringBuilder sb = new StringBuilder();
@@ -175,7 +185,7 @@ public class MailboxSendNode extends BasePlanNode {
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
     return new MailboxSendNode(_stageId, _dataSchema, inputs, _receiverStages, _exchangeType, _distributionType, _keys,
-        _prePartitioned, _collations, _sort);
+        _prePartitioned, _collations, _sort, _hashFunction);
   }
 
   @Override
@@ -192,13 +202,14 @@ public class MailboxSendNode extends BasePlanNode {
     MailboxSendNode that = (MailboxSendNode) o;
     return Objects.equals(_receiverStages, that._receiverStages) && _prePartitioned == that._prePartitioned
         && _sort == that._sort && _exchangeType == that._exchangeType && _distributionType == that._distributionType
-        && Objects.equals(_keys, that._keys) && Objects.equals(_collations, that._collations);
+        && Objects.equals(_keys, that._keys) && Objects.equals(_collations, that._collations)
+        && Objects.equals(_hashFunction, that._hashFunction);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _receiverStages, _exchangeType, _distributionType, _keys, _prePartitioned,
-        _collations, _sort);
+        _collations, _sort, _hashFunction);
   }
 
   @Override

@@ -40,7 +40,6 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.datatable.DataTableFactory;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
@@ -50,7 +49,10 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
@@ -64,6 +66,10 @@ import static org.testng.Assert.assertTrue;
 
 public class PrioritySchedulerTest {
   private static final ServerMetrics METRICS = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+
+  static {
+    ServerMetrics.register(METRICS);
+  }
 
   private static boolean _useBarrier = false;
   private static CyclicBarrier _startupBarrier;
@@ -117,7 +123,7 @@ public class PrioritySchedulerTest {
     for (ListenableFuture<byte[]> result : results) {
       DataTable table = DataTableFactory.getDataTable(result.get());
       hasServerShuttingDownError +=
-          table.getExceptions().containsKey(QueryException.SERVER_SCHEDULER_DOWN_ERROR.getErrorCode()) ? 1 : 0;
+          table.getExceptions().containsKey(QueryErrorCode.SERVER_SHUTTING_DOWN.getId()) ? 1 : 0;
     }
     assertTrue(hasServerShuttingDownError > 0);
   }
@@ -213,7 +219,7 @@ public class PrioritySchedulerTest {
     group.addLast(createQueryRequest("1", METRICS));
     results.add(scheduler.submit(createServerQueryRequest("1", METRICS)));
     DataTable dataTable = DataTableFactory.getDataTable(results.get(1).get());
-    assertTrue(dataTable.getExceptions().containsKey(QueryException.SERVER_OUT_OF_CAPACITY_ERROR.getErrorCode()));
+    assertTrue(dataTable.getExceptions().containsKey(QueryErrorCode.SERVER_OUT_OF_CAPACITY.getId()));
     scheduler.stop();
   }
 
@@ -224,8 +230,34 @@ public class PrioritySchedulerTest {
     ListenableFuture<byte[]> result = scheduler.submit(createServerQueryRequest("1", METRICS));
     // start is not called
     DataTable response = DataTableFactory.getDataTable(result.get());
-    assertTrue(response.getExceptions().containsKey(QueryException.SERVER_SCHEDULER_DOWN_ERROR.getErrorCode()));
+    assertTrue(response.getExceptions().containsKey(QueryErrorCode.SERVER_SHUTTING_DOWN.getId()));
     assertFalse(response.getMetadata().containsKey(MetadataKey.TABLE.getName()));
+    scheduler.stop();
+  }
+
+  @Test
+  public void testResizeUpdatesSemaphoreIncrease() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(ResourceManager.QUERY_RUNNER_CONFIG_KEY, 4);
+    properties.put(ResourceManager.QUERY_WORKER_CONFIG_KEY, 8);
+    TestPriorityScheduler scheduler = TestPriorityScheduler.create(new PinotConfiguration(properties));
+    assertEquals(scheduler.getRunningQueriesSemaphore().availablePermits(), 4);
+
+    scheduler.getResourceManager().resizeThreadPools(8, 16);
+    assertEquals(scheduler.getRunningQueriesSemaphore().availablePermits(), 8);
+    scheduler.stop();
+  }
+
+  @Test
+  public void testResizeUpdatesSemaphoreDecrease() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(ResourceManager.QUERY_RUNNER_CONFIG_KEY, 8);
+    properties.put(ResourceManager.QUERY_WORKER_CONFIG_KEY, 16);
+    TestPriorityScheduler scheduler = TestPriorityScheduler.create(new PinotConfiguration(properties));
+    assertEquals(scheduler.getRunningQueriesSemaphore().availablePermits(), 8);
+
+    scheduler.getResourceManager().resizeThreadPools(4, 8);
+    assertEquals(scheduler.getRunningQueriesSemaphore().availablePermits(), 4);
     scheduler.stop();
   }
 
@@ -234,27 +266,29 @@ public class PrioritySchedulerTest {
     static LongAccumulator _latestQueryTime;
 
     // store locally for easy access
-    public TestPriorityScheduler(PinotConfiguration config, ResourceManager resourceManager,
-        QueryExecutor queryExecutor, SchedulerPriorityQueue queue, ServerMetrics metrics,
-        LongAccumulator latestQueryTime) {
-      super(config, resourceManager, queryExecutor, queue, metrics, latestQueryTime);
+    public TestPriorityScheduler(PinotConfiguration config, QueryExecutor queryExecutor,
+        ThreadAccountant threadAccountant, LongAccumulator latestQueryTime, ResourceManager resourceManager,
+        SchedulerPriorityQueue queue) {
+      super(config, "serverId", queryExecutor, threadAccountant, latestQueryTime, resourceManager, queue);
     }
 
     public static TestPriorityScheduler create(PinotConfiguration config) {
       ResourceManager rm = new PolicyBasedResourceManager(config);
       QueryExecutor qe = new TestQueryExecutor();
+      _latestQueryTime = new LongAccumulator(Long::max, 0);
       _groupFactory = new TestSchedulerGroupFactory();
       MultiLevelPriorityQueue queue =
           new MultiLevelPriorityQueue(config, rm, _groupFactory, new TableBasedGroupMapper());
-      _latestQueryTime = new LongAccumulator(Long::max, 0);
-      return new TestPriorityScheduler(config, rm, qe, queue, METRICS, _latestQueryTime);
+      return new TestPriorityScheduler(config, qe, ThreadAccountantUtils.getNoOpAccountant(), _latestQueryTime, rm,
+          queue);
     }
 
     public static TestPriorityScheduler create() {
       return create(new PinotConfiguration());
     }
 
-    ResourceManager getResourceManager() {
+    @Override
+    public ResourceManager getResourceManager() {
       return _resourceManager;
     }
 
@@ -284,6 +318,11 @@ public class PrioritySchedulerTest {
 
     @Override
     public void init(PinotConfiguration config, InstanceDataManager instanceDataManager, ServerMetrics serverMetrics) {
+    }
+
+    @Override
+    public InstanceDataManager getInstanceDataManager() {
+      throw new UnsupportedOperationException();
     }
 
     @Override

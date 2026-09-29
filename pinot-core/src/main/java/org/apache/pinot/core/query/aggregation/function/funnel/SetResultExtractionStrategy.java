@@ -27,14 +27,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Aggregation strategy leveraging set algebra (unions/intersections).
- */
+/// Extracts intermediate set results for cross-segment merging.
+///
+/// For single-key, converts dictionary IDs to typed value sets. For multi-key, converts composite IDs
+/// to length-prefix-encoded composite strings, producing a `Set<String>` per step.
 class SetResultExtractionStrategy implements ResultExtractionStrategy<DictIdsWrapper, List<Set>> {
   protected final int _numSteps;
 
@@ -44,18 +45,44 @@ class SetResultExtractionStrategy implements ResultExtractionStrategy<DictIdsWra
 
   @Override
   public List<Set> extractIntermediateResult(DictIdsWrapper dictIdsWrapper) {
-    Dictionary dictionary = dictIdsWrapper._dictionary;
+    if (dictIdsWrapper == null) {
+      List<Set> result = new ArrayList<>(_numSteps);
+      for (int i = 0; i < _numSteps; i++) {
+        result.add(new ObjectOpenHashSet<>());
+      }
+      return result;
+    }
     List<Set> result = new ArrayList<>(_numSteps);
-    for (RoaringBitmap dictIdBitmap : dictIdsWrapper._stepsBitmaps) {
-      result.add(convertToValueSet(dictionary, dictIdBitmap));
+    if (dictIdsWrapper.isMultiKey()) {
+      for (RoaringBitmap compositeIdBitmap : dictIdsWrapper._stepsBitmaps) {
+        result.add(convertCompositeToValueSet(dictIdsWrapper, compositeIdBitmap));
+      }
+    } else {
+      Dictionary dictionary = dictIdsWrapper._dictionaries[0];
+      for (RoaringBitmap dictIdBitmap : dictIdsWrapper._stepsBitmaps) {
+        result.add(convertToValueSet(dictionary, dictIdBitmap));
+      }
     }
     return result;
+  }
+
+  private Set<String> convertCompositeToValueSet(DictIdsWrapper wrapper, RoaringBitmap compositeIdBitmap) {
+    int numValues = compositeIdBitmap.getCardinality();
+    int numKeys = wrapper._dictionaries.length;
+    int[] dictIds = new int[numKeys];
+    ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(numValues);
+    PeekableIntIterator iterator = compositeIdBitmap.getIntIterator();
+    while (iterator.hasNext()) {
+      wrapper.reverseCompositeId(iterator.next(), dictIds);
+      stringSet.add(DictIdsWrapper.toCompositeString(wrapper._dictionaries, dictIds));
+    }
+    return stringSet;
   }
 
   private Set convertToValueSet(Dictionary dictionary, RoaringBitmap dictIdBitmap) {
     int numValues = dictIdBitmap.getCardinality();
     PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
-    FieldSpec.DataType storedType = dictionary.getValueType();
+    DataType storedType = dictionary.getValueType();
     switch (storedType) {
       case INT:
         IntOpenHashSet intSet = new IntOpenHashSet(numValues);

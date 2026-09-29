@@ -22,13 +22,9 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * All bitmap-based filter iterators should implement this interface to allow intersection to be optimized.
- */
+/// All bitmap-based filter iterators should implement this interface to allow intersection to be optimized.
 public interface BitmapBasedDocIdIterator extends BlockDocIdIterator {
 
-  /**
-   * Returns a bitmap of the matching document ids.
-   */
+  /// Returns a bitmap of the matching document ids.
   ImmutableRoaringBitmap getDocIds();
 }

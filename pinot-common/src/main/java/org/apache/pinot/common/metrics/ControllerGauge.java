@@ -21,9 +21,7 @@ package org.apache.pinot.common.metrics;
 import org.apache.pinot.common.Utils;
 
 
-/**
- * Controller gauges.
- */
+/// Controller gauges.
 public enum ControllerGauge implements AbstractMetrics.Gauge {
   VERSION("version", true),
 
@@ -54,8 +52,12 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // be queried from the table.
   SEGMENT_COUNT_INCLUDING_REPLACED("SegmentCount", false),
 
+  // Track response size of getChildren from /PROPERTYSTORE/SEGMENTS/<table>
+  PROPERTYSTORE_SEGMENT_CHILDREN_BYTE_SIZE("propertystore", false),
   IDEALSTATE_ZNODE_SIZE("idealstate", false),
   IDEALSTATE_ZNODE_BYTE_SIZE("idealstate", false),
+  EXTERNALVIEW_ZNODE_SIZE("externalview", false),
+  EXTERNALVIEW_ZNODE_BYTE_SIZE("externalview", false),
   REALTIME_TABLE_COUNT("TableCount", true),
   OFFLINE_TABLE_COUNT("TableCount", true),
   DISABLED_TABLE_COUNT("TableCount", true),
@@ -64,11 +66,17 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   TIME_MS_SINCE_LAST_MINION_TASK_METADATA_UPDATE("TimeMsSinceLastMinionTaskMetadataUpdate", false),
   TIME_MS_SINCE_LAST_SUCCESSFUL_MINION_TASK_GENERATION("TimeMsSinceLastSuccessfulMinionTaskGeneration", false),
   LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR("LastMinionTaskGenerationEncountersError", false),
+  // TODO: Unify below subtask metrics into a single metric with status label
   NUM_MINION_TASKS_IN_PROGRESS("NumMinionTasksInProgress", true),
   NUM_MINION_SUBTASKS_WAITING("NumMinionSubtasksWaiting", true),
+  MAX_SUBTASK_WAIT_TIME_MS("MaxSubtaskWaitTimeMs", false),
   NUM_MINION_SUBTASKS_RUNNING("NumMinionSubtasksRunning", true),
+  MAX_SUBTASK_RUNNING_TIME_MS("MaxSubtaskRunningTimeMs", false),
   NUM_MINION_SUBTASKS_ERROR("NumMinionSubtasksError", true),
   NUM_MINION_SUBTASKS_UNKNOWN("NumMinionSubtasksUnknown", true),
+  NUM_MINION_SUBTASKS_DROPPED("NumMinionSubtasksDropped", true),
+  NUM_MINION_SUBTASKS_TIMED_OUT("NumMinionSubtasksTimedOut", true),
+  NUM_MINION_SUBTASKS_ABORTED("NumMinionSubtasksAborted", true),
   PERCENT_MINION_SUBTASKS_IN_QUEUE("PercentMinionSubtasksInQueue", true),
   PERCENT_MINION_SUBTASKS_IN_ERROR("PercentMinionSubtasksInError", true),
   TIER_BACKEND_TABLE_COUNT("TierBackendTableCount", true),
@@ -106,11 +114,23 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Percentage of segments we failed to get size for
   TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT("TableStorageEstMissingSegmentPercent", false),
 
+  // Uncompressed-value to forward-index-and-dictionary storage ratio scaled by 100 (e.g., 4.5x becomes 450).
+  TABLE_COMPRESSION_STATS_RATIO_PERCENT("percent", false),
+
+  // Uncompressed column-value size represented by compression statistics, per replica
+  TABLE_COMPRESSION_STATS_UNCOMPRESSED_VALUE_SIZE_PER_REPLICA("bytes", false),
+
+  // Forward-index and dictionary size represented by compression statistics, per replica
+  TABLE_COMPRESSION_STATS_FORWARD_INDEX_AND_DICTIONARY_STORAGE_SIZE_PER_REPLICA("bytes", false),
+
   // Number of scheduled Cron jobs
   CRON_SCHEDULER_JOB_SCHEDULED("cronSchedulerJobScheduled", false),
 
   // Number of Tasks Status
   TASK_STATUS("taskStatus", false),
+
+  // Number of tracked jobs in a task queue (per task type)
+  TASKS_TRACKED_FOR_TASK_TYPE("tasksTrackedForTaskType", false),
 
   // Number of dropped stale minion instances
   DROPPED_MINION_INSTANCES("droppedMinionInstances", true),
@@ -145,20 +165,11 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Consumption availability lag in ms at a partition level
   MAX_RECORD_AVAILABILITY_LAG_MS("maxRecordAvailabilityLagMs", false),
 
-  // Number of table schema got misconfigured
-  MISCONFIGURED_SCHEMA_TABLE_COUNT("misconfiguredSchemaTableCount", true),
+  // Number of table without table config
+  TABLE_WITHOUT_TABLE_CONFIG_COUNT("tableWithoutTableConfigCount", true),
 
-  // Number of table without schema
+  // Number of table with table config but without schema
   TABLE_WITHOUT_SCHEMA_COUNT("tableWithoutSchemaCount", true),
-
-  // Number of table schema got fixed
-  FIXED_SCHEMA_TABLE_COUNT("fixedSchemaTableCount", true),
-
-  // Number of tables that we want to fix but failed to copy schema from old schema name to new schema name
-  FAILED_TO_COPY_SCHEMA_COUNT("failedToCopySchemaCount", true),
-
-  // Number of tables that we want to fix but failed to update table config
-  FAILED_TO_UPDATE_TABLE_CONFIG_COUNT("failedToUpdateTableConfigCount", true),
 
   LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_QUEUE_SIZE("LLCSegmentDeepStoreUploadRetryQueueSize", false),
 
@@ -170,13 +181,73 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // any partition in the realtime table. This metric is emitted from the segment size based threshold
   // computer.
   NUM_ROWS_THRESHOLD("numRowsThreshold", false),
+  // Added to preserve backwards compatibility of the above metric
+  NUM_ROWS_THRESHOLD_WITH_TOPIC("numRowsThresholdWithTopic", false),
 
   // The actual segment size for committing segments. These may be shorter than expected when the administrator
   // issues a force-commit, or zero when new partitions are detected in the stream (since there is no completing
   // segment when the partition is first detected).
   COMMITTING_SEGMENT_SIZE("committingSegmentSize", false),
+  // Added to preserve backwards compatibility of the above metric
+  COMMITTING_SEGMENT_SIZE_WITH_TOPIC("committingSegmentSizeWithTopic", false),
 
-  TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false);
+  TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false),
+
+  TABLE_REBALANCE_IN_PROGRESS_GLOBAL("jobs", true),
+
+  // Number of reingested segments getting uploaded
+  REINGESTED_SEGMENT_UPLOADS_IN_PROGRESS("reingestedSegmentUploadsInProgress", true),
+
+  // Resource utilization is within limits or not for a table
+  RESOURCE_UTILIZATION_LIMIT_EXCEEDED("ResourceUtilizationLimitExceeded", false),
+
+  // The number of segments in deepstore that do not have corresponding metadata in ZooKeeper.
+  // These segments are untracked and should be considered for deletion based on retention policies.
+  UNTRACKED_SEGMENTS_COUNT("untrackedSegmentsCount", false),
+
+  // Metric used to track errors during the periodic table retention management
+  RETENTION_MANAGER_ERROR("retentionManagerError", false),
+
+  // Gauge to reflect whether pauseless is enabled or not
+  PAUSELESS_CONSUMPTION_ENABLED("pauselessConsumptionEnabled", false),
+
+  // Metric used to track when segments in error state are detected for pauseless table
+  PAUSELESS_SEGMENTS_IN_ERROR_COUNT("pauselessSegmentsInErrorCount", false),
+
+  // Metric used to track when segments in error state are detected for pauseless table for which needs
+  // manual intervention for repair
+  PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT("pauselessSegmentsInUnrecoverableErrorCount", false),
+
+  // ZK JUTE max buffer size in bytes
+  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true),
+
+  // Bytes to be read from deep store
+  DEEP_STORE_READ_BYTES_IN_PROGRESS("deepStoreReadBytesInProgress", true),
+  // Count of deep store segment downloads that are currently in progress
+  DEEP_STORE_READ_OPS_IN_PROGRESS("deepStoreReadOpsInProgress", true),
+  // Bytes to be written to deep store
+  DEEP_STORE_WRITE_BYTES_IN_PROGRESS("deepStoreWriteBytesInProgress", true),
+  // Count of deep store segment writes that are currently in progress
+  DEEP_STORE_WRITE_OPS_IN_PROGRESS("deepStoreWriteOpsInProgress", true),
+
+  // The progress of a certain table rebalance job of a table
+  TABLE_REBALANCE_JOB_PROGRESS_PERCENT("percent", false),
+
+  // Mapping metric for table-to-tenant attribution. One gauge per (tenantType, tenantName) pair; always set to 1.
+  // The compound key "<tenantType>.<tenantName>" is embedded as extra segments in the JMX metric name so that
+  // Prometheus can extract both as labels and join them onto other table-scoped metrics via group_left.
+  // tenantType values: "server" (server tenant), "broker" (broker tenant), "tier" (tier server tenant).
+  // JMX name pattern: pinot.controller.tableTenantInfo.<tableNameWithType>.<tenantType>.<tenantName>
+  // NOTE: this gauge is exempt from the standard ControllerGauge.values() loop in removeMetricsForTable because its
+  // registered name includes extra key segments. Removal is handled explicitly via _tableTenantMap in
+  // SegmentStatusChecker.
+  TABLE_TENANT_INFO("info", false),
+
+  // HTTP thread utilization
+  HTTP_THREAD_UTILIZATION("httpThreadUtilization", true),
+  // Track the concurrent executions of the API resources that use @ManagedAsync
+  MANAGED_ASYNC_ACTIVE_THREADS("threads", true);
+
 
   private final String _gaugeName;
   private final String _unit;
@@ -198,11 +269,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
     return _unit;
   }
 
-  /**
-   * Returns true if the gauge is global (not attached to a particular resource)
-   *
-   * @return true if the gauge is global
-   */
+  /// Returns true if the gauge is global (not attached to a particular resource)
+  ///
+  /// @return true if the gauge is global
   @Override
   public boolean isGlobal() {
     return _global;

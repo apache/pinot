@@ -132,7 +132,7 @@ public class RetryPolicyTest {
       // Use MAX_NUM_ATTEMPTS - 1 to make sure we do not throw and return attempts
       AtomicInteger atomicInteger = new AtomicInteger(MAX_NUM_ATTEMPTS - 1);
       int retries = retryPolicy.attempt(() -> {
-          return (atomicInteger.decrementAndGet() <= 0);
+        return (atomicInteger.decrementAndGet() <= 0);
       });
       Assert.assertEquals(retries, MAX_NUM_ATTEMPTS - 2);
     }

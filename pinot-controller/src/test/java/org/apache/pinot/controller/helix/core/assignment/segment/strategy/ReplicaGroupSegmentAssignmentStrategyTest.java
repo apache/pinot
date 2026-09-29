@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment.strategy;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -32,17 +31,18 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.assignment.segment.OfflineSegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentTestUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -91,7 +91,8 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
     TableConfig tableConfigWithoutPartitions =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITHOUT_PARTITION)
             .setNumReplicas(NUM_REPLICAS)
-            .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY).build();
+            .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
+                new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY))).build();
     _segmentAssignmentWithoutPartition =
         SegmentAssignmentFactory.getSegmentAssignment(null, tableConfigWithoutPartitions, null);
 
@@ -112,7 +113,7 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
       instancePartitionsWithoutPartition.setInstances(0, replicaGroupId, instancesForReplicaGroup);
     }
     _instancePartitionsMapWithoutPartition =
-        Collections.singletonMap(InstancePartitionsType.OFFLINE, instancePartitionsWithoutPartition);
+        Map.of(InstancePartitionsType.OFFLINE, instancePartitionsWithoutPartition);
 
     // Mock HelixManager
     ZkHelixPropertyStore<ZNRecord> propertyStoreWithPartitions = mock(ZkHelixPropertyStore.class);
@@ -121,8 +122,8 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
       String segmentName = SEGMENTS.get(segmentId);
       SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
       int partitionId = segmentId % NUM_PARTITIONS;
-      segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap(PARTITION_COLUMN,
-          new ColumnPartitionMetadata(null, NUM_PARTITIONS, Collections.singleton(partitionId), null))));
+      segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Map.of(PARTITION_COLUMN,
+          new ColumnPartitionMetadata(null, NUM_PARTITIONS, Set.of(partitionId), null))));
       ZNRecord segmentZKMetadataZNRecord = segmentZKMetadata.toZNRecord();
       when(propertyStoreWithPartitions.get(
           eq(ZKMetadataProvider.constructPropertyStorePathForSegment(OFFLINE_TABLE_NAME_WITH_PARTITION, segmentName)),
@@ -141,7 +142,8 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
     TableConfig tableConfigWithPartitions =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITH_PARTITION)
             .setNumReplicas(NUM_REPLICAS)
-            .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
+            .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
+                new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)))
             .setReplicaGroupStrategyConfig(replicaGroupStrategyConfig).build();
     _segmentAssignmentWithPartition =
         SegmentAssignmentFactory.getSegmentAssignment(helixManagerWithPartitions, tableConfigWithPartitions, null);
@@ -164,7 +166,7 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
       }
     }
     _instancePartitionsMapWithPartition =
-        Collections.singletonMap(InstancePartitionsType.OFFLINE, instancePartitionsWithPartition);
+        Map.of(InstancePartitionsType.OFFLINE, instancePartitionsWithPartition);
   }
 
   @Test
@@ -358,8 +360,8 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
     String instance1 = INSTANCE_NAME_PREFIX + "1";
     String instance2 = INSTANCE_NAME_PREFIX + "2";
     Map<String, Map<String, String>> unbalancedAssignment = new TreeMap<>();
-    SEGMENTS.forEach(segName -> unbalancedAssignment.put(segName, ImmutableMap
-        .of(instance0, SegmentStateModel.ONLINE, instance1, SegmentStateModel.ONLINE, instance2,
+    SEGMENTS.forEach(segName -> unbalancedAssignment.put(segName,
+        Map.of(instance0, SegmentStateModel.ONLINE, instance1, SegmentStateModel.ONLINE, instance2,
             SegmentStateModel.ONLINE)));
     Map<String, Map<String, String>> balancedAssignment =
         _segmentAssignmentWithPartition.rebalanceTable(unbalancedAssignment, _instancePartitionsMapWithoutPartition,
@@ -380,8 +382,8 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
       String segmentName = SEGMENTS.get(segmentId);
       SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
       int partitionId = segmentId % NUM_PARTITIONS;
-      segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap(PARTITION_COLUMN,
-          new ColumnPartitionMetadata(null, NUM_PARTITIONS, Collections.singleton(partitionId), null))));
+      segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Map.of(PARTITION_COLUMN,
+          new ColumnPartitionMetadata(null, NUM_PARTITIONS, Set.of(partitionId), null))));
       ZNRecord segmentZKMetadataZNRecord = segmentZKMetadata.toZNRecord();
       when(propertyStore.get(
           eq(ZKMetadataProvider.constructPropertyStorePathForSegment(OFFLINE_TABLE_NAME_WITH_PARTITION, segmentName)),
@@ -399,7 +401,8 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
         new ReplicaGroupStrategyConfig(PARTITION_COLUMN, numInstancesPerPartition);
     TableConfig tableConfigWithPartitions =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITH_PARTITION).setNumReplicas(1)
-            .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY).build();
+            .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
+                new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY))).build();
     tableConfigWithPartitions.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(helixManager, tableConfigWithPartitions, null);
@@ -419,7 +422,7 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
       instancePartitions.setInstances(partitionId, 0, instancesForPartition);
     }
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-        Collections.singletonMap(InstancePartitionsType.OFFLINE, instancePartitions);
+        Map.of(InstancePartitionsType.OFFLINE, instancePartitions);
 
     // Test assignment
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();

@@ -25,59 +25,27 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
-/**
- * Starter for Pinot server.
- * <p>When the server starts for the first time, it will automatically join the Helix cluster with the default tag.
- * <ul>
- *   <li>
- *     Optional start-up checks:
- *     <ul>
- *       <li>Service status check (ON by default)</li>
- *     </ul>
- *   </li>
- *   <li>
- *     Optional shut-down checks:
- *     <ul>
- *       <li>Query check (drains and finishes existing queries, ON by default)</li>
- *       <li>Resource check (wait for all resources OFFLINE, OFF by default)</li>
- *     </ul>
- *   </li>
- * </ul>
- */
+/// Starter for Pinot server.
+///
+/// When the server starts for the first time, it will automatically join the Helix cluster with the default tag.
+///
+/// - Optional start-up checks:
+///   - Service status check (ON by default)
+/// - Optional shut-down checks:
+///   - Query check (drains and finishes existing queries, ON by default)
+///   - Resource check (wait for all resources OFFLINE, OFF by default)
 public class HelixServerStarter extends BaseServerStarter {
 
   public HelixServerStarter() {
   }
 
-  @Deprecated
-  public HelixServerStarter(String helixClusterName, String zkAddress, PinotConfiguration serverConf)
-      throws Exception {
-    init(applyServerConfig(serverConf, helixClusterName, zkAddress));
-  }
-
-  @Deprecated
-  private static PinotConfiguration applyServerConfig(PinotConfiguration serverConf, String helixClusterName,
-      String zkAddress) {
-    serverConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, helixClusterName);
-    serverConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkAddress);
-    return serverConf;
-  }
-
-  @Deprecated
-  public HelixServerStarter(PinotConfiguration serverConf)
-      throws Exception {
-    init(serverConf);
-  }
-
-  /**
-   * This method is for reference purpose only.
-   */
+  /// This method is for reference purpose only.
   public static HelixServerStarter startDefault()
       throws Exception {
     Map<String, Object> properties = new HashMap<>();
     int port = 8003;
     properties.put(Helix.CONFIG_OF_CLUSTER_NAME, "quickstart");
-    properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, "localhost:2191");
+    properties.put(Helix.CONFIG_OF_ZOOKEEPER_SERVER, "localhost:2191");
     properties.put(Helix.KEY_OF_SERVER_NETTY_PORT, port);
     properties.put(Server.CONFIG_OF_INSTANCE_DATA_DIR, "/tmp/PinotServer/test" + port + "/index");
     properties.put(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, "/tmp/PinotServer/test" + port + "/segmentTar");

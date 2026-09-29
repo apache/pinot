@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -38,12 +37,10 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,20 +54,19 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer and a fake PinotFS as
- * the deep store for segments. This test enables the peer to peer segment download scheme to test Pinot servers can
- * download segments from peer servers even when the deep store is down. This is done by injection of failures in
- * the fake PinotFS segment upload api (i.e., copyFromLocal) for all segments whose seq number mod 5 is 0.
- *
- * Besides standard tests, it also verifies that
- * (1) All the segments on all servers are in either ONLINE or CONSUMING states
- * (2) For segments failed during deep store upload, the corresponding segment download url string is empty in Zk.
- */
+/// Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer and a fake PinotFS as
+/// the deep store for segments. This test enables the peer to peer segment download scheme to test Pinot servers can
+/// download segments from peer servers even when the deep store is down. This is done by injection of failures in
+/// the fake PinotFS segment upload api (i.e., copyFromLocal) for all segments whose seq number mod 5 is 0.
+///
+/// Besides standard tests, it also verifies that
+/// (1) All the segments on all servers are in either ONLINE or CONSUMING states
+/// (2) For segments failed during deep store upload, the corresponding segment download url string is empty in Zk.
 public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PeerDownloadLLCRealtimeClusterIntegrationTest.class);
 
-  private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
+  private static final String CONSUMER_DIRECTORY =
+      new File(FileUtils.getTempDirectory(), "consumer-test").getAbsolutePath();
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
   private static final int NUM_SERVERS = 2;
@@ -85,9 +81,9 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
   @Override
   public void setUp()
       throws Exception {
-    System.out.println(String.format(
-        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s",
-        RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource));
+    System.out.printf(
+        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s%n",
+        RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource);
 
     _pinotFsRootDir = new File(FileUtils.getTempDirectoryPath() + File.separator + System.currentTimeMillis() + "/");
     Preconditions.checkState(_pinotFsRootDir.mkdir(), "Failed to make a dir for " + _pinotFsRootDir.getPath());
@@ -132,8 +128,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
   }
 
   @Override
-  public void addTableConfig(TableConfig tableConfig)
-      throws IOException {
+  public void addTableConfig(TableConfig tableConfig) {
     SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
         new SegmentsValidationAndRetentionConfig();
     CompletionConfig completionConfig = new CompletionConfig("DOWNLOAD");
@@ -145,7 +140,11 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
     tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
     tableConfig.getValidationConfig().setTimeColumnName(this.getTimeColumnName());
 
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
+    try {
+      getOrCreateAdminClient().getTableClient().createTable(tableConfig.toJsonString(), null);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
@@ -223,14 +222,6 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
             instanceState.getValue()));
       }
     }
-  }
-
-  @Test(expectedExceptions = IOException.class)
-  public void testAddHLCTableShouldFail()
-      throws IOException {
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
-        .setStreamConfigs(Collections.singletonMap("stream.kafka.consumer.type", "HIGHLEVEL")).build();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
   }
 
   // MockPinotFS is a localPinotFS whose root directory is configured as _basePath;

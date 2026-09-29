@@ -27,16 +27,17 @@ import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metrics.MinionMetrics;
-import org.apache.pinot.common.utils.SchemaUtils;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
-import org.apache.pinot.minion.event.MinionProgressObserver;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -51,10 +52,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * This task only tests the basic functionality of {@link PurgeTaskExecutor#convert(PinotTaskConfig, File, File)}.
- * Random test for segment purger is covered in SegmentPurgerTest.
- */
+/// This task only tests the basic functionality of [PurgeTaskExecutor#convert(PinotTaskConfig, File, File)].
+/// Random test for segment purger is covered in SegmentPurgerTest.
 public class PurgeTaskExecutorTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "PurgeTaskExecutorTest");
   private static final File ORIGINAL_SEGMENT_DIR = new File(TEMP_DIR, "originalSegment");
@@ -84,9 +83,9 @@ public class PurgeTaskExecutorTest {
     GenericRowRecordReader genericRowRecordReader = new GenericRowRecordReader(rows);
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setInstanceType(InstanceType.MINION);
     config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
     config.setSegmentName(SEGMENT_NAME);
-
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, genericRowRecordReader);
     driver.build();
@@ -96,9 +95,9 @@ public class PurgeTaskExecutorTest {
     @SuppressWarnings("unchecked")
     ZkHelixPropertyStore<ZNRecord> helixPropertyStore = Mockito.mock(ZkHelixPropertyStore.class);
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/testTable_OFFLINE", null, AccessOption.PERSISTENT))
-        .thenReturn(TableConfigUtils.toZNRecord(tableConfig));
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfig));
     Mockito.when(helixPropertyStore.get("/SCHEMAS/testTable", null, AccessOption.PERSISTENT))
-        .thenReturn(SchemaUtils.toZNRecord(schema));
+        .thenReturn(SchemaSerDeUtils.toZNRecord(schema));
     minionContext.setHelixPropertyStore(helixPropertyStore);
     minionContext.setRecordPurgerFactory(rawTableName -> {
       if (rawTableName.equals(TABLE_NAME)) {
@@ -123,7 +122,7 @@ public class PurgeTaskExecutorTest {
   public void testConvert()
       throws Exception {
     PurgeTaskExecutor purgeTaskExecutor = new PurgeTaskExecutor();
-    purgeTaskExecutor.setMinionEventObserver(new MinionProgressObserver());
+    purgeTaskExecutor.setMinionEventObserver(MinionTaskTestUtils.getMinionProgressObserver());
     PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.PurgeTask.TASK_TYPE, Collections
         .singletonMap(MinionConstants.TABLE_NAME_KEY, TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME)));
     File purgedIndexDir = purgeTaskExecutor.convert(pinotTaskConfig, _originalIndexDir, PURGED_SEGMENT_DIR).getFile();

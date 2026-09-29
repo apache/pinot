@@ -18,18 +18,21 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TableLLCSegmentUploadResponse {
   private final String _segmentName;
   private final long _crc;
+  private final long _dataCrc;
   private final String _downloadUrl;
 
-  public TableLLCSegmentUploadResponse(@JsonProperty("segmentName") String segmentName,
-      @JsonProperty("crc") Long crc, @JsonProperty("downloadUrl") String downloadUrl) {
+  public TableLLCSegmentUploadResponse(@JsonProperty("segmentName") String segmentName, @JsonProperty("crc") long crc,
+      @JsonProperty ("dataCrc") long dataCrc, @JsonProperty("downloadUrl") String downloadUrl) {
     _segmentName = segmentName;
     _crc = crc;
+    _dataCrc = dataCrc;
     _downloadUrl = downloadUrl;
   }
 
@@ -37,8 +40,12 @@ public class TableLLCSegmentUploadResponse {
     return _segmentName;
   }
 
-  public Long getCrc() {
+  public long getCrc() {
     return _crc;
+  }
+
+  public long getDataCrc() {
+    return _dataCrc;
   }
 
   public String getDownloadUrl() {

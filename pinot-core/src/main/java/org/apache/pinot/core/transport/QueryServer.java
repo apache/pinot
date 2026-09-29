@@ -36,6 +36,9 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.util.internal.PlatformDependent;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
@@ -46,10 +49,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code QueryServer} is the Netty server that runs on Pinot Server to handle the instance requests sent from Pinot
- * Brokers.
- */
+/// The `QueryServer` is the Netty server that runs on Pinot Server to handle the instance requests sent from
+/// Pinot Brokers.
 public class QueryServer {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryServer.class);
   private final int _port;
@@ -60,24 +61,22 @@ public class QueryServer {
   private final Class<? extends ServerSocketChannel> _channelClass;
   private final ChannelHandler _instanceRequestHandler;
   private ServerSocketChannel _channel;
+  private final ConcurrentHashMap<SocketChannel, Boolean> _allChannels = new ConcurrentHashMap<>();
 
-  /**
-   * Create an unsecured server instance
-   *
-   * @param port bind port
-   * @param nettyConfig configurations for netty library
-   */
+
+  /// Create an unsecured server instance
+  ///
+  /// @param port bind port
+  /// @param nettyConfig configurations for netty library
   public QueryServer(int port, NettyConfig nettyConfig, ChannelHandler instanceRequestHandler) {
     this(port, nettyConfig, null, instanceRequestHandler);
   }
 
-  /**
-   * Create a server instance with TLS config
-   *
-   * @param port bind port
-   * @param nettyConfig configurations for netty library
-   * @param tlsConfig TLS/SSL config
-   */
+  /// Create a server instance with TLS config
+  ///
+  /// @param port bind port
+  /// @param nettyConfig configurations for netty library
+  /// @param tlsConfig TLS/SSL config
   public QueryServer(int port, NettyConfig nettyConfig, TlsConfig tlsConfig, ChannelHandler instanceRequestHandler) {
     _port = port;
     _tlsConfig = tlsConfig;
@@ -113,8 +112,9 @@ public class QueryServer {
     try {
       ServerBootstrap serverBootstrap = new ServerBootstrap();
 
-      PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
-      PooledByteBufAllocatorMetric metric = bufAllocator.metric();
+      PooledByteBufAllocator bufAllocatorWithLimits =
+          PooledByteBufAllocatorWithLimits.getSharedBufferAllocatorWithLimits();
+      PooledByteBufAllocatorMetric metric = bufAllocatorWithLimits.metric();
       ServerMetrics metrics = ServerMetrics.get();
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_USED_HEAP_MEMORY, metric::usedHeapMemory);
@@ -124,11 +124,22 @@ public class QueryServer {
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL, metric::normalCacheSize);
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_THREADLOCALCACHE, metric::numThreadLocalCaches);
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_TOTAL_MAX_DIRECT_MEMORY, PlatformDependent::maxDirectMemory);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_TOTAL_USED_DIRECT_MEMORY, PlatformDependent::usedDirectMemory);
+
       _channel = (ServerSocketChannel) serverBootstrap.group(_bossGroup, _workerGroup).channel(_channelClass)
-          .option(ChannelOption.SO_BACKLOG, 128).childOption(ChannelOption.SO_KEEPALIVE, true)
-          .option(ChannelOption.ALLOCATOR, bufAllocator).childHandler(new ChannelInitializer<SocketChannel>() {
+          .option(ChannelOption.SO_BACKLOG, 128)
+          .childOption(ChannelOption.SO_KEEPALIVE, true)
+          .option(ChannelOption.ALLOCATOR, bufAllocatorWithLimits)
+          .childOption(ChannelOption.ALLOCATOR, bufAllocatorWithLimits)
+          .childHandler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
+              _allChannels.put(ch, true);
+              ch.closeFuture().addListener(f -> _allChannels.remove(ch));
+
+              ch.pipeline()
+                  .addLast(ChannelHandlerFactory.getDirectOOMHandler(null, null, null, _allChannels, _channel));
               if (_tlsConfig != null) {
                 // Add SSL handler first to encrypt and decrypt everything.
                 ch.pipeline()
@@ -162,5 +173,15 @@ public class QueryServer {
   @VisibleForTesting
   ServerSocketChannel getChannel() {
     return _channel;
+  }
+
+  @VisibleForTesting
+  int getConnectedChannelCount() {
+    return _allChannels.size();
+  }
+
+  @VisibleForTesting
+  Set<SocketChannel> getConnectedChannels() {
+    return _allChannels.keySet();
   }
 }

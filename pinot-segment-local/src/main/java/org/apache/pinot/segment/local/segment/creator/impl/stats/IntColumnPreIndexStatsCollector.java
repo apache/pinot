@@ -21,7 +21,11 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
@@ -34,38 +38,51 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     super(column, statsCollectorConfig);
   }
 
+  public IntColumnPreIndexStatsCollector(FieldSpec fieldSpec, @Nullable FieldConfig fieldConfig,
+      @Nullable PartitionFunction partitionFunction) {
+    super(fieldSpec, fieldConfig, partitionFunction);
+  }
+
   @Override
   public void collect(Object entry) {
     assert !_sealed;
 
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;
-      for (Object obj : values) {
-        int value = (int) obj;
-        _values.add(value);
-      }
-
-      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
-      updateTotalNumberOfEntries(values);
+      collectMultiValue(values.length, i -> (int) values[i]);
     } else if (entry instanceof int[]) {
-      int[] values = (int[]) entry;
-      for (int value : values) {
-        _values.add(value);
-      }
-
-      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
-      updateTotalNumberOfEntries(values.length);
+      collect((int[]) entry);
     } else {
-      int value = (int) entry;
-      addressSorted(value);
-      if (_values.add(value)) {
-        if (isPartitionEnabled()) {
-          updatePartition(Integer.toString(value));
-        }
-      }
-
-      _totalNumberOfEntries++;
+      collect((int) entry);
     }
+  }
+
+  @Override
+  public void collect(int value) {
+    assert !_sealed;
+    addressSorted(value);
+    if (_values.add(value)) {
+      if (isPartitionEnabled()) {
+        updatePartition(Integer.toString(value));
+      }
+    }
+    _totalDocs++;
+    _totalNumberOfEntries++;
+  }
+
+  @Override
+  public void collect(int[] values) {
+    assert !_sealed;
+    collectMultiValue(values.length, i -> values[i]);
+  }
+
+  private void collectMultiValue(int length, java.util.function.IntFunction<Integer> valueGetter) {
+    for (int i = 0; i < length; i++) {
+      _values.add(valueGetter.apply(i));
+    }
+    _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, length);
+    _totalDocs++;
+    updateTotalNumberOfEntries(length);
   }
 
   private void addressSorted(int entry) {
@@ -102,6 +119,10 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public int getCardinality() {
     return _sealed ? _sortedValues.length : _values.size();
+  }
+
+  int[] getValues() {
+    return _values.toIntArray();
   }
 
   @Override

@@ -23,6 +23,8 @@ import org.apache.pinot.common.Utils;
 
 public enum MinionGauge implements AbstractMetrics.Gauge {
   VERSION("version", true),
+  /// The ZooKeeper jute.maxbuffer size in bytes.
+  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true),
   NUMBER_OF_TASKS("tasks", true);
 
   private final String _gaugeName;

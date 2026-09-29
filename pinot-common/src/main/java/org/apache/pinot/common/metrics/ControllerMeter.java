@@ -21,9 +21,7 @@ package org.apache.pinot.common.metrics;
 import org.apache.pinot.common.Utils;
 
 
-/**
- * Meters for the controller.
- */
+/// Meters for the controller.
 public enum ControllerMeter implements AbstractMetrics.Meter {
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
   HEALTHCHECK_OK_CALLS("healthcheck", true),
@@ -68,8 +66,37 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   NUMBER_ADHOC_TASKS_SUBMITTED("adhocTasks", false),
   IDEAL_STATE_UPDATE_FAILURE("IdealStateUpdateFailure", false),
   IDEAL_STATE_UPDATE_RETRY("IdealStateUpdateRetry", false),
-  IDEAL_STATE_UPDATE_SUCCESS("IdealStateUpdateSuccess", false);
-
+  IDEAL_STATE_UPDATE_SUCCESS("IdealStateUpdateSuccess", false),
+  SEGMENT_SIZE_AUTO_REDUCTION("SegmentSizeAutoReduction", false),
+  // Total Bytes read from deep store
+  DEEP_STORE_READ_BYTES_COMPLETED("deepStoreReadBytesCompleted", true),
+  // Total Bytes written to deep store
+  DEEP_STORE_WRITE_BYTES_COMPLETED("deepStoreWriteBytesCompleted", true),
+  // Tracks failures encountered while fetching partition group metadata
+  PARTITION_GROUP_METADATA_FETCH_ERROR("failures", true),
+  OFFSET_AUTO_RESET_SKIPPED_OFFSETS("autoResetSkippedOffsets", false),
+  OFFSET_AUTO_RESET_BACKFILL_OFFSETS("autoResetBackfillOffsets", false),
+  // Audit logging metrics
+  AUDIT_REQUEST_FAILURES("failures", true),
+  AUDIT_RESPONSE_FAILURES("failures", true),
+  AUDIT_REQUEST_PAYLOAD_TRUNCATED("count", true),
+  // Page cache warmup metrics
+  PAGE_CACHE_WARMUP_REQUESTS("pageCacheWarmupRequests", true),
+  PAGE_CACHE_WARMUP_REQUEST_ERRORS("pageCacheWarmupRequestErrors", true),
+  // Upsert compact merge task metrics
+  UPSERT_COMPACT_MERGE_SEGMENT_SKIPPED_CONSENSUS_FAILURE("UpsertCompactMergeSegmentsSkipped", false),
+  // Query workload propagation metrics
+  QUERY_WORKLOAD_PROPAGATION_COUNT("count", true),
+  QUERY_WORKLOAD_PROPAGATION_ERROR("count", true),
+  QUERY_WORKLOAD_MESSAGES_COUNT("count", true),
+  QUERY_WORKLOAD_MESSAGES_ERROR("count", true),
+  QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_COUNT("count", true),
+  QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_ERROR("count", true),
+  QUERY_WORKLOAD_LISTENER_CHANGES_COUNT("count", true),
+  QUERY_WORKLOAD_REQUEST_DROPPED("count", true),
+  QUERY_WORKLOAD_HTTP_CALLBACK_DROPPED("count", true),
+  // Number of segment-delete requests rejected because the targets participate in a live segment lineage entry.
+  LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false);
 
   private final String _brokerMeterName;
   private final String _unit;
@@ -91,11 +118,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
     return _unit;
   }
 
-  /**
-   * Returns true if the metric is global (not attached to a particular resource)
-   *
-   * @return true if the metric is global
-   */
+  /// Returns true if the metric is global (not attached to a particular resource)
+  ///
+  /// @return true if the metric is global
   @Override
   public boolean isGlobal() {
     return _global;

@@ -22,10 +22,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
@@ -60,9 +59,9 @@ public class MockDataBlockOperatorFactory {
       private int _invocationCount = 0;
       public Object answer(InvocationOnMock invocation) {
         return _invocationCount >= _rowsMap.get(operatorName).size()
-            ? TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0)
-            : new TransferableBlock(_rowsMap.get(operatorName).get(_invocationCount++),
-                _operatorSchemaMap.get(operatorName), DataBlock.Type.ROW);
+            ? SuccessMseBlock.INSTANCE
+            : new RowHeapDataBlock(_rowsMap.get(operatorName).get(_invocationCount++),
+                _operatorSchemaMap.get(operatorName));
       }
     });
     return operator;

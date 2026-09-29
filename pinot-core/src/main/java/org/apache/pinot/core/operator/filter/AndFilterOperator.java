@@ -28,11 +28,11 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
-import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
-import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
+import org.apache.pinot.core.operator.docidsets.ShortCircuitingDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.BufferFastAggregation;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class AndFilterOperator extends BaseFilterOperator {
@@ -52,48 +52,53 @@ public class AndFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getTrues() {
     Tracing.activeRecording().setNumChildren(_filterOperators.size());
     List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
+    long totalEntriesScanned = 0L;
     for (BaseFilterOperator filterOperator : _filterOperators) {
-      blockDocIdSets.add(filterOperator.getTrues());
+      BlockDocIdSet blockDocIdSet = filterOperator.getTrues();
+      BlockDocIdSet optimizedDocIdSet = blockDocIdSet.getOptimizedDocIdSet();
+      totalEntriesScanned += blockDocIdSet.getNumEntriesScannedInFilter();
+      if (optimizedDocIdSet instanceof EmptyDocIdSet) {
+        return new ShortCircuitingDocIdSet(totalEntriesScanned);
+      }
+      if (optimizedDocIdSet instanceof MatchAllDocIdSet) {
+        continue;
+      }
+      blockDocIdSets.add(optimizedDocIdSet);
+    }
+    if (blockDocIdSets.isEmpty()) {
+      return new MatchAllDocIdSet(_numDocs);
     }
     return new AndDocIdSet(blockDocIdSets, _queryOptions);
   }
 
+  /// A conjunction is not false where no child is false: the intersection of the children's not-false documents.
   @Override
-  protected BlockDocIdSet getFalses() {
-    List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
+  protected BlockDocIdSet getNotFalses() {
+    List<BlockDocIdSet> notFalses = new ArrayList<>(_filterOperators.size());
     for (BaseFilterOperator filterOperator : _filterOperators) {
-      BlockDocIdSet trues = filterOperator.getTrues();
-      if (trues instanceof EmptyDocIdSet) {
-        return new MatchAllDocIdSet(_numDocs);
+      BlockDocIdSet childNotFalses = filterOperator.getNotFalses();
+      if (childNotFalses instanceof EmptyDocIdSet) {
+        return EmptyDocIdSet.getInstance();
       }
-      if (trues instanceof MatchAllDocIdSet) {
+      if (childNotFalses instanceof MatchAllDocIdSet) {
         continue;
       }
-      if (_nullHandlingEnabled) {
-        BlockDocIdSet nulls = filterOperator.getNulls();
-        if (!(nulls instanceof EmptyDocIdSet)) {
-          blockDocIdSets.add(new OrDocIdSet(Arrays.asList(trues, nulls), _numDocs));
-          continue;
-        }
-      }
-      blockDocIdSets.add(trues);
+      notFalses.add(childNotFalses);
     }
-    if (blockDocIdSets.isEmpty()) {
-      return EmptyDocIdSet.getInstance();
+    if (notFalses.isEmpty()) {
+      return new MatchAllDocIdSet(_numDocs);
     }
-    if (blockDocIdSets.size() == 1) {
-      return new NotDocIdSet(blockDocIdSets.get(0), _numDocs);
-    }
-    return new NotDocIdSet(new AndDocIdSet(blockDocIdSets, _queryOptions), _numDocs);
+    return notFalses.size() == 1 ? notFalses.get(0) : new AndDocIdSet(notFalses, _queryOptions);
+  }
+
+  @Override
+  protected BlockDocIdSet getNulls() {
+    return mayHaveNulls() ? deriveNulls(_queryOptions) : EmptyDocIdSet.getInstance();
   }
 
   @Override
   public boolean canOptimizeCount() {
-    boolean allChildrenCanProduceBitmaps = true;
-    for (BaseFilterOperator child : _filterOperators) {
-      allChildrenCanProduceBitmaps &= child.canProduceBitmaps();
-    }
-    return allChildrenCanProduceBitmaps;
+    return canProduceBitmaps();
   }
 
   @Override
@@ -107,6 +112,58 @@ public class AndFilterOperator extends BaseFilterOperator {
       bitmaps[i++] = child.getBitmaps().reduce();
     }
     return BufferFastAggregation.andCardinality(bitmaps);
+  }
+
+  @Override
+  public boolean canProduceBitmaps() {
+    for (BaseFilterOperator child : _filterOperators) {
+      if (!child.canProduceBitmaps()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// The true documents are those true for every child. When a child has UNKNOWN documents, so has the result: a
+  /// document is UNKNOWN when no child is false for it and some child is UNKNOWN, which is the intersection of the
+  /// children's not-false documents minus the intersection of their true ones.
+  @Override
+  public BitmapCollection getBitmaps() {
+    int numChildren = _filterOperators.size();
+    ImmutableRoaringBitmap[] trues = new ImmutableRoaringBitmap[numChildren];
+    ImmutableRoaringBitmap[] notFalses = null;
+    for (int i = 0; i < numChildren; i++) {
+      BitmapCollection childBitmaps = _filterOperators.get(i).getBitmaps();
+      trues[i] = childBitmaps.reduce();
+      ImmutableRoaringBitmap childNulls = childBitmaps.getNullBitmap();
+      if (childNulls != null) {
+        if (notFalses == null) {
+          notFalses = Arrays.copyOf(trues, numChildren);
+        }
+        notFalses[i] = ImmutableRoaringBitmap.or(trues[i], childNulls);
+      } else if (notFalses != null) {
+        notFalses[i] = trues[i];
+      }
+    }
+    MutableRoaringBitmap andTrues = BufferFastAggregation.and(trues);
+    if (notFalses == null) {
+      return new BitmapCollection(_numDocs, false, andTrues);
+    }
+    MutableRoaringBitmap nulls = BufferFastAggregation.and(notFalses);
+    nulls.andNot(andTrues);
+    return new BitmapCollection(_numDocs, false, andTrues).excludingNulls(nulls);
+  }
+
+  @Override
+  public boolean mayHaveNulls() {
+    if (_nullHandlingEnabled) {
+      for (BaseFilterOperator filterOperator : _filterOperators) {
+        if (filterOperator.mayHaveNulls()) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   @Override

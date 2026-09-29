@@ -31,13 +31,11 @@ public class IntGroupByResultHolder implements GroupByResultHolder {
   private int _resultHolderCapacity;
   private int[] _resultArray;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param initialCapacity Initial capacity of the result holder
-   * @param maxCapacity Maximum capacity of the result holder
-   * @param defaultValue Default value of un-initialized results
-   */
+  /// Constructor for the class.
+  ///
+  /// @param initialCapacity Initial capacity of the result holder
+  /// @param maxCapacity Maximum capacity of the result holder
+  /// @param defaultValue Default value of un-initialized results
   public IntGroupByResultHolder(int initialCapacity, int maxCapacity, int defaultValue) {
     _maxCapacity = maxCapacity;
     _defaultValue = defaultValue;
@@ -85,6 +83,11 @@ public class IntGroupByResultHolder implements GroupByResultHolder {
   }
 
   @Override
+  public long getLongResult(int groupKey) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public <T> T getResult(int groupKey) {
     throw new UnsupportedOperationException();
   }
@@ -99,6 +102,11 @@ public class IntGroupByResultHolder implements GroupByResultHolder {
     if (groupKey != GroupKeyGenerator.INVALID_ID) {
       _resultArray[groupKey] = newValue;
     }
+  }
+
+  @Override
+  public void setValueForKey(int groupKey, long newValue) {
+    throw new UnsupportedOperationException();
   }
 
   @Override

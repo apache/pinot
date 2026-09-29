@@ -18,72 +18,71 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
-/**
- * Interface for ResultHolder to store results of GroupByAggregation.
- */
+/// Interface for ResultHolder to store results of GroupByAggregation.
 public interface GroupByResultHolder {
 
-  /**
-   * Stores the given value (of type double) for the given groupKey.
-   *
-   * @param groupKey
-   * @param value
-   */
+  /// Stores the given value (of type double) for the given groupKey.
+  ///
+  /// @param groupKey
+  /// @param value
   void setValueForKey(int groupKey, double value);
 
-  /**
-   * Stores the given value (of type int) for the given groupKey.
-   *
-   * @param groupKey
-   * @param value
-   */
+  /// Stores the given value (of type int) for the given groupKey.
+  ///
+  /// @param groupKey
+  /// @param value
   void setValueForKey(int groupKey, int value);
 
-  /**
-   * Store the given value (of type ResultType) for the given groupKey.
-   * @param groupKey
-   * @param value
-   */
+  /// Stores the given value (of type long) for the given groupKey.
+  ///
+  /// @param groupKey
+  /// @param value
+  void setValueForKey(int groupKey, long value);
+
+  /// Store the given value (of type ResultType) for the given groupKey.
+  /// @param groupKey
+  /// @param value
   void setValueForKey(int groupKey, Object value);
 
-  /**
-   * Returns the result (double) for the given group by key.
-   * If the group key does not exist in the result holder, returns
-   * the defaultValue it was initialized with (default value of the aggregation
-   * function it is holding the result for).
-   *
-   * @param groupKey
-   * @return
-   */
+  /// Returns the result (double) for the given group by key.
+  /// If the group key does not exist in the result holder, returns
+  /// the defaultValue it was initialized with (default value of the aggregation
+  /// function it is holding the result for).
+  ///
+  /// @param groupKey
+  /// @return
   double getDoubleResult(int groupKey);
 
-  /**
-   * Returns the result (int) for the given group by key.
-   * If the group key does not exist in the result holder, returns
-   * the defaultValue it was initialized with (default value of the aggregation
-   * function it is holding the result for).
-   *
-   * @param groupKey
-   * @return
-   */
+  /// Returns the result (int) for the given group by key.
+  /// If the group key does not exist in the result holder, returns
+  /// the defaultValue it was initialized with (default value of the aggregation
+  /// function it is holding the result for).
+  ///
+  /// @param groupKey
+  /// @return
   int getIntResult(int groupKey);
 
-  /**
-   * Returns the result (ResultType) for the given group key.
-   * If the group key does not exist in the result holder, returns the
-   * defaultValue it was initialized with (default value of the aggregation
-   * function it is holding the result for).
-   *
-   * @param groupKey
-   * @return
-   */
+  /// Returns the result (long) for the given group by key.
+  /// If the group key does not exist in the result holder, returns
+  /// the defaultValue it was initialized with (default value of the aggregation
+  /// function it is holding the result for).
+  ///
+  /// @param groupKey
+  /// @return
+  long getLongResult(int groupKey);
+
+  /// Returns the result (ResultType) for the given group key.
+  /// If the group key does not exist in the result holder, returns the
+  /// defaultValue it was initialized with (default value of the aggregation
+  /// function it is holding the result for).
+  ///
+  /// @param groupKey
+  /// @return
   <T> T getResult(int groupKey);
 
-  /**
-   * Increase internal storage if needed to store the required number
-   * of unique group keys.
-   *
-   * @param capacity
-   */
+  /// Increase internal storage if needed to store the required number
+  /// of unique group keys.
+  ///
+  /// @param capacity
   void ensureCapacity(int capacity);
 }

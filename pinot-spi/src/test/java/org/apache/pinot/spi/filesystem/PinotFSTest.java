@@ -69,9 +69,7 @@ public class PinotFSTest {
     Assert.assertEquals(callArgs.get("dstUri").toString(), _dstForMoveFileWithPort, "should keep correct dst");
   }
 
-  /**
-   * MockRemoteFS implementation used to test behavior of the Abstract class PinotFS
-   */
+  /// MockRemoteFS implementation used to test behavior of the Abstract class PinotFS
   private class MockRemoteFS extends BasePinotFS {
     public int _doMoveCalls;
     public List<Map<String, URI>> _doMoveArgs;

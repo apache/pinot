@@ -25,14 +25,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
@@ -42,14 +43,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This is a singleton class in the controller that drives the state machines for segments that are in the
- * committing stage.
- *
- * SegmentCompletionManager has a sub-class that represents the FSM that the segment goes through while
- * executing the segment completion protocol between pinot servers and pinot controller. The protocol is
- * described in SegmentCompletionProtocol.
- */
+/// This is a singleton class in the controller that drives the state machines for segments that are in the
+/// committing stage.
+///
+/// SegmentCompletionManager has a sub-class that represents the FSM that the segment goes through while
+/// executing the segment completion protocol between pinot servers and pinot controller. The protocol is
+/// described in SegmentCompletionProtocol.
 public class SegmentCompletionManager {
   // TODO Can we log using the segment name in the log message?
   public static final Logger LOGGER = LoggerFactory.getLogger(SegmentCompletionManager.class);
@@ -101,8 +100,7 @@ public class SegmentCompletionManager {
   protected StreamPartitionMsgOffsetFactory getStreamPartitionMsgOffsetFactory(LLCSegmentName llcSegmentName) {
     String rawTableName = llcSegmentName.getTableName();
     TableConfig tableConfig = _segmentManager.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
-    StreamConfig streamConfig =
-        new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0));
+    StreamConfig streamConfig = IngestionConfigUtils.getFirstStreamConfig(tableConfig);
     return StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
   }
 
@@ -126,19 +124,15 @@ public class SegmentCompletionManager {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName());
     String segmentName = llcSegmentName.getSegmentName();
     SegmentZKMetadata segmentMetadata = _segmentManager.getSegmentZKMetadata(realtimeTableName, segmentName, null);
-    Preconditions.checkState(segmentMetadata != null, "Failed to find ZK metadata for segment: %s", segmentName);
 
     TableConfig tableConfig = _segmentManager.getTableConfig(realtimeTableName);
-    String factoryName = null;
-    try {
-      Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
-      factoryName = streamConfigMap.get(StreamConfigProperties.SEGMENT_COMPLETION_FSM_SCHEME);
-    } catch (Exception e) {
-      // If there is an exception, we default to the default factory.
-    }
-
-    if (factoryName == null) {
+    String factoryName;
+    if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+      factoryName = _segmentCompletionConfig.getDefaultPauselessFsmScheme();
+      _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_CONSUMPTION_ENABLED, 1);
+    } else {
       factoryName = _segmentCompletionConfig.getDefaultFsmScheme();
+      _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_CONSUMPTION_ENABLED, 0);
     }
 
     Preconditions.checkState(SegmentCompletionFSMFactory.isFactoryTypeSupported(factoryName),
@@ -152,11 +146,9 @@ public class SegmentCompletionManager {
     return fsm;
   }
 
-  /**
-   * This method is to be called when a server calls in with the segmentConsumed() API, reporting an offset in the
-   * stream
-   * that it currently has (i.e. next offset that it will consume, if it continues to consume).
-   */
+  /// This method is to be called when a server calls in with the segmentConsumed() API, reporting an offset in the
+  /// stream
+  /// that it currently has (i.e. next offset that it will consume, if it continues to consume).
   public SegmentCompletionProtocol.Response segmentConsumed(SegmentCompletionProtocol.Request.Params reqParams) {
     final String segmentNameStr = reqParams.getSegmentName();
     final LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
@@ -184,17 +176,15 @@ public class SegmentCompletionManager {
     return response;
   }
 
-  /**
-   * This method is to be called when a server calls in with the segmentCommit() API. The server sends in the segment
-   * along with the API, but it is the caller's responsibility to save the segment after this call (and before the
-   * segmentCommitEnd() call).
-   *
-   * If successful, this method will return Response.COMMIT_CONTINUE, in which case, the caller should save the incoming
-   * segment and then call segmentCommitEnd().
-   *
-   * Otherwise, this method will return a protocol response to be returned to the client right away (without saving the
-   * incoming segment).
-   */
+  /// This method is to be called when a server calls in with the segmentCommit() API. The server sends in the segment
+  /// along with the API, but it is the caller's responsibility to save the segment after this call (and before the
+  /// segmentCommitEnd() call).
+  ///
+  /// If successful, this method will return Response.COMMIT_CONTINUE, in which case, the caller should save the
+  /// incoming segment and then call segmentCommitEnd().
+  ///
+  /// Otherwise, this method will return a protocol response to be returned to the client right away (without saving the
+  /// incoming segment).
   public SegmentCompletionProtocol.Response segmentCommitStart(
       final SegmentCompletionProtocol.Request.Params reqParams) {
     final String segmentNameStr = reqParams.getSegmentName();
@@ -210,7 +200,7 @@ public class SegmentCompletionManager {
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-      response = fsm.segmentCommitStart(instanceId, offset);
+      response = fsm.segmentCommitStart(reqParams);
     } catch (Exception e) {
       LOGGER.error("Caught exception in segmentCommitStart for segment {}", segmentNameStr, e);
     }
@@ -247,11 +237,23 @@ public class SegmentCompletionManager {
     return response;
   }
 
-  /**
-   * This method is to be called when a server reports that it has stopped consuming a real-time segment.
-   *
-   * @return
-   */
+  public SegmentCompletionProtocol.Response reduceSegmentSizeAndReset(
+      SegmentCompletionProtocol.Request.Params reqParams) {
+    String segmentName = reqParams.getSegmentName();
+    SegmentCompletionFSM fsm = _fsmMap.get(segmentName);
+    if (fsm != null && fsm.isImmutableSegmentCreated()) {
+      // In this case, other replica already starts committing the segment. It is a false alert.
+      LOGGER.warn("Segment {} cannot build is a false alert", segmentName);
+      return SegmentCompletionProtocol.RESP_DISCARD;
+    }
+    _segmentManager.reduceSegmentSizeAndReset(new LLCSegmentName(reqParams.getSegmentName()), reqParams.getNumRows());
+    _fsmMap.remove(segmentName);
+    return SegmentCompletionProtocol.RESP_PROCESSED;
+  }
+
+  /// This method is to be called when a server reports that it has stopped consuming a real-time segment.
+  ///
+  /// @return
   public SegmentCompletionProtocol.Response segmentStoppedConsuming(
       SegmentCompletionProtocol.Request.Params reqParams) {
     final String segmentNameStr = reqParams.getSegmentName();
@@ -279,14 +281,12 @@ public class SegmentCompletionManager {
     return response;
   }
 
-  /**
-   * This method is to be called when the segment sent in by the server has been saved locally in the correct path that
-   * is downloadable by the servers.
-   *
-   * It returns a response code to be sent back to the client.
-   *
-   * If the response code is not COMMIT_SUCCESS, then the caller may remove the segment that has been saved.
-   */
+  /// This method is to be called when the segment sent in by the server has been saved locally in the correct path that
+  /// is downloadable by the servers.
+  ///
+  /// It returns a response code to be sent back to the client.
+  ///
+  /// If the response code is not COMMIT_SUCCESS, then the caller may remove the segment that has been saved.
   public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
       CommittingSegmentDescriptor committingSegmentDescriptor) {
     final String segmentNameStr = reqParams.getSegmentName();

@@ -30,7 +30,8 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
-
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 public class TextIndexTest {
   public static class ConfTest extends AbstractSerdeIndexContract {
@@ -50,6 +51,8 @@ public class TextIndexTest {
       JsonNode indexConfig = fieldConfig.getIndexes().get(TextIndexType.INDEX_DISPLAY_NAME);
       assertNotNull(indexConfig);
       assertFalse(indexConfig.get("disabled").asBoolean());
+      assertTrue(fieldConfig.getIndexTypes().isEmpty());
+      assertNull(fieldConfig.getProperties());
     }
   }
 

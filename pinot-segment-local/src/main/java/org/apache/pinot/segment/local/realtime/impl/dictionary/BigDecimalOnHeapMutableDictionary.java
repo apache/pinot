@@ -25,17 +25,20 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 @SuppressWarnings("Duplicates")
 public class BigDecimalOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   private volatile BigDecimal _min = null;
   private volatile BigDecimal _max = null;
+  private volatile int _lengthOfShortestElement = Integer.MAX_VALUE;
+  private volatile int _lengthOfLongestElement = 0;
 
   @Override
   public int index(Object value) {
     BigDecimal bigDecimalValue = (BigDecimal) value;
-    updateMinMax(bigDecimalValue);
+    updateStats(bigDecimalValue);
     return indexValue(bigDecimalValue);
   }
 
@@ -45,10 +48,25 @@ public class BigDecimalOnHeapMutableDictionary extends BaseOnHeapMutableDictiona
     int[] dictIds = new int[numValues];
     for (int i = 0; i < numValues; i++) {
       BigDecimal bigDecimalValue = (BigDecimal) values[i];
-      updateMinMax(bigDecimalValue);
+      updateStats(bigDecimalValue);
       dictIds[i] = indexValue(bigDecimalValue);
     }
     return dictIds;
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.BIG_DECIMAL;
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    return getDictId(new BigDecimal(stringValue));
+  }
+
+  @Override
+  public int indexOf(BigDecimal bigDecimalValue) {
+    return getDictId(bigDecimalValue);
   }
 
   @Override
@@ -158,18 +176,13 @@ public class BigDecimalOnHeapMutableDictionary extends BaseOnHeapMutableDictiona
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.BIG_DECIMAL;
+  public int getLengthOfShortestElement() {
+    return _lengthOfShortestElement;
   }
 
   @Override
-  public int indexOf(String stringValue) {
-    return getDictId(new BigDecimal(stringValue));
-  }
-
-  @Override
-  public int indexOf(BigDecimal bigDecimalValue) {
-    return getDictId(bigDecimalValue);
+  public int getLengthOfLongestElement() {
+    return _lengthOfLongestElement;
   }
 
   @Override
@@ -204,19 +217,33 @@ public class BigDecimalOnHeapMutableDictionary extends BaseOnHeapMutableDictiona
 
   @Override
   public byte[] getBytesValue(int dictId) {
-    return getBytesValue(dictId);
+    return BigDecimalUtils.serialize(getBigDecimalValue(dictId));
   }
 
-  private void updateMinMax(BigDecimal value) {
+  @Override
+  public int getValueSize(int dictId) {
+    return BigDecimalUtils.byteSize(getBigDecimalValue(dictId));
+  }
+
+  private void updateStats(BigDecimal value) {
+    int byteSize = BigDecimalUtils.byteSize(value);
     if (_min == null) {
       _min = value;
       _max = value;
+      _lengthOfShortestElement = byteSize;
+      _lengthOfLongestElement = byteSize;
     } else {
       if (value.compareTo(_min) < 0) {
         _min = value;
       }
       if (value.compareTo(_max) > 0) {
         _max = value;
+      }
+      if (byteSize < _lengthOfShortestElement) {
+        _lengthOfShortestElement = byteSize;
+      }
+      if (byteSize > _lengthOfLongestElement) {
+        _lengthOfLongestElement = byteSize;
       }
     }
   }

@@ -20,12 +20,12 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -33,16 +33,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This basic {@code TransformOperator} implement basic transformations.
- *
- * This operator performs three kinds of transform
- * - InputRef transform, which reads from certain input column based on column index
- * - Literal transform, which outputs literal value
- * - Function transform, which runs a function on function operands. Function operands and be any of 3 the transform.
- * Note: Function transform only runs functions from v1 engine scalar function factory, which only does argument count
- * and canonicalized function name matching (lower case).
- */
+/// This basic `TransformOperator` implement basic transformations.
+///
+/// This operator performs three kinds of transform
+/// - InputRef transform, which reads from certain input column based on column index
+/// - Literal transform, which outputs literal value
+/// - Function transform, which runs a function on function operands. Function operands and be any of 3 the transform.
+/// Note: Function transform only runs functions from v1 engine scalar function factory, which only does argument count
+/// and canonicalized function name matching (lower case).
 public class TransformOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(TransformOperator.class);
   private static final String EXPLAIN_NAME = "TRANSFORM";
@@ -68,9 +66,11 @@ public class TransformOperator extends MultiStageOperator {
   }
 
   @Override
-  public void registerExecution(long time, int numRows) {
+  public void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+    _statMap.merge(StatKey.ALLOCATED_MEMORY_BYTES, memoryUsedBytes);
+    _statMap.merge(StatKey.GC_TIME_MS, gcTimeMs);
   }
 
   @Override
@@ -94,16 +94,13 @@ public class TransformOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
-    TransferableBlock block = _input.nextBlock();
-    if (block.isEndOfStreamBlock()) {
-      if (block.isSuccessfulEndOfStreamBlock()) {
-        return updateEosBlock(block, _statMap);
-      } else {
-        return block;
-      }
+  protected MseBlock getNextBlock() {
+    MseBlock block = _input.nextBlock();
+    if (block.isEos()) {
+      return block;
     }
-    List<Object[]> container = block.getContainer();
+    MseBlock.Data dataBlock = (MseBlock.Data) block;
+    List<Object[]> container = dataBlock.asRowHeap().getRows();
     List<Object[]> resultRows = new ArrayList<>(container.size());
     for (Object[] row : container) {
       Object[] resultRow = new Object[_resultColumnSize];
@@ -112,19 +109,26 @@ public class TransformOperator extends MultiStageOperator {
       }
       resultRows.add(resultRow);
     }
-    return new TransferableBlock(resultRows, _resultSchema, DataBlock.Type.ROW);
+    return new RowHeapDataBlock(resultRows, _resultSchema);
+  }
+
+  @Override
+  public StatMap<StatKey> copyStatMaps() {
+    return new StatMap<>(_statMap);
   }
 
   public enum StatKey implements StatMap.Key {
-    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
         return true;
       }
     },
-    EMITTED_ROWS(StatMap.Type.LONG);
-    //@formatter:on
+    EMITTED_ROWS(StatMap.Type.LONG),
+    /// Allocated memory in bytes for this operator or its children in the same stage.
+    ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
+    /// Time spent on GC while this operator or its children in the same stage were running.
+    GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;
 

@@ -17,15 +17,21 @@
  * under the License.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { get, each } from 'lodash';
-import { Grid, makeStyles } from '@material-ui/core';
+import { Grid, makeStyles, Box } from '@material-ui/core';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import CustomizedTables from '../components/Table';
+import CustomButton from '../components/CustomButton';
+import { useConfirm } from '../components/Confirm';
+import TaskStatusFilter, { TaskStatus } from '../components/TaskStatusFilter';
 import { TaskRuntimeConfig } from 'Models';
 import AppLoader from '../components/AppLoader';
 import SimpleAccordion from '../components/SimpleAccordion';
 import CustomCodemirror from '../components/CustomCodemirror';
+import { NotificationContext } from '../components/Notification/NotificationContext';
+import { formatTimeInTimezone } from '../utils/TimezoneUtils';
+import { useTimezone } from '../contexts/TimezoneContext';
 
 const useStyles = makeStyles(() => ({
   gridContainer: {
@@ -68,17 +74,21 @@ const useStyles = makeStyles(() => ({
 
 const TaskDetail = (props) => {
   const classes = useStyles();
+  const { currentTimezone } = useTimezone();
+  const { history } = props;
   const { taskID, taskType, queueTableName } = props.match.params;
+  const { dispatch } = useContext(NotificationContext);
 
   const [fetching, setFetching] = useState(true);
   const [taskDebugData, setTaskDebugData] = useState({});
   const [subtaskTableData, setSubtaskTableData] = useState({ columns: ['Task ID', 'Status', 'Start Time', 'Finish Time', 'Minion Host Name'], records: [] });
   const [taskRuntimeConfig, setTaskRuntimeConfig] = useState<TaskRuntimeConfig | null>(null);
+  const [subtaskStatusFilter, setSubtaskStatusFilter] = useState<'ALL' | TaskStatus>('ALL');
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setFetching(true);
     const [debugRes, runtimeConfig] = await Promise.all([
-      PinotMethodUtils.getTaskDebugData(taskID), 
+      PinotMethodUtils.getTaskDebugData(taskID, queueTableName),
       PinotMethodUtils.getTaskRuntimeConfigData(taskID)
     ]);
     const subtaskTableRecords = [];
@@ -86,8 +96,8 @@ const TaskDetail = (props) => {
       subtaskTableRecords.push([
         get(subTask, 'taskId'),
         get(subTask, 'state'),
-        get(subTask, 'startTime'),
-        get(subTask, 'finishTime'),
+        get(subTask, 'startTime') ? formatTimeInTimezone(get(subTask, 'startTime'), 'MMMM Do YYYY, HH:mm:ss z') : '-',
+        get(subTask, 'finishTime') ? formatTimeInTimezone(get(subTask, 'finishTime'), 'MMMM Do YYYY, HH:mm:ss z') : '-',
         get(subTask, 'participant'),
       ])
     });
@@ -98,11 +108,91 @@ const TaskDetail = (props) => {
     setTaskRuntimeConfig(runtimeConfig)
 
     setFetching(false);
-  };
+  }, [taskID]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [currentTimezone, fetchData]);
+
+  const filteredSubtaskTableData = useMemo(() => {
+    if (subtaskStatusFilter === 'ALL') {
+      return subtaskTableData;
+    }
+
+    const filtered = subtaskTableData.records.filter(([_, status]) => {
+      const rawStatus = (typeof status === 'object' && status !== null && 'value' in status)
+        ? (status as { value?: unknown }).value
+        : status;
+      const statusString = typeof rawStatus === 'string' ? rawStatus : '';
+      const statusUpper = statusString.toUpperCase();
+      const normalized = statusUpper === 'TIMEDOUT' ? 'TIMED_OUT' : statusUpper;
+      return normalized === subtaskStatusFilter;
+    });
+
+    return { ...subtaskTableData, records: filtered };
+  }, [subtaskTableData, subtaskStatusFilter]);
+
+  const subtaskStatusFilterOptions = [
+    { label: 'All', value: 'ALL' as const },
+    { label: 'Completed', value: 'COMPLETED' as const },
+    { label: 'Running', value: 'RUNNING' as const },
+    { label: 'Waiting', value: 'WAITING' as const },
+    { label: 'Error', value: 'ERROR' as const },
+    { label: 'Task Error', value: 'TASK_ERROR' as const },
+    { label: 'Unknown', value: 'UNKNOWN' as const },
+    { label: 'Dropped', value: 'DROPPED' as const },
+    { label: 'Timed Out', value: 'TIMED_OUT' as const },
+    { label: 'Aborted', value: 'ABORTED' as const },
+  ];
+
+  const subtaskStatusFilterElement = (
+    <TaskStatusFilter
+      value={subtaskStatusFilter}
+      onChange={setSubtaskStatusFilter}
+      options={subtaskStatusFilterOptions}
+    />
+  );
+
+  const handleDeleteTask = async () => {
+    deleteTaskConfirm.setConfirmDialog(false);
+    try {
+      // Some Pinot endpoints embed errors in a 200 body (`{error: "..."}`).
+      // Treat that as a failure rather than a silent success.
+      const result = await PinotMethodUtils.deleteSingleTaskOp(taskID);
+      const embeddedError = get(result, 'error');
+      if (embeddedError) {
+        throw new Error(String(embeddedError));
+      }
+      dispatch({
+        type: 'success',
+        message: `Successfully deleted task ${taskID}`,
+        show: true,
+      });
+      const target = `/task-queue/${taskType}/tables/${queueTableName}`;
+      // Defer navigation by a tick so the success toast has time to mount before
+      // this page unmounts. Fall back to window.location when react-router is
+      // unavailable so the user does not stay on a stale (deleted) URL.
+      setTimeout(() => {
+        if (history && typeof history.push === 'function') {
+          history.push(target);
+        } else if (typeof window !== 'undefined') {
+          window.location.hash = `#${target}`;
+        }
+      }, 0);
+    } catch (e) {
+      dispatch({
+        type: 'error',
+        message: `Failed to delete task: ${get(e, 'response.data.error') || (e as Error).message || 'unknown error'}`,
+        show: true,
+      });
+    }
+  };
+
+  const deleteTaskConfirm = useConfirm({
+    dialogTitle: 'Delete task',
+    dialogContent: `Delete task ${taskID}? Sub-tasks and their state will be removed from ZooKeeper.`,
+    successCallback: handleDeleteTask,
+  });
 
   if(fetching) {
     return <AppLoader />
@@ -110,6 +200,19 @@ const TaskDetail = (props) => {
 
   return (
     <Grid item xs className={classes.gridContainer}>
+      <div className={classes.operationDiv}>
+        <SimpleAccordion headerTitle="Operations" showSearchBox={false}>
+          <Box p={1}>
+            <CustomButton
+              onClick={() => deleteTaskConfirm.setConfirmDialog(true)}
+              tooltipTitle="Delete this task and remove its sub-tasks from the task queue"
+              enableTooltip={true}
+            >
+              Delete Task
+            </CustomButton>
+          </Box>
+        </SimpleAccordion>
+      </div>
       <div className={classes.highlightBackground}>
         <Grid container className={classes.body}>
           <Grid item xs={12}>
@@ -118,11 +221,18 @@ const TaskDetail = (props) => {
           <Grid item xs={12}>
             <strong>Status:</strong> {get(taskDebugData, 'taskState', '')}
           </Grid>
+          {get(taskDebugData, 'startTime') && (
+            <Grid item xs={12}>
+              <strong>Start Time:</strong> {formatTimeInTimezone(get(taskDebugData, 'startTime'), 'MMMM Do YYYY, HH:mm:ss z')}
+            </Grid>
+          )}
+          {get(taskDebugData, 'finishTime') && (
+            <Grid item xs={12}>
+              <strong>Finish Time:</strong> {formatTimeInTimezone(get(taskDebugData, 'finishTime'), 'MMMM Do YYYY, HH:mm:ss z')}
+            </Grid>
+          )}
           <Grid item xs={12}>
-            <strong>Start Time:</strong> {get(taskDebugData, 'startTime', '')}
-          </Grid>
-          <Grid item xs={12}>
-            <strong>Finish Time:</strong> {get(taskDebugData, 'finishTime', '')}
+            <strong>Triggered By:</strong> {get(taskDebugData, 'triggeredBy', '')}
           </Grid>
           <Grid item xs={12}>
             <strong>Number of Sub Tasks:</strong> {get(taskDebugData, 'subtaskCount.total', '')}
@@ -142,19 +252,21 @@ const TaskDetail = (props) => {
             />
           </SimpleAccordion>
         </Grid>
-      
+
         {/* Sub task table */}
         <Grid item xs={12}>
           <CustomizedTables
             title="Sub Tasks"
-            data={subtaskTableData}
+            data={filteredSubtaskTableData}
             showSearchBox={true}
             inAccordionFormat={true}
             addLinks
             baseURL={`/task-queue/${taskType}/tables/${queueTableName}/task/${taskID}/sub-task/`}
+            additionalControls={<Box display="flex" alignItems="center">{subtaskStatusFilterElement}</Box>}
           />
         </Grid>
       </Grid>
+      {deleteTaskConfirm.confirmComponent}
     </Grid>
   );
 };

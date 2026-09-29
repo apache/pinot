@@ -22,8 +22,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 import javax.tools.JavaCompiler;
@@ -34,6 +36,7 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 public class PluginManagerTest {
@@ -191,7 +194,235 @@ public class PluginManagerTest {
     // StreamConsumerFactory
     Assert.assertEquals(PluginManager
             .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory"),
-        "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory");
+        "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+    Assert.assertEquals(PluginManager
+            .loadClassWithBackwardCompatibleCheck("org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory"),
+        "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+  }
+
+  @DataProvider(name = "recordReaderClassNames")
+  public Object[][] recordReaderClassNames() {
+    return new Object[][]{
+        {"avro", "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader"},
+        {"AVRO", "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader"},
+        {"csv", "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader"},
+        {"json", "org.apache.pinot.plugin.inputformat.json.JSONRecordReader"},
+        {"orc", "org.apache.pinot.plugin.inputformat.orc.ORCRecordReader"},
+        {"parquet", "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader"},
+        {"protobuf", "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReader"},
+        {"PROTOBUF", "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReader"},
+        {"thrift", "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader"}
+    };
+  }
+
+  @Test(dataProvider = "recordReaderClassNames")
+  public void testGetRecordReaderClassName(String inputFormat, String expectedClassName) {
+    String actualClassName = PluginManager.get().getRecordReaderClassName(inputFormat);
+    Assert.assertEquals(actualClassName, expectedClassName,
+        "RecordReader class name mismatch for input: " + inputFormat);
+  }
+
+  @Test
+  public void testGetRecordReaderClassNameWithUnknownFormat() {
+    Assert.assertNull(PluginManager.get().getRecordReaderClassName("unknown"));
+    Assert.assertNull(PluginManager.get().getRecordReaderClassName("xml"));
+    Assert.assertNull(PluginManager.get().getRecordReaderClassName("gzipped_avro"));
+  }
+
+  @DataProvider(name = "recordReaderConfigClassNames")
+  public Object[][] recordReaderConfigClassNames() {
+    return new Object[][]{
+        {"avro", "org.apache.pinot.plugin.inputformat.avro.AvroRecordReaderConfig"},
+        {"AVRO", "org.apache.pinot.plugin.inputformat.avro.AvroRecordReaderConfig"},
+        {"csv", "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig"},
+        {"parquet", "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReaderConfig"},
+        {"protobuf", "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReaderConfig"},
+        {"PROTOBUF", "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReaderConfig"},
+        {"thrift", "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig"}
+    };
+  }
+
+  @Test(dataProvider = "recordReaderConfigClassNames")
+  public void testGetRecordReaderConfigClassName(String inputFormat, String expectedClassName) {
+    String actualClassName = PluginManager.get().getRecordReaderConfigClassName(inputFormat);
+    Assert.assertEquals(actualClassName, expectedClassName,
+        "RecordReaderConfig class name mismatch for input: " + inputFormat);
+  }
+
+  @Test
+  public void testGetRecordReaderConfigClassNameWithUnknownFormat() {
+    Assert.assertNull(PluginManager.get().getRecordReaderConfigClassName("unknown"));
+    Assert.assertNull(PluginManager.get().getRecordReaderConfigClassName("gzipped_avro"));
+  }
+
+  @Test
+  public void testGetRecordReaderConfigClassNameReturnsNullForFormatsWithoutConfig() {
+    // JSON and ORC don't have config classes registered
+    Assert.assertNull(PluginManager.get().getRecordReaderConfigClassName("json"));
+    Assert.assertNull(PluginManager.get().getRecordReaderConfigClassName("orc"));
+  }
+
+  @Test
+  public void testRegisterRecordReaderClass() {
+    String customReaderClass = "com.example.CustomRecordReader";
+    String customConfigClass = "com.example.CustomRecordReaderConfig";
+
+    // Register custom classes for an existing format
+    PluginManager.get().registerRecordReaderClass("avro", customReaderClass, customConfigClass);
+
+    // Verify the registration
+    Assert.assertEquals(PluginManager.get().getRecordReaderClassName("avro"), customReaderClass);
+    Assert.assertEquals(PluginManager.get().getRecordReaderConfigClassName("avro"), customConfigClass);
+
+    // Restore original values
+    PluginManager.get().registerRecordReaderClass("avro",
+        "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader",
+        "org.apache.pinot.plugin.inputformat.avro.AvroRecordReaderConfig");
+  }
+
+  @Test
+  public void testRegisterRecordReaderClassWithNullValues() {
+    String originalReaderClass = PluginManager.get().getRecordReaderClassName("csv");
+    String originalConfigClass = PluginManager.get().getRecordReaderConfigClassName("csv");
+
+    // Register with null reader class - should not change the reader class
+    PluginManager.get().registerRecordReaderClass("csv", null, "com.example.NewConfig");
+    Assert.assertEquals(PluginManager.get().getRecordReaderClassName("csv"), originalReaderClass);
+
+    // Register with null config class - should not change the config class
+    PluginManager.get().registerRecordReaderClass("csv", "com.example.NewReader", null);
+    Assert.assertEquals(PluginManager.get().getRecordReaderConfigClassName("csv"), "com.example.NewConfig");
+
+    // Restore original values
+    PluginManager.get().registerRecordReaderClass("csv", originalReaderClass, originalConfigClass);
+  }
+
+  @Test
+  public void testRegisterRecordReaderClassWithNewFormat() {
+    // Registering with a new format should add it to the maps
+    PluginManager.get().registerRecordReaderClass("customFormat", "com.example.Reader", "com.example.Config");
+
+    // Should return the registered values
+    Assert.assertEquals(PluginManager.get().getRecordReaderClassName("customFormat"), "com.example.Reader");
+    Assert.assertEquals(PluginManager.get().getRecordReaderConfigClassName("customFormat"), "com.example.Config");
+  }
+
+  @Test
+  public void testGetRecordReaderClassNameCaseInsensitivity() {
+    // Test that input format lookup is case-insensitive
+    Assert.assertEquals(PluginManager.get().getRecordReaderClassName("AVRO"),
+        PluginManager.get().getRecordReaderClassName("avro"));
+    Assert.assertEquals(PluginManager.get().getRecordReaderClassName("Avro"),
+        PluginManager.get().getRecordReaderClassName("avro"));
+    Assert.assertEquals(PluginManager.get().getRecordReaderClassName("CSV"),
+        PluginManager.get().getRecordReaderClassName("csv"));
+    Assert.assertEquals(PluginManager.get().getRecordReaderClassName("Json"),
+        PluginManager.get().getRecordReaderClassName("json"));
+    Assert.assertEquals(PluginManager.get().getRecordReaderClassName("PROTOBUF"),
+        PluginManager.get().getRecordReaderClassName("protobuf"));
+  }
+
+  @Test
+  public void testGetRecordReaderConfigClassNameCaseInsensitivity() {
+    // Test that config class lookup is case-insensitive
+    Assert.assertEquals(PluginManager.get().getRecordReaderConfigClassName("AVRO"),
+        PluginManager.get().getRecordReaderConfigClassName("avro"));
+    Assert.assertEquals(PluginManager.get().getRecordReaderConfigClassName("Csv"),
+        PluginManager.get().getRecordReaderConfigClassName("csv"));
+    Assert.assertEquals(PluginManager.get().getRecordReaderConfigClassName("PROTOBUF"),
+        PluginManager.get().getRecordReaderConfigClassName("protobuf"));
+  }
+
+  @Test
+  public void testPluginManagerSingleton() {
+    // Verify that PluginManager.get() always returns the same instance
+    PluginManager instance1 = PluginManager.get();
+    PluginManager instance2 = PluginManager.get();
+    Assert.assertSame(instance1, instance2, "PluginManager should be a singleton");
+  }
+
+  @Test
+  public void testGetPluginClassLoadersEmptyOnFreshInstance() {
+    PluginManager pm = new PluginManager();
+    Set<ClassLoader> loaders = pm.getPluginClassLoaders();
+    Assert.assertNotNull(loaders, "getPluginClassLoaders() must never return null");
+    Assert.assertTrue(loaders.isEmpty(),
+        "A fresh PluginManager with no loaded plugins should return an empty set");
+  }
+
+  @Test
+  public void testGetPluginClassLoadersIncludesNewStylePlugin()
+      throws Exception {
+    // New-style plugins (with pinot-plugin.properties) are loaded into a ClassRealm.
+    // Old-style plugins (without the file) are NOT returned by getPluginClassLoaders().
+    File newStyleDir = new File(_tempDir, "new-style-plugin-for-cl-test");
+    newStyleDir.mkdirs();
+    Files.createFile(newStyleDir.toPath().resolve("pinot-plugin.properties"));
+    try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(new File(newStyleDir, "dummy.jar")))) {
+      // intentionally empty JAR
+    }
+    File oldStyleDir = new File(_tempDir, "old-style-plugin-for-cl-test");
+    oldStyleDir.mkdirs();
+    try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(new File(oldStyleDir, "dummy.jar")))) {
+      // intentionally empty JAR — no pinot-plugin.properties
+    }
+
+    PluginManager pm = new PluginManager();
+    Assert.assertTrue(pm.getPluginClassLoaders().isEmpty(), "Should start empty");
+
+    pm.load("old-style-plugin-for-cl-test", oldStyleDir);
+    Assert.assertTrue(pm.getPluginClassLoaders().isEmpty(),
+        "Old-style plugins must not appear in getPluginClassLoaders()");
+
+    pm.load("new-style-plugin-for-cl-test", newStyleDir);
+    Set<ClassLoader> loaders = pm.getPluginClassLoaders();
+    Assert.assertEquals(loaders.size(), 1,
+        "New-style plugin must appear in getPluginClassLoaders()");
+  }
+
+  @Test
+  public void testRegisterRecordReaderClassCaseInsensitivity() {
+    // Test that registration works with different case formats
+    String customClass = "com.example.TestReader";
+    String customConfig = "com.example.TestConfig";
+
+    // Register with uppercase
+    PluginManager.get().registerRecordReaderClass("TESTFORMAT", customClass, customConfig);
+
+    // Should be retrievable with lowercase
+    Assert.assertEquals(PluginManager.get().getRecordReaderClassName("testformat"), customClass);
+    Assert.assertEquals(PluginManager.get().getRecordReaderConfigClassName("testformat"), customConfig);
+
+    // Should be retrievable with mixed case
+    Assert.assertEquals(PluginManager.get().getRecordReaderClassName("TestFormat"), customClass);
+  }
+
+  @Test
+  public void testRegisterOverwritesExistingRegistration() {
+    String originalClass = PluginManager.get().getRecordReaderClassName("json");
+
+    // Register a new class for json
+    String newClass = "com.example.NewJsonReader";
+    PluginManager.get().registerRecordReaderClass("json", newClass, null);
+
+    // Verify it was overwritten
+    Assert.assertEquals(PluginManager.get().getRecordReaderClassName("json"), newClass);
+
+    // Restore original
+    PluginManager.get().registerRecordReaderClass("json", originalClass, null);
+  }
+
+  @Test
+  public void testLoadClassWithBackwardCompatibleCheckWithUnknownClass() {
+    // Unknown classes should return as-is
+    String unknownClass = "com.example.UnknownClass";
+    Assert.assertEquals(PluginManager.loadClassWithBackwardCompatibleCheck(unknownClass), unknownClass);
+  }
+
+  @Test
+  public void testLoadClassWithBackwardCompatibleCheckWithNull() {
+    // Null should return null
+    Assert.assertNull(PluginManager.loadClassWithBackwardCompatibleCheck(null));
   }
 
   @AfterClass

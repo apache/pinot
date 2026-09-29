@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -26,14 +27,11 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.glassfish.jersey.internal.guava.Preconditions;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * <code>LogicalOperatorTransformFunction</code> abstracts common functions for logical operators (AND, OR).
- * The results are BOOLEAN type.
- */
+/// `LogicalOperatorTransformFunction` abstracts common functions for logical operators (AND, OR).
+/// The results are BOOLEAN type.
 public abstract class LogicalOperatorTransformFunction extends BaseTransformFunction {
 
   @Override

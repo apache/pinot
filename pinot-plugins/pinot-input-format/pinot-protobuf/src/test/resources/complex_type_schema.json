@@ -135,7 +135,7 @@
     "name" : "test_message.long_field",
     "dataType" : "LONG",
     "notNull" : false,
-    "format" : "1:MILLISECONDS:EPOCH",
+    "format" : "EPOCH|MILLISECONDS",
     "granularity" : "1:MILLISECONDS"
   } ]
 }

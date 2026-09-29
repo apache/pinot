@@ -20,13 +20,10 @@
 package org.apache.pinot.segment.local.customobject;
 
 import java.nio.ByteBuffer;
-import javax.annotation.Nonnull;
 
 
-/**
- * Intermediate state used by CovarianceAggregationFunction which helps calculate
- * population covariance and sample covariance
- */
+/// Intermediate state used by CovarianceAggregationFunction which helps calculate
+/// population covariance and sample covariance
 public class CovarianceTuple implements Comparable<CovarianceTuple> {
 
   private double _sumX;
@@ -48,7 +45,7 @@ public class CovarianceTuple implements Comparable<CovarianceTuple> {
     _count += count;
   }
 
-  public void apply(@Nonnull CovarianceTuple covarianceTuple) {
+  public void apply(CovarianceTuple covarianceTuple) {
     _sumX += covarianceTuple._sumX;
     _sumY += covarianceTuple._sumY;
     _sumXY += covarianceTuple._sumXY;
@@ -71,7 +68,6 @@ public class CovarianceTuple implements Comparable<CovarianceTuple> {
     return _count;
   }
 
-  @Nonnull
   public byte[] toBytes() {
     ByteBuffer byteBuffer = ByteBuffer.allocate(Double.BYTES + Double.BYTES + Double.BYTES + Long.BYTES);
     byteBuffer.putDouble(_sumX);
@@ -81,19 +77,17 @@ public class CovarianceTuple implements Comparable<CovarianceTuple> {
     return byteBuffer.array();
   }
 
-  @Nonnull
   public static CovarianceTuple fromBytes(byte[] bytes) {
     return fromByteBuffer(ByteBuffer.wrap(bytes));
   }
 
-  @Nonnull
   public static CovarianceTuple fromByteBuffer(ByteBuffer byteBuffer) {
     return new CovarianceTuple(byteBuffer.getDouble(), byteBuffer.getDouble(), byteBuffer.getDouble(),
         byteBuffer.getLong());
   }
 
   @Override
-  public int compareTo(@Nonnull CovarianceTuple covarianceTuple) {
+  public int compareTo(CovarianceTuple covarianceTuple) {
     if (_count == 0) {
       if (covarianceTuple._count == 0) {
         return 0;

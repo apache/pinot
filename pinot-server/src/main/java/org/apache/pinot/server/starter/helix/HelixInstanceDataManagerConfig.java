@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.collections4.map.DefaultedMap;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
@@ -36,9 +36,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.*;
 
 
-/**
- * The config used for HelixInstanceDataManager.
- */
+/// The config used for HelixInstanceDataManager.
 public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManagerConfig.class);
 
@@ -49,12 +47,16 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String SEGMENT_DIRECTORY_LOADER = "segment.directory.loader";
   // Prefix for upsert config
   public static final String UPSERT_CONFIG_PREFIX = "upsert";
+  // Prefix for dedup config
+  public static final String DEDUP_CONFIG_PREFIX = "dedup";
   // Prefix for auth config
   public static final String AUTH_CONFIG_PREFIX = "auth";
   // Prefix for tier configs
   public static final String TIER_CONFIGS_PREFIX = "tierConfigs";
   // Key of tier names
   public static final String TIER_NAMES = "tierNames";
+  // Prefix for default tier configs
+  public static final String DEFAULT_TIER_CONFIG_KEY_PREFIX = "defaultTierConfigs";
 
   // Key of how many parallel realtime segments can be built.
   // A value of <= 0 indicates unlimited.
@@ -94,7 +96,16 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // NOTE: While segment load can be faster, multiple threads will be taken up loading segments, so
   //       it is possible that the query latencies increase during that period.
   //
-  private static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
+  public static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
+
+  // Whether to process SEGMENT_REFRESH in a synchronous or asynchronous manner when the messaged is received.
+  // Defaults to false, meaning SEGMENT_REFRESH will be processed in a synchronous manner.
+  public static final String ENABLE_ASYNC_SEGMENT_REFRESH = "enable.async.segment.refresh";
+  private static final boolean DEFAULT_ENABLE_ASYNC_SEGMENT_REFRESH = false;
+
+  // Whether to disable preloading for dimension tables. Preload Enabled by default.
+  public static final String DISABLE_DIMENSION_TABLE_PRELOAD = "disable.dimension.table.preload";
+  private static final boolean DEFAULT_DISABLE_DIMENSION_TABLE_PRELOAD = false;
 
   // To preload segments of table using upsert in parallel for fast upsert metadata recovery.
   private static final String MAX_SEGMENT_PRELOAD_THREADS = "max.segment.preload.threads";
@@ -115,11 +126,15 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final int DEFAULT_DELETED_TABLES_CACHE_TTL_MINUTES = 60;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_SIZE = 10_000;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_TTL_MINUTES = 2;
+  // By default, check CRC matching when loading segments.
+  private static final boolean DEFAULT_CHECK_CRC_ON_SEGMENT_LOAD = true;
+  private static final String CHECK_CRC_ON_SEGMENT_LOAD = "check.crc.on.segment.load";
 
   private final PinotConfiguration _serverConfig;
   private final PinotConfiguration _upsertConfig;
+  private final PinotConfiguration _dedupConfig;
   private final PinotConfiguration _authConfig;
-  private final Map<String, Map<String, String>> _tierConfigs;
+  private final DefaultedMap<String, Map<String, String>> _tierConfigs;
 
   public HelixInstanceDataManagerConfig(PinotConfiguration serverConfig)
       throws ConfigurationException {
@@ -133,18 +148,31 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
     _authConfig = serverConfig.subset(AUTH_CONFIG_PREFIX);
     _upsertConfig = serverConfig.subset(UPSERT_CONFIG_PREFIX);
+    _dedupConfig = serverConfig.subset(DEDUP_CONFIG_PREFIX);
 
+    // Load default tier configurations
+    // Properties are prefixed with pinot.server.instance.defaultTierConfigs.
+    // e.g. pinot.server.instance.defaultTierConfigs.myKey = myValue
+    // The resulting defaultTierProperties map will be { "myKey": "myValue" }
+    Map<String, String> defaultTierProperties = new HashMap<>();
+    serverConfig.subset(DEFAULT_TIER_CONFIG_KEY_PREFIX)
+        .toMap()
+        .forEach((key, value) -> defaultTierProperties.put(key, String.valueOf(value)));
+    Map<String, String> unmodifiableDefaultTierProperties = Collections.unmodifiableMap(defaultTierProperties);
+
+    // If a tier is not found in this map, this map of default configs will be used.
+    _tierConfigs = new DefaultedMap<>(unmodifiableDefaultTierProperties);
+
+    // Load specific tier configurations and merge with defaults
+    // Tier configs are prefixed with pinot.server.instance.tierConfigs.
+    // Tier names are defined by pinot.server.instance.tierConfigs.tierNames = tierA,tierB
+    // Specific configs for a tier are like pinot.server.instance.tierConfigs.tierA.someKey = someValue
     PinotConfiguration tierConfigs = getConfig().subset(TIER_CONFIGS_PREFIX);
-    List<String> tierNames = tierConfigs.getProperty(TIER_NAMES, Collections.emptyList());
-    if (tierNames.isEmpty()) {
-      _tierConfigs = Collections.emptyMap();
-    } else {
-      _tierConfigs = Maps.newHashMapWithExpectedSize(tierNames.size());
-      for (String tierName : tierNames) {
-        Map<String, String> tierConfigMap = new HashMap<>();
-        tierConfigs.subset(tierName).toMap().forEach((k, v) -> tierConfigMap.put(k, String.valueOf(v)));
-        _tierConfigs.put(tierName, tierConfigMap);
-      }
+    List<String> tierNames = tierConfigs.getProperty(TIER_NAMES, List.of());
+    for (String tierName : tierNames) {
+      Map<String, String> mergedProps = new HashMap<>(unmodifiableDefaultTierProperties);
+      tierConfigs.subset(tierName).toMap().forEach((k, v) -> mergedProps.put(k, String.valueOf(v)));
+      _tierConfigs.put(tierName, Collections.unmodifiableMap(mergedProps));
     }
   }
 
@@ -207,6 +235,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
+  public String getAvgMultiValueCount() {
+    return _serverConfig.getProperty(AVERAGE_MV_COUNT);
+  }
+
+  @Override
   public boolean isRealtimeOffHeapAllocation() {
     return _serverConfig.getProperty(REALTIME_OFFHEAP_ALLOCATION, DEFAULT_REALTIME_OFFHEAP_ALLOCATION);
   }
@@ -216,23 +249,27 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
     return _serverConfig.getProperty(REALTIME_OFFHEAP_DIRECT_ALLOCATION, DEFAULT_REALTIME_OFFHEAP_DIRECT_ALLOCATION);
   }
 
+  @Override
   public boolean shouldReloadConsumingSegment() {
     return _serverConfig.getProperty(RELOAD_CONSUMING_SEGMENT, DEFAULT_RELOAD_CONSUMING_SEGMENT);
   }
 
   @Override
-  public String getAvgMultiValueCount() {
-    return _serverConfig.getProperty(AVERAGE_MV_COUNT);
-  }
-
   public int getMaxParallelRefreshThreads() {
     return _serverConfig.getProperty(MAX_PARALLEL_REFRESH_THREADS, 1);
   }
 
+  @Override
+  public boolean isAsyncSegmentRefreshEnabled() {
+    return _serverConfig.getProperty(ENABLE_ASYNC_SEGMENT_REFRESH, DEFAULT_ENABLE_ASYNC_SEGMENT_REFRESH);
+  }
+
+  @Override
   public int getMaxSegmentPreloadThreads() {
     return _serverConfig.getProperty(MAX_SEGMENT_PRELOAD_THREADS, 0);
   }
 
+  @Override
   public int getMaxParallelSegmentBuilds() {
     return _serverConfig.getProperty(MAX_PARALLEL_SEGMENT_BUILDS, DEFAULT_MAX_PARALLEL_SEGMENT_BUILDS);
   }
@@ -242,6 +279,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
     return _serverConfig.getProperty(MAX_PARALLEL_SEGMENT_DOWNLOADS, DEFAULT_MAX_PARALLEL_SEGMENT_DOWNLOADS);
   }
 
+  @Override
   public String getSegmentDirectoryLoader() {
     return _serverConfig.getProperty(SEGMENT_DIRECTORY_LOADER,
         SegmentDirectoryLoaderRegistry.DEFAULT_SEGMENT_DIRECTORY_LOADER_NAME);
@@ -290,6 +328,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
+  public PinotConfiguration getDedupConfig() {
+    return _dedupConfig;
+  }
+
+  @Override
   public PinotConfiguration getAuthConfig() {
     return _authConfig;
   }
@@ -302,5 +345,16 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public boolean isUploadSegmentToDeepStore() {
     return _serverConfig.getProperty(UPLOAD_SEGMENT_TO_DEEP_STORE, DEFAULT_UPLOAD_SEGMENT_TO_DEEP_STORE);
+  }
+
+  @Override
+  public boolean shouldCheckCRCOnSegmentLoad() {
+    return _serverConfig.getProperty(CHECK_CRC_ON_SEGMENT_LOAD, DEFAULT_CHECK_CRC_ON_SEGMENT_LOAD);
+  }
+
+  @Override
+  public boolean isDimensionTablePreloadDisabled() {
+    return _serverConfig.getProperty(DISABLE_DIMENSION_TABLE_PRELOAD,
+        DEFAULT_DISABLE_DIMENSION_TABLE_PRELOAD);
   }
 }

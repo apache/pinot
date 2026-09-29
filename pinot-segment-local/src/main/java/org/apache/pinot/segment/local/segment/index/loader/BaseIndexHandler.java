@@ -24,42 +24,42 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base class for all of the {@link IndexHandler} classes. This class provides a mechanism to rebuild the forward
- * index if the forward index does not exist and is required to rebuild the index of interest. It also handles cleaning
- * up the forward index if temporarily built once all handlers have completed via overriding the
- * postUpdateIndicesCleanup() method. For {@link IndexHandler} classes which do not utilize the forward index or do not
- * need this behavior, the postUpdateIndicesCleanup() method can be overridden to be a no-op.
- */
+/// Base class for all of the [IndexHandler] classes. This class provides a mechanism to rebuild the forward
+/// index if the forward index does not exist and is required to rebuild the index of interest. It also handles cleaning
+/// up the forward index if temporarily built once all handlers have completed via overriding the
+/// postUpdateIndicesCleanup() method. For [IndexHandler] classes which do not utilize the forward index or do not
+/// need this behavior, the postUpdateIndicesCleanup() method can be overridden to be a no-op.
 public abstract class BaseIndexHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseIndexHandler.class);
   protected final Set<String> _tmpForwardIndexColumns;
   protected final SegmentDirectory _segmentDirectory;
   protected final Map<String, FieldIndexConfigs> _fieldIndexConfigs;
-  @Nullable
   protected final TableConfig _tableConfig;
+  protected final Schema _schema;
 
   public BaseIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
-    this(segmentDirectory, indexLoadingConfig.getFieldIndexConfigByColName(), indexLoadingConfig.getTableConfig());
+    this(segmentDirectory, indexLoadingConfig.getFieldIndexConfigByColName(), indexLoadingConfig.getTableConfig(),
+        indexLoadingConfig.getSchema());
   }
 
   public BaseIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> fieldIndexConfigs,
-      @Nullable TableConfig tableConfig) {
+      TableConfig tableConfig, Schema schema) {
     _segmentDirectory = segmentDirectory;
     SegmentMetadataImpl segmentMetadata = segmentDirectory.getSegmentMetadata();
+    Preconditions.checkState(segmentMetadata.getTotalDocs() > 0, "Got empty segment: %s in index handler",
+        segmentMetadata.getName());
     if (fieldIndexConfigs.keySet().equals(segmentMetadata.getAllColumns())) {
       _fieldIndexConfigs = fieldIndexConfigs;
     } else {
@@ -68,7 +68,10 @@ public abstract class BaseIndexHandler implements IndexHandler {
         _fieldIndexConfigs.putIfAbsent(column, FieldIndexConfigs.EMPTY);
       }
     }
+    Preconditions.checkArgument(tableConfig != null, "Table config must be provided");
     _tableConfig = tableConfig;
+    Preconditions.checkArgument(schema != null, "Schema must be provided");
+    _schema = schema;
     _tmpForwardIndexColumns = new HashSet<>();
   }
 
@@ -105,15 +108,10 @@ public abstract class BaseIndexHandler implements IndexHandler {
 
     LOGGER.info("Rebuilding the forward index for column: {}, is temporary: {}", columnName, isTemporaryForwardIndex);
 
-    FieldIndexConfigs fieldIndexConfig = _fieldIndexConfigs.get(columnName);
-    boolean dictionaryEnabled = fieldIndexConfig.getConfig(StandardIndexes.dictionary()).isEnabled();
-    ForwardIndexConfig forwardIndexConfig = fieldIndexConfig.getConfig(StandardIndexes.forward());
-
-    InvertedIndexAndDictionaryBasedForwardIndexCreator invertedIndexAndDictionaryBasedForwardIndexCreator =
-        new InvertedIndexAndDictionaryBasedForwardIndexCreator(columnName, _segmentDirectory, dictionaryEnabled,
-            forwardIndexConfig, segmentWriter, isTemporaryForwardIndex);
-    invertedIndexAndDictionaryBasedForwardIndexCreator.regenerateForwardIndex();
-
+    InvertedIndexAndDictionaryBasedForwardIndexCreator creator =
+        new InvertedIndexAndDictionaryBasedForwardIndexCreator(_segmentDirectory, segmentWriter, _tableConfig,
+            columnName, _fieldIndexConfigs.get(columnName), isTemporaryForwardIndex);
+    creator.regenerateForwardIndex();
     // Validate that the forward index is created.
     if (!segmentWriter.hasIndexFor(columnName, StandardIndexes.forward())) {
       throw new IOException(String.format("Forward index was not created for column: %s, is temporary: %s", columnName,

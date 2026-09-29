@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.List;
+import java.util.function.Predicate;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -48,6 +49,12 @@ public class NoClosePinotFS implements PinotFS {
   public boolean delete(URI segmentUri, boolean forceDelete)
       throws IOException {
     return _delegate.delete(segmentUri, forceDelete);
+  }
+
+  @Override
+  public boolean deleteBatch(List<URI> segmentUris, boolean forceDelete)
+      throws IOException {
+    return _delegate.deleteBatch(segmentUris, forceDelete);
   }
 
   @Override
@@ -90,6 +97,13 @@ public class NoClosePinotFS implements PinotFS {
   public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
       throws IOException {
     return _delegate.listFilesWithMetadata(fileUri, recursive);
+  }
+
+  @Override
+  public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive,
+      Predicate<String> pathFilter, int maxResults)
+      throws IOException {
+    return _delegate.listFilesWithMetadata(fileUri, recursive, pathFilter, maxResults);
   }
 
   @Override

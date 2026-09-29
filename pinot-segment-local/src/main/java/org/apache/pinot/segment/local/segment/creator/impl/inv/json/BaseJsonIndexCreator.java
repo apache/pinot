@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.inv.json;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -31,6 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.index.json.JsonIndexType;
+import org.apache.pinot.segment.local.utils.MetricUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
@@ -41,17 +44,15 @@ import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
 
 
-/**
- * Base implementation of the json index creator.
- * <p>Header format:
- * <ul>
- *   <li>Version (int)</li>
- *   <li>Max value length (int)</li>
- *   <li>Dictionary file length (long)</li>
- *   <li>Inverted index file length (long)</li>
- *   <li>Doc id mapping file length (long)</li>
- * </ul>
- */
+/// Base implementation of the json index creator.
+///
+/// Header format:
+///
+/// - Version (int)
+/// - Max value length (int)
+/// - Dictionary file length (long)
+/// - Inverted index file length (long)
+/// - Doc id mapping file length (long)
 public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   // NOTE: V1 is deprecated because it does not support top-level value, top-level array and nested array
   public static final int VERSION_1 = 1;
@@ -62,6 +63,8 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   static final String DICTIONARY_FILE_NAME = "dictionary.buf";
   static final String INVERTED_INDEX_FILE_NAME = "inverted.index.buf";
 
+  final String _tableNameWithType;
+  final boolean _continueOnError;
   final JsonIndexConfig _jsonIndexConfig;
   final File _indexFile;
   final File _tempDir;
@@ -74,8 +77,11 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   int _nextFlattenedDocId;
   int _maxValueLength;
 
-  BaseJsonIndexCreator(File indexDir, String columnName, JsonIndexConfig jsonIndexConfig)
+  BaseJsonIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
+      JsonIndexConfig jsonIndexConfig)
       throws IOException {
+    _tableNameWithType = tableNameWithType;
+    _continueOnError = continueOnError;
     _jsonIndexConfig = jsonIndexConfig;
     _indexFile = new File(indexDir, columnName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
     _tempDir = new File(indexDir, columnName + TEMP_DIR_SUFFIX);
@@ -91,12 +97,49 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   @Override
   public void add(String jsonString)
       throws IOException {
-    addFlattenedRecords(JsonUtils.flatten(jsonString, _jsonIndexConfig));
+    List<Map<String, String>> flattenedRecord;
+    try {
+      flattenedRecord = JsonUtils.flatten(jsonString, _jsonIndexConfig);
+      if (flattenedRecord == JsonUtils.SKIPPED_FLATTENED_RECORD) {
+        // The default SKIPPED_FLATTENED_RECORD was returned, this can only happen if the original record could not be
+        // flattened, update the metric
+        MetricUtils.updateIndexingErrorMetric(_tableNameWithType, JsonIndexType.INDEX_DISPLAY_NAME);
+      }
+    } catch (Exception e) {
+      if (_continueOnError) {
+        // Caught exception while trying to add, update metric and add a default SKIPPED_FLATTENED_RECORD
+        // This check is needed in the case where `_jsonIndexConfig.getSkipInvalidJson()` is false,
+        // but _continueOnError is true
+        MetricUtils.updateIndexingErrorMetric(_tableNameWithType, JsonIndexType.INDEX_DISPLAY_NAME);
+        flattenedRecord = JsonUtils.SKIPPED_FLATTENED_RECORD;
+      } else {
+        throw e;
+      }
+    }
+    addFlattenedRecords(flattenedRecord);
   }
 
-  /**
-   * Adds the flattened records for the next document.
-   */
+  @Override
+  public void add(Map value)
+      throws IOException {
+    String valueToAdd;
+    try {
+      // TODO: Avoid this ser/de from map -> string -> json node
+      valueToAdd = JsonUtils.objectToString(value);
+    } catch (JsonProcessingException e) {
+      if (_jsonIndexConfig.getSkipInvalidJson() || _continueOnError) {
+        // Caught exception while trying to add, update metric and add a default SKIPPED_FLATTENED_RECORD
+        MetricUtils.updateIndexingErrorMetric(_tableNameWithType, JsonIndexType.INDEX_DISPLAY_NAME);
+        addFlattenedRecords(JsonUtils.SKIPPED_FLATTENED_RECORD);
+        return;
+      } else {
+        throw e;
+      }
+    }
+    add(valueToAdd);
+  }
+
+  /// Adds the flattened records for the next document.
   void addFlattenedRecords(List<Map<String, String>> records)
       throws IOException {
     int numRecords = records.size();
@@ -115,9 +158,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
     }
   }
 
-  /**
-   * Adds the given value to the posting list.
-   */
+  /// Adds the given value to the posting list.
   void addToPostingList(String value) {
     RoaringBitmapWriter<RoaringBitmap> bitmapWriter = _postingListMap.get(value);
     if (bitmapWriter == null) {
@@ -127,10 +168,9 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
     bitmapWriter.add(_nextFlattenedDocId);
   }
 
-  /**
-   * Generates the index file based on _maxValueLength, _dictionaryFile, _invertedIndexFile, _numFlattenedRecordsList,
-   * _nextFlattenedDocId.
-   */
+  /// Generates the index file based on \_maxValueLength, \_dictionaryFile, \_invertedIndexFile,
+  /// \_numFlattenedRecordsList,
+  /// \_nextFlattenedDocId.
   void generateIndexFile()
       throws IOException {
     ByteBuffer headerBuffer = ByteBuffer.allocate(HEADER_LENGTH);

@@ -21,14 +21,12 @@ package org.apache.pinot.core.common.datatable;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.IOException;
-import javax.annotation.Nullable;
+import java.io.UncheckedIOException;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.datatable.DataTableImplV4;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.roaringbitmap.RoaringBitmap;
 
 
 public class DataTableBuilderV4 extends BaseDataTableBuilder {
@@ -68,20 +66,13 @@ public class DataTableBuilderV4 extends BaseDataTableBuilder {
   }
 
   @Override
-  public void setNullRowIds(@Nullable RoaringBitmap nullRowIds)
-      throws IOException {
-    _fixedSizeDataOutputStream.writeInt(_variableSizeDataByteArrayOutputStream.size());
-    if (nullRowIds == null || nullRowIds.isEmpty()) {
-      _fixedSizeDataOutputStream.writeInt(0);
-    } else {
-      byte[] bitmapBytes = RoaringBitmapUtils.serialize(nullRowIds);
-      _fixedSizeDataOutputStream.writeInt(bitmapBytes.length);
-      _variableSizeDataByteArrayOutputStream.write(bitmapBytes);
-    }
-  }
-
-  @Override
   public DataTable build() {
+    try {
+      writeNullBitmaps();
+    } catch (IOException e) {
+      // Both buffers are in-memory byte arrays, so this cannot happen.
+      throw new UncheckedIOException(e);
+    }
     String[] reverseDictionary = new String[_dictionary.size()];
     for (Object2IntMap.Entry<String> entry : _dictionary.object2IntEntrySet()) {
       reverseDictionary[entry.getIntValue()] = entry.getKey();

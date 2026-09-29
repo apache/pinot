@@ -22,9 +22,7 @@ import java.util.List;
 import org.apache.pinot.common.request.context.FilterContext;
 
 
-/**
- * OR filter matcher.
- */
+/// OR filter matcher.
 public class OrRowMatcher implements RowMatcher {
   private final RowMatcher[] _childMatchers;
 

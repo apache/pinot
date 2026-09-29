@@ -79,7 +79,12 @@ public class BasePartitionDedupMetadataManagerTest {
     }
 
     @Override
-    protected long getNumPrimaryKeys() {
+    public boolean checkRecordPresentOrUpdate(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment) {
+      return false;
+    }
+
+    @Override
+    public long getNumPrimaryKeys() {
       return 0;
     }
   }

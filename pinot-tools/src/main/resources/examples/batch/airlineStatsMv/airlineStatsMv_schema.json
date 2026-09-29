@@ -1,0 +1,47 @@
+{
+  "schemaName": "airlineStatsMv",
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "STRING",
+      "name": "Carrier"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "dataType": "LONG",
+      "defaultNullValue": 0,
+      "name": "sum_ArrDelay"
+    },
+    {
+      "dataType": "LONG",
+      "defaultNullValue": 0,
+      "name": "flight_count"
+    },
+    {
+      "dataType": "INT",
+      "name": "min_ArrDelay"
+    },
+    {
+      "dataType": "INT",
+      "name": "max_ArrDelay"
+    },
+    {
+      "dataType": "BYTES",
+      "maxLength": 16384,
+      "name": "raw_hll_FlightNum"
+    },
+    {
+      "dataType": "BYTES",
+      "maxLength": 16384,
+      "name": "raw_hllplus_FlightNum"
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "tsMs",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:TIMESTAMP",
+      "granularity": "1:MILLISECONDS"
+    }
+  ]
+}

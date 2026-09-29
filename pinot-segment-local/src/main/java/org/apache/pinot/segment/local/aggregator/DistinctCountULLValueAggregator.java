@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.aggregator;
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
@@ -54,7 +55,10 @@ public class DistinctCountULLValueAggregator implements ValueAggregator<Object, 
   }
 
   @Override
-  public UltraLogLog getInitialAggregatedValue(Object rawValue) {
+  public UltraLogLog getInitialAggregatedValue(@Nullable Object rawValue) {
+    if (rawValue == null) {
+      return UltraLogLog.create(_p);
+    }
     UltraLogLog initialValue;
     if (rawValue instanceof byte[]) {
       byte[] bytes = (byte[]) rawValue;
@@ -81,6 +85,11 @@ public class DistinctCountULLValueAggregator implements ValueAggregator<Object, 
   @Override
   public UltraLogLog cloneAggregatedValue(UltraLogLog value) {
     return deserializeAggregatedValue(serializeAggregatedValue(value));
+  }
+
+  @Override
+  public boolean isAggregatedValueFixedSize() {
+    return true;
   }
 
   @Override

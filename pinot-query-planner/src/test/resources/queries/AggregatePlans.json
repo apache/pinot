@@ -6,20 +6,20 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col4) as avg FROM a WHERE a.col3 >= (SELECT AVG(a.col4) FROM a)",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(avg=[CAST(/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)):DECIMAL(1000, 0)])",
+          "\nLogicalProject(avg=[CAST(/(CASE(=($1, 0), null:DECIMAL(2000, 1000), $0), $1)):DECIMAL(2000, 1000)])",
           "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()], aggType=[LEAF])",
-          "\n        LogicalJoin(condition=[>=($0, $2)], joinType=[inner])",
+          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT()], aggType=[LEAF])",
+          "\n        LogicalJoin(condition=[>=($1, $2)], joinType=[inner])",
           "\n          PinotLogicalExchange(distribution=[random])",
-          "\n            LogicalProject(col3=[$2], col4=[$3])",
-          "\n              LogicalTableScan(table=[[default, a]])",
+          "\n            LogicalProject(col4=[$3], EXPR$0=[CAST($2):DECIMAL(2000, 1000) NOT NULL])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n          PinotLogicalExchange(distribution=[broadcast])",
-          "\n            LogicalProject(EXPR$0=[CAST(/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)):DECIMAL(1000, 0)])",
+          "\n            LogicalProject(EXPR$0=[CAST(/(CASE(=($1, 0), null:DECIMAL(2000, 1000), $0), $1)):DECIMAL(2000, 1000)])",
           "\n              PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
           "\n                PinotLogicalExchange(distribution=[hash])",
           "\n                  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($3)], agg#1=[COUNT()], aggType=[LEAF])",
-          "\n                    LogicalTableScan(table=[[default, a]])",
+          "\n                    PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -28,12 +28,12 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col4) as avg FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(avg=[CAST(/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)):DECIMAL(1000, 0)])",
+          "\nLogicalProject(avg=[CAST(/(CASE(=($1, 0), null:DECIMAL(2000, 1000), $0), $1)):DECIMAL(2000, 1000)])",
           "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($3)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
-          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -42,12 +42,12 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col4) as avg, SUM(a.col4) as sum, MAX(a.col4) as max FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(avg=[CAST(/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)):DECIMAL(1000, 0)], sum=[CASE(=($1, 0), null:DECIMAL(1000, 0), $0)], max=[$2])",
+          "\nLogicalProject(avg=[CAST(/(CASE(=($1, 0), null:DECIMAL(2000, 1000), $0), $1)):DECIMAL(2000, 1000)], sum=[CASE(=($1, 0), null:DECIMAL(2000, 1000), $0)], max=[$2])",
           "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], agg#2=[MAX($2)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($3)], agg#1=[COUNT()], agg#2=[MAX($3)], aggType=[LEAF])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
-          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -61,7 +61,7 @@
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
-          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -74,7 +74,7 @@
           "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
-          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -88,7 +88,7 @@
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -102,7 +102,7 @@
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
-          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -116,7 +116,7 @@
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
-          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -130,7 +130,7 @@
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
-          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -143,18 +143,104 @@
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    PinotLogicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[LEAF])",
           "\n      LogicalUnion(all=[true])",
-          "\n        PinotLogicalExchange(distribution=[hash[0, 1, 2]])",
+          "\n        PinotLogicalExchange(distribution=[single])",
           "\n          LogicalProject(col2=[$0], sum_of_runs=[$1], $f2=[50])",
           "\n            PinotLogicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[DIRECT])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
           "\n                LogicalProject(col2=[$1], col3=[$2], $f2=[50])",
-          "\n                  LogicalTableScan(table=[[default, a]])",
-          "\n        PinotLogicalExchange(distribution=[hash[0, 1, 2]])",
+          "\n                  PinotLogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalExchange(distribution=[single])",
           "\n          LogicalProject(col2=[$0], sum_of_runs=[$1], $f2=[50])",
           "\n            PinotLogicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[DIRECT])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
           "\n                LogicalProject(col2=[$1], col3=[$2], $f2=[50])",
-          "\n                  LogicalTableScan(table=[[default, a]])",
+          "\n                  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MIN on STRING column rewritten to MINSTRING",
+        "sql": "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR SELECT MIN(a.col1) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[MINSTRING($0)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[MINSTRING($0)], aggType=[LEAF])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MIN on INT column not rewritten",
+        "sql": "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR SELECT MIN(a.col3) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[MIN($0)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[MIN($2)], aggType=[LEAF])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MAX on STRING column rewritten to MAXSTRING",
+        "sql": "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR SELECT MAX(a.col2) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[MAXSTRING($0)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[MAXSTRING($1)], aggType=[LEAF])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MAX on INT column not rewritten",
+        "sql": "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR SELECT MAX(a.col3) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[MAX($0)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[MAX($2)], aggType=[LEAF])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "SUM on MV LONG column plans natively as SUM (no broker rewrite)",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(mcol2) FROM e",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])",
+          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
+          "\n    PinotLogicalExchange(distribution=[hash])",
+          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($8)], agg#1=[COUNT()], aggType=[LEAF])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "AVG on MV LONG column plans natively as AVG (no broker rewrite)",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(mcol2) FROM e",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[/(CAST(CASE(=($1, 0), null:BIGINT, $0)):DOUBLE, $1)])",
+          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
+          "\n    PinotLogicalExchange(distribution=[hash])",
+          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($8)], agg#1=[COUNT()], aggType=[LEAF])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MIN/MAX on MV LONG column plan natively (no broker rewrite)",
+        "sql": "EXPLAIN PLAN FOR SELECT MIN(mcol2), MAX(mcol2) FROM e",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[MIN($0)], agg#1=[MAX($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[MIN($8)], agg#1=[MAX($8)], aggType=[LEAF])",
+          "\n      PinotLogicalTableScan(table=[[default, e]])",
           "\n"
         ]
       }

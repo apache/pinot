@@ -20,36 +20,38 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.RoutingInfo;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.BlockSplitter;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This {@code MailboxSendOperator} is created to send {@link TransferableBlock}s to the receiving end.
- *
- * TODO: Add support to sort the data prior to sending if sorting is enabled
- */
+/// This `MailboxSendOperator` is created to send [MseBlock]s to the receiving end.
+///
+/// TODO: Add support to sort the data prior to sending if sorting is enabled
 public class MailboxSendOperator extends MultiStageOperator {
   public static final EnumSet<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPES =
       EnumSet.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED,
@@ -64,9 +66,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   // TODO: Support sort on sender
   public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator input, MailboxSendNode node) {
-    this(context, input,
-        statMap -> getBlockExchange(context, node.getReceiverStageId(), node.getDistributionType(), node.getKeys(),
-            statMap));
+    this(context, input, statMap -> getBlockExchange(context, node, statMap));
     _statMap.merge(StatKey.STAGE, context.getStageId());
     _statMap.merge(StatKey.PARALLELISM, 1);
   }
@@ -79,13 +79,85 @@ public class MailboxSendOperator extends MultiStageOperator {
     _exchange = exchangeFactory.apply(_statMap);
   }
 
+  /// Creates a [BlockExchange] for the given [MailboxSendNode].
+  ///
+  /// In normal cases, where the sender sends data to a single receiver stage, this method just delegates on
+  /// [#getBlockExchange(OpChainExecutionContext, int, MailboxSendNode, StatMap, BlockSplitter)].
+  ///
+  /// In case of a multi-sender node, this method creates a two steps exchange:
+  ///
+  /// 1. One inner exchange is created for each receiver stage, using the method mentioned above and keeping the
+  ///    distribution type specified in the [MailboxSendNode].
+  /// 2. Then, a single outer broadcast exchange is created to fan out the data to all the inner exchanges. It copies
+  ///    blocks that carry aggregation intermediate results, so that no two receiver stages share them. Stages whose
+  ///    workers all read the block within [SendingMailbox#send(MseBlock.Data)] do not need a copy.
+  ///
+  /// @see BlockExchange#asSendingMailbox(String)
+  private static BlockExchange getBlockExchange(OpChainExecutionContext ctx, MailboxSendNode node,
+      StatMap<StatKey> statMap) {
+    BlockSplitter mainSplitter = BlockSplitter.DEFAULT;
+    if (!node.isMultiSend()) {
+      // it is guaranteed that there is exactly one receiver stage
+      int receiverStageId = node.getReceiverStageIds().iterator().next();
+      return getBlockExchange(ctx, receiverStageId, node, statMap, mainSplitter);
+    }
+    List<SendingMailbox> perStageSendingMailboxes = new ArrayList<>();
+    // The inner splitter is a NO_OP because the outer splitter will take care of splitting the blocks
+    BlockSplitter innerSplitter = BlockSplitter.NO_OP;
+    for (int receiverStageId : node.getReceiverStageIds()) {
+      BlockExchange blockExchange =
+          getBlockExchange(ctx, receiverStageId, node, statMap, innerSplitter);
+      perStageSendingMailboxes.add(blockExchange.asSendingMailbox(Integer.toString(receiverStageId)));
+    }
+
+    Function<List<SendingMailbox>, Integer> statsIndexChooser = getStatsIndexChooser(ctx, node);
+    return BlockExchange.getExchange(perStageSendingMailboxes, RelDistribution.Type.BROADCAST_DISTRIBUTED,
+        List.of(), mainSplitter, statsIndexChooser, node.getHashFunction());
+  }
+
+  private static Function<List<SendingMailbox>, Integer> getStatsIndexChooser(OpChainExecutionContext ctx,
+      MailboxSendNode node) {
+    // Stats must be sent to a single stage. That stage must also be one with a smaller stage id than the current stage.
+    // Ideally, the stage chosen should always be the same in order to have repeatable stats.
+    int minStageIndex = indexOfMinStageId(node);
+    Preconditions.checkState(minStageIndex >= 0, "Invalid minStageIndex: %s", minStageIndex);
+    Preconditions.checkArgument(minStageIndex < ctx.getStageId(),
+        "Min stage index %s should be smaller than current stage id %s",
+        minStageIndex, ctx.getStageId());
+    return sendingMailboxes -> {
+      Preconditions.checkState(minStageIndex <= sendingMailboxes.size(),
+          "Invalid minStageIndex: %s, sendingMailboxes.size(): %s", minStageIndex, sendingMailboxes.size());
+      return minStageIndex;
+    };
+  }
+
+  private static int indexOfMinStageId(MailboxSendNode node) {
+    int minStageId = Integer.MAX_VALUE;
+    int index = 0;
+    int minIndex = Integer.MAX_VALUE;
+    for (int receiverStageId : node.getReceiverStageIds()) {
+      if (receiverStageId < minStageId) {
+        minStageId = receiverStageId;
+        minIndex = index;
+      }
+      index++;
+    }
+    return minIndex;
+  }
+
+  /// Creates a [BlockExchange] that sends data to the given receiver stage.
+  ///
+  /// In case of a multi-sender node, this method will be called for each receiver stage.
   private static BlockExchange getBlockExchange(OpChainExecutionContext context, int receiverStageId,
-      RelDistribution.Type distributionType, List<Integer> keys, StatMap<StatKey> statMap) {
+      MailboxSendNode node, StatMap<StatKey> statMap, BlockSplitter splitter) {
+    RelDistribution.Type distributionType = node.getDistributionType();
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(distributionType), "Unsupported distribution type: %s",
         distributionType);
     MailboxService mailboxService = context.getMailboxService();
     long requestId = context.getRequestId();
-    long deadlineMs = context.getDeadlineMs();
+    // It is important to use passive deadline here, otherwise the GRPC channel could be closed before
+    // the useful error block is sent
+    long deadlineMs = context.getPassiveDeadlineMs();
 
     List<MailboxInfo> mailboxInfos =
         context.getWorkerMetadata().getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
@@ -96,13 +168,16 @@ public class MailboxSendOperator extends MultiStageOperator {
         .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap))
         .collect(Collectors.toList());
     statMap.merge(StatKey.FAN_OUT, sendingMailboxes.size());
-    return BlockExchange.getExchange(sendingMailboxes, distributionType, keys, TransferableBlockUtils::splitBlock);
+    return BlockExchange.getExchange(sendingMailboxes, distributionType, node.getKeys(), splitter,
+        node.getHashFunction());
   }
 
   @Override
-  public void registerExecution(long time, int numRows) {
+  public void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+    _statMap.merge(StatKey.ALLOCATED_MEMORY_BYTES, memoryUsedBytes);
+    _statMap.merge(StatKey.GC_TIME_MS, gcTimeMs);
   }
 
   @Override
@@ -117,7 +192,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return Collections.singletonList(_input);
+    return List.of(_input);
   }
 
   @Override
@@ -126,55 +201,114 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
+  protected MseBlock getNextBlock() {
     try {
-      TransferableBlock block = _input.nextBlock();
-      if (block.isSuccessfulEndOfStreamBlock()) {
-        updateEosBlock(block, _statMap);
-        // no need to check early terminate signal b/c the current block is already EOS
-        sendTransferableBlock(block);
-        // After sending its own stats, the sending operator of the stage 1 has the complete view of all stats
-        // Therefore this is the only place we can update some of the metrics like total seen rows or time spent.
-        if (_context.getStageId() == 1) {
-          updateMetrics(block);
-        }
+      MseBlock block = _input.nextBlock();
+      if (block.isEos()) {
+        sendEos((MseBlock.Eos) block);
       } else {
-        if (sendTransferableBlock(block)) {
-          earlyTerminate();
-        }
+        sendMseBlock(((MseBlock.Data) block));
+        checkTerminationAndSampleUsage();
       }
-      sampleAndCheckInterruption();
       return block;
-    } catch (QueryCancelledException e) {
-      LOGGER.debug("Query was cancelled! for opChain: {}", _context.getId());
-      return createLeafBlock();
-    } catch (TimeoutException e) {
-      LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
-    } catch (Exception e) {
-      TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
-      try {
+    } catch (RuntimeException e) {
+      if (e instanceof QueryCancelledException) {
+        LOGGER.debug("Query was cancelled for opChain: {}", _context.getId());
+        // TODO: Revisit if we should return success block here.
+        return SuccessMseBlock.INSTANCE;
+      }
+      ErrorMseBlock errorBlock;
+      // First check terminate exception and use it as the results block if exists. We want to return the termination
+      // reason when query is explicitly terminated.
+      QueryException queryException = QueryThreadContext.getTerminateException();
+      if (queryException == null && e instanceof QueryException) {
+        queryException = (QueryException) e;
+      }
+      if (queryException != null) {
+        errorBlock = ErrorMseBlock.fromException(queryException);
+      } else {
         LOGGER.error("Exception while transferring data on opChain: {}", _context.getId(), e);
-        sendTransferableBlock(errorBlock);
-      } catch (Exception e2) {
+        errorBlock = ErrorMseBlock.fromException(e);
+      }
+      try {
+        sendEos(errorBlock);
+      } catch (RuntimeException e2) {
         LOGGER.error("Exception while sending error block.", e2);
       }
       return errorBlock;
     }
   }
 
-  protected TransferableBlock createLeafBlock() {
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock(
-        MultiStageQueryStats.createCancelledSend(_context.getStageId(), _statMap));
+  @Override
+  protected long getDeadlineMs() {
+    // mailbox send operator uses passive deadline instead of the active one
+    return _context.getPassiveDeadlineMs();
   }
 
-  private boolean sendTransferableBlock(TransferableBlock block)
-      throws Exception {
-    boolean isEarlyTerminated = _exchange.send(block);
+  private void sendEos(MseBlock.Eos eosBlockWithoutStats) {
+    MultiStageQueryStats stats = null;
+    List<DataBuffer> serializedStats;
+    if (_context.isSendStats()) {
+      // The stats are serialized into the block this method is about to send, so what this operator has spent in
+      // the getNextBlock() call it is running has to be accounted before they are collected. Otherwise this
+      // operator reports less than the input whose call it contains, and the stage renders a negative self time.
+      registerExecutionSoFar();
+      stats = calculateStats();
+      try {
+        serializedStats = stats.serialize();
+      } catch (Exception e) {
+        LOGGER.warn("Failed to serialize stats", e);
+        serializedStats = List.of();
+      }
+    } else {
+      serializedStats = List.of();
+    }
+    // no need to check early terminate signal b/c the current block is already EOS
+    sendMseBlock(eosBlockWithoutStats, serializedStats);
+    // After sending its own stats, the sending operator of the stage 1 has the complete view of all stats
+    // Therefore this is the only place we can update some of the metrics like total seen rows or time spent.
+    if (_context.getStageId() == 1) {
+      updateMetrics(stats == null ? calculateStats() : stats);
+    }
+  }
+
+  /// Returns a copy of this operator's stats, extended with the stats describing this single worker.
+  ///
+  /// These cannot be accumulated in [#registerExecution] like the others, because they are not per-block
+  /// quantities: merging [StatKey#MAX_EMITTED_ROWS] once per block would report the largest block rather than the
+  /// busiest worker, and merging [StatKey#NON_ACTIVE_WORKERS] once per block would count the blocks. They are
+  /// computed once, here, from the totals the operator ends up with.
+  ///
+  /// They describe a single worker, but every stat is merged across all the workers of the stage before being
+  /// reported, which is what turns them into a description of how the work was spread.
+  @Override
+  public StatMap<StatKey> copyStatMaps() {
+    StatMap<StatKey> statMap = new StatMap<>(_statMap);
+    long emittedRows = statMap.getLong(StatKey.EMITTED_ROWS);
+    if (emittedRows > 0) {
+      statMap.merge(StatKey.MAX_EMITTED_ROWS, emittedRows);
+    } else {
+      statMap.merge(StatKey.NON_ACTIVE_WORKERS, 1);
+    }
+    // Reported by every worker, idle ones included: a worker that sent nothing still spent time deciding that.
+    statMap.merge(StatKey.MAX_CLOCK_TIME_MS, statMap.getLong(StatKey.EXECUTION_TIME_MS));
+    return statMap;
+  }
+
+  private void sendMseBlock(MseBlock.Data block) {
+    if (_exchange.send(block)) {
+      earlyTerminate();
+    }
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
     }
-    return isEarlyTerminated;
+  }
+
+  private void sendMseBlock(MseBlock.Eos block, List<DataBuffer> serializedStats) {
+    _exchange.send(block, serializedStats);
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
+    }
   }
 
   @Override
@@ -189,25 +323,30 @@ public class MailboxSendOperator extends MultiStageOperator {
     _exchange.cancel(t);
   }
 
-  private void updateMetrics(TransferableBlock block) {
-    ServerMetrics serverMetrics = ServerMetrics.get();
-    MultiStageQueryStats queryStats = block.getQueryStats();
+  private void updateMetrics(MultiStageQueryStats queryStats) {
+    MseMetrics mseMetrics = MseMetrics.get();
     if (queryStats == null) {
       LOGGER.info("Query stats not found in the EOS block.");
     } else {
       for (MultiStageQueryStats.StageStats.Closed closed : queryStats.getClosedStats()) {
         if (closed != null) {
-          closed.forEach((type, stats) -> type.updateServerMetrics(stats, serverMetrics));
+          closed.forEach((type, stats) -> type.updateMseMetrics(stats, mseMetrics));
         }
       }
       queryStats.getCurrentStats().forEach((type, stats) -> {
-        type.updateServerMetrics(stats, serverMetrics);
+        type.updateMseMetrics(stats, mseMetrics);
       });
     }
   }
 
+  /// The stats reported by this operator.
+  ///
+  /// As the root operator of its stage, this operator is also where the stage-wide stats live, like [#PARALLELISM]
+  /// and [#NON_ACTIVE_WORKERS].
+  ///
+  /// New keys must be appended at the end of this enum: [StatMap] identifies keys by their ordinal on the wire, so
+  /// inserting, reordering or removing a constant breaks the compatibility with other versions.
   public enum StatKey implements StatMap.Key {
-    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
@@ -231,54 +370,78 @@ public class MailboxSendOperator extends MultiStageOperator {
         return true;
       }
     },
-    /**
-     * Number of parallelism of the stage this operator is the root of.
-     * <p>
-     * The CPU times reported by this stage will be proportional to this number.
-     */
+    /// Number of parallelism of the stage this operator is the root of.
+    ///
+    /// The CPU times reported by this stage will be proportional to this number.
     PARALLELISM(StatMap.Type.INT),
-    /**
-     * How many receive mailboxes are being written by this send operator.
-     */
+    /// How many receive mailboxes are being written by this send operator.
     FAN_OUT(StatMap.Type.INT) {
       @Override
       public int merge(int value1, int value2) {
         return Math.max(value1, value2);
       }
     },
-    /**
-     * How many messages have been sent in heap format by this mailbox.
-     * <p>
-     * The lower the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the more efficient the exchange is.
-     */
+    /// How many messages have been sent in heap format by this mailbox.
+    ///
+    /// The lower the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the more efficient the exchange is.
     IN_MEMORY_MESSAGES(StatMap.Type.INT),
-    /**
-     * How many messages have been sent in raw format and therefore serialized by this mailbox.
-     * <p>
-     * The higher the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the less efficient the exchange is.
-     */
+    /// How many messages have been sent in raw format and therefore serialized by this mailbox.
+    ///
+    /// The higher the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the less efficient the exchange is.
     RAW_MESSAGES(StatMap.Type.INT),
-    /**
-     * How many bytes have been serialized by this mailbox.
-     * <p>
-     * A high number here indicates that the mailbox is sending a lot of data to other servers.
-     */
+    /// How many bytes have been serialized by this mailbox.
+    ///
+    /// A high number here indicates that the mailbox is sending a lot of data to other servers.
     SERIALIZED_BYTES(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
         return true;
       }
     },
-    /**
-     * How long (in CPU time) it took to serialize the raw messages sent by this mailbox.
-     */
+    /// How long (in CPU time) it took to serialize the raw messages sent by this mailbox.
     SERIALIZATION_TIME_MS(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
         return true;
       }
+    },
+    /// Allocated memory in bytes for this operator or its children in the same stage.
+    ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
+    /// Time spent on GC while this operator or its children in the same stage were running.
+    GC_TIME_MS(StatMap.Type.LONG),
+    /// How many workers of this stage sent no row at all.
+    ///
+    /// Reported as the count of idle workers rather than active ones so that it is absent from the stats of a
+    /// stage where every worker produced something, which is the common case.
+    ///
+    /// Each operator reports which of the stage's workers it was idle on, applying its own notion of activity:
+    /// this one sent no row, a mailbox receive operator received none, a leaf operator had no segment assigned to
+    /// it. Comparing this against `parallelism` on the same node detects distribution bias, and comparing it
+    /// against the operators below shows where the stage narrowed: a leaf idle on no worker under a send idle on
+    /// nine means the work was spread but the output was not.
+    NON_ACTIVE_WORKERS(StatMap.Type.INT),
+    /// The highest number of rows sent by a single worker of this stage.
+    ///
+    /// [#EMITTED_ROWS] is the sum across all workers, so `maxEmittedRows` greatly exceeding the average number of
+    /// rows per worker means the rows were not evenly distributed.
+    MAX_EMITTED_ROWS(StatMap.Type.LONG) {
+      @Override
+      public long merge(long value1, long value2) {
+        return Math.max(value1, value2);
+      }
+    },
+    /// How long the slowest worker of this stage took.
+    ///
+    /// The `clockTimeMs` reported for a stage is its [#EXECUTION_TIME_MS] divided by its [#PARALLELISM], which
+    /// assumes the work was spread evenly across the workers. This is the same measure taken on the worker that
+    /// took longest, so `maxClockTimeMs` greatly exceeding `clockTimeMs` means that assumption does not hold and
+    /// the average understates how long the stage actually took.
+    MAX_CLOCK_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public long merge(long value1, long value2) {
+        return Math.max(value1, value2);
+      }
     };
-    //@formatter:on
 
     private final StatMap.Type _type;
 

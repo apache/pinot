@@ -31,6 +31,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.locationtech.jts.geom.Geometry;
@@ -40,15 +41,15 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * H3 index creator that uses off-heap memory.
- * <p>The posting lists (map from H3 id to doc ids) are initially stored in a TreeMap, then flushed into a file for
- * every 100,000 entries. After all the documents are added, we read all the posting lists from the file and merge them
- * using a priority queue to calculate the final posting lists.
- * <p>Off-heap creator uses less heap memory, but is more expensive on computation and needs flush data to disk which
- * can slow down the creation because of the IO latency. Use off-heap creator in the environment where there is limited
- * heap memory or garbage collection can cause performance issue (e.g. index creation at loading time on Pinot Server).
- */
+/// H3 index creator that uses off-heap memory.
+///
+/// The posting lists (map from H3 id to doc ids) are initially stored in a TreeMap, then flushed into a file for
+/// every 100,000 entries. After all the documents are added, we read all the posting lists from the file and merge them
+/// using a priority queue to calculate the final posting lists.
+///
+/// Off-heap creator uses less heap memory, but is more expensive on computation and needs flush data to disk which
+/// can slow down the creation because of the IO latency. Use off-heap creator in the environment where there is limited
+/// heap memory or garbage collection can cause performance issue (e.g. index creation at loading time on Pinot Server).
 public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
   private static final int FLUSH_THRESHOLD = 100_000;
 
@@ -60,25 +61,24 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
 
   private long _postingListChunkOffset;
 
-  public OffHeapH3IndexCreator(File indexDir, String columnName, H3IndexResolution resolution)
+  public OffHeapH3IndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
+      H3IndexResolution resolution)
       throws IOException {
-    super(indexDir, columnName, resolution);
+    super(indexDir, columnName, tableNameWithType, continueOnError, resolution);
     _postingListFile = new File(_tempDir, POSTING_LIST_FILE_NAME);
     _postingListOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_postingListFile)));
   }
 
   @Override
-  public void add(Geometry geometry)
+  public void add(@Nullable Geometry geometry)
       throws IOException {
     super.add(geometry);
-    if (_postingListMap.size() % FLUSH_THRESHOLD == 0) {
+    if (_postingListMap.size() == FLUSH_THRESHOLD) {
       flush();
     }
   }
 
-  /**
-   * Flushes the current posting list map into the file.
-   */
+  /// Flushes the current posting list map into the file.
   private void flush()
       throws IOException {
     long length = 0;
@@ -111,7 +111,7 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
     }
 
     // Flush the last chunk
-    if (_postingListMap.size() % FLUSH_THRESHOLD != 0) {
+    if (!_postingListMap.isEmpty()) {
       flush();
     }
     _postingListOutputStream.close();
@@ -133,7 +133,10 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
       // Merge posting lists from the chunk iterators
       PriorityQueue<PostingListEntry> priorityQueue = new PriorityQueue<>(numChunks);
       for (ChunkIterator chunkIterator : chunkIterators) {
-        priorityQueue.offer(chunkIterator.next());
+        // Defensive: skip empty chunks instead of blindly reading the first entry (flush() should never produce one)
+        if (chunkIterator.hasNext()) {
+          priorityQueue.offer(chunkIterator.next());
+        }
       }
       long currentH3Id = Long.MIN_VALUE;
       MutableRoaringBitmap currentDocIds = null;

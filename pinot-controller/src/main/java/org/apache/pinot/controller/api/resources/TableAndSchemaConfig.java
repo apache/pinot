@@ -21,17 +21,13 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Wrapper for TableConfig and Schema used in validation API
- * @deprecated Use {@link TableConfigs} instead.
- */
+/// Wrapper for TableConfig and Schema used in validation API
+/// @deprecated Use [org.apache.pinot.spi.config.TableConfigs] instead.
 @Deprecated
 public class TableAndSchemaConfig {
   private final TableConfig _tableConfig;
@@ -39,7 +35,7 @@ public class TableAndSchemaConfig {
 
   @JsonCreator
   public TableAndSchemaConfig(@JsonProperty(value = "tableConfig", required = true) TableConfig tableConfig,
-      @JsonProperty("schema") @Nullable Schema schema) {
+      @JsonProperty(value = "schema", required = true) Schema schema) {
     _tableConfig = tableConfig;
     _schema = schema;
   }
@@ -48,7 +44,6 @@ public class TableAndSchemaConfig {
     return _tableConfig;
   }
 
-  @Nullable
   public Schema getSchema() {
     return _schema;
   }

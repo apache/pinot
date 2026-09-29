@@ -25,28 +25,15 @@ import PinotMethodUtils from '../utils/PinotMethodUtils';
 import Utils from '../utils/Utils';
 import Loading from './Loading';
 
-type BaseProps = {
+type Props = {
   instanceType: InstanceType;
   showInstanceDetails?: boolean;
   instanceNames: string[] | null;
   liveInstanceNames?: string[];
 };
 
-type ClusterProps = BaseProps & {
-  cluster: string;
-  tenant?: never;
-};
-
-type TenantProps = BaseProps & {
-  tenant: string;
-  cluster?: never;
-};
-
-type Props = ClusterProps | TenantProps;
-
 export const AsyncInstanceTable = ({
   instanceType,
-  cluster,
   instanceNames,
   liveInstanceNames,
   showInstanceDetails = false,
@@ -69,19 +56,24 @@ export const AsyncInstanceTable = ({
   }, [instanceNames]);
 
   useEffect(() => {
-    // async load all the other details
-    if(showInstanceDetails && cluster && instanceNames && liveInstanceNames) {
-      fetchAdditionalInstanceDetails();
-    }
-  }, [showInstanceDetails, cluster, instanceNames, liveInstanceNames]);
+    let isMounted = true;
 
-  const fetchAdditionalInstanceDetails = async () => {
-    const additionalData = await PinotMethodUtils.getInstanceData(
-      instanceNames,
-      liveInstanceNames
-    );
-    setInstanceData(additionalData);
-  }
+    if(showInstanceDetails && instanceNames && liveInstanceNames) {
+      PinotMethodUtils.getInstanceData(
+        instanceNames,
+        liveInstanceNames
+      ).then((additionalData) => {
+        if (!isMounted) {
+          return;
+        }
+        setInstanceData(additionalData);
+      });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [showInstanceDetails, instanceNames, liveInstanceNames]);
 
   return (
     <CustomizedTables

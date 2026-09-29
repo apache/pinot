@@ -25,9 +25,7 @@ import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 
 
-/**
- * A tabular structure for representing result rows
- */
+/// A tabular structure for representing result rows
 @JsonPropertyOrder({"dataSchema", "rows"})
 public class ResultTable {
   private final DataSchema _dataSchema;

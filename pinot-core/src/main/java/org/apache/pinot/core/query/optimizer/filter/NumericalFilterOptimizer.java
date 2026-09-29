@@ -30,46 +30,42 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
 
 
-/**
- * Numerical expressions of the form "column [operator] literal", where operator can be '=', '!=', '>', '>=', '<', '<=',
- * or 'BETWEEN' can compare a column of one datatype (say INT) with a literal of different datatype (say DOUBLE). These
- * expressions can not be evaluated on the Server. Hence, we rewrite such expressions into an equivalent expression
- * whose LHS and RHS are of the same datatype.
- * <p>
- * Simple predicate examples:
- * <ol>
- *  <li> "WHERE intColumn = 5.0"  gets rewritten to "WHERE intColumn = 5"
- *  <li> "WHERE intColumn != 5.0" gets rewritten to "WHERE intColumn != 5"
- *  <li> "WHERE intColumn = 5.5"  gets rewritten to "WHERE false" because INT values can not match 5.5.
- *  <li> "WHERE intColumn = 3000000000" gets rewritten to "WHERE false" because INT values can not match 3000000000.
- *  <li> "WHERE intColumn != 3000000000" gets rewritten to "WHERE true" because INT values always not equal to
- *  3000000000.
- *  <li> "WHERE intColumn < 5.1" gets rewritten to "WHERE intColumn <= 5"
- *  <li> "WHERE intColumn > -3E9" gets rewritten to "WHERE true" because int values are always greater than -3E9.
- *  <li> "WHERE intColumn BETWEEN 2.5 AND 7.5" gets rewritten to "WHERE intColumn BETWEEN 3 AND 7"
- *  <li> "WHERE intColumn BETWEEN 5.5 AND 3000000000" gets rewritten to "WHERE intColumn BETWEEN 6 AND 2147483647" since
- *  3000000000 is greater than Integer.MAX_VALUE.
- *  <li> "WHERE intColumn BETWEEN 10 AND 0" gets rewritten to "WHERE false" because lower bound is greater than upper
- *  bound.
- * </ol>
- * <p>
- * Compound predicate examples:
- * <ol>
- *  <li> "WHERE intColumn1 = 5.5 AND intColumn2 = intColumn3"
- *       rewrite to "WHERE false AND intColumn2 = intColumn3"
- *       rewrite to "WHERE intColumn2 = intColumn3"
- *  <li> "WHERE intColumn1 != 5.5 OR intColumn2 = 5000000000" (5000000000 is out of bounds for integer column)
- *       rewrite to "WHERE true OR false"
- *       rewrite to "WHERE true"
- *       rewrite to query without any WHERE clause.
- * </ol>
- * <p>
- * When entire predicate gets rewritten to false (Example 3 above), the query will not return any data. Hence, it is
- * better for the Broker itself to return an empty response rather than sending the query to servers for further
- * evaluation.
- * <p>
- * TODO: Add support for IN, and NOT IN operators.
- */
+/// Numerical expressions of the form "column \[operator\] literal", where operator can be '=', '!=', '>', '>=', '<',
+/// '<=', or 'BETWEEN' can compare a column of one datatype (say INT) with a literal of different datatype (say DOUBLE).
+/// These expressions can not be evaluated on the Server. Hence, we rewrite such expressions into an equivalent
+/// expression whose LHS and RHS are of the same datatype.
+///
+/// Simple predicate examples:
+///
+/// 1. "WHERE intColumn = 5.0"  gets rewritten to "WHERE intColumn = 5"
+/// 2. "WHERE intColumn != 5.0" gets rewritten to "WHERE intColumn != 5"
+/// 3. "WHERE intColumn = 5.5"  gets rewritten to "WHERE false" because INT values can not match 5.5.
+/// 4. "WHERE intColumn = 3000000000" gets rewritten to "WHERE false" because INT values can not match 3000000000.
+/// 5. "WHERE intColumn != 3000000000" gets rewritten to "WHERE true" because INT values always not equal to
+///    3000000000.
+/// 6. "WHERE intColumn < 5.1" gets rewritten to "WHERE intColumn <= 5"
+/// 7. "WHERE intColumn > -3E9" gets rewritten to "WHERE true" because int values are always greater than -3E9.
+/// 8. "WHERE intColumn BETWEEN 2.5 AND 7.5" gets rewritten to "WHERE intColumn BETWEEN 3 AND 7"
+/// 9. "WHERE intColumn BETWEEN 5.5 AND 3000000000" gets rewritten to "WHERE intColumn BETWEEN 6 AND 2147483647"
+///    since 3000000000 is greater than Integer.MAX_VALUE.
+/// 10. "WHERE intColumn BETWEEN 10 AND 0" gets rewritten to "WHERE false" because lower bound is greater than upper
+///     bound.
+///
+/// Compound predicate examples:
+///
+/// 1. "WHERE intColumn1 = 5.5 AND intColumn2 = intColumn3"
+///       rewrite to "WHERE false AND intColumn2 = intColumn3"
+///       rewrite to "WHERE intColumn2 = intColumn3"
+/// 2. "WHERE intColumn1 != 5.5 OR intColumn2 = 5000000000" (5000000000 is out of bounds for integer column)
+///       rewrite to "WHERE true OR false"
+///       rewrite to "WHERE true"
+///       rewrite to query without any WHERE clause.
+///
+/// When entire predicate gets rewritten to false (Example 3 above), the query will not return any data. Hence, it is
+/// better for the Broker itself to return an empty response rather than sending the query to servers for further
+/// evaluation.
+///
+/// TODO: Add support for IN, and NOT IN operators.
 public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
 
   @Override
@@ -121,10 +117,8 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
     return filterExpression;
   }
 
-  /**
-   * Rewrite expressions of form "column = literal" or "column != literal" to ensure that RHS literal is the same
-   * datatype as LHS column.
-   */
+  /// Rewrite expressions of form "column = literal" or "column != literal" to ensure that RHS literal is the same
+  /// datatype as LHS column.
   private static Expression rewriteEqualsExpression(Expression equals, FilterKind kind, DataType dataType,
       Expression rhs) {
     // Get expression operator
@@ -216,10 +210,8 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
     return equals;
   }
 
-  /**
-   * Rewrite expressions of form "column > literal", "column >= literal", "column < literal", and "column <= literal"
-   * to ensure that RHS literal is the same datatype as LHS column.
-   */
+  /// Rewrite expressions of form "column > literal", "column >= literal", "column < literal", and "column <= literal"
+  /// to ensure that RHS literal is the same datatype as LHS column.
   private static Expression rewriteRangeExpression(Expression range, FilterKind kind, DataType dataType,
       Expression rhs) {
     switch (rhs.getLiteral().getSetField()) {
@@ -361,10 +353,8 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
     return range;
   }
 
-  /**
-   * Rewrite expressions of the form "column BETWEEN lower AND upper" to ensure that lower and upper bounds are the same
-   * datatype as the column (or can be cast to the same datatype in the server).
-   */
+  /// Rewrite expressions of the form "column BETWEEN lower AND upper" to ensure that lower and upper bounds are the
+  /// same datatype as the column (or can be cast to the same datatype in the server).
   private static Expression rewriteBetweenExpression(Expression between, DataType dataType) {
     // TODO: Consider unifying logic with rewriteRangeExpression
     List<Expression> operands = between.getFunctionCall().getOperands();
@@ -514,12 +504,10 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
     return between;
   }
 
-  /**
-   * Helper function to rewrite range operator of a range expression.
-   * @param range Range expression.
-   * @param kind The kind of range filter being used in the range expression.
-   * @param comparison -1 (literal < converted value), 0 (literal == converted value), 1 (literal > converted value).
-   */
+  /// Helper function to rewrite range operator of a range expression.
+  /// @param range Range expression.
+  /// @param kind The kind of range filter being used in the range expression.
+  /// @param comparison -1 (literal < converted value), 0 (literal == converted value), 1 (literal > converted value).
   private static void rewriteRangeOperator(Expression range, FilterKind kind, int comparison) {
     if (comparison > 0) {
       // Literal value is greater than the converted value, so rewrite:
@@ -548,7 +536,7 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
     }
   }
 
-  /** @return field data type extracted from the expression. null if we can't determine the type. */
+  /// @return field data type extracted from the expression. null if we can't determine the type.
   @Nullable
   private static DataType getDataType(Expression expression, Schema schema) {
     if (expression.getType() == ExpressionType.IDENTIFIER) {

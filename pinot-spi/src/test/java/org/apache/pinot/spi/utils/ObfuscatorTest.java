@@ -20,8 +20,9 @@ package org.apache.pinot.spi.utils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.tuple.Pair;
@@ -102,13 +103,13 @@ public class ObfuscatorTest {
 
   @Test
   public void testNoop() {
-    Object output = new Obfuscator("nope", Collections.emptyList()).toJson(_map);
+    Object output = new Obfuscator("nope", List.of()).toJson(_map);
     Assert.assertEquals(output, JsonUtils.objectToJsonNode(_map));
   }
 
   @Test
   public void testCustomPattern() {
-    Obfuscator obfuscator = new Obfuscator("verycustomized", Collections.singletonList(Pattern.compile("^value$")));
+    Obfuscator obfuscator = new Obfuscator("verycustomized", List.of(Pattern.compile("^value$")));
     String output = obfuscator.toJsonString(_nestedMap);
     Assert.assertFalse(output.contains(VALUE));
     Assert.assertTrue(output.contains("verycustomized"));
@@ -129,5 +130,85 @@ public class ObfuscatorTest {
     String output = _obfuscator.toJsonString("{\"key\":\"VALUE\",\"my.secret\":\"SECRET\"}");
     Assert.assertTrue(output.contains(VALUE));
     Assert.assertFalse(output.contains(SECRET));
+  }
+
+  @Test
+  public void testArrayOfObjects() {
+    Map<String, Object> item1 = new HashMap<>();
+    item1.put("name", "item1");
+    item1.put("password", "SECRET");
+
+    Map<String, Object> item2 = new HashMap<>();
+    item2.put("name", "item2");
+    item2.put("secret", "SECRET");
+
+    Map<String, Object> root = new HashMap<>();
+    root.put("items", Arrays.asList(item1, item2));
+
+    String output = _obfuscator.toJsonString(root);
+    Assert.assertTrue(output.contains("item1"));
+    Assert.assertTrue(output.contains("item2"));
+    Assert.assertFalse(output.contains(SECRET));
+  }
+
+  @Test
+  public void testNestedArrayOfObjects() {
+    Map<String, Object> innerItem = new HashMap<>();
+    innerItem.put("token", "SECRET");
+    innerItem.put("host", "localhost");
+
+    Map<String, Object> outerItem = new HashMap<>();
+    outerItem.put("connections", List.of(innerItem));
+    outerItem.put("label", "cluster-1");
+
+    Map<String, Object> root = new HashMap<>();
+    root.put("clusters", List.of(outerItem));
+
+    String output = _obfuscator.toJsonString(root);
+    Assert.assertTrue(output.contains("localhost"));
+    Assert.assertTrue(output.contains("cluster-1"));
+    Assert.assertFalse(output.contains(SECRET));
+  }
+
+  @Test
+  public void testArrayOfObjectsViaJsonString() {
+    String json = "{\"items\":[{\"user\":\"admin\",\"password\":\"SECRET\"},"
+        + "{\"user\":\"reader\",\"token\":\"SECRET\"}]}";
+    String output = _obfuscator.toJsonString(json);
+    Assert.assertTrue(output.contains("admin"));
+    Assert.assertTrue(output.contains("reader"));
+    Assert.assertFalse(output.contains(SECRET));
+  }
+
+  @Test
+  public void testTopLevelArray()
+      throws IOException {
+    JsonNode node = JsonUtils.stringToJsonNode("[{\"password\":\"SECRET\",\"host\":\"db1\"},{\"token\":\"SECRET\","
+        + "\"host\":\"db2\"}]");
+    String output = _obfuscator.toJsonString(node);
+    Assert.assertTrue(output.contains("db1"));
+    Assert.assertTrue(output.contains("db2"));
+    Assert.assertFalse(output.contains(SECRET));
+  }
+
+  @Test
+  public void testArrayWithMixedContent() {
+    Map<String, Object> root = new HashMap<>();
+    root.put("tags", Arrays.asList("public", "production"));
+    root.put("credentials", Arrays.asList(
+        createEntry("apiKey", "SECRET"),
+        createEntry("apiKey", "SECRET")
+    ));
+
+    String output = _obfuscator.toJsonString(root);
+    Assert.assertTrue(output.contains("public"));
+    Assert.assertTrue(output.contains("production"));
+    Assert.assertFalse(output.contains(SECRET));
+  }
+
+  private static Map<String, Object> createEntry(String key, String value) {
+    Map<String, Object> map = new HashMap<>();
+    map.put(key, value);
+    return map;
   }
 }

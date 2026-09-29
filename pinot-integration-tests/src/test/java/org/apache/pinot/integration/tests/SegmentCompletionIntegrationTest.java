@@ -85,11 +85,9 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
     addTableConfig(createRealtimeTableConfig(null));
   }
 
-  /**
-   * Helper method to start a fake server that only implements Helix part.
-   *
-   * @throws Exception
-   */
+  /// Helper method to start a fake server that only implements Helix part.
+  ///
+  /// @throws Exception
   private void startFakeServer()
       throws Exception {
     _serverInstance = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NetUtils.getHostAddress() + "_"
@@ -111,11 +109,9 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
     ControllerLeaderLocator.create(_serverHelixManager);
   }
 
-  /**
-   * Test stop consuming and auto fix.
-   *
-   * @throws Exception
-   */
+  /// Test stop consuming and auto fix.
+  ///
+  /// @throws Exception
   @Test
   public void testStopConsumingAndAutoFix()
       throws Exception {

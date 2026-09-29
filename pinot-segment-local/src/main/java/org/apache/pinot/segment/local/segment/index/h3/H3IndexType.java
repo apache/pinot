@@ -22,7 +22,6 @@ package org.apache.pinot.segment.local.segment.index.h3;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -54,12 +53,13 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 
 
 public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader, GeoSpatialIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "h3";
-  private static final List<String> EXTENSIONS = Collections.singletonList(V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
+  private static final List<String> EXTENSIONS = List.of(V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
 
   protected H3IndexType() {
     super(StandardIndexes.H3_ID);
@@ -76,16 +76,26 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
   }
 
   @Override
+  public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
+    H3IndexConfig h3IndexConfig = indexConfigs.getConfig(StandardIndexes.h3());
+    if (h3IndexConfig.isEnabled()) {
+      String column = fieldSpec.getName();
+      Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot create H3 index on multi-value column: %s",
+          column);
+      Preconditions.checkState(fieldSpec.getDataType().getStoredType() == DataType.BYTES,
+          "Cannot create H3 index on column: %s of stored type other than BYTES", column);
+    }
+  }
+
+  @Override
   public String getPrettyName() {
     return INDEX_DISPLAY_NAME;
   }
 
   @Override
-  public ColumnConfigDeserializer<H3IndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
-        .withExclusiveAlternative(IndexConfigDeserializer.fromIndexTypes(
-            FieldConfig.IndexType.H3,
-            ((tableConfig, fieldConfig) -> new H3IndexConfig(fieldConfig.getProperties()))));
+  protected ColumnConfigDeserializer<H3IndexConfig> createDeserializerForLegacyConfigs() {
+    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.H3,
+        (tableConfig, fieldConfig) -> new H3IndexConfig(fieldConfig.getProperties()));
   }
 
   @Override
@@ -93,12 +103,14 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
       throws IOException {
     Preconditions.checkState(context.getFieldSpec().isSingleValueField(),
         "H3 index is currently only supported on single-value columns");
-    Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.BYTES,
+    Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == DataType.BYTES,
         "H3 index is currently only supported on BYTES columns");
     H3IndexResolution resolution = Objects.requireNonNull(indexConfig).getResolution();
     return context.isOnHeap()
-        ? new OnHeapH3IndexCreator(context.getIndexDir(), context.getFieldSpec().getName(), resolution)
-        : new OffHeapH3IndexCreator(context.getIndexDir(), context.getFieldSpec().getName(), resolution);
+        ? new OnHeapH3IndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
+        context.getTableNameWithType(), context.isContinueOnError(), resolution)
+        : new OffHeapH3IndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
+            context.getTableNameWithType(), context.isContinueOnError(), resolution);
   }
 
   @Override
@@ -108,8 +120,20 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    return new H3IndexHandler(segmentDirectory, configsByCol, tableConfig);
+      Schema schema, TableConfig tableConfig) {
+    return new H3IndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
+  }
+
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, H3IndexConfig indexConfig) {
+    // H3 index is built directly from geospatial values; it does not depend on a dictionary.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, H3IndexConfig indexConfig) {
+    // H3 cell IDs are derived from geometry values, independent of dictionary representation.
+    return false;
   }
 
   @Override

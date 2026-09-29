@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.request.context;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -26,10 +25,8 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 
 
-/**
- * The {@code FilterContext} class encapsulates the information of a filter in the query. Both WHERE clause and HAVING
- * clause are modeled as a filter.
- */
+/// The {@code FilterContext} class encapsulates the information of a filter in the query. Both WHERE clause and HAVING
+/// clause are modeled as a filter.
 public final class FilterContext {
   public static final FilterContext CONSTANT_TRUE = new FilterContext(Type.CONSTANT, null, null, true);
   public static final FilterContext CONSTANT_FALSE = new FilterContext(Type.CONSTANT, null, null, false);
@@ -66,7 +63,7 @@ public final class FilterContext {
   }
 
   public static FilterContext forNot(FilterContext child) {
-    return new FilterContext(Type.NOT, Collections.singletonList(child), null, false);
+    return new FilterContext(Type.NOT, List.of(child), null, false);
   }
 
   public static FilterContext forPredicate(Predicate predicate) {
@@ -101,9 +98,7 @@ public final class FilterContext {
     return _type == Type.CONSTANT && !_isTrue;
   }
 
-  /**
-   * Adds the columns (IDENTIFIER expressions) in the filter to the given set.
-   */
+  /// Adds the columns (IDENTIFIER expressions) in the filter to the given set.
   public void getColumns(Set<String> columns) {
     if (_children != null) {
       for (FilterContext child : _children) {

@@ -31,9 +31,7 @@ import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-/**
- * Results block for EXPLAIN queries.
- */
+/// Results block for EXPLAIN queries.
 public class ExplainResultsBlock extends BaseResultsBlock {
   private final QueryContext _queryContext;
   private final List<ExplainEntry> _entries = new ArrayList<>();

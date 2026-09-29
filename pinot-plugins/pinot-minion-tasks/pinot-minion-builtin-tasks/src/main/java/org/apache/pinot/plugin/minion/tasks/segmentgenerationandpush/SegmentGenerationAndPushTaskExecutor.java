@@ -54,51 +54,49 @@ import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.Obfuscator;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * SegmentGenerationAndPushTaskExecutor implements a minion task to build a single Pinot segment based on one input file
- * given task configs.
- *
- * Task configs:
- *   input.data.file.uri - Required, the location of input file
- *   inputFormat - Required, the input file format, e.g. JSON/Avro/Parquet/CSV/...
- *   input.fs.className - Optional, the class name of filesystem to read input data. Default to PinotLocalFs if not
- *   specified.
- *   input.fs.prop.<keys> - Optional, defines the configs to initialize input filesystem.
- *
- *   output.segment.dir.uri -  Optional, the location of generated segment. Use local temp dir with push mode TAR, If
- *   not specified.
- *   output.fs.className - Optional, the class name of filesystem to write output segment. Default to PinotLocalFs if
- *   not specified.
- *   output.fs.prop.<keys> - Optional, the configs to initialize output filesystem.
- *   overwriteOutput - Optional, delete the output segment directory if set to true.
- *
- *   recordReader.className - Required, the class name of RecordReader.
- *   recordReader.configClassName - Required, the class name of RecordReaderConfig.
- *   recordReader.prop.<keys> - Optional, the configs used to initialize RecordReaderConfig.
- *
- *   schema - Required, if schemaURI is not specified. Pinot schema in Json string.
- *   schemaURI - Required, if schema is not specified. The URI to query for Pinot schema.
- *
- *   sequenceId - Optional, an option to set segment name.
- *   segmentNameGenerator.type - Required, the segment name generator to create segment name.
- *   segmentNameGenerator.configs.<keys> - Optional, configs of segment name generator.
- *
- *   push.mode - Required, push job type: TAR/URI/METADATA
- *   push.controllerUri - Required, controller uri to send push request to.
- *   push.segmentUriPrefix - Optional, segment download uri prefix, used when push.mode=uri
- *   push.segmentUriSuffix - Optional, segment download uri suffix, used when push.mode=uri
- *
- */
+/// SegmentGenerationAndPushTaskExecutor implements a minion task to build a single Pinot segment based on one input
+/// file given task configs.
+///
+/// Task configs:
+///   input.data.file.uri - Required, the location of input file
+///   inputFormat - Required, the input file format, e.g. JSON/Avro/Parquet/CSV/...
+///   input.fs.className - Optional, the class name of filesystem to read input data. Default to PinotLocalFs if not
+///   specified.
+///   input.fs.prop.<keys> - Optional, defines the configs to initialize input filesystem.
+///
+///   output.segment.dir.uri -  Optional, the location of generated segment. Use local temp dir with push mode TAR, If
+///   not specified.
+///   output.fs.className - Optional, the class name of filesystem to write output segment. Default to PinotLocalFs if
+///   not specified.
+///   output.fs.prop.<keys> - Optional, the configs to initialize output filesystem.
+///   overwriteOutput - Optional, delete the output segment directory if set to true.
+///
+///   recordReader.className - Required, the class name of RecordReader.
+///   recordReader.configClassName - Required, the class name of RecordReaderConfig.
+///   recordReader.prop.<keys> - Optional, the configs used to initialize RecordReaderConfig.
+///
+///   schema - Required, if schemaURI is not specified. Pinot schema in Json string.
+///   schemaURI - Required, if schema is not specified. The URI to query for Pinot schema.
+///
+///   sequenceId - Optional, an option to set segment name.
+///   segmentNameGenerator.type - Required, the segment name generator to create segment name.
+///   segmentNameGenerator.configs.<keys> - Optional, configs of segment name generator.
+///
+///   push.mode - Required, push job type: TAR/URI/METADATA
+///   push.controllerUri - Required, controller uri to send push request to.
+///   push.segmentUriPrefix - Optional, segment download uri prefix, used when push.mode=uri
+///   push.segmentUriSuffix - Optional, segment download uri suffix, used when push.mode=uri
 public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerationAndPushTaskExecutor.class);
 
-  private static final int DEFUALT_PUSH_ATTEMPTS = 5;
+  private static final int DEFAULT_PUSH_ATTEMPTS = 5;
   private static final int DEFAULT_PUSH_PARALLELISM = 1;
   private static final long DEFAULT_PUSH_RETRY_INTERVAL_MILLIS = 1000L;
 
@@ -114,7 +112,10 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
   @Override
   public Object executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception {
-    LOGGER.info("Executing SegmentGenerationAndPushTask with task config: {}", pinotTaskConfig);
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Executing SegmentGenerationAndPushTask with task config: {}",
+          Obfuscator.DEFAULT.toJsonString(pinotTaskConfig));
+    }
     Map<String, String> taskConfigs = pinotTaskConfig.getConfigs();
     SegmentGenerationAndPushResult.Builder resultBuilder = new SegmentGenerationAndPushResult.Builder();
     File localTempDir = new File(new File(MinionContext.getInstance().getDataDir(), "SegmentGenerationAndPushResult"),
@@ -165,7 +166,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     LOGGER.info("Trying to push Pinot segment with push mode {} from {}", pushMode, outputSegmentTarURI);
 
     PushJobSpec pushJobSpec = new PushJobSpec();
-    pushJobSpec.setPushAttempts(DEFUALT_PUSH_ATTEMPTS);
+    pushJobSpec.setPushAttempts(DEFAULT_PUSH_ATTEMPTS);
     pushJobSpec.setPushParallelism(DEFAULT_PUSH_PARALLELISM);
     pushJobSpec.setPushRetryIntervalMillis(DEFAULT_PUSH_RETRY_INTERVAL_MILLIS);
     pushJobSpec.setSegmentUriPrefix(taskConfigs.get(BatchConfigProperties.PUSH_SEGMENT_URI_PREFIX));
@@ -227,27 +228,18 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     spec.setPushJobSpec(pushJobSpec);
     spec.setTableSpec(tableSpec);
     spec.setPinotClusterSpecs(pinotClusterSpecs);
-    spec.setAuthToken(taskConfigs.get(BatchConfigProperties.AUTH_TOKEN));
+    spec.setAuthToken(MinionTaskUtils.resolveAuthToken(taskConfigs));
 
     return spec;
   }
 
-  private URI moveSegmentToOutputPinotFS(Map<String, String> taskConfigs, File localSegmentTarFile)
+  @Override
+  protected URI moveSegmentToOutputPinotFS(Map<String, String> taskConfigs, File localSegmentTarFile)
       throws Exception {
     if (!taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
       return localSegmentTarFile.toURI();
     }
-    URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
-    try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
-      URI outputSegmentTarURI = URI.create(outputSegmentDirURI + localSegmentTarFile.getName());
-      if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS.exists(
-          outputSegmentDirURI)) {
-        LOGGER.warn("Not overwrite existing output segment tar file: {}", outputFileFS.exists(outputSegmentDirURI));
-      } else {
-        outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
-      }
-      return outputSegmentTarURI;
-    }
+    return super.moveSegmentToOutputPinotFS(taskConfigs, localSegmentTarFile);
   }
 
   private File tarSegmentDir(SegmentGenerationTaskSpec taskSpec, String segmentName)
@@ -291,7 +283,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
           BatchConfigProperties.RECORD_READER_PROP_PREFIX));
       taskSpec.setRecordReaderSpec(recordReaderSpec);
 
-      String authToken = taskConfigs.get(BatchConfigProperties.AUTH_TOKEN);
+      String authToken = MinionTaskUtils.resolveAuthToken(taskConfigs);
 
       String tableNameWithType = taskConfigs.get(BatchConfigProperties.TABLE_NAME);
       Schema schema;

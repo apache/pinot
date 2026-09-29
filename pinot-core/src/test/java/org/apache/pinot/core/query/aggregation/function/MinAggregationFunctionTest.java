@@ -20,6 +20,8 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -30,144 +32,109 @@ public class MinAggregationFunctionTest extends AbstractAggregationFunctionTest 
   @DataProvider(name = "scenarios")
   Object[] scenarios() {
     return new Object[] {
-        new DataTypeScenario(FieldSpec.DataType.INT),
-        new DataTypeScenario(FieldSpec.DataType.LONG),
-        new DataTypeScenario(FieldSpec.DataType.FLOAT),
-        new DataTypeScenario(FieldSpec.DataType.DOUBLE),
-        new DataTypeScenario(FieldSpec.DataType.BIG_DECIMAL)
+        new DataTypeScenario(DataType.INT),
+        new DataTypeScenario(DataType.LONG),
+        new DataTypeScenario(DataType.FLOAT),
+        new DataTypeScenario(DataType.DOUBLE),
+        new DataTypeScenario(DataType.BIG_DECIMAL)
     };
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationAllNullsWithNullHandlingDisabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select min(myField) from testTable")
-        .thenResultIs("DOUBLE",
-            String.valueOf(FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, scenario.getDataType(), null)));
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select min(myField) from testTable")
+        .thenResultIs(
+            "DOUBLE",
+            String.valueOf(FieldSpec.getDefaultNullValue(FieldType.DIMENSION, scenario.getDataType(), null))
+        );
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationAllNullsWithNullHandlingEnabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select min(myField) from testTable")
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select min(myField) from testTable")
         .thenResultIs("DOUBLE", "null");
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationGroupBySVAllNullsWithNullHandlingDisabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select 'literal', min(myField) from testTable group by 'literal'")
-        .thenResultIs("STRING | DOUBLE", "literal | "
-            + FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, scenario.getDataType(), null));
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select 'literal', min(myField) from testTable group by 'literal'")
+        .thenResultIs(
+            "STRING | DOUBLE",
+            "literal | " + FieldSpec.getDefaultNullValue(FieldType.DIMENSION, scenario.getDataType(), null)
+        );
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationGroupBySVAllNullsWithNullHandlingEnabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select 'literal', min(myField) from testTable group by 'literal'")
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select 'literal', min(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | DOUBLE", "literal | null");
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationWithNullHandlingDisabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "5",
-            "null",
-            "3"
-        ).andOnSecondInstance("myField",
-            "null",
-            "2",
-            "null"
-        ).whenQuery("select min(myField) from testTable")
-        .thenResultIs("DOUBLE",
-            String.valueOf(FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, scenario.getDataType(), null)));
+        .onFirstInstance("myField", "5", "null", "3")
+        .andOnSecondInstance("myField", "null", "2", "null")
+        .whenQuery("select min(myField) from testTable")
+        .thenResultIs(
+            "DOUBLE",
+            String.valueOf(FieldSpec.getDefaultNullValue(FieldType.DIMENSION, scenario.getDataType(), null))
+        );
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationWithNullHandlingEnabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "5",
-            "null",
-            "3"
-        ).andOnSecondInstance("myField",
-            "null",
-            "2",
-            "null"
-        ).whenQuery("select min(myField) from testTable")
+        .onFirstInstance("myField", "5", "null", "3")
+        .andOnSecondInstance("myField", "null", "2", "null")
+        .whenQuery("select min(myField) from testTable")
         .thenResultIs("DOUBLE", "2");
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationGroupBySVWithNullHandlingDisabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "5",
-            "null",
-            "3"
-        ).andOnSecondInstance("myField",
-            "null",
-            "2",
-            "null"
-        ).whenQuery("select 'literal', min(myField) from testTable group by 'literal'")
-        .thenResultIs("STRING | DOUBLE", "literal | "
-            + FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, scenario.getDataType(), null));
+        .onFirstInstance("myField", "5", "null", "3")
+        .andOnSecondInstance("myField", "null", "2", "null")
+        .whenQuery("select 'literal', min(myField) from testTable group by 'literal'")
+        .thenResultIs(
+            "STRING | DOUBLE",
+            "literal | " + FieldSpec.getDefaultNullValue(FieldType.DIMENSION, scenario.getDataType(), null)
+        );
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationGroupBySVWithNullHandlingEnabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "5",
-            "null",
-            "3"
-        ).andOnSecondInstance("myField",
-            "null",
-            "null",
-            "null"
-        ).whenQuery("select 'literal', min(myField) from testTable group by 'literal'")
+        .onFirstInstance("myField", "5", "null", "3")
+        .andOnSecondInstance("myField", "null", "null", "null")
+        .whenQuery("select 'literal', min(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | DOUBLE", "literal | 3");
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationGroupByMV(DataTypeScenario scenario) {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("tags", DataType.STRING)
+        .addMetricField("value", scenario.getDataType())
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
-                .addMetricField("value", scenario.getDataType())
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"tag1;tag2", 1},
-            new Object[]{"tag2;tag3", null}
-        )
-        .andOnSecondInstance(
-            new Object[]{"tag1;tag2", 2},
-            new Object[]{"tag2;tag3", null}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"tag1;tag2", 1}, new Object[]{"tag2;tag3", null})
+        .andOnSecondInstance(new Object[]{"tag1;tag2", 2}, new Object[]{"tag2;tag3", null})
         .whenQuery("select tags, MIN(value) from testTable group by tags order by tags")
         .thenResultIs(
             "STRING | DOUBLE",
@@ -182,5 +149,122 @@ public class MinAggregationFunctionTest extends AbstractAggregationFunctionTest 
             "tag2    | 1.0",
             "tag3    | null"
         );
+  }
+
+  @Test
+  public void aggregationMVAllNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .build();
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null"})
+        .andOnSecondInstance(new Object[]{"null"})
+        .whenQuery("select min(mv) from testTable")
+        .thenResultIs(
+            "DOUBLE",
+            String.valueOf((int) FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null))
+        )
+        .whenQueryWithNullHandlingEnabled("select min(mv) from testTable")
+        .thenResultIs("DOUBLE", "null");
+  }
+
+  @Test
+  public void aggregationMVWithNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .build();
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"1;2;3"})
+        .andOnSecondInstance(new Object[]{"null"})
+        .whenQuery("select min(mv) from testTable")
+        .thenResultIs("DOUBLE", String.valueOf(FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null)))
+        .whenQueryWithNullHandlingEnabled("select min(mv) from testTable")
+        .thenResultIs("DOUBLE", "1");
+  }
+
+  @Test
+  public void aggregationGroupBySVAllNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .addSingleValueDimension("sv", DataType.STRING)
+        .build();
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null", "k1"})
+        .andOnSecondInstance(new Object[]{"null", "k1"})
+        .whenQuery("select min_mv(mv) from testTable group by sv")
+        .thenResultIs("DOUBLE", String.valueOf(FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null)))
+        .whenQueryWithNullHandlingEnabled("select min_mv(mv) from testTable group by sv")
+        .thenResultIs("DOUBLE", "null");
+  }
+
+  @Test
+  public void aggregationMVGroupBySVWithNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .addSingleValueDimension("sv", DataType.STRING)
+        .build();
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null", "k1"}, new Object[]{"1;2;3", "k2"})
+        .andOnSecondInstance(new Object[]{"null", "k2"}, new Object[]{"1;2;3", "k1"})
+        .whenQuery("select min(mv) from testTable group by sv")
+        .thenResultIs(
+            "DOUBLE",
+            String.valueOf(
+                ((Number) FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null)).doubleValue()),
+            String.valueOf(
+                ((Number) FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null)).doubleValue())
+        )
+        .whenQueryWithNullHandlingEnabled("select min(mv) from testTable group by sv")
+        .thenResultIs("DOUBLE", "1", "1");
+  }
+
+  @Test
+  public void aggregationMVGroupByMVAllNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv1", DataType.INT)
+        .addMultiValueDimension("mv2", DataType.STRING)
+        .build();
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null", "k1;k2"})
+        .andOnSecondInstance(new Object[]{"null", "k1;k2"})
+        .whenQuery("select min(mv1) from testTable group by mv2")
+        .thenResultIs(
+            "DOUBLE",
+            String.valueOf(FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null)),
+            String.valueOf(FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null))
+        )
+        .whenQueryWithNullHandlingEnabled("select min(mv1) from testTable group by mv2")
+        .thenResultIs("DOUBLE", "null", "null");
+  }
+
+  @Test
+  public void aggregationMVGroupByMVWithNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv1", DataType.INT)
+        .addMultiValueDimension("mv2", DataType.STRING)
+        .build();
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"1;2", "k1;k2"})
+        .andOnSecondInstance(new Object[]{"null", "k1;k2"})
+        .whenQuery("select min(mv1) from testTable group by mv2")
+        .thenResultIs(
+            "DOUBLE",
+            String.valueOf(FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null)),
+            String.valueOf(FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null))
+        )
+        .whenQueryWithNullHandlingEnabled("select min(mv1) from testTable group by mv2")
+        .thenResultIs("DOUBLE", "1", "1");
   }
 }

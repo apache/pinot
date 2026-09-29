@@ -23,22 +23,24 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
-public abstract class BaseProjectOperator<T extends ValueBlock> extends BaseOperator<T> {
+public abstract class BaseProjectOperator<T extends ValueBlock> extends BaseOperator<T>
+    implements DocIdOrderedOperator<T> {
 
-  /**
-   * Returns a map from source column name to context.
-   */
+  /// Returns a map from source column name to context.
   public abstract Map<String, ColumnContext> getSourceColumnContextMap();
 
-  /**
-   * Returns the result column context. Without transform, the source and result column context are the same.
-   */
+  /// Returns the result column context. Without transform, the source and result column context are the same.
   public abstract ColumnContext getResultColumnContext(ExpressionContext expression);
 
-  /**
-   * Returns the number of columns projected.
-   */
+  /// Returns the number of columns projected.
   public int getNumColumnsProjected() {
     return getSourceColumnContextMap().size();
   }
+
+  /// Returns an instance of [BaseProjectOperator] with the given order.
+  ///
+  /// The instance can be the same as the current one if requested order is the same as the current one.
+  ///
+  /// @throws UnsupportedOperationException if the order cannot be changed
+  public abstract BaseProjectOperator<T> withOrder(DocIdOrder newOrder);
 }

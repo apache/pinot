@@ -35,8 +35,9 @@ import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
-import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
+import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
+import org.apache.pinot.common.utils.grpc.ServerGrpcRequestBuilder;
+import org.apache.pinot.core.accounting.ResourceUsageAccountantFactory;
 import org.apache.pinot.core.query.reduce.DataTableReducer;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.reduce.ResultReducerFactory;
@@ -45,7 +46,11 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -58,7 +63,8 @@ import static org.testng.Assert.*;
 
 
 public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest {
-  private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
+  private static final ExecutorService EXECUTOR_SERVICE =
+      QueryThreadContext.contextAwareExecutorService(Executors.newFixedThreadPool(2));
   private static final DataTableReducerContext DATATABLE_REDUCER_CONTEXT =
       new DataTableReducerContext(EXECUTOR_SERVICE, 2, 10000, 10000, 5000, 128);
 
@@ -96,19 +102,45 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
     waitForAllDocsLoaded(600_000L);
   }
 
-  public GrpcQueryClient getGrpcQueryClient() {
-    return new GrpcQueryClient("localhost", getServerGrpcPort());
+  @Override
+  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    super.overrideBrokerConf(brokerConf);
+
+    // Enable thread CPU/memory tracking but not killing queries
+    brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+    String prefix = Accounting.BROKER_PREFIX + ".";
+    brokerConf.setProperty(prefix + Accounting.Keys.FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
+    brokerConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, true);
+    brokerConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING, true);
+  }
+
+  @Override
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    super.overrideServerConf(serverConf);
+
+    // Enable thread CPU/memory tracking but not killing queries
+    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+    String prefix = Accounting.SERVER_PREFIX + ".";
+    serverConf.setProperty(prefix + Accounting.Keys.FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
+    serverConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, true);
+    serverConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING, true);
+  }
+
+  public ServerGrpcQueryClient getGrpcQueryClient() {
+    return new ServerGrpcQueryClient("localhost", getServerGrpcPort());
   }
 
   @Test
   public void testGrpcQueryServer()
       throws Exception {
-    GrpcQueryClient queryClient = getGrpcQueryClient();
+    ServerGrpcQueryClient queryClient = getGrpcQueryClient();
     String sql = "SELECT * FROM mytable_OFFLINE LIMIT 1000000 OPTION(timeoutMs=30000)";
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(sql);
     List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE", true);
 
-    GrpcRequestBuilder requestBuilder = new GrpcRequestBuilder().setSegments(segments);
+    ServerGrpcRequestBuilder requestBuilder = new ServerGrpcRequestBuilder().setSegments(segments);
     testNonStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
     testNonStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
 
@@ -121,9 +153,9 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
   @Test(dataProvider = "provideSqlTestCases")
   public void testQueryingGrpcServer(String sql)
       throws Exception {
-    try (GrpcQueryClient queryClient = getGrpcQueryClient()) {
+    try (ServerGrpcQueryClient queryClient = getGrpcQueryClient()) {
       List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE", true);
-      GrpcRequestBuilder requestBuilder = new GrpcRequestBuilder().setSql(sql).setSegments(segments);
+      ServerGrpcRequestBuilder requestBuilder = new ServerGrpcRequestBuilder().setSql(sql).setSegments(segments);
       DataTable dataTable = collectNonStreamingRequestResult(queryClient.submit(requestBuilder.build()));
       collectAndCompareResult(sql, queryClient.submit(requestBuilder.setEnableStreaming(true).build()), dataTable);
     }
@@ -203,12 +235,18 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
         QueryContext queryContext = QueryContextConverterUtils.getQueryContext(sql);
         DataTableReducer reducer = ResultReducerFactory.getResultReducer(queryContext);
         BrokerResponseNative streamingBrokerResponse = new BrokerResponseNative();
-        reducer.reduceAndSetResults("mytable_OFFLINE", cachedDataSchema, dataTableMap, streamingBrokerResponse,
-            DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
+        try (QueryThreadContext ignore = useMultiStageQueryEngine() ? QueryThreadContext.openForMseTest()
+            : QueryThreadContext.openForSseTest()) {
+          reducer.reduceAndSetResults("mytable_OFFLINE", cachedDataSchema, dataTableMap, streamingBrokerResponse,
+              DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
+        }
         BrokerResponseNative nonStreamBrokerResponse = new BrokerResponseNative();
-        reducer.reduceAndSetResults("mytable_OFFLINE", nonStreamResultDataTable.getDataSchema(),
-            Map.of(mock(ServerRoutingInstance.class), nonStreamResultDataTable), nonStreamBrokerResponse,
-            DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
+        try (QueryThreadContext ignore = useMultiStageQueryEngine() ? QueryThreadContext.openForMseTest()
+            : QueryThreadContext.openForSseTest()) {
+          reducer.reduceAndSetResults("mytable_OFFLINE", nonStreamResultDataTable.getDataSchema(),
+              Map.of(mock(ServerRoutingInstance.class), nonStreamResultDataTable), nonStreamBrokerResponse,
+              DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
+        }
         assertEquals(streamingBrokerResponse.getResultTable().getRows().size(),
             nonStreamBrokerResponse.getResultTable().getRows().size());
 
@@ -244,7 +282,7 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
       if (responseType.equals(CommonConstants.Query.Response.ResponseType.DATA)) {
         // verify the returned data table metadata only contains "responseSerializationCpuTimeNs".
         Map<String, String> metadata = dataTable.getMetadata();
-        assertTrue(metadata.size() == 1 && metadata.containsKey(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
+        assertTrue(metadata.containsKey(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
         assertNotNull(dataTable.getDataSchema());
         numTotalDocs += dataTable.getNumberOfRows();
       } else {

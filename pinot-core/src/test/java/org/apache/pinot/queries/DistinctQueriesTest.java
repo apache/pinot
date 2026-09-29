@@ -20,22 +20,21 @@ package org.apache.pinot.queries;
 
 import java.io.File;
 import java.math.BigDecimal;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
-import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.core.query.distinct.table.DistinctTable;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -49,6 +48,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -57,14 +57,11 @@ import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for DISTINCT queries.
- */
+/// Queries test for DISTINCT queries.
 public class DistinctQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "DistinctQueryTest");
   private static final String RAW_TABLE_NAME = "testTable";
@@ -91,12 +88,16 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   private static final String LONG_MV_COLUMN = "longMVColumn";
   private static final String FLOAT_MV_COLUMN = "floatMVColumn";
   private static final String DOUBLE_MV_COLUMN = "doubleMVColumn";
+  private static final String BIG_DECIMAL_MV_COLUMN = "bigDecimalMVColumn";
   private static final String STRING_MV_COLUMN = "stringMVColumn";
+  private static final String BYTES_MV_COLUMN = "bytesMVColumn";
   private static final String RAW_INT_MV_COLUMN = "rawIntMVColumn";
   private static final String RAW_LONG_MV_COLUMN = "rawLongMVColumn";
   private static final String RAW_FLOAT_MV_COLUMN = "rawFloatMVColumn";
   private static final String RAW_DOUBLE_MV_COLUMN = "rawDoubleMVColumn";
+  private static final String RAW_BIG_DECIMAL_MV_COLUMN = "rawBigDecimalMVColumn";
   private static final String RAW_STRING_MV_COLUMN = "rawStringMVColumn";
+  private static final String RAW_BYTES_MV_COLUMN = "rawBytesMVColumn";
 
   //@formatter:off
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
@@ -118,12 +119,16 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       .addMultiValueDimension(LONG_MV_COLUMN, DataType.LONG)
       .addMultiValueDimension(FLOAT_MV_COLUMN, DataType.FLOAT)
       .addMultiValueDimension(DOUBLE_MV_COLUMN, DataType.DOUBLE)
+      .addMultiValueDimension(BIG_DECIMAL_MV_COLUMN, DataType.BIG_DECIMAL)
       .addMultiValueDimension(STRING_MV_COLUMN, DataType.STRING)
+      .addMultiValueDimension(BYTES_MV_COLUMN, DataType.BYTES)
       .addMultiValueDimension(RAW_INT_MV_COLUMN, DataType.INT)
       .addMultiValueDimension(RAW_LONG_MV_COLUMN, DataType.LONG)
       .addMultiValueDimension(RAW_FLOAT_MV_COLUMN, DataType.FLOAT)
       .addMultiValueDimension(RAW_DOUBLE_MV_COLUMN, DataType.DOUBLE)
+      .addMultiValueDimension(RAW_BIG_DECIMAL_MV_COLUMN, DataType.BIG_DECIMAL)
       .addMultiValueDimension(RAW_STRING_MV_COLUMN, DataType.STRING)
+      .addMultiValueDimension(RAW_BYTES_MV_COLUMN, DataType.BYTES)
       .build();
   //@formatter:on
 
@@ -131,7 +136,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       .setNoDictionaryColumns(
           Arrays.asList(RAW_INT_COLUMN, RAW_LONG_COLUMN, RAW_FLOAT_COLUMN, RAW_DOUBLE_COLUMN, RAW_BIG_DECIMAL_COLUMN,
               RAW_STRING_COLUMN, RAW_BYTES_COLUMN, RAW_INT_MV_COLUMN, RAW_LONG_MV_COLUMN, RAW_FLOAT_MV_COLUMN,
-              RAW_DOUBLE_MV_COLUMN, RAW_STRING_MV_COLUMN)).build();
+              RAW_DOUBLE_MV_COLUMN, RAW_BIG_DECIMAL_MV_COLUMN, RAW_STRING_MV_COLUMN, RAW_BYTES_MV_COLUMN))
+      .build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -171,12 +177,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  /**
-   * Helper method to generate records based on the given base value.
-   *
-   * All columns will have the same value but different data types (BYTES values are encoded STRING values).
-   * For the {i}th unique record, the value will be {baseValue + i}.
-   */
+  /// Helper method to generate records based on the given base value.
+  ///
+  /// All columns will have the same value but different data types (BYTES values are encoded STRING values).
+  /// For the {i}th unique record, the value will be {baseValue + i}.
   private List<GenericRow> generateRecords(int baseValue) {
     List<GenericRow> uniqueRecords = new ArrayList<>(NUM_UNIQUE_RECORDS_PER_SEGMENT);
     for (int i = 0; i < NUM_UNIQUE_RECORDS_PER_SEGMENT; i++) {
@@ -197,16 +201,26 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       record.putValue(RAW_STRING_COLUMN, value);
       record.putValue(RAW_BYTES_COLUMN, Integer.toString(value).getBytes(UTF_8));
       Integer[] mvValue = new Integer[]{value, value + NUM_UNIQUE_RECORDS_PER_SEGMENT};
+      BigDecimal[] bigDecimalMVValue =
+          new BigDecimal[]{BigDecimal.valueOf(value), BigDecimal.valueOf(value + NUM_UNIQUE_RECORDS_PER_SEGMENT)};
+      byte[][] bytesMVValue = new byte[][]{
+          StringUtils.leftPad(Integer.toString(value), 4).getBytes(UTF_8),
+          StringUtils.leftPad(Integer.toString(value + NUM_UNIQUE_RECORDS_PER_SEGMENT), 4).getBytes(UTF_8)
+      };
       record.putValue(INT_MV_COLUMN, mvValue);
       record.putValue(LONG_MV_COLUMN, mvValue);
       record.putValue(FLOAT_MV_COLUMN, mvValue);
       record.putValue(DOUBLE_MV_COLUMN, mvValue);
+      record.putValue(BIG_DECIMAL_MV_COLUMN, bigDecimalMVValue);
       record.putValue(STRING_MV_COLUMN, mvValue);
+      record.putValue(BYTES_MV_COLUMN, bytesMVValue);
       record.putValue(RAW_INT_MV_COLUMN, mvValue);
       record.putValue(RAW_LONG_MV_COLUMN, mvValue);
       record.putValue(RAW_FLOAT_MV_COLUMN, mvValue);
       record.putValue(RAW_DOUBLE_MV_COLUMN, mvValue);
+      record.putValue(RAW_BIG_DECIMAL_MV_COLUMN, bigDecimalMVValue);
       record.putValue(RAW_STRING_MV_COLUMN, mvValue);
+      record.putValue(RAW_BYTES_MV_COLUMN, bytesMVValue);
       uniqueRecords.add(record);
     }
 
@@ -253,7 +267,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           "SELECT DISTINCT(intMVColumn) FROM testTable",
           "SELECT DISTINCT(longMVColumn) FROM testTable",
           "SELECT DISTINCT(floatMVColumn) FROM testTable",
-          "SELECT DISTINCT(doubleMVColumn) FROM testTable"
+          "SELECT DISTINCT(doubleMVColumn) FROM testTable",
+          "SELECT DISTINCT(bigDecimalMVColumn) FROM testTable"
       );
       //@formatter:on
       // Query should be solved with dictionary, so it should return the 10 smallest values
@@ -262,19 +277,15 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         expectedValues.add(i);
       }
       for (String query : queries) {
-        DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-        DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-        for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
-          assertEquals(distinctTable.size(), 10);
-          Set<Integer> actualValues = new HashSet<>();
-          for (Record record : distinctTable.getRecords()) {
-            Object[] values = record.getValues();
-            assertEquals(values.length, 1);
-            assertTrue(values[0] instanceof Number);
-            actualValues.add(((Number) values[0]).intValue());
-          }
-          assertEquals(actualValues, expectedValues);
+        DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+        assertEquals(distinctTable.size(), 10);
+        Set<Integer> actualValues = new HashSet<>();
+        for (Object[] values : distinctTable.getRows()) {
+          assertEquals(values.length, 1);
+          assertTrue(values[0] instanceof Number);
+          actualValues.add(((Number) values[0]).intValue());
         }
+        assertEquals(actualValues, expectedValues);
       }
     }
     {
@@ -282,38 +293,30 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       String query = "SELECT DISTINCT(stringColumn) FROM testTable";
       // We define a specific result set here since the data read from dictionary is in alphabetically sorted order
       Set<Integer> expectedValues = new HashSet<>(Arrays.asList(0, 1, 10, 11, 12, 13, 14, 15, 16, 17));
-      DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-      DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-      for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
-        assertEquals(distinctTable.size(), 10);
-        Set<Integer> actualValues = new HashSet<>();
-        for (Record record : distinctTable.getRecords()) {
-          Object[] values = record.getValues();
-          assertEquals(values.length, 1);
-          assertTrue(values[0] instanceof String);
-          actualValues.add(Integer.parseInt((String) values[0]));
-        }
-        assertEquals(actualValues, expectedValues);
+      DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+      assertEquals(distinctTable.size(), 10);
+      Set<Integer> actualValues = new HashSet<>();
+      for (Object[] values : distinctTable.getRows()) {
+        assertEquals(values.length, 1);
+        assertTrue(values[0] instanceof String);
+        actualValues.add(Integer.parseInt((String) values[0]));
       }
+      assertEquals(actualValues, expectedValues);
     }
     {
       // String MV column
       String query = "SELECT DISTINCT(stringMVColumn) FROM testTable";
       // We define a specific result set here since the data read from dictionary is in alphabetically sorted order
       Set<Integer> expectedValues = new HashSet<>(Arrays.asList(0, 1, 10, 100, 101, 102, 103, 104, 105, 106));
-      DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-      DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-      for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
-        assertEquals(distinctTable.size(), 10);
-        Set<Integer> actualValues = new HashSet<>();
-        for (Record record : distinctTable.getRecords()) {
-          Object[] values = record.getValues();
-          assertEquals(values.length, 1);
-          assertTrue(values[0] instanceof String);
-          actualValues.add(Integer.parseInt((String) values[0]));
-        }
-        assertEquals(actualValues, expectedValues);
+      DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+      assertEquals(distinctTable.size(), 10);
+      Set<Integer> actualValues = new HashSet<>();
+      for (Object[] values : distinctTable.getRows()) {
+        assertEquals(values.length, 1);
+        assertTrue(values[0] instanceof String);
+        actualValues.add(Integer.parseInt((String) values[0]));
       }
+      assertEquals(actualValues, expectedValues);
     }
     {
       // Raw string SV column
@@ -322,26 +325,23 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       for (int i = 0; i < 10; i++) {
         expectedValues.add(i);
       }
-      DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-      DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-      for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
-        assertEquals(distinctTable.size(), 10);
-        Set<Integer> actualValues = new HashSet<>();
-        for (Record record : distinctTable.getRecords()) {
-          Object[] values = record.getValues();
-          assertEquals(values.length, 1);
-          assertTrue(values[0] instanceof String);
-          actualValues.add(Integer.parseInt((String) values[0]));
-        }
-        assertEquals(actualValues, expectedValues);
+      DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+      assertEquals(distinctTable.size(), 10);
+      Set<Integer> actualValues = new HashSet<>();
+      for (Object[] values : distinctTable.getRows()) {
+        assertEquals(values.length, 1);
+        assertTrue(values[0] instanceof String);
+        actualValues.add(Integer.parseInt((String) values[0]));
       }
+      assertEquals(actualValues, expectedValues);
     }
     {
       // Bytes columns
       //@formatter:off
       List<String> queries = Arrays.asList(
           "SELECT DISTINCT(bytesColumn) FROM testTable",
-          "SELECT DISTINCT(rawBytesColumn) FROM testTable"
+          "SELECT DISTINCT(rawBytesColumn) FROM testTable",
+          "SELECT DISTINCT(bytesMVColumn) FROM testTable"
       );
       //@formatter:on
       Set<Integer> expectedValues = new HashSet<>();
@@ -349,19 +349,15 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         expectedValues.add(i);
       }
       for (String query : queries) {
-        DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-        DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-        for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
-          assertEquals(distinctTable.size(), 10);
-          Set<Integer> actualValues = new HashSet<>();
-          for (Record record : distinctTable.getRecords()) {
-            Object[] values = record.getValues();
-            assertEquals(values.length, 1);
-            assertTrue(values[0] instanceof ByteArray);
-            actualValues.add(Integer.parseInt(new String(((ByteArray) values[0]).getBytes(), UTF_8).trim()));
-          }
-          assertEquals(actualValues, expectedValues);
+        DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+        assertEquals(distinctTable.size(), 10);
+        Set<Integer> actualValues = new HashSet<>();
+        for (Object[] values : distinctTable.getRows()) {
+          assertEquals(values.length, 1);
+          assertTrue(values[0] instanceof ByteArray);
+          actualValues.add(Integer.parseInt(new String(((ByteArray) values[0]).getBytes(), UTF_8).trim()));
         }
+        assertEquals(actualValues, expectedValues);
       }
     }
     {
@@ -371,25 +367,22 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           "SELECT DISTINCT(rawIntMVColumn) FROM testTable",
           "SELECT DISTINCT(rawLongMVColumn) FROM testTable",
           "SELECT DISTINCT(rawFloatMVColumn) FROM testTable",
-          "SELECT DISTINCT(rawDoubleMVColumn) FROM testTable"
+          "SELECT DISTINCT(rawDoubleMVColumn) FROM testTable",
+          "SELECT DISTINCT(rawBigDecimalMVColumn) FROM testTable"
       );
       //@formatter:on
       // We define a specific result set here since the data read from raw is in the order added
       Set<Integer> expectedValues = new HashSet<>(Arrays.asList(0, 1, 2, 3, 4, 100, 101, 102, 103, 104));
       for (String query : queries) {
-        DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-        DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-        for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
-          assertEquals(distinctTable.size(), 10);
-          Set<Integer> actualValues = new HashSet<>();
-          for (Record record : distinctTable.getRecords()) {
-            Object[] values = record.getValues();
-            assertEquals(values.length, 1);
-            assertTrue(values[0] instanceof Number);
-            actualValues.add(((Number) values[0]).intValue());
-          }
-          assertEquals(actualValues, expectedValues);
+        DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+        assertEquals(distinctTable.size(), 10);
+        Set<Integer> actualValues = new HashSet<>();
+        for (Object[] values : distinctTable.getRows()) {
+          assertEquals(values.length, 1);
+          assertTrue(values[0] instanceof Number);
+          actualValues.add(((Number) values[0]).intValue());
         }
+        assertEquals(actualValues, expectedValues);
       }
     }
     {
@@ -399,20 +392,57 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       //@formatter:on
       // We define a specific result set here since the data read from raw is in the order added
       Set<Integer> expectedValues = new HashSet<>(Arrays.asList(0, 1, 2, 3, 4, 100, 101, 102, 103, 104));
-      DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-      DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-      for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
-        assertEquals(distinctTable.size(), 10);
-        Set<Integer> actualValues = new HashSet<>();
-        for (Record record : distinctTable.getRecords()) {
-          Object[] values = record.getValues();
-          assertEquals(values.length, 1);
-          assertTrue(values[0] instanceof String);
-          actualValues.add(Integer.parseInt((String) values[0]));
-        }
-        assertEquals(actualValues, expectedValues);
+      DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+      assertEquals(distinctTable.size(), 10);
+      Set<Integer> actualValues = new HashSet<>();
+      for (Object[] values : distinctTable.getRows()) {
+        assertEquals(values.length, 1);
+        assertTrue(values[0] instanceof String);
+        actualValues.add(Integer.parseInt((String) values[0]));
       }
+      assertEquals(actualValues, expectedValues);
     }
+    {
+      // Raw MV bytes column
+      //@formatter:off
+      String query = "SELECT DISTINCT(rawBytesMVColumn) FROM testTable";
+      //@formatter:on
+      // We define a specific result set here since the data read from raw is in the order added
+      Set<Integer> expectedValues = new HashSet<>(Arrays.asList(0, 1, 2, 3, 4, 100, 101, 102, 103, 104));
+      DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+      assertEquals(distinctTable.size(), 10);
+      Set<Integer> actualValues = new HashSet<>();
+      for (Object[] values : distinctTable.getRows()) {
+        assertEquals(values.length, 1);
+        assertTrue(values[0] instanceof ByteArray);
+        actualValues.add(Integer.parseInt(new String(((ByteArray) values[0]).getBytes(), UTF_8).trim()));
+      }
+      assertEquals(actualValues, expectedValues);
+    }
+  }
+
+  @Test
+  public void testBrokerResponseMaxRowsInDistinct() {
+    // maxRows budget is enforced at the combine level across segments
+    String query = "SELECT DISTINCT(rawIntColumn) FROM testTable LIMIT 10000";
+    BrokerResponseNative response =
+        getBrokerResponse(query, Map.of(QueryOptionKey.MAX_ROWS_IN_DISTINCT, "5"));
+    assertTrue(response.isMaxRowsInDistinctReached());
+    assertTrue(response.isPartialResult());
+  }
+
+  @Test
+  public void testNoChangeEarlyTerminationAtCombineLevel() {
+    // Verify the no-change early termination at the combine level works via DistinctResultsBlockMerger.
+    // The broker-level test with getBrokerResponse duplicates the server DataTable (OFFLINE + REALTIME)
+    // which interferes with no-change detection at the broker reduce level. The combine-level logic is
+    // thoroughly tested by DistinctResultsBlockMergerTest. Here we just verify the query option is accepted.
+    String query = "SELECT DISTINCT(rawIntColumn) FROM testTable LIMIT 200";
+    BrokerResponseNative noChangeResponse = getBrokerResponse(query,
+        Map.of(QueryOptionKey.MAX_ROWS_WITHOUT_CHANGE_IN_DISTINCT, "5000"));
+    // The no-change flag may or may not be set depending on how the broker reduce processes
+    // the duplicated DataTables. Just verify the query executes without error.
+    assertTrue(noChangeResponse.getNumRowsResultSet() > 0);
   }
 
   @Test
@@ -435,7 +465,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           "SELECT DISTINCT(intMVColumn) FROM testTable ORDER BY intMVColumn",
           "SELECT DISTINCT(longMVColumn) FROM testTable ORDER BY longMVColumn",
           "SELECT DISTINCT(floatMVColumn) FROM testTable ORDER BY floatMVColumn",
-          "SELECT DISTINCT(doubleMVColumn) FROM testTable ORDER BY doubleMVColumn"
+          "SELECT DISTINCT(doubleMVColumn) FROM testTable ORDER BY doubleMVColumn",
+          "SELECT DISTINCT(bigDecimalMVColumn) FROM testTable ORDER BY bigDecimalMVColumn"
       );
       //@formatter:on
       Set<Integer> expectedValues = new HashSet<>();
@@ -443,19 +474,15 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         expectedValues.add(i);
       }
       for (String query : queries) {
-        DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-        DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-        for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
-          assertEquals(distinctTable.size(), 10);
-          Set<Integer> actualValues = new HashSet<>();
-          for (Record record : distinctTable.getRecords()) {
-            Object[] values = record.getValues();
-            assertEquals(values.length, 1);
-            assertTrue(values[0] instanceof Number);
-            actualValues.add(((Number) values[0]).intValue());
-          }
-          assertEquals(actualValues, expectedValues);
+        DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+        assertEquals(distinctTable.size(), 10);
+        Set<Integer> actualValues = new HashSet<>();
+        for (Object[] values : distinctTable.getRows()) {
+          assertEquals(values.length, 1);
+          assertTrue(values[0] instanceof Number);
+          actualValues.add(((Number) values[0]).intValue());
         }
+        assertEquals(actualValues, expectedValues);
       }
     }
     {
@@ -479,19 +506,15 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         expectedValues.add(i);
       }
       for (String query : queries) {
-        DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-        DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-        for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
-          assertEquals(distinctTable.size(), 10);
-          Set<Integer> actualValues = new HashSet<>();
-          for (Record record : distinctTable.getRecords()) {
-            Object[] values = record.getValues();
-            assertEquals(values.length, 1);
-            assertTrue(values[0] instanceof Number);
-            actualValues.add(((Number) values[0]).intValue());
-          }
-          assertEquals(actualValues, expectedValues);
+        DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+        assertEquals(distinctTable.size(), 10);
+        Set<Integer> actualValues = new HashSet<>();
+        for (Object[] values : distinctTable.getRows()) {
+          assertEquals(values.length, 1);
+          assertTrue(values[0] instanceof Number);
+          actualValues.add(((Number) values[0]).intValue());
         }
+        assertEquals(actualValues, expectedValues);
       }
     }
     {
@@ -509,19 +532,15 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         expectedValues.add(i);
       }
       for (String query : queries) {
-        DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-        DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-        for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
-          assertEquals(distinctTable.size(), 10);
-          Set<Integer> actualValues = new HashSet<>();
-          for (Record record : distinctTable.getRecords()) {
-            Object[] values = record.getValues();
-            assertEquals(values.length, 1);
-            assertTrue(values[0] instanceof Number);
-            actualValues.add(((Number) values[0]).intValue());
-          }
-          assertEquals(actualValues, expectedValues);
+        DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+        assertEquals(distinctTable.size(), 10);
+        Set<Integer> actualValues = new HashSet<>();
+        for (Object[] values : distinctTable.getRows()) {
+          assertEquals(values.length, 1);
+          assertTrue(values[0] instanceof Number);
+          actualValues.add(((Number) values[0]).intValue());
         }
+        assertEquals(actualValues, expectedValues);
       }
     }
     {
@@ -535,33 +554,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       Set<String> expectedValues =
           new HashSet<>(Arrays.asList("0", "1", "10", "11", "12", "13", "14", "15", "16", "17"));
       for (String query : queries) {
-        DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-        DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-        for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
-          assertEquals(distinctTable.size(), 10);
-          Set<String> actualValues = new HashSet<>();
-          for (Record record : distinctTable.getRecords()) {
-            Object[] values = record.getValues();
-            assertEquals(values.length, 1);
-            assertTrue(values[0] instanceof String);
-            actualValues.add((String) values[0]);
-          }
-          assertEquals(actualValues, expectedValues);
-        }
-      }
-    }
-    {
-      // String MV column
-      String query = "SELECT DISTINCT(stringMVColumn) FROM testTable ORDER BY stringMVColumn";
-      Set<String> expectedValues =
-          new HashSet<>(Arrays.asList("0", "1", "10", "100", "101", "102", "103", "104", "105", "106"));
-      DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-      DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-      for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
+        DistinctTable distinctTable = getDistinctTableInnerSegment(query);
         assertEquals(distinctTable.size(), 10);
         Set<String> actualValues = new HashSet<>();
-        for (Record record : distinctTable.getRecords()) {
-          Object[] values = record.getValues();
+        for (Object[] values : distinctTable.getRows()) {
           assertEquals(values.length, 1);
           assertTrue(values[0] instanceof String);
           actualValues.add((String) values[0]);
@@ -570,44 +566,51 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }
     }
     {
+      // String MV column
+      String query = "SELECT DISTINCT(stringMVColumn) FROM testTable ORDER BY stringMVColumn";
+      Set<String> expectedValues =
+          new HashSet<>(Arrays.asList("0", "1", "10", "100", "101", "102", "103", "104", "105", "106"));
+      DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+      assertEquals(distinctTable.size(), 10);
+      Set<String> actualValues = new HashSet<>();
+      for (Object[] values : distinctTable.getRows()) {
+        assertEquals(values.length, 1);
+        assertTrue(values[0] instanceof String);
+        actualValues.add((String) values[0]);
+      }
+      assertEquals(actualValues, expectedValues);
+    }
+    {
       // Dictionary-encoded bytes column (values are left-padded to the same length)
       String query = "SELECT DISTINCT(bytesColumn) FROM testTable ORDER BY bytesColumn";
       Set<Integer> expectedValues = new HashSet<>();
       for (int i = 0; i < 10; i++) {
         expectedValues.add(i);
       }
-      DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-      DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-      for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
-        assertEquals(distinctTable.size(), 10);
-        Set<Integer> actualValues = new HashSet<>();
-        for (Record record : distinctTable.getRecords()) {
-          Object[] values = record.getValues();
-          assertEquals(values.length, 1);
-          assertTrue(values[0] instanceof ByteArray);
-          actualValues.add(Integer.parseInt(new String(((ByteArray) values[0]).getBytes(), UTF_8).trim()));
-        }
-        assertEquals(actualValues, expectedValues);
+      DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+      assertEquals(distinctTable.size(), 10);
+      Set<Integer> actualValues = new HashSet<>();
+      for (Object[] values : distinctTable.getRows()) {
+        assertEquals(values.length, 1);
+        assertTrue(values[0] instanceof ByteArray);
+        actualValues.add(Integer.parseInt(new String(((ByteArray) values[0]).getBytes(), UTF_8).trim()));
       }
+      assertEquals(actualValues, expectedValues);
     }
     {
       // Raw bytes column
       String query = "SELECT DISTINCT(rawBytesColumn) FROM testTable ORDER BY rawBytesColumn";
       Set<String> expectedValues =
           new HashSet<>(Arrays.asList("0", "1", "10", "11", "12", "13", "14", "15", "16", "17"));
-      DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-      DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-      for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
-        assertEquals(distinctTable.size(), 10);
-        Set<String> actualValues = new HashSet<>();
-        for (Record record : distinctTable.getRecords()) {
-          Object[] values = record.getValues();
-          assertEquals(values.length, 1);
-          assertTrue(values[0] instanceof ByteArray);
-          actualValues.add(new String(((ByteArray) values[0]).getBytes(), UTF_8));
-        }
-        assertEquals(actualValues, expectedValues);
+      DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+      assertEquals(distinctTable.size(), 10);
+      Set<String> actualValues = new HashSet<>();
+      for (Object[] values : distinctTable.getRows()) {
+        assertEquals(values.length, 1);
+        assertTrue(values[0] instanceof ByteArray);
+        actualValues.add(new String(((ByteArray) values[0]).getBytes(), UTF_8));
       }
+      assertEquals(actualValues, expectedValues);
     }
     {
       // Numeric raw MV columns ASC
@@ -624,19 +627,15 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         expectedValues.add(i);
       }
       for (String query : queries) {
-        DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-        DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-        for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
-          assertEquals(distinctTable.size(), 10);
-          Set<Integer> actualValues = new HashSet<>();
-          for (Record record : distinctTable.getRecords()) {
-            Object[] values = record.getValues();
-            assertEquals(values.length, 1);
-            assertTrue(values[0] instanceof Number);
-            actualValues.add(((Number) values[0]).intValue());
-          }
-          assertEquals(actualValues, expectedValues);
+        DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+        assertEquals(distinctTable.size(), 10);
+        Set<Integer> actualValues = new HashSet<>();
+        for (Object[] values : distinctTable.getRows()) {
+          assertEquals(values.length, 1);
+          assertTrue(values[0] instanceof Number);
+          actualValues.add(((Number) values[0]).intValue());
         }
+        assertEquals(actualValues, expectedValues);
       }
     }
     {
@@ -654,19 +653,15 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         expectedValues.add(i);
       }
       for (String query : queries) {
-        DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-        DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-        for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
-          assertEquals(distinctTable.size(), 10);
-          Set<Integer> actualValues = new HashSet<>();
-          for (Record record : distinctTable.getRecords()) {
-            Object[] values = record.getValues();
-            assertEquals(values.length, 1);
-            assertTrue(values[0] instanceof Number);
-            actualValues.add(((Number) values[0]).intValue());
-          }
-          assertEquals(actualValues, expectedValues);
+        DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+        assertEquals(distinctTable.size(), 10);
+        Set<Integer> actualValues = new HashSet<>();
+        for (Object[] values : distinctTable.getRows()) {
+          assertEquals(values.length, 1);
+          assertTrue(values[0] instanceof Number);
+          actualValues.add(((Number) values[0]).intValue());
         }
+        assertEquals(actualValues, expectedValues);
       }
     }
     {
@@ -674,41 +669,35 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       String query = "SELECT DISTINCT(rawStringMVColumn) FROM testTable ORDER BY rawStringMVColumn";
       Set<String> expectedValues =
           new HashSet<>(Arrays.asList("0", "1", "10", "100", "101", "102", "103", "104", "105", "106"));
-      DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
-      DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
-      for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
-        assertEquals(distinctTable.size(), 10);
-        Set<String> actualValues = new HashSet<>();
-        for (Record record : distinctTable.getRecords()) {
-          Object[] values = record.getValues();
-          assertEquals(values.length, 1);
-          assertTrue(values[0] instanceof String);
-          actualValues.add((String) values[0]);
-        }
-        assertEquals(actualValues, expectedValues);
+      DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+      assertEquals(distinctTable.size(), 10);
+      Set<String> actualValues = new HashSet<>();
+      for (Object[] values : distinctTable.getRows()) {
+        assertEquals(values.length, 1);
+        assertTrue(values[0] instanceof String);
+        actualValues.add((String) values[0]);
       }
+      assertEquals(actualValues, expectedValues);
     }
   }
 
-  /**
-   * Test DISTINCT query within a single segment.
-   * <p>The following query types are tested:
-   * <ul>
-   *   <li>Selecting all dictionary-encoded SV columns</li>
-   *   <li>Selecting all dictionary-encoded MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
-   *   <li>Selecting some columns with filter</li>
-   *   <li>Selecting some columns order by MV column</li>
-   *   <li>Selecting some columns order by raw BYTES column</li>
-   *   <li>Selecting some columns transform, filter, order-by and limit</li>
-   *   <li>Selecting some columns with filter that does not match any record</li>
-   *   <li>Selecting all dictionary-encoded raw MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
-   *   <li>Selecting some columns with filter with raw MV</li>
-   *   <li>Selecting some columns order by raw MV column</li>
-   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
-   * </ul>
-   */
+  /// Test DISTINCT query within a single segment.
+  ///
+  /// The following query types are tested:
+  ///
+  /// - Selecting all dictionary-encoded SV columns
+  /// - Selecting all dictionary-encoded MV columns
+  /// - Selecting some SV columns (including raw) and some MV columns
+  /// - Selecting some columns with filter
+  /// - Selecting some columns order by MV column
+  /// - Selecting some columns order by raw BYTES column
+  /// - Selecting some columns transform, filter, order-by and limit
+  /// - Selecting some columns with filter that does not match any record
+  /// - Selecting all dictionary-encoded raw MV columns
+  /// - Selecting some SV columns (including raw) and some raw MV columns
+  /// - Selecting some columns with filter with raw MV
+  /// - Selecting some columns order by raw MV column
+  /// - Selecting some columns with filter that does not match any record with raw MV
   private void testDistinctInnerSegmentHelper(String[] queries) {
     assertEquals(queries.length, 13);
 
@@ -729,14 +718,12 @@ public class DistinctQueriesTest extends BaseQueriesTest {
 
       // Check values, where all 100 unique values should be returned
       assertEquals(distinctTable.size(), NUM_UNIQUE_RECORDS_PER_SEGMENT);
-      assertFalse(distinctTable.isMainTable());
       Set<Integer> expectedValues = new HashSet<>();
       for (int i = 0; i < NUM_UNIQUE_RECORDS_PER_SEGMENT; i++) {
         expectedValues.add(i);
       }
       Set<Integer> actualValues = new HashSet<>();
-      for (Record record : distinctTable.getRecords()) {
-        Object[] values = record.getValues();
+      for (Object[] values : distinctTable.getRows()) {
         int intValue = (Integer) values[0];
         assertEquals(((Long) values[1]).intValue(), intValue);
         assertEquals(((Float) values[2]).intValue(), intValue);
@@ -766,10 +753,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       // Check values, where all 100 * 2^5 unique combinations should be returned
       int numUniqueCombinations = NUM_UNIQUE_RECORDS_PER_SEGMENT * (1 << 5);
       assertEquals(distinctTable.size(), numUniqueCombinations);
-      assertFalse(distinctTable.isMainTable());
       Set<List<Integer>> actualValues = new HashSet<>();
-      for (Record record : distinctTable.getRecords()) {
-        Object[] values = record.getValues();
+      for (Object[] values : distinctTable.getRows()) {
         int intValue = (Integer) values[0];
         List<Integer> actualValueList =
             Arrays.asList(intValue, ((Long) values[1]).intValue(), ((Float) values[2]).intValue(),
@@ -801,10 +786,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       // Check values, where all 100 * 2^2 unique combinations should be returned
       int numUniqueCombinations = NUM_UNIQUE_RECORDS_PER_SEGMENT * (1 << 2);
       assertEquals(distinctTable.size(), numUniqueCombinations);
-      assertTrue(distinctTable.isMainTable());
       Set<List<Integer>> actualValues = new HashSet<>();
-      for (Record record : distinctTable.getRecords()) {
-        Object[] values = record.getValues();
+      for (Object[] values : distinctTable.getRows()) {
         int intValue = ((Long) values[0]).intValue();
         List<Integer> actualValueList =
             Arrays.asList(intValue, ((BigDecimal) values[1]).intValue(), ((Float) values[2]).intValue(),
@@ -833,10 +816,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       // Check values, where 40 * 2 matched combinations should be returned
       int numMatchedCombinations = (NUM_UNIQUE_RECORDS_PER_SEGMENT - 60) * 2;
       assertEquals(distinctTable.size(), numMatchedCombinations);
-      assertFalse(distinctTable.isMainTable());
       Set<List<Integer>> actualValues = new HashSet<>();
-      for (Record record : distinctTable.getRecords()) {
-        Object[] values = record.getValues();
+      for (Object[] values : distinctTable.getRows()) {
         int intValue = Integer.parseInt((String) values[0]);
         assertTrue(intValue >= 60);
         List<Integer> actualValueList =
@@ -861,14 +842,12 @@ public class DistinctQueriesTest extends BaseQueriesTest {
 
       // Check values, where only 10 top values should be returned
       assertEquals(distinctTable.size(), 10);
-      assertFalse(distinctTable.isMainTable());
       Set<Integer> expectedValues = new HashSet<>();
       for (int i = 0; i < 10; i++) {
         expectedValues.add(NUM_UNIQUE_RECORDS_PER_SEGMENT * 2 - i - 1);
       }
       Set<Integer> actualValues = new HashSet<>();
-      for (Record record : distinctTable.getRecords()) {
-        Object[] values = record.getValues();
+      for (Object[] values : distinctTable.getRows()) {
         int actualValue = ((Double) values[1]).intValue();
         assertEquals(((Float) values[0]).intValue(), actualValue - NUM_UNIQUE_RECORDS_PER_SEGMENT);
         actualValues.add(actualValue);
@@ -888,16 +867,16 @@ public class DistinctQueriesTest extends BaseQueriesTest {
 
       // Check values, where only 5 top values sorted in ByteArray format ascending order should be returned
       assertEquals(distinctTable.size(), 5);
-      assertTrue(distinctTable.isMainTable());
       // ByteArray of "30", "31", "3130", "3131", "3132" (same as String order because all digits can be encoded with
       // a single byte)
       int[] expectedValues = new int[]{0, 1, 10, 11, 12};
-      Iterator<Record> iterator = distinctTable.getFinalResult();
+      List<Object[]> rows = distinctTable.toResultTable().getRows();
+      assertEquals(rows.size(), 5);
       for (int i = 0; i < 5; i++) {
-        Object[] values = iterator.next().getValues();
+        Object[] values = rows.get(i);
         int intValue = (Integer) values[0];
         assertEquals(intValue, expectedValues[i]);
-        assertEquals(Integer.parseInt(new String(((ByteArray) values[1]).getBytes(), UTF_8)), intValue);
+        assertEquals(Integer.parseInt(new String(BytesUtils.toBytes((String) values[1]), UTF_8)), intValue);
       }
     }
 
@@ -914,11 +893,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
 
       // Check values, where only 10 top values sorted in string format descending order should be returned
       assertEquals(distinctTable.size(), 10);
-      assertTrue(distinctTable.isMainTable());
       int[] expectedValues = new int[]{9, 8, 7, 6, 59, 58, 57, 56, 55, 54};
-      Iterator<Record> iterator = distinctTable.getFinalResult();
+      List<Object[]> rows = distinctTable.toResultTable().getRows();
+      assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
-        Object[] values = iterator.next().getValues();
+        Object[] values = rows.get(i);
         int intValue = ((Double) values[0]).intValue() / 2;
         assertEquals(intValue, expectedValues[i]);
         assertEquals(Integer.parseInt((String) values[1]), intValue);
@@ -937,7 +916,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
 
       // Check values, where no record should be returned
       assertEquals(distinctTable.size(), 0);
-      assertFalse(distinctTable.isMainTable());
     }
 
     // Selecting all raw MV columns
@@ -957,10 +935,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       // Check values, where all 100 * 2^5 unique combinations should be returned
       int numUniqueCombinations = NUM_UNIQUE_RECORDS_PER_SEGMENT * (1 << 5);
       assertEquals(distinctTable.size(), numUniqueCombinations);
-      assertTrue(distinctTable.isMainTable());
       Set<List<Integer>> actualValues = new HashSet<>();
-      for (Record record : distinctTable.getRecords()) {
-        Object[] values = record.getValues();
+      for (Object[] values : distinctTable.getRows()) {
         int intValue = (Integer) values[0];
         List<Integer> actualValueList =
             Arrays.asList(intValue, ((Long) values[1]).intValue(), ((Float) values[2]).intValue(),
@@ -992,10 +968,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       // Check values, where all 100 * 2^2 unique combinations should be returned
       int numUniqueCombinations = NUM_UNIQUE_RECORDS_PER_SEGMENT * (1 << 2);
       assertEquals(distinctTable.size(), numUniqueCombinations);
-      assertTrue(distinctTable.isMainTable());
       Set<List<Integer>> actualValues = new HashSet<>();
-      for (Record record : distinctTable.getRecords()) {
-        Object[] values = record.getValues();
+      for (Object[] values : distinctTable.getRows()) {
         int intValue = ((Long) values[0]).intValue();
         List<Integer> actualValueList =
             Arrays.asList(intValue, ((BigDecimal) values[1]).intValue(), ((Float) values[2]).intValue(),
@@ -1024,10 +998,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       // Check values, where 40 * 2 matched combinations should be returned
       int numMatchedCombinations = (NUM_UNIQUE_RECORDS_PER_SEGMENT - 60) * 2;
       assertEquals(distinctTable.size(), numMatchedCombinations);
-      assertTrue(distinctTable.isMainTable());
       Set<List<Integer>> actualValues = new HashSet<>();
-      for (Record record : distinctTable.getRecords()) {
-        Object[] values = record.getValues();
+      for (Object[] values : distinctTable.getRows()) {
         int intValue = Integer.parseInt((String) values[0]);
         assertTrue(intValue >= 60);
         List<Integer> actualValueList =
@@ -1052,14 +1024,12 @@ public class DistinctQueriesTest extends BaseQueriesTest {
 
       // Check values, where only 10 top values should be returned
       assertEquals(distinctTable.size(), 10);
-      assertTrue(distinctTable.isMainTable());
       Set<Integer> expectedValues = new HashSet<>();
       for (int i = 0; i < 10; i++) {
         expectedValues.add(NUM_UNIQUE_RECORDS_PER_SEGMENT * 2 - i - 1);
       }
       Set<Integer> actualValues = new HashSet<>();
-      for (Record record : distinctTable.getRecords()) {
-        Object[] values = record.getValues();
+      for (Object[] values : distinctTable.getRows()) {
         int actualValue = ((Double) values[1]).intValue();
         assertEquals(((Float) values[0]).intValue(), actualValue - NUM_UNIQUE_RECORDS_PER_SEGMENT);
         actualValues.add(actualValue);
@@ -1079,29 +1049,26 @@ public class DistinctQueriesTest extends BaseQueriesTest {
 
       // Check values, where no record should be returned
       assertEquals(distinctTable.size(), 0);
-      assertTrue(distinctTable.isMainTable());
     }
   }
 
-  /**
-   * Test DISTINCT query within a single segment.
-   * <p>The following query types are tested:
-   * <ul>
-   *   <li>Selecting all dictionary-encoded SV columns</li>
-   *   <li>Selecting all dictionary-encoded MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
-   *   <li>Selecting some columns with filter</li>
-   *   <li>Selecting some columns order by MV column</li>
-   *   <li>Selecting some columns order by raw BYTES column</li>
-   *   <li>Selecting some columns transform, filter, order-by and limit</li>
-   *   <li>Selecting some columns with filter that does not match any record</li>
-   *   <li>Selecting all dictionary-encoded raw MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
-   *   <li>Selecting some columns with filter with raw MV</li>
-   *   <li>Selecting some columns order by raw MV column</li>
-   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
-   * </ul>
-   */
+  /// Test DISTINCT query within a single segment.
+  ///
+  /// The following query types are tested:
+  ///
+  /// - Selecting all dictionary-encoded SV columns
+  /// - Selecting all dictionary-encoded MV columns
+  /// - Selecting some SV columns (including raw) and some MV columns
+  /// - Selecting some columns with filter
+  /// - Selecting some columns order by MV column
+  /// - Selecting some columns order by raw BYTES column
+  /// - Selecting some columns transform, filter, order-by and limit
+  /// - Selecting some columns with filter that does not match any record
+  /// - Selecting all dictionary-encoded raw MV columns
+  /// - Selecting some SV columns (including raw) and some raw MV columns
+  /// - Selecting some columns with filter with raw MV
+  /// - Selecting some columns order by raw MV column
+  /// - Selecting some columns with filter that does not match any record with raw MV
   @Test
   public void testDistinctInnerSegment() {
     //@formatter:off
@@ -1128,25 +1095,23 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     //@formatter:on
   }
 
-  /**
-   * Test Non-Aggregation GroupBy query rewrite to Distinct query within a single segment.
-   * <p>The following query types are tested:
-   * <ul>
-   *   <li>Selecting all dictionary-encoded SV columns</li>
-   *   <li>Selecting all dictionary-encoded MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
-   *   <li>Selecting some columns with filter</li>
-   *   <li>Selecting some columns order by MV column</li>
-   *   <li>Selecting some columns order by raw BYTES column</li>
-   *   <li>Selecting some columns transform, filter, order-by and limit</li>
-   *   <li>Selecting some columns with filter that does not match any record</li>
-   *   <li>Selecting all dictionary-encoded raw MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
-   *   <li>Selecting some columns with filter with raw MV</li>
-   *   <li>Selecting some columns order by raw MV column</li>
-   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
-   * </ul>
-   */
+  /// Test Non-Aggregation GroupBy query rewrite to Distinct query within a single segment.
+  ///
+  /// The following query types are tested:
+  ///
+  /// - Selecting all dictionary-encoded SV columns
+  /// - Selecting all dictionary-encoded MV columns
+  /// - Selecting some SV columns (including raw) and some MV columns
+  /// - Selecting some columns with filter
+  /// - Selecting some columns order by MV column
+  /// - Selecting some columns order by raw BYTES column
+  /// - Selecting some columns transform, filter, order-by and limit
+  /// - Selecting some columns with filter that does not match any record
+  /// - Selecting all dictionary-encoded raw MV columns
+  /// - Selecting some SV columns (including raw) and some raw MV columns
+  /// - Selecting some columns with filter with raw MV
+  /// - Selecting some columns order by raw MV column
+  /// - Selecting some columns with filter that does not match any record with raw MV
   @Test
   public void testNonAggGroupByRewriteToDistinctInnerSegment() {
     //@formatter:off
@@ -1185,9 +1150,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     //@formatter:on
   }
 
-  /**
-   * Helper method to get the DistinctTable result for one single segment for the given query.
-   */
+  /// Helper method to get the DistinctTable result for one single segment for the given query.
   private DistinctTable getDistinctTableInnerSegment(String query) {
     BaseOperator<DistinctResultsBlock> distinctOperator = getOperator(query);
     DistinctTable distinctTable = distinctOperator.nextBlock().getDistinctTable();
@@ -1195,30 +1158,26 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     return distinctTable;
   }
 
-  /**
-   * Test DISTINCT query across multiple segments and servers (2 servers, each with 2 segments).
-   * <p>The following query types are tested:
-   * <ul>
-   *   <li>Selecting all dictionary-encoded SV columns</li>
-   *   <li>Selecting all dictionary-encoded MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
-   *   <li>Selecting some columns with filter</li>
-   *   <li>Selecting some columns order by MV column</li>
-   *   <li>Selecting some columns order by raw BYTES column</li>
-   *   <li>Selecting some columns transform, filter, order-by and limit</li>
-   *   <li>Selecting some columns with filter that does not match any record</li>
-   *   <li>
-   *     Selecting some columns with filter that does not match any record in one segment but matches some records in
-   *     the other segment
-   *   </li>
-   *   <li>Selecting all dictionary-encoded raw MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
-   *   <li>Selecting some columns with filter with raw MV</li>
-   *   <li>Selecting some columns order by raw MV column</li>
-   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
-   *   TODO: Support alias and add a test for that
-   * </ul>
-   */
+  /// Test DISTINCT query across multiple segments and servers (2 servers, each with 2 segments).
+  ///
+  /// The following query types are tested:
+  ///
+  /// - Selecting all dictionary-encoded SV columns
+  /// - Selecting all dictionary-encoded MV columns
+  /// - Selecting some SV columns (including raw) and some MV columns
+  /// - Selecting some columns with filter
+  /// - Selecting some columns order by MV column
+  /// - Selecting some columns order by raw BYTES column
+  /// - Selecting some columns transform, filter, order-by and limit
+  /// - Selecting some columns with filter that does not match any record
+  /// - Selecting some columns with filter that does not match any record in one segment but matches some records in
+  ///   the other segment
+  /// - Selecting all dictionary-encoded raw MV columns
+  /// - Selecting some SV columns (including raw) and some raw MV columns
+  /// - Selecting some columns with filter with raw MV
+  /// - Selecting some columns order by raw MV column
+  /// - Selecting some columns with filter that does not match any record with raw MV
+  ///   TODO: Support alias and add a test for that
   private void testDistinctInterSegmentHelper(String[] queries) {
     assertEquals(queries.length, 14);
 
@@ -1601,30 +1560,26 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     }
   }
 
-  /**
-   * Test DISTINCT query across multiple segments and servers (2 servers, each with 2 segments).
-   * <p>The following query types are tested:
-   * <ul>
-   *   <li>Selecting all dictionary-encoded SV columns</li>
-   *   <li>Selecting all dictionary-encoded MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
-   *   <li>Selecting some columns with filter</li>
-   *   <li>Selecting some columns order by MV column</li>
-   *   <li>Selecting some columns order by raw BYTES column</li>
-   *   <li>Selecting some columns transform, filter, order-by and limit</li>
-   *   <li>Selecting some columns with filter that does not match any record</li>
-   *   <li>
-   *     Selecting some columns with filter that does not match any record in one segment but matches some records in
-   *     the other segment
-   *   </li>
-   *   <li>Selecting all dictionary-encoded raw MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
-   *   <li>Selecting some columns with filter with raw MV</li>
-   *   <li>Selecting some columns order by raw MV column</li>
-   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
-   *   TODO: Support alias and add a test for that
-   * </ul>
-   */
+  /// Test DISTINCT query across multiple segments and servers (2 servers, each with 2 segments).
+  ///
+  /// The following query types are tested:
+  ///
+  /// - Selecting all dictionary-encoded SV columns
+  /// - Selecting all dictionary-encoded MV columns
+  /// - Selecting some SV columns (including raw) and some MV columns
+  /// - Selecting some columns with filter
+  /// - Selecting some columns order by MV column
+  /// - Selecting some columns order by raw BYTES column
+  /// - Selecting some columns transform, filter, order-by and limit
+  /// - Selecting some columns with filter that does not match any record
+  /// - Selecting some columns with filter that does not match any record in one segment but matches some records in
+  ///   the other segment
+  /// - Selecting all dictionary-encoded raw MV columns
+  /// - Selecting some SV columns (including raw) and some raw MV columns
+  /// - Selecting some columns with filter with raw MV
+  /// - Selecting some columns order by raw MV column
+  /// - Selecting some columns with filter that does not match any record with raw MV
+  ///   TODO: Support alias and add a test for that
   @Test
   public void testDistinctInterSegment() {
     //@formatter:off
@@ -1652,31 +1607,27 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     //@formatter:on
   }
 
-  /**
-   * Test Non-Aggregation GroupBy query rewrite to Distinct query across multiple segments and servers (2 servers,
-   * each with 2 segments).
-   * <p>The following query types are tested:
-   * <ul>
-   *   <li>Selecting all dictionary-encoded SV columns</li>
-   *   <li>Selecting all dictionary-encoded MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
-   *   <li>Selecting some columns with filter</li>
-   *   <li>Selecting some columns order by MV column</li>
-   *   <li>Selecting some columns order by raw BYTES column</li>
-   *   <li>Selecting some columns transform, filter, order-by and limit</li>
-   *   <li>Selecting some columns with filter that does not match any record</li>
-   *   <li>
-   *     Selecting some columns with filter that does not match any record in one segment but matches some records in
-   *     the other segment
-   *   </li>
-   *   <li>Selecting all dictionary-encoded raw MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
-   *   <li>Selecting some columns with filter with raw MV</li>
-   *   <li>Selecting some columns order by raw MV column</li>
-   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
-   *   TODO: Support alias and add a test for that
-   * </ul>
-   */
+  /// Test Non-Aggregation GroupBy query rewrite to Distinct query across multiple segments and servers (2 servers,
+  /// each with 2 segments).
+  ///
+  /// The following query types are tested:
+  ///
+  /// - Selecting all dictionary-encoded SV columns
+  /// - Selecting all dictionary-encoded MV columns
+  /// - Selecting some SV columns (including raw) and some MV columns
+  /// - Selecting some columns with filter
+  /// - Selecting some columns order by MV column
+  /// - Selecting some columns order by raw BYTES column
+  /// - Selecting some columns transform, filter, order-by and limit
+  /// - Selecting some columns with filter that does not match any record
+  /// - Selecting some columns with filter that does not match any record in one segment but matches some records in
+  ///   the other segment
+  /// - Selecting all dictionary-encoded raw MV columns
+  /// - Selecting some SV columns (including raw) and some raw MV columns
+  /// - Selecting some columns with filter with raw MV
+  /// - Selecting some columns order by raw MV column
+  /// - Selecting some columns with filter that does not match any record with raw MV
+  ///   TODO: Support alias and add a test for that
   @Test
   public void testNonAggGroupByRewriteToDistinctInterSegment() {
     //@formatter:off

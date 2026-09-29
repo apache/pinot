@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.realtime;
 
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -37,26 +38,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class implements the FSM on the controller side for each completing segment.
- *
- * An FSM is is created when we first hear about a segment (typically through the segmentConsumed message).
- * When an FSM is created, it may have one of two start states (HOLDING, or COMMITTED), depending on the
- * constructor used.
- *
- * We kick off an FSM in the COMMITTED state (rare) when we find that PROPERTYSTORE already has the segment
- * with the Status set to DONE.
- *
- * We kick off an FSM in the HOLDING state (typical) when a sementConsumed() message arrives from the
- * first server we hear from.
- *
- * The FSM does not have a timer. It is clocked by the servers, which, typically, are retransmitting their
- * segmentConsumed() message every so often (SegmentCompletionProtocol.MAX_HOLD_TIME_MS).
- *
- * See https://github.com/linkedin/pinot/wiki/Low-level-kafka-consumers
- */
+/// This class implements the FSM on the controller side for each completing segment.
+///
+/// An FSM is created when we first hear about a segment (typically through the segmentConsumed message).
+/// When an FSM is created, it may have one of two start states (HOLDING, or COMMITTED), depending on the
+/// constructor used.
+///
+/// We kick off an FSM in the COMMITTED state (rare) when we find that PROPERTYSTORE already has the segment
+/// with the Status set to DONE.
+///
+/// We kick off an FSM in the HOLDING state (typical) when a sementConsumed() message arrives from the
+/// first server we hear from.
+///
+/// The FSM does not have a timer. It is clocked by the servers, which, typically, are retransmitting their
+/// segmentConsumed() message every so often (SegmentCompletionProtocol.MAX_HOLD_TIME_MS).
+///
+/// See https://github.com/linkedin/pinot/wiki/Low-level-kafka-consumers
 public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
-  public static final Logger LOGGER = LoggerFactory.getLogger(BlockingSegmentCompletionFSM.class);
 
   public enum BlockingSegmentCompletionFSMState {
     PARTIAL_CONSUMING,  // Indicates that at least one replica has reported that it has stopped consuming.
@@ -88,26 +86,26 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
   BlockingSegmentCompletionFSMState _state = BlockingSegmentCompletionFSMState.HOLDING;
       // Typically start off in HOLDING state.
   final long _startTimeMs;
-  private final LLCSegmentName _segmentName;
-  private final String _rawTableName;
-  private final String _realtimeTableName;
-  private final int _numReplicas;
-  private final Set<String> _excludedServerStateMap;
-  private final Map<String, StreamPartitionMsgOffset> _commitStateMap;
-  private final StreamPartitionMsgOffsetFactory _streamPartitionMsgOffsetFactory;
-  private StreamPartitionMsgOffset _winningOffset = null;
-  private String _winner;
-  private final PinotLLCRealtimeSegmentManager _segmentManager;
-  private final SegmentCompletionManager _segmentCompletionManager;
-  private final long _maxTimeToPickWinnerMs;
-  private final long _maxTimeToNotifyWinnerMs;
-  private final long _initialCommitTimeMs;
+  protected final LLCSegmentName _segmentName;
+  protected final String _rawTableName;
+  protected final String _realtimeTableName;
+  protected final int _numReplicas;
+  protected final Set<String> _excludedServerStateMap;
+  protected final Map<String, StreamPartitionMsgOffset> _commitStateMap;
+  protected final StreamPartitionMsgOffsetFactory _streamPartitionMsgOffsetFactory;
+  protected StreamPartitionMsgOffset _winningOffset = null;
+  protected String _winner;
+  protected final PinotLLCRealtimeSegmentManager _segmentManager;
+  protected final SegmentCompletionManager _segmentCompletionManager;
+  protected final long _maxTimeToPickWinnerMs;
+  protected final long _maxTimeToNotifyWinnerMs;
+  protected final long _initialCommitTimeMs;
   // Once the winner is notified, they are expected to commit right away. At this point, it is the segment build
   // time that we need to consider.
   // We may need to add some time here to allow for getting the lock? For now 0
   // We may need to add some time for the committer come back to us (after the build)? For now 0.
-  private long _maxTimeAllowedToCommitMs;
-  private final String _controllerVipUrl;
+  protected long _maxTimeAllowedToCommitMs;
+  protected final String _controllerVipUrl;
 
   public BlockingSegmentCompletionFSM(PinotLLCRealtimeSegmentManager segmentManager,
       SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName,
@@ -129,7 +127,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     if (savedCommitTime != null && savedCommitTime > initialCommitTimeMs) {
       initialCommitTimeMs = savedCommitTime;
     }
-    _logger = LoggerFactory.getLogger("SegmentCompletionFSM_" + segmentName.getSegmentName());
+    _logger = LoggerFactory.getLogger(this.getClass().getSimpleName() + "_" + segmentName.getSegmentName());
     int maxCommitTimeForAllSegmentsSeconds = SegmentCompletionManager.getMaxCommitTimeForAllSegmentsSeconds();
     if (initialCommitTimeMs > maxCommitTimeForAllSegmentsSeconds * 1000L) {
       // The table has a really high value configured for max commit time. Set it to a higher value than default
@@ -143,12 +141,15 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     _maxTimeAllowedToCommitMs = _startTimeMs + _initialCommitTimeMs;
     _controllerVipUrl = segmentCompletionManager.getControllerVipUrl();
 
-    if (segmentMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
+    // NOTE: If segment ZK status is COMMITTING, The current behaviour expects the segment protocol calls to fail and
+    // abort leaving it to realtime segment validation job to fix it.
+    if (segmentMetadata.getStatus().isCompleted()) {
+      _state = BlockingSegmentCompletionFSMState.COMMITTED;
       StreamPartitionMsgOffsetFactory factory =
           _segmentCompletionManager.getStreamPartitionMsgOffsetFactory(_segmentName);
-      StreamPartitionMsgOffset endOffset = factory.create(segmentMetadata.getEndOffset());
-      _state = BlockingSegmentCompletionFSMState.COMMITTED;
-      _winningOffset = endOffset;
+      String endOffset = segmentMetadata.getEndOffset();
+      Preconditions.checkState(endOffset != null, "Failed to find end offset for segment: %s", segmentName);
+      _winningOffset = factory.create(endOffset);
       _winner = "UNKNOWN";
     }
   }
@@ -177,6 +178,18 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
   public boolean isDone() {
     return _state.equals(BlockingSegmentCompletionFSMState.COMMITTED) || _state.equals(
         BlockingSegmentCompletionFSMState.ABORTED);
+  }
+
+  /// The method is used to decide whether we should reduce segment size and reset when server reports cannot build
+  /// segment due to non-recoverable error. In most of cases, when such request is sent, the error should be
+  /// deterministic. However, due to possible data lost, replicas may not hold exact same data and some of them might be
+  /// able to build the segment. If the FSM \_state indicates that one replica starts to commit, it means immutable
+  /// segment can be created successfully, returns true.
+  ///
+  /// @return boolean
+  public boolean isImmutableSegmentCreated() {
+    return _state.equals(BlockingSegmentCompletionFSMState.COMMITTER_UPLOADING) || _state.equals(
+        BlockingSegmentCompletionFSMState.COMMITTING) || _state.equals(BlockingSegmentCompletionFSMState.COMMITTED);
   }
 
   /*
@@ -242,7 +255,10 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
    * that they re-transmit their segmentConsumed() message and start over.
    */
   @Override
-  public SegmentCompletionProtocol.Response segmentCommitStart(String instanceId, StreamPartitionMsgOffset offset) {
+  public SegmentCompletionProtocol.Response segmentCommitStart(SegmentCompletionProtocol.Request.Params reqParams) {
+    String instanceId = reqParams.getInstanceId();
+    StreamPartitionMsgOffset offset =
+        _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
     long now = _segmentCompletionManager.getCurrentTimeMs();
     if (_excludedServerStateMap.contains(instanceId)) {
       _logger.warn("Not accepting commit from {} since it had stoppd consuming", instanceId);
@@ -261,7 +277,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
           return committerDecidedCommit(instanceId, offset, now);
 
         case COMMITTER_NOTIFIED:
-          return committerNotifiedCommit(instanceId, offset, now);
+          return committerNotifiedCommit(reqParams, now);
 
         case COMMITTER_UPLOADING:
           return committerUploadingCommit(instanceId, offset, now);
@@ -376,7 +392,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
   }
 
   // Helper methods that log the current state and the response sent
-  private SegmentCompletionProtocol.Response fail(String instanceId, StreamPartitionMsgOffset offset) {
+  protected SegmentCompletionProtocol.Response fail(String instanceId, StreamPartitionMsgOffset offset) {
     _logger.info("{}:FAIL for instance={} offset={}", _state, instanceId, offset);
     return SegmentCompletionProtocol.RESP_FAILED;
   }
@@ -398,28 +414,28 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     return SegmentCompletionProtocol.RESP_DISCARD;
   }
 
-  private SegmentCompletionProtocol.Response keep(String instanceId, StreamPartitionMsgOffset offset) {
+  protected SegmentCompletionProtocol.Response keep(String instanceId, StreamPartitionMsgOffset offset) {
     _logger.info("{}:KEEP for instance={} offset={}", _state, instanceId, offset);
     return new SegmentCompletionProtocol.Response(
         new SegmentCompletionProtocol.Response.Params().withStreamPartitionMsgOffset(offset.toString())
             .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.KEEP));
   }
 
-  private SegmentCompletionProtocol.Response catchup(String instanceId, StreamPartitionMsgOffset offset) {
+  protected SegmentCompletionProtocol.Response catchup(String instanceId, StreamPartitionMsgOffset offset) {
     _logger.info("{}:CATCHUP for instance={} offset={}", _state, instanceId, offset);
     return new SegmentCompletionProtocol.Response(
         new SegmentCompletionProtocol.Response.Params().withStreamPartitionMsgOffset(_winningOffset.toString())
             .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP));
   }
 
-  private SegmentCompletionProtocol.Response hold(String instanceId, StreamPartitionMsgOffset offset) {
+  protected SegmentCompletionProtocol.Response hold(String instanceId, StreamPartitionMsgOffset offset) {
     _logger.info("{}:HOLD for instance={} offset={}", _state, instanceId, offset);
     return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params()
         .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD)
         .withStreamPartitionMsgOffset(offset.toString()));
   }
 
-  private SegmentCompletionProtocol.Response abortAndReturnHold(long now, String instanceId,
+  protected SegmentCompletionProtocol.Response abortAndReturnHold(long now, String instanceId,
       StreamPartitionMsgOffset offset) {
     _state = BlockingSegmentCompletionFSMState.ABORTED;
     _segmentCompletionManager.getControllerMetrics()
@@ -427,14 +443,14 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     return hold(instanceId, offset);
   }
 
-  private SegmentCompletionProtocol.Response abortAndReturnFailed() {
+  protected SegmentCompletionProtocol.Response abortAndReturnFailed() {
     _state = BlockingSegmentCompletionFSMState.ABORTED;
     _segmentCompletionManager.getControllerMetrics()
         .addMeteredTableValue(_rawTableName, ControllerMeter.LLC_STATE_MACHINE_ABORTS, 1);
     return SegmentCompletionProtocol.RESP_FAILED;
   }
 
-  private SegmentCompletionProtocol.Response abortIfTooLateAndReturnHold(long now, String instanceId,
+  protected SegmentCompletionProtocol.Response abortIfTooLateAndReturnHold(long now, String instanceId,
       StreamPartitionMsgOffset offset) {
     if (now > _maxTimeAllowedToCommitMs) {
       _logger
@@ -464,7 +480,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
    * message. As long as the committer is not the one who stopped consuming (which we have already checked before
    * coming here), we will trust the server that this is a valid commit.
    */
-  private SegmentCompletionProtocol.Response partialConsumingCommit(String instanceId,
+  protected SegmentCompletionProtocol.Response partialConsumingCommit(String instanceId,
       StreamPartitionMsgOffset offset, long now) {
     // Do the same as HOLDING__commit
     return processCommitWhileHoldingOrPartialConsuming(instanceId, offset, now);
@@ -510,7 +526,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
    * This not a good state to receive a commit message, but then it may be that the controller
    * failed over while in the COMMITTER_NOTIFIED state...
    */
-  private SegmentCompletionProtocol.Response holdingCommit(String instanceId, StreamPartitionMsgOffset offset,
+  protected SegmentCompletionProtocol.Response holdingCommit(String instanceId, StreamPartitionMsgOffset offset,
       long now) {
     return processCommitWhileHoldingOrPartialConsuming(instanceId, offset, now);
   }
@@ -565,7 +581,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
    * We have already decided who the committer is, but have not let them know yet. So, we don't expect
    * a commit() call here.
    */
-  private SegmentCompletionProtocol.Response committerDecidedCommit(String instanceId,
+  protected SegmentCompletionProtocol.Response committerDecidedCommit(String instanceId,
       StreamPartitionMsgOffset offset, long now) {
     return processCommitWhileHoldingOrPartialConsuming(instanceId, offset, now);
   }
@@ -621,8 +637,10 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
    * We have notified the committer. If we get a consumed message from another server, we can ask them to
    * catchup (if the offset is lower). If anything else, then we pretty much ask them to hold.
    */
-  private SegmentCompletionProtocol.Response committerNotifiedCommit(String instanceId,
-      StreamPartitionMsgOffset offset, long now) {
+  protected SegmentCompletionProtocol.Response committerNotifiedCommit(
+      SegmentCompletionProtocol.Request.Params reqParams, long now) {
+    String instanceId = reqParams.getInstanceId();
+    StreamPartitionMsgOffset offset = _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
     SegmentCompletionProtocol.Response response = null;
     response = checkBadCommitRequest(instanceId, offset, now);
     if (response != null) {
@@ -645,7 +663,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     return processStoppedConsuming(instanceId, offset, reason, false);
   }
 
-  private SegmentCompletionProtocol.Response committerNotifiedExtendBuildTime(String instanceId,
+  protected SegmentCompletionProtocol.Response committerNotifiedExtendBuildTime(String instanceId,
       StreamPartitionMsgOffset offset, int extTimeSec, long now) {
     SegmentCompletionProtocol.Response response = abortIfTooLateAndReturnHold(now, instanceId, offset);
     if (response == null) {
@@ -667,7 +685,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     return processConsumedAfterCommitStart(instanceId, offset, now);
   }
 
-  private SegmentCompletionProtocol.Response committerUploadingCommit(String instanceId,
+  protected SegmentCompletionProtocol.Response committerUploadingCommit(String instanceId,
       StreamPartitionMsgOffset offset, long now) {
     return processCommitWhileUploading(instanceId, offset, now);
   }
@@ -682,7 +700,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     return processConsumedAfterCommitStart(instanceId, offset, now);
   }
 
-  private SegmentCompletionProtocol.Response committingCommit(String instanceId, StreamPartitionMsgOffset offset,
+  protected SegmentCompletionProtocol.Response committingCommit(String instanceId, StreamPartitionMsgOffset offset,
       long now) {
     return processCommitWhileUploading(instanceId, offset, now);
   }
@@ -704,7 +722,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     return response;
   }
 
-  private SegmentCompletionProtocol.Response committedCommit(String instanceId, StreamPartitionMsgOffset offset) {
+  protected SegmentCompletionProtocol.Response committedCommit(String instanceId, StreamPartitionMsgOffset offset) {
     if (offset.compareTo(_winningOffset) == 0) {
       return keep(instanceId, offset);
     }
@@ -732,7 +750,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
   }
 
   // A common method when the state is > COMMITTER_NOTIFIED.
-  private SegmentCompletionProtocol.Response processConsumedAfterCommitStart(String instanceId,
+  protected SegmentCompletionProtocol.Response processConsumedAfterCommitStart(String instanceId,
       StreamPartitionMsgOffset offset, long now) {
     SegmentCompletionProtocol.Response response;
     // We have already picked a winner, and may or many not have heard from them.
@@ -749,28 +767,31 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
       // The winner is coming back to report its offset. Take a decision based on the offset reported, and whether we
       // already notified them
       // Winner is supposedly already in the commit call. Something wrong.
-      LOGGER.warn(
+      _logger.warn(
           "{}:Aborting FSM because winner is reporting a segment while it is also committing instance={} offset={} "
               + "now={}", _state, instanceId, offset, now);
       // Ask them to hold, just in case the committer fails for some reason..
       return abortAndReturnHold(now, instanceId, offset);
-    } else {
-      // Common case: A different instance is reporting.
-      if (offset.compareTo(_winningOffset) == 0) {
-        // Wait until winner has posted the segment before asking this server to KEEP the segment.
-        response = hold(instanceId, offset);
-      } else if (offset.compareTo(_winningOffset) < 0) {
-        response = catchup(instanceId, offset);
-      } else {
-        // We have not yet committed, so ask the new responder to hold. They may be the new leader in case the
-        // committer fails.
-        response = hold(instanceId, offset);
-      }
     }
-    return response;
+    // Common case: A different instance is reporting.
+    return handleNonWinnerCase(instanceId, offset);
   }
 
-  private SegmentCompletionProtocol.Response commitSegment(SegmentCompletionProtocol.Request.Params reqParams,
+  protected SegmentCompletionProtocol.Response handleNonWinnerCase(String instanceId,
+      StreamPartitionMsgOffset offset) {
+    if (offset.compareTo(_winningOffset) == 0) {
+      // Wait until winner has posted the segment before asking this server to KEEP the segment.
+      return hold(instanceId, offset);
+    } else if (offset.compareTo(_winningOffset) < 0) {
+      return catchup(instanceId, offset);
+    } else {
+      // We have not yet committed, so ask the new responder to hold. They may be the new leader in case the
+      // committer fails.
+      return hold(instanceId, offset);
+    }
+  }
+
+  protected SegmentCompletionProtocol.Response commitSegment(SegmentCompletionProtocol.Request.Params reqParams,
       CommittingSegmentDescriptor committingSegmentDescriptor) {
     String instanceId = reqParams.getInstanceId();
     StreamPartitionMsgOffset offset =
@@ -802,7 +823,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
             .constructDownloadUrl(_controllerVipUrl, TableNameBuilder.extractRawTableName(_realtimeTableName),
                 _segmentName.getSegmentName()));
       }
-      _segmentManager.commitSegmentMetadata(_realtimeTableName, committingSegmentDescriptor);
+      commitSegmentMetadata(_realtimeTableName, committingSegmentDescriptor);
     } catch (Exception e) {
       _logger
           .error("Caught exception while committing segment metadata for segment: {}", _segmentName.getSegmentName(),
@@ -813,6 +834,11 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     _state = BlockingSegmentCompletionFSMState.COMMITTED;
     _logger.info("Committed segment {} at offset {} winner {}", _segmentName.getSegmentName(), offset, instanceId);
     return SegmentCompletionProtocol.RESP_COMMIT_SUCCESS;
+  }
+
+  protected void commitSegmentMetadata(String realtimeTableName,
+      CommittingSegmentDescriptor committingSegmentDescriptor) {
+    _segmentManager.commitSegmentMetadata(realtimeTableName, committingSegmentDescriptor);
   }
 
   private SegmentCompletionProtocol.Response processCommitWhileUploading(String instanceId,
@@ -828,7 +854,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
             .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
   }
 
-  private SegmentCompletionProtocol.Response checkBadCommitRequest(String instanceId, StreamPartitionMsgOffset offset,
+  protected SegmentCompletionProtocol.Response checkBadCommitRequest(String instanceId, StreamPartitionMsgOffset offset,
       long now) {
     SegmentCompletionProtocol.Response response = abortIfTooLateAndReturnHold(now, instanceId, offset);
     if (response != null) {
@@ -854,25 +880,23 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     return hold(instanceId, offset);
   }
 
-  /**
-   * Pick a winner if we can, preferring the instance that we are handling right now,
-   *
-   * We accept the first server to report an offset as long as the server stopped consumption
-   * due to row limit. The premise is that other servers will also stop at row limit, and there
-   * is no need to wait for them to report an offset in order to decide on a winner. The state machine takes care
-   * of the cases where other servers may report different offsets (just in case).
-   *
-   * If the above condition is not satisfied (i.e. either this is not the first server, or it did not reach
-   * row limit), then we can pick a winner only if it is too late to pick a winner, or we have heard from all
-   * servers.
-   *
-   * Otherwise, we wait to hear from more servers.
-   *
-   * @param preferredInstance The instance that is reporting in this thread.
-   * @param now current time
-   * @param stopReason reason reported by instance for stopping consumption.
-   * @return true if winner picked, false otherwise.
-   */
+  /// Pick a winner if we can, preferring the instance that we are handling right now,
+  ///
+  /// We accept the first server to report an offset as long as the server stopped consumption
+  /// due to row limit. The premise is that other servers will also stop at row limit, and there
+  /// is no need to wait for them to report an offset in order to decide on a winner. The state machine takes care
+  /// of the cases where other servers may report different offsets (just in case).
+  ///
+  /// If the above condition is not satisfied (i.e. either this is not the first server, or it did not reach
+  /// row limit), then we can pick a winner only if it is too late to pick a winner, or we have heard from all
+  /// servers.
+  ///
+  /// Otherwise, we wait to hear from more servers.
+  ///
+  /// @param preferredInstance The instance that is reporting in this thread.
+  /// @param now current time
+  /// @param stopReason reason reported by instance for stopping consumption.
+  /// @return true if winner picked, false otherwise.
   private boolean isWinnerPicked(String preferredInstance, long now, final String stopReason) {
     if ((SegmentCompletionProtocol.REASON_ROW_LIMIT.equals(stopReason)
         || SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP.equals(stopReason))

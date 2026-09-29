@@ -19,7 +19,6 @@
 package org.apache.pinot.common.utils;
 
 import java.net.URI;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Random;
@@ -79,17 +78,17 @@ public class URIUtilsTest {
     int maxPartLength = 10;
     Random random = new Random();
     for (int i = 0; i < numRounds; i++) {
-      String randomString = RandomStringUtils.random(random.nextInt(maxPartLength + 1));
+      String randomString = RandomStringUtils.secure().next(random.nextInt(maxPartLength + 1));
       assertEquals(URIUtils.decode(URIUtils.encode(randomString)), randomString);
     }
   }
 
   @Test
   public void testBuildURI() {
-    URI uri = URIUtils.buildURI("http", "foo", "bar", Collections.emptyMap());
+    URI uri = URIUtils.buildURI("http", "foo", "bar", Map.of());
     Assert.assertEquals(uri.toString(), "http://foo/bar");
 
-    uri = URIUtils.buildURI("http", "foo:8080", "bar/moo", Collections.emptyMap());
+    uri = URIUtils.buildURI("http", "foo:8080", "bar/moo", Map.of());
     Assert.assertEquals(uri.toString(), "http://foo:8080/bar/moo");
     Assert.assertEquals(uri.getHost(), "foo");
     Assert.assertEquals(uri.getPort(), 8080);
@@ -103,7 +102,7 @@ public class URIUtilsTest {
         .encode("{\"format\":\"JSON\",\"timeout\":1000}"));
 
     // test that path gets encoded
-    uri = URIUtils.buildURI("http", "foo", "bar%moo{}", Collections.emptyMap());
+    uri = URIUtils.buildURI("http", "foo", "bar%moo{}", Map.of());
     Assert.assertEquals(uri.toString(), "http://foo/" + URIUtils.encode("bar%moo{}"));
   }
 }

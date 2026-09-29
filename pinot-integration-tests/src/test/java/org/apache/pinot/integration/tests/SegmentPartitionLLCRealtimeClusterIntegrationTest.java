@@ -21,10 +21,10 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
@@ -51,9 +51,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test that enables segment partition for the LLC real-time table.
- */
+/// Integration test that enables segment partition for the LLC real-time table.
 public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String PARTITION_COLUMN = "DestState";
   // Number of documents in the first and second Avro file
@@ -91,14 +89,14 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
     TableConfig tableConfig = createRealtimeTableConfig(_avroFiles.get(0));
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     indexingConfig.setSegmentPartitionConfig(new SegmentPartitionConfig(
-        Collections.singletonMap(PARTITION_COLUMN, new ColumnPartitionConfig("murmur", 2))));
+        Map.of(PARTITION_COLUMN, new ColumnPartitionConfig("murmur", 2))));
     tableConfig.setRoutingConfig(
-        new RoutingConfig(null, Collections.singletonList(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE), null, false));
+        new RoutingConfig(null, List.of(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE), null, false));
     addTableConfig(tableConfig);
 
     // Push data into Kafka (only ingest the first Avro file)
     _partitionColumn = PARTITION_COLUMN;
-    pushAvroIntoKafka(Collections.singletonList(_avroFiles.get(0)));
+    pushAvroIntoKafka(List.of(_avroFiles.get(0)));
 
     // Wait for all documents loaded
     _countStarResult = NUM_DOCS_IN_FIRST_AVRO_FILE;
@@ -162,7 +160,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
       assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
       int partitionGroupId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
-      assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
+      assertEquals(columnPartitionMetadata.getPartitions(), Set.of(partitionGroupId));
       numSegmentsForPartition[partitionGroupId]++;
     }
 
@@ -208,11 +206,80 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
   }
 
   @Test(dependsOnMethods = "testPartitionRouting")
+  public void testMultiStageBrokerPruningOnPartitionedTable()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    try {
+      // 'CA' hashes to partition 0, so only that partition's segments should be routed when broker pruning is enabled.
+      String filteredQuery = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
+
+      // Baseline: with broker pruning explicitly disabled, the query scans all segments across both partitions.
+      JsonNode unpruned = postQuery("SET useBrokerPruning=false; " + filteredQuery);
+      assertTrue(unpruned.get("exceptions").isEmpty(), "Unexpected exceptions without broker pruning");
+      int unprunedSegmentsQueried = unpruned.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt();
+
+      // Broker pruning is on by default: without any SET, the non-matching partition's segments are pruned at the
+      // broker before dispatch.
+      JsonNode pruned = postQuery(filteredQuery);
+      assertTrue(pruned.get("exceptions").isEmpty(), "Unexpected exceptions with broker pruning");
+
+      // Broker pruning is a routing optimization only; the result must be identical to the unpruned run.
+      assertEquals(pruned.get("resultTable").get("rows").get(0).get(0).asLong(),
+          unpruned.get("resultTable").get("rows").get(0).get(0).asLong(),
+          "Broker pruning changed the query result");
+      // Broker pruning actually engaged by default: the non-matching partition's segments were dropped, so fewer
+      // were queried.
+      assertTrue(pruned.get("numSegmentsPrunedByBroker").asInt() > 0,
+          "Expected the broker to prune the non-matching partition's segments");
+      assertTrue(pruned.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt() < unprunedSegmentsQueried,
+          "Expected fewer segments queried with broker pruning");
+    } finally {
+      setUseMultiStageQueryEngine(false);
+    }
+  }
+
+  @Test(dependsOnMethods = "testPartitionRouting")
+  public void testPartitionIdVirtualColumn()
+      throws Exception {
+    // Query to get partition ID information for all segments
+    String query = "SELECT $partitionId, $segmentName FROM mytable GROUP BY $segmentName, $partitionId";
+    JsonNode response = postQuery(query);
+
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode rows = resultTable.get("rows");
+
+    assertTrue(rows.size() > 0, "Should have at least one segment result");
+
+    // Define expected partition ID values
+    Set<String> expectedPartitions = new HashSet<>();
+    expectedPartitions.add("DestState_0");
+    expectedPartitions.add("DestState_1");
+
+    // Validate that $partitionId virtual column returns expected results
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      String partitionIdResult = row.get(0).asText();
+      String segmentName = row.get(1).asText();
+
+      assertNotNull(partitionIdResult);
+      assertNotNull(segmentName);
+      assertTrue(LLCSegmentName.isLLCSegment(segmentName));
+
+      if (partitionIdResult.isBlank()) {
+        continue;
+      }
+      // Validate that partitionIdResult is one of the expected partition IDs
+      assertTrue(expectedPartitions.contains(partitionIdResult),
+          "Expected one of " + expectedPartitions + " but found: " + partitionIdResult);
+    }
+  }
+
+  @Test(dependsOnMethods = "testPartitionIdVirtualColumn")
   public void testNonPartitionedStream()
       throws Exception {
     // Push the second Avro file into Kafka without partitioning
     _partitionColumn = null;
-    pushAvroIntoKafka(Collections.singletonList(_avroFiles.get(1)));
+    pushAvroIntoKafka(List.of(_avroFiles.get(1)));
 
     // Wait for all documents loaded
     _countStarResult += NUM_DOCS_IN_SECOND_AVRO_FILE;
@@ -237,13 +304,13 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
 
       if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
         // For consuming segment, the partition metadata should only contain the stream partition
-        assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
+        assertEquals(columnPartitionMetadata.getPartitions(), Set.of(partitionGroupId));
       } else {
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
         int sequenceNumber = llcSegmentName.getSequenceNumber();
         if (sequenceNumber == 0) {
           // The partition metadata for the first completed segment should only contain the stream partition
-          assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
+          assertEquals(columnPartitionMetadata.getPartitions(), Set.of(partitionGroupId));
         } else {
           // The partition metadata for the new completed segments should contain both partitions
           assertEquals(columnPartitionMetadata.getPartitions(), new HashSet<>(Arrays.asList(0, 1)));
@@ -290,7 +357,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
 
     // Push the third Avro file into Kafka with partitioning
     _partitionColumn = PARTITION_COLUMN;
-    pushAvroIntoKafka(Collections.singletonList(_avroFiles.get(2)));
+    pushAvroIntoKafka(List.of(_avroFiles.get(2)));
 
     // Wait for all documents loaded
     _countStarResult += NUM_DOCS_IN_THIRD_AVRO_FILE;
@@ -314,14 +381,14 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
 
       if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
         // For consuming segment, the partition metadata should only contain the stream partition
-        assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
+        assertEquals(columnPartitionMetadata.getPartitions(), Set.of(partitionGroupId));
       } else {
         // The partition metadata for the new completed segments should only contain the stream partition
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
         int sequenceNumber = llcSegmentName.getSequenceNumber();
         if (sequenceNumber == 0 || sequenceNumber >= 4) {
           // The partition metadata for the first and new completed segments should only contain the stream partition
-          assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
+          assertEquals(columnPartitionMetadata.getPartitions(), Set.of(partitionGroupId));
         } else {
           // The partition metadata for the completed segments containing records from the second Avro file should
           // contain both partitions

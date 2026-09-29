@@ -23,19 +23,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
-/**
- * A class to hold the details regarding a request and the statistics.
- * This object can be used to publish the query processing statistics to a stream for
- * post-processing at a finer level than metrics.
- */
+/// A class to hold the details regarding a request and the statistics.
+/// This object can be used to publish the query processing statistics to a stream for
+/// post-processing at a finer level than metrics.
 public class DefaultRequestContext implements RequestScope {
 
   private static final String DEFAULT_TABLE_NAME = "NotYetParsed";
 
   private int _errorCode = 0;
   private String _query;
+  private QueryFingerprint _queryFingerprint;
   private List<String> _tableNames = new ArrayList<>();
   private long _processingTimeMillis = -1;
   private long _totalDocs;
@@ -53,8 +53,15 @@ public class DefaultRequestContext implements RequestScope {
   private long _realtimeResponseSerializationCpuTimeNs;
   private long _offlineTotalCpuTimeNs;
   private long _realtimeTotalCpuTimeNs;
+  private long _offlineThreadMemAllocatedBytes;
+  private long _realtimeThreadMemAllocatedBytes;
+  private long _offlineResponseSerMemAllocatedBytes;
+  private long _realtimeResponseSerMemAllocatedBytes;
+  private long _offlineTotalMemAllocatedBytes;
+  private long _realtimeTotalMemAllocatedBytes;
   private int _numServersQueried;
   private int _numServersResponded;
+  private boolean _groupsTrimmed;
   private boolean _isNumGroupsLimitReached;
   private int _numExceptions;
   private String _brokerId;
@@ -176,13 +183,18 @@ public class DefaultRequestContext implements RequestScope {
   }
 
   @Override
-  public void setErrorCode(int errorCode) {
-    _errorCode = errorCode;
+  public void setErrorCode(QueryErrorCode errorCode) {
+    _errorCode = errorCode.getId();
   }
 
   @Override
   public void setQuery(String query) {
     _query = query;
+  }
+
+  @Override
+  public void setQueryFingerprint(QueryFingerprint queryFingerprint) {
+    _queryFingerprint = queryFingerprint;
   }
 
   @Override
@@ -261,6 +273,11 @@ public class DefaultRequestContext implements RequestScope {
   }
 
   @Override
+  public QueryFingerprint getQueryFingerprint() {
+    return _queryFingerprint;
+  }
+
+  @Override
   public String getTableName() {
     if (_tableNames.size() == 0) {
       return DEFAULT_TABLE_NAME;
@@ -334,6 +351,11 @@ public class DefaultRequestContext implements RequestScope {
   }
 
   @Override
+  public boolean isGroupsTrimmed() {
+    return _groupsTrimmed;
+  }
+
+  @Override
   public boolean isNumGroupsLimitReached() {
     return _isNumGroupsLimitReached;
   }
@@ -404,6 +426,66 @@ public class DefaultRequestContext implements RequestScope {
   }
 
   @Override
+  public long getOfflineThreadMemAllocatedBytes() {
+    return _offlineThreadMemAllocatedBytes;
+  }
+
+  @Override
+  public void setOfflineThreadMemAllocatedBytes(long offlineThreadMemAllocatedBytes) {
+    _offlineThreadMemAllocatedBytes = offlineThreadMemAllocatedBytes;
+  }
+
+  @Override
+  public long getRealtimeThreadMemAllocatedBytes() {
+    return _realtimeThreadMemAllocatedBytes;
+  }
+
+  @Override
+  public void setRealtimeThreadMemAllocatedBytes(long realtimeThreadMemAllocatedBytes) {
+    _realtimeThreadMemAllocatedBytes = realtimeThreadMemAllocatedBytes;
+  }
+
+  @Override
+  public long getOfflineResponseSerMemAllocatedBytes() {
+    return _offlineResponseSerMemAllocatedBytes;
+  }
+
+  @Override
+  public void setOfflineResponseSerMemAllocatedBytes(long offlineResponseSerMemAllocatedBytes) {
+    _offlineResponseSerMemAllocatedBytes = offlineResponseSerMemAllocatedBytes;
+  }
+
+  @Override
+  public long getRealtimeResponseSerMemAllocatedBytes() {
+    return _realtimeResponseSerMemAllocatedBytes;
+  }
+
+  @Override
+  public void setRealtimeResponseSerMemAllocatedBytes(long realtimeResponseSerMemAllocatedBytes) {
+    _realtimeResponseSerMemAllocatedBytes = realtimeResponseSerMemAllocatedBytes;
+  }
+
+  @Override
+  public long getOfflineTotalMemAllocatedBytes() {
+    return _offlineTotalMemAllocatedBytes;
+  }
+
+  @Override
+  public void setOfflineTotalMemAllocatedBytes(long offlineTotalMemAllocatedBytes) {
+    _offlineTotalMemAllocatedBytes = offlineTotalMemAllocatedBytes;
+  }
+
+  @Override
+  public long getRealtimeTotalMemAllocatedBytes() {
+    return _realtimeTotalMemAllocatedBytes;
+  }
+
+  @Override
+  public void setRealtimeTotalMemAllocatedBytes(long realtimeTotalMemAllocatedBytes) {
+    _realtimeTotalMemAllocatedBytes = realtimeTotalMemAllocatedBytes;
+  }
+
+  @Override
   public void setNumServersQueried(int numServersQueried) {
     _numServersQueried = numServersQueried;
   }
@@ -414,8 +496,18 @@ public class DefaultRequestContext implements RequestScope {
   }
 
   @Override
+  public void setGroupsTrimmed(boolean groupsTrimmed) {
+    _groupsTrimmed = groupsTrimmed;
+  }
+
+  @Override
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _isNumGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  @Override
+  public void setMseLiteLeafStageLimitReached(boolean mseLiteLeafStageLimitReached) {
+    // No-op: not tracked in default context
   }
 
   @Override

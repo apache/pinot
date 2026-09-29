@@ -35,9 +35,7 @@ public class TableConfigTunerUtils {
   private TableConfigTunerUtils() {
   }
 
-  /**
-   * Apply the entire tunerConfig list inside the tableConfig.
-   */
+  /// Apply the entire tunerConfig list inside the tableConfig.
   public static void applyTunerConfigs(PinotHelixResourceManager pinotHelixResourceManager, TableConfig tableConfig,
       Schema schema, Map<String, String> extraProperties) {
     List<TunerConfig> tunerConfigs = tableConfig.getTunerConfigsList();
@@ -48,9 +46,7 @@ public class TableConfigTunerUtils {
     }
   }
 
-  /**
-   * Apply one explicit tunerConfig to the tableConfig
-   */
+  /// Apply one explicit tunerConfig to the tableConfig
   public static void applyTunerConfig(
       PinotHelixResourceManager pinotHelixResourceManager, TunerConfig tunerConfig, TableConfig tableConfig,
       Schema schema, Map<String, String> extraProperties) {

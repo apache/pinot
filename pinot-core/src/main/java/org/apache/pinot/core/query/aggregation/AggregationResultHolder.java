@@ -18,46 +18,40 @@
  */
 package org.apache.pinot.core.query.aggregation;
 
-/**
- * Interface for ResultHolder to hold the result of aggregation.
- *
- */
+/// Interface for ResultHolder to hold the result of aggregation.
 public interface AggregationResultHolder {
 
-  /**
-   * Set the 'primitive double' aggregation result.
-   * @param value
-   */
+  /// Set the 'primitive double' aggregation result.
+  /// @param value
   void setValue(double value);
 
-  /**
-   * Set the 'primitive int' aggregation result.
-   * @param value
-   */
+  /// Set the 'primitive int' aggregation result.
+  /// @param value
   void setValue(int value);
 
-  /**
-   * Set the aggregation result value.
-   * @param value
-   */
+  /// Set the 'primitive long' aggregation result.
+  /// @param value
+  void setValue(long value);
+
+  /// Set the aggregation result value.
+  /// @param value
   void setValue(Object value);
 
-  /**
-   * Returns the 'primitive double' aggregation result.
-   * @return
-   */
+  /// Returns the 'primitive double' aggregation result.
+  /// @return
   double getDoubleResult();
 
-  /**
-   * Returns the 'primitive int' aggregation result.
-   *
-   * @return
-   */
+  /// Returns the 'primitive int' aggregation result.
+  ///
+  /// @return
   int getIntResult();
 
-  /**
-   * Returns the result of aggregation.
-   * @return
-   */
+  /// Returns the 'primitive long' aggregation result.
+  ///
+  /// @return
+  long getLongResult();
+
+  /// Returns the result of aggregation.
+  /// @return
   <T> T getResult();
 }

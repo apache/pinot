@@ -23,9 +23,8 @@ import java.io.File;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
@@ -35,13 +34,17 @@ import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.RangeIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,17 +57,19 @@ public class RangeIndexHandler extends BaseIndexHandler {
 
   @VisibleForTesting
   public RangeIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
-    this(segmentDirectory, indexLoadingConfig.getFieldIndexConfigByColName(), indexLoadingConfig.getTableConfig());
+    this(segmentDirectory, indexLoadingConfig.getFieldIndexConfigByColName(), indexLoadingConfig.getTableConfig(),
+        indexLoadingConfig.getSchema());
   }
 
   public RangeIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> fieldIndexConfigs,
-      @Nullable TableConfig tableConfig) {
-    super(segmentDirectory, fieldIndexConfigs, tableConfig);
+      TableConfig tableConfig, Schema schema) {
+    super(segmentDirectory, fieldIndexConfigs, tableConfig, schema);
     _columnsToAddIdx = FieldIndexConfigsUtil.columnsWithIndexEnabled(StandardIndexes.range(), _fieldIndexConfigs);
   }
 
   @Override
-  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader)
+      throws Exception {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.range());
@@ -72,10 +77,14 @@ public class RangeIndexHandler extends BaseIndexHandler {
     // Check if any index updates are required.
     boolean rangeIndexUpdated = false;
 
-    // Check if any existing index need to be removed.
+    // Check if any existing index need to be removed or rebuilt due to a version change.
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Need to remove existing range index from segment: {}, column: {}", segmentName, column);
+        rangeIndexUpdated = true;
+      } else if (existingRangeIndexVersionDiffers(segmentReader, column)) {
+        LOGGER.info("Need to rebuild range index for segment: {}, column: {} due to version change", segmentName,
+            column);
         rangeIndexUpdated = true;
       }
     }
@@ -95,10 +104,23 @@ public class RangeIndexHandler extends BaseIndexHandler {
     return rangeIndexUpdated;
   }
 
+  /// Returns `true` if the on-disk range index version doesn't match the configured version. Range index v1
+  /// (RangeIndexCreator) and v2 (BitSlicedRangeIndexCreator) have incompatible on-disk layouts and serve
+  /// different query semantics (v1 is non-exact, v2 is exact), so a version change requires rebuild.
+  private boolean existingRangeIndexVersionDiffers(SegmentDirectory.Reader segmentReader, String column)
+      throws Exception {
+    int configuredVersion = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.range()).getVersion();
+    // The buffer is owned by SegmentDirectory; don't close it here (mmap regions are shared).
+    PinotDataBuffer rangeIndexBuffer = segmentReader.getIndexFor(column, StandardIndexes.range());
+    int onDiskVersion = rangeIndexBuffer.getInt(0);
+    return onDiskVersion != configuredVersion;
+  }
+
   @Override
   public void updateIndices(SegmentDirectory.Writer segmentWriter)
       throws Exception {
-    // Remove indices not set in table config any more
+    // Remove indices not set in table config any more, or those whose on-disk version differs from the
+    // configured version (v1↔v2 require rebuild).
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.range());
@@ -107,6 +129,13 @@ public class RangeIndexHandler extends BaseIndexHandler {
         LOGGER.info("Removing existing range index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, StandardIndexes.range());
         LOGGER.info("Removed existing range index from segment: {}, column: {}", segmentName, column);
+      } else if (existingRangeIndexVersionDiffers(segmentWriter, column)) {
+        LOGGER.info("Rebuilding range index for segment: {}, column: {} due to version change", segmentName, column);
+        segmentWriter.removeIndex(column, StandardIndexes.range());
+        ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        if (columnMetadata != null && !columnMetadata.isSorted()) {
+          createRangeIndexForColumn(segmentWriter, columnMetadata);
+        }
       }
     }
     for (String column : columnsToAddIdx) {
@@ -161,20 +190,29 @@ public class RangeIndexHandler extends BaseIndexHandler {
   private void handleDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws Exception {
     int numDocs = columnMetadata.getTotalDocs();
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
+    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+    try (ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
+        _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
-      if (columnMetadata.isSingleValue()) {
-        // Single-value column
-        for (int i = 0; i < numDocs; i++) {
-          rangeIndexCreator.add(forwardIndexReader.getDictId(i, readerContext));
+      if (forwardIndexReader.isDictionaryEncoded()) {
+        if (columnMetadata.isSingleValue()) {
+          for (int i = 0; i < numDocs; i++) {
+            rangeIndexCreator.add(forwardIndexReader.getDictId(i, readerContext));
+          }
+        } else {
+          int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
+          for (int i = 0; i < numDocs; i++) {
+            int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
+            rangeIndexCreator.add(dictIds, length);
+          }
         }
       } else {
-        // Multi-value column
-        int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
-        for (int i = 0; i < numDocs; i++) {
-          int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
-          rangeIndexCreator.add(dictIds, length);
+        // RAW forward + shared standalone dictionary: read raw values and look each up in the dictionary to feed
+        // dict IDs into the range index.
+        try (Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
+          DictionaryBasedIndexBuilder.addRawValuesViaDictionary(rangeIndexCreator, forwardIndexReader, readerContext,
+              dictionary, columnMetadata, numDocs);
         }
       }
       rangeIndexCreator.seal();
@@ -184,12 +222,14 @@ public class RangeIndexHandler extends BaseIndexHandler {
   private void handleNonDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws Exception {
     int numDocs = columnMetadata.getTotalDocs();
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
+    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+    try (ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
+        _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
       if (columnMetadata.isSingleValue()) {
         // Single-value column.
-        switch (columnMetadata.getDataType()) {
+        switch (columnMetadata.getDataType().getStoredType()) {
           case INT:
             for (int i = 0; i < numDocs; i++) {
               rangeIndexCreator.add(forwardIndexReader.getInt(i, readerContext));
@@ -214,9 +254,9 @@ public class RangeIndexHandler extends BaseIndexHandler {
             throw new IllegalStateException("Unsupported data type: " + columnMetadata.getDataType());
         }
       } else {
-        // Multi-value column
+        // Multi-value column.
         int maxNumValuesPerMVEntry = columnMetadata.getMaxNumberOfMultiValues();
-        switch (columnMetadata.getDataType()) {
+        switch (columnMetadata.getDataType().getStoredType()) {
           case INT:
             int[] intValues = new int[maxNumValuesPerMVEntry];
             for (int i = 0; i < numDocs; i++) {
@@ -256,10 +296,7 @@ public class RangeIndexHandler extends BaseIndexHandler {
   private CombinedInvertedIndexCreator newRangeIndexCreator(ColumnMetadata columnMetadata)
       throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
-    IndexCreationContext context = IndexCreationContext.builder()
-        .withIndexDir(indexDir)
-        .withColumnMetadata(columnMetadata)
-        .build();
+    IndexCreationContext context = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata).build();
     RangeIndexConfig config = _fieldIndexConfigs.get(columnMetadata.getColumnName())
         .getConfig(StandardIndexes.range());
     return StandardIndexes.range().createIndexCreator(context, config);

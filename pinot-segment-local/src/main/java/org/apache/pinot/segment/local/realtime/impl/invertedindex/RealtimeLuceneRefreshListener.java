@@ -24,16 +24,14 @@ import java.util.function.Supplier;
 import org.apache.lucene.search.ReferenceManager;
 
 
-/**
- * RealtimeLuceneRefreshListener is a listener that listens to the refresh of a Lucene index reader
- * and updates the metrics for the delay between the last refresh time and the current time, as well as
- * the number of documents that have been added since the last refresh.
- * <p>
- * RefreshListener.beforeRefresh() is called before a refresh attempt, and RefreshListener.afterRefresh() is called
- * after the refresh attempt. If the lock cannot be acquired for a refresh, then neither method will be called.
- * <p>
- * Tracking can be used in the future to handoff between a small live index, and the current reference searcher.
- */
+/// RealtimeLuceneRefreshListener is a listener that listens to the refresh of a Lucene index reader
+/// and updates the metrics for the delay between the last refresh time and the current time, as well as
+/// the number of documents that have been added since the last refresh.
+///
+/// RefreshListener.beforeRefresh() is called before a refresh attempt, and RefreshListener.afterRefresh() is called
+/// after the refresh attempt. If the lock cannot be acquired for a refresh, then neither method will be called.
+///
+/// Tracking can be used in the future to handoff between a small live index, and the current reference searcher.
 public class RealtimeLuceneRefreshListener implements ReferenceManager.RefreshListener {
 
   private final RealtimeLuceneIndexingDelayTracker _realtimeLuceneIndexingDelayTracker;
@@ -49,26 +47,22 @@ public class RealtimeLuceneRefreshListener implements ReferenceManager.RefreshLi
   private int _numDocsBeforeRefresh;
   private Clock _clock;
 
-  /**
-   * Create a new RealtimeLuceneRefreshListener with a clock.
-   * @param tableName Table name
-   * @param segmentName Segment name
-   * @param partition Partition number
-   * @param numDocsSupplier Supplier for retrieving the current of documents in the index
-   */
+  /// Create a new RealtimeLuceneRefreshListener with a clock.
+  /// @param tableName Table name
+  /// @param segmentName Segment name
+  /// @param partition Partition number
+  /// @param numDocsSupplier Supplier for retrieving the current of documents in the index
   public RealtimeLuceneRefreshListener(String tableName, String segmentName, String columnName, int partition,
       Supplier<Integer> numDocsSupplier) {
     this(tableName, segmentName, columnName, partition, numDocsSupplier, Clock.systemUTC());
   }
 
-  /**
-   * Create a new RealtimeLuceneRefreshListener with a clock. Intended for testing.
-   * @param tableName Table name
-   * @param segmentName Segment name
-   * @param partition Partition number
-   * @param numDocsSupplier Supplier for retrieving the current of documents in the index
-   * @param clock Clock to use for time
-   */
+  /// Create a new RealtimeLuceneRefreshListener with a clock. Intended for testing.
+  /// @param tableName Table name
+  /// @param segmentName Segment name
+  /// @param partition Partition number
+  /// @param numDocsSupplier Supplier for retrieving the current of documents in the index
+  /// @param clock Clock to use for time
   @VisibleForTesting
   public RealtimeLuceneRefreshListener(String tableName, String segmentName, String columnName, int partition,
       Supplier<Integer> numDocsSupplier, Clock clock) {
@@ -99,9 +93,7 @@ public class RealtimeLuceneRefreshListener implements ReferenceManager.RefreshLi
     _numDocsBeforeRefresh = _numDocsSupplier.get();
   }
 
-  /**
-   * @param didRefresh true if the searcher reference was swapped to a new reference, otherwise false
-   */
+  /// @param didRefresh true if the searcher reference was swapped to a new reference, otherwise false
   @Override
   public void afterRefresh(boolean didRefresh) {
     // Even if didRefresh is false, we should still update the last refresh time so that the delay is more accurate
@@ -127,6 +119,10 @@ public class RealtimeLuceneRefreshListener implements ReferenceManager.RefreshLi
 
   public void close() {
     _realtimeLuceneIndexingDelayTracker.clear(_tableName, _segmentName, _columnName, _partition);
+  }
+
+  public int getLastRefreshNumDocs() {
+    return _lastRefreshNumDocs;
   }
 
   @VisibleForTesting

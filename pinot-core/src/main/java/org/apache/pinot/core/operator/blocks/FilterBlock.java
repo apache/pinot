@@ -22,9 +22,7 @@ import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
 
 
-/**
- * The {@code FilterBlock} class is the block holding the document Ids returned from the filter operator.
- */
+/// The `FilterBlock` class is the block holding the document Ids returned from the filter operator.
 public class FilterBlock implements Block {
   private final BlockDocIdSet _blockDocIdSet;
   private BlockDocIdSet _nonScanBlockDocIdSet;
@@ -33,9 +31,7 @@ public class FilterBlock implements Block {
     _blockDocIdSet = blockDocIdSet;
   }
 
-  /**
-   * Pre-scans the documents if needed, and returns a non-scan-based FilterBlockDocIdSet.
-   */
+  /// Pre-scans the documents if needed, and returns a non-scan-based FilterBlockDocIdSet.
   public BlockDocIdSet getNonScanFilterBLockDocIdSet() {
     if (_nonScanBlockDocIdSet == null) {
       _nonScanBlockDocIdSet = _blockDocIdSet.toNonScanDocIdSet();

@@ -20,10 +20,8 @@ package org.apache.pinot.common.function.scalar;
 
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
-/**
- * Geohash scalar functions that can be used in transformation.
- * This class is used to encode and decode geohash values.
- */
+/// Geohash scalar functions that can be used in transformation.
+/// This class is used to encode and decode geohash values.
 public class GeohashFunctions {
   private static final String BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
   private static final int[] BITS = {16, 8, 4, 2, 1};
@@ -114,44 +112,36 @@ public class GeohashFunctions {
     }
   }
 
-  /**
-   * Encodes a latitude and longitude to a geohash.
-   * @param latitude
-   * @param longitude
-   * @param precision
-   * @return the geohash value as a string
-   */
+  /// Encodes a latitude and longitude to a geohash.
+  /// @param latitude
+  /// @param longitude
+  /// @param precision
+  /// @return the geohash value as a string
   @ScalarFunction
   public static String encodeGeoHash(double latitude, double longitude, int precision) {
     return longHashToStringGeohash(encode(latitude, longitude, precision));
   }
 
-  /**
-   * Decodes a geohash to a latitude and longitude.
-   * @param geohash
-   * @return the latitude and longitude as a double array
-   */
+  /// Decodes a geohash to a latitude and longitude.
+  /// @param geohash
+  /// @return the latitude and longitude as a double array
   @ScalarFunction
   public static double[] decodeGeoHash(String geohash) {
     return decode(geohash);
   }
 
-  /**
-   * Decodes a geohash to a latitude.
-   * @param geohash
-   * @return the latitude as a double
-   */
+  /// Decodes a geohash to a latitude.
+  /// @param geohash
+  /// @return the latitude as a double
   @ScalarFunction(names = {"decodeGeoHashLatitude", "decodeGeoHashLat"})
   public static double decodeGeoHashLatitude(String geohash) {
     double[] latLon = decode(geohash);
     return latLon[0];
   }
 
-  /**
-   * Decodes a geohash to a longitude.
-   * @param geohash
-   * @return the longitude as a double
-   */
+  /// Decodes a geohash to a longitude.
+  /// @param geohash
+  /// @return the longitude as a double
   @ScalarFunction(names = {"decodeGeoHashLongitude", "decodeGeoHashLon"})
   public static double decodeGeoHashLongitude(String geohash) {
     double[] latLon = decode(geohash);

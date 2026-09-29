@@ -21,9 +21,12 @@ package org.apache.pinot.core.query.aggregation.function.array;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
@@ -35,8 +38,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class SumArrayDoubleAggregationFunction
     extends BaseSingleInputAggregationFunction<DoubleArrayList, DoubleArrayList> {
 
-  public SumArrayDoubleAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "SUM_ARRAY"));
+  public SumArrayDoubleAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "SUM_ARRAY"), nullHandlingEnabled);
   }
 
   @Override
@@ -57,39 +60,47 @@ public class SumArrayDoubleAggregationFunction
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] values = blockValSetMap.get(_expression).getDoubleValuesMV();
-    if (aggregationResultHolder.getResult() == null) {
-      aggregationResultHolder.setValue(new DoubleArrayList());
-    }
-    DoubleArrayList result = aggregationResultHolder.getResult();
-    for (int i = 0; i < length; i++) {
-      double[] value = values[i];
-      aggregateMerge(value, result);
-    }
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[][] values = blockValSet.getDoubleValuesMV();
+    // The accumulator is created inside the range, so a block with no non-null row leaves the holder untouched and
+    // extractFinalResult sees the null that means nothing was aggregated
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      DoubleArrayList result = aggregationResultHolder.getResult();
+      if (result == null) {
+        result = new DoubleArrayList();
+        aggregationResultHolder.setValue(result);
+      }
+      for (int i = from; i < to; i++) {
+        aggregateMerge(values[i], result);
+      }
+    });
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
-    for (int i = 0; i < length; i++) {
-      double[] values = valuesArray[i];
-      int groupKey = groupKeyArray[i];
-      setGroupByResult(groupByResultHolder, values, groupKey);
-    }
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        setGroupByResult(groupByResultHolder, valuesArray[i], groupKeyArray[i]);
+      }
+    });
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
-    for (int i = 0; i < length; i++) {
-      double[] values = valuesArray[i];
-      int[] groupKeys = groupKeysArray[i];
-      for (int groupKey : groupKeys) {
-        setGroupByResult(groupByResultHolder, values, groupKey);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        double[] values = valuesArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          setGroupByResult(groupByResultHolder, values, groupKey);
+        }
       }
-    }
+    });
   }
 
   private void setGroupByResult(GroupByResultHolder groupByResultHolder, double[] values, int groupKey) {
@@ -110,11 +121,13 @@ public class SumArrayDoubleAggregationFunction
     }
   }
 
+  @Nullable
   @Override
   public DoubleArrayList extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public DoubleArrayList extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -136,7 +149,21 @@ public class SumArrayDoubleAggregationFunction
 
   @Override
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.DOUBLE_ARRAY;
+    // AggregationResultsBlock#setIntermediateResult and AggregationFunctionUtils#getIntermediateResult only serialize
+    // intermediate results whose stored type is INT/LONG/DOUBLE/STRING/OBJECT, so we need the OBJECT/custom ser-de path
+    // for DoubleArrayList payloads.
+    return DataSchema.ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(DoubleArrayList doubleArrayList) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(),
+        ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(doubleArrayList));
+  }
+
+  @Override
+  public DoubleArrayList deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override
@@ -144,8 +171,9 @@ public class SumArrayDoubleAggregationFunction
     return DataSchema.ColumnDataType.DOUBLE_ARRAY;
   }
 
+  @Nullable
   @Override
-  public DoubleArrayList extractFinalResult(DoubleArrayList result) {
+  public DoubleArrayList extractFinalResult(@Nullable DoubleArrayList result) {
     return result;
   }
 }

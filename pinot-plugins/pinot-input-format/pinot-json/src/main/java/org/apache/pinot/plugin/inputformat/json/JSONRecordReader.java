@@ -27,15 +27,14 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordFetchException;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Record reader for JSON file.
- */
+/// Record reader for JSON file.
 public class JSONRecordReader implements RecordReader {
   private File _dataFile;
   private InputStream _inputStream;
@@ -78,8 +77,16 @@ public class JSONRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next(GenericRow reuse) {
-    Map<String, Object> record = _iterator.next();
+  public GenericRow next(GenericRow reuse)
+      throws IOException {
+    // Record fetch: read next JSON record from stream.
+    Map<String, Object> record;
+    try {
+      record = _iterator.next();
+    } catch (Exception e) {
+      throw new RecordFetchException("Failed to read next JSON record", e);
+    }
+    // Data parsing: extract into GenericRow.
     _recordExtractor.extract(record, reuse);
     return reuse;
   }

@@ -26,9 +26,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Polymorphic greaterThanOrEqual (>=) scalar function implementation
- */
+/// Polymorphic greaterThanOrEqual (>=) scalar function implementation
 @ScalarFunction
 public class GreaterThanOrEqualScalarFunction extends PolymorphicComparisonScalarFunction {
 

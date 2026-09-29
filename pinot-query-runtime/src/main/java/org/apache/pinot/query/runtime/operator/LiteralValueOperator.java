@@ -20,14 +20,13 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.ValueNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,9 +50,11 @@ public class LiteralValueOperator extends MultiStageOperator {
   }
 
   @Override
-  public void registerExecution(long time, int numRows) {
+  public void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+    _statMap.merge(StatKey.ALLOCATED_MEMORY_BYTES, memoryUsedBytes);
+    _statMap.merge(StatKey.GC_TIME_MS, gcTimeMs);
   }
 
   @Override
@@ -72,18 +73,13 @@ public class LiteralValueOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
+  protected MseBlock getNextBlock() {
     if (!_isLiteralBlockReturned && !_isEarlyTerminated && !_literalRows.isEmpty()) {
       _isLiteralBlockReturned = true;
       return constructBlock();
     } else {
-      return createEosBlock();
+      return SuccessMseBlock.INSTANCE;
     }
-  }
-
-  protected TransferableBlock createEosBlock() {
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock(
-        MultiStageQueryStats.createLiteral(_context.getStageId(), _statMap));
   }
 
   @Override
@@ -91,7 +87,7 @@ public class LiteralValueOperator extends MultiStageOperator {
     return Type.LITERAL;
   }
 
-  private TransferableBlock constructBlock() {
+  private RowHeapDataBlock constructBlock() {
     List<Object[]> blockContent = new ArrayList<>(_literalRows.size());
     for (List<RexExpression.Literal> row : _literalRows) {
       Object[] values = new Object[_dataSchema.size()];
@@ -100,14 +96,21 @@ public class LiteralValueOperator extends MultiStageOperator {
       }
       blockContent.add(values);
     }
-    return new TransferableBlock(blockContent, _dataSchema, DataBlock.Type.ROW);
+    return new RowHeapDataBlock(blockContent, _dataSchema);
+  }
+
+  @Override
+  public StatMap<StatKey> copyStatMaps() {
+    return new StatMap<>(_statMap);
   }
 
   public enum StatKey implements StatMap.Key {
-    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG),
-    EMITTED_ROWS(StatMap.Type.LONG);
-    //@formatter:on
+    EMITTED_ROWS(StatMap.Type.LONG),
+    /// Allocated memory in bytes for this operator or its children in the same stage.
+    ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
+    /// Time spent on GC while this operator or its children in the same stage were running.
+    GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;
 

@@ -20,10 +20,10 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -39,9 +39,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests the evaluation of transform expressions by the ExpressionTransformer
- */
+/// Tests the evaluation of transform expressions by the ExpressionTransformer
 public class ExpressionTransformerTest {
 
   @Test
@@ -128,11 +126,9 @@ public class ExpressionTransformerTest {
     Assert.assertEquals(genericRow.getValue("hoursSinceEpoch"), 437222L);
   }
 
-  /**
-   * TODO: transform functions have moved to tableConfig#ingestionConfig. However, these tests remain to test
-   * backward compatibility/
-   *  Remove these when we totally stop honoring transform functions in schema
-   */
+  /// TODO: transform functions have moved to tableConfig#ingestionConfig. However, these tests remain to test
+  /// backward compatibility/
+  ///  Remove these when we totally stop honoring transform functions in schema
   @Test
   public void testTransformConfigsFromSchema() {
     Schema pinotSchema = new Schema.SchemaBuilder().addSingleValueDimension("userId", FieldSpec.DataType.LONG)
@@ -198,15 +194,86 @@ public class ExpressionTransformerTest {
     Assert.assertEquals(genericRow.getValue("hoursSinceEpoch").toString(), "437222.2222222222");
   }
 
-  /**
-   * If destination field already exists in the row, do not execute transform function
-   */
+  @Test
+  public void testImplicitMapTransformDoesNotOverrideExistingValuesWhenSourceMissing() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addMultiValueDimension("mapDim1__KEYS", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("mapDim1__VALUES", FieldSpec.DataType.INT)
+        .build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testImplicitMapTransformExisting").build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    row.putValue("mapDim1__KEYS", new String[]{"k1", "k2"});
+    row.putValue("mapDim1__VALUES", new Integer[]{1, 2});
+
+    expressionTransformer.transform(row);
+
+    Assert.assertEquals((Object[]) row.getValue("mapDim1__KEYS"), new Object[]{"k1", "k2"});
+    Assert.assertEquals((Object[]) row.getValue("mapDim1__VALUES"), new Object[]{1, 2});
+    Assert.assertFalse(row.isNullValue("mapDim1__KEYS"));
+    Assert.assertFalse(row.isNullValue("mapDim1__VALUES"));
+  }
+
+  @Test
+  public void testTransformReturningNullDoesNotOverrideExistingBytesValue() {
+    // A BYTES column with an explicit transform that yields null should not clobber the existing byte[] value.
+    // BYTES is a scalar type even though byte[] is technically an array.
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("payload", FieldSpec.DataType.BYTES)
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("payload", "Groovy({null})")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testBytesNullTransform")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    byte[] existing = new byte[]{7, 8, 9};
+    row.putValue("payload", existing);
+
+    expressionTransformer.transform(row);
+
+    Assert.assertSame(row.getValue("payload"), existing);
+    Assert.assertFalse(row.isNullValue("payload"));
+  }
+
+  @Test
+  public void testLegacyNonDeterministicTransformFunctionRemainsRuntimeCompatible() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("eventTimeMs", FieldSpec.DataType.LONG)
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("eventTimeMs", "now()")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testNonDeterministicTransformFunctionStillRunsAtRuntime")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    long lowerBound = System.currentTimeMillis();
+    expressionTransformer.transform(row);
+    long upperBound = System.currentTimeMillis();
+
+    Object value = row.getValue("eventTimeMs");
+    Assert.assertTrue(value instanceof Long, "Expected now() transform to produce a LONG value");
+    long eventTimeMs = (Long) value;
+    long toleranceMs = 1000;
+    Assert.assertTrue(eventTimeMs >= lowerBound - toleranceMs);
+    Assert.assertTrue(eventTimeMs <= upperBound + toleranceMs);
+  }
+
+  /// If destination field already exists in the row, do not execute transform function
   @Test
   public void testValueAlreadyExists() {
     Schema pinotSchema = new Schema();
     DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("fullName", FieldSpec.DataType.STRING, true);
     pinotSchema.addField(dimensionFieldSpec);
-    List<TransformConfig> transformConfigs = Collections.singletonList(
+    List<TransformConfig> transformConfigs = List.of(
         new TransformConfig("fullName", "Groovy({firstName + ' ' + lastName}, firstName, lastName)"));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
@@ -241,6 +308,73 @@ public class ExpressionTransformerTest {
   }
 
   @Test
+  public void testExistingCollectionIsTransformedWhenIncompatibleType() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addMultiValueDimension("rawBids", FieldSpec.DataType.INT)
+        .addMultiValueDimension("bids", FieldSpec.DataType.INT)
+        .build();
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(
+        new TransformConfig("bids", "Groovy({rawBids.toArray()}, rawBids)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testExistingCollectionIsTransformed")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("rawBids", Arrays.asList(1, 2, 3));
+    // Simulate pre-existing collection value that should be overwritten by transform
+    genericRow.putValue("bids", Arrays.asList(10, 20));
+
+    expressionTransformer.transform(genericRow);
+
+    Object transformedValue = genericRow.getValue("bids");
+    Assert.assertTrue(transformedValue.getClass().isArray());
+    Assert.assertEquals(Arrays.asList((Object[]) transformedValue), Arrays.asList(1, 2, 3));
+  }
+
+  @Test
+  public void testNullTransformMarksNullField() {
+    Schema schema =
+        new Schema.SchemaBuilder().addSingleValueDimension("fullName", FieldSpec.DataType.STRING).build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("fullName", "Groovy({null})")));
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testNullTransform").setIngestionConfig(ingestionConfig)
+            .build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    expressionTransformer.transform(row);
+
+    Assert.assertNull(row.getValue("fullName"));
+    Assert.assertTrue(row.isNullValue("fullName"));
+    Assert.assertFalse(row.getFieldToValueMap().containsKey("fullName"));
+  }
+
+  @Test
+  public void testNullTransformMarksNullFieldWhenValueAlreadyExists() {
+    Schema schema =
+        new Schema.SchemaBuilder().addMultiValueDimension("tags", FieldSpec.DataType.STRING).build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("tags", "Groovy({null})")));
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testNullTransformExisting")
+            .setIngestionConfig(ingestionConfig).build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    row.putValue("tags", new String[]{"foo", "bar"});
+    expressionTransformer.transform(row);
+
+    Assert.assertNull(row.getValue("tags"));
+    Assert.assertTrue(row.isNullValue("tags"));
+    Assert.assertFalse(row.getFieldToValueMap().containsKey("tags"));
+  }
+
+  @Test
   public void testTransformFunctionSortOrder() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.STRING)
         .addSingleValueDimension("b", FieldSpec.DataType.STRING).addSingleValueDimension("c", FieldSpec.DataType.STRING)
@@ -257,21 +391,21 @@ public class ExpressionTransformerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testDerivedFunctions")
         .setIngestionConfig(ingestionConfig).build();
     ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
-    GenericRow genericRow = new GenericRow();
-    genericRow.putValue("x", 100);
-    genericRow.putValue("e", 200);
-    GenericRow transform = expressionTransformer.transform(genericRow);
-    Assert.assertEquals(transform.getValue("a"), 130.0);
-    Assert.assertEquals(transform.getValue("b"), 120.0);
-    Assert.assertEquals(transform.getValue("c"), 240.0);
-    Assert.assertEquals(transform.getValue("d"), 110.0);
-    Assert.assertEquals(transform.getValue("e"), 200);
-    Assert.assertEquals(transform.getValue("f"), 210.0);
+    GenericRow record = new GenericRow();
+    record.putValue("x", 100);
+    record.putValue("e", 200);
+    expressionTransformer.transform(record);
+    Assert.assertEquals(record.getValue("a"), 130.0);
+    Assert.assertEquals(record.getValue("b"), 120.0);
+    Assert.assertEquals(record.getValue("c"), 240.0);
+    Assert.assertEquals(record.getValue("d"), 110.0);
+    Assert.assertEquals(record.getValue("e"), 200);
+    Assert.assertEquals(record.getValue("f"), 210.0);
   }
 
-  /** Check if there is more than one transform function definition for the same column. */
+  /// Check if there is more than one transform function definition for the same column.
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Cannot set more than one"
-      + " ingestion transform function on column: a.")
+      + " transform function on column: a.")
   public void testMultipleTransformFunctionSortOrder() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.INT)
         .addSingleValueDimension("b", FieldSpec.DataType.INT).addSingleValueDimension("c", FieldSpec.DataType.INT)
@@ -320,7 +454,7 @@ public class ExpressionTransformerTest {
 
   /* Check if we throw exception when Ingestion Transform Functions have a cycle. */
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Expression "
-      + "cycle found for column 'a' in Ingestion Transform Function definitions.")
+      + "cycle found for column 'a' in transform function definitions.")
   public void testCyclicTransformFunctionSortOrder() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.INT)
         .addSingleValueDimension("b", FieldSpec.DataType.INT).addSingleValueDimension("c", FieldSpec.DataType.INT)
@@ -344,7 +478,7 @@ public class ExpressionTransformerTest {
     Schema pinotSchema = new Schema();
     DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("x", FieldSpec.DataType.INT, true);
     pinotSchema.addField(dimensionFieldSpec);
-    List<TransformConfig> transformConfigs = Collections.singletonList(
+    List<TransformConfig> transformConfigs = List.of(
         new TransformConfig("y", "plus(x, 10)"));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
@@ -374,7 +508,7 @@ public class ExpressionTransformerTest {
     Schema pinotSchema = new Schema();
     DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("x", FieldSpec.DataType.INT, true);
     pinotSchema.addField(dimensionFieldSpec);
-    List<TransformConfig> transformConfigs = Collections.singletonList(
+    List<TransformConfig> transformConfigs = List.of(
         new TransformConfig("y", "plus(x, 10)"));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
@@ -393,11 +527,68 @@ public class ExpressionTransformerTest {
     genericRow = new GenericRow();
     genericRow.putValue("x", "abcd");
     expressionTransformer.transform(genericRow);
-    Assert.assertEquals(genericRow.getValue("y"), null);
+    Assert.assertNull(genericRow.getValue("y"));
     // Invalid case: x is null, y is int
     genericRow = new GenericRow();
     genericRow.putValue("x", null);
     expressionTransformer.transform(genericRow);
-    Assert.assertEquals(genericRow.getValue("y"), null);
+    Assert.assertNull(genericRow.getValue("y"));
+  }
+
+  @Test
+  public void testJsonToMapIngestionTransform() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("columnJson", FieldSpec.DataType.STRING)
+        .addComplex("columnMap", FieldSpec.DataType.MAP, Map.of(
+            "a", new DimensionFieldSpec("a", FieldSpec.DataType.INT, true),
+            "b", new DimensionFieldSpec("b", FieldSpec.DataType.STRING, true)
+        ))
+        .build();
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(
+        new TransformConfig("columnMap", "jsonStringToMap(columnJson)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testJsonToMapIngestionTransform")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    row.putValue("columnJson", "{\"a\":1,\"b\":\"x\"}");
+
+    expressionTransformer.transform(row);
+    Map<String, Object> map = (Map<String, Object>) row.getValue("columnMap");
+    Assert.assertEquals(map.get("a"), 1);
+    Assert.assertEquals(map.get("b"), "x");
+  }
+
+  @Test
+  public void testJsonToArrayIngestionTransform() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("columnJson", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("columnArray", FieldSpec.DataType.STRING)
+        .build();
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(
+        new TransformConfig("columnArray", "jsonPathArray(columnJson, '$')")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testJsonToArrayIngestionTransform")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    row.putValue("columnJson", "[\"a\",\"b\",\"c\"]");
+    // Pre-existing collection should be overwritten because transform returns an array (incompatible type)
+    row.putValue("columnArray", Arrays.asList("preExisting"));
+
+    expressionTransformer.transform(row);
+    Object transformedValue = row.getValue("columnArray");
+    Assert.assertTrue(transformedValue.getClass().isArray());
+    Assert.assertEquals(Arrays.asList((Object[]) transformedValue), Arrays.asList("a", "b", "c"));
   }
 }

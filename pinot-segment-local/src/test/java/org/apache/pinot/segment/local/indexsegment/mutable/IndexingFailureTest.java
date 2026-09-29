@@ -20,16 +20,19 @@ package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -40,11 +43,12 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-public class IndexingFailureTest {
+public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
   private static final String TABLE_NAME = "testTable";
   private static final String INT_COL = "int_col";
   private static final String STRING_COL = "string_col";
   private static final String JSON_COL = "json_col";
+  private static final StreamMessageMetadata METADATA = mock(StreamMessageMetadata.class);
 
   private MutableSegmentImpl _mutableSegment;
   private ServerMetrics _serverMetrics;
@@ -53,23 +57,29 @@ public class IndexingFailureTest {
   public void setup() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(INT_COL, FieldSpec.DataType.INT)
         .addSingleValueDimension(STRING_COL, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(JSON_COL, FieldSpec.DataType.JSON).setSchemaName(TABLE_NAME).build();
+        .addSingleValueDimension(JSON_COL, FieldSpec.DataType.JSON)
+        .setSchemaName(TABLE_NAME)
+        .build();
     _serverMetrics = mock(ServerMetrics.class);
     _mutableSegment =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.emptySet(), Collections.emptySet(),
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(), Set.of(),
             new HashSet<>(Arrays.asList(INT_COL, STRING_COL)),
-            Collections.singletonMap(JSON_COL, new JsonIndexConfig()), _serverMetrics);
+            Map.of(JSON_COL, new JsonIndexConfig()), _serverMetrics);
+  }
+
+  @AfterMethod
+  public void tearDown() {
+    _mutableSegment.destroy();
   }
 
   @Test
   public void testIndexingFailures()
       throws IOException {
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
     GenericRow goodRow = new GenericRow();
     goodRow.putValue(INT_COL, 0);
     goodRow.putValue(STRING_COL, "a");
     goodRow.putValue(JSON_COL, "{\"valid\": \"json\"}");
-    _mutableSegment.index(goodRow, defaultMetadata);
+    _mutableSegment.index(goodRow, METADATA);
     assertEquals(_mutableSegment.getNumDocsIndexed(), 1);
     assertEquals(_mutableSegment.getDataSource(INT_COL).getInvertedIndex().getDocIds(0),
         ImmutableRoaringBitmap.bitmapOf(0));
@@ -85,7 +95,7 @@ public class IndexingFailureTest {
     badRow.putValue(INT_COL, 0);
     badRow.putValue(STRING_COL, "b");
     badRow.putValue(JSON_COL, "{\"truncatedJson...");
-    _mutableSegment.index(badRow, defaultMetadata);
+    _mutableSegment.index(badRow, METADATA);
     assertEquals(_mutableSegment.getNumDocsIndexed(), 2);
     assertEquals(_mutableSegment.getDataSource(INT_COL).getInvertedIndex().getDocIds(0),
         ImmutableRoaringBitmap.bitmapOf(0, 1));
@@ -99,7 +109,7 @@ public class IndexingFailureTest {
     anotherGoodRow.putValue(INT_COL, 2);
     anotherGoodRow.putValue(STRING_COL, "c");
     anotherGoodRow.putValue(JSON_COL, "{\"valid\": \"json\"}");
-    _mutableSegment.index(anotherGoodRow, defaultMetadata);
+    _mutableSegment.index(anotherGoodRow, METADATA);
     assertEquals(_mutableSegment.getNumDocsIndexed(), 3);
     assertEquals(_mutableSegment.getDataSource(INT_COL).getInvertedIndex().getDocIds(1),
         ImmutableRoaringBitmap.bitmapOf(2));
@@ -116,7 +126,7 @@ public class IndexingFailureTest {
     nullStringRow.putValue(STRING_COL, null);
     nullStringRow.addNullValueField(STRING_COL);
     nullStringRow.putValue(JSON_COL, "{\"valid\": \"json\"}");
-    _mutableSegment.index(nullStringRow, defaultMetadata);
+    _mutableSegment.index(nullStringRow, METADATA);
     assertEquals(_mutableSegment.getNumDocsIndexed(), 4);
     assertEquals(_mutableSegment.getDataSource(INT_COL).getInvertedIndex().getDocIds(0),
         ImmutableRoaringBitmap.bitmapOf(0, 1, 3));

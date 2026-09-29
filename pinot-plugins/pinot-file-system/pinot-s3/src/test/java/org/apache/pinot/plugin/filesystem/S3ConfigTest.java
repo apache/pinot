@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.filesystem;
 
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.services.s3.model.StorageClass;
@@ -66,5 +67,25 @@ public class S3ConfigTest {
     PinotConfiguration pinotConfig = new PinotConfiguration();
     pinotConfig.setProperty("storageClass", "invalid-storage-class");
     S3Config cfg = new S3Config(pinotConfig);
+  }
+
+  @Test
+  public void testLegacyMd5Plugin() {
+    PinotConfiguration pinotConfig = new PinotConfiguration();
+    pinotConfig.setProperty("useLegacyMd5Plugin", "true");
+    S3Config cfg = new S3Config(pinotConfig);
+    Assert.assertTrue(cfg.useLegacyMd5Plugin());
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testLegacyMd5PluginWhenMd5Disabled() {
+    PinotConfiguration pinotConfig = new PinotConfiguration();
+    pinotConfig.setProperty("useLegacyMd5Plugin", "true");
+    try {
+      PinotMd5Mode.setPinotMd5Disabled(true);
+      new S3Config(pinotConfig);
+    } finally {
+      PinotMd5Mode.setPinotMd5Disabled(false);
+    }
   }
 }

@@ -23,17 +23,15 @@ import java.util.Objects;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
-/**
- * Predicate for vector similarity search.
- * NOTE: Currently, we only support vector similarity search on float array column.
- * Example:
- *   {
- *   "type": "vectorSimilarity",
- *   "leftValue": "embedding",
- *   "rightValue": [1.0, 2.0, 3.0],
- *   "topK": 10
- *   }
- */
+/// Predicate for vector similarity search.
+/// NOTE: Currently, we only support vector similarity search on float array column.
+/// Example:
+///   {
+///   "type": "vectorSimilarity",
+///   "leftValue": "embedding",
+///   "rightValue": [1.0, 2.0, 3.0],
+///   "topK": 10
+///   }
 public class VectorSimilarityPredicate extends BasePredicate {
   public static final int DEFAULT_TOP_K = 10;
   private final float[] _value;

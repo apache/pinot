@@ -26,36 +26,46 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.core.data.manager.provider.DefaultTableDataManagerProvider;
 import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.Fixtures;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
@@ -65,16 +75,23 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
@@ -92,7 +109,8 @@ public class RealtimeSegmentDataManagerTest {
   private static final long START_OFFSET_VALUE = 198L;
   private static final LongMsgOffset START_OFFSET = new LongMsgOffset(START_OFFSET_VALUE);
 
-  private final Map<Integer, Semaphore> _partitionGroupIdToSemaphoreMap = new ConcurrentHashMap<>();
+  private final Map<Integer, ConsumerCoordinator> _partitionGroupIdToConsumerCoordinatorMap =
+      new ConcurrentHashMap<>();
 
   private static TableConfig createTableConfig()
       throws Exception {
@@ -128,6 +146,90 @@ public class RealtimeSegmentDataManagerTest {
     return createFakeSegmentManager(false, new TimeSupplier(), null, null, null);
   }
 
+  @Test
+  public void testInitializationErrorStopMsgSkippedWhenDifferentSegmentManagerRegistered()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      SegmentDataManager registeredSegmentDataManager = mock(SegmentDataManager.class);
+      when(tableDataManager.getSegmentDataManager(SEGMENT_NAME_STR)).thenReturn(registeredSegmentDataManager);
+
+      segmentDataManager.postStopConsumedMsgForInitializationError();
+
+      Assert.assertFalse(segmentDataManager._postConsumeStoppedCalled);
+    }
+  }
+
+  @Test
+  public void testInitializationErrorStopMsgSentWhenCurrentSegmentManagerRegistered()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      when(tableDataManager.getSegmentDataManager(SEGMENT_NAME_STR)).thenReturn(segmentDataManager);
+
+      segmentDataManager.postStopConsumedMsgForInitializationError();
+
+      Assert.assertTrue(segmentDataManager._postConsumeStoppedCalled);
+    }
+  }
+
+  @Test
+  public void testInitializationErrorStopMsgSkippedAfterTableShutdown()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      // Shutdown drained the old table's segment map, so nothing is registered under this segment name even though a
+      // recreated same-name table may already be consuming it.
+      when(tableDataManager.getSegmentDataManager(SEGMENT_NAME_STR)).thenReturn(null);
+      when(tableDataManager.isShutDown()).thenReturn(true);
+
+      segmentDataManager.postStopConsumedMsgForInitializationError();
+
+      Assert.assertFalse(segmentDataManager._postConsumeStoppedCalled);
+    }
+  }
+
+  @Test(timeOut = 10_000)
+  public void testStopConsumedMsgRetryStopsAfterTableShutdown()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      // The controller rejects the first attempt (e.g. the table's ideal state is already gone) and the table is shut
+      // down before the retry: the loop must give up instead of sleeping and retrying on behalf of a recreated table.
+      segmentDataManager._stopConsumedResponseStatus = SegmentCompletionProtocol.ControllerResponseStatus.FAILED;
+      when(tableDataManager.isShutDown()).thenReturn(true);
+
+      segmentDataManager.invokePostStopConsumedMsg("Consuming segment initialization error");
+
+      Assert.assertEquals(segmentDataManager._postConsumeStoppedAttempts, 1);
+    }
+  }
+
+  @Test
+  public void testDestroyBeforeConsumptionStarts()
+      throws Exception {
+    FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    // Never started: the real stop() must tolerate the missing consumer thread (the fake normally overrides it), and
+    // destroy() must still close the stream consumer.
+    segmentDataManager.invokeRealStop();
+    segmentDataManager.destroy();
+    Assert.assertTrue(segmentDataManager.isStreamConsumerClosed());
+  }
+
+  @Test
+  public void testPostStopConsumedMsgDoesNotCheckRegisteredSegmentManager()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      SegmentDataManager registeredSegmentDataManager = mock(SegmentDataManager.class);
+      when(tableDataManager.getSegmentDataManager(SEGMENT_NAME_STR)).thenReturn(registeredSegmentDataManager);
+
+      segmentDataManager.invokePostStopConsumedMsg("consumer error");
+
+      Assert.assertTrue(segmentDataManager._postConsumeStoppedCalled);
+    }
+  }
+
   private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
       @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig)
       throws Exception {
@@ -146,14 +248,19 @@ public class RealtimeSegmentDataManagerTest {
       tableConfig.getIndexingConfig().getStreamConfigs()
           .put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, maxDuration);
     }
+    if (tableConfig.getIngestionConfig() == null) {
+      tableConfig.setIngestionConfig(new IngestionConfig());
+    }
+    tableConfig.getIngestionConfig().setRetryOnSegmentBuildPrecheckFailure(true);
     RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
     LLCSegmentName llcSegmentName = new LLCSegmentName(SEGMENT_NAME_STR);
-    _partitionGroupIdToSemaphoreMap.putIfAbsent(PARTITION_GROUP_ID, new Semaphore(1));
+    _partitionGroupIdToConsumerCoordinatorMap.putIfAbsent(PARTITION_GROUP_ID,
+        new ConsumerCoordinator(false, tableDataManager));
     Schema schema = Fixtures.createSchema();
     ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     return new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager,
         new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), schema, llcSegmentName,
-        _partitionGroupIdToSemaphoreMap, serverMetrics, timeSupplier);
+        _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, timeSupplier);
   }
 
   @BeforeClass
@@ -248,6 +355,7 @@ public class RealtimeSegmentDataManagerTest {
 
     consumer.run();
     Assert.assertTrue(segmentDataManager._buildSegmentCalled);
+    Assert.assertTrue(segmentDataManager._notifySegmentBuildFailedWithDeterministicErrorCalled);
     Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.ERROR);
     segmentDataManager.close();
   }
@@ -481,7 +589,7 @@ public class RealtimeSegmentDataManagerTest {
 
   // Tests to go online from consuming state
 
-  // If the state is is COMMITTED or RETAINED, nothing to do
+  // If the state is COMMITTED or RETAINED, nothing to do
   // If discarded or error state, then downloadAndReplace the segment
   @Test
   public void testOnlineTransitionAfterStop()
@@ -492,6 +600,7 @@ public class RealtimeSegmentDataManagerTest {
     metadata.setEndOffset(finalOffset.toString());
 
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.COMMITTED);
       segmentDataManager.goOnlineFromConsuming(metadata);
@@ -500,6 +609,7 @@ public class RealtimeSegmentDataManagerTest {
     }
 
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.RETAINED);
       segmentDataManager.goOnlineFromConsuming(metadata);
@@ -508,6 +618,7 @@ public class RealtimeSegmentDataManagerTest {
     }
 
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.DISCARDED);
       segmentDataManager.goOnlineFromConsuming(metadata);
@@ -516,6 +627,7 @@ public class RealtimeSegmentDataManagerTest {
     }
 
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.ERROR);
       segmentDataManager.goOnlineFromConsuming(metadata);
@@ -525,6 +637,7 @@ public class RealtimeSegmentDataManagerTest {
 
     // If holding, but we have overshot the expected final offset, the download and replace
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.HOLDING);
       segmentDataManager.setCurrentOffset(finalOffsetValue + 1);
@@ -535,6 +648,7 @@ public class RealtimeSegmentDataManagerTest {
 
     // If catching up, but we have overshot the expected final offset, the download and replace
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager.setCurrentOffset(finalOffsetValue + 1);
@@ -545,6 +659,7 @@ public class RealtimeSegmentDataManagerTest {
 
     // If catching up, but we did not get to the final offset, then download and replace
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager._consumeOffsets.add(new LongMsgOffset(finalOffsetValue - 1));
@@ -555,6 +670,7 @@ public class RealtimeSegmentDataManagerTest {
 
     // But then if we get to the exact offset, we get to build and replace, not download
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager._consumeOffsets.add(finalOffset);
@@ -562,6 +678,270 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
     }
+
+    // But then if we get to the exact offset, we download the segment because consumer semaphore was never acquired.
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager._consumeOffsets.add(finalOffset);
+      segmentDataManager.goOnlineFromConsuming(metadata);
+      Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
+    }
+
+    // Test downloadAndReplace is called after buildAndReplace fails.
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager._failSegmentBuildAndReplace = true;
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.HOLDING);
+      segmentDataManager.setCurrentOffset(finalOffsetValue);
+      segmentDataManager.goOnlineFromConsuming(metadata);
+      Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+    }
+  }
+
+  @Test
+  public void testOffloadRemovesSegmentMetadataBeforeReleasingConsumerSemaphore()
+      throws Exception {
+    // Use a fresh coordinator. Other tests release the shared semaphore without acquiring it, which inflates permits.
+    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+
+      // MutableSegmentImpl.offload() removes the segment from the upsert/dedup metadata managers. For partial upsert in
+      // PROTECTED mode that is where the primary keys are reverted to their previous locations, so it has to run
+      // (1) after the stream consumer is closed, so nothing can consume into the offloaded segment, and
+      // (2) while the consumer semaphore is still held, so the next consuming segment cannot replay against
+      //     un-reverted state.
+      AtomicInteger permitsWhenMetadataRemoved = new AtomicInteger(-1);
+      AtomicBoolean streamConsumerClosedWhenMetadataRemoved = new AtomicBoolean(false);
+      MutableSegmentImpl realtimeSegment = spy((MutableSegmentImpl) segmentDataManager.getSegment());
+      doAnswer(invocation -> {
+        permitsWhenMetadataRemoved.set(semaphore.availablePermits());
+        streamConsumerClosedWhenMetadataRemoved.set(segmentDataManager.isStreamConsumerClosed());
+        return null;
+      }).when(realtimeSegment).offload();
+      segmentDataManager.setRealtimeSegment(realtimeSegment);
+
+      segmentDataManager.offload();
+
+      verify(realtimeSegment).offload();
+      Assert.assertTrue(streamConsumerClosedWhenMetadataRemoved.get(),
+          "Stream consumer must be closed before the segment metadata is removed");
+      Assert.assertEquals(permitsWhenMetadataRemoved.get(), 0,
+          "Segment metadata must be removed while the consumer semaphore is still held");
+      Assert.assertEquals(semaphore.availablePermits(), 1, "Consumer semaphore must be released after offload");
+      Assert.assertFalse(segmentDataManager.getConsumerSemaphoreAcquired().get());
+    }
+  }
+
+  @Test
+  public void testOffloadAfterParallelConsumptionReleaseDoesNotReleaseSemaphoreTwice()
+      throws Exception {
+    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+
+      // With ALLOW_DURING_BUILD_ONLY / ALLOW_ALWAYS, buildSegmentInternal() and downloadSegmentAndReplace() let the
+      // next consuming segment start early by closing the consumer and releasing the semaphore together.
+      segmentDataManager.closeStreamConsumerAndReleaseSemaphore();
+      Assert.assertTrue(segmentDataManager.isStreamConsumerClosed());
+      Assert.assertEquals(semaphore.availablePermits(), 1,
+          "Consumer semaphore must be released for parallel consumption");
+      Assert.assertFalse(segmentDataManager.getConsumerSemaphoreAcquired().get());
+
+      MutableSegmentImpl realtimeSegment = spy((MutableSegmentImpl) segmentDataManager.getSegment());
+      doAnswer(invocation -> null).when(realtimeSegment).offload();
+      segmentDataManager.setRealtimeSegment(realtimeSegment);
+
+      segmentDataManager.offload();
+
+      verify(realtimeSegment).offload();
+      Assert.assertEquals(semaphore.availablePermits(), 1, "Offload must not release the consumer semaphore twice");
+    }
+  }
+
+  @Test
+  public void testOffloadReleasesConsumerSemaphoreWhenMetadataRemovalFails()
+      throws Exception {
+    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+
+      MutableSegmentImpl realtimeSegment = spy((MutableSegmentImpl) segmentDataManager.getSegment());
+      doThrow(new RuntimeException("metadata removal failed")).when(realtimeSegment).offload();
+      segmentDataManager.setRealtimeSegment(realtimeSegment);
+
+      try {
+        segmentDataManager.offload();
+        Assert.fail("Expected the metadata removal failure to propagate");
+      } catch (RuntimeException e) {
+        Assert.assertEquals(e.getMessage(), "metadata removal failed");
+      }
+      // A failed metadata removal must not leave the semaphore held, or the partition can never consume again.
+      Assert.assertEquals(semaphore.availablePermits(), 1,
+          "Consumer semaphore must be released even when metadata removal fails");
+    }
+  }
+
+  @Test
+  public void testOnlineTransitionSkipsLocalBuildOnCrcMismatch()
+      throws Exception {
+    long finalOffsetValue = START_OFFSET_VALUE + 600;
+
+    // Upsert + committed CRC set + local CRC mismatch -> discard local build, download the committed segment.
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      when(segmentDataManager._tableDataManager.isUpsertEnabled()).thenReturn(true);
+      runGoOnlineForCrcGuard(segmentDataManager, crcMetadata(finalOffsetValue, 12345L), false, finalOffsetValue);
+      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+      Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
+    }
+
+    // Non-upsert + committed CRC set + local CRC mismatch -> discard local build, download the committed segment.
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      when(segmentDataManager._tableDataManager.isUpsertEnabled()).thenReturn(false);
+      runGoOnlineForCrcGuard(segmentDataManager, crcMetadata(finalOffsetValue, 12345L), false, finalOffsetValue);
+      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+      Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
+    }
+
+    // Upsert + committed CRC set + local CRC match -> build locally, no download, swap in committed metadata.
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      when(segmentDataManager._tableDataManager.isUpsertEnabled()).thenReturn(true);
+      SegmentZKMetadata committedMetadata = crcMetadata(finalOffsetValue, 12345L);
+      runGoOnlineForCrcGuard(segmentDataManager, committedMetadata, true, finalOffsetValue);
+      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+      Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
+      verify(segmentDataManager._tableDataManager)
+          .replaceConsumingSegment(eq(SEGMENT_NAME_STR), same(committedMetadata));
+    }
+
+    // Non-upsert + committed CRC set + local CRC match -> build locally, no download, swap in committed metadata.
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      when(segmentDataManager._tableDataManager.isUpsertEnabled()).thenReturn(false);
+      SegmentZKMetadata committedMetadata = crcMetadata(finalOffsetValue, 12345L);
+      runGoOnlineForCrcGuard(segmentDataManager, committedMetadata, true, finalOffsetValue);
+      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+      Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
+      verify(segmentDataManager._tableDataManager)
+          .replaceConsumingSegment(eq(SEGMENT_NAME_STR), same(committedMetadata));
+    }
+
+    // Committed CRC unset (-1) -> guard skipped, build locally with construction-time metadata.
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      when(segmentDataManager._tableDataManager.isUpsertEnabled()).thenReturn(false);
+      SegmentZKMetadata committedMetadata = crcMetadata(finalOffsetValue, -1L);
+      runGoOnlineForCrcGuard(segmentDataManager, committedMetadata, false, finalOffsetValue);
+      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+      Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
+      verify(segmentDataManager._tableDataManager)
+          .replaceConsumingSegment(eq(SEGMENT_NAME_STR), argThat(m -> m != committedMetadata));
+    }
+
+    // Pauseless table -> guard skipped, build locally with construction-time metadata.
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, createPauselessTableConfig())) {
+      when(segmentDataManager._tableDataManager.isUpsertEnabled()).thenReturn(false);
+      SegmentZKMetadata committedMetadata = crcMetadata(finalOffsetValue, 12345L);
+      runGoOnlineForCrcGuard(segmentDataManager, committedMetadata, false, finalOffsetValue);
+      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+      Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
+      verify(segmentDataManager._tableDataManager)
+          .replaceConsumingSegment(eq(SEGMENT_NAME_STR), argThat(m -> m != committedMetadata));
+    }
+  }
+
+  private void runGoOnlineForCrcGuard(FakeRealtimeSegmentDataManager segmentDataManager, SegmentZKMetadata metadata,
+      boolean localCrcMatchesZk, long currentOffsetValue)
+      throws Exception {
+    segmentDataManager._useRealBuildAndReplace = true;
+    segmentDataManager._localSegmentCrcMatchesZk = localCrcMatchesZk;
+    segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+    segmentDataManager._stopWaitTimeMs = 0;
+    segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.HOLDING);
+    segmentDataManager.setCurrentOffset(currentOffsetValue);
+    segmentDataManager.goOnlineFromConsuming(metadata);
+  }
+
+  private SegmentZKMetadata crcMetadata(long endOffsetValue, long crc) {
+    SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+    metadata.setEndOffset(new LongMsgOffset(endOffsetValue).toString());
+    if (crc >= 0) {
+      metadata.setCrc(crc);
+    }
+    return metadata;
+  }
+
+  private TableConfig createPauselessTableConfig()
+      throws Exception {
+    TableConfig tableConfig = createTableConfig();
+    StreamIngestionConfig streamIngestionConfig =
+        new StreamIngestionConfig(List.of(tableConfig.getIndexingConfig().getStreamConfigs()));
+    streamIngestionConfig.setPauselessConsumptionEnabled(true);
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig == null) {
+      ingestionConfig = new IngestionConfig();
+      tableConfig.setIngestionConfig(ingestionConfig);
+    }
+    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+    return tableConfig;
+  }
+
+  // Exercises the real CRC comparison (on-disk SegmentMetadataImpl read + hasSameCRC) rather than the stubbed branch.
+  @Test
+  public void testIsLocalSegmentCrcMatchingZk()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager._useRealCrcCheck = true;
+      File resourceDir = new File(TEMP_DIR, REALTIME_TABLE_NAME);
+      long localCrc = buildRealSegmentAndGetCrc(resourceDir, SEGMENT_NAME_STR);
+
+      SegmentZKMetadata matchingMetadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+      matchingMetadata.setCrc(localCrc);
+      Assert.assertTrue(segmentDataManager.isLocalSegmentCrcMatchingZk(matchingMetadata));
+
+      SegmentZKMetadata mismatchingMetadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+      mismatchingMetadata.setCrc(localCrc + 1);
+      Assert.assertFalse(segmentDataManager.isLocalSegmentCrcMatchingZk(mismatchingMetadata));
+    }
+  }
+
+  // When the locally-built segment cannot be read (e.g. missing/corrupt), the CRC check must report a mismatch so the
+  // ONLINE transition downloads the committed segment instead of throwing.
+  @Test
+  public void testIsLocalSegmentCrcMatchingZkTreatsUnreadableSegmentAsMismatch()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager._useRealCrcCheck = true;
+      // No segment was built under the resource dir, so the metadata read fails.
+      FileUtils.deleteQuietly(new File(new File(TEMP_DIR, REALTIME_TABLE_NAME), SEGMENT_NAME_STR));
+      SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+      metadata.setCrc(12345L);
+      Assert.assertFalse(segmentDataManager.isLocalSegmentCrcMatchingZk(metadata));
+    }
+  }
+
+  private long buildRealSegmentAndGetCrc(File resourceDir, String segmentName)
+      throws Exception {
+    Schema schema = Fixtures.createSchema();
+    TableConfig tableConfig = createTableConfig();
+    SegmentGeneratorConfig generatorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    generatorConfig.setOutDir(resourceDir.getAbsolutePath());
+    generatorConfig.setSegmentName(segmentName);
+    List<GenericRow> rows = List.of(Fixtures.createSingleRow(1L), Fixtures.createSingleRow(2L));
+    try (GenericRowRecordReader recordReader = new GenericRowRecordReader(rows)) {
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(generatorConfig, recordReader);
+      driver.build();
+    }
+    return new SegmentMetadataImpl(new File(resourceDir, segmentName)).getCrc();
   }
 
   @Test
@@ -730,72 +1110,21 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testOnlyOneSegmentHoldingTheSemaphoreForParticularPartition()
-      throws Exception {
-    long timeout = 10_000L;
-    FakeRealtimeSegmentDataManager firstSegmentDataManager = createFakeSegmentManager();
-    Assert.assertTrue(firstSegmentDataManager.getAcquiredConsumerSemaphore().get());
-    Semaphore firstSemaphore = firstSegmentDataManager.getPartitionGroupConsumerSemaphore();
-    Assert.assertEquals(firstSemaphore.availablePermits(), 0);
-    Assert.assertFalse(firstSemaphore.hasQueuedThreads());
-
-    AtomicReference<FakeRealtimeSegmentDataManager> secondSegmentDataManager = new AtomicReference<>(null);
-
-    // Construct the second segment manager, which will be blocked on the semaphore.
-    Thread constructSecondSegmentManager = new Thread(() -> {
-      try {
-        secondSegmentDataManager.set(createFakeSegmentManager());
-      } catch (Exception e) {
-        throw new RuntimeException("Exception when sleeping for " + timeout + "ms", e);
-      }
-    });
-    constructSecondSegmentManager.start();
-
-    // Wait until the second segment manager gets blocked on the semaphore.
-    TestUtils.waitForCondition(aVoid -> {
-      if (firstSemaphore.hasQueuedThreads()) {
-        // Once verified the second segment gets blocked, release the semaphore.
-        firstSegmentDataManager.close();
-        return true;
-      } else {
-        return false;
-      }
-    }, timeout, "Failed to wait for the second segment blocked on semaphore");
-
-    // Wait for the second segment manager finished the construction.
-    TestUtils.waitForCondition(aVoid -> secondSegmentDataManager.get() != null, timeout,
-        "Failed to acquire the semaphore for the second segment manager in " + timeout + "ms");
-
-    Assert.assertTrue(secondSegmentDataManager.get().getAcquiredConsumerSemaphore().get());
-    Semaphore secondSemaphore = secondSegmentDataManager.get().getPartitionGroupConsumerSemaphore();
-    Assert.assertEquals(firstSemaphore, secondSemaphore);
-    Assert.assertEquals(secondSemaphore.availablePermits(), 0);
-    Assert.assertFalse(secondSemaphore.hasQueuedThreads());
-
-    // Call offload method the 2nd time on the first segment manager, the permits in semaphore won't increase.
-    firstSegmentDataManager.close();
-    Assert.assertEquals(firstSegmentDataManager.getPartitionGroupConsumerSemaphore().availablePermits(), 0);
-
-    // The permit finally gets released in the Semaphore.
-    secondSegmentDataManager.get().close();
-    Assert.assertEquals(secondSegmentDataManager.get().getPartitionGroupConsumerSemaphore().availablePermits(), 1);
-  }
-
-  @Test
   public void testShutdownTableDataManagerWillNotShutdownLeaseExtenderExecutor()
       throws Exception {
-    TableConfig tableConfig = createTableConfig();
-    tableConfig.setUpsertConfig(null);
-    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
-    when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(TableConfigUtils.toZNRecord(tableConfig));
-    HelixManager helixManager = mock(HelixManager.class);
-    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
-
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
+    when(instanceDataManagerConfig.getUpsertConfig()).thenReturn(new PinotConfiguration());
+    when(instanceDataManagerConfig.getDedupConfig()).thenReturn(new PinotConfiguration());
     TableDataManagerProvider tableDataManagerProvider = new DefaultTableDataManagerProvider();
-    tableDataManagerProvider.init(instanceDataManagerConfig, helixManager, new SegmentLocks());
-    TableDataManager tableDataManager = tableDataManagerProvider.getTableDataManager(tableConfig);
+    tableDataManagerProvider.init(instanceDataManagerConfig,
+        mock(HelixManager.class),
+        new SegmentLocks(),
+        null,
+        mock(ServerReloadJobStatusCache.class));
+    TableConfig tableConfig = createTableConfig();
+    Schema schema = Fixtures.createSchema();
+    TableDataManager tableDataManager = tableDataManagerProvider.getTableDataManager(tableConfig, schema);
     tableDataManager.start();
     tableDataManager.shutDown();
     Assert.assertFalse(SegmentBuildTimeLeaseExtender.isExecutorShutdown());
@@ -809,8 +1138,9 @@ public class RealtimeSegmentDataManagerTest {
       @Override
       public Long get() {
         long now = System.currentTimeMillis();
-        // now() is called once in the run() method, once before each batch reading and once for every row indexation
-        if (_timeCheckCounter.incrementAndGet() <= FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 4) {
+        // now() is called once in the run() method, then once on setting consumeStartTime, once before each batch
+        // reading and once for every row indexation
+        if (_timeCheckCounter.incrementAndGet() <= FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 5) {
           return now;
         }
         // Exceed segment time threshold
@@ -834,10 +1164,10 @@ public class RealtimeSegmentDataManagerTest {
 
       consumer.run();
 
-      // millis() is called first in run before consumption, then once for each batch and once for each message in
-      // the batch, then once more when metrics are updated after each batch is processed and then 4 more times in
-      // run() after consume loop
-      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 8);
+      // millis() is called first in run before consumption, then once on setting consumeStartTime, then once for
+      // each batch and once for each message in the batch, then once more when metrics are updated after each batch
+      // is processed and then 4 more times in run() after consume loop
+      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 9);
       Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
           START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
       Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
@@ -869,15 +1199,271 @@ public class RealtimeSegmentDataManagerTest {
 
       consumer.run();
 
-      // millis() is called first in run before consumption, then once for each batch and once for each message in
-      // the batch, then once for metrics updates and then 4 more times in run() after consume loop
-      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 6);
+      // millis() is called first in run before consumption, then once on setting consumeStartTime, then once for
+      // each batch and once for each message in the batch, then once for metrics updates and then 4 more times in
+      // run() after consume loop
+      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 7);
       Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
           START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
       Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
           FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
       Assert.assertEquals(segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs(),
           FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    }
+  }
+
+  @Test
+  public void testServerIngestionOomProtectionWaitsAndResumesWhileInitialConsuming()
+      throws Exception {
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS), "10m", null)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+
+      ServerIngestionOomProtectionManager oomProtectionManager = mock(ServerIngestionOomProtectionManager.class);
+      when(oomProtectionManager.waitIfProtectionNeeded(any())).thenReturn(true, false);
+      segmentDataManager.setServerIngestionOomProtectionManager(oomProtectionManager);
+
+      RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+      final LongMsgOffset endOffset =
+          new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      segmentDataManager._consumeOffsets.add(endOffset);
+      SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+                  SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+              .withStreamPartitionMsgOffset(endOffset.toString()));
+      segmentDataManager._responses.add(response);
+
+      consumer.run();
+
+      verify(oomProtectionManager, atLeast(1)).waitIfProtectionNeeded(any());
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
+          FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    }
+  }
+
+  @Test
+  public void testServerIngestionOomProtectionStopPredicateDoesNotMutateEndCriteria()
+      throws Exception {
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS), "10m", null)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+
+      ServerIngestionOomProtectionManager oomProtectionManager = mock(ServerIngestionOomProtectionManager.class);
+      when(oomProtectionManager.waitIfProtectionNeeded(any())).thenAnswer(invocation -> {
+        BooleanSupplier stopCondition = invocation.getArgument(0);
+        long consumeEndTime = segmentDataManager.getConsumeEndTime();
+        timeSupplier.set(consumeEndTime);
+
+        Assert.assertTrue(stopCondition.getAsBoolean());
+        Assert.assertEquals(segmentDataManager.getConsumeEndTime(), consumeEndTime);
+        return true;
+      });
+      segmentDataManager.setServerIngestionOomProtectionManager(oomProtectionManager);
+
+      RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+      final LongMsgOffset endOffset =
+          new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      segmentDataManager._consumeOffsets.add(endOffset);
+      SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+                  SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+              .withStreamPartitionMsgOffset(endOffset.toString()));
+      segmentDataManager._responses.add(response);
+
+      consumer.run();
+
+      verify(oomProtectionManager, atLeast(1)).waitIfProtectionNeeded(any());
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
+          FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    }
+  }
+
+  @Test
+  public void testServerIngestionOomProtectionIsSkippedWhileCatchingUp()
+      throws Exception {
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2), "10m", null)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
+      LongMsgOffset finalOffset =
+          new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      Field finalOffsetField = RealtimeSegmentDataManager.class.getDeclaredField("_finalOffset");
+      finalOffsetField.setAccessible(true);
+      finalOffsetField.set(segmentDataManager, finalOffset);
+
+      ServerIngestionOomProtectionManager oomProtectionManager = mock(ServerIngestionOomProtectionManager.class);
+      when(oomProtectionManager.waitIfProtectionNeeded(any())).thenReturn(true);
+      segmentDataManager.setServerIngestionOomProtectionManager(oomProtectionManager);
+
+      RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+      SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+                  SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+              .withStreamPartitionMsgOffset(finalOffset.toString()));
+      segmentDataManager._responses.add(response);
+
+      consumer.run();
+
+      verify(oomProtectionManager, never()).waitIfProtectionNeeded(any());
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    }
+  }
+
+  @Test
+  public void testCompletionModeDownloadWithUrlValidation()
+      throws Exception {
+    // Test the new validation logic for CompletionMode.DOWNLOAD
+
+    // Test Case 1: Valid download URL - should proceed with DOWNLOAD mode
+    testCompletionModeDownloadWithValidUrl();
+
+    // Test Case 2: Missing/null download URL - should fall back to RETAINING mode
+    testCompletionModeDownloadWithMissingUrl();
+
+    // Test Case 3: Empty download URL - should fall back to RETAINING mode
+    testCompletionModeDownloadWithEmptyUrl();
+  }
+
+  private void testCompletionModeDownloadWithValidUrl()
+      throws Exception {
+    String downloadUrl = "http://example.com/segment.tar.gz";
+    TestResult expectedResult = new TestResult(
+        RealtimeSegmentDataManager.State.DISCARDED, false);
+
+    runCompletionModeDownloadTest(downloadUrl, downloadUrl, expectedResult);
+  }
+
+  private void testCompletionModeDownloadWithMissingUrl()
+      throws Exception {
+    TestResult expectedResult = new TestResult(
+        RealtimeSegmentDataManager.State.RETAINED, true);
+
+    runCompletionModeDownloadTest(null, null, expectedResult);
+  }
+
+  private void testCompletionModeDownloadWithEmptyUrl()
+      throws Exception {
+    TestResult expectedResult = new TestResult(
+        RealtimeSegmentDataManager.State.RETAINED, true);
+
+    runCompletionModeDownloadTest("", "", expectedResult);
+  }
+
+  /// Helper method to run completion mode download tests with different download URL scenarios.
+  ///
+  /// @param freshMetadataDownloadUrl The download URL returned by fetchZKMetadata (fresh metadata)
+  /// @param initialSegmentDownloadUrl The download URL in the initial segment metadata
+  /// @param expectedResult The expected test result (state and buildAndReplaceCalled flag)
+  private void runCompletionModeDownloadTest(String freshMetadataDownloadUrl,
+      String initialSegmentDownloadUrl, TestResult expectedResult)
+      throws Exception {
+
+    // Create table config with DOWNLOAD completion mode
+    TableConfig tableConfig = createTableConfigWithDownloadCompletionMode();
+
+    // Create mock table data manager with the specified download URL
+    RealtimeTableDataManager mockTableDataManager = createMockTableDataManager(freshMetadataDownloadUrl);
+
+    // Create segment data manager with DOWNLOAD completion mode
+    SegmentZKMetadata segmentZKMetadata = createZkMetadata();
+    if (initialSegmentDownloadUrl != null) {
+      segmentZKMetadata.setDownloadUrl(initialSegmentDownloadUrl);
+    }
+
+    LLCSegmentName llcSegmentName = new LLCSegmentName(SEGMENT_NAME_STR);
+    Schema schema = Fixtures.createSchema();
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, mockTableDataManager,
+            new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), schema, llcSegmentName,
+            _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, new TimeSupplier())) {
+
+      // Execute the consumer with KEEP response
+      executeConsumerWithKeepResponse(segmentDataManager);
+
+      // Verify the expected results
+      Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
+          expectedResult._expectedState);
+      Assert.assertEquals(segmentDataManager._buildAndReplaceCalled,
+          expectedResult._expectedBuildAndReplaceCalled);
+      Assert.assertTrue(segmentDataManager._responses.isEmpty());
+      Assert.assertTrue(segmentDataManager._consumeOffsets.isEmpty());
+    }
+  }
+
+  /// Creates a table config with DOWNLOAD completion mode.
+  private TableConfig createTableConfigWithDownloadCompletionMode()
+      throws Exception {
+    TableConfig tableConfig = createTableConfig();
+    tableConfig.getValidationConfig().setCompletionConfig(
+        new org.apache.pinot.spi.config.table.CompletionConfig("DOWNLOAD"));
+    return tableConfig;
+  }
+
+  /// Creates a mock table data manager that returns the specified download URL in fresh metadata.
+  private RealtimeTableDataManager createMockTableDataManager(String downloadUrl) {
+    RealtimeTableDataManager mockTableDataManager = mock(RealtimeTableDataManager.class);
+    when(mockTableDataManager.getInstanceId()).thenReturn("server-1");
+    when(mockTableDataManager.getSegmentLock(any())).thenReturn(mock(Lock.class));
+
+    // Mock fetchZKMetadata to return metadata with the specified download URL
+    SegmentZKMetadata metadata = createZkMetadata();
+    metadata.setDownloadUrl(downloadUrl);
+    when(mockTableDataManager.fetchZKMetadata(SEGMENT_NAME_STR)).thenReturn(metadata);
+
+    // Set up stats history and consumer directory
+    RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
+    when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
+    when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
+    when(mockTableDataManager.getStatsHistory()).thenReturn(statsHistory);
+    when(mockTableDataManager.getConsumerDir()).thenReturn(TEMP_DIR.getAbsolutePath() + "/consumerDir");
+
+    // Set up consumer coordinator in the map
+    _partitionGroupIdToConsumerCoordinatorMap.putIfAbsent(PARTITION_GROUP_ID,
+        new ConsumerCoordinator(false, mockTableDataManager));
+
+    return mockTableDataManager;
+  }
+
+  /// Executes the consumer with a KEEP response to trigger the completion mode logic.
+  private void executeConsumerWithKeepResponse(FakeRealtimeSegmentDataManager segmentDataManager) {
+    RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    final LongMsgOffset endOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
+    segmentDataManager._consumeOffsets.add(endOffset);
+
+    final SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
+        new SegmentCompletionProtocol.Response.Params().withStatus(
+                SegmentCompletionProtocol.ControllerResponseStatus.KEEP)
+            .withStreamPartitionMsgOffset(endOffset.toString()));
+    segmentDataManager._responses.add(response);
+
+    consumer.run();
+  }
+
+  /// Helper class to encapsulate expected test results for segment state transitions.
+  ///
+  /// This class holds the expected state of a [RealtimeSegmentDataManager] after a test,
+  /// as well as whether the build-and-replace operation was expected to be called.
+  private static class TestResult {
+    /// The expected state of the [RealtimeSegmentDataManager] after the test execution.
+    final RealtimeSegmentDataManager.State _expectedState;
+    /// Whether the build-and-replace operation was expected to be called during the test.
+    final boolean _expectedBuildAndReplaceCalled;
+
+    /// Constructs a TestResult with the expected state and build-and-replace flag.
+    ///
+    /// @param expectedState The expected state of the segment manager after the test.
+    /// @param expectedBuildAndReplaceCalled Whether build-and-replace was expected to be called.
+    TestResult(RealtimeSegmentDataManager.State expectedState, boolean expectedBuildAndReplaceCalled) {
+      _expectedState = expectedState;
+      _expectedBuildAndReplaceCalled = expectedBuildAndReplaceCalled;
     }
   }
 
@@ -906,6 +1492,14 @@ public class RealtimeSegmentDataManagerTest {
     public Field _state;
     public Field _shouldStop;
     public Field _stopReason;
+    public Field _segmentBuildFailedWithDeterministicError;
+    public boolean _failSegmentBuildAndReplace = false;
+    // When set, buildSegmentAndReplace runs the real implementation (including the upsert CRC guard) instead of being
+    // short-circuited, and isLocalSegmentCrcMatchingZk returns _localSegmentCrcMatchesZk.
+    public boolean _useRealBuildAndReplace = false;
+    public boolean _localSegmentCrcMatchesZk = true;
+    // When set, isLocalSegmentCrcMatchingZk runs the real on-disk metadata read + CRC comparison.
+    public boolean _useRealCrcCheck = false;
     private Field _streamMsgOffsetFactory;
     public LinkedList<LongMsgOffset> _consumeOffsets = new LinkedList<>();
     public LinkedList<SegmentCompletionProtocol.Response> _responses = new LinkedList<>();
@@ -915,10 +1509,15 @@ public class RealtimeSegmentDataManagerTest {
     public boolean _buildAndReplaceCalled = false;
     public int _stopWaitTimeMs = 100;
     private boolean _downloadAndReplaceCalled = false;
+    private boolean _notifySegmentBuildFailedWithDeterministicErrorCalled = false;
     public boolean _throwExceptionFromConsume = false;
     public boolean _postConsumeStoppedCalled = false;
-    public Map<Integer, Semaphore> _semaphoreMap;
+    public int _postConsumeStoppedAttempts = 0;
+    public SegmentCompletionProtocol.ControllerResponseStatus _stopConsumedResponseStatus =
+        SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED;
+    public Map<Integer, ConsumerCoordinator> _consumerCoordinatorMap;
     public boolean _stubConsumeLoop = true;
+    public RealtimeTableDataManager _tableDataManager;
     private TimeSupplier _timeSupplier;
     private boolean _indexCapacityThresholdBreached;
 
@@ -934,23 +1533,47 @@ public class RealtimeSegmentDataManagerTest {
 
     public FakeRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
         RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, Schema schema,
-        LLCSegmentName llcSegmentName, Map<Integer, Semaphore> semaphoreMap, ServerMetrics serverMetrics,
-        TimeSupplier timeSupplier)
+        LLCSegmentName llcSegmentName, Map<Integer, ConsumerCoordinator> consumerCoordinatorMap,
+        ServerMetrics serverMetrics, TimeSupplier timeSupplier)
         throws Exception {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
-          semaphoreMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null, () -> true);
+          consumerCoordinatorMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null,
+          () -> true);
+      _tableDataManager = realtimeTableDataManager;
       _state = RealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
       _shouldStop = RealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");
       _shouldStop.setAccessible(true);
       _stopReason = RealtimeSegmentDataManager.class.getDeclaredField("_stopReason");
       _stopReason.setAccessible(true);
-      _semaphoreMap = semaphoreMap;
+      _segmentBuildFailedWithDeterministicError =
+          RealtimeSegmentDataManager.class.getDeclaredField("_segmentBuildFailedWithDeterministicError");
+      _segmentBuildFailedWithDeterministicError.setAccessible(true);
+      _consumerCoordinatorMap = consumerCoordinatorMap;
       _streamMsgOffsetFactory = RealtimeSegmentDataManager.class.getDeclaredField("_streamPartitionMsgOffsetFactory");
       _streamMsgOffsetFactory.setAccessible(true);
       _streamMsgOffsetFactory.set(this, new LongMsgOffsetFactory());
       _timeSupplier = timeSupplier;
+    }
+
+    public RealtimeTableDataManager getTableDataManager() {
+      return _tableDataManager;
+    }
+
+    /// Replaces the mutable segment so tests can observe or fail its offload().
+    public void setRealtimeSegment(MutableSegmentImpl realtimeSegment)
+        throws Exception {
+      Field realtimeSegmentField = RealtimeSegmentDataManager.class.getDeclaredField("_realtimeSegment");
+      realtimeSegmentField.setAccessible(true);
+      realtimeSegmentField.set(this, realtimeSegment);
+    }
+
+    public boolean isStreamConsumerClosed()
+        throws Exception {
+      Field streamConsumerClosedField = RealtimeSegmentDataManager.class.getDeclaredField("_streamConsumerClosed");
+      streamConsumerClosedField.setAccessible(true);
+      return ((AtomicBoolean) streamConsumerClosedField.get(this)).get();
     }
 
     public String getStopReason() {
@@ -966,7 +1589,8 @@ public class RealtimeSegmentDataManagerTest {
       return new PartitionConsumer();
     }
 
-    public SegmentBuildDescriptor invokeBuildForCommit(long leaseTime) {
+    public SegmentBuildDescriptor invokeBuildForCommit(long leaseTime)
+        throws SegmentBuildFailureException {
       super.buildSegmentForCommit(leaseTime);
       return getSegmentBuildDescriptor();
     }
@@ -978,11 +1602,15 @@ public class RealtimeSegmentDataManagerTest {
 
     private void terminateLoopIfNecessary() {
       if (_consumeOffsets.isEmpty() && _responses.isEmpty()) {
-        try {
-          _shouldStop.set(this, true);
-        } catch (Exception e) {
-          Assert.fail();
-        }
+        setShouldStop();
+      }
+    }
+
+    private void setShouldStop() {
+      try {
+        _shouldStop.set(this, true);
+      } catch (Exception e) {
+        Assert.fail();
       }
     }
 
@@ -1007,9 +1635,7 @@ public class RealtimeSegmentDataManagerTest {
 
     @Override
     protected SegmentCompletionProtocol.Response postSegmentConsumedMsg() {
-      SegmentCompletionProtocol.Response response = _responses.remove();
-      terminateLoopIfNecessary();
-      return response;
+      return _responses.remove();
     }
 
     @Override
@@ -1021,6 +1647,30 @@ public class RealtimeSegmentDataManagerTest {
     protected void postStopConsumedMsg(String reason) {
       _postConsumeStoppedCalled = true;
     }
+
+    public void invokePostStopConsumedMsg(String reason) {
+      super.postStopConsumedMsg(reason);
+    }
+
+    /// Runs the production stop() instead of this fake's override.
+    public void invokeRealStop()
+        throws InterruptedException {
+      super.stop();
+    }
+
+    @Override
+    SegmentCompletionProtocol.Response postSegmentStoppedConsuming(ConsumptionStopIndicator indicator) {
+      _postConsumeStoppedCalled = true;
+      _postConsumeStoppedAttempts++;
+      return new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(_stopConsumedResponseStatus));
+    }
+
+    @Override
+    protected void notifySegmentBuildFailedWithDeterministicError() {
+      _notifySegmentBuildFailedWithDeterministicErrorCalled = true;
+    }
+
 
     // TODO: Some of the tests rely on specific number of calls to the `now()` method in the SegmentDataManager.
     // This is not a good coding practice and makes the code very fragile. This needs to be fixed.
@@ -1038,19 +1688,39 @@ public class RealtimeSegmentDataManagerTest {
 
     @Override
     protected void hold() {
+      terminateLoopIfNecessary();
       _timeSupplier.add(5000L);
     }
 
     @Override
-    protected boolean buildSegmentAndReplace() {
+    protected boolean buildSegmentAndReplace(SegmentZKMetadata committedSegmentZKMetadata)
+        throws Exception {
+      terminateLoopIfNecessary();
       _buildAndReplaceCalled = true;
-      return true;
+      if (_useRealBuildAndReplace) {
+        return super.buildSegmentAndReplace(committedSegmentZKMetadata);
+      }
+      return !_failSegmentBuildAndReplace;
+    }
+
+    @Override
+    protected boolean isLocalSegmentCrcMatchingZk(SegmentZKMetadata committedSegmentZKMetadata) {
+      if (_useRealCrcCheck) {
+        return super.isLocalSegmentCrcMatchingZk(committedSegmentZKMetadata);
+      }
+      return _localSegmentCrcMatchesZk;
     }
 
     @Override
     protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
+      terminateLoopIfNecessary();
       _buildSegmentCalled = true;
       if (_failSegmentBuild) {
+        try {
+          _segmentBuildFailedWithDeterministicError.set(this, true);
+        } catch (Exception e) {
+          Assert.fail();
+        }
         return null;
       }
       if (!forCommit) {
@@ -1067,17 +1737,20 @@ public class RealtimeSegmentDataManagerTest {
 
     @Override
     protected boolean commitSegment(String controllerVipUrl) {
+      terminateLoopIfNecessary();
       _commitSegmentCalled = true;
       return true;
     }
 
     @Override
     protected void downloadSegmentAndReplace(SegmentZKMetadata metadata) {
+      terminateLoopIfNecessary();
       _downloadAndReplaceCalled = true;
     }
 
     @Override
     public void stop() {
+      setShouldStop();
       _timeSupplier.add(_stopWaitTimeMs);
     }
 
@@ -1087,6 +1760,10 @@ public class RealtimeSegmentDataManagerTest {
 
     public void setConsumeEndTime(long endTime) {
       setLong(endTime, "_consumeEndTime");
+    }
+
+    public long getConsumeEndTime() {
+      return getLong("_consumeEndTime");
     }
 
     public void setNumRowsConsumed(int numRows) {
@@ -1141,6 +1818,19 @@ public class RealtimeSegmentDataManagerTest {
       } catch (IllegalAccessException e) {
         Assert.fail();
       }
+    }
+
+    private long getLong(String fieldName) {
+      try {
+        Field field = RealtimeSegmentDataManager.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.getLong(this);
+      } catch (NoSuchFieldException e) {
+        Assert.fail();
+      } catch (IllegalAccessException e) {
+        Assert.fail();
+      }
+      throw new RuntimeException("Cannot get here");
     }
 
     private void setOffset(long value, String fieldName) {

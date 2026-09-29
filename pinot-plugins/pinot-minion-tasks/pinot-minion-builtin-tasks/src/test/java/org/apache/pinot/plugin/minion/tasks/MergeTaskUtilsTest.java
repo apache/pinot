@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,10 +88,10 @@ public class MergeTaskUtilsTest {
   public void testGetPartitionerConfigs() {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable")
         .setSegmentPartitionConfig(
-            new SegmentPartitionConfig(Collections.singletonMap("memberId", new ColumnPartitionConfig("murmur", 10))))
+            new SegmentPartitionConfig(Map.of("memberId", new ColumnPartitionConfig("murmur", 10))))
         .build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("memberId", DataType.LONG).build();
-    Map<String, String> taskConfig = Collections.emptyMap();
+    Map<String, String> taskConfig = Map.of();
 
     List<PartitionerConfig> partitionerConfigs = MergeTaskUtils.getPartitionerConfigs(tableConfig, schema, taskConfig);
     assertEquals(partitionerConfigs.size(), 1);
@@ -134,16 +133,16 @@ public class MergeTaskUtilsTest {
 
   @Test
   public void testGetMergeType() {
-    assertEquals(MergeTaskUtils.getMergeType(Collections.singletonMap(MergeTask.MERGE_TYPE_KEY, "concat")),
+    assertEquals(MergeTaskUtils.getMergeType(Map.of(MergeTask.MERGE_TYPE_KEY, "concat")),
         MergeType.CONCAT);
-    assertEquals(MergeTaskUtils.getMergeType(Collections.singletonMap(MergeTask.MERGE_TYPE_KEY, "Rollup")),
+    assertEquals(MergeTaskUtils.getMergeType(Map.of(MergeTask.MERGE_TYPE_KEY, "Rollup")),
         MergeType.ROLLUP);
-    assertEquals(MergeTaskUtils.getMergeType(Collections.singletonMap(MergeTask.MERGE_TYPE_KEY, "DeDuP")),
+    assertEquals(MergeTaskUtils.getMergeType(Map.of(MergeTask.MERGE_TYPE_KEY, "DeDuP")),
         MergeType.DEDUP);
-    assertNull(MergeTaskUtils.getMergeType(Collections.emptyMap()));
+    assertNull(MergeTaskUtils.getMergeType(Map.of()));
 
     try {
-      MergeTaskUtils.getMergeType(Collections.singletonMap(MergeTask.MERGE_TYPE_KEY, "unsupported"));
+      MergeTaskUtils.getMergeType(Map.of(MergeTask.MERGE_TYPE_KEY, "unsupported"));
       fail();
     } catch (IllegalArgumentException e) {
       // Expected
@@ -156,12 +155,19 @@ public class MergeTaskUtilsTest {
     taskConfig.put("colA.aggregationType", "sum");
     taskConfig.put("colB.aggregationType", "Min");
     taskConfig.put("colC.aggregationType", "MaX");
+    taskConfig.put("colE.aggregationType", "firstWithTime");
+    taskConfig.put("colF.aggregationType", "LastWithTime");
+    taskConfig.put("colG.aggregationType", "lastWithTime");
 
     Map<String, AggregationFunctionType> aggregationTypes = MergeTaskUtils.getAggregationTypes(taskConfig);
-    assertEquals(aggregationTypes.size(), 3);
+    assertEquals(aggregationTypes.size(), 6);
     assertEquals(aggregationTypes.get("colA"), AggregationFunctionType.SUM);
     assertEquals(aggregationTypes.get("colB"), AggregationFunctionType.MIN);
     assertEquals(aggregationTypes.get("colC"), AggregationFunctionType.MAX);
+    // "firstWithTime"/"lastWithTime" are parsed case-insensitively like any other aggregation type
+    assertEquals(aggregationTypes.get("colE"), AggregationFunctionType.FIRSTWITHTIME);
+    assertEquals(aggregationTypes.get("colF"), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationTypes.get("colG"), AggregationFunctionType.LASTWITHTIME);
 
     taskConfig.put("colD.aggregationType", "unsupported");
     try {
@@ -173,26 +179,49 @@ public class MergeTaskUtilsTest {
   }
 
   @Test
-  public void testGetAggregationFunctionParameters() {
-    Map<String, String> taskConfig = new HashMap<>();
-    taskConfig.put(MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX + "metricColumnA.param1", "value1");
-    taskConfig.put(MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX + "metricColumnA.param2", "value2");
-    taskConfig.put(MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX + "metricColumnB.param1", "value3");
-    taskConfig.put("otherPrefix.metricColumnC.param1", "value1");
-    taskConfig.put("aggregationFunction.metricColumnD.param2", "value2");
-    Map<String, Map<String, String>> result = MergeTaskUtils.getAggregationFunctionParameters(taskConfig);
-    assertEquals(result.size(), 2);
-    assertTrue(result.containsKey("metricColumnA"));
-    assertTrue(result.containsKey("metricColumnB"));
-    assertEquals(result.get("metricColumnA").get("param1"), "value1");
-    assertEquals(result.get("metricColumnA").get("param2"), "value2");
-    assertEquals(result.get("metricColumnB").get("param1"), "value3");
+  public void testValidateOrderSensitiveAggregation() {
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("dateTime").build();
+    Schema schema = new Schema.SchemaBuilder().addMetric("metricCol", DataType.LONG)
+        .addSingleValueDimension("dimensionCol", DataType.STRING)
+        .addDateTime("dateTime", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+
+    // Valid: order sensitive aggregation on a metric column with a resolvable time column
+    MergeTaskUtils.validateOrderSensitiveAggregation(tableConfig, schema, "metricCol", "firstWithTime");
+    MergeTaskUtils.validateOrderSensitiveAggregation(tableConfig, schema, "metricCol", "lastWithTime");
+
+    // No-op for non order sensitive aggregation types, even when the prerequisites do not hold
+    TableConfig tableConfigWithoutTimeColumn =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    MergeTaskUtils.validateOrderSensitiveAggregation(tableConfigWithoutTimeColumn, schema, "dimensionCol", "sum");
+
+    // Column not a metric column in schema
+    assertThrows(IllegalStateException.class,
+        () -> MergeTaskUtils.validateOrderSensitiveAggregation(tableConfig, schema, "dimensionCol", "firstWithTime"));
+
+    // Column not in schema
+    assertThrows(IllegalStateException.class,
+        () -> MergeTaskUtils.validateOrderSensitiveAggregation(tableConfig, schema, "missingCol", "lastWithTime"));
+
+    // Table has no time column
+    assertThrows(IllegalStateException.class, () -> MergeTaskUtils
+        .validateOrderSensitiveAggregation(tableConfigWithoutTimeColumn, schema, "metricCol", "firstWithTime"));
+
+    // Time column not a DateTime column in schema
+    Schema schemaWithoutTimeColumn = new Schema.SchemaBuilder().addMetric("metricCol", DataType.LONG).build();
+    assertThrows(IllegalStateException.class, () -> MergeTaskUtils
+        .validateOrderSensitiveAggregation(tableConfig, schemaWithoutTimeColumn, "metricCol", "lastWithTime"));
+
+    // Aggregation type must be parseable
+    assertThrows(IllegalArgumentException.class,
+        () -> MergeTaskUtils.validateOrderSensitiveAggregation(tableConfig, schema, "metricCol", "unsupported"));
   }
 
   @Test
   public void testGetSegmentConfig() {
     Map<String, String> taskConfig = new HashMap<>();
     taskConfig.put(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, "10000");
+    taskConfig.put(MergeTask.MAX_DISK_USAGE_PERCENTAGE, "80");
     taskConfig.put(MergeTask.SEGMENT_NAME_PREFIX_KEY, "myPrefix");
     taskConfig.put(MergeTask.SEGMENT_NAME_POSTFIX_KEY, "myPostfix");
     taskConfig.put(MergeTask.FIXED_SEGMENT_NAME_KEY, "mySegment");
@@ -204,11 +233,9 @@ public class MergeTaskUtilsTest {
     assertEquals(segmentConfig.getSegmentNamePostfix(), "myPostfix");
     assertEquals(segmentConfig.getFixedSegmentName(), "mySegment");
     assertEquals(segmentConfig.getIntermediateFileSizeThreshold(), 1000000000L);
-    assertEquals(segmentConfig.toString(),
-        "SegmentConfig{_maxNumRecordsPerSegment=10000, _segmentMapperFileSizeThresholdInBytes=1000000000, "
-            + "_segmentNamePrefix='myPrefix', _segmentNamePostfix='myPostfix', _fixedSegmentName='mySegment'}");
+    assertEquals(segmentConfig.getMaxDiskUsagePercentage(), 80);
 
-    segmentConfig = MergeTaskUtils.getSegmentConfig(Collections.emptyMap());
+    segmentConfig = MergeTaskUtils.getSegmentConfig(Map.of());
     assertEquals(segmentConfig.getMaxNumRecordsPerSegment(), SegmentConfig.DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT);
     assertNull(segmentConfig.getSegmentNamePrefix());
     assertNull(segmentConfig.getSegmentNamePostfix());
@@ -221,15 +248,15 @@ public class MergeTaskUtilsTest {
     assertNull(segmentZKMetadata.getCustomMap());
     assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
 
-    segmentZKMetadata.setCustomMap(Collections.emptyMap());
+    segmentZKMetadata.setCustomMap(Map.of());
     assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
 
     segmentZKMetadata.setCustomMap(
-        Collections.singletonMap(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "false"));
+        Map.of(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "false"));
     assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
 
     segmentZKMetadata.setCustomMap(
-        Collections.singletonMap(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "true"));
+        Map.of(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "true"));
     assertFalse(MergeTaskUtils.allowMerge(segmentZKMetadata));
   }
 }

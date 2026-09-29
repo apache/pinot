@@ -23,12 +23,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Manager for generic row files.
- */
+/// Manager for generic row files.
 public class GenericRowFileManager {
   public static final String OFFSET_FILE_NAME = "record.offset";
   public static final String DATA_FILE_NAME = "record.data";
@@ -38,43 +37,59 @@ public class GenericRowFileManager {
   private final List<FieldSpec> _fieldSpecs;
   private final boolean _includeNullFields;
   private final int _numSortFields;
+  private final boolean _hasOriginalTimeField;
 
   private GenericRowFileWriter _fileWriter;
   private GenericRowFileReader _fileReader;
 
   public GenericRowFileManager(File outputDir, List<FieldSpec> fieldSpecs, boolean includeNullFields,
       int numSortFields) {
+    this(outputDir, fieldSpecs, includeNullFields, numSortFields, false);
+  }
+
+  /// Creates the file manager. When `hasOriginalTimeField` is `true`, the last sort field must be the
+  /// hidden column ([TimeHandler#ORIGINAL_TIME_MS_COLUMN]) carrying the original (pre-rounding) time value,
+  /// appended by the mapper for order sensitive aggregations (FIRSTWITHTIME/LASTWITHTIME). The flag is carried
+  /// explicitly instead of being inferred from the column name, so that a schema column which happens to share the
+  /// name can never be mistaken for the hidden field.
+  public GenericRowFileManager(File outputDir, List<FieldSpec> fieldSpecs, boolean includeNullFields,
+      int numSortFields, boolean hasOriginalTimeField) {
+    if (hasOriginalTimeField) {
+      Preconditions.checkArgument(numSortFields > 0 && fieldSpecs.get(numSortFields - 1).getName()
+              .equals(TimeHandler.ORIGINAL_TIME_MS_COLUMN),
+          "The last sort field must be the hidden original time column: %s",
+          TimeHandler.ORIGINAL_TIME_MS_COLUMN);
+    }
     _offsetFile = new File(outputDir, OFFSET_FILE_NAME);
     _dataFile = new File(outputDir, DATA_FILE_NAME);
     _fieldSpecs = fieldSpecs;
     _includeNullFields = includeNullFields;
     _numSortFields = numSortFields;
+    _hasOriginalTimeField = hasOriginalTimeField;
   }
 
-  /**
-   * Returns the field specs for the files.
-   */
+  /// Returns the field specs for the files.
   public List<FieldSpec> getFieldSpecs() {
     return _fieldSpecs;
   }
 
-  /**
-   * Returns {@code true} if the file contains null fields, {@code false} otherwise.
-   */
+  /// Returns `true` if the file contains null fields, `false` otherwise.
   public boolean isIncludeNullFields() {
     return _includeNullFields;
   }
 
-  /**
-   * Returns the number of sort fields.
-   */
+  /// Returns the number of sort fields.
   public int getNumSortFields() {
     return _numSortFields;
   }
 
-  /**
-   * Returns the file writer. Creates one if not exists.
-   */
+  /// Returns `true` if the last sort field is the hidden column carrying the original (pre-rounding) time
+  /// value ([TimeHandler#ORIGINAL_TIME_MS_COLUMN]), `false` otherwise.
+  public boolean hasOriginalTimeField() {
+    return _hasOriginalTimeField;
+  }
+
+  /// Returns the file writer. Creates one if not exists.
   public GenericRowFileWriter getFileWriter()
       throws IOException {
     if (_fileWriter == null) {
@@ -85,9 +100,7 @@ public class GenericRowFileManager {
     return _fileWriter;
   }
 
-  /**
-   * Closes the file writer.
-   */
+  /// Closes the file writer.
   public void closeFileWriter()
       throws IOException {
     if (_fileWriter != null) {
@@ -96,9 +109,7 @@ public class GenericRowFileManager {
     }
   }
 
-  /**
-   * Returns the file reader. Creates one if not exists.
-   */
+  /// Returns the file reader. Creates one if not exists.
   public GenericRowFileReader getFileReader()
       throws IOException {
     if (_fileReader == null) {
@@ -109,9 +120,7 @@ public class GenericRowFileManager {
     return _fileReader;
   }
 
-  /**
-   * Closes the file reader.
-   */
+  /// Closes the file reader.
   public void closeFileReader()
       throws IOException {
     if (_fileReader != null) {
@@ -120,9 +129,7 @@ public class GenericRowFileManager {
     }
   }
 
-  /**
-   * Cleans up the files.
-   */
+  /// Cleans up the files.
   public void cleanUp()
       throws IOException {
     closeFileWriter();

@@ -29,10 +29,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * {@link SegmentCreationDataSource} that uses a
- * {@link RecordReader} as the underlying data source.
- */
+/// [SegmentCreationDataSource] that uses a
+/// [RecordReader] as the underlying data source.
 // TODO: make it Closeable so that resource in record reader can be released
 public class RecordReaderSegmentCreationDataSource implements SegmentCreationDataSource {
   private static final Logger LOGGER = LoggerFactory.getLogger(RecordReaderSegmentCreationDataSource.class);
@@ -62,24 +60,22 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
           statsCollectorConfig.getTableConfig().getIngestionConfig() != null && statsCollectorConfig.getTableConfig()
               .getIngestionConfig().isContinueOnError();
       GenericRow reuse = new GenericRow();
-      TransformPipeline.Result reusedResult = new TransformPipeline.Result();
       while (_recordReader.hasNext()) {
         reuse.clear();
         try {
           reuse = _recordReader.next(reuse);
-          transformPipeline.processRow(reuse, reusedResult);
-          for (GenericRow row : reusedResult.getTransformedRows()) {
+          TransformPipeline.Result result = transformPipeline.processRow(reuse);
+          for (GenericRow row : result.getTransformedRows()) {
             collector.collectRow(row);
           }
         } catch (Exception e) {
           if (!continueOnError) {
             throw new RuntimeException("Caught exception while reading data", e);
-          } else {
-            LOGGER.debug("Caught exception while reading data", e);
           }
+          LOGGER.debug("Caught exception while reading data", e);
         }
       }
-
+      transformPipeline.reportStats();
       collector.build();
       return collector;
     } catch (Exception e) {

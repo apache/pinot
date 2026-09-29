@@ -61,13 +61,13 @@ public class PredicateEvaluatorTestUtils {
 
   public static void fillRandom(String[] randomValues, int maxStringLength) {
     for (int i = 0; i < randomValues.length; i++) {
-      randomValues[i] = RandomStringUtils.random(maxStringLength);
+      randomValues[i] = RandomStringUtils.secure().next(maxStringLength);
     }
   }
 
   public static void fillRandom(byte[][] randomValues, int maxStringLength) {
     for (int i = 0; i < randomValues.length; i++) {
-      randomValues[i] = RandomStringUtils.random(maxStringLength).getBytes();
+      randomValues[i] = RandomStringUtils.secure().next(maxStringLength).getBytes();
     }
   }
 
@@ -76,7 +76,7 @@ public class PredicateEvaluatorTestUtils {
     for (int i = 0; i < randomValues.length; i++) {
       Object[] randomPlaceholderValues = new String[numPlaceholders];
       for (int j = 0; j < numPlaceholders; j++) {
-        randomPlaceholderValues[j] = RandomStringUtils.randomAlphanumeric(maxStringLength);
+        randomPlaceholderValues[j] = RandomStringUtils.secure().nextAlphanumeric(maxStringLength);
       }
       randomValues[i] = String.format(jsonStringTemplate, randomPlaceholderValues);
     }

@@ -19,27 +19,66 @@
 package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import java.util.Arrays;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
+import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
 
 
-public class ArrayAggDistinctStringFunction extends BaseArrayAggStringFunction<ObjectOpenHashSet<String>> {
+public class ArrayAggDistinctStringFunction extends BaseArrayAggStringFunction<ObjectSet<String>> {
   public ArrayAggDistinctStringFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
+  }
+
+  @Override
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    return true;
   }
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    String[] value = blockValSet.getStringValuesSV();
-    ObjectOpenHashSet<String> valueArray = new ObjectOpenHashSet<>(length);
-    forEachNotNull(length, blockValSet, (from, to) -> valueArray.addAll(Arrays.asList(value).subList(from, to)));
-    aggregationResultHolder.setValue(valueArray);
+    ObjectOpenHashSet<String> valueSet =
+        aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult()
+            : new ObjectOpenHashSet<>(length);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set to merge in.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueSet.addAll(ObjectSerDeUtils.STRING_SET_SER_DE.deserialize(starTreeSetPayload(bytesValues[i],
+              ElementType.STRING)));
+        }
+      });
+      aggregationResultHolder.setValue(valueSet);
+      return;
+    }
+    if (blockValSet.isSingleValue()) {
+      String[] values = blockValSet.getStringValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueSet.add(values[i]);
+        }
+      });
+    } else {
+      String[][] valuesArray = blockValSet.getStringValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          String[] values = valuesArray[i];
+          for (String v : values) {
+            valueSet.add(v);
+          }
+        }
+      });
+    }
+    aggregationResultHolder.setValue(valueSet);
   }
 
   @Override
@@ -50,5 +89,16 @@ public class ArrayAggDistinctStringFunction extends BaseArrayAggStringFunction<O
       resultHolder.setValueForKey(groupKey, valueSet);
     }
     valueSet.add(value);
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(ObjectSet<String> stringSet) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.StringSet.getValue(),
+        ObjectSerDeUtils.STRING_SET_SER_DE.serialize(stringSet));
+  }
+
+  @Override
+  public ObjectSet<String> deserializeIntermediateResult(CustomObject customObject) {
+    return (ObjectSet<String>) ObjectSerDeUtils.STRING_SET_SER_DE.deserialize(customObject.getBuffer());
   }
 }

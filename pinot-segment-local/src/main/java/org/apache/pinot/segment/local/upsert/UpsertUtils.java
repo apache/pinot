@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -56,6 +57,35 @@ public class UpsertUtils {
         : (useEmptyForNull ? new MutableRoaringBitmap() : null);
   }
 
+  /// Unlike [#getQueryableDocIdsSnapshotFromSegment], never falls back to preferring queryable docs.
+  @Nullable
+  public static MutableRoaringBitmap getValidDocIdsSnapshotFromSegment(IndexSegment segment) {
+    return getValidDocIdsSnapshotFromSegment(segment, false);
+  }
+
+  /// Shared by `ImmutableSegmentImpl`/`MutableSegmentImpl`'s `hasNoValidDocs()`. Mirrors
+  /// `hasNoQueryableDocs()`'s consistency-mode-aware/live-fallback split, against the valid-docs cache instead.
+  public static boolean hasNoValidDocs(@Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      IndexSegment segment) {
+    if (partitionUpsertMetadataManager == null) {
+      return false;
+    }
+    UpsertViewManager viewManager = partitionUpsertMetadataManager.getUpsertViewManager();
+    if (viewManager != null) {
+      MutableRoaringBitmap validDocIdsSnapshot = viewManager.getValidDocIdsSnapshot(segment);
+      return validDocIdsSnapshot != null && validDocIdsSnapshot.isEmpty();
+    }
+    ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+    return validDocIds != null && validDocIds.isEmpty();
+  }
+
+  @Nullable
+  public static MutableRoaringBitmap getValidDocIdsSnapshotFromSegment(IndexSegment segment,
+      boolean useEmptyForNull) {
+    ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+    return validDocIds != null ? validDocIds.getMutableRoaringBitmap()
+        : (useEmptyForNull ? new MutableRoaringBitmap() : null);
+  }
 
   public static void doReplaceDocId(ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {
@@ -86,9 +116,7 @@ public class UpsertUtils {
     }
   }
 
-  /**
-   * Returns an iterator of {@link RecordInfo} for all the documents from the segment.
-   */
+  /// Returns an iterator of [RecordInfo] for all the documents from the segment.
   public static Iterator<RecordInfo> getRecordInfoIterator(RecordInfoReader recordInfoReader, int numDocs) {
     return new Iterator<RecordInfo>() {
       private int _docId = 0;
@@ -105,9 +133,7 @@ public class UpsertUtils {
     };
   }
 
-  /**
-   * Returns an iterator of {@link RecordInfo} for the valid documents from the segment.
-   */
+  /// Returns an iterator of [RecordInfo] for the valid documents from the segment.
   public static Iterator<RecordInfo> getRecordInfoIterator(RecordInfoReader recordInfoReader,
       MutableRoaringBitmap validDocIds) {
     return new Iterator<RecordInfo>() {
@@ -125,14 +151,11 @@ public class UpsertUtils {
     };
   }
 
-  /**
-   * Returns an iterator of {@link PrimaryKey} for the valid documents from the segment.
-   */
+  /// Returns an iterator of [PrimaryKey] for the valid documents from the segment.
   public static Iterator<PrimaryKey> getPrimaryKeyIterator(PrimaryKeyReader primaryKeyReader,
       MutableRoaringBitmap validDocIds) {
     return new Iterator<>() {
       private final PeekableIntIterator _docIdIterator = validDocIds.getIntIterator();
-
       @Override
       public boolean hasNext() {
         return _docIdIterator.hasNext();
@@ -145,9 +168,7 @@ public class UpsertUtils {
     };
   }
 
-  /**
-   * Returns an iterator of {@link PrimaryKey} for all the documents from the segment.
-   */
+  /// Returns an iterator of [PrimaryKey] for all the documents from the segment.
   public static Iterator<PrimaryKey> getPrimaryKeyIterator(PrimaryKeyReader primaryKeyReader,
       int numDocs) {
     return new Iterator<>() {
@@ -161,6 +182,44 @@ public class UpsertUtils {
       @Override
       public PrimaryKey next() {
         return primaryKeyReader.getPrimaryKey(_docId++);
+      }
+    };
+  }
+
+  public static Iterator<Map.Entry<Integer, PrimaryKey>> getRecordIterator(PrimaryKeyReader primaryKeyReader,
+      MutableRoaringBitmap validDocIds) {
+
+    return new Iterator<>() {
+      private final PeekableIntIterator _docIdIterator = validDocIds.getIntIterator();
+
+      @Override
+      public boolean hasNext() {
+        return _docIdIterator.hasNext();
+      }
+
+      @Override
+      public Map.Entry<Integer, PrimaryKey> next() {
+        int docId = _docIdIterator.next();
+        return Map.entry(docId, primaryKeyReader.getPrimaryKey(docId));
+      }
+    };
+  }
+
+  /// Returns an iterator of docId and [PrimaryKey] for all the documents from the segment.
+  public static Iterator<Map.Entry<Integer, PrimaryKey>> getRecordIterator(PrimaryKeyReader primaryKeyReader,
+      int numDocs) {
+    return new Iterator<>() {
+      private int _docId = 0;
+
+      @Override
+      public boolean hasNext() {
+        return _docId < numDocs;
+      }
+
+      @Override
+      public Map.Entry<Integer, PrimaryKey> next() {
+        int docId = _docId++;
+        return Map.entry(docId, primaryKeyReader.getPrimaryKey(docId));
       }
     };
   }

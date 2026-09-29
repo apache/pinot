@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Closer;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -31,6 +29,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -58,21 +57,19 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test for GcsPinotFS
- *
- * Credentials to connect to gcs must be supplied via environment variables.
- * The following environment variables are used to connect to gcs:
- * GOOGLE_APPLICATION_CREDENTIALS: path to gcp json key file
- * GCP_PROJECT: the name of the project to use
- * GCS_BUCKET: the name of the bucket to use
- *
- * The reason we do not use RemoteStorageHelper is that create bucket
- * permissions are required. Pinot only needs to test creating objects.
- * The bucket should already exist.
- *
- * If credentials are not supplied then all tests are skipped.
- */
+/// Integration test for GcsPinotFS
+///
+/// Credentials to connect to gcs must be supplied via environment variables.
+/// The following environment variables are used to connect to gcs:
+/// GOOGLE_APPLICATION_CREDENTIALS: path to gcp json key file
+/// GCP_PROJECT: the name of the project to use
+/// GCS_BUCKET: the name of the bucket to use
+///
+/// The reason we do not use RemoteStorageHelper is that create bucket
+/// permissions are required. Pinot only needs to test creating objects.
+/// The bucket should already exist.
+///
+/// If credentials are not supplied then all tests are skipped.
 @Test(singleThreaded = true)
 public class GcsPinotFSTest {
   private static final String DATA_DIR_PREFIX = "testing-data";
@@ -92,8 +89,7 @@ public class GcsPinotFSTest {
     _bucket = System.getenv("GCS_BUCKET");
     if (_keyFile != null && _projectId != null && _bucket != null) {
       _pinotFS = new GcsPinotFS();
-      _pinotFS.init(new PinotConfiguration(
-          ImmutableMap.<String, Object>builder().put(PROJECT_ID, _projectId).put(GCP_KEY, _keyFile).build()));
+      _pinotFS.init(new PinotConfiguration(Map.of(PROJECT_ID, _projectId, GCP_KEY, _keyFile)));
     }
   }
 
@@ -138,13 +134,11 @@ public class GcsPinotFSTest {
     return _dataDir.resolve("dir-" + randomUUID());
   }
 
-  /**
-   * Resolved gcs uri does not contain trailing delimiter, e.g. "/",
-   * as the GcsUri.resolve() method uses Path.resolve() semantics.
-   *
-   * @param gcsUri
-   * @return path with trailing delimiter
-   */
+  /// Resolved gcs uri does not contain trailing delimiter, e.g. "/",
+  /// as the GcsUri.resolve() method uses Path.resolve() semantics.
+  ///
+  /// @param gcsUri
+  /// @return path with trailing delimiter
   private static GcsUri appendSlash(GcsUri gcsUri) {
     return createGcsUri(gcsUri.getBucketName(), gcsUri.getPrefix());
   }
@@ -244,7 +238,7 @@ public class GcsPinotFSTest {
     Set<GcsUri> expectedElementsCopy = new HashSet<>();
     String directoryName = Paths.get(gcsDirectoryUri.getPath()).getFileName().toString();
     String directoryCopyName = Paths.get(gcsDirectoryUriCopy.getPath()).getFileName().toString();
-    for (GcsUri element : ImmutableList.copyOf(expectedElements)) {
+    for (GcsUri element : List.copyOf(expectedElements)) {
       expectedElementsCopy.add(
           createGcsUri(element.getBucketName(), element.getPath().replace(directoryName, directoryCopyName)));
     }

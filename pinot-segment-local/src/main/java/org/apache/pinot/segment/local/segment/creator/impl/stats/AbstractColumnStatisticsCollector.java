@@ -20,73 +20,116 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import com.google.common.base.Preconditions;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * This class in initialized per column and all the data is
- * sent to it before actual indexes are created
- * the job of this class is to collect
- * unique elements
- * record cardinality
- * compute min
- * compute max
- * see if column isSorted
- */
+/// This class in initialized per column and all the data is
+/// sent to it before actual indexes are created
+/// the job of this class is to collect
+/// unique elements
+/// record cardinality
+/// compute min
+/// compute max
+/// see if column isSorted
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class AbstractColumnStatisticsCollector implements ColumnStatistics {
   protected static final int INITIAL_HASH_SET_SIZE = 1000;
   protected final FieldSpec _fieldSpec;
+  protected final DataType _storedType;
   protected final FieldConfig _fieldConfig;
+  protected final PartitionFunction _partitionFunction;
+  protected final Set<Integer> _partitions;
 
-  private final Map<String, String> _partitionFunctionConfig;
-  private final PartitionFunction _partitionFunction;
-  private final int _numPartitions;
-  private final Set<Integer> _partitions;
-
+  protected int _totalDocs = 0;
   protected int _totalNumberOfEntries = 0;
   protected int _maxNumberOfMultiValues = 0;
-  protected boolean _sorted = true;
-  private Comparable _previousValue = null;
+  protected boolean _sorted;
+  protected Comparable _previousValue = null;
 
   public AbstractColumnStatisticsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
-    _fieldSpec = statsCollectorConfig.getFieldSpecForColumn(column);
-    _fieldConfig = statsCollectorConfig.getFieldConfigForColumn(column);
-    Preconditions.checkArgument(_fieldSpec != null, "Failed to find column: %s", column);
-    if (!_fieldSpec.isSingleValueField()) {
-      _sorted = false;
-    }
-
-    String partitionFunctionName = statsCollectorConfig.getPartitionFunctionName(column);
-    _numPartitions = statsCollectorConfig.getNumPartitions(column);
-    _partitionFunctionConfig = statsCollectorConfig.getPartitionFunctionConfig(column);
-    _partitionFunction =
-        (partitionFunctionName != null) ? PartitionFunctionFactory.getPartitionFunction(partitionFunctionName,
-            _numPartitions, _partitionFunctionConfig) : null;
-    if (_partitionFunction != null) {
-      _partitions = new HashSet<>();
-    } else {
-      _partitions = null;
-    }
+    this(getRequiredFieldSpec(column, statsCollectorConfig),
+        statsCollectorConfig.getFieldConfigForColumn(column),
+        statsCollectorConfig.getPartitionFunction(column));
   }
 
-  public int getMaxNumberOfMultiValues() {
-    return _maxNumberOfMultiValues;
+  /// Constructs a collector directly from a [FieldSpec], without a [StatsCollectorConfig]. Lets callers
+  /// that operate outside schema-driven segment generation (e.g. OPEN_STRUCT materialized child columns,
+  /// whose synthetic columns exist in no schema) reuse the standard stats collectors.
+  public AbstractColumnStatisticsCollector(FieldSpec fieldSpec, @Nullable FieldConfig fieldConfig,
+      @Nullable PartitionFunction partitionFunction) {
+    _fieldSpec = fieldSpec;
+    _storedType = fieldSpec.getDataType().getStoredType();
+    _sorted = fieldSpec.isSingleValueField();
+    _fieldConfig = fieldConfig;
+    _partitionFunction = partitionFunction;
+    _partitions = partitionFunction != null ? new HashSet<>() : null;
   }
 
-  protected void addressSorted(Comparable entry) {
-    if (_sorted) {
-      _sorted = _previousValue == null || entry.compareTo(_previousValue) >= 0;
-      _previousValue = entry;
-    }
+  private static FieldSpec getRequiredFieldSpec(String column, StatsCollectorConfig statsCollectorConfig) {
+    FieldSpec fieldSpec = statsCollectorConfig.getFieldSpecForColumn(column);
+    Preconditions.checkArgument(fieldSpec != null, "Failed to find column: %s", column);
+    return fieldSpec;
+  }
+
+  /// Collects statistics for the given entry (entry can be either single-valued or multi-valued).
+  public abstract void collect(Object entry);
+
+  // Collects statistics for primitive values
+  // Default implementation boxes the value for backward compatibility.
+  public void collect(int value) {
+    collect((Object) value);
+  }
+
+  public void collect(long value) {
+    collect((Object) value);
+  }
+
+  public void collect(float value) {
+    collect((Object) value);
+  }
+
+  public void collect(double value) {
+    collect((Object) value);
+  }
+
+  public void collect(int[] values) {
+    collect((Object) values);
+  }
+
+  public void collect(long[] values) {
+    collect((Object) values);
+  }
+
+  public void collect(float[] values) {
+    collect((Object) values);
+  }
+
+  public void collect(double[] values) {
+    collect((Object) values);
+  }
+
+  public abstract void seal();
+
+  @Override
+  public FieldSpec getFieldSpec() {
+    return _fieldSpec;
+  }
+
+  @Override
+  public DataType getStoredType() {
+    return _storedType;
+  }
+
+  @Override
+  public int getTotalDocs() {
+    return _totalDocs;
   }
 
   @Override
@@ -94,81 +137,48 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
     return _sorted;
   }
 
-  /**
-   * Collects statistics for the given entry (entry can be either single-valued or multi-valued).
-   */
-  public abstract void collect(Object entry);
-
-  public int getLengthOfShortestElement() {
-    return -1;
+  @Override
+  public int getTotalNumberOfEntries() {
+    return _totalNumberOfEntries;
   }
 
-  public int getLengthOfLargestElement() {
-    return -1;
+  @Override
+  public int getMaxNumberOfMultiValues() {
+    return _maxNumberOfMultiValues;
   }
 
-  public abstract void seal();
-
-  /**
-   * Returns the {@link PartitionFunction} for the column.
-   * @return Partition function for the column.
-   */
   @Nullable
+  @Override
   public PartitionFunction getPartitionFunction() {
     return _partitionFunction;
   }
 
-  /**
-   * Returns the number of partitions for this column.
-   *
-   * @return Number of partitions.
-   */
-  public int getNumPartitions() {
-    return _numPartitions;
-  }
-
-  /**
-   * Returns the {@link PartitionFunction}'s functionConfig for the column.
-   *
-   * @return Partition Function config for the column.
-   */
   @Nullable
-  public Map<String, String> getPartitionFunctionConfig() {
-    return _partitionFunctionConfig;
-  }
-
-  /**
-   * Returns the partitions within which the column values exist.
-   *
-   * @return List of ranges for the column values.
-   */
-  @Nullable
+  @Override
   public Set<Integer> getPartitions() {
     return _partitions;
   }
 
-  protected boolean isPartitionEnabled() {
-    return _partitionFunction != null;
-  }
-
-  /**
-   * Updates the partition range based on the partition of the given value.
-   *
-   * @param value Column value.
-   */
-  protected void updatePartition(String value) {
-    _partitions.add(_partitionFunction.getPartition(value));
-  }
-
-  protected void updateTotalNumberOfEntries(Object[] entries) {
-    _totalNumberOfEntries += entries.length;
+  protected void addressSorted(Comparable value) {
+    if (_sorted) {
+      _sorted = _previousValue == null || value.compareTo(_previousValue) >= 0;
+      _previousValue = value;
+    }
   }
 
   protected void updateTotalNumberOfEntries(int newEntries) {
     _totalNumberOfEntries += newEntries;
   }
 
-  public int getTotalNumberOfEntries() {
-    return _totalNumberOfEntries;
+  protected void updateTotalNumberOfEntries(Object[] entries) {
+    _totalNumberOfEntries += entries.length;
+  }
+
+  protected boolean isPartitionEnabled() {
+    return _partitionFunction != null;
+  }
+
+  protected void updatePartition(String value) {
+    _partitions.add(_partitionFunction.getPartition(value));
   }
 }

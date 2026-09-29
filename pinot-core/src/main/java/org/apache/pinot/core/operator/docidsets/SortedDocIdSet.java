@@ -42,4 +42,12 @@ public final class SortedDocIdSet implements BlockDocIdSet {
   public long getNumEntriesScannedInFilter() {
     return 0L;
   }
+
+  @Override
+  public BlockDocIdSet getOptimizedDocIdSet() {
+    if (_docIdRanges.isEmpty()) {
+      return EmptyDocIdSet.getInstance();
+    }
+    return this;
+  }
 }

@@ -31,9 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Class for handling lead controller assignments given the table names. This should be created at controller startup.
- */
+/// Class for handling lead controller assignments given the table names. This should be created at controller startup.
 @ThreadSafe
 public class LeadControllerManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerManager.class);
@@ -94,12 +92,10 @@ public class LeadControllerManager {
     };
   }
 
-  /**
-   * Checks whether the current controller is the leader for the given table. Return true if current controller is
-   * the leader for this table.
-   * Otherwise check whether the current controller is helix leader if the resource is disabled.
-   * @param tableName table name with/without table type.
-   */
+  /// Checks whether the current controller is the leader for the given table. Return true if current controller is
+  /// the leader for this table.
+  /// Otherwise check whether the current controller is helix leader if the resource is disabled.
+  /// @param tableName table name with/without table type.
   public boolean isLeaderForTable(String tableName) {
     if (_isLeadControllerResourceEnabled) {
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
@@ -111,11 +107,9 @@ public class LeadControllerManager {
     }
   }
 
-  /**
-   * Given a partition name, marks current controller as lead controller for this partition by caching the partition
-   * id to current controller.
-   * @param partitionName partition name in lead controller resource, e.g. leadControllerResource_0.
-   */
+  /// Given a partition name, marks current controller as lead controller for this partition by caching the partition
+  /// id to current controller.
+  /// @param partitionName partition name in lead controller resource, e.g. leadControllerResource_0.
   public synchronized void addPartitionLeader(String partitionName) {
     LOGGER.info("Add Partition: {} to LeadControllerManager", partitionName);
     int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
@@ -124,11 +118,9 @@ public class LeadControllerManager {
         .setValueOfGlobalGauge(ControllerGauge.CONTROLLER_LEADER_PARTITION_COUNT, _leadForPartitions.size());
   }
 
-  /**
-   * Given a partition name, removes current controller as lead controller for this partition by removing the
-   * partition id from current controller.
-   * @param partitionName partition name in lead controller resource, e.g. leadControllerResource_0.
-   */
+  /// Given a partition name, removes current controller as lead controller for this partition by removing the
+  /// partition id from current controller.
+  /// @param partitionName partition name in lead controller resource, e.g. leadControllerResource_0.
   public synchronized void removePartitionLeader(String partitionName) {
     LOGGER.info("Remove Partition: {} from LeadControllerManager", partitionName);
     int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
@@ -137,9 +129,7 @@ public class LeadControllerManager {
         .setValueOfGlobalGauge(ControllerGauge.CONTROLLER_LEADER_PARTITION_COUNT, _leadForPartitions.size());
   }
 
-  /**
-   * Checks from ZK if the current controller host is Helix cluster leader.
-   */
+  /// Checks from ZK if the current controller host is Helix cluster leader.
   private boolean isHelixLeader() {
     try {
       String helixLeaderInstanceId = LeadControllerUtils.getHelixClusterLeader(_helixManager);
@@ -154,18 +144,14 @@ public class LeadControllerManager {
     }
   }
 
-  /**
-   * Starts the fetching thread to actively fetch helix leadership and resource config of lead controller resource.
-   */
+  /// Starts the fetching thread to actively fetch helix leadership and resource config of lead controller resource.
   public synchronized void start() {
     _controllerLeadershipFetchingThread.start();
   }
 
-  /**
-   * Marks the cached indices invalid and isShuttingDown to be true.
-   * Adding the synchronized block here and in the following callback methods
-   * to make sure that {@link HelixManager} won't be closed when the callback changes happened.
-   */
+  /// Marks the cached indices invalid and isShuttingDown to be true.
+  /// Adding the synchronized block here and in the following callback methods
+  /// to make sure that [HelixManager] won't be closed when the callback changes happened.
   public void stop() {
     synchronized (this) {
       _isShuttingDown = true;
@@ -181,14 +167,12 @@ public class LeadControllerManager {
     }
   }
 
-  /**
-   * Callback on changes in the controller. Should be registered to the controller callback. This callback is not
-   * needed when the resource is enabled.
-   * However, the resource can be disabled sometime while the cluster is in operation, so we keep it here. Plus, it
-   * does not add much overhead.
-   * At some point in future when we stop supporting the disabled resource, we will remove this line altogether and
-   * the logic that goes with it.
-   */
+  /// Callback on changes in the controller. Should be registered to the controller callback. This callback is not
+  /// needed when the resource is enabled.
+  /// However, the resource can be disabled sometime while the cluster is in operation, so we keep it here. Plus, it
+  /// does not add much overhead.
+  /// At some point in future when we stop supporting the disabled resource, we will remove this line altogether and
+  /// the logic that goes with it.
   synchronized void onHelixControllerChange() {
     if (_isShuttingDown) {
       return;
@@ -212,9 +196,7 @@ public class LeadControllerManager {
     }
   }
 
-  /**
-   * Callback on changes in resource config.
-   */
+  /// Callback on changes in resource config.
   synchronized void onResourceConfigChange() {
     if (_isShuttingDown) {
       return;

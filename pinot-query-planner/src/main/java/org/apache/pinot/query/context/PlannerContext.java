@@ -18,28 +18,36 @@
  */
 package org.apache.pinot.query.context;
 
-import java.util.Collections;
+import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import org.apache.calcite.plan.Contexts;
+import javax.annotation.Nullable;
+import org.apache.calcite.plan.Context;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.hep.HepProgram;
+import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.PlannerImpl;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.tools.FrameworkConfig;
+import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.validate.Validator;
 
 
-/**
- * PlannerContext is an object that holds all contextual information during planning phase.
- *
- * TODO: currently we don't support option or query rewrite.
- * It is used to hold per query context for query planning, which cannot be shared across queries.
- */
-public class PlannerContext implements AutoCloseable {
+/// Holds all per-query contextual information used during the planning phase.
+///
+/// This class implements [Context] so that Calcite rules can retrieve it directly from the
+/// planner: `call.getPlanner().getContext().unwrap(PlannerContext.class)`. Both the opt planner
+/// and the trait planner expose this instance as their context.
+///
+/// Callers may also unwrap [QueryEnvironment.Config] to access broker-wide defaults:
+/// `call.getPlanner().getContext().unwrap(QueryEnvironment.Config.class)`.
+public class PlannerContext implements AutoCloseable, Context {
   private final PlannerImpl _planner;
 
   private final SqlValidator _validator;
@@ -47,15 +55,52 @@ public class PlannerContext implements AutoCloseable {
   private final RelOptPlanner _relOptPlanner;
   private final LogicalPlanner _relTraitPlanner;
 
-  private Map<String, String> _options;
+  private final Map<String, String> _options;
+  private final QueryEnvironment.Config _envConfig;
+  private final Map<String, String> _plannerOutput;
+  private final SqlExplainFormat _sqlExplainFormat;
+  @Nullable
+  private final PhysicalPlannerContext _physicalPlannerContext;
+  /// Set by the approximate aggregation rewrite rule when it rewrites at least one aggregation, so that the broker
+  /// can report on the response that the results are approximate. Written during planning, which is single threaded
+  /// for a query, and read after planning completes.
+  private boolean _approximateFunctionApplied;
 
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
-      HepProgram optProgram, HepProgram traitProgram) {
+      HepProgram optProgram, HepProgram traitProgram, Map<String, String> options, QueryEnvironment.Config envConfig,
+      SqlExplainFormat sqlExplainFormat, @Nullable PhysicalPlannerContext physicalPlannerContext) {
     _planner = new PlannerImpl(config);
     _validator = new Validator(config.getOperatorTable(), catalogReader, typeFactory);
-    _relOptPlanner = new LogicalPlanner(optProgram, Contexts.EMPTY_CONTEXT, config.getTraitDefs());
-    _relTraitPlanner = new LogicalPlanner(traitProgram, Contexts.EMPTY_CONTEXT,
-        Collections.singletonList(RelDistributionTraitDef.INSTANCE));
+    _options = options;
+    _envConfig = envConfig;
+    _relOptPlanner = new LogicalPlanner(optProgram, this, config.getTraitDefs());
+    _relTraitPlanner = new LogicalPlanner(traitProgram, this,
+        List.of(RelDistributionTraitDef.INSTANCE));
+    _plannerOutput = new HashMap<>();
+    _sqlExplainFormat = sqlExplainFormat;
+    _physicalPlannerContext = physicalPlannerContext;
+  }
+
+  /// Test factory: creates a minimal [PlannerContext] without going through
+  /// [org.apache.pinot.query.QueryEnvironment], suitable for unit tests.
+  @VisibleForTesting
+  public static PlannerContext forTesting(Map<String, String> options, QueryEnvironment.Config envConfig) {
+    return new PlannerContext(options, envConfig);
+  }
+
+  /// Minimal constructor for use in unit tests. Creates no-op planners backed by an empty HEP program.
+  @VisibleForTesting
+  PlannerContext(Map<String, String> options, QueryEnvironment.Config envConfig) {
+    _planner = null;
+    _validator = null;
+    _options = options;
+    _envConfig = envConfig;
+    HepProgram emptyProgram = new HepProgramBuilder().build();
+    _relOptPlanner = new LogicalPlanner(emptyProgram, this);
+    _relTraitPlanner = new LogicalPlanner(emptyProgram, this);
+    _plannerOutput = new HashMap<>();
+    _sqlExplainFormat = null;
+    _physicalPlannerContext = null;
   }
 
   public PlannerImpl getPlanner() {
@@ -74,16 +119,60 @@ public class PlannerContext implements AutoCloseable {
     return _relTraitPlanner;
   }
 
-  public void setOptions(Map<String, String> options) {
-    _options = options;
-  }
-
   public Map<String, String> getOptions() {
     return _options;
   }
 
+  public QueryEnvironment.Config getEnvConfig() {
+    return _envConfig;
+  }
+
+  /// Records that an exact aggregation was rewritten into its approximate counterpart.
+  public void setApproximateFunctionApplied() {
+    _approximateFunctionApplied = true;
+  }
+
+  /// Returns whether any exact aggregation was rewritten into its approximate counterpart while planning this query.
+  public boolean isApproximateFunctionApplied() {
+    return _approximateFunctionApplied;
+  }
+
+  /// Unwraps this context. Returns `this` when asked for [PlannerContext] or
+  /// [Context], and delegates to [#_envConfig] when asked for
+  /// [QueryEnvironment.Config] so that existing rules remain compatible.
+  @Override
+  @Nullable
+  public <C> C unwrap(Class<C> clazz) {
+    if (clazz.isInstance(this)) {
+      return clazz.cast(this);
+    }
+    if (clazz.isInstance(_envConfig)) {
+      return clazz.cast(_envConfig);
+    }
+    return null;
+  }
+
   @Override
   public void close() {
-    _planner.close();
+    if (_planner != null) {
+      _planner.close();
+    }
+  }
+
+  public Map<String, String> getPlannerOutput() {
+    return _plannerOutput;
+  }
+
+  public SqlExplainFormat getSqlExplainFormat() {
+    return _sqlExplainFormat;
+  }
+
+  @Nullable
+  public PhysicalPlannerContext getPhysicalPlannerContext() {
+    return _physicalPlannerContext;
+  }
+
+  public boolean isUsePhysicalOptimizer() {
+    return _physicalPlannerContext != null;
   }
 }

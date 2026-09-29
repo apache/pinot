@@ -23,14 +23,10 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * Interface for filter optimizers.
- * TODO: Support AlwaysTrueFilter and AlwaysFalseFilter
- */
+/// Interface for filter optimizers.
+/// TODO: Support AlwaysTrueFilter and AlwaysFalseFilter
 public interface FilterOptimizer {
 
-  /**
-   * Optimizes the given filter, returns the optimized filter.
-   */
+  /// Optimizes the given filter, returns the optimized filter.
   Expression optimize(Expression filterExpression, @Nullable Schema schema);
 }

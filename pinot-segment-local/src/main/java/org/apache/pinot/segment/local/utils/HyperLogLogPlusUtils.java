@@ -25,17 +25,13 @@ public class HyperLogLogPlusUtils {
   private HyperLogLogPlusUtils() {
   }
 
-  /**
-   * Returns the byte size of the given HyperLogLog.
-   */
+  /// Returns the byte size of the given HyperLogLog.
   public static int byteSize(HyperLogLogPlus value) {
     // 8 bytes header (p, sp, & register set size) & register set data
     return value.sizeof() + 3 * Integer.BYTES;
   }
 
-  /**
-   * Returns the byte size of HyperLogLogPlus of a given p and sp.
-   */
+  /// Returns the byte size of HyperLogLogPlus of a given p and sp.
   public static int byteSize(int p, int sp) {
     // 8 bytes header (p & sp) & register set data
     return new HyperLogLogPlus(p, sp).sizeof() + 3 * Integer.BYTES;

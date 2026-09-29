@@ -133,7 +133,7 @@ public class SegmentPrunerFactory {
       LOGGER.warn("Cannot enable time range pruning without time column for table: {}", tableNameWithType);
       return null;
     }
-    Schema schema = ZKMetadataProvider.getTableSchema(propertyStore, tableConfig);
+    Schema schema = ZKMetadataProvider.getTableSchema(propertyStore, tableNameWithType);
     if (schema == null) {
       LOGGER.warn("Cannot enable time range pruning without schema for table: {}", tableNameWithType);
       return null;

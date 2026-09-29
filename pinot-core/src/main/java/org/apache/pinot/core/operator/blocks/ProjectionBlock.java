@@ -18,21 +18,34 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
+import org.apache.pinot.core.operator.docvalsets.OpenStructDocumentBlockValSet;
 import org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource.MapValueReader;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.OpenStructKeyFlattener;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * ProjectionBlock holds a column name to Block Map.
- * It provides DocIdSetBlock for a given column.
- */
+/// ProjectionBlock holds a column name to Block Map.
+/// It provides DocIdSetBlock for a given column.
 public class ProjectionBlock implements ValueBlock {
+  private static final TypeReference<Map<String, Object>> MAP_TYPE_REFERENCE = new TypeReference<>() { };
+  private static final TypeReference<Object> OBJECT_TYPE_REFERENCE = new TypeReference<>() { };
+
   private final Map<String, DataSource> _dataSourceMap;
   private final DataBlockCache _dataBlockCache;
 
@@ -59,16 +72,180 @@ public class ProjectionBlock implements ValueBlock {
 
   @Override
   public BlockValSet getBlockValueSet(String column) {
-    return new ProjectionBlockValSet(_dataBlockCache, column, _dataSourceMap.get(column));
+    DataSource dataSource = _dataSourceMap.get(column);
+    // An OPEN_STRUCT parent is only a handle for per-key resolution — it has no forward index, so DataFetcher does
+    // not register it and it cannot be read through the block cache. Assemble its document here instead, which is
+    // what the storage layer's contract defers to the query layer. Without this `SELECT col` and, worse, `SELECT *`
+    // both failed outright on any table carrying one.
+    if (dataSource instanceof OpenStructDataSource openStructDataSource) {
+      return openStructDocuments(column, openStructDataSource);
+    }
+    return new ProjectionBlockValSet(_dataBlockCache, column, dataSource);
+  }
+
+  /// The column's whole document per row, as JSON text.
+  ///
+  /// Assembled through [OpenStructDataSource#openMapValueReader()], the reconstruction the storage layer already
+  /// owns and the seal path already uses. Going key by key over [OpenStructDataSource#getDataSources()] instead
+  /// reads only the materialized keys -- sparse keys share one JSON column and have no DataSource of their own --
+  /// so every unmaterialized key would silently vanish from the document.
+  private BlockValSet openStructDocuments(String column, OpenStructDataSource openStructDataSource) {
+    int numDocs = getNumDocs();
+    int[] docIds = getDocIds();
+    String[] documents = new String[numDocs];
+    try (MapValueReader reader = openStructDataSource.openMapValueReader()) {
+      for (int i = 0; i < numDocs; i++) {
+        Map<String, Object> document = reader.getMapValue(docIds[i]);
+        documents[i] = document == null ? "{}" : JsonUtils.objectToString(renderDocument(document));
+      }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to read OPEN_STRUCT column: " + column, e);
+    }
+    return new OpenStructDocumentBlockValSet(documents);
+  }
+
+  /// The document as it should read back: nested, and with no key spelled twice.
+  ///
+  /// A key nested inside an object is materialized under its path -- `configApi.timeTaken` -- while the object it
+  /// came from stays in the document whole, so the reconstruction carries the same value both ways. The object is
+  /// the shape the source had, so it wins and the paths into it are dropped. `.` is an ordinary key character with
+  /// no escape, and that is exactly what makes the container's own entry the thing that disambiguates: a dotted key
+  /// whose prefix is not itself a key was never a path, so it stays a key spelled with a dot.
+  private static Map<String, Object> renderDocument(Map<String, Object> document) {
+    Map<String, Object> rendered = new LinkedHashMap<>(document.size());
+    for (Map.Entry<String, Object> entry : document.entrySet()) {
+      if (!isPathIntoPresentObject(entry.getKey(), document)) {
+        rendered.put(entry.getKey(), renderValue(entry.getValue()));
+      }
+    }
+    return rendered;
+  }
+
+  /// Whether `key` is a path into an object that the document also carries whole. `configApi.timeTaken` is, when
+  /// `configApi` is an object of the document holding `timeTaken`; a key the document literally spells with a dot
+  /// is not.
+  ///
+  /// The container is usually JSON **text** rather than a map: that is how the flattener emits it
+  /// ([OpenStructKeyFlattener]) and how the read path keeps it, so a shape check alone would miss every native
+  /// document. Requiring the container to actually hold the rest of the path is what keeps a string that merely
+  /// looks like JSON from swallowing a key that is genuinely spelled with a dot.
+  private static boolean isPathIntoPresentObject(String key, Map<String, Object> document) {
+    int dot = key.indexOf(OpenStructKeyFlattener.PATH_SEPARATOR);
+    while (dot >= 0) {
+      Map<String, Object> container = asContainer(document.get(key.substring(0, dot)));
+      if (container != null && container.containsKey(nextSegment(key, dot + 1))) {
+        return true;
+      }
+      dot = key.indexOf(OpenStructKeyFlattener.PATH_SEPARATOR, dot + 1);
+    }
+    return false;
+  }
+
+  /// The path segment starting at `from`, i.e. the first key the enclosing container would have to hold.
+  private static String nextSegment(String key, int from) {
+    int dot = key.indexOf(OpenStructKeyFlattener.PATH_SEPARATOR, from);
+    return dot < 0 ? key.substring(from) : key.substring(from, dot);
+  }
+
+  /// `value` as an object, whether it arrives as a map or as the JSON text the flattener stores a container as.
+  /// Null for anything that is not an object, text that does not parse, and text that parses to an array or a
+  /// scalar -- none of those can be the thing a dotted path descends into.
+  @Nullable
+  private static Map<String, Object> asContainer(@Nullable Object value) {
+    if (value instanceof Map<?, ?> map) {
+      return asStringKeyedMap(map);
+    }
+    if (value instanceof String text && !text.isEmpty() && text.charAt(0) == '{') {
+      try {
+        return JsonUtils.stringToObject(text, MAP_TYPE_REFERENCE);
+      } catch (IOException e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /// JSON text unwrapped into the object or array it holds, or the text unchanged when it is neither.
+  private static Object unwrapJsonText(String text) {
+    if (text.isEmpty()) {
+      return text;
+    }
+    char first = text.charAt(0);
+    if (first != '{' && first != '[') {
+      return text;
+    }
+    try {
+      return renderValue(JsonUtils.stringToObject(text, OBJECT_TYPE_REFERENCE));
+    } catch (IOException e) {
+      return text;
+    }
+  }
+
+  private static Map<String, Object> asStringKeyedMap(Map<?, ?> map) {
+    Map<String, Object> keyed = new LinkedHashMap<>(map.size());
+    for (Map.Entry<?, ?> entry : map.entrySet()) {
+      keyed.put(String.valueOf(entry.getKey()), entry.getValue());
+    }
+    return keyed;
+  }
+
+  /// Values as JSON renders them, recursing so a nested object is cleaned up the same way the top level is.
+  /// Only BYTES needs a hand: Jackson would base64 it, while every other way of reading this value out of Pinot
+  /// -- `col['key']` included -- gives hex.
+  @Nullable
+  private static Object renderValue(@Nullable Object value) {
+    if (value instanceof byte[] bytes) {
+      return BytesUtils.toHexString(bytes);
+    }
+    if (value instanceof Map<?, ?> map) {
+      // Keys re-typed, values left raw: renderDocument renders each one as it walks them.
+      return renderDocument(asStringKeyedMap(map));
+    }
+    if (value instanceof String text) {
+      // A container reaches here as the JSON text the flattener stored, so inserting it as a string would nest a
+      // quoted document inside the document. Only text that parses as an object or an array is unwrapped, and text
+      // that fails to parse stays text, so the cost of the ambiguity falls on a string that both looks like JSON
+      // and is valid JSON.
+      return unwrapJsonText(text);
+    }
+    if (value instanceof List<?> list) {
+      List<Object> rendered = new ArrayList<>(list.size());
+      for (Object element : list) {
+        rendered.add(renderValue(element));
+      }
+      return rendered;
+    }
+    if (value instanceof Object[] array) {
+      List<Object> rendered = new ArrayList<>(array.length);
+      for (Object element : array) {
+        rendered.add(renderValue(element));
+      }
+      return rendered;
+    }
+    return value;
   }
 
   @Override
   public BlockValSet getBlockValueSet(String[] paths) {
     // TODO: only support one level of path for now, e.g. `map.key`
     assert paths.length == 2;
-    MapDataSource mapDataSource = (MapDataSource) _dataSourceMap.get(paths[0]);
-    DataSource keyDataSource = mapDataSource.getKeyDataSource(paths[1]);
     String fullColumnKeyName = ComplexFieldSpec.getFullChildName(paths);
+    // Resolve once per ProjectionOperator, not once per block: _dataSourceMap is owned by the operator and
+    // shared across every block of the segment. Re-resolving an absent OPEN_STRUCT key rebuilds a null bitmap
+    // spanning the whole segment on each block, and DataFetcher keeps the first reader registered under the
+    // name anyway, so every later resolution is garbage that also leaves this map disagreeing with the fetcher.
+    if (_dataSourceMap.containsKey(fullColumnKeyName)) {
+      return getBlockValueSet(fullColumnKeyName);
+    }
+    DataSource columnDataSource = _dataSourceMap.get(paths[0]);
+    DataSource keyDataSource;
+    if (columnDataSource instanceof MapDataSource) {
+      keyDataSource = ((MapDataSource) columnDataSource).getDataSource(paths[1]);
+    } else if (columnDataSource instanceof OpenStructDataSource) {
+      keyDataSource = ((OpenStructDataSource) columnDataSource).getDataSource(paths[1]);
+    } else {
+      throw new IllegalStateException("Path-based access requires MAP or OPEN_STRUCT column: " + paths[0]);
+    }
     _dataSourceMap.put(fullColumnKeyName, keyDataSource);
     _dataBlockCache.addDataSource(fullColumnKeyName, keyDataSource);
     return getBlockValueSet(fullColumnKeyName);

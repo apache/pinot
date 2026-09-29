@@ -32,9 +32,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * Record reader for multiple pinot segments.
- */
+/// Record reader for multiple pinot segments.
 public class MultiplePinotSegmentRecordReader implements RecordReader {
   private final List<PinotSegmentRecordReader> _recordReaders;
   private final List<String> _sortOrder;
@@ -42,27 +40,26 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
 
   private int _currentReaderId;
 
-  /**
-   * Read records using the passed in schema from multiple pinot segments.
-   * <p>Passed in schema must be a subset of the segment schema.
-   *
-   * @param indexDirs a list of input segment directory paths
-   */
+  /// Read records using the passed in schema from multiple pinot segments.
+  ///
+  /// Passed in schema must be a subset of the segment schema.
+  ///
+  /// @param indexDirs a list of input segment directory paths
   public MultiplePinotSegmentRecordReader(List<File> indexDirs)
       throws Exception {
     this(indexDirs, null, null);
   }
 
-  /**
-   * Read records using the passed in schema and in the order of sorted column from multiple pinot segments.
-   * <p>Passed in schema must be a subset of the segment schema.
-   * <p>If sort order is not specified, it will not attempt to sort the segments and simply concatenate the records from
-   * muiltiple segments.
-   *
-   * @param indexDirs a list of input paths for the segment indices
-   * @param fieldsToRead if null or empty, reads all fields
-   * @param sortOrder a list of column names that represent the sorting order
-   */
+  /// Read records using the passed in schema and in the order of sorted column from multiple pinot segments.
+  ///
+  /// Passed in schema must be a subset of the segment schema.
+  ///
+  /// If sort order is not specified, it will not attempt to sort the segments and simply concatenate the records from
+  /// muiltiple segments.
+  ///
+  /// @param indexDirs a list of input paths for the segment indices
+  /// @param fieldsToRead if null or empty, reads all fields
+  /// @param sortOrder a list of column names that represent the sorting order
   public MultiplePinotSegmentRecordReader(List<File> indexDirs, @Nullable Set<String> fieldsToRead,
       @Nullable List<String> sortOrder)
       throws Exception {
@@ -165,12 +162,10 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
     }
   }
 
-  /**
-   * Wrapper for generic row and record reader along with sorted column. Comparison of this object is based on
-   * the value of sorted column.
-   *
-   * TODO: add the support for multi value columns
-   */
+  /// Wrapper for generic row and record reader along with sorted column. Comparison of this object is based on
+  /// the value of sorted column.
+  ///
+  /// TODO: add the support for multi value columns
   private class GenericRowWithReader implements Comparable<GenericRowWithReader> {
     private final GenericRow _row;
     private final PinotSegmentRecordReader _recordReader;

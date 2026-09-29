@@ -18,24 +18,26 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
-import java.util.function.Supplier;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.FileUtils;
@@ -43,55 +45,76 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.config.provider.LogicalTableMetadataCache;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
+import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.LogicalTableContext;
 import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
-import org.apache.pinot.core.util.SegmentRefreshSemaphore;
+import org.apache.pinot.core.data.manager.realtime.ServerIngestionOomProtectionManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
+import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.util.Objects.requireNonNull;
 
-/**
- * The class <code>HelixInstanceDataManager</code> is the instance data manager based on Helix.
- */
+
+/// The class `HelixInstanceDataManager` is the instance data manager based on Helix.
 @ThreadSafe
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
 
-  private final ConcurrentHashMap<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
-  // TODO: Consider making segment locks per table instead of per instance
+  private final Map<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
+  /// Serializes table creation with the previous owner's entire shutdown, including table-scoped resource cleanup
+  /// such as the segment build time lease extender. Acquire it before changing [#_tableDataManagerMap], and release
+  /// it before calling the table's segment-add methods. Values are weak so idle tables do not accumulate locks; a
+  /// lock stays strongly reachable from its holder for as long as it is held.
+  private final LoadingCache<String, Lock> _tableLifecycleLocks =
+      CacheBuilder.newBuilder().weakValues().build(CacheLoader.from(() -> new ReentrantLock()));
+
+  // Logical table metadata cache to cache logical table configs, schemas, and offline/realtime table configs.
+  private final LogicalTableMetadataCache _logicalTableMetadataCache = new LogicalTableMetadataCache();
+
+  /// Intentionally shared across all table data managers, including successive incarnations of the same table name:
+  /// a deleted table's stale segment operation and a recreated same-name table's operation on a colliding segment
+  /// name must serialize on one lock. The shutdown re-checks in `BaseTableDataManager.moveSegment` and
+  /// `RealtimeTableDataManager.doAddConsumingSegment` rely on this, so do not make these locks per table.
   private final SegmentLocks _segmentLocks = new SegmentLocks();
 
   private HelixInstanceDataManagerConfig _instanceDataManagerConfig;
   private String _instanceId;
   private TableDataManagerProvider _tableDataManagerProvider;
+  private ServerReloadJobStatusCache _reloadJobStatusCache;
   private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private SegmentUploader _segmentUploader;
-  private Supplier<Boolean> _isServerReadyToServeQueries = () -> false;
+  private BooleanSupplier _isServerReadyToConsumeData = () -> false;
+  private BooleanSupplier _isServerReadyToServeQueries = () -> false;
+  private ServerIngestionOomProtectionManager.ServerThrottleState _serverIngestionOomProtectionThrottleState;
 
   // Fixed size LRU cache for storing last N errors on the instance.
   // Key is TableNameWithType-SegmentName pair.
@@ -100,16 +123,28 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   // Key is table name with type, value is deletion time.
   protected Cache<String, Long> _recentlyDeletedTables;
 
-  private ExecutorService _segmentRefreshExecutor;
+  private SegmentReloadSemaphore _segmentReloadSemaphore;
+  private ExecutorService _segmentReloadRefreshExecutor;
+
+  private boolean _enableAsyncSegmentRefresh;
+
+  @Nullable
   private ExecutorService _segmentPreloadExecutor;
 
   @Override
-  public void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServingQueries) {
+  public void setSupplierOfIsServerReadyToConsumeData(BooleanSupplier isServerReadyToConsumeData) {
+    _isServerReadyToConsumeData = isServerReadyToConsumeData;
+  }
+
+  @Override
+  public void setSupplierOfIsServerReadyToServeQueries(BooleanSupplier isServingQueries) {
     _isServerReadyToServeQueries = isServingQueries;
   }
 
   @Override
-  public synchronized void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics)
+  public synchronized void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics,
+      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
+      ServerReloadJobStatusCache reloadJobStatusCache)
       throws Exception {
     LOGGER.info("Initializing Helix instance data manager");
 
@@ -117,10 +152,15 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("HelixInstanceDataManagerConfig: {}", _instanceDataManagerConfig.getConfig());
     _instanceId = _instanceDataManagerConfig.getInstanceId();
     _helixManager = helixManager;
+    _reloadJobStatusCache = requireNonNull(reloadJobStatusCache, "reloadJobStatusCache cannot be null");
+    _serverIngestionOomProtectionThrottleState =
+        ServerIngestionOomProtectionManager.createServerThrottleState(config, serverMetrics);
     String tableDataManagerProviderClass = _instanceDataManagerConfig.getTableDataManagerProviderClass();
     LOGGER.info("Initializing table data manager provider of class: {}", tableDataManagerProviderClass);
     _tableDataManagerProvider = PluginManager.get().createInstance(tableDataManagerProviderClass);
-    _tableDataManagerProvider.init(_instanceDataManagerConfig, helixManager, _segmentLocks);
+    _tableDataManagerProvider.init(_instanceDataManagerConfig, helixManager, _segmentLocks,
+        segmentOperationsThrottlerSet,
+        _reloadJobStatusCache);
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
         ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), serverMetrics);
 
@@ -128,28 +168,28 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     initInstanceDataDir(instanceDataDir);
 
     File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
-    if (!instanceSegmentTarDir.exists()) {
-      Preconditions.checkState(instanceSegmentTarDir.mkdirs());
-    }
+    initInstanceSegmentTarDir(instanceSegmentTarDir);
 
     // Initialize segment build time lease extender executor
     SegmentBuildTimeLeaseExtender.initExecutor();
-    // Initialize a fixed thread pool to reload/refresh segments in parallel. The getMaxParallelRefreshThreads() is
-    // used to initialize a segment refresh semaphore to limit the parallelism, so create a pool of same size.
-    int poolSize = getMaxParallelRefreshThreads();
-    Preconditions.checkArgument(poolSize > 0,
-        "SegmentRefreshExecutor requires a positive pool size but got: " + poolSize);
-    _segmentRefreshExecutor = Executors.newFixedThreadPool(poolSize,
-        new ThreadFactoryBuilder().setNameFormat("segment-refresh-thread-%d").build());
-    LOGGER.info("Created SegmentRefreshExecutor with pool size: {}", poolSize);
-    poolSize = _instanceDataManagerConfig.getMaxSegmentPreloadThreads();
-    if (poolSize > 0) {
-      _segmentPreloadExecutor = Executors.newFixedThreadPool(poolSize,
+    // Initialize a semaphore and a fixed thread pool to reload/refresh segments in parallel.
+    int maxParallelRefreshThreads = getMaxParallelRefreshThreads();
+    Preconditions.checkArgument(maxParallelRefreshThreads > 0,
+        "'pinot.server.instance.max.parallel.refresh.threads' must be positive, got: " + maxParallelRefreshThreads);
+    _segmentReloadSemaphore = new SegmentReloadSemaphore(maxParallelRefreshThreads);
+    _segmentReloadRefreshExecutor = Executors.newFixedThreadPool(maxParallelRefreshThreads,
+        new ThreadFactoryBuilder().setNameFormat("segment-reload-refresh-thread-%d").build());
+    LOGGER.info("Created SegmentReloadRefreshExecutor with pool size: {}", maxParallelRefreshThreads);
+    int maxSegmentPreloadThreads = _instanceDataManagerConfig.getMaxSegmentPreloadThreads();
+    if (maxSegmentPreloadThreads > 0) {
+      _segmentPreloadExecutor = Executors.newFixedThreadPool(maxSegmentPreloadThreads,
           new ThreadFactoryBuilder().setNameFormat("segment-preload-thread-%d").build());
-      LOGGER.info("Created SegmentPreloadExecutor with pool size: {}", poolSize);
+      LOGGER.info("Created SegmentPreloadExecutor with pool size: {}", maxSegmentPreloadThreads);
     } else {
-      LOGGER.info("SegmentPreloadExecutor was not created with pool size: {}", poolSize);
+      LOGGER.info("SegmentPreloadExecutor was not created with pool size: {}", maxSegmentPreloadThreads);
     }
+    _enableAsyncSegmentRefresh = isAsyncSegmentRefreshEnabled();
+    LOGGER.info("Segment refresh asynchronous handling is {}", _enableAsyncSegmentRefresh ? "enabled" : "disabled");
     LOGGER.info("Initialized Helix instance data manager");
 
     // Initialize the error cache and recently deleted tables cache
@@ -158,7 +198,12 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         .expireAfterWrite(_instanceDataManagerConfig.getDeletedTablesCacheTtlMinutes(), TimeUnit.MINUTES).build();
   }
 
-  private void initInstanceDataDir(File instanceDataDir) {
+  ServerIngestionOomProtectionManager.ServerThrottleState getServerIngestionOomProtectionThrottleState() {
+    return _serverIngestionOomProtectionThrottleState;
+  }
+
+  @VisibleForTesting
+  void initInstanceDataDir(File instanceDataDir) {
     if (!instanceDataDir.exists()) {
       Preconditions.checkState(instanceDataDir.mkdirs(), "Failed to create instance data dir: %s", instanceDataDir);
     } else {
@@ -182,6 +227,33 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         }
       }
     }
+    ensureDirectoryWritable(instanceDataDir, "instance data dir");
+  }
+
+  @VisibleForTesting
+  void initInstanceSegmentTarDir(File instanceSegmentTarDir) {
+    if (!instanceSegmentTarDir.exists()) {
+      Preconditions.checkState(instanceSegmentTarDir.mkdirs(), "Failed to create instance segment tar dir: %s",
+          instanceSegmentTarDir);
+    }
+    ensureDirectoryWritable(instanceSegmentTarDir, "instance segment tar dir");
+  }
+
+  @VisibleForTesting
+  static void ensureDirectoryWritable(File directory, String directoryDescription) {
+    Preconditions.checkState(directory.isDirectory(), "Expected %s to be a directory: %s", directoryDescription,
+        directory);
+
+    File probeFile = null;
+    try {
+      probeFile = File.createTempFile(".pinot-writability-check-", ".tmp", directory);
+    } catch (IOException e) {
+      throw new IllegalStateException("Cannot write to the " + directoryDescription + ": " + directory, e);
+    } finally {
+      if (probeFile != null) {
+        Preconditions.checkState(probeFile.delete(), "Failed to delete writability check file: %s", probeFile);
+      }
+    }
   }
 
   @Override
@@ -197,6 +269,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
+  public String getInstanceDataDir() {
+    return _instanceDataManagerConfig.getInstanceDataDir();
+  }
+
+  @Override
   public String getInstanceId() {
     return _instanceId;
   }
@@ -204,12 +281,15 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public synchronized void start() {
     _propertyStore = _helixManager.getHelixPropertyStore();
+    // Initialize logical table metadata cache
+    _logicalTableMetadataCache.init(_propertyStore);
+
     LOGGER.info("Helix instance data manager started");
   }
 
   @Override
   public synchronized void shutDown() {
-    _segmentRefreshExecutor.shutdownNow();
+    _segmentReloadRefreshExecutor.shutdownNow();
     if (_segmentPreloadExecutor != null) {
       _segmentPreloadExecutor.shutdownNow();
     }
@@ -231,42 +311,70 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       }
     }
     SegmentBuildTimeLeaseExtender.shutdownExecutor();
+    // shutdown logical table metadata cache
+    _logicalTableMetadataCache.shutdown();
     LOGGER.info("Helix instance data manager shut down");
   }
 
   @Override
   public void deleteTable(String tableNameWithType, long deletionTimeMs)
       throws Exception {
-    AtomicReference<TableDataManager> tableDataManagerRef = new AtomicReference<>();
-    _tableDataManagerMap.computeIfPresent(tableNameWithType, (k, v) -> {
-      _recentlyDeletedTables.put(k, deletionTimeMs);
-      tableDataManagerRef.set(v);
-      return null;
-    });
-    TableDataManager tableDataManager = tableDataManagerRef.get();
-    if (tableDataManager == null) {
-      LOGGER.warn("Failed to find table data manager for table: {}, skip deleting the table", tableNameWithType);
-      return;
+    Lock lifecycleLock = _tableLifecycleLocks.getUnchecked(tableNameWithType);
+    lifecycleLock.lock();
+    try {
+      // The first segment callback can arrive after deletion, before a manager has ever been created.
+      // Keep the newest deletion timestamp when duplicate or out-of-order deletion messages arrive.
+      _recentlyDeletedTables.asMap().merge(tableNameWithType, deletionTimeMs, Math::max);
+      TableDataManager tableDataManager = _tableDataManagerMap.remove(tableNameWithType);
+      if (tableDataManager == null) {
+        LOGGER.warn("Failed to find table data manager for table: {}, skip deleting the table", tableNameWithType);
+        return;
+      }
+      // Shutdown can wait for segment callbacks, so do not run it inside a map computation.
+      LOGGER.info("Shutting down table data manager for table: {}", tableNameWithType);
+      tableDataManager.setDeleted(true);
+      tableDataManager.shutDown();
+      LOGGER.info("Finished shutting down table data manager for table: {}", tableNameWithType);
+    } finally {
+      lifecycleLock.unlock();
     }
-    LOGGER.info("Shutting down table data manager for table: {}", tableNameWithType);
-    tableDataManager.shutDown();
-    LOGGER.info("Finished shutting down table data manager for table: {}", tableNameWithType);
   }
 
   @Override
   public void addOnlineSegment(String tableNameWithType, String segmentName)
       throws Exception {
-    _tableDataManagerMap.computeIfAbsent(tableNameWithType, this::createTableDataManager).addOnlineSegment(segmentName);
+    getOrCreateTableDataManager(tableNameWithType).addOnlineSegment(segmentName);
   }
 
   @Override
   public void addConsumingSegment(String realtimeTableName, String segmentName)
       throws Exception {
-    _tableDataManagerMap.computeIfAbsent(realtimeTableName, this::createTableDataManager)
-        .addConsumingSegment(segmentName);
+    getOrCreateTableDataManager(realtimeTableName).addConsumingSegment(segmentName);
   }
 
-  private TableDataManager createTableDataManager(String tableNameWithType) {
+  /// Returns the table data manager, creating and starting it under the table's lifecycle lock when absent. The
+  /// lock-free fast path can return a manager that a concurrent [#deleteTable] is shutting down; that manager's
+  /// segment-add methods reject the operation once shutdown has closed admission. The slow path waits for such a
+  /// shutdown to finish before creating the replacement.
+  private TableDataManager getOrCreateTableDataManager(String tableNameWithType) {
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager != null) {
+      return tableDataManager;
+    }
+    Lock lifecycleLock = _tableLifecycleLocks.getUnchecked(tableNameWithType);
+    lifecycleLock.lock();
+    try {
+      return _tableDataManagerMap.computeIfAbsent(tableNameWithType, this::createTableDataManager);
+    } finally {
+      lifecycleLock.unlock();
+    }
+  }
+
+  /// Creates and starts a table data manager; callers must hold the table's lifecycle lock. A recently deleted table
+  /// is recreated only from a table config created after its newest recorded deletion, and the deletion record is
+  /// cleared only after the manager has started, so a failed creation keeps rejecting stale configs.
+  @VisibleForTesting
+  TableDataManager createTableDataManager(String tableNameWithType) {
     LOGGER.info("Creating table data manager for table: {}", tableNameWithType);
     TableConfig tableConfig;
     Long tableDeleteTimeMs = _recentlyDeletedTables.getIfPresent(tableNameWithType);
@@ -281,17 +389,22 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       tableConfig = tableConfigAndStat.getLeft();
       long tableCreationTimeMs = tableConfigAndStat.getRight().getCtime();
       Preconditions.checkState(tableCreationTimeMs > tableDeleteTimeMs,
-          "Table: %s was recently deleted (deleted %dms ago) but the table config was created before that (created "
-              + "%dms ago)", tableNameWithType, currentTimeMs - tableDeleteTimeMs, currentTimeMs - tableCreationTimeMs);
-      _recentlyDeletedTables.invalidate(tableNameWithType);
+          "Table: %s was recently deleted (deleted %sms ago) but the table config was created before that (created "
+              + "%sms ago)", tableNameWithType, currentTimeMs - tableDeleteTimeMs, currentTimeMs - tableCreationTimeMs);
     } else {
       tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
       Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
     }
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
+    Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
+    TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     TableDataManager tableDataManager =
-        _tableDataManagerProvider.getTableDataManager(tableConfig, _segmentPreloadExecutor, _errorCache,
-            _isServerReadyToServeQueries);
+        _tableDataManagerProvider.getTableDataManager(tableConfig, schema, _segmentReloadSemaphore,
+            _segmentReloadRefreshExecutor, _segmentPreloadExecutor, _errorCache, _isServerReadyToConsumeData,
+            _isServerReadyToServeQueries, _serverIngestionOomProtectionThrottleState, _enableAsyncSegmentRefresh,
+            _reloadJobStatusCache);
     tableDataManager.start();
+    _recentlyDeletedTables.invalidate(tableNameWithType);
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;
   }
@@ -330,185 +443,65 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public void deleteSegment(String tableNameWithType, String segmentName)
       throws Exception {
     LOGGER.info("Deleting segment: {} from table: {}", segmentName, tableNameWithType);
-    // Segment deletion is handled at instance level because table data manager might not exist. Acquire the lock here.
+    // Hold the per-segment lock around the TDM lookup so the lookup + delete is atomic vs. removeTableDataManager
+    // shutting the TDM down concurrently. The TDM's own deleteSegment re-acquires the same lock (ReentrantLock).
     Lock segmentLock = _segmentLocks.getLock(tableNameWithType, segmentName);
     segmentLock.lock();
     try {
-      // Check if the segment is still loaded, if so, offload it first.
-      // This might happen when the server disconnected from ZK and reconnected, and the segment is still loaded.
-      // TODO: Consider using table data manager to delete the segment. This will allow the table data manager to clean
-      //       up the segment data on all tiers. Note that table data manager might have not been created, and table
-      //       config might have been deleted at this point.
       TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
-      if (tableDataManager != null && tableDataManager.hasSegment(segmentName)) {
-        LOGGER.warn("Segment: {} from table: {} is still loaded, offloading it first", segmentName, tableNameWithType);
-        tableDataManager.offloadSegment(segmentName);
+      if (tableDataManager != null) {
+        // The TDM owns the offload-if-loaded prelude, the on-disk dir delete, and the tier-aware
+        // segment-directory-loader cleanup.
+        tableDataManager.deleteSegment(segmentName);
+      } else {
+        // Fallback: TDM can be null if it was never instantiated, or has already been removed via deleteTable.
+        // In that case, do a path-only cleanup keyed by segment name.
+        String tableDataDir = _instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType;
+        BaseTableDataManager.deleteSegmentFilesFromDisk(tableDataDir, segmentName, _instanceDataManagerConfig);
+        LOGGER.info("Deleted segment: {} from table: {}", segmentName, tableNameWithType);
       }
-      // Clean up the segment data on default tier unconditionally.
-      File segmentDir = getSegmentDataDirectory(tableNameWithType, segmentName);
-      if (segmentDir.exists()) {
-        FileUtils.deleteQuietly(segmentDir);
-        LOGGER.info("Deleted segment directory {} on default tier", segmentDir);
-      }
-      // We might clean up further more with the specific segment loader. But note that table data manager might have
-      // not been created, and table config might have been deleted at this point.
-      SegmentDirectoryLoader segmentLoader = SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(
-          _instanceDataManagerConfig.getSegmentDirectoryLoader());
-      if (segmentLoader != null) {
-        LOGGER.info("Deleting segment: {} further with segment loader: {}", segmentName,
-            _instanceDataManagerConfig.getSegmentDirectoryLoader());
-        SegmentDirectoryLoaderContext ctx = new SegmentDirectoryLoaderContext.Builder().setSegmentName(segmentName)
-            .setTableDataDir(_instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType).build();
-        segmentLoader.delete(ctx);
-      }
-      LOGGER.info("Deleted segment: {} from table: {}", segmentName, tableNameWithType);
     } finally {
       segmentLock.unlock();
     }
   }
 
-  // TODO: Move reload handling logic to table data manager
   @Override
-  public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload)
+  public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload, String reloadJobId)
       throws Exception {
-    LOGGER.info("Reloading single segment: {} in table: {}", segmentName, tableNameWithType);
-    SegmentMetadata segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
-    if (segmentMetadata == null) {
-      LOGGER.info("Segment metadata is null. Skip reloading segment: {} in table: {}", segmentName, tableNameWithType);
-      return;
+    LOGGER.info("Reloading segment: {} in table: {}", segmentName, tableNameWithType);
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager != null) {
+      tableDataManager.reloadSegment(segmentName, forceDownload, reloadJobId);
+    } else {
+      LOGGER.warn("Failed to find data manager for table: {}, skipping reloading segment: {}", tableNameWithType,
+          segmentName);
     }
-
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-    Preconditions.checkNotNull(tableConfig);
-
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
-
-    reloadSegmentWithMetadata(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
-
-    LOGGER.info("Reloaded single segment: {} in table: {}", segmentName, tableNameWithType);
   }
 
-  // TODO: Move reload handling logic to table data manager
   @Override
-  public void reloadAllSegments(String tableNameWithType, boolean forceDownload,
-      SegmentRefreshSemaphore segmentRefreshSemaphore)
+  public void reloadAllSegments(String tableNameWithType, boolean forceDownload, String reloadJobId)
       throws Exception {
     LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
-    List<SegmentMetadata> segmentsMetadata = getAllSegmentsMetadata(tableNameWithType);
-    reloadSegmentsWithMetadata(tableNameWithType, segmentsMetadata, forceDownload, segmentRefreshSemaphore);
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager != null) {
+      tableDataManager.reloadAllSegments(forceDownload, reloadJobId);
+    } else {
+      LOGGER.warn("Failed to find data manager for table: {}, skipping reloading all segments", tableNameWithType);
+    }
   }
 
-  // TODO: Move reload handling logic to table data manager
   @Override
   public void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload,
-      SegmentRefreshSemaphore segmentRefreshSemaphore)
+      String reloadJobId)
       throws Exception {
-    LOGGER.info("Reloading multiple segments: {} in table: {}", segmentNames, tableNameWithType);
-
+    LOGGER.info("Reloading segments: {} in table: {}", segmentNames, tableNameWithType);
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
-    if (tableDataManager == null) {
-      LOGGER.warn("Failed to find table data manager for table: {}, skipping reloading segments: {}", tableNameWithType,
+    if (tableDataManager != null) {
+      tableDataManager.reloadSegments(segmentNames, forceDownload, reloadJobId);
+    } else {
+      LOGGER.warn("Failed to find data manager for table: {}, skipping reloading segments: {}", tableNameWithType,
           segmentNames);
-      return;
     }
-    List<String> missingSegments = new ArrayList<>();
-    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(segmentNames, missingSegments);
-    if (!missingSegments.isEmpty()) {
-      LOGGER.warn("Failed to get segment data manager for segments: {} of table: {}, skipping reloading them",
-          missingSegments, tableDataManager);
-    }
-    List<SegmentMetadata> segmentsMetadata = new ArrayList<>(segmentDataManagers.size());
-    try {
-      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        segmentsMetadata.add(segmentDataManager.getSegment().getSegmentMetadata());
-      }
-    } finally {
-      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        tableDataManager.releaseSegment(segmentDataManager);
-      }
-    }
-    reloadSegmentsWithMetadata(tableNameWithType, segmentsMetadata, forceDownload, segmentRefreshSemaphore);
-  }
-
-  private void reloadSegmentsWithMetadata(String tableNameWithType, List<SegmentMetadata> segmentsMetadata,
-      boolean forceDownload, SegmentRefreshSemaphore segmentRefreshSemaphore)
-      throws Exception {
-    long startTime = System.currentTimeMillis();
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-    Preconditions.checkNotNull(tableConfig);
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
-    List<String> failedSegments = new ArrayList<>();
-    final AtomicReference<Exception> sampleException = new AtomicReference<>();
-    //calling thread hasn't acquired any permit so we don't reload any segments using it.
-    CompletableFuture.allOf(segmentsMetadata.stream().map(segmentMetadata -> CompletableFuture.runAsync(() -> {
-      String segmentName = segmentMetadata.getName();
-      try {
-        segmentRefreshSemaphore.acquireSema(segmentMetadata.getName(), LOGGER);
-        try {
-          reloadSegmentWithMetadata(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
-        } finally {
-          segmentRefreshSemaphore.releaseSema();
-        }
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while reloading segment: {} in table: {}", segmentName, tableNameWithType, e);
-        failedSegments.add(segmentName);
-        sampleException.set(e);
-      }
-    }, _segmentRefreshExecutor)).toArray(CompletableFuture[]::new)).get();
-    if (sampleException.get() != null) {
-      throw new RuntimeException(
-          String.format("Failed to reload %d/%d segments: %s in table: %s", failedSegments.size(),
-              segmentsMetadata.size(), failedSegments, tableNameWithType), sampleException.get());
-    }
-    LOGGER.info("Reloaded segments with metadata in table: {}. Duration: {}", tableNameWithType,
-        (System.currentTimeMillis() - startTime));
-  }
-
-  private void reloadSegmentWithMetadata(String tableNameWithType, SegmentMetadata segmentMetadata,
-      TableConfig tableConfig, @Nullable Schema schema, boolean forceDownload)
-      throws Exception {
-    String segmentName = segmentMetadata.getName();
-    LOGGER.info("Reloading segment: {} in table: {} with forceDownload: {}", segmentName, tableNameWithType,
-        forceDownload);
-
-    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
-    if (tableDataManager == null) {
-      LOGGER.warn("Failed to find table data manager for table: {}, skipping reloading segment", tableNameWithType);
-      return;
-    }
-
-    if (segmentMetadata.isMutableSegment()) {
-      // Use force commit to reload consuming segment
-      SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
-      if (segmentDataManager == null) {
-        LOGGER.warn("Failed to find segment data manager for table: {}, segment: {}, skipping reloading segment",
-            tableNameWithType, segmentName);
-        return;
-      }
-      try {
-        if (!_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
-          LOGGER.warn("Skip reloading consuming segment: {} in table: {} as configured", segmentName,
-              tableNameWithType);
-          return;
-        }
-        if (segmentDataManager instanceof RealtimeSegmentDataManager) {
-          LOGGER.info("Reloading (force committing) consuming segment: {} in table: {}", segmentName,
-              tableNameWithType);
-          ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
-        }
-        return;
-      } finally {
-        tableDataManager.releaseSegment(segmentDataManager);
-      }
-    }
-
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
-    indexLoadingConfig.setErrorOnColumnBuildFailure(true);
-    SegmentZKMetadata zkMetadata =
-        ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
-    Preconditions.checkState(zkMetadata != null, "Failed to find ZK metadata for segment: %s of table: %s", segmentName,
-        tableNameWithType);
-    tableDataManager.reloadSegment(segmentName, indexLoadingConfig, zkMetadata, segmentMetadata, schema, forceDownload);
   }
 
   @Override
@@ -544,7 +537,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public List<SegmentMetadata> getAllSegmentsMetadata(String tableNameWithType) {
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager == null) {
-      return Collections.emptyList();
+      return List.of();
     } else {
       List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
       try {
@@ -561,10 +554,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
   }
 
-  /**
-   * Assemble the path to segment dir directly, when table mgr object is not
-   * created for the given table yet.
-   */
+  /// Assemble the path to segment dir directly, when table mgr object is not
+  /// created for the given table yet.
   @Override
   public File getSegmentDataDirectory(String tableNameWithType, String segmentName) {
     return new File(new File(_instanceDataManagerConfig.getInstanceDataDir(), tableNameWithType), segmentName);
@@ -578,6 +569,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public int getMaxParallelRefreshThreads() {
     return _instanceDataManagerConfig.getMaxParallelRefreshThreads();
+  }
+
+  @Override
+  public boolean isAsyncSegmentRefreshEnabled() {
+    return _instanceDataManagerConfig.isAsyncSegmentRefreshEnabled();
   }
 
   @Override
@@ -597,6 +593,22 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         tableNameWithType, segmentNames));
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager != null) {
+      // Use cached table config for performance - properties we check (replication, upsert mode)
+      // rarely change after table creation, and cache is refreshed on reload
+      TableConfig tableConfig = tableDataManager.getCachedTableConfigAndSchema().getLeft();
+      boolean isTableTypeInconsistentDuringConsumption =
+          TableConfigUtils.isTableTypeInconsistentDuringConsumption(tableConfig);
+      ConsumingSegmentConsistencyModeListener config = ConsumingSegmentConsistencyModeListener.getInstance();
+
+      // Only restrict force commit for tables with inconsistent state configs
+      // (partial upsert or dropOutOfOrderRecord=true with replication > 1)
+      // when mode is DEFAULT (isForceCommitAllowed = false)
+      if (isTableTypeInconsistentDuringConsumption && !config.isForceCommitAllowed()) {
+        LOGGER.warn("Force commit disabled for table: {} due to inconsistent state config. "
+            + "Change the config to `PROTECTED` via cluster config: {}", tableNameWithType, config.getConfigKey());
+        return;
+      }
+
       segmentNames.forEach(segName -> {
         SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segName);
         if (segmentDataManager != null) {
@@ -610,5 +622,39 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         }
       });
     }
+  }
+
+  @Nullable
+  @Override
+  public LogicalTableContext getLogicalTableContext(String logicalTableName) {
+    Schema schema = _logicalTableMetadataCache.getSchema(logicalTableName);
+    if (schema == null) {
+      LOGGER.warn("Failed to find schema for logical table: {}, skipping", logicalTableName);
+      return null;
+    }
+    LogicalTableConfig logicalTableConfig = _logicalTableMetadataCache.getLogicalTableConfig(logicalTableName);
+    if (logicalTableConfig == null) {
+      LOGGER.warn("Failed to find logical table config for logical table: {}, skipping", logicalTableName);
+      return null;
+    }
+
+    TableConfig offlineTableConfig = null;
+    if (logicalTableConfig.getRefOfflineTableName() != null) {
+      offlineTableConfig = _logicalTableMetadataCache.getTableConfig(logicalTableConfig.getRefOfflineTableName());
+      if (offlineTableConfig == null) {
+        LOGGER.warn("Failed to find offline table config for logical table: {}, skipping", logicalTableName);
+        return null;
+      }
+    }
+
+    TableConfig realtimeTableConfig = null;
+    if (logicalTableConfig.getRefRealtimeTableName() != null) {
+      realtimeTableConfig = _logicalTableMetadataCache.getTableConfig(logicalTableConfig.getRefRealtimeTableName());
+      if (realtimeTableConfig == null) {
+        LOGGER.warn("Failed to find realtime table config for logical table: {}, skipping", logicalTableName);
+        return null;
+      }
+    }
+    return new LogicalTableContext(logicalTableConfig, schema, offlineTableConfig, realtimeTableConfig);
   }
 }

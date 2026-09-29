@@ -24,12 +24,10 @@ import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlWriter;
 
 
-/**
- * {@code UnparseUtils} provides utility for unparsing keywords, {@link SqlNode} or {@link SqlNodeList} using provided
- * {@link SqlWriter}.
- *
- * @see SqlNode#unparse(SqlWriter, int, int)
- */
+/// `UnparseUtils` provides utility for unparsing keywords, [SqlNode] or [SqlNodeList] using provided
+/// [SqlWriter].
+///
+/// @see SqlNode#unparse(SqlWriter, int, int)
 class UnparseUtils {
   private final SqlWriter _writer;
   private final int _leftPrec;

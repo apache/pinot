@@ -20,6 +20,7 @@ package org.apache.pinot.spi.trace;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
 public interface RequestContext {
@@ -63,9 +64,11 @@ public interface RequestContext {
 
   long getReduceTimeMillis();
 
-  void setErrorCode(int errorCode);
+  void setErrorCode(QueryErrorCode errorCode);
 
   void setQuery(String pql);
+
+  void setQueryFingerprint(QueryFingerprint queryFingerprint);
 
   void setTableName(String tableName);
 
@@ -97,6 +100,8 @@ public interface RequestContext {
 
   String getQuery();
 
+  QueryFingerprint getQueryFingerprint();
+
   String getTableName();
 
   List<String> getTableNames();
@@ -124,6 +129,26 @@ public interface RequestContext {
   long getOfflineThreadCpuTimeNs();
 
   long getRealtimeThreadCpuTimeNs();
+
+  long getOfflineThreadMemAllocatedBytes();
+  void setOfflineThreadMemAllocatedBytes(long offlineThreadMemAllocatedBytes);
+
+  long getRealtimeThreadMemAllocatedBytes();
+  void setRealtimeThreadMemAllocatedBytes(long realtimeThreadMemAllocatedBytes);
+
+  long getOfflineResponseSerMemAllocatedBytes();
+  void setOfflineResponseSerMemAllocatedBytes(long offlineResponseSerMemAllocatedBytes);
+
+  long getRealtimeResponseSerMemAllocatedBytes();
+  void setRealtimeResponseSerMemAllocatedBytes(long realtimeResponseSerMemAllocatedBytes);
+
+  long getOfflineTotalMemAllocatedBytes();
+  void setOfflineTotalMemAllocatedBytes(long offlineTotalMemAllocatedBytes);
+
+  long getRealtimeTotalMemAllocatedBytes();
+  void setRealtimeTotalMemAllocatedBytes(long realtimeTotalMemAllocatedBytes);
+
+  boolean isGroupsTrimmed();
 
   boolean isNumGroupsLimitReached();
 
@@ -157,7 +182,11 @@ public interface RequestContext {
 
   void setNumServersResponded(int numServersResponded);
 
+  void setGroupsTrimmed(boolean groupsTrimmed);
+
   void setNumGroupsLimitReached(boolean numGroupsLimitReached);
+
+  void setMseLiteLeafStageLimitReached(boolean mseLiteLeafStageLimitReached);
 
   void setNumExceptions(int numExceptions);
 
@@ -217,16 +246,12 @@ public interface RequestContext {
 
   void setProcessingExceptions(List<String> processingExceptions);
 
-  /**
-   * @return Map of allowlisted request header keys (in lowercase) to list of header values
-   */
+  /// @return Map of allowlisted request header keys (in lowercase) to list of header values
   Map<String, List<String>> getRequestHttpHeaders();
 
-  /**
-   * While setting the http request headers here, we send the keys in lower-case to be in parity with the
-   * case-insensitive nature of Http.
-   * @param requestHttpHeaders Map of request header keys (in lowercase) to list of header values
-   */
+  /// While setting the http request headers here, we send the keys in lower-case to be in parity with the
+  /// case-insensitive nature of Http.
+  /// @param requestHttpHeaders Map of request header keys (in lowercase) to list of header values
   void setRequestHttpHeaders(Map<String, List<String>> requestHttpHeaders);
 
   enum FanoutType {

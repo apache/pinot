@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import java.util.UUID;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.DataTypeConversionFunctions.hexDecimalToLong;
 import static org.apache.pinot.common.function.scalar.DataTypeConversionFunctions.longToHexDecimal;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 
 
 public class DataTypeConversionFunctionsTest {
@@ -53,6 +55,8 @@ public class DataTypeConversionFunctionsTest {
         {10, "long", 10L},
         {10D, "float", 10F},
         {10F, "double", 10D},
+        {UUID.fromString("550e8400-e29b-41d4-a716-446655440000"), "string",
+            "550e8400-e29b-41d4-a716-446655440000"},
         {"abc1", "bytes", new byte[]{(byte) 0xab, (byte) 0xc1}},
         {new byte[]{(byte) 0xab, (byte) 0xc1}, "string", "abc1"}
     };
@@ -61,6 +65,31 @@ public class DataTypeConversionFunctionsTest {
   @Test(dataProvider = "testCases")
   public void test(Object value, String type, Object expected) {
     assertEquals(DataTypeConversionFunctions.cast(value, type), expected);
+  }
+
+  @Test
+  public void testCastToUnsignedTypes() {
+    // Calcite 1.41+ (CALCITE-1466) makes unsigned casts (e.g. CAST(x AS INTEGER UNSIGNED)) parseable in the
+    // single-stage path; the type literal reaches cast() as the SqlTypeName name. The representable ones are mapped to
+    // the signed equivalent, mirroring the multi-stage RelToPlanNodeConverter: UTINYINT/USMALLINT -> INT, UINTEGER ->
+    // LONG.
+    assertEquals(DataTypeConversionFunctions.cast(5, "UTINYINT"), 5);
+    assertEquals(DataTypeConversionFunctions.cast(5, "USMALLINT"), 5);
+    assertEquals(DataTypeConversionFunctions.cast(5, "UINTEGER"), 5L);
+    // A value above the signed 32-bit max round-trips through UINTEGER -> LONG without wrapping (the reason UINTEGER
+    // maps to LONG rather than INT).
+    assertEquals(DataTypeConversionFunctions.cast(4000000000L, "UINTEGER"), 4000000000L);
+    // UBIGINT is unsupported -- rejected rather than silently wrapping values above Long.MAX_VALUE.
+    assertThrows(IllegalArgumentException.class, () -> DataTypeConversionFunctions.cast(5, "UBIGINT"));
+  }
+
+  @Test
+  public void testCastToIntegerLiteral() {
+    // `INTEGER` was the PinotDataType enum name before it was renamed to `INT`. It is kept as an explicit cast literal
+    // for backward compatibility so existing `CAST(x AS INTEGER)` queries keep working; both literals resolve to INT.
+    assertEquals(DataTypeConversionFunctions.cast(10L, "INTEGER"), 10);
+    assertEquals(DataTypeConversionFunctions.cast(10L, "INT"), 10);
+    assertEquals(DataTypeConversionFunctions.cast("10.0", "INTEGER"), 10);
   }
 
   @Test

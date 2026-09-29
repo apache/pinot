@@ -220,6 +220,11 @@ public class BenchmarkScanDocIdIterators {
     }
 
     @Override
+    public boolean applyMV(BigDecimal[] values, int length) {
+      return false;
+    }
+
+    @Override
     public boolean applyMV(double[] values, int length) {
       return false;
     }

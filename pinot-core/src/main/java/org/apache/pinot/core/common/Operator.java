@@ -22,72 +22,66 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.plan.ExplainInfo;
-import org.apache.pinot.core.query.request.context.ExplainMode;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
 
 
 @InterfaceAudience.Private
 public interface Operator<T extends Block> {
 
-  /**
-   * Get the next {@link Block}.
-   * <p>For filter operator and operators above projection phase (aggregation, selection, combine etc.), method should
-   * only be called once, and will return a non-null block.
-   * <p>For operators in projection phase (docIdSet, projection, transformExpression), method can be called multiple
-   * times, and will return non-empty block or null if no more documents available
-   *
-   * @throws EarlyTerminationException if the operator is early-terminated (interrupted) before processing the next
-   *         block of data. Operator can be early terminated when the query times out, or is already satisfied.
-   */
+  /// Get the next [Block].
+  ///
+  /// For filter operator and operators above projection phase (aggregation, selection, combine etc.), method should
+  /// only be called once, and will return a non-null block.
+  ///
+  /// For operators in projection phase (docIdSet, projection, transformExpression), method can be called multiple
+  /// times, and will return non-empty block or null if no more documents available
+  ///
+  /// @throws org.apache.pinot.spi.exception.EarlyTerminationException if the operator is early-terminated
+  ///         (interrupted) before processing the next block of data. Operator can be early terminated when the
+  ///         query times out, or is already satisfied.
+  /// @throws org.apache.pinot.spi.exception.QueryException if the query is cancelled, killed or timed out before
+  ///         processing the next block of data.
   T nextBlock();
 
-  /** @return List of {@link Operator}s that this operator depends upon. */
+  /// @return List of [Operator]s that this operator depends upon.
   List<? extends Operator> getChildOperators();
 
-  /**
-   * Explains the operator and its children into a tree structure.
-   *
-   * This is the method that ends up being called when using {@link ExplainMode#NODE}.
-   */
+  /// Explains the operator and its children into a tree structure.
+  ///
+  /// This is the method that ends up being called when using
+  /// [org.apache.pinot.core.query.request.context.ExplainMode#NODE].
   ExplainInfo getExplainInfo();
 
-  /**
-   * Returns the string representation of the operator in a string format.
-   *
-   * This string may include some additional information about the operator, such as the number of documents matched
-   * or the aggregation functions applied.
-   *
-   * By default, this method is called when using {@link ExplainMode#DESCRIPTION description} mode after
-   * {@link #prepareForExplainPlan(ExplainPlanRows)} has been called.
-   */
+  /// Returns the string representation of the operator in a string format.
+  ///
+  /// This string may include some additional information about the operator, such as the number of documents matched
+  /// or the aggregation functions applied.
+  ///
+  /// By default, this method is called when using
+  /// [`description`]\[org.apache.pinot.core.query.request.context.ExplainMode#DESCRIPTION\] mode after
+  /// [#prepareForExplainPlan(ExplainPlanRows)] has been called.
   @Nullable
   String toExplainString();
 
-  /**
-   * This method is called before {@link #toExplainString()} when explaining the plan in
-   * {@link ExplainMode#DESCRIPTION description} mode.
-   *
-   * Most operators don't need to do anything here, but some operators may need to prepare some data.
-   */
+  /// This method is called before [#toExplainString()] when explaining the plan in
+  /// [`description`]\[org.apache.pinot.core.query.request.context.ExplainMode#DESCRIPTION\] mode.
+  ///
+  /// Most operators don't need to do anything here, but some operators may need to prepare some data.
   default void prepareForExplainPlan(ExplainPlanRows explainPlanRows) {
   }
 
-  /**
-   * This method is called after {@link #toExplainString()} when explaining the plan in
-   * {@link ExplainMode#DESCRIPTION description} mode.
-   *
-   * Most operators don't need to do anything here, but some operators may need to post-process some data.
-   */
+  /// This method is called after [#toExplainString()] when explaining the plan in
+  /// [`description`]\[org.apache.pinot.core.query.request.context.ExplainMode#DESCRIPTION\] mode.
+  ///
+  /// Most operators don't need to do anything here, but some operators may need to post-process some data.
   default void postExplainPlan(ExplainPlanRows explainPlanRows) {
   }
 
-  /**
-   * Explains the operator and its children in a string format.
-   *
-   * This is the method that ends up being called when using {@link ExplainMode#DESCRIPTION}.
-   */
+  /// Explains the operator and its children in a string format.
+  ///
+  /// This is the method that ends up being called when using
+  /// [org.apache.pinot.core.query.request.context.ExplainMode#DESCRIPTION].
   default void explainPlan(ExplainPlanRows explainPlanRows, int[] globalId, int parentId) {
     prepareForExplainPlan(explainPlanRows);
     String explainPlanString = toExplainString();
@@ -106,17 +100,13 @@ public interface Operator<T extends Block> {
     postExplainPlan(explainPlanRows);
   }
 
-  /**
-   * Returns the index segment associated with the operator.
-   */
+  /// Returns the index segment associated with the operator.
   default IndexSegment getIndexSegment() {
     return null;
   }
 
-  /**
-   * Returns the execution statistics associated with the operator. This method should be called after the operator has
-   * finished execution.
-   */
+  /// Returns the execution statistics associated with the operator. This method should be called after the operator has
+  /// finished execution.
   default ExecutionStatistics getExecutionStatistics() {
     throw new UnsupportedOperationException();
   }

@@ -18,26 +18,23 @@
  */
 package org.apache.pinot.controller.util;
 
-import com.google.common.collect.ImmutableList;
 import java.util.List;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.transport.HttpServerThreadPoolConfig;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * Asserts that {@link ListenerConfigUtil} will generated expected {@link ListenerConfig} based on the properties
- * provided in {@link ControllerConf}
- */
+/// Asserts that [ListenerConfigUtil] will generated expected [ListenerConfig] based on the properties
+/// provided in [ControllerConf]
 public class ListenerConfigUtilTest {
-  /**
-   * Asserts that the protocol listeners properties are Opt-In and not initialized when nothing but controler.port is
-   * used.
-   */
+  /// Asserts that the protocol listeners properties are Opt-In and not initialized when nothing but controler.port is
+  /// used.
   @Test(expectedExceptions = IllegalStateException.class)
   public void testControllerPortConfig() {
     ControllerConf controllerConf = new ControllerConf();
@@ -76,10 +73,45 @@ public class ListenerConfigUtilTest {
     Assert.assertEquals(9, listenerConfigs.get(0).getThreadPoolConfig().getMaxPoolSize());
   }
 
-  /**
-   * Asserts that enabling https generates the existing legacy listener as well as the another one configured with
-   * TLS settings.
-   */
+  @Test
+  public void testMaxHttpHeaderConfig() {
+    // Test broker
+    PinotConfiguration brokerConf = new PinotConfiguration();
+    brokerConf.setProperty("pinot.broker.client.queryPort", "8099");
+
+    List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildBrokerConfigs(brokerConf);
+    Assert.assertEquals(listenerConfigs.size(), 1);
+    Assert.assertEquals(-1, listenerConfigs.get(0).getMaxHttpHeaderSize());
+    Assert.assertEquals(-1, listenerConfigs.get(0).getMaxRequestHeaders());
+
+    brokerConf.setProperty("pinot.broker.http.server.max.http.header.size", 16384);
+    brokerConf.setProperty("pinot.broker.http.server.max.request.headers", 200);
+
+    listenerConfigs = ListenerConfigUtil.buildBrokerConfigs(brokerConf);
+    Assert.assertEquals(listenerConfigs.size(), 1);
+    Assert.assertEquals(16384, listenerConfigs.get(0).getMaxHttpHeaderSize());
+    Assert.assertEquals(200, listenerConfigs.get(0).getMaxRequestHeaders());
+
+    // Test controller
+    ControllerConf controllerConf = new ControllerConf();
+    controllerConf.setProperty("controller.port", "9000");
+
+    listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
+    Assert.assertEquals(listenerConfigs.size(), 1);
+    Assert.assertEquals(-1, listenerConfigs.get(0).getMaxHttpHeaderSize());
+    Assert.assertEquals(-1, listenerConfigs.get(0).getMaxRequestHeaders());
+
+    controllerConf.setProperty("pinot.controller.http.server.max.http.header.size", 32768);
+    controllerConf.setProperty("pinot.controller.http.server.max.request.headers", 150);
+
+    listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
+    Assert.assertEquals(listenerConfigs.size(), 1);
+    Assert.assertEquals(32768, listenerConfigs.get(0).getMaxHttpHeaderSize());
+    Assert.assertEquals(150, listenerConfigs.get(0).getMaxRequestHeaders());
+  }
+
+  /// Asserts that enabling https generates the existing legacy listener as well as the another one configured with
+  /// TLS settings.
   @Test
   public void testLegacyAndHttps() {
     ControllerConf controllerConf = new ControllerConf();
@@ -100,9 +132,7 @@ public class ListenerConfigUtilTest {
     assertHttpsListener(httpsListener, "10.0.0.10", 9443);
   }
 
-  /**
-   * Asserts that controller.port can be opt-out and both http and https can be configured with seperate ports.
-   */
+  /// Asserts that controller.port can be opt-out and both http and https can be configured with separate ports.
   @Test
   public void testHttpAndHttpsConfigs() {
     ControllerConf controllerConf = new ControllerConf();
@@ -126,9 +156,43 @@ public class ListenerConfigUtilTest {
     assertHttpsListener(httpsListener, "0.0.0.0", 9443);
   }
 
-  /**
-   * Asserts that a single listener configuration is generated with a secured TLS port.
-   */
+  /// Asserts that protocol names are trimmed and empty names are skipped. Cluster configs are applied with
+  /// `setProperty`, which keeps the raw value, so a value like `http, https` is not split or trimmed by the config.
+  @Test(dataProvider = "accessProtocolsWithSpaces")
+  public void testAccessProtocolsWithSpaces(String accessProtocols) {
+    ControllerConf controllerConf = new ControllerConf();
+
+    controllerConf.setProperty("controller.access.protocols", accessProtocols);
+    controllerConf.setProperty("controller.access.protocols.http.port", "9000");
+
+    configureHttpsProperties(controllerConf, 9443);
+
+    List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
+
+    Assert.assertEquals(listenerConfigs.size(), 2);
+
+    assertHttpListener(getListener("http", listenerConfigs), "0.0.0.0", 9000);
+    assertHttpsListener(getListener("https", listenerConfigs), "0.0.0.0", 9443);
+  }
+
+  @DataProvider
+  public Object[][] accessProtocolsWithSpaces() {
+    return new Object[][]{{"http, https"}, {" http , https "}, {"http, ,https,"}};
+  }
+
+  /// Asserts that no listener is generated when the protocols value is blank or has only empty names.
+  @Test
+  public void testBlankAccessProtocols() {
+    for (String accessProtocols : List.of("", "  ", " , ")) {
+      PinotConfiguration config = new PinotConfiguration();
+      config.setProperty("controller.access.protocols", accessProtocols);
+
+      Assert.assertEquals(ListenerConfigUtil.buildListenerConfigs(config, "controller", new TlsConfig()), List.of(),
+          "Protocols: '" + accessProtocols + "'");
+    }
+  }
+
+  /// Asserts that a single listener configuration is generated with a secured TLS port.
   @Test
   public void testHttpsOnly() {
     ControllerConf controllerConf = new ControllerConf();
@@ -144,9 +208,7 @@ public class ListenerConfigUtilTest {
     assertHttpsListener(listenerConfigs.get(0), "0.0.0.0", 9443);
   }
 
-  /**
-   * Tests behavior when an invalid host is provided.
-   */
+  /// Tests behavior when an invalid host is provided.
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testInvalidHost() {
     ControllerConf controllerConf = new ControllerConf();
@@ -158,9 +220,7 @@ public class ListenerConfigUtilTest {
     ListenerConfigUtil.buildControllerConfigs(controllerConf);
   }
 
-  /**
-   * Tests behavior when an invalid port is provided
-   */
+  /// Tests behavior when an invalid port is provided
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testInvalidPort() {
     ControllerConf controllerConf = new ControllerConf();
@@ -173,9 +233,7 @@ public class ListenerConfigUtilTest {
     ListenerConfigUtil.buildControllerConfigs(controllerConf);
   }
 
-  /**
-   * Tests behavior when an empty http port is provided.
-   */
+  /// Tests behavior when an empty http port is provided.
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testEmptyHttpPort() {
     ControllerConf controllerConf = new ControllerConf();
@@ -186,9 +244,7 @@ public class ListenerConfigUtilTest {
     ListenerConfigUtil.buildControllerConfigs(controllerConf);
   }
 
-  /**
-   * Tests behavior when an empty https port is provided.
-   */
+  /// Tests behavior when an empty https port is provided.
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testEmptyHttpsPort() {
     ControllerConf controllerConf = new ControllerConf();
@@ -201,7 +257,7 @@ public class ListenerConfigUtilTest {
 
   @Test
   public void testFindLastTlsPort() {
-    List<ListenerConfig> configs = ImmutableList.of(new ListenerConfig("conf1", "host1", 9000, "http", null,
+    List<ListenerConfig> configs = List.of(new ListenerConfig("conf1", "host1", 9000, "http", null,
             HttpServerThreadPoolConfig.defaultInstance()),
         new ListenerConfig("conf2", "host2", 9001, "https", null,
             HttpServerThreadPoolConfig.defaultInstance()),
@@ -217,7 +273,7 @@ public class ListenerConfigUtilTest {
 
   @Test
   public void testFindLastTlsPortMissing() {
-    List<ListenerConfig> configs = ImmutableList.of(new ListenerConfig("conf1", "host1", 9000, "http", null,
+    List<ListenerConfig> configs = List.of(new ListenerConfig("conf1", "host1", 9000, "http", null,
             HttpServerThreadPoolConfig.defaultInstance()),
         new ListenerConfig("conf2", "host2", 9001, "http", null,
             HttpServerThreadPoolConfig.defaultInstance()),

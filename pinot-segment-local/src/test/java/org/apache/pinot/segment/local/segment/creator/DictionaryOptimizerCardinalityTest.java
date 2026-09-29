@@ -22,14 +22,14 @@ package org.apache.pinot.segment.local.segment.creator;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -51,7 +51,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class DictionaryOptimizerCardinalityTest {
+public class DictionaryOptimizerCardinalityTest implements PinotBuffersAfterClassCheckRule {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryOptimizerCardinalityTest.class);
   private static final File INDEX_DIR = new File(DictionaryOptimizerCardinalityTest.class.toString());
@@ -64,24 +64,28 @@ public class DictionaryOptimizerCardinalityTest {
       throws Exception {
 
     ImmutableSegment heapSegment = ImmutableSegmentLoader.load(_segmentDirectory, ReadMode.heap);
+    try {
 
-    Schema schema = heapSegment.getSegmentMetadata().getSchema();
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      // Skip virtual columns
-      if (fieldSpec.isVirtualColumn()) {
-        continue;
-      }
+      Schema schema = heapSegment.getSegmentMetadata().getSchema();
+      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+        // Skip virtual columns
+        if (fieldSpec.isVirtualColumn()) {
+          continue;
+        }
 
-      String columnName = fieldSpec.getName();
-      if ("low_cardinality_strings".equals(columnName)) {
-        Assert.assertTrue(heapSegment.getForwardIndex(columnName).isDictionaryEncoded(),
-            "Low cardinality columns should be dictionary encoded");
-      }
+        String columnName = fieldSpec.getName();
+        if ("low_cardinality_strings".equals(columnName)) {
+          Assert.assertTrue(heapSegment.getForwardIndex(columnName).isDictionaryEncoded(),
+              "Low cardinality columns should be dictionary encoded");
+        }
 
-      if ("high_cardinality_strings".equals(columnName)) {
-        Assert.assertFalse(heapSegment.getForwardIndex(columnName).isDictionaryEncoded(),
-            "High cardinality columns should be raw encoded");
+        if ("high_cardinality_strings".equals(columnName)) {
+          Assert.assertFalse(heapSegment.getForwardIndex(columnName).isDictionaryEncoded(),
+              "High cardinality columns should be raw encoded");
+        }
       }
+    } finally {
+      heapSegment.destroy();
     }
   }
 
@@ -100,15 +104,18 @@ public class DictionaryOptimizerCardinalityTest {
     ingestionConfig.setRowTimeValueCheck(false);
     ingestionConfig.setSegmentTimeValueCheck(false);
     Schema schema =
-        new Schema.SchemaBuilder().addSingleValueDimension("low_cardinality_strings", FieldSpec.DataType.STRING)
+        new Schema.SchemaBuilder()
+            .addSingleValueDimension("low_cardinality_strings", FieldSpec.DataType.STRING)
             .addSingleValueDimension("high_cardinality_strings", FieldSpec.DataType.STRING)
-            .addDateTimeField("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+            .addDateTimeField("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .build();
+
     List<DimensionFieldSpec> stringColumns =
-        schema.getDimensionFieldSpecs().stream().filter(x -> x.getDataType() == FieldSpec.DataType.STRING).collect(
-            Collectors.toList());
+        schema.getDimensionFieldSpecs().stream().filter(x -> x.getDataType() == FieldSpec.DataType.STRING)
+            .collect(Collectors.toList());
 
     List<FieldConfig> fieldConfigList = stringColumns.stream().map(
-            x -> new FieldConfig(x.getName(), FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(), null, null))
+            x -> new FieldConfig(x.getName(), FieldConfig.EncodingType.DICTIONARY, List.of(), null, null))
         .collect(Collectors.toList());
 
     SegmentGeneratorConfig segmentGenSpec =
@@ -126,7 +133,7 @@ public class DictionaryOptimizerCardinalityTest {
     segmentGenSpec.setOptimizeDictionary(true);
     segmentGenSpec.setNoDictionaryCardinalityRatioThreshold(0.1); // cardinality must be <10% of total docs to override
 
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGenSpec);
     driver.build();
 

@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
@@ -39,33 +38,35 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Combine operator for group-by queries.
- * TODO: Use CombineOperatorUtils.getNumThreadsForQuery() to get the parallelism of the query instead of using
- *       all threads
- */
+/// Combine operator for group-by queries.
 @SuppressWarnings("rawtypes")
 public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
-  public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
-
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
   private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
 
   private final int _numAggregationFunctions;
-  private final int _numGroupByExpressions;
+  /// Number of key columns: union group-by columns plus the synthetic $groupingId column for grouping sets.
+  /// Key columns precede the aggregation columns in the record layout.
+  private final int _numKeyColumns;
   private final int _numColumns;
   // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
   // _futures (try to interrupt the execution if it already started).
   private final CountDownLatch _operatorLatch;
 
   private volatile IndexedTable _indexedTable;
+  private volatile boolean _groupsTrimmed;
   private volatile boolean _numGroupsLimitReached;
+  private volatile boolean _numGroupsWarningLimitReached;
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
@@ -74,18 +75,17 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     assert aggregationFunctions != null;
     _numAggregationFunctions = aggregationFunctions.length;
     assert _queryContext.getGroupByExpressions() != null;
-    _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
-    _numColumns = _numGroupByExpressions + _numAggregationFunctions;
+    _numKeyColumns = _queryContext.getNumGroupByKeyColumns();
+    _numColumns = _numKeyColumns + _numAggregationFunctions;
     _operatorLatch = new CountDownLatch(_numTasks);
   }
 
-  /**
-   * For group-by queries, when maxExecutionThreads is not explicitly configured, create one task per operator.
-   */
+  /// For group-by queries, when maxExecutionThreads is not explicitly configured, override it to create as many tasks
+  /// as the default number of query worker threads (or the number of operators / segments if that's lower).
   private static QueryContext overrideMaxExecutionThreads(QueryContext queryContext, int numOperators) {
     int maxExecutionThreads = queryContext.getMaxExecutionThreads();
     if (maxExecutionThreads <= 0) {
-      queryContext.setMaxExecutionThreads(numOperators);
+      queryContext.setMaxExecutionThreads(Math.min(numOperators, ResourceManager.DEFAULT_QUERY_WORKER_THREADS));
     }
     return queryContext;
   }
@@ -95,9 +95,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     return EXPLAIN_NAME;
   }
 
-  /**
-   * Executes query on one segment in a worker thread and merges the results into the indexed table.
-   */
+  /// Executes query on one segment in a worker thread and merges the results into the indexed table.
   @Override
   protected void processSegments() {
     int operatorId;
@@ -111,14 +109,21 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         if (_indexedTable == null) {
           synchronized (this) {
             if (_indexedTable == null) {
-              _indexedTable = GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks);
+              _indexedTable = GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks,
+                  _executorService);
             }
           }
         }
 
+        if (resultsBlock.isGroupsTrimmed()) {
+          _groupsTrimmed = true;
+        }
         // Set groups limit reached flag.
         if (resultsBlock.isNumGroupsLimitReached()) {
           _numGroupsLimitReached = true;
+        }
+        if (resultsBlock.isNumGroupsWarningLimitReached()) {
+          _numGroupsWarningLimitReached = true;
         }
 
         // Merge aggregation group-by result.
@@ -132,26 +137,29 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
           if (aggregationGroupByResult != null) {
             // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-            Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-            while (dicGroupKeyIterator.hasNext()) {
-              GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
-              Object[] keys = groupKey._keys;
-              Object[] values = Arrays.copyOf(keys, _numColumns);
-              int groupId = groupKey._groupId;
-              for (int i = 0; i < _numAggregationFunctions; i++) {
-                values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+            try {
+              Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+              while (dicGroupKeyIterator.hasNext()) {
+                QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
+                GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
+                Object[] keys = groupKey._keys;
+                Object[] values = Arrays.copyOf(keys, _numColumns);
+                int groupId = groupKey._groupId;
+                for (int i = 0; i < _numAggregationFunctions; i++) {
+                  values[_numKeyColumns + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+                }
+                _indexedTable.upsert(new Key(keys), new Record(values));
               }
-              _indexedTable.upsert(new Key(keys), new Record(values));
-              Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
-              mergedKeys++;
+            } finally {
+              // Release the resources used by the group key generator
+              aggregationGroupByResult.closeGroupKeyGenerator();
             }
           }
         } else {
           for (IntermediateRecord intermediateResult : intermediateRecords) {
+            QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
             //TODO: change upsert api so that it accepts intermediateRecord directly
             _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
-            mergedKeys++;
           }
         }
       } catch (RuntimeException e) {
@@ -174,19 +182,12 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     _operatorLatch.countDown();
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * <p>Combines intermediate selection result blocks from underlying operators and returns a merged one.
-   * <ul>
-   *   <li>
-   *     Merges multiple intermediate selection result blocks as a merged one.
-   *   </li>
-   *   <li>
-   *     Set all exceptions encountered during execution into the merged result block
-   *   </li>
-   * </ul>
-   */
+  /// {@inheritDoc}
+  ///
+  /// Combines intermediate selection result blocks from underlying operators and returns a merged one.
+  ///
+  /// - Merges multiple intermediate selection result blocks as a merged one.
+  /// - Set all exceptions encountered during execution into the merged result block
   @Override
   public BaseResultsBlock mergeResults()
       throws Exception {
@@ -194,16 +195,29 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
     if (!opCompleted) {
       // If this happens, the broker side should already timed out, just log the error and return
-      String errorMessage =
-          String.format("Timed out while combining group-by order-by results after %dms, queryContext = %s", timeoutMs,
-              _queryContext);
-      LOGGER.error(errorMessage);
-      return new ExceptionResultsBlock(new TimeoutException(errorMessage));
+      String userError = "Timed out while combining group-by order-by results after " + timeoutMs + "ms";
+      String logMsg = userError + ", queryContext = " + _queryContext;
+      LOGGER.error(logMsg);
+      return new ExceptionResultsBlock(new QueryErrorMessage(QueryErrorCode.EXECUTION_TIMEOUT, userError, logMsg));
     }
 
-    Throwable processingException = _processingException.get();
-    if (processingException != null) {
-      return new ExceptionResultsBlock(processingException);
+    Throwable ex = _processingException.get();
+    if (ex != null) {
+      String userError = "Caught exception while processing group-by order-by query";
+      String devError = userError + ": " + ex.getMessage();
+      QueryErrorMessage errMsg;
+      if (ex instanceof QueryException) {
+        // If the exception is a QueryException, use the error code from the exception and trust the error message
+        errMsg = new QueryErrorMessage(((QueryException) ex).getErrorCode(), devError, devError);
+      } else {
+        // If the exception is not a QueryException, use the generic error code and don't expose the exception message
+        errMsg = new QueryErrorMessage(QueryErrorCode.QUERY_EXECUTION, userError, devError);
+      }
+      return new ExceptionResultsBlock(errMsg);
+    }
+
+    if (_indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
+      _groupsTrimmed = true;
     }
 
     IndexedTable indexedTable = _indexedTable;
@@ -215,7 +229,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       indexedTable.finish(false);
     }
     GroupByResultsBlock mergedBlock = new GroupByResultsBlock(indexedTable, _queryContext);
+    mergedBlock.setGroupsTrimmed(_groupsTrimmed);
     mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
+    mergedBlock.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
     mergedBlock.setNumResizes(indexedTable.getNumResizes());
     mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
     return mergedBlock;

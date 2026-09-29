@@ -19,20 +19,60 @@
 package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Map;
+import javax.annotation.Nullable;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentSizeInfo {
   private final String _segmentName;
   private final long _diskSizeInBytes;
+  /// Segment-level uncompressed serialized column-value size covered by compression statistics.
+  @JsonProperty("compressionStatsUncompressedValueSizeInBytes")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private final Long _compressionStatsUncompressedValueSizeInBytes;
+  /// Segment-level forward-index and dictionary size covered by compression statistics.
+  @JsonProperty("compressionStatsForwardIndexAndDictionaryStorageSizeInBytes")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private final Long _compressionStatsForwardIndexAndDictionaryStorageSizeInBytes;
+  private final Map<String, ColumnCompressionStatsInfo> _columnCompressionStats;
+
+  public SegmentSizeInfo(String segmentName, long sizeBytes) {
+    this(segmentName, sizeBytes, (Long) null, null, null);
+  }
+
+  public SegmentSizeInfo(String segmentName, long sizeBytes, long compressionStatsUncompressedValueSizeInBytes,
+      long compressionStatsForwardIndexAndDictionaryStorageSizeInBytes) {
+    this(segmentName, sizeBytes, compressionStatsUncompressedValueSizeInBytes,
+        compressionStatsForwardIndexAndDictionaryStorageSizeInBytes, null);
+  }
+
+  public SegmentSizeInfo(String segmentName, long sizeBytes, long compressionStatsUncompressedValueSizeInBytes,
+      long compressionStatsForwardIndexAndDictionaryStorageSizeInBytes,
+      @Nullable Map<String, ColumnCompressionStatsInfo> columnCompressionStats) {
+    this(segmentName, sizeBytes, availableValue(compressionStatsUncompressedValueSizeInBytes),
+        availableValue(compressionStatsForwardIndexAndDictionaryStorageSizeInBytes), columnCompressionStats);
+  }
 
   @JsonCreator
   public SegmentSizeInfo(@JsonProperty("segmentName") String segmentName,
-      @JsonProperty("diskSizeInBytes") long sizeBytes) {
+      @JsonProperty("diskSizeInBytes") long sizeBytes,
+      @JsonProperty("compressionStatsUncompressedValueSizeInBytes") @Nullable
+      Long compressionStatsUncompressedValueSizeInBytes,
+      @JsonProperty("compressionStatsForwardIndexAndDictionaryStorageSizeInBytes") @Nullable
+      Long compressionStatsForwardIndexAndDictionaryStorageSizeInBytes,
+      @JsonProperty("columnCompressionStats") @Nullable Map<String, ColumnCompressionStatsInfo>
+          columnCompressionStats) {
     _segmentName = segmentName;
     _diskSizeInBytes = sizeBytes;
+    _compressionStatsUncompressedValueSizeInBytes = compressionStatsUncompressedValueSizeInBytes;
+    _compressionStatsForwardIndexAndDictionaryStorageSizeInBytes =
+        compressionStatsForwardIndexAndDictionaryStorageSizeInBytes;
+    _columnCompressionStats = columnCompressionStats != null ? Map.copyOf(columnCompressionStats) : null;
   }
 
   public String getSegmentName() {
@@ -41,6 +81,30 @@ public class SegmentSizeInfo {
 
   public long getDiskSizeInBytes() {
     return _diskSizeInBytes;
+  }
+
+  /// Returns segment-level uncompressed serialized column-value bytes, or `-1` when unavailable.
+  @JsonIgnore
+  public long getCompressionStatsUncompressedValueSizeInBytes() {
+    return _compressionStatsUncompressedValueSizeInBytes != null ? _compressionStatsUncompressedValueSizeInBytes : -1;
+  }
+
+  /// Returns segment-level forward-index and dictionary bytes, or `-1` when unavailable.
+  @JsonIgnore
+  public long getCompressionStatsForwardIndexAndDictionaryStorageSizeInBytes() {
+    return _compressionStatsForwardIndexAndDictionaryStorageSizeInBytes != null
+        ? _compressionStatsForwardIndexAndDictionaryStorageSizeInBytes : -1;
+  }
+
+  /// Returns public per-column compression statistics, or null when details were not requested.
+  @Nullable
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public Map<String, ColumnCompressionStatsInfo> getColumnCompressionStats() {
+    return _columnCompressionStats;
+  }
+
+  private static Long availableValue(long value) {
+    return value >= 0 ? value : null;
   }
 
   @Override

@@ -38,62 +38,64 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.datablock.DataBlockBuilder;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
 
-/**
- * Implements a simple Serde mechanism for the Time Series Block. This is used for transferring data between servers
- * and brokers. The approach is to use a {@link TransferableBlock} and rely on the existing serialization code to avoid
- * re-inventing the wheel. Once the time-series engine coalesces with the Multistage Engine, we will anyway use
- * TransferableBlock for data transfers.
- * <p>
- *   The {@link TimeSeriesBlock} is converted to and from a table, where the first row contains information about the
- *   time-buckets. For each tag/label in the query, there's a dedicated column, and the Double values are stored in
- *   the last column. As an example, consider the following, where FBV represents the first bucket value of TimeBuckets.
- *   <pre>
- *     +-------------+------------+-------------+---------------------------------+
- *     | tag-0       | tag-1      | tag-n       | values (String[] or double[])  |
- *     +-------------+------------+-------------+---------------------------------+
- *     | null        | null       | null        | [FBV, bucketSize, numBuckets]   |
- *     +-------------+------------+-------------+---------------------------------+
- *     | Chicago     | 60607      | ...         | [value-0, value-1, ... value-x] |
- *     +-------------+------------+-------------+---------------------------------+
- *     | San Fran.   | 94107      | ...         | [value-0, value-1, ... value-x] |
- *     +-------------+------------+-------------+---------------------------------+
- *   </pre>
- *   TODO(timeseries): When we support Time Series selection queries, we will likely need a special column instead of
- *     tags, because one could store data in JSON Blobs and the series may have different tags/labels.
- * </p>
- * <p>
- *  TODO(timeseries): One source of inefficiency is boxing/unboxing of Double arrays.
- *  TODO(timeseries): The other is tag values being Object[]. We should make tag values String[].
- * </p>
- */
+/// Implements a simple Serde mechanism for the Time Series Block. This is used for transferring data between servers
+/// and brokers. The approach is to use a [org.apache.pinot.query.runtime.blocks.MseBlock] and rely on the
+/// existing serialization code to avoid re-inventing the wheel. Once the time-series engine coalesces with the
+/// Multistage Engine, we will anyway use MseBlock for data transfers.
+///
+///   The [TimeSeriesBlock] is converted to and from a table, where the first row contains information about the
+///   time-buckets. For each tag/label in the query, there's a dedicated column, and the Double values are stored in the
+///   last column. As an example, consider the following, where FBV represents the first bucket value of TimeBuckets.
+///
+/// ```
+/// +-------------+------------+-------------+---------------------------------+
+/// | tag-0       | tag-1      | tag-n       | values (String[] or double[])  |
+/// +-------------+------------+-------------+---------------------------------+
+/// | null        | null       | null        | [FBV, bucketSize, numBuckets]   |
+/// +-------------+------------+-------------+---------------------------------+
+/// | Chicago     | 60607      | ...         | [value-0, value-1, ... value-x] |
+/// +-------------+------------+-------------+---------------------------------+
+/// | San Fran.   | 94107      | ...         | [value-0, value-1, ... value-x] |
+/// +-------------+------------+-------------+---------------------------------+
+/// ```
+///
+///   TODO(timeseries): When we support Time Series selection queries, we will likely need a special column instead of
+///     tags, because one could store data in JSON Blobs and the series may have different tags/labels.
+///
+///  TODO(timeseries): One source of inefficiency is boxing/unboxing of Double arrays.
+///  TODO(timeseries): The other is tag values being Object\[\]. We should make tag values String\[\].
 public class TimeSeriesBlockSerde {
-  /**
-   * Since DataBlock can only handle primitive double[] arrays, we use Double.MIN_VALUE to represent nulls.
-   * Using Double.MIN_VALUE is better than using Double.NaN since Double.NaN can help detect divide by 0.
-   * TODO(timeseries): Check if we can get rid of boxed Doubles altogether.
-   */
+  /// Since DataBlock can only handle primitive double\[\] arrays, we use Double.MIN_VALUE to represent nulls.
+  /// Using Double.MIN_VALUE is better than using Double.NaN since Double.NaN can help detect divide by 0.
+  /// TODO(timeseries): Check if we can get rid of boxed Doubles altogether.
   private static final String VALUES_COLUMN_NAME = "__ts_serde_values";
   private static final double NULL_PLACEHOLDER = Double.MIN_VALUE;
+  private static final String EXCEPTIONS_METADATA_KEY = "__ts_exceptions";
+  private static final String ERROR_CODE = "errorCode";
+  private static final String MESSAGE = "message";
 
   private TimeSeriesBlockSerde() {
   }
 
-  public static TimeSeriesBlock deserializeTimeSeriesBlock(ByteBuffer readOnlyByteBuffer)
+  public static TimeSeriesBlock deserializeTimeSeriesBlock(ByteBuffer readOnlyByteBuffer,
+      Map<String, String> metadataMap)
       throws IOException {
     DataBlock dataBlock = DataBlockUtils.readFrom(readOnlyByteBuffer);
-    TransferableBlock transferableBlock = TransferableBlockUtils.wrap(dataBlock);
-    List<String> tagNames = generateTagNames(Objects.requireNonNull(transferableBlock.getDataSchema(),
-        "Missing data schema in TransferableBlock"));
-    final DataSchema dataSchema = transferableBlock.getDataSchema();
-    List<Object[]> container = transferableBlock.getContainer();
+    SerializedDataBlock mseBlock = new SerializedDataBlock(dataBlock);
+    List<String> tagNames = generateTagNames(Objects.requireNonNull(mseBlock.getDataSchema(),
+        "Missing data schema in MseBlock"));
+    final DataSchema dataSchema = mseBlock.getDataSchema();
+    List<Object[]> container = mseBlock.asRowHeap().getRows();
     TimeBuckets timeBuckets = timeBucketsFromRow(container.get(0), dataSchema);
     Map<Long, List<TimeSeries>> seriesMap = new HashMap<>();
     for (int index = 1; index < container.size(); index++) {
@@ -102,7 +104,17 @@ public class TimeSeriesBlockSerde {
       long seriesId = Long.parseLong(timeSeries.getId());
       seriesMap.computeIfAbsent(seriesId, x -> new ArrayList<>()).add(timeSeries);
     }
-    return new TimeSeriesBlock(timeBuckets, seriesMap);
+    TimeSeriesBlock block = new TimeSeriesBlock(timeBuckets, seriesMap, metadataMap);
+    if (metadataMap.containsKey(EXCEPTIONS_METADATA_KEY)) {
+      String exceptionsJson = metadataMap.get(EXCEPTIONS_METADATA_KEY);
+      List<Map<String, Object>> exceptionsList = JsonUtils.stringToObject(exceptionsJson, List.class);
+      for (Map<String, Object> exceptionData : exceptionsList) {
+        int errorCode = ((Number) exceptionData.get(ERROR_CODE)).intValue();
+        String message = (String) exceptionData.get(MESSAGE);
+        block.addToExceptions(new QueryException(QueryErrorCode.fromErrorCode(errorCode), message));
+      }
+    }
+    return block;
   }
 
   public static ByteString serializeTimeSeriesBlock(TimeSeriesBlock timeSeriesBlock)
@@ -116,14 +128,27 @@ public class TimeSeriesBlockSerde {
         container.add(timeSeriesToRow(timeSeries, dataSchema));
       }
     }
-    TransferableBlock transferableBlock = new TransferableBlock(container, dataSchema, DataBlock.Type.ROW);
-    return DataBlockUtils.toByteString(transferableBlock.getDataBlock());
+    RowHeapDataBlock rowHeapBlock = new RowHeapDataBlock(container, dataSchema);
+    return DataBlockUtils.toByteString(rowHeapBlock.asSerialized().getDataBlock());
   }
 
-  /**
-   * This method is only used for encoding time-bucket-values to byte arrays, when the TimeSeries value type
-   * is byte[][].
-   */
+  public static void encodeExceptionsToMetadata(TimeSeriesBlock timeSeriesBlock, Map<String, String> metadataMap)
+      throws Exception {
+    List<QueryException> exceptions = timeSeriesBlock.getExceptions();
+    if (exceptions != null && !exceptions.isEmpty()) {
+      List<Map<String, Object>> exceptionsList = new ArrayList<>();
+      for (QueryException exception : exceptions) {
+        Map<String, Object> exceptionData = new HashMap<>();
+        exceptionData.put(ERROR_CODE, exception.getErrorCode().getId());
+        exceptionData.put(MESSAGE, exception.getMessage());
+        exceptionsList.add(exceptionData);
+      }
+      metadataMap.put(EXCEPTIONS_METADATA_KEY, JsonUtils.objectToString(exceptionsList));
+    }
+  }
+
+  /// This method is only used for encoding time-bucket-values to byte arrays, when the TimeSeries value type
+  /// is byte\[\]\[\].
   @VisibleForTesting
   static byte[][] toBytesArray(double[] values) {
     byte[][] result = new byte[values.length][8];
@@ -135,10 +160,8 @@ public class TimeSeriesBlockSerde {
     return result;
   }
 
-  /**
-   * This method is only used for decoding time-bucket-values from byte arrays, when the TimeSeries value type
-   * is byte[][].
-   */
+  /// This method is only used for decoding time-bucket-values from byte arrays, when the TimeSeries value type
+  /// is byte\[\]\[\].
   @VisibleForTesting
   static double[] fromBytesArray(byte[][] bytes) {
     double[] result = new double[bytes.length];
@@ -150,10 +173,8 @@ public class TimeSeriesBlockSerde {
     return result;
   }
 
-  /**
-   * Since {@link DataBlockBuilder} does not support {@link ColumnDataType#BYTES_ARRAY}, we have to encode the
-   * transmitted bytes as Hex to use String[].
-   */
+  /// Since [org.apache.pinot.core.common.datablock.DataBlockBuilder] does not support
+  /// [ColumnDataType#BYTES_ARRAY], we have to encode the transmitted bytes as Hex to use String\[\].
   @VisibleForTesting
   static String[] encodeAsHex(byte[][] byteValues) {
     String[] result = new String[byteValues.length];
@@ -163,9 +184,7 @@ public class TimeSeriesBlockSerde {
     return result;
   }
 
-  /**
-   * Used for decoding Hex strings. See {@link TimeSeriesBlockSerde#encodeAsHex} for more.
-   */
+  /// Used for decoding Hex strings. See [TimeSeriesBlockSerde#encodeAsHex] for more.
   @VisibleForTesting
   static byte[][] decodeFromHex(String[] hexEncodedValues) {
     byte[][] result = new byte[hexEncodedValues.length][];

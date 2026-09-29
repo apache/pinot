@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.startree.v2;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.Random;
-import org.apache.datasketches.tuple.Sketch;
-import org.apache.datasketches.tuple.Union;
-import org.apache.datasketches.tuple.aninteger.IntegerSketch;
+import org.apache.datasketches.tuple.TupleSketch;
+import org.apache.datasketches.tuple.TupleUnion;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerTupleSketch;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.aggregator.IntegerTupleSketchValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
@@ -36,7 +36,7 @@ public class DistinctCountIntegerSumTupleSketchStarTreeV2Test extends BaseStarTr
 
   @Override
   ValueAggregator<byte[], Object> getValueAggregator() {
-    return new IntegerTupleSketchValueAggregator(Collections.emptyList(), IntegerSummary.Mode.Sum);
+    return new IntegerTupleSketchValueAggregator(List.of(), IntegerSummary.Mode.Sum);
   }
 
   @Override
@@ -46,7 +46,7 @@ public class DistinctCountIntegerSumTupleSketchStarTreeV2Test extends BaseStarTr
 
   @Override
   byte[] getRandomRawValue(Random random) {
-    IntegerSketch is = new IntegerSketch(4, IntegerSummary.Mode.Sum);
+    IntegerTupleSketch is = new IntegerTupleSketch(4, IntegerSummary.Mode.Sum);
     is.update(random.nextInt(100), random.nextInt(100));
     return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(is.compact());
   }
@@ -60,11 +60,11 @@ public class DistinctCountIntegerSumTupleSketchStarTreeV2Test extends BaseStarTr
   }
 
   @SuppressWarnings("unchecked")
-  private Sketch<IntegerSummary> toSketch(Object value) {
-    if (value instanceof Union) {
-      return ((Union) value).getResult();
-    } else if (value instanceof Sketch) {
-      return ((Sketch) value);
+  private TupleSketch<IntegerSummary> toSketch(Object value) {
+    if (value instanceof TupleUnion) {
+      return ((TupleUnion) value).getResult();
+    } else if (value instanceof TupleSketch) {
+      return ((TupleSketch) value);
     } else {
       throw new IllegalStateException(
           "Unsupported data type for Integer Tuple Sketch aggregation: " + value.getClass().getSimpleName());

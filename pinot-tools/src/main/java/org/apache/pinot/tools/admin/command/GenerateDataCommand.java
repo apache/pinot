@@ -38,10 +38,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class to implement GenerateData command.
- *
- */
+/// Class to implement GenerateData command.
 @CommandLine.Command(name = "GenerateData", mixinStandardHelpOptions = true)
 public class GenerateDataCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(GenerateDataCommand.class);

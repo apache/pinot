@@ -23,9 +23,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -34,37 +37,35 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * The {@code FunnelCountAggregationFunction} calculates the number of conversions for a given correlation column and
- * a list of steps as boolean expressions.
- *
- * @param <A> Aggregation result accumulated across blocks within segment, kept by result holder.
- * @param <I> Intermediate result at segment level (extracted from aforementioned aggregation result).
- *
- * Example:
- *   SELECT
- *    dateTrunc('day', timestamp) AS ts,
- *    FUNNEL_COUNT(
- *      STEPS(url = '/addToCart', url = '/checkout', url = '/orderConfirmation'),
- *      CORRELATE_BY(user_id)
- *    ) as step_counts
- *    FROM user_log
- *    WHERE url in ('/addToCart', '/checkout', '/orderConfirmation')
- *    GROUP BY 1
- *
- *  Counting strategies can be controlled via optional SETTINGS options, for example:
- *
- *  FUNNEL_COUNT(
- *    STEPS(url = '/addToCart', url = '/checkout', url = '/orderConfirmation'),
- *    CORRELATE_BY(user_id),
- *    SETTINGS('theta_sketch','nominalEntries=4096')
- *  )
- *
- * Please refer to {@link FunnelCountAggregationFunctionFactory} to learn about counting strategies available.
- *
- * @see FunnelCountAggregationFunctionFactory
- * @see FunnelCountSortedAggregationFunction
- */
+/// The `FunnelCountAggregationFunction` calculates the number of conversions for a given correlation column and
+/// a list of steps as boolean expressions.
+///
+/// @param <A> Aggregation result accumulated across blocks within segment, kept by result holder.
+/// @param <I> Intermediate result at segment level (extracted from aforementioned aggregation result).
+///
+/// Example:
+///   SELECT
+///    dateTrunc('day', timestamp) AS ts,
+///    FUNNEL_COUNT(
+///      STEPS(url = '/addToCart', url = '/checkout', url = '/orderConfirmation'),
+///      CORRELATE_BY(user_id)
+///    ) as step_counts
+///    FROM user_log
+///    WHERE url in ('/addToCart', '/checkout', '/orderConfirmation')
+///    GROUP BY 1
+///
+///  Counting strategies can be controlled via optional SETTINGS options, for example:
+///
+///  FUNNEL_COUNT(
+///    STEPS(url = '/addToCart', url = '/checkout', url = '/orderConfirmation'),
+///    CORRELATE_BY(user_id),
+///    SETTINGS('theta_sketch','nominalEntries=4096')
+///  )
+///
+/// Please refer to [FunnelCountAggregationFunctionFactory] to learn about counting strategies available.
+///
+/// @see FunnelCountAggregationFunctionFactory
+/// @see FunnelCountSortedAggregationFunction
 public class FunnelCountAggregationFunction<A, I> implements AggregationFunction<I, LongArrayList> {
   private final List<ExpressionContext> _expressions;
   private final List<ExpressionContext> _stepExpressions;
@@ -146,12 +147,6 @@ public class FunnelCountAggregationFunction<A, I> implements AggregationFunction
 
   @Override
   public I merge(I a, I b) {
-    if (a == null) {
-      return b;
-    }
-    if (b == null) {
-      return a;
-    }
     return _mergeStrategy.merge(a, b);
   }
 
@@ -161,14 +156,27 @@ public class FunnelCountAggregationFunction<A, I> implements AggregationFunction
   }
 
   @Override
+  public SerializedIntermediateResult serializeIntermediateResult(I i) {
+    // TODO: Improve the ser/de logic
+    int type = ObjectSerDeUtils.ObjectType.getObjectType(i).getValue();
+    byte[] bytes = ObjectSerDeUtils.serialize(i, type);
+    return new SerializedIntermediateResult(type, bytes);
+  }
+
+  @Override
+  public I deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.deserialize(customObject);
+  }
+
+  @Override
   public ColumnDataType getFinalResultColumnType() {
     return ColumnDataType.LONG_ARRAY;
   }
 
   @Override
-  public LongArrayList extractFinalResult(I intermediateResult) {
+  public LongArrayList extractFinalResult(@Nullable I intermediateResult) {
     if (intermediateResult == null) {
-      return new LongArrayList(_numSteps);
+      return LongArrayList.wrap(new long[_numSteps]);
     }
     return _mergeStrategy.extractFinalResult(intermediateResult);
   }

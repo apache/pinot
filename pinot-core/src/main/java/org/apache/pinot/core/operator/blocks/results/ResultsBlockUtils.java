@@ -18,21 +18,19 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.common.request.context.TimeSeriesContext;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.operator.blocks.TimeSeriesBuilderBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.core.query.distinct.table.DistinctTable;
+import org.apache.pinot.core.query.distinct.table.EmptyDistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 
@@ -42,10 +40,8 @@ public class ResultsBlockUtils {
   private ResultsBlockUtils() {
   }
 
+  // TODO: Use schema to fill the correct data types for empty results.
   public static BaseResultsBlock buildEmptyQueryResults(QueryContext queryContext) {
-    if (QueryContextUtils.isTimeSeriesQuery(queryContext)) {
-      return buildEmptyTimeSeriesResults(queryContext);
-    }
     if (QueryContextUtils.isSelectionQuery(queryContext)) {
       return buildEmptySelectionQueryResults(queryContext);
     }
@@ -71,7 +67,7 @@ public class ResultsBlockUtils {
     // NOTE: Use STRING column data type as default for selection query
     Arrays.fill(columnDataTypes, ColumnDataType.STRING);
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-    return new SelectionResultsBlock(dataSchema, Collections.emptyList(), queryContext);
+    return new SelectionResultsBlock(dataSchema, List.of(), queryContext);
   }
 
   private static AggregationResultsBlock buildEmptyAggregationQueryResults(QueryContext queryContext) {
@@ -90,7 +86,11 @@ public class ResultsBlockUtils {
         queryContext.getFilteredAggregationFunctions();
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert filteredAggregationFunctions != null && groupByExpressions != null;
-    int numColumns = groupByExpressions.size() + filteredAggregationFunctions.size();
+    /// Grouping-set queries append a synthetic $groupingId key column after the group-by columns; the empty
+    /// result schema must match the non-empty one (see GroupByOperator) so an empty match (e.g. fully-pruned
+    /// segments) does not produce a narrower DataTable that the reducer would reject as a schema mismatch.
+    int numExtraKeyColumns = queryContext.getNumExtraGroupByKeyColumns();
+    int numColumns = groupByExpressions.size() + numExtraKeyColumns + filteredAggregationFunctions.size();
     String[] columnNames = new String[numColumns];
     ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
     int index = 0;
@@ -98,6 +98,11 @@ public class ResultsBlockUtils {
       columnNames[index] = groupByExpression.toString();
       // Use STRING column data type as default for group-by expressions
       columnDataTypes[index] = ColumnDataType.STRING;
+      index++;
+    }
+    if (numExtraKeyColumns > 0) {
+      columnNames[index] = GroupingSets.GROUPING_ID_COLUMN;
+      columnDataTypes[index] = ColumnDataType.INT;
       index++;
     }
     for (Pair<AggregationFunction, FilterContext> pair : filteredAggregationFunctions) {
@@ -119,15 +124,9 @@ public class ResultsBlockUtils {
     ColumnDataType[] columnDataTypes = new ColumnDataType[numExpressions];
     // NOTE: Use STRING column data type as default for distinct query
     Arrays.fill(columnDataTypes, ColumnDataType.STRING);
-    DistinctTable distinctTable = new DistinctTable(new DataSchema(columns, columnDataTypes), Collections.emptySet(),
-        queryContext.isNullHandlingEnabled());
+    DistinctTable distinctTable =
+        new EmptyDistinctTable(new DataSchema(columns, columnDataTypes), queryContext.getLimit(),
+            queryContext.isNullHandlingEnabled());
     return new DistinctResultsBlock(distinctTable, queryContext);
-  }
-
-  private static TimeSeriesResultsBlock buildEmptyTimeSeriesResults(QueryContext queryContext) {
-    TimeSeriesContext timeSeriesContext = queryContext.getTimeSeriesContext();
-    Preconditions.checkNotNull(timeSeriesContext);
-    return new TimeSeriesResultsBlock(
-        new TimeSeriesBuilderBlock(timeSeriesContext.getTimeBuckets(), Collections.emptyMap()));
   }
 }

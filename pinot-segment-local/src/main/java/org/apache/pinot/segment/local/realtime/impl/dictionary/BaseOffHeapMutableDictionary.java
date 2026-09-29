@@ -33,106 +33,104 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Off-heap mutable dictionaries have the following elements:
- * - A forward map from dictionary ID to the actual value.
- * - A reverse map from the value to the dictionary ID.
- *
- * This base class provides the reverse map functionality. The reverse map is realized using a list of off-heap
- * IntBuffers directly allocated.
- *
- * An on-heap overflow hashmap holds items that have hash collisions, until the overflow hashmap reaches a threshold
- * size. At this point, we add a new IntBuffer, and transfer items from the overflow hashmap into the newly allocated
- * buffer, and also create a new overflow hashmap to handle future collisions.
- *
- * Overflow on-heap hashmap is set to contain a max number of values as provided in the constructor. If number is 0
- * then overflow on-heap hashmap is disabled.
- *
- * To start with, we only have the on-heap overflow buffer. The IntBuffers are allocated when overflow hashmap reaches
- * a threshold number of entries.
- *
- * A buffer has N rows (N being a prime number) and NUM_COLUMNS columns, as below.
- * - The actual value for NUM_COLUMNS is yet to be tuned.
- * - Each cell in the buffer can hold one integer.
- *
- *                | col 0 | col 1 | ..... | col M-1 |
- *        ==========================================|
- *        row 0   |       |       |       |         |
- *        ==========================================|
- *        row 1   |       |       |       |
- *        ==========================================|
- *          .
- *          .
- *          .
- *        ==========================================|
- *        row N-1 |       |       |       |         |
- *        ==========================================|
- *
- * To start with, all cells are initialized to have NULL_VALUE_INDEX (indicating empty cell)
- * Here is the pseudo-code for indexing an item or finding the dictionary ID of an item.
- *
- * index(item) {
- *   foreach (iBuf: iBufList) {
- *     hash value into a row for the buffer.
- *     foreach (cell: rowOfCells) {
- *       if (cell is not occupied) {
- *         set it to dictId
- *         return
- *       } else if (item.equals(get(dictId)) {
- *         // item already present in dictionary
- *         return
- *       }
- *     }
- *   }
- *   oveflow.put(item, dictId)
- *   if (overflow.size() > threshold) {
- *     newSize = lastBufSize * expansionMultiple
- *     newBuf = allocateDirect(newSize)
- *     add newBuf to iBufList
- *     newOverflow = new HashMap()
- *     foreach (entry: overflow) {
- *       hash entry.key() into a row for newBuf
- *       foreach (cell : rowOfCells) {
- *         if (cell empty) {
- *           set cell to entry.value();
- *         }
- *       }
- *       if (we did not enter value above) {
- *         newOverflow.put(entry.key(), entry.value());
- *       }
- *     }
- *   }
- * }
- *
- * indexOf(item) {
- *   foreach (iBuf: iBufList) {
- *     hash value into a row for the buffer;
- *     foreach (cell : rowOfCells) {
- *       if (cell is not occupied) {
- *         return NULL_VALUE_INDEX;
- *       }
- *       if (cell is occupied && item.equals(get(dictId))) {
- *         return dictId;
- *       }
- *     }
- *   }
- *   if (overflow.contains(item)) {
- *     return overflow.get(item);
- *   }
- *   return NULL_VALUE_INDEX;
- * }
- *
- * The list of buffers and the overflow hash are maintained in a class (ValueToDictId) that is referenced via an
- * AtomicReference. This ensures that readers always get either the new version of these objects or the old version,
- * but not some inconsistent versions of these.
- *
- * It should be noted that this class assumes that there is one writer and multiple readers of the dictionary. It is
- * NOT safe for a multiple writer scenario.
- *
- * TODO
- * - It may be useful to implement a way to stop adding new items when the the number of buffers reaches a certain
- *   threshold. In this case, we could close the realtime segment, and start a new one with bigger buffers.
- */
+/// Off-heap mutable dictionaries have the following elements:
+/// - A forward map from dictionary ID to the actual value.
+/// - A reverse map from the value to the dictionary ID.
+///
+/// This base class provides the reverse map functionality. The reverse map is realized using a list of off-heap
+/// IntBuffers directly allocated.
+///
+/// An on-heap overflow hashmap holds items that have hash collisions, until the overflow hashmap reaches a threshold
+/// size. At this point, we add a new IntBuffer, and transfer items from the overflow hashmap into the newly allocated
+/// buffer, and also create a new overflow hashmap to handle future collisions.
+///
+/// Overflow on-heap hashmap is set to contain a max number of values as provided in the constructor. If number is 0
+/// then overflow on-heap hashmap is disabled.
+///
+/// To start with, we only have the on-heap overflow buffer. The IntBuffers are allocated when overflow hashmap reaches
+/// a threshold number of entries.
+///
+/// A buffer has N rows (N being a prime number) and NUM_COLUMNS columns, as below.
+/// - The actual value for NUM_COLUMNS is yet to be tuned.
+/// - Each cell in the buffer can hold one integer.
+///
+///                | col 0 | col 1 | ..... | col M-1 |
+///        ==========================================|
+///        row 0   |       |       |       |         |
+///        ==========================================|
+///        row 1   |       |       |       |
+///        ==========================================|
+///          .
+///          .
+///          .
+///        ==========================================|
+///        row N-1 |       |       |       |         |
+///        ==========================================|
+///
+/// To start with, all cells are initialized to have NULL_VALUE_INDEX (indicating empty cell)
+/// Here is the pseudo-code for indexing an item or finding the dictionary ID of an item.
+///
+/// index(item) {
+///   foreach (iBuf: iBufList) {
+///     hash value into a row for the buffer.
+///     foreach (cell: rowOfCells) {
+///       if (cell is not occupied) {
+///         set it to dictId
+///         return
+///       } else if (item.equals(get(dictId)) {
+///         // item already present in dictionary
+///         return
+///       }
+///     }
+///   }
+///   oveflow.put(item, dictId)
+///   if (overflow.size() > threshold) {
+///     newSize = lastBufSize \* expansionMultiple
+///     newBuf = allocateDirect(newSize)
+///     add newBuf to iBufList
+///     newOverflow = new HashMap()
+///     foreach (entry: overflow) {
+///       hash entry.key() into a row for newBuf
+///       foreach (cell : rowOfCells) {
+///         if (cell empty) {
+///           set cell to entry.value();
+///         }
+///       }
+///       if (we did not enter value above) {
+///         newOverflow.put(entry.key(), entry.value());
+///       }
+///     }
+///   }
+/// }
+///
+/// indexOf(item) {
+///   foreach (iBuf: iBufList) {
+///     hash value into a row for the buffer;
+///     foreach (cell : rowOfCells) {
+///       if (cell is not occupied) {
+///         return NULL_VALUE_INDEX;
+///       }
+///       if (cell is occupied && item.equals(get(dictId))) {
+///         return dictId;
+///       }
+///     }
+///   }
+///   if (overflow.contains(item)) {
+///     return overflow.get(item);
+///   }
+///   return NULL_VALUE_INDEX;
+/// }
+///
+/// The list of buffers and the overflow hash are maintained in a class (ValueToDictId) that is referenced via an
+/// AtomicReference. This ensures that readers always get either the new version of these objects or the old version,
+/// but not some inconsistent versions of these.
+///
+/// It should be noted that this class assumes that there is one writer and multiple readers of the dictionary. It is
+/// NOT safe for a multiple writer scenario.
+///
+/// TODO
+/// - It may be useful to implement a way to stop adding new items when the number of buffers reaches a certain
+///   threshold. In this case, we could close the realtime segment, and start a new one with bigger buffers.
 public abstract class BaseOffHeapMutableDictionary implements MutableDictionary {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseOffHeapMutableDictionary.class);
 
@@ -167,9 +165,7 @@ public abstract class BaseOffHeapMutableDictionary implements MutableDictionary 
   private final PinotDataBufferMemoryManager _memoryManager;
   private final String _allocationContext;
 
-  /**
-   * A class to hold all the objects needed for the reverse mapping.
-   */
+  /// A class to hold all the objects needed for the reverse mapping.
   private static class ValueToDictId {
     // Each iBuf layout is as described in comments above.
     private final List<IntBuffer> _iBufList;
@@ -315,17 +311,15 @@ public abstract class BaseOffHeapMutableDictionary implements MutableDictionary 
     return 1 << power;
   }
 
-  /**
-   * Given a raw value, get the dictionary ID from the reverse map.
-   *
-   * Since the dictionary IDs are stored in a hash map, multiple dictionary
-   * IDs may match to the same raw value. Use the methods provided by sub-class
-   * to compare the raw values with those in the forward map.
-   *
-   * @param value value of object for which we need to get dictionary ID
-   * @param serializedValue serialized form of the
-   * @return dictionary ID if found, NULL_VALUE_INDEX otherwise.
-   */
+  /// Given a raw value, get the dictionary ID from the reverse map.
+  ///
+  /// Since the dictionary IDs are stored in a hash map, multiple dictionary
+  /// IDs may match to the same raw value. Use the methods provided by sub-class
+  /// to compare the raw values with those in the forward map.
+  ///
+  /// @param value value of object for which we need to get dictionary ID
+  /// @param serializedValue serialized form of the
+  /// @return dictionary ID if found, NULL_VALUE_INDEX otherwise.
   protected int getDictId(Object value, byte[] serializedValue) {
     final int hashVal = value.hashCode() & Integer.MAX_VALUE;
     final ValueToDictId valueToDictId = _valueToDict;
@@ -352,15 +346,13 @@ public abstract class BaseOffHeapMutableDictionary implements MutableDictionary 
     return dictId;
   }
 
-  /**
-   * Index a value into the forward map (dictionary ID to value) and the reverse map
-   * (value to dictionary). Take care to set the reverse map last so as to make it
-   * work correctly for single writer multiple reader threads. Insertion and comparison
-   * methods for the forward map are provided by sub-classes.
-   *
-   * @param value value to be inserted into the dictionary
-   * @param serializedValue serialized representation of the value, may be null.
-   */
+  /// Index a value into the forward map (dictionary ID to value) and the reverse map
+  /// (value to dictionary). Take care to set the reverse map last so as to make it
+  /// work correctly for single writer multiple reader threads. Insertion and comparison
+  /// methods for the forward map are provided by sub-classes.
+  ///
+  /// @param value value to be inserted into the dictionary
+  /// @param serializedValue serialized representation of the value, may be null.
   protected int indexValue(Object value, byte[] serializedValue) {
     final int hashVal = value.hashCode() & Integer.MAX_VALUE;
     int newValueDictId = _numEntries;

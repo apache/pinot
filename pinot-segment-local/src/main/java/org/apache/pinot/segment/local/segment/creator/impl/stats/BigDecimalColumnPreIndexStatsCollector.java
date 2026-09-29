@@ -21,13 +21,15 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.math.BigDecimal;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
-/**
- * Extension of {@link AbstractColumnStatisticsCollector} for BigDecimal column type.
- */
+/// Extension of [AbstractColumnStatisticsCollector] for BigDecimal column type.
 public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
   private ObjectOpenHashSet<BigDecimal> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
   private int _minLength = Integer.MAX_VALUE;
@@ -40,12 +42,31 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
     super(column, statsCollectorConfig);
   }
 
+  public BigDecimalColumnPreIndexStatsCollector(FieldSpec fieldSpec, @Nullable FieldConfig fieldConfig,
+      @Nullable PartitionFunction partitionFunction) {
+    super(fieldSpec, fieldConfig, partitionFunction);
+  }
+
   @Override
   public void collect(Object entry) {
     assert !_sealed;
+    _totalDocs++;
 
     if (entry instanceof Object[]) {
-      throw new UnsupportedOperationException();
+      Object[] values = (Object[]) entry;
+      int rowLength = 0;
+      for (Object obj : values) {
+        BigDecimal value = (BigDecimal) obj;
+        int length = BigDecimalUtils.byteSize(value);
+        if (_values.add(value)) {
+          _minLength = Math.min(_minLength, length);
+          _maxLength = Math.max(_maxLength, length);
+        }
+        rowLength += length;
+      }
+      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
+      _maxRowLength = Math.max(_maxRowLength, rowLength);
+      updateTotalNumberOfEntries(values);
     } else {
       BigDecimal value = (BigDecimal) entry;
       int length = BigDecimalUtils.byteSize(value);
@@ -88,11 +109,11 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
 
   @Override
   public int getLengthOfShortestElement() {
-    return _minLength;
+    return _minLength != Integer.MAX_VALUE ? _minLength : 0;
   }
 
   @Override
-  public int getLengthOfLargestElement() {
+  public int getLengthOfLongestElement() {
     return _maxLength;
   }
 
@@ -104,6 +125,10 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
   @Override
   public int getCardinality() {
     return _sealed ? _sortedValues.length : _values.size();
+  }
+
+  BigDecimal[] getValues() {
+    return _values.toArray(new BigDecimal[0]);
   }
 
   @Override

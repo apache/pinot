@@ -35,9 +35,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for FUNNEL_COUNT queries using sorted strategy.
- */
+/// Queries test for FUNNEL_COUNT queries using sorted strategy.
 @SuppressWarnings("rawtypes")
 public class FunnelCountQueriesPartitionedSortedTest extends BaseFunnelCountQueriesTest {
 

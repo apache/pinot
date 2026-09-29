@@ -38,9 +38,7 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * This is a wrapper class for fetching segment metadata related information.
- */
+/// This is a wrapper class for fetching segment metadata related information.
 public class SegmentMetadataFetcher {
   private SegmentMetadataFetcher() {
   }
@@ -66,22 +64,15 @@ public class SegmentMetadataFetcher {
   private static final String STAR_TREE_METRIC_AGGREGATIONS = "metric-aggregations";
   private static final String STAR_TREE_MAX_LEAF_RECORDS = "max-leaf-records";
   private static final String STAR_TREE_DIMENSION_COLUMNS_SKIPPED = "dimension-columns-skipped";
+  private static final String STAR_TREE_NULL_HANDLING_ENABLED = "null-handling-enabled";
 
-  /**
-   * This is a helper method that fetches the segment metadata for a given segment.
-   * @param columns Columns to include for metadata
-   */
+  /// This is a helper method that fetches the segment metadata for a given segment.
+  /// @param columns Columns to include for metadata
   public static String getSegmentMetadata(SegmentDataManager segmentDataManager, List<String> columns)
       throws JsonProcessingException {
     IndexSegment segment = segmentDataManager.getSegment();
     SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
-    Set<String> columnSet;
-    if (columns.size() == 1 && columns.get(0).equals("*")) {
-      // Making code consistent and returning metadata and indexes only for non-virtual columns.
-      columnSet = segment.getPhysicalColumnNames();
-    } else {
-      columnSet = new HashSet<>(columns);
-    }
+    Set<String> columnSet = columns.contains("*") ? segment.getPhysicalColumnNames() : new HashSet<>(columns);
     ObjectNode segmentMetadataJson = (ObjectNode) segmentMetadata.toJson(columnSet);
     segmentMetadataJson.set(COLUMN_INDEX_KEY,
         JsonUtils.objectToJsonNode(getIndexesForSegmentColumns(segmentDataManager, columnSet)));
@@ -90,10 +81,8 @@ public class SegmentMetadataFetcher {
     return JsonUtils.objectToString(segmentMetadataJson);
   }
 
-  /**
-   * Get the JSON object with the segment column's indexing metadata.
-   * Lists all the columns if the parameter columnSet is null.
-   */
+  /// Get the JSON object with the segment column's indexing metadata.
+  /// Lists all the columns if the parameter columnSet is null.
   private static Map<String, Map<String, String>> getIndexesForSegmentColumns(SegmentDataManager segmentDataManager,
       @Nullable Set<String> columnSet) {
     IndexSegment segment = segmentDataManager.getSegment();
@@ -107,10 +96,8 @@ public class SegmentMetadataFetcher {
     return columnIndexMap;
   }
 
-  /**
-   * Helper to loop through column datasource to create a index map as follows for each column:
-   * {<"bloom-filter", "YES">, <"dictionary", "NO">}
-   */
+  /// Helper to loop through column datasource to create a index map as follows for each column:
+  /// {<"bloom-filter", "YES">, <"dictionary", "NO">}
   private static Map<String, String> getColumnIndexes(DataSource dataSource) {
     Map<String, String> indexStatus = new LinkedHashMap<>();
     if (Objects.isNull(dataSource.getBloomFilter())) {
@@ -176,18 +163,14 @@ public class SegmentMetadataFetcher {
     return indexStatus;
   }
 
-  /**
-   * Get the JSON object containing star tree index details for a segment.
-   */
+  /// Get the JSON object containing star tree index details for a segment.
   @Nullable
   private static List<Map<String, Object>> getStarTreeIndexesForSegment(SegmentDataManager segmentDataManager) {
     List<StarTreeV2> starTrees = segmentDataManager.getSegment().getStarTrees();
     return starTrees != null ? getStarTreeIndexes(starTrees) : null;
   }
 
-  /**
-   * Helper to loop over star trees of a segment to create a map containing star tree details.
-   */
+  /// Helper to loop over star trees of a segment to create a map containing star tree details.
   private static List<Map<String, Object>> getStarTreeIndexes(List<StarTreeV2> starTrees) {
     List<Map<String, Object>> startreeDetails = new ArrayList<>();
     for (StarTreeV2 starTree : starTrees) {
@@ -206,6 +189,9 @@ public class SegmentMetadataFetcher {
       starTreeIndexMap.put(STAR_TREE_MAX_LEAF_RECORDS, starTreeMetadata.getMaxLeafRecords());
       starTreeIndexMap.put(STAR_TREE_DIMENSION_COLUMNS_SKIPPED,
           starTreeMetadata.getSkipStarNodeCreationForDimensions());
+      // Part of the star-tree's identity: a null-aware and a regular star-tree over the same columns are different
+      // indexes, so a consumer rebuilding a config from this metadata has to carry it
+      starTreeIndexMap.put(STAR_TREE_NULL_HANDLING_ENABLED, starTreeMetadata.isNullHandlingEnabled());
       startreeDetails.add(starTreeIndexMap);
     }
     return startreeDetails;

@@ -23,10 +23,8 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 
-/**
- * Placeholder for all RecordReader configs. Manages the lifecycle of a RecordReader by initing/closing within the
- * Segment creation framework.
- */
+/// Placeholder for all RecordReader configs. Manages the lifecycle of a RecordReader by initing/closing within the
+/// Segment creation framework.
 public class RecordReaderFileConfig {
   public final FileFormat _fileFormat;
   public final File _dataFile;

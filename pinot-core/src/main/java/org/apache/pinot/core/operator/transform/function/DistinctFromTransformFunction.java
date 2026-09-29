@@ -26,13 +26,11 @@ import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * <code>DistinctFromTransformFunction</code> abstracts the transform needed for IsDistinctFrom and IsNotDistinctFrom.
- * Null value is considered as distinct from non-null value.
- * When both values are not null, this function calls equal transform function to determined whether two values are
- * distinct.
- * This function only supports two arguments which are both column names.
- */
+/// `DistinctFromTransformFunction` abstracts the transform needed for IsDistinctFrom and IsNotDistinctFrom.
+/// Null value is considered as distinct from non-null value.
+/// When both values are not null, this function calls equal transform function to determined whether two values are
+/// distinct.
+/// This function only supports two arguments which are both column names.
 public class DistinctFromTransformFunction extends BinaryOperatorTransformFunction {
   // Result value to save when two values are distinct.
   // 1 for isDistinct, 0 for isNotDistinct
@@ -41,16 +39,12 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
   // 0 for isDistinct, 1 for isNotDistinct
   private final int _notDistinctResult;
 
-  /**
-   * Returns true when bitmap is null (null option is disabled) or bitmap is empty.
-   */
+  /// Returns true when bitmap is null (null option is disabled) or bitmap is empty.
   private static boolean isEmpty(RoaringBitmap bitmap) {
     return bitmap == null || bitmap.isEmpty();
   }
 
-  /**
-   * @param distinct is set to true for IsDistinctFrom, otherwise it is for IsNotDistinctFrom.
-   */
+  /// @param distinct is set to true for IsDistinctFrom, otherwise it is for IsNotDistinctFrom.
   protected DistinctFromTransformFunction(boolean distinct) {
     super(distinct ? TransformFunctionType.NOT_EQUALS : TransformFunctionType.EQUALS);
     _distinctResult = distinct ? 1 : 0;

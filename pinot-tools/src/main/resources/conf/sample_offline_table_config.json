@@ -7,7 +7,6 @@
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "365",
     "segmentPushType": "APPEND",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "replication": "3"
   },
   "tenants": {

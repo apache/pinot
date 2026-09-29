@@ -26,15 +26,13 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.logical.PlanFragmenter;
+import org.apache.pinot.query.planner.physical.v2.ExchangeStrategy;
 
 
-/**
- * ExchangeNode represents the exchange stage in the query plan.
- * It is used to exchange the data between the instances.
- * NOTE: ExchangeNode will be replaced by {@link PlanFragmenter} into {@link MailboxSendNode} and
- *       {@link MailboxReceiveNode} pair, so it is never serialized.
- */
+/// ExchangeNode represents the exchange stage in the query plan.
+/// It is used to exchange the data between the instances.
+/// NOTE: ExchangeNode will be replaced by [org.apache.pinot.query.planner.logical.PlanFragmenter] into
+///       [MailboxSendNode] and [MailboxReceiveNode] pair, so it is never serialized.
 public class ExchangeNode extends BasePlanNode {
   private final PinotRelExchangeType _exchangeType;
   private final RelDistribution.Type _distributionType;
@@ -45,11 +43,14 @@ public class ExchangeNode extends BasePlanNode {
   private final boolean _sortOnReceiver;
   // Table names should be set for SUB_PLAN exchange type.
   private final Set<String> _tableNames;
+  @Nullable
+  private final ExchangeStrategy _exchangeStrategy;
+  private final String _hashFunction;
 
   public ExchangeNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs, PinotRelExchangeType exchangeType,
       RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
       @Nullable List<RelFieldCollation> collations, boolean sortOnSender, boolean sortOnReceiver,
-      @Nullable Set<String> tableNames) {
+      @Nullable Set<String> tableNames, ExchangeStrategy exchangeStrategy, String hashFunction) {
     super(stageId, dataSchema, null, inputs);
     _exchangeType = exchangeType;
     _distributionType = distributionType;
@@ -59,6 +60,8 @@ public class ExchangeNode extends BasePlanNode {
     _sortOnSender = sortOnSender;
     _sortOnReceiver = sortOnReceiver;
     _tableNames = tableNames;
+    _exchangeStrategy = exchangeStrategy;
+    _hashFunction = hashFunction;
   }
 
   public PinotRelExchangeType getExchangeType() {
@@ -96,6 +99,15 @@ public class ExchangeNode extends BasePlanNode {
     return _tableNames;
   }
 
+  @Nullable
+  public ExchangeStrategy getExchangeStrategy() {
+    return _exchangeStrategy;
+  }
+
+  public String getHashFunction() {
+    return _hashFunction;
+  }
+
   @Override
   public String explain() {
     return "EXCHANGE";
@@ -109,7 +121,7 @@ public class ExchangeNode extends BasePlanNode {
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
     return new ExchangeNode(_stageId, _dataSchema, inputs, _exchangeType, _distributionType, _keys, _prePartitioned,
-        _collations, _sortOnSender, _sortOnReceiver, _tableNames);
+        _collations, _sortOnSender, _sortOnReceiver, _tableNames, null, _hashFunction);
   }
 
   @Override
@@ -126,13 +138,14 @@ public class ExchangeNode extends BasePlanNode {
     ExchangeNode that = (ExchangeNode) o;
     return _sortOnSender == that._sortOnSender && _sortOnReceiver == that._sortOnReceiver
         && _prePartitioned == that._prePartitioned && _exchangeType == that._exchangeType
-        && _distributionType == that._distributionType && Objects.equals(_keys, that._keys) && Objects.equals(
-        _collations, that._collations) && Objects.equals(_tableNames, that._tableNames);
+        && _distributionType == that._distributionType && Objects.equals(_keys, that._keys)
+        && Objects.equals(_collations, that._collations) && Objects.equals(_tableNames, that._tableNames)
+        && Objects.equals(_hashFunction, that._hashFunction);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _exchangeType, _distributionType, _keys, _sortOnSender, _sortOnReceiver,
-        _prePartitioned, _collations, _tableNames);
+        _prePartitioned, _collations, _tableNames, _hashFunction);
   }
 }

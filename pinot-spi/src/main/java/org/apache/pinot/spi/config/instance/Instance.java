@@ -27,22 +27,21 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/**
- * Instance configuration.
- * <pre>
- * Example:
- * {
- *   "host": "hostname.example.com",
- *   "port": 1234,
- *   "type": "SERVER",
- *   "tags": ["example_OFFLINE"],
- *   "pools": {
- *     "example_OFFLINE": 0
- *   },
- *   "grpcPort": 8090
- * }
- * </pre>
- */
+/// Instance configuration.
+///
+/// ```
+/// Example:
+/// {
+///   "host": "hostname.example.com",
+///   "port": 1234,
+///   "type": "SERVER",
+///   "tags": ["example_OFFLINE"],
+///   "pools": {
+///     "example_OFFLINE": 0
+///   },
+///   "grpcPort": 8090
+/// }
+/// ```
 public class Instance extends BaseJsonConfig {
   public static final int NOT_SET_GRPC_PORT_VALUE = -1;
   public static final int NOT_SET_ADMIN_PORT_VALUE = -1;

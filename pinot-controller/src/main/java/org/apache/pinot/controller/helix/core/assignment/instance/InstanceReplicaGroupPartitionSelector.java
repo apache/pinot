@@ -39,10 +39,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The instance replica-group/partition selector is responsible for selecting the instances for each replica-group and
- * partition.
- */
+/// The instance replica-group/partition selector is responsible for selecting the instances for each replica-group and
+/// partition.
 public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceReplicaGroupPartitionSelector.class);
 
@@ -112,12 +110,10 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
     instancePartitions.setInstances(0, 0, instancesToSelect);
   }
 
-  /**
-   * Selects the instances with minimum movement.
-   * For each instance in the existing instances, if it is still alive, keep it in the same position. Then fill the
-   * vacant positions with the remaining candidate instances.
-   * NOTE: This method will modify the candidate instances.
-   */
+  /// Selects the instances with minimum movement.
+  /// For each instance in the existing instances, if it is still alive, keep it in the same position. Then fill the
+  /// vacant positions with the remaining candidate instances.
+  /// NOTE: This method will modify the candidate instances.
   private static List<String> selectInstancesWithMinimumMovement(int numInstancesToSelect,
       LinkedHashSet<String> candidateInstances, List<String> existingInstances) {
     // Initialize the list with empty positions to fill
@@ -248,7 +244,7 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
     return numInstancesPerReplicaGroup;
   }
 
-  private int getNumPartitions() {
+  protected int getNumPartitions() {
     // Assign instances within a replica-group to one partition if not configured
     int numPartitions = _replicaGroupPartitionConfig.getNumPartitions();
     if (numPartitions <= 0) {
@@ -257,7 +253,7 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
     return numPartitions;
   }
 
-  private int getNumInstancesPerPartition(int numInstancesPerReplicaGroup) {
+  protected int getNumInstancesPerPartition(int numInstancesPerReplicaGroup) {
     // Assign all instances within a replica-group to each partition if not configured
     int numInstancesPerPartition = _replicaGroupPartitionConfig.getNumInstancesPerPartition();
     if (numInstancesPerPartition > 0) {
@@ -411,7 +407,8 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
       for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
         List<String> instancesInReplicaGroup = replicaGroupIdToInstancesMap.get(replicaGroupId);
         if (replicaGroupId < existingNumReplicaGroups) {
-          int maxNumPartitionsPerInstance = (numInstancesPerReplicaGroup + numPartitions - 1) / numPartitions;
+          int maxNumPartitionsPerInstance =
+              (numPartitions + numInstancesPerReplicaGroup - 1) / numInstancesPerReplicaGroup;
           Map<String, Integer> instanceToNumPartitionsMap =
               Maps.newHashMapWithExpectedSize(numInstancesPerReplicaGroup);
           for (String instance : instancesInReplicaGroup) {

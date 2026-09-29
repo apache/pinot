@@ -27,13 +27,11 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 
 
-/**
- * The {@code LatencySelector} is an AdaptiveServerSelector implementation that picks the best server based on
- * the exponential weighted moving average (EMA) of query latencies seen by the server. The EMA latencies are
- * updated when the broker receives the query responses from the respective servers. It is a reactive algorithm and
- * will be useful only for a selective usecases. Please perform usecase testing before enabling this method of
- * server selection.
- */
+/// The `LatencySelector` is an AdaptiveServerSelector implementation that picks the best server based on
+/// the exponential weighted moving average (EMA) of query latencies seen by the server. The EMA latencies are
+/// updated when the broker receives the query responses from the respective servers. It is a reactive algorithm and
+/// will be useful only for a selective usecases. Please perform usecase testing before enabling this method of
+/// server selection.
 public class LatencySelector implements AdaptiveServerSelector {
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
 

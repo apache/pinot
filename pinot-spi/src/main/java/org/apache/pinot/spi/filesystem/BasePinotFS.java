@@ -23,12 +23,28 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public abstract class BasePinotFS implements PinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(BasePinotFS.class);
+
+  @Override
+  public boolean deleteBatch(List<URI> segmentUris, boolean forceDelete)
+      throws IOException {
+    if (segmentUris == null || segmentUris.isEmpty()) {
+      return true;
+    }
+    boolean result = true;
+    for (URI segmentUri : segmentUris) {
+      if (!delete(segmentUri, forceDelete)) {
+        result = false;
+      }
+    }
+    return result;
+  }
 
   @Override
   public boolean move(URI srcUri, URI dstUri, boolean overwrite)
@@ -58,10 +74,8 @@ public abstract class BasePinotFS implements PinotFS {
     return doMove(srcUri, dstUri);
   }
 
-  /**
-   * Actual move implementation for each PinotFS. It should not be directly called, instead use
-   * {@link PinotFS#move(URI, URI, boolean)}.
-   */
+  /// Actual move implementation for each PinotFS. It should not be directly called, instead use
+  /// [PinotFS#move(URI, URI, boolean)].
   protected abstract boolean doMove(URI srcUri, URI dstUri)
       throws IOException;
 }

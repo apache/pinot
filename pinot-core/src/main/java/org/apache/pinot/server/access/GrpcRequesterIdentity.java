@@ -21,11 +21,10 @@ package org.apache.pinot.server.access;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import java.util.Map;
+import org.apache.pinot.spi.auth.server.RequesterIdentity;
 
 
-/**
- * Identity container for GRPC requests with (optional) authorization metadata
- */
+/// Identity container for GRPC requests with (optional) authorization metadata
 public class GrpcRequesterIdentity extends RequesterIdentity {
   private Multimap<String, String> _metaData;
 

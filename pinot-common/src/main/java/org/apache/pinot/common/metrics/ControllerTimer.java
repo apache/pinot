@@ -21,16 +21,26 @@ package org.apache.pinot.common.metrics;
 import org.apache.pinot.common.Utils;
 
 
-/**
- * Enumeration containing all the timers exposed by the Pinot controller.
- *
- */
+/// Enumeration containing all the timers exposed by the Pinot controller.
 public enum ControllerTimer implements AbstractMetrics.Timer {
   TABLE_REBALANCE_EXECUTION_TIME_MS("tableRebalanceExecutionTimeMs", false),
   CRON_SCHEDULER_JOB_EXECUTION_TIME_MS("cronSchedulerJobExecutionTimeMs", false),
   IDEAL_STATE_UPDATE_TIME_MS("IdealStateUpdateTimeMs", false),
+  MINION_TASK_GENERATION_LOCK_HELD_ELAPSED_TIME_MS("minionTaskGenerationLockHeldElapsedTimeMs", false),
   // How long it took the server to start.
-  STARTUP_SUCCESS_DURATION_MS("startupSuccessDurationMs", true);
+  STARTUP_SUCCESS_DURATION_MS("startupSuccessDurationMs", true),
+  // Time taken to read the segment from deep store
+  DEEP_STORE_SEGMENT_READ_TIME_MS("deepStoreSegmentReadTimeMs", true),
+  // Time taken to write the segment to deep store
+  DEEP_STORE_SEGMENT_WRITE_TIME_MS("deepStoreSegmentWriteTimeMs", true),
+  // Audit logging timers
+  AUDIT_REQUEST_PROCESSING_TIME("auditRequestProcessingTime", true),
+  AUDIT_RESPONSE_PROCESSING_TIME("auditResponseProcessingTime", true),
+  // Query workload propagation metrics
+  QUERY_WORKLOAD_PROPAGATE_TIME_MS("queryWorkloadPropagateTimeMs", false),
+  QUERY_WORKLOAD_SEND_MESSAGE_TIME_MS("queryWorkloadSendMessageTimeMs", false),
+  QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_TIME_MS("queryWorkloadUpdateResourceTimeMs", true);
+
 
   private final String _timerName;
   private final boolean _global;
@@ -45,11 +55,9 @@ public enum ControllerTimer implements AbstractMetrics.Timer {
     return _timerName;
   }
 
-  /**
-   * Returns true if the timer is global (not attached to a particular resource)
-   *
-   * @return true if the timer is global
-   */
+  /// Returns true if the timer is global (not attached to a particular resource)
+  ///
+  /// @return true if the timer is global
   @Override
   public boolean isGlobal() {
     return _global;

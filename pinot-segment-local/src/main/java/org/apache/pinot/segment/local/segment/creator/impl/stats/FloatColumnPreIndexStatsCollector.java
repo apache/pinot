@@ -21,7 +21,11 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatSet;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
@@ -34,38 +38,51 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
     super(column, statsCollectorConfig);
   }
 
+  public FloatColumnPreIndexStatsCollector(FieldSpec fieldSpec, @Nullable FieldConfig fieldConfig,
+      @Nullable PartitionFunction partitionFunction) {
+    super(fieldSpec, fieldConfig, partitionFunction);
+  }
+
   @Override
   public void collect(Object entry) {
     assert !_sealed;
 
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;
-      for (Object obj : values) {
-        float value = (float) obj;
-        _values.add(value);
-      }
-
-      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
-      updateTotalNumberOfEntries(values);
+      collectMultiValue(values.length, i -> (float) values[i]);
     } else if (entry instanceof float[]) {
-      float[] values = (float[]) entry;
-      for (float value : values) {
-        _values.add(value);
-      }
-
-      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
-      updateTotalNumberOfEntries(values.length);
+      collect((float[]) entry);
     } else {
-      float value = (float) entry;
-      addressSorted(value);
-      if (_values.add(value)) {
-        if (isPartitionEnabled()) {
-          updatePartition(Float.toString(value));
-        }
-      }
-
-      _totalNumberOfEntries++;
+      collect((float) entry);
     }
+  }
+
+  @Override
+  public void collect(float value) {
+    assert !_sealed;
+    addressSorted(value);
+    if (_values.add(value)) {
+      if (isPartitionEnabled()) {
+        updatePartition(Float.toString(value));
+      }
+    }
+    _totalDocs++;
+    _totalNumberOfEntries++;
+  }
+
+  @Override
+  public void collect(float[] values) {
+    assert !_sealed;
+    collectMultiValue(values.length, i -> values[i]);
+  }
+
+  private void collectMultiValue(int length, java.util.function.IntFunction<Float> valueGetter) {
+    for (int i = 0; i < length; i++) {
+      _values.add(valueGetter.apply(i));
+    }
+    _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, length);
+    _totalDocs++;
+    updateTotalNumberOfEntries(length);
   }
 
   private void addressSorted(float entry) {
@@ -102,6 +119,10 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
   @Override
   public int getCardinality() {
     return _sealed ? _sortedValues.length : _values.size();
+  }
+
+  float[] getValues() {
+    return _values.toFloatArray();
   }
 
   @Override

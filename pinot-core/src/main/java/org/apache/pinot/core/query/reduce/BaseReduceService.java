@@ -29,14 +29,13 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This is the base reduce service.
- */
+/// This is the base reduce service.
 @ThreadSafe
 public abstract class BaseReduceService {
 
@@ -74,7 +73,8 @@ public abstract class BaseReduceService {
             .setNameFormat(REDUCE_THREAD_NAME_FORMAT).build();
 
     // ExecutorService is initialized with numThreads same as availableProcessors.
-    _reduceExecutorService = Executors.newFixedThreadPool(numThreadsInExecutorService, reduceThreadFactory);
+    _reduceExecutorService = QueryThreadContext.contextAwareExecutorService(
+        Executors.newFixedThreadPool(numThreadsInExecutorService, reduceThreadFactory));
   }
 
   protected static void updateAlias(QueryContext queryContext, BrokerResponseNative brokerResponseNative) {

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.transform.transformer.datetime;
 
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.transform.transformer.DataTransformer;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -32,11 +31,10 @@ import org.joda.time.chrono.ISOChronology;
 import org.joda.time.format.DateTimeFormatter;
 
 
-/**
- * Base date time transformer to transform and bucket date time values from epoch/simple date format to epoch/simple
- * date format.
- * <p>NOTE: time size and time unit do not apply to simple date format.
- */
+/// Base date time transformer to transform and bucket date time values from epoch/simple date format to epoch/simple
+/// date format.
+///
+/// NOTE: time size and time unit do not apply to simple date format.
 public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I, O> {
   private final int _inputTimeSize;
   private final TimeUnit _inputTimeUnit;
@@ -216,7 +214,7 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
     return _dateTime;
   }
 
-  protected long transformSDFToMillis(@Nonnull String sdfTime) {
+  protected long transformSDFToMillis(String sdfTime) {
     return _inputDateTimeFormatter.parseMillis(sdfTime);
   }
 

@@ -27,7 +27,6 @@ import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +37,8 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -47,6 +48,7 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -63,7 +65,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.jetbrains.annotations.NotNull;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -80,6 +81,11 @@ public class TableIndexingTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "TableIndexingTest");
   private static final String TABLE_NAME = "mytable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
+  private static final SegmentOperationsThrottlerSet SEGMENT_PREPROCESS_THROTTLER = new SegmentOperationsThrottlerSet(
+      new SegmentOperationsThrottler(2, 4, true),
+      new SegmentOperationsThrottler(1, 2, true),
+      new SegmentOperationsThrottler(2, 4, true),
+      new SegmentOperationsThrottler(1, 2, true));
   public static final String COLUMN_NAME = "col";
   public static final String COLUMN_DAY_NAME = "$col$DAY";
   public static final String COLUMN_MONTH_NAME = "$col$MONTH";
@@ -102,7 +108,7 @@ public class TableIndexingTest {
   private void createTestCases() {
     String[] indexTypes = {
         "timestamp_index", "bloom_filter", "fst_index", "h3_index", "inverted_index", "json_index",
-        "native_text_index", "text_index", "range_index", "startree_index", "vector_index"
+        "text_index", "range_index", "startree_index", "vector_index", "multi_col_text_index"
     };
 
     _testCases = new TestCase[_schemas.size() * indexTypes.length];
@@ -142,7 +148,7 @@ public class TableIndexingTest {
       String schemaName = enc + "_" + cardType + "_" + dataType;
       TestCase testCase = _testCaseMap.get(new TestCase(schemaName, -1, indexType));
       if (testCase == null) {
-        throw new AssertionError("Expected testCase not found: " + testCase);
+        Assert.fail("Expected testCase not found: " + schemaName);
       } else {
         testCase._expectedSuccess = Boolean.valueOf(result);
         testCase._expectedMessage = error;
@@ -152,24 +158,22 @@ public class TableIndexingTest {
 
   protected void createSchemas() {
     for (DataType type : DataType.values()) {
-      if (type == DataType.UNKNOWN || type == DataType.LIST || type == DataType.MAP || type == DataType.STRUCT) {
+      if (type == DataType.UNKNOWN || type == DataType.LIST || type == DataType.MAP || type == DataType.STRUCT
+          || type == DataType.OPEN_STRUCT || type == DataType.UUID) {
+        // UUID is excluded because this static expectation matrix (TableIndexingTest.csv) has no UUID rows.
+        // UUID-specific index behavior (inverted, bloom, range, dictionary/no-dictionary, SV and MV) is covered by
+        // dedicated UUID unit and integration tests introduced in later PRs of this stack.
         continue;
       }
 
       for (String encoding : List.of("raw", "dict")) {
-        if (type == DataType.BOOLEAN && "dict".equals(encoding)) {
-          // pinot doesn't support dictionary encoding for boolean type
-          continue;
-        }
-
         if (type == DataType.TIMESTAMP) {
           //create separate tables for all data types
           _schemas.add(new Schema.SchemaBuilder().setSchemaName(encoding + "_sv_" + type.name())
               .addDateTime(COLUMN_NAME, type, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
               .build());
-
           _schemas.add(new Schema.SchemaBuilder().setSchemaName(encoding + "_mv_" + type.name())
-              .addDateTime(COLUMN_NAME, type, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+              .addMultiValueDimension(COLUMN_NAME, type)
               .build());
         } else {
           _schemas.add(new Schema.SchemaBuilder().setSchemaName(encoding + "_sv_" + type.name())
@@ -250,11 +254,11 @@ public class TableIndexingTest {
 
   @Test(dataProvider = "fieldsAndIndexTypes")
   public void testAddIndex(TestCase testCase) {
+    String indexType = testCase._indexType;
     try {
       // create schema copy to avoid side effects between test cases
       // e.g. timestamp index creates additional virtual columns
       Schema schema = Schema.fromString(_schemas.get(testCase._schemaIndex).toPrettyJsonString());
-      String indexType = testCase._indexType;
       String schemaName = schema.getSchemaName();
 
       FieldSpec field = schema.getFieldSpecFor(COLUMN_NAME);
@@ -290,7 +294,7 @@ public class TableIndexingTest {
               ...
             } */
           // no params
-          indexes.put("bloom", JsonUtils.newObjectNode());
+          indexes.set("bloom", JsonUtils.newObjectNode());
 
           break;
         case "fst_index":
@@ -341,7 +345,7 @@ public class TableIndexingTest {
                  old:
                -> "tableIndexConfig": {  "invertedIndexColumns": ["uuid"], */
           // no params, has to be dictionary
-          indexes.put("inverted", new ObjectNode(JsonNodeFactory.instance));
+          indexes.set("inverted", new ObjectNode(JsonNodeFactory.instance));
           break;
         case "json_index":
             /* json index (string or json column), should be no-dictionary
@@ -357,20 +361,7 @@ public class TableIndexingTest {
               ...
               } */
           // no params, should be no dictionary, only string or json
-          indexes.put("json", new ObjectNode(JsonNodeFactory.instance));
-          break;
-        case "native_text_index":
-            /* native text index
-            "fieldConfigList":[
-              {
-                 "name":"text_col_1",
-                 "encodingType":"RAW",
-                 "indexTypes": ["TEXT"],
-                 "properties":{"fstType":"native"}
-              }
-            ] */
-          indexTypes.add(FieldConfig.IndexType.TEXT);
-          properties.put("fstType", "native");
+          indexes.set("json", new ObjectNode(JsonNodeFactory.instance));
           break;
         case "text_index":
             /* text index
@@ -382,6 +373,20 @@ public class TableIndexingTest {
               }
             ] */
           indexTypes.add(FieldConfig.IndexType.TEXT);
+          break;
+        case "multi_col_text_index":
+             /* multi col text index
+              "tableIndexConfig": {
+                "multiColumnTextIndexConfig": {
+                  "columns": ["text_col_1"]
+                  "properties": {
+                  ...
+                  }
+                },
+              }
+             */
+
+          idxCfg.setMultiColumnTextIndexConfig(new MultiColumnTextIndexConfig(List.of(field.getName())));
           break;
         case "range_index":
             /* range index (supported for dictionary encoded columns of any type as well as raw encoded columns
@@ -424,8 +429,8 @@ public class TableIndexingTest {
             idxCfg.setStarTreeIndexConfigs(new ArrayList<>());
           }
           StarTreeIndexConfig stIdxCfg =
-              new StarTreeIndexConfig(List.of(COLUMN_NAME), Collections.emptyList(), List.of("SUM__col"),
-                  Collections.emptyList(), 1);
+              new StarTreeIndexConfig(List.of(COLUMN_NAME), List.of(), List.of("SUM__col"),
+                  List.of(), 1);
           idxCfg.getStarTreeIndexConfigs().add(stIdxCfg);
 
           break;
@@ -485,14 +490,12 @@ public class TableIndexingTest {
         Assert.assertEquals(indexStats.get(COLUMN_WEEK_NAME).get("range_index"), 1);
         Assert.assertEquals(indexStats.get(COLUMN_MONTH_NAME).get("range_index"), 1);
       } else {
-        String expectedType;
-        if ("native_text_index".equals(indexType)) {
-          expectedType = "text_index";
+        if ("startree_index".equals(indexType) && !testCase._expectedSuccess) {
+          // It is possible that we successfully create the segment, but without the star-tree index
+          Assert.assertEquals(indexStats.get(COLUMN_NAME).get(indexType), 0);
         } else {
-          expectedType = indexType;
+          Assert.assertEquals(indexStats.get(COLUMN_NAME).get(indexType), 1);
         }
-
-        Assert.assertEquals(indexStats.get(COLUMN_NAME).get(expectedType), 1);
       }
     } catch (Throwable t) {
       testCase._error = t;
@@ -502,13 +505,18 @@ public class TableIndexingTest {
     }
 
     if (testCase._expectedSuccess == null) {
-      throw new AssertionError("No expected status found for test case: " + testCase);
+      Assert.fail("No expected status found for test case: " + testCase);
     } else if (testCase._expectedSuccess && testCase._error != null) {
-      throw new AssertionError("Expected success for test case: " + testCase + " but got error: " + testCase._error);
-    } else if (!testCase._expectedSuccess && !testCase.getErrorMessage().equals(testCase._expectedMessage)) {
-      throw new AssertionError(
-          "Expected error: \"" + testCase._expectedMessage + "\" for test case: " + testCase + " but got: \""
-              + testCase.getErrorMessage() + " \"");
+      Assert.fail("Expected success for test case: " + testCase + " but got error: " + testCase._error);
+    } else if ("startree_index".equals(indexType) && !testCase._expectedSuccess && testCase._expectedMessage.isEmpty()
+        && (testCase.getErrorMessage() != null && !testCase.getErrorMessage().isEmpty())) {
+      Assert.fail("Expected no error message for test case " + testCase + " as star-tree index creation should be "
+          + "skipped for such cases");
+    } else if (!testCase._expectedSuccess && !testCase._expectedMessage.isEmpty()
+        && (testCase.getErrorMessage() == null || (!testCase.getErrorMessage().equals(testCase._expectedMessage)
+        && !testCase.getErrorMessage().matches(testCase._expectedMessage)))) {
+      Assert.fail("Expected error: \"" + testCase._expectedMessage + "\" for test case: " + testCase + " but got: \""
+          + testCase.getErrorMessage() + "\"");
     }
   }
 
@@ -520,7 +528,7 @@ public class TableIndexingTest {
     }
   }
 
-  private @NotNull StringBuilder generateSummary() {
+  private StringBuilder generateSummary() {
     StringBuilder summary = new StringBuilder();
     summary.append("data_type;cardinality;encoding;index_type;success;error\n");
     for (TestCase test : _allResults) {
@@ -547,7 +555,7 @@ public class TableIndexingTest {
     return summary;
   }
 
-  private @NotNull List<String> readExpectedFromFile()
+  private List<String> readExpectedFromFile()
       throws IOException {
     URL resource = getClass().getClassLoader().getResource("TableIndexingTest.csv");
     File expectedFile = new File(TestUtils.getFileFromResourceUrl(resource));
@@ -669,7 +677,7 @@ public class TableIndexingTest {
     File indexDir = createSegment(tableConfig, schema, segmentName, rows);
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
-    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, SEGMENT_PREPROCESS_THROTTLER);
 
     Map<String, Map<String, Integer>> map = new HashMap<>();
     addColumnIndexStats(segment, COLUMN_NAME, map);
@@ -706,6 +714,14 @@ public class TableIndexingTest {
       }
     }
     stats.put("startree_index", starTrees);
+
+    int multiColCount = 0;
+    if (segment.getSegmentMetadata().getMultiColumnTextMetadata() != null && segment.getSegmentMetadata()
+        .getMultiColumnTextMetadata().getColumns().contains(columnName)) {
+      multiColCount = 1;
+    }
+
+    stats.put("multi_col_text_index", multiColCount);
     return stats;
   }
 }

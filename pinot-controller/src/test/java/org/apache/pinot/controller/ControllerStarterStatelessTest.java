@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.controller;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.CONTROLLER_HOST;
@@ -46,10 +47,11 @@ public class ControllerStarterStatelessTest extends ControllerTest {
   @Test
   public void testHostnamePortOverride()
       throws Exception {
+    int controllerPort = NetUtils.findOpenPort(_nextControllerPort);
     _configOverride.clear();
     _configOverride.put(CONFIG_OF_INSTANCE_ID, "Controller_myInstance");
     _configOverride.put(CONTROLLER_HOST, "myHost");
-    _configOverride.put(CONTROLLER_PORT, 1234);
+    _configOverride.put(CONTROLLER_PORT, controllerPort);
 
     startZk();
     startController();
@@ -59,8 +61,8 @@ public class ControllerStarterStatelessTest extends ControllerTest {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, instanceId);
     assertEquals(instanceConfig.getInstanceName(), instanceId);
     assertEquals(instanceConfig.getHostName(), "myHost");
-    assertEquals(instanceConfig.getPort(), "1234");
-    assertEquals(instanceConfig.getTags(), Collections.singleton(CONTROLLER_INSTANCE));
+    assertEquals(instanceConfig.getPort(), Integer.toString(controllerPort));
+    assertEquals(instanceConfig.getTags(), Set.of(CONTROLLER_INSTANCE));
 
     stopController();
     stopZk();
@@ -69,10 +71,11 @@ public class ControllerStarterStatelessTest extends ControllerTest {
   @Test
   public void testInvalidInstanceId()
       throws Exception {
+    int controllerPort = NetUtils.findOpenPort(_nextControllerPort);
     _configOverride.clear();
     _configOverride.put(CONFIG_OF_INSTANCE_ID, "myInstance");
     _configOverride.put(CONTROLLER_HOST, "myHost");
-    _configOverride.put(CONTROLLER_PORT, 1234);
+    _configOverride.put(CONTROLLER_PORT, controllerPort);
 
     startZk();
     try {
@@ -88,20 +91,21 @@ public class ControllerStarterStatelessTest extends ControllerTest {
   @Test
   public void testDefaultInstanceId()
       throws Exception {
+    int controllerPort = NetUtils.findOpenPort(_nextControllerPort);
     _configOverride.clear();
     _configOverride.put(CONTROLLER_HOST, "myHost");
-    _configOverride.put(CONTROLLER_PORT, 1234);
+    _configOverride.put(CONTROLLER_PORT, controllerPort);
 
     startZk();
     startController();
 
     String instanceId = _controllerStarter.getInstanceId();
-    assertEquals(instanceId, "Controller_myHost_1234");
+    assertEquals(instanceId, "Controller_myHost_" + controllerPort);
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, instanceId);
     assertEquals(instanceConfig.getInstanceName(), instanceId);
     assertEquals(instanceConfig.getHostName(), "myHost");
-    assertEquals(instanceConfig.getPort(), "1234");
-    assertEquals(instanceConfig.getTags(), Collections.singleton(CONTROLLER_INSTANCE));
+    assertEquals(instanceConfig.getPort(), Integer.toString(controllerPort));
+    assertEquals(instanceConfig.getTags(), Set.of(CONTROLLER_INSTANCE));
 
     stopController();
     stopZk();

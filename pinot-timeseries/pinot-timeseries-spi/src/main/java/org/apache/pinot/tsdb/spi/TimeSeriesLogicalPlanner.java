@@ -18,22 +18,41 @@
  */
 package org.apache.pinot.tsdb.spi;
 
+import java.util.Stack;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
-
-/**
- * Allows time-series query languages to implement their own logical planner. The input to this planner is a
- * {@link RangeTimeSeriesRequest} and the output is a {@link TimeSeriesLogicalPlanResult}. Put simply, this abstraction
- * takes in the query text and other parameters, and returns a logical plan which is a tree of
- * {@link BaseTimeSeriesPlanNode}. Other than the plan-tree, the planner also returns a {@link TimeBuckets} which is
- * the default TimeBuckets used by the query operators at runtime. Implementations are free to adjust them as they see
- * fit. For instance, one query language might want to extend to the left or right of the time-range based on certain
- * operators. Also, see {@link LeafTimeSeriesPlanNode#getEffectiveFilter(TimeBuckets)}.
- */
+/// Allows time-series query languages to implement their own logical planner. The input to this planner is a
+/// [RangeTimeSeriesRequest] and the output is a [TimeSeriesLogicalPlanResult]. Put simply, this abstraction
+/// takes in the query text and other parameters, and returns a logical plan which is a tree of
+/// [BaseTimeSeriesPlanNode]. Other than the plan-tree, the planner also returns a [TimeBuckets] which is
+/// the default TimeBuckets used by the query operators at runtime. Implementations are free to adjust them as they see
+/// fit. For instance, one query language might want to extend to the left or right of the time-range based on certain
+/// operators. Also, see [LeafTimeSeriesPlanNode#getEffectiveFilter(TimeBuckets)].
 public interface TimeSeriesLogicalPlanner {
   void init(PinotConfiguration pinotConfiguration);
 
-  TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request);
+  TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request, TimeSeriesMetadata metadata);
+
+  /// Returns the name of the table from the logical plan result by traversing the plan tree and extracting the
+  /// table name from the first encountered [LeafTimeSeriesPlanNode]
+  /// This method is recommended to be overridden by implementations for more efficient table name extraction.
+  default String getTableName(TimeSeriesLogicalPlanResult result) {
+    BaseTimeSeriesPlanNode node = result.getPlanNode();
+
+    Stack<BaseTimeSeriesPlanNode> nodeStack = new Stack<>();
+    nodeStack.push(node);
+
+    while (!nodeStack.isEmpty()) {
+      BaseTimeSeriesPlanNode currentNode = nodeStack.pop();
+      if (currentNode instanceof LeafTimeSeriesPlanNode) {
+        return ((LeafTimeSeriesPlanNode) currentNode).getTableName();
+      }
+      for (BaseTimeSeriesPlanNode child : currentNode.getInputs()) {
+        nodeStack.push(child);
+      }
+    }
+    throw new RuntimeException("No LeafTimeSeriesPlanNode found in the plan tree.");
+  }
 }

@@ -22,9 +22,7 @@ import java.util.Objects;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
-/**
- * Predicate for NOT_EQ.
- */
+/// Predicate for NOT_EQ.
 public class NotEqPredicate extends BasePredicate {
   private final String _value;
 

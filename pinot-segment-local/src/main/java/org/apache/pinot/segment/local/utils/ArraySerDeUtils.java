@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -279,6 +281,45 @@ public class ArraySerDeUtils {
     }
   }
 
+  public static byte[] serializeBigDecimalArray(BigDecimal[] values) {
+    // Format: [numValues][length1][length2]...[lengthN][value1][value2]...[valueN] where each value is a
+    // BigDecimalUtils.serializeWithSize payload (scale + unscaled bytes).
+    int headerSize = Integer.BYTES + Integer.BYTES * values.length;
+    int size = headerSize;
+    byte[][] serialized = new byte[values.length][];
+    for (int i = 0; i < values.length; i++) {
+      serialized[i] = BigDecimalUtils.serialize(values[i]);
+      size += serialized[i].length;
+    }
+    return writeValues(serialized, size, headerSize);
+  }
+
+  public static BigDecimal[] deserializeBigDecimalArray(byte[] bytes) {
+    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+    int numValues = byteBuffer.getInt();
+    BigDecimal[] values = new BigDecimal[numValues];
+    readValues(bytes, byteBuffer, values, numValues);
+    return values;
+  }
+
+  public static int deserializeBigDecimalArray(byte[] bytes, BigDecimal[] values) {
+    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+    int numValues = byteBuffer.getInt();
+    readValues(bytes, byteBuffer, values, numValues);
+    return numValues;
+  }
+
+  private static void readValues(byte[] bytes, ByteBuffer byteBuffer, BigDecimal[] values, int numValues) {
+    int offset = (numValues + 1) * Integer.BYTES;
+    for (int i = 0; i < numValues; i++) {
+      int length = byteBuffer.getInt();
+      byte[] valueBytes = new byte[length];
+      System.arraycopy(bytes, offset, valueBytes, 0, length);
+      values[i] = BigDecimalUtils.deserialize(valueBytes);
+      offset += length;
+    }
+  }
+
   public static byte[] serializeStringArray(String[] values) {
     // Format: [numValues][length1][length2]...[lengthN][value1][value2]...[valueN]
     int headerSize = Integer.BYTES + Integer.BYTES * values.length;
@@ -306,6 +347,15 @@ public class ArraySerDeUtils {
     return numValues;
   }
 
+  private static void readValues(byte[] bytes, ByteBuffer byteBuffer, String[] values, int numValues) {
+    int offset = (numValues + 1) * Integer.BYTES;
+    for (int i = 0; i < numValues; i++) {
+      int length = byteBuffer.getInt();
+      values[i] = new String(bytes, offset, length, UTF_8);
+      offset += length;
+    }
+  }
+
   public static byte[] serializeBytesArray(byte[][] values) {
     // Format: [numValues][length1][length2]...[lengthN][value1][value2]...[valueN]
     int headerSize = Integer.BYTES + Integer.BYTES * values.length;
@@ -331,6 +381,15 @@ public class ArraySerDeUtils {
     return numValues;
   }
 
+  private static void readValues(ByteBuffer byteBuffer, byte[][] values, int numValues) {
+    byteBuffer.position((numValues + 1) * Integer.BYTES);
+    for (int i = 0; i < numValues; i++) {
+      int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
+      values[i] = new byte[length];
+      byteBuffer.get(values[i]);
+    }
+  }
+
   private static byte[] writeValues(byte[][] values, int size, int headerSize) {
     byte[] bytes = new byte[size];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
@@ -341,23 +400,5 @@ public class ArraySerDeUtils {
       byteBuffer.put(values[i]);
     }
     return bytes;
-  }
-
-  private static void readValues(byte[] bytes, ByteBuffer byteBuffer, String[] values, int numValues) {
-    int offset = (numValues + 1) * Integer.BYTES;
-    for (int i = 0; i < numValues; i++) {
-      int length = byteBuffer.getInt();
-      values[i] = new String(bytes, offset, length, UTF_8);
-      offset += length;
-    }
-  }
-
-  private static void readValues(ByteBuffer byteBuffer, byte[][] values, int numValues) {
-    byteBuffer.position((numValues + 1) * Integer.BYTES);
-    for (int i = 0; i < numValues; i++) {
-      int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
-      values[i] = new byte[length];
-      byteBuffer.get(values[i]);
-    }
   }
 }

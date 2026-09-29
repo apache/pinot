@@ -17,8 +17,8 @@
  * under the License.
  */
 package org.apache.pinot.controller.api.resources;
-
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -28,13 +28,17 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -46,12 +50,18 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
+import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.restlet.resources.BatchConfig;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.core.auth.Actions;
@@ -69,15 +79,18 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.TABLE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = Constants.TABLE_TAG, authorizations = {
+    @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
         key = SWAGGER_AUTHORIZATION_KEY,
         description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+            + "context will be considered.")
+}))
 @Path("/")
 public class PinotRealtimeTableResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeTableResource.class);
@@ -99,19 +112,69 @@ public class PinotRealtimeTableResource {
 
   @POST
   @Path("/tables/{tableName}/pauseConsumption")
+  @Authenticate(AccessType.UPDATE)
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.PAUSE_CONSUMPTION)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Pause consumption of a realtime table", notes = "Pause the consumption of a realtime table")
   public Response pauseConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Comment on pausing the consumption") @QueryParam("comment") String comment,
+      @ApiParam(value = "Max number of consuming segments to commit at once")
+      @QueryParam("batchSize") @DefaultValue(BatchConfig.DEFAULT_BATCH_SIZE + "") int batchSize,
+      @ApiParam(value = "How often to check whether the current batch of segments have been successfully committed or"
+          + " not")
+      @QueryParam("batchStatusCheckIntervalSec")
+      @DefaultValue(BatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC + "") int batchStatusCheckIntervalSec,
+      @ApiParam(value = "Timeout based on which the controller will stop checking the forceCommit status of the batch"
+          + " of segments and throw an exception")
+      @QueryParam("batchStatusCheckTimeoutSec")
+      @DefaultValue(BatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC + "") int batchStatusCheckTimeoutSec,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validateTable(tableNameWithType);
+    BatchConfig batchConfig;
+    try {
+      batchConfig = BatchConfig.of(batchSize, batchStatusCheckIntervalSec, batchStatusCheckTimeoutSec);
+    } catch (IllegalArgumentException e) {
+      throw new ControllerApplicationException(LOGGER, "Invalid batch config", Response.Status.BAD_REQUEST, e);
+    }
     try {
       return Response.ok(_pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType,
-          PauseState.ReasonCode.ADMINISTRATIVE, comment)).build();
+          PauseState.ReasonCode.ADMINISTRATIVE, comment, batchConfig)).build();
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  @POST
+  @Path("/tables/{tableName}/pauseTopicConsumption")
+  @Authenticate(AccessType.UPDATE)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.PAUSE_CONSUMPTION)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Pause consumption of some topics of a realtime table", notes = "Pause the consumption of "
+      + "some topics of a realtime table.")
+  public Response pauseTopicConsumption(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Comma separated list of index of the topics", required = true) @QueryParam("topicIndices")
+      String topicIndices,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    validateTable(tableNameWithType);
+    List<Integer> topicIndexList;
+    try {
+      topicIndexList = Arrays.stream(topicIndices.split(","))
+          .map(String::trim)
+          .map(idx -> Integer.parseInt(idx))
+          .collect(Collectors.toList());
+    } catch (NumberFormatException nfe) {
+      throw new ControllerApplicationException(LOGGER, "topicIndices should be a comma separated list of integers",
+          Response.Status.BAD_REQUEST, nfe);
+    }
+    try {
+      return Response.ok(_pinotLLCRealtimeSegmentManager.pauseTopicsConsumption(tableNameWithType, topicIndexList))
+          .build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
@@ -119,6 +182,7 @@ public class PinotRealtimeTableResource {
 
   @POST
   @Path("/tables/{tableName}/resumeConsumption")
+  @Authenticate(AccessType.UPDATE)
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.RESUME_CONSUMPTION)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Resume consumption of a realtime table", notes =
@@ -144,7 +208,7 @@ public class PinotRealtimeTableResource {
     if (consumeFrom != null && !consumeFrom.equalsIgnoreCase("smallest") && !consumeFrom.equalsIgnoreCase("largest")) {
       throw new ControllerApplicationException(LOGGER,
           String.format("consumeFrom param '%s' is not valid. Valid values are 'lastConsumed', 'smallest' and "
-                  + "'largest'.", consumeFrom), Response.Status.BAD_REQUEST);
+              + "'largest'.", consumeFrom), Response.Status.BAD_REQUEST);
     }
     try {
       return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType, consumeFrom,
@@ -155,7 +219,42 @@ public class PinotRealtimeTableResource {
   }
 
   @POST
+  @Path("/tables/{tableName}/resumeTopicConsumption")
+  @Authenticate(AccessType.UPDATE)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.RESUME_CONSUMPTION)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Resume consumption of some topics of a realtime table", notes =
+      "Resume the consumption for some topics of a realtime table. There are two independent pause mechanism, "
+          + "table pause and topic pause. The topics is resumed only if both table and topics are resumed.")
+  public Response resumeTopicConsumption(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Comma separated list of index of the topics", required = true) @QueryParam("topicIndices")
+      String topicIndices,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    validateTable(tableNameWithType);
+    List<Integer> topicIndexList;
+    try {
+      topicIndexList = Arrays.stream(topicIndices.split(","))
+          .map(String::trim)
+          .map(idx -> Integer.parseInt(idx))
+          .collect(Collectors.toList());
+    } catch (NumberFormatException nfe) {
+      throw new ControllerApplicationException(LOGGER, "topicIndices should be a comma separated list of integers",
+          Response.Status.BAD_REQUEST, nfe);
+    }
+    try {
+      return Response.ok(_pinotLLCRealtimeSegmentManager.resumeTopicsConsumption(
+          tableNameWithType, topicIndexList)).build();
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  @POST
   @Path("/tables/{tableName}/forceCommit")
+  @Authenticate(AccessType.UPDATE)
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.FORCE_COMMIT)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Force commit the current consuming segments",
@@ -170,11 +269,28 @@ public class PinotRealtimeTableResource {
       @ApiParam(value = "Comma separated list of partition group IDs to be committed") @QueryParam("partitions")
       String partitionGroupIds,
       @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
-      String consumingSegments, @Context HttpHeaders headers) {
+      String consumingSegments,
+      @ApiParam(value = "Max number of consuming segments to commit at once")
+      @QueryParam("batchSize") @DefaultValue(BatchConfig.DEFAULT_BATCH_SIZE + "") int batchSize,
+      @ApiParam(value = "How often to check whether the current batch of segments have been successfully committed or"
+          + " not")
+      @QueryParam("batchStatusCheckIntervalSec")
+      @DefaultValue(BatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC + "") int batchStatusCheckIntervalSec,
+      @ApiParam(value = "Timeout based on which the controller will stop checking the forceCommit status of the batch"
+          + " of segments and throw an exception")
+      @QueryParam("batchStatusCheckTimeoutSec")
+      @DefaultValue(BatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC + "") int batchStatusCheckTimeoutSec,
+      @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (partitionGroupIds != null && consumingSegments != null) {
       throw new ControllerApplicationException(LOGGER, "Cannot specify both partitions and segments to commit",
           Response.Status.BAD_REQUEST);
+    }
+    BatchConfig batchConfig;
+    try {
+      batchConfig = BatchConfig.of(batchSize, batchStatusCheckIntervalSec, batchStatusCheckTimeoutSec);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Invalid batch config", Response.Status.BAD_REQUEST, e);
     }
     long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
@@ -182,12 +298,13 @@ public class PinotRealtimeTableResource {
     Map<String, String> response = new HashMap<>();
     try {
       Set<String> consumingSegmentsForceCommitted =
-          _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, partitionGroupIds, consumingSegments);
+          _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, partitionGroupIds, consumingSegments,
+              batchConfig);
       response.put("forceCommitStatus", "SUCCESS");
       try {
         String jobId = UUID.randomUUID().toString();
         if (!_pinotHelixResourceManager.addNewForceCommitJob(tableNameWithType, jobId, startTimeMs,
-                consumingSegmentsForceCommitted)) {
+            consumingSegmentsForceCommitted)) {
           throw new IllegalStateException("Failed to update table jobs ZK metadata");
         }
         response.put("jobMetaZKWriteStatus", "SUCCESS");
@@ -214,7 +331,7 @@ public class PinotRealtimeTableResource {
       throws Exception {
     Map<String, String> controllerJobZKMetadata =
         _pinotHelixResourceManager.getControllerJobZKMetadata(forceCommitJobId,
-            ControllerJobType.FORCE_COMMIT);
+            ControllerJobTypes.FORCE_COMMIT);
     if (controllerJobZKMetadata == null) {
       throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + forceCommitJobId,
           Response.Status.NOT_FOUND);
@@ -222,19 +339,31 @@ public class PinotRealtimeTableResource {
     String tableNameWithType = controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
     Set<String> consumingSegmentCommitted = JsonUtils.stringToObject(
         controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST), Set.class);
-    Set<String> onlineSegmentsForTable =
-        _pinotHelixResourceManager.getOnlineSegmentsFromIdealState(tableNameWithType, false);
 
-    Set<String> segmentsYetToBeCommitted = new HashSet<>();
-    consumingSegmentCommitted.forEach(segmentName -> {
-      if (!onlineSegmentsForTable.contains(segmentName)) {
-        segmentsYetToBeCommitted.add(segmentName);
-      }
-    });
+    Set<String> segmentsToCheck;
+    String segmentsPendingToBeComittedString =
+        controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST);
+
+    if (segmentsPendingToBeComittedString != null) {
+      segmentsToCheck = JsonUtils.stringToObject(segmentsPendingToBeComittedString, Set.class);
+    } else {
+      segmentsToCheck = consumingSegmentCommitted;
+    }
+
+    Set<String> segmentsYetToBeCommitted =
+        _pinotLLCRealtimeSegmentManager.getSegmentsYetToBeCommitted(tableNameWithType, segmentsToCheck);
+
+    if (segmentsYetToBeCommitted.size() < segmentsToCheck.size()) {
+      controllerJobZKMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST,
+          JsonUtils.objectToString(segmentsYetToBeCommitted));
+      _pinotHelixResourceManager.addControllerJobToZK(forceCommitJobId, controllerJobZKMetadata,
+          ControllerJobTypes.FORCE_COMMIT);
+    }
 
     Map<String, Object> result = new HashMap<>(controllerJobZKMetadata);
-    result.put("segmentsYetToBeCommitted", segmentsYetToBeCommitted);
-    result.put("numberOfSegmentsYetToBeCommitted", segmentsYetToBeCommitted.size());
+    result.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST, segmentsYetToBeCommitted);
+    result.put(CommonConstants.ControllerJob.NUM_CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED,
+        segmentsYetToBeCommitted.size());
     return JsonUtils.objectToJsonNode(result);
   }
 
@@ -289,6 +418,82 @@ public class PinotRealtimeTableResource {
           String.format("Failed to get consuming segments info for table %s. %s", realtimeTableName, e.getMessage()),
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+  }
+
+  @GET
+  @Path("/tables/{tableName}/pauselessDebugInfo")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_DEBUG_INFO)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Returns state of pauseless table", notes =
+      "Gets the segments that are in error state and segments with COMMITTING status in ZK metadata")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public String getPauselessTableDebugInfo(
+      @ApiParam(value = "Realtime table name with or without type", required = true, example = "myTable | "
+          + "myTable_REALTIME") @PathParam("tableName") String realtimeTableName,
+      @Context HttpHeaders headers) {
+    realtimeTableName = DatabaseUtils.translateTableName(realtimeTableName, headers);
+    try {
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableName);
+      if (TableType.OFFLINE == tableType) {
+        throw new IllegalStateException("Cannot get consuming segments info for OFFLINE table: " + realtimeTableName);
+      }
+
+      String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(realtimeTableName);
+
+      Map<String, Object> result = new HashMap<>();
+
+      result.put("instanceToErrorSegmentsMap", getInstanceToErrorSegmentsMap(tableNameWithType));
+
+      result.put("committingSegments", _pinotLLCRealtimeSegmentManager.getCommittingSegments(tableNameWithType));
+
+      return JsonUtils.objectToPrettyString(result);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to get pauseless debug info for table %s. %s", realtimeTableName, e.getMessage()),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/consumerWatermarks")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_IDEAL_STATE)
+  @ApiOperation(value = "Get consumer watermarks for a realtime table",
+      notes = "Returns the next offset to be consumed for each partition group. Only works for realtime tables.")
+  public WatermarkInductionResult getConsumerWatermark(
+      @ApiParam(value = "Name of the realtime table", required = true) @PathParam("tableName") String tableName,
+      @Context HttpHeaders headers) {
+    try {
+      String table = DatabaseUtils.translateTableName(tableName, headers);
+      return _pinotHelixResourceManager.getConsumerWatermarks(table);
+    } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND, e);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  private Map<String, Set<String>> getInstanceToErrorSegmentsMap(String tableNameWithType) {
+    ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
+    Preconditions.checkState(externalView != null, "External view does not exist for table: " + tableNameWithType);
+
+    Map<String, Set<String>> instanceToErrorSegmentsMap = new HashMap<>();
+
+    for (String segmentName : externalView.getPartitionSet()) {
+      Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
+      for (String instance : externalViewStateMap.keySet()) {
+        if (CommonConstants.Helix.StateModel.SegmentStateModel.ERROR.equals(
+            externalViewStateMap.get(instance))) {
+          instanceToErrorSegmentsMap.computeIfAbsent(instance, unused -> new HashSet<>()).add(segmentName);
+        }
+      }
+    }
+    return instanceToErrorSegmentsMap;
   }
 
   private void validateTable(String tableNameWithType) {

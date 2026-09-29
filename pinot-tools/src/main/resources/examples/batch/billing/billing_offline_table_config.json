@@ -1,8 +1,7 @@
 {
   "tableName": "billing",
   "segmentsConfig" : {
-    "replication" : "1",
-    "schemaName" : "billing"
+    "replication" : "1"
   },
   "tableIndexConfig" : {
     "invertedIndexColumns" : [],

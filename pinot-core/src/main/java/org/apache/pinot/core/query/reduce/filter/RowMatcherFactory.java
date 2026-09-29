@@ -21,16 +21,12 @@ package org.apache.pinot.core.query.reduce.filter;
 import org.apache.pinot.common.request.context.FilterContext;
 
 
-/**
- * Factory for RowMatcher.
- */
+/// Factory for RowMatcher.
 public class RowMatcherFactory {
   private RowMatcherFactory() {
   }
 
-  /**
-   * Helper method to construct a RowMatcher based on the given filter.
-   */
+  /// Helper method to construct a RowMatcher based on the given filter.
   public static RowMatcher getRowMatcher(FilterContext filter, ValueExtractorFactory valueExtractorFactory,
       boolean nullHandlingEnabled) {
     switch (filter.getType()) {

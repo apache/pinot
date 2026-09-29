@@ -20,9 +20,12 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -40,8 +43,9 @@ public class FourthMomentAggregationFunction extends BaseSingleInputAggregationF
     KURTOSIS, SKEWNESS, MOMENT
   }
 
-  public FourthMomentAggregationFunction(List<ExpressionContext> arguments, Type type) {
-    super(verifySingleArgument(arguments, type.name()));
+  public FourthMomentAggregationFunction(List<ExpressionContext> arguments, Type type,
+      boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, type.name()), nullHandlingEnabled);
     _type = type;
   }
 
@@ -74,65 +78,72 @@ public class FourthMomentAggregationFunction extends BaseSingleInputAggregationF
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[] values = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression);
 
-    PinotFourthMoment m4 = aggregationResultHolder.getResult();
-    if (m4 == null) {
-      m4 = new PinotFourthMoment();
-      aggregationResultHolder.setValue(m4);
-    }
-
-    for (int i = 0; i < length; i++) {
-      m4.increment(values[i]);
-    }
+    // The moment is created inside the range, so a block with no non-null row leaves the holder untouched and
+    // extractFinalResult sees the null that means nothing was aggregated
+    forEachNotNull(length, blockValSetMap.get(_expression), (from, to) -> {
+      PinotFourthMoment m4 = aggregationResultHolder.getResult();
+      if (m4 == null) {
+        m4 = new PinotFourthMoment();
+        aggregationResultHolder.setValue(m4);
+      }
+      for (int i = from; i < to; i++) {
+        m4.increment(values[i]);
+      }
+    });
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[] values = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression);
-    for (int i = 0; i < length; i++) {
-      PinotFourthMoment m4 = groupByResultHolder.getResult(groupKeyArray[i]);
-      if (m4 == null) {
-        m4 = new PinotFourthMoment();
-        groupByResultHolder.setValueForKey(groupKeyArray[i], m4);
+    forEachNotNull(length, blockValSetMap.get(_expression), (from, to) -> {
+      for (int i = from; i < to; i++) {
+        PinotFourthMoment m4 = groupByResultHolder.getResult(groupKeyArray[i]);
+        if (m4 == null) {
+          m4 = new PinotFourthMoment();
+          groupByResultHolder.setValueForKey(groupKeyArray[i], m4);
+        }
+        m4.increment(values[i]);
       }
-      m4.increment(values[i]);
-    }
+    });
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[] values = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression);
-    for (int i = 0; i < length; i++) {
-      for (int groupKey : groupKeysArray[i]) {
-        PinotFourthMoment m4 = groupByResultHolder.getResult(groupKey);
-        if (m4 == null) {
-          m4 = new PinotFourthMoment();
-          groupByResultHolder.setValueForKey(groupKey, m4);
+    forEachNotNull(length, blockValSetMap.get(_expression), (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          PinotFourthMoment m4 = groupByResultHolder.getResult(groupKey);
+          if (m4 == null) {
+            m4 = new PinotFourthMoment();
+            groupByResultHolder.setValueForKey(groupKey, m4);
+          }
+          m4.increment(values[i]);
         }
-        m4.increment(values[i]);
       }
-    }
+    });
   }
 
+  @Nullable
   @Override
   public PinotFourthMoment extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     PinotFourthMoment m4 = aggregationResultHolder.getResult();
-    if (m4 == null) {
-      return new PinotFourthMoment();
-    } else {
+    if (m4 != null) {
       return m4;
     }
+    // With the option disabled an untouched holder still renders the empty accumulator, which is the
+    // intermediate this mode has always emitted; with it enabled the null is the signal that nothing was
+    // aggregated.
+    return _nullHandlingEnabled ? null : new PinotFourthMoment();
   }
 
+  @Nullable
   @Override
   public PinotFourthMoment extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     PinotFourthMoment m4 = groupByResultHolder.getResult(groupKey);
-    if (m4 == null) {
-      return new PinotFourthMoment();
-    } else {
-      return m4;
-    }
+    return m4 != null ? m4 : (_nullHandlingEnabled ? null : new PinotFourthMoment());
   }
 
   @Override
@@ -142,19 +153,34 @@ public class FourthMomentAggregationFunction extends BaseSingleInputAggregationF
   }
 
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.OBJECT;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
   }
 
   @Override
-  public DataSchema.ColumnDataType getFinalResultColumnType() {
-    return DataSchema.ColumnDataType.DOUBLE;
+  public SerializedIntermediateResult serializeIntermediateResult(PinotFourthMoment pinotFourthMoment) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.PinotFourthMoment.getValue(),
+        ObjectSerDeUtils.PINOT_FOURTH_MOMENT_OBJECT_SER_DE.serialize(pinotFourthMoment));
   }
 
   @Override
-  public Double extractFinalResult(PinotFourthMoment m4) {
+  public PinotFourthMoment deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.PINOT_FOURTH_MOMENT_OBJECT_SER_DE.deserialize(customObject.getBuffer());
+  }
+
+  @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.DOUBLE;
+  }
+
+  @Nullable
+  @Override
+  public Double extractFinalResult(@Nullable PinotFourthMoment m4) {
     if (m4 == null) {
-      return null;
+      // A null intermediate result means nothing was aggregated. With null handling enabled the skewness of nothing
+      // is NULL; with it disabled it is what an untouched moment renders to, which Commons Math reports as NaN below
+      // the three samples skewness needs and the four kurtosis needs.
+      return _nullHandlingEnabled ? null : Double.NaN;
     }
 
     switch (_type) {

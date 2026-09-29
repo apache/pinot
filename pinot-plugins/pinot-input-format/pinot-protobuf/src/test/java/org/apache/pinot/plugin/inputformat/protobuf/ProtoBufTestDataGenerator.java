@@ -74,7 +74,7 @@ public class ProtoBufTestDataGenerator {
     messageBuilder.setLongField((Long) inputRecord.get(LONG_FIELD));
     messageBuilder.setDoubleField((Double) inputRecord.get(DOUBLE_FIELD));
     messageBuilder.setFloatField((Float) inputRecord.get(FLOAT_FIELD));
-    messageBuilder.setBoolField(Boolean.parseBoolean((String) inputRecord.get(BOOL_FIELD)));
+    messageBuilder.setBoolField((Boolean) inputRecord.get(BOOL_FIELD));
     messageBuilder.setBytesField(ByteString.copyFrom((byte[]) inputRecord.get(BYTES_FIELD)));
     messageBuilder.addAllRepeatedStrings((List) inputRecord.get(REPEATED_STRINGS));
     messageBuilder.setNestedMessage(createNestedMessage((Map<String, Object>) inputRecord.get(NESTED_MESSAGE)));
@@ -108,7 +108,7 @@ public class ProtoBufTestDataGenerator {
     record.put(LONG_FIELD, 100L);
     record.put(DOUBLE_FIELD, 1.1);
     record.put(FLOAT_FIELD, 2.2f);
-    record.put(BOOL_FIELD, "true");
+    record.put(BOOL_FIELD, true);
     record.put(BYTES_FIELD, "hello world!".getBytes(UTF_8));
     record.put(REPEATED_STRINGS, Arrays.asList("aaa", "bbb", "ccc"));
     record.put(NESTED_MESSAGE, getNestedMap(NESTED_STRING_FIELD, "ice cream", NESTED_INT_FIELD, 9));

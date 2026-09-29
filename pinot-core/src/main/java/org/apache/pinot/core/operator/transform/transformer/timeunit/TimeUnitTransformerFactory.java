@@ -19,15 +19,13 @@
 package org.apache.pinot.core.operator.transform.transformer.timeunit;
 
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 
 
 public class TimeUnitTransformerFactory {
   private TimeUnitTransformerFactory() {
   }
 
-  public static TimeUnitTransformer getTimeUnitTransformer(@Nonnull TimeUnit inputTimeUnit,
-      @Nonnull String outputTimeUnitName) {
+  public static TimeUnitTransformer getTimeUnitTransformer(TimeUnit inputTimeUnit, String outputTimeUnitName) {
     outputTimeUnitName = outputTimeUnitName.toUpperCase();
     try {
       return new JavaTimeUnitTransformer(inputTimeUnit, TimeUnit.valueOf(outputTimeUnitName));

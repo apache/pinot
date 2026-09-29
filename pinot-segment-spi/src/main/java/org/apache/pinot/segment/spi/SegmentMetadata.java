@@ -28,6 +28,7 @@ import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.data.Schema;
@@ -35,15 +36,11 @@ import org.joda.time.Duration;
 import org.joda.time.Interval;
 
 
-/**
- * The <code>SegmentMetadata</code> class holds the segment level management information and data statistics.
- */
+/// The `SegmentMetadata` class holds the segment level management information and data statistics.
 @InterfaceAudience.Private
 public interface SegmentMetadata {
 
-  /**
-   * Returns the raw table name (without the type suffix).
-   */
+  /// Returns the raw table name (without the type suffix).
   @Deprecated
   String getTableName();
 
@@ -61,7 +58,12 @@ public interface SegmentMetadata {
 
   Interval getTimeInterval();
 
-  String getCrc();
+  /// Returns the CRC of the whole segment, or `Long.MIN_VALUE` when the segment has no CRC recorded.
+  long getCrc();
+
+  /// Returns the CRC of the segment data only (excluding the metadata), or `Long.MIN_VALUE` when the segment has no
+  /// data CRC recorded.
+  long getDataCrc();
 
   SegmentVersion getVersion();
 
@@ -76,24 +78,30 @@ public interface SegmentMetadata {
 
   long getIndexCreationTime();
 
-  /**
-   * Return the last time a record was indexed in this segment. Applicable for MutableSegments.
-   *
-   * @return time when the last record was indexed
-   */
+  /// Return the last time a record was indexed in this segment. Applicable for MutableSegments.
+  ///
+  /// @return time when the last record was indexed
   long getLastIndexedTimestamp();
 
-  /**
-   * Return the latest ingestion timestamp associated with the records indexed in this segment.
-   * Applicable for MutableSegments.
-   *
-   * @return latest timestamp associated with indexed records
-   *         <code>Long.MIN_VALUE</code> if the stream doesn't provide a timestamp
-   */
+  /// Return the latest ingestion timestamp associated with the records indexed in this segment.
+  /// Applicable for MutableSegments.
+  ///
+  /// @return latest timestamp associated with indexed records
+  ///         `Long.MIN_VALUE` if the stream doesn't provide a timestamp
   long getLatestIngestionTimestamp();
+
+  /// Return the minimum ingestion lag recorded for this segment. Ingestion lag is
+  /// the difference between the record ingestion timestamp and current system time.
+  /// Applicable for MutableSegments.
+  ///
+  /// @return minimum ingestion lag recorded for this segment
+  long getMinimumIngestionLagMs();
 
   @Nullable
   List<StarTreeV2Metadata> getStarTreeV2MetadataList();
+
+  @Nullable
+  MultiColumnTextMetadata getMultiColumnTextMetadata();
 
   Map<String, String> getCustomMap();
 
@@ -111,16 +119,12 @@ public interface SegmentMetadata {
     return getColumnMetadataMap().get(column);
   }
 
-  /**
-   * Removes a column from the segment metadata.
-   */
+  /// Removes a column from the segment metadata.
   void removeColumn(String column);
 
-  /**
-   * Converts segment metadata to json.
-   * @param columnFilter list only the columns in the set. Lists all the columns if the parameter value is null.
-   * @return json representation of segment metadata.
-   */
+  /// Converts segment metadata to json.
+  /// @param columnFilter list only the columns in the set. Lists all the columns if the parameter value is null.
+  /// @return json representation of segment metadata.
   JsonNode toJson(@Nullable Set<String> columnFilter);
 
   default boolean isMutableSegment() {

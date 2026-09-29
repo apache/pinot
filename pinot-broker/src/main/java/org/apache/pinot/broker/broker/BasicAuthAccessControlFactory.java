@@ -21,6 +21,7 @@ package org.apache.pinot.broker.broker;
 import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -28,31 +29,29 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.ws.rs.NotAuthorizedException;
 import org.apache.pinot.broker.api.AccessControl;
-import org.apache.pinot.broker.api.HttpRequesterIdentity;
-import org.apache.pinot.broker.api.RequesterIdentity;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
-import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.TableRowColAccessResult;
+import org.apache.pinot.spi.auth.TableRowColAccessResultImpl;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Basic Authentication based on http headers. Configured via the "pinot.broker.access.control" family of properties.
- *
- * <pre>
- *     Example:
- *     pinot.broker.access.control.principals=admin123,user456
- *     pinot.broker.access.control.principals.admin123.password=verysecret
- *     pinot.broker.access.control.principals.user456.password=kindasecret
- *     pinot.broker.access.control.principals.user456.tables=stuff,lessImportantStuff
- * </pre>
- */
+/// Basic Authentication based on http headers. Configured via the "pinot.broker.access.control" family of properties.
+///
+/// ```
+/// Example:
+/// pinot.broker.access.control.principals=admin123,user456
+/// pinot.broker.access.control.principals.admin123.password=verysecret
+/// pinot.broker.access.control.principals.user456.password=kindasecret
+/// pinot.broker.access.control.principals.user456.tables=stuff,lessImportantStuff
+/// ```
 public class BasicAuthAccessControlFactory extends AccessControlFactory {
   private static final String PREFIX = "principals";
-
-  private static final String HEADER_AUTHORIZATION = "authorization";
 
   private AccessControl _accessControl;
 
@@ -62,7 +61,8 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
 
   @Override
   public void init(PinotConfiguration configuration) {
-    _accessControl = new BasicAuthAccessControl(BasicAuthUtils.extractBasicAuthPrincipals(configuration, PREFIX));
+    _accessControl = new BasicAuthAccessControl(
+        BasicAuthPrincipalUtils.extractBasicAuthPrincipals(configuration, PREFIX));
   }
 
   @Override
@@ -70,9 +70,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
     return _accessControl;
   }
 
-  /**
-   * Access Control using header-based basic http authentication
-   */
+  /// Access Control using header-based basic http authentication
   private static class BasicAuthAccessControl implements AccessControl {
     private final Map<String, BasicAuthPrincipal> _token2principal;
 
@@ -135,16 +133,34 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       return new TableAuthorizationResult(failedTables);
     }
 
-    private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {
-      Preconditions.checkArgument(requesterIdentity instanceof HttpRequesterIdentity, "HttpRequesterIdentity required");
-      HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
+    @Override
+    public TableRowColAccessResult getRowColFilters(RequesterIdentity requesterIdentity, String table) {
+      Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
 
-      Collection<String> tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
-      Optional<BasicAuthPrincipal> principalOpt =
-          tokens.stream().map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
-              .map(_token2principal::get).filter(Objects::nonNull)
-              .findFirst();
-      return principalOpt;
+      Preconditions.checkState(principalOpt.isPresent(), "Principal is not authorized");
+      Preconditions.checkState(table != null, "Table cannot be null");
+
+      TableRowColAccessResult tableRowColAccessResult = new TableRowColAccessResultImpl();
+      BasicAuthPrincipal principal = principalOpt.get();
+
+      //precondition: The principal should have the table.
+      Preconditions.checkArgument(principal.hasTable(table),
+          "Principal: " + principal.getName() + " does not have access to table: " + table);
+
+      Optional<List<String>> rlsFiltersMaybe = principal.getRLSFilters(table);
+      rlsFiltersMaybe.ifPresent(tableRowColAccessResult::setRLSFilters);
+
+      return tableRowColAccessResult;
+    }
+
+    private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {
+      Collection<String> tokens = extractAuthorizationTokens(requesterIdentity);
+      if (tokens.isEmpty()) {
+        return Optional.empty();
+      }
+      return tokens.stream().map(BasicAuthTokenUtils::normalizeBase64Token)
+          .map(_token2principal::get).filter(Objects::nonNull)
+          .findFirst();
     }
   }
 }

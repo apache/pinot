@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.core.accounting;
 
-import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryMXBean;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.utils.ResourceUsageUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -43,24 +43,54 @@ public class TestThreadMXBean {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
   }
 
-  /**
-   * simple memory allocation
-   */
+  @Test
+  public void testDisableThenEnableCpuTimeMeasurement() {
+    if (!ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
+      return;
+    }
+
+    Assert.assertTrue(ThreadResourceUsageProvider.getCurrentThreadCpuTime() > 0);
+
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(false);
+    Assert.assertFalse(ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled());
+    Assert.assertEquals(ThreadResourceUsageProvider.getCurrentThreadCpuTime(), 0);
+
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
+    Assert.assertTrue(ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled());
+    Assert.assertTrue(ThreadResourceUsageProvider.getCurrentThreadCpuTime() > 0);
+  }
+
+  @Test
+  public void testDisableThenEnableMemoryMeasurement() {
+    if (!ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
+      return;
+    }
+
+    Assert.assertTrue(ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes() > 0);
+
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(false);
+    Assert.assertFalse(ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled());
+    Assert.assertEquals(ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes(), 0);
+
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
+    Assert.assertTrue(ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled());
+    Assert.assertTrue(ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes() > 0);
+  }
+
+  /// simple memory allocation
   @Test
   public void testThreadMXBeanSimpleMemAllocTracking() {
     if (ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
-      ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
+      ThreadResourceSnapshot threadResourceSnapshot = new ThreadResourceSnapshot();
       long[] ll = new long[10000];
       ll[2] = 4;
       LOGGER.trace(String.valueOf(ll[2]));
-      long result = threadResourceUsageProvider.getThreadAllocatedBytes();
+      long result = threadResourceSnapshot.getAllocatedBytes();
       Assert.assertTrue(result >= 80000 && result <= 85000);
     }
   }
 
-  /**
-   * multithread memory allocation test, do not remove
-   */
+  /// multithread memory allocation test, do not remove
   @SuppressWarnings("unused")
   public void testThreadMXBeanMultithreadMemAllocTracking() {
     if (ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
@@ -71,33 +101,32 @@ public class TestThreadMXBean {
       AtomicLong b = new AtomicLong();
       AtomicLong c = new AtomicLong();
       ExecutorService executor = Executors.newFixedThreadPool(3);
-      MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
       System.gc();
 
-      long heapPrev = memoryMXBean.getHeapMemoryUsage().getUsed();
-      ThreadResourceUsageProvider threadResourceUsageProvider0 = new ThreadResourceUsageProvider();
+      long heapPrev = ResourceUsageUtils.getUsedHeapSize();
+      ThreadResourceSnapshot threadResourceSnapshot0 = new ThreadResourceSnapshot();
       executor.submit(() -> {
-        ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
+        ThreadResourceSnapshot threadResourceSnapshot = new ThreadResourceSnapshot();
         for (int i = 0; i < 100000; i++) {
           concurrentHashMap.put(i, i);
         }
-        a.set(threadResourceUsageProvider.getThreadAllocatedBytes());
+        a.set(threadResourceSnapshot.getAllocatedBytes());
       });
 
       executor.submit(() -> {
-        ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
+        ThreadResourceSnapshot threadResourceSnapshot = new ThreadResourceSnapshot();
         for (int i = 100000; i < 200000; i++) {
           concurrentHashMap.put(i, i);
         }
-        b.set(threadResourceUsageProvider.getThreadAllocatedBytes());
+        b.set(threadResourceSnapshot.getAllocatedBytes());
       });
 
       executor.submit(() -> {
-        ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
+        ThreadResourceSnapshot threadResourceSnapshot = new ThreadResourceSnapshot();
         for (int i = 0; i < 200000; i++) {
           concurrentHashMap2.put(i, i);
         }
-        c.set(threadResourceUsageProvider.getThreadAllocatedBytes());
+        c.set(threadResourceSnapshot.getAllocatedBytes());
       });
 
       try {
@@ -105,9 +134,9 @@ public class TestThreadMXBean {
       } catch (InterruptedException ignored) {
       }
 
-      long d = threadResourceUsageProvider0.getThreadAllocatedBytes();
+      long d = threadResourceSnapshot0.getAllocatedBytes();
       long threadAllocatedBytes = a.get() + b.get() + c.get() + d;
-      float heapUsedBytes = (float) memoryMXBean.getHeapMemoryUsage().getUsed() - heapPrev;
+      float heapUsedBytes = (float) ResourceUsageUtils.getUsedHeapSize() - heapPrev;
       float ratio = threadAllocatedBytes / heapUsedBytes;
 
       LOGGER.info("Measured thread allocated bytes {}, heap used bytes {}, ratio {}",
@@ -115,9 +144,7 @@ public class TestThreadMXBean {
     }
   }
 
-  /**
-   * multithreading deep memory allocation test, do not remove
-   */
+  /// multithreading deep memory allocation test, do not remove
   @SuppressWarnings("unused")
   public void testThreadMXBeanDeepMemAllocTracking() {
     if (ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
@@ -128,33 +155,32 @@ public class TestThreadMXBean {
       AtomicLong b = new AtomicLong();
       AtomicLong c = new AtomicLong();
       ExecutorService executor = Executors.newFixedThreadPool(3);
-      MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
       System.gc();
 
-      long heapPrev = memoryMXBean.getHeapMemoryUsage().getUsed();
-      ThreadResourceUsageProvider threadResourceUsageProvider0 = new ThreadResourceUsageProvider();
+      long heapPrev = ResourceUsageUtils.getUsedHeapSize();
+      ThreadResourceSnapshot threadResourceSnapshot0 = new ThreadResourceSnapshot();
       executor.submit(() -> {
-        ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
+        ThreadResourceSnapshot threadResourceSnapshot = new ThreadResourceSnapshot();
         for (int i = 0; i < 100; i++) {
           concurrentHashMap.put(i, new NestedArray());
         }
-        a.set(threadResourceUsageProvider.getThreadAllocatedBytes());
+        a.set(threadResourceSnapshot.getAllocatedBytes());
       });
 
       executor.submit(() -> {
-        ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
+        ThreadResourceSnapshot threadResourceSnapshot = new ThreadResourceSnapshot();
         for (int i = 100; i < 200; i++) {
           concurrentHashMap.put(i, new NestedArray());
         }
-        b.set(threadResourceUsageProvider.getThreadAllocatedBytes());
+        b.set(threadResourceSnapshot.getAllocatedBytes());
       });
 
       executor.submit(() -> {
-        ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
+        ThreadResourceSnapshot threadResourceSnapshot = new ThreadResourceSnapshot();
         for (int i = 0; i < 200; i++) {
           concurrentHashMap2.put(i, new NestedArray());
         }
-        c.set(threadResourceUsageProvider.getThreadAllocatedBytes());
+        c.set(threadResourceSnapshot.getAllocatedBytes());
       });
 
       try {
@@ -162,9 +188,9 @@ public class TestThreadMXBean {
       } catch (InterruptedException ignored) {
       }
 
-      long d = threadResourceUsageProvider0.getThreadAllocatedBytes();
+      long d = threadResourceSnapshot0.getAllocatedBytes();
       long threadAllocatedBytes = a.get() + b.get() + c.get() + d;
-      float heapUsedBytes = (float) memoryMXBean.getHeapMemoryUsage().getUsed() - heapPrev;
+      float heapUsedBytes = (float) ResourceUsageUtils.getUsedHeapSize() - heapPrev;
       float ratio = threadAllocatedBytes / heapUsedBytes;
 
       LOGGER.info("Measured thread allocated bytes {}, heap used bytes {}, ratio {}",
@@ -172,23 +198,20 @@ public class TestThreadMXBean {
     }
   }
 
-  /**
-   * test allocation and gc, getHeapMemoryUsage() tracks realtime usage, while getThreadAllocatedBytes() only tracks
-   * allocated bytes, do not remove
-   */
+  /// test allocation and gc, getHeapMemoryUsage() tracks realtime usage, while getThreadAllocatedBytes() only tracks
+  /// allocated bytes, do not remove
   @SuppressWarnings("unused")
   public void testThreadMXBeanMemAllocGCTracking() {
     LogManager.getLogger(TestThreadMXBean.class).setLevel(Level.INFO);
-    MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
     System.gc();
-    ThreadResourceUsageProvider threadResourceUsageProvider0 = new ThreadResourceUsageProvider();
-    long heapPrev = memoryMXBean.getHeapMemoryUsage().getUsed();
+    ThreadResourceSnapshot threadResourceSnapshot0 = new ThreadResourceSnapshot();
+    long heapPrev = ResourceUsageUtils.getUsedHeapSize();
     for (int i = 0; i < 3; i++) {
       long[] ignored = new long[100000000];
     }
     System.gc();
-    long heapResult = memoryMXBean.getHeapMemoryUsage().getUsed() - heapPrev;
-    long result = threadResourceUsageProvider0.getThreadAllocatedBytes();
+    long heapResult = ResourceUsageUtils.getUsedHeapSize() - heapPrev;
+    long result = threadResourceSnapshot0.getAllocatedBytes();
     LOGGER.info("Measured thread allocated bytes {}, heap used bytes {}",
         result, heapResult);
   }

@@ -23,8 +23,6 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 
 public final class FixedByteValueReaderWriter implements ValueReader {
   private final PinotDataBuffer _dataBuffer;
@@ -53,10 +51,8 @@ public final class FixedByteValueReaderWriter implements ValueReader {
     return _dataBuffer.getDouble((long) index * Double.BYTES);
   }
 
-  /**
-   * Reads the unpadded bytes into the given buffer and returns the length.
-   */
-  private int readUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer) {
+  @Override
+  public int readUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer) {
     // Based on the ZeroInWord algorithm: http://graphics.stanford.edu/~seander/bithacks.html#ZeroInWord
     assert buffer.length >= numBytesPerValue;
     long startOffset = (long) index * numBytesPerValue;
@@ -86,26 +82,12 @@ public final class FixedByteValueReaderWriter implements ValueReader {
   }
 
   @Override
-  public byte[] getUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer) {
-    int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
-    byte[] bytes = new byte[length];
-    System.arraycopy(buffer, 0, bytes, 0, length);
-    return bytes;
-  }
-
-  @Override
-  public String getUnpaddedString(int index, int numBytesPerValue, byte[] buffer) {
-    int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
-    return new String(buffer, 0, length, UTF_8);
-  }
-
-  @Override
-  public String getPaddedString(int index, int numBytesPerValue, byte[] buffer) {
+  public int readBytes(int index, int numBytesPerValue, byte[] buffer) {
     assert buffer.length >= numBytesPerValue;
 
     long startOffset = (long) index * numBytesPerValue;
     _dataBuffer.copyTo(startOffset, buffer, 0, numBytesPerValue);
-    return new String(buffer, 0, numBytesPerValue, UTF_8);
+    return numBytesPerValue;
   }
 
   @Override
@@ -114,6 +96,34 @@ public final class FixedByteValueReaderWriter implements ValueReader {
     byte[] value = new byte[numBytesPerValue];
     _dataBuffer.copyTo(startOffset, value, 0, numBytesPerValue);
     return value;
+  }
+
+  @Override
+  public int getUnpaddedByteSize(int index, int numBytesPerValue) {
+    // Based on the ZeroInWord algorithm: http://graphics.stanford.edu/~seander/bithacks.html#ZeroInWord
+    long startOffset = (long) index * numBytesPerValue;
+    boolean littleEndian = _dataBuffer.order() == ByteOrder.LITTLE_ENDIAN;
+    int endIndex = numBytesPerValue & 0xFFFFFFF8;
+    int i = 0;
+    for (; i < endIndex; i += Long.BYTES) {
+      long word = _dataBuffer.getLong(startOffset + i);
+      long tmp = ~(((word & 0x7F7F7F7F7F7F7F7FL) + 0x7F7F7F7F7F7F7F7FL) | word | 0x7F7F7F7F7F7F7F7FL);
+      if (tmp != 0) {
+        return i + ((littleEndian ? Long.numberOfTrailingZeros(tmp) : Long.numberOfLeadingZeros(tmp)) >>> 3);
+      }
+    }
+    for (; i < numBytesPerValue; i++) {
+      byte b = _dataBuffer.getByte(startOffset + i);
+      if (b == 0) {
+        break;
+      }
+    }
+    return i;
+  }
+
+  @Override
+  public int getByteSize(int index, int numBytesPerValue) {
+    return numBytesPerValue;
   }
 
   @Override

@@ -52,6 +52,21 @@ public class FloatOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
+  public DataType getValueType() {
+    return DataType.FLOAT;
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    return getDictId(Float.valueOf(stringValue));
+  }
+
+  @Override
+  public int indexOf(float floatValue) {
+    return getDictId(floatValue);
+  }
+
+  @Override
   public int compare(int dictId1, int dictId2) {
     return Float.compare(getFloatValue(dictId1), getFloatValue(dictId2));
   }
@@ -155,21 +170,6 @@ public class FloatOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
     Arrays.sort(sortedValues);
     return sortedValues;
-  }
-
-  @Override
-  public DataType getValueType() {
-    return DataType.FLOAT;
-  }
-
-  @Override
-  public int indexOf(String stringValue) {
-    return getDictId(Float.valueOf(stringValue));
-  }
-
-  @Override
-  public int indexOf(float floatValue) {
-    return getDictId(floatValue);
   }
 
   @Override

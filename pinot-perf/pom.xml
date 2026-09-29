@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-perf</artifactId>
   <name>Pinot Perf</name>
@@ -43,17 +43,34 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-local</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-server</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-kafka-2.0</artifactId>
+      <artifactId>pinot-kafka-3.0</artifactId>
       <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-protobuf</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-json</artifactId>
     </dependency>
 
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
+      <type>test-jar</type>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-core</artifactId>
       <type>test-jar</type>
     </dependency>
     <dependency>
@@ -85,6 +102,7 @@
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
+      <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
@@ -94,6 +112,10 @@
     <dependency>
       <groupId>org.openjdk.jmh</groupId>
       <artifactId>jmh-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.fory</groupId>
+      <artifactId>fory-json</artifactId>
     </dependency>
     <dependency>
       <groupId>net.sf.jopt-simple</groupId>
@@ -125,6 +147,10 @@
               <name>pinot-BenchmarkDictionary</name>
             </program>
             <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkObjectOpenHashMap</mainClass>
+              <name>pinot-BenchmarkObjectOpenHashMap</name>
+            </program>
+            <program>
               <mainClass>org.apache.pinot.perf.BenchmarkDictionaryCreation</mainClass>
               <name>pinot-BenchmarkDictionaryCreation</name>
             </program>
@@ -141,20 +167,12 @@
               <name>pinot-BenchmarkFixedIntArrayOffHeapIdMap</name>
             </program>
             <program>
-              <mainClass>org.apache.pinot.perf.BenchmarkOffHeapDictionaryMemory</mainClass>
-              <name>pinot-BenchmarkOffHeapDictionaryMemory</name>
-            </program>
-            <program>
               <mainClass>org.apache.pinot.perf.BenchmarkOfflineIndexReader</mainClass>
               <name>pinot-BenchmarkOfflineIndexReader</name>
             </program>
             <program>
               <mainClass>org.apache.pinot.perf.BenchmarkOrDocIdIterator</mainClass>
               <name>pinot-BenchmarkOrDocIdIterator</name>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.perf.BenchmarkQueryEngine</mainClass>
-              <name>pinot-BenchmarkQueryEngine</name>
             </program>
             <program>
               <mainClass>org.apache.pinot.perf.BenchmarkRealtimeConsumptionSpeed</mainClass>
@@ -165,24 +183,28 @@
               <name>pinot-BenchmarkStringDictionary</name>
             </program>
             <program>
-              <mainClass>org.apache.pinot.perf.DictionaryDumper</mainClass>
-              <name>pinot-DictionaryDumper</name>
+              <mainClass>org.apache.pinot.perf.aggregation.BenchmarkDistinctCountHLLThreshold</mainClass>
+              <name>pinot-BenchmarkDistinctCountHLLThreshold</name>
             </program>
             <program>
-              <mainClass>org.apache.pinot.perf.ForwardIndexWriterBenchmark</mainClass>
-              <name>pinot-ForwardIndexWriterBenchmark</name>
+              <mainClass>org.apache.pinot.perf.DictionaryDumper</mainClass>
+              <name>pinot-DictionaryDumper</name>
             </program>
             <program>
               <mainClass>org.apache.pinot.perf.BenchmarkPinotDataBitSet</mainClass>
               <name>pinot-BenchmarkPinotDataBitSet</name>
             </program>
             <program>
-              <mainClass>org.apache.pinot.perf.RawIndexBenchmark</mainClass>
-              <name>pinot-RawIndexBenchmark</name>
+              <mainClass>org.apache.pinot.perf.aggregation.SumIntAggregationFunctionBenchmark</mainClass>
+              <name>pinot-SumIntAggregationFunctionBenchmark</name>
             </program>
             <program>
-              <mainClass>org.apache.pinot.perf.StringDictionaryPerfTest</mainClass>
-              <name>pinot-StringDictionaryPerfTest</name>
+              <mainClass>org.apache.pinot.perf.BenchmarkJsonParsing</mainClass>
+              <name>pinot-BenchmarkJsonParsing</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkProtoBufRecordExtractor</mainClass>
+              <name>pinot-BenchmarkProtoBufRecordExtractor</name>
             </program>
           </programs>
           <repositoryLayout>flat</repositoryLayout>
@@ -231,6 +253,9 @@
                     <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                       <mainClass>org.openjdk.jmh.Main</mainClass>
                     </transformer>
+                    <!-- merge META-INF/services/ files so that all SPI registrations (e.g. gRPC NameResolverProvider,
+                         NameResolverRegistry) survive the shade step instead of the last JAR overwriting earlier ones -->
+                    <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                   </transformers>
                   <finalName>benchmarks</finalName>
                 </configuration>

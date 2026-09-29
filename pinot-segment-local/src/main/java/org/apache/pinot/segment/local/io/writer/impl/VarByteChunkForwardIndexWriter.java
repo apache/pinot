@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.io.writer.impl;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.math.BigDecimal;
 import javax.annotation.concurrent.NotThreadSafe;
@@ -30,19 +29,14 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * Chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains fixed number of docs, and
- * the entries are variable length.
- *
- * <p>The layout of each chunk is as follows:
- * <ul>
- *   <li>
- *     Header Section: start offsets (stored as int) of the entry within the data section. For partial chunks, offset
- *     values are 0 for missing entries.
- *   </li>
- *   <li>Data Section</li>
- * </ul>
- */
+/// Chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains fixed number of docs, and
+/// the entries are variable length.
+///
+/// The layout of each chunk is as follows:
+///
+/// - Header Section: start offsets (stored as int) of the entry within the data section. For partial chunks, offset
+///   values are 0 for missing entries.
+/// - Data Section
 @NotThreadSafe
 public class VarByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter implements VarByteChunkWriter {
   public static final int CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE = Integer.BYTES;
@@ -51,18 +45,16 @@ public class VarByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter 
   private int _chunkHeaderOffset;
   private int _chunkDataOffSet;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param file File to write to.
-   * @param compressionType Type of compression to use.
-   * @param totalDocs Total number of docs to write.
-   * @param numDocsPerChunk Number of documents per chunk.
-   * @param lengthOfLongestEntry Length of longest entry (in bytes)
-   * @param writerVersion writer format version
-   * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is
-   *     not found.
-   */
+  /// Constructor for the class.
+  ///
+  /// @param file File to write to.
+  /// @param compressionType Type of compression to use.
+  /// @param totalDocs Total number of docs to write.
+  /// @param numDocsPerChunk Number of documents per chunk.
+  /// @param lengthOfLongestEntry Length of longest entry (in bytes)
+  /// @param writerVersion writer format version
+  /// @throws java.io.FileNotFoundException Throws [java.io.FileNotFoundException] if the specified file is
+  ///     not found.
   public VarByteChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
       int numDocsPerChunk, int lengthOfLongestEntry, int writerVersion)
       throws IOException {
@@ -119,6 +111,11 @@ public class VarByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter 
   }
 
   @Override
+  public void putBigDecimalMV(BigDecimal[] values) {
+    putBytes(ArraySerDeUtils.serializeBigDecimalArray(values));
+  }
+
+  @Override
   public void putStringMV(String[] values) {
     putBytes(ArraySerDeUtils.serializeStringArray(values));
   }
@@ -135,16 +132,16 @@ public class VarByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter 
     }
   }
 
-  /**
-   * Helper method to compress and write the current chunk.
-   * <ul>
-   *   <li> Chunk header is of fixed size, so fills out any remaining offsets for partially filled chunks. </li>
-   *   <li> Compresses and writes the chunk to the data file. </li>
-   *   <li> Updates the header with the current chunks offset. </li>
-   *   <li> Clears up the buffers, so that they can be reused. </li>
-   * </ul>
-   */
+  /// Helper method to compress and write the current chunk.
+  ///
+  /// - Chunk header is of fixed size, so fills out any remaining offsets for partially filled chunks.
+  /// - Compresses and writes the chunk to the data file.
+  /// - Updates the header with the current chunks offset.
+  /// - Clears up the buffers, so that they can be reused.
   protected void writeChunk() {
+    if (_trackUncompressedValueSize) {
+      _uncompressedValueSize += _chunkDataOffSet - _chunkHeaderSize;
+    }
     // For partially filled chunks, we still need to clear the offsets for remaining rows, as we reuse this buffer.
     for (int i = _chunkHeaderOffset; i < _chunkHeaderSize; i += Integer.BYTES) {
       _chunkBuffer.putInt(i, 0);
@@ -155,5 +152,10 @@ public class VarByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter 
     // Reset the chunk offsets.
     _chunkHeaderOffset = 0;
     _chunkDataOffSet = _chunkHeaderSize;
+  }
+
+  @Override
+  public long getRawForwardIndexUncompressedValueSizeInBytes() {
+    return _trackUncompressedValueSize ? _uncompressedValueSize + _chunkDataOffSet - _chunkHeaderSize : -1;
   }
 }

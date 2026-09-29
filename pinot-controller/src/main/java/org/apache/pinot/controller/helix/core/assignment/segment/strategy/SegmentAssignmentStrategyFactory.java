@@ -26,23 +26,15 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
-/**
- * Factory for SegmentAssignmentStrategy
- */
+/// Factory for SegmentAssignmentStrategy
 public class SegmentAssignmentStrategyFactory {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentAssignmentStrategyFactory.class);
 
   private SegmentAssignmentStrategyFactory() {
   }
 
-  /**
-   * Determine Segment Assignment strategy
-   */
+  /// Determine Segment Assignment strategy
   public static SegmentAssignmentStrategy getSegmentAssignmentStrategy(HelixManager helixManager,
       TableConfig tableConfig, String assignmentType, InstancePartitions instancePartitions) {
     String assignmentStrategy = null;
@@ -64,9 +56,9 @@ public class SegmentAssignmentStrategyFactory {
       // Try to determine segment assignment strategy from table config
       if (segmentAssignmentConfigMap != null) {
         SegmentAssignmentConfig segmentAssignmentConfig;
-        // Use the pre defined segment assignment strategy
+        // Use the pre-defined segment assignment strategy
         segmentAssignmentConfig = segmentAssignmentConfigMap.get(assignmentType.toUpperCase());
-        // Segment assignment config is only applicable to offline tables and completed segments of real time tables
+        // Segment assignment config is only applicable to offline tables and completed segments of realtime tables
         if (segmentAssignmentConfig != null) {
           assignmentStrategy = segmentAssignmentConfig.getAssignmentStrategy().toLowerCase();
         }
@@ -90,6 +82,12 @@ public class SegmentAssignmentStrategyFactory {
     } else {
       // Set segment assignment strategy depending on strategy set in table config
       switch (assignmentStrategy) {
+        case AssignmentStrategy.ROUND_ROBIN_SEGMENT_ASSIGNMENT_STRATEGY:
+          segmentAssignmentStrategy = new RoundRobinSegmentAssignmentStrategy();
+          break;
+        case AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY:
+          segmentAssignmentStrategy = new RoundRobinReplicaGroupSegmentAssignmentStrategy();
+          break;
         case AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY:
           segmentAssignmentStrategy = new ReplicaGroupSegmentAssignmentStrategy();
           break;

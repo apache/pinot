@@ -23,9 +23,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
 
 
-/**
- * The {@code ServerResponse} class contains the response and time info from a {@link ServerRoutingInstance}.
- */
+/// The `ServerResponse` class contains the response and time info from a [ServerRoutingInstance].
 @ThreadSafe
 public class ServerResponse {
   private final long _startTimeMs;

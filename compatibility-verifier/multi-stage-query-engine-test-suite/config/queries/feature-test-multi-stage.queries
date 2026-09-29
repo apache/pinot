@@ -28,4 +28,4 @@ SELECT * FROM (SELECT stringDimSV1 FROM FeatureTest1 WHERE generationNumber = __
 SELECT * FROM (SELECT stringDimSV1 FROM FeatureTest1 WHERE generationNumber = __GENERATION_NUMBER__) UNION (SELECT stringDimSV1 FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__)
 
 # Windows
-SELECT stringDimSV1, longMetric1, SUM(longMetric1) OVER (PARTITION BY stringDimSV1) FROM FeatureTest1 WHERE generationNumber = __GENERATION_NUMBER__
+SELECT stringDimSV1, longMetric1, SUM(longMetric1) OVER (PARTITION BY stringDimSV1), AVG(longMetric1) OVER (PARTITION BY stringDimSV1) FROM FeatureTest1 WHERE generationNumber = __GENERATION_NUMBER__

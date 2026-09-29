@@ -18,13 +18,13 @@
  * under the License.
  */
 
-import React, { useEffect, useState } from 'react';
-import { makeStyles } from '@material-ui/core/styles';
-import { Grid, Checkbox, Button, FormControl, Input, InputLabel, Box, Typography } from '@material-ui/core';
+import React, {useEffect, useState} from 'react';
+import {makeStyles} from '@material-ui/core/styles';
+import {Box, Button, ButtonGroup, Checkbox, FormControl, Grid, Input, InputLabel, Typography} from '@material-ui/core';
 import Alert from '@material-ui/lab/Alert';
 import FileCopyIcon from '@material-ui/icons/FileCopy';
-import { SqlException, TableData } from 'Models';
-import { UnControlled as CodeMirror } from 'react-codemirror2';
+import {SqlException, TableData} from 'Models';
+import {UnControlled as CodeMirror} from 'react-codemirror2';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
 import 'codemirror/mode/javascript/javascript';
@@ -33,9 +33,8 @@ import 'codemirror/addon/hint/show-hint';
 import 'codemirror/addon/hint/sql-hint';
 import 'codemirror/addon/hint/show-hint.css';
 import NativeCodeMirror from 'codemirror';
-import { forEach, uniqBy, range as _range } from 'lodash';
+import {forEach, range as _range, uniqBy} from 'lodash';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
-import Switch from '@material-ui/core/Switch';
 import exportFromJSON from 'export-from-json';
 import Utils from '../utils/Utils';
 import AppLoader from '../components/AppLoader';
@@ -43,11 +42,36 @@ import CustomizedTables from '../components/Table';
 import QuerySideBar from '../components/Query/QuerySideBar';
 import TableToolbar from '../components/TableToolbar';
 import SimpleAccordion from '../components/SimpleAccordion';
-import PinotMethodUtils from '../utils/PinotMethodUtils';
+import PinotMethodUtils, { QUERY_STATS_COLUMNS } from '../utils/PinotMethodUtils';
+import { runBootstrapRequest } from '../utils/bootstrap';
 import '../styles/styles.css';
 import {Resizable} from "re-resizable";
-import { useHistory, useLocation } from 'react-router';
+import {useHistory, useLocation} from 'react-router-dom';
 import sqlFormatter from '@sqltools/formatter';
+import {FlamegraphMode, FlameGraphQueryStageStats} from '../components/Query/FlamegraphQueryStageStats';
+import {VisualizeQueryStageStats} from '../components/Query/VisualizeQueryStageStats';
+
+enum ResultViewType {
+  TABULAR = 'tabular',
+  JSON = 'json',
+  VISUAL = 'visual',
+}
+
+enum ErrorViewType {
+  EXCEPTION = 'exception',
+  JSON = 'json',
+  VISUAL = 'visual',
+}
+
+const QUERY_BOOTSTRAP_TIMEOUT_MS = 3000;
+const EMPTY_TABLE_LIST = {
+  columns: ['Tables'],
+  records: [],
+};
+const EMPTY_LOGICAL_TABLE_LIST = {
+  columns: ['Logical Tables'],
+  records: [],
+};
 
 const useStyles = makeStyles((theme) => ({
   title: {
@@ -133,36 +157,52 @@ const sqlFuntionsList = [
   'SUMMV', 'AVGMV', 'MINMAXRANGEMV', 'DISTINCTCOUNTMV', 'DISTINCTCOUNTBITMAPMV', 'DISTINCTCOUNTHLLMV',
   'DISTINCTCOUNTRAWHLLMV', 'DISTINCT', 'ST_UNION'];
 
-const responseStatCols = [
-  'timeUsedMs',
-  'numDocsScanned',
-  'totalDocs',
-  'numServersQueried',
-  'numServersResponded',
-  'numSegmentsQueried',
-  'numSegmentsProcessed',
-  'numSegmentsMatched',
-  'numConsumingSegmentsQueried',
-  'numEntriesScannedInFilter',
-  'numEntriesScannedPostFilter',
-  'numGroupsLimitReached',
-  'partialResponse',
-  'minConsumingFreshnessTimeMs',
-  'offlineThreadCpuTimeNs',
-  'realtimeThreadCpuTimeNs',
-  'offlineSystemActivitiesCpuTimeNs',
-  'realtimeSystemActivitiesCpuTimeNs',
-  'offlineResponseSerializationCpuTimeNs',
-  'realtimeResponseSerializationCpuTimeNs',
-  'offlineTotalCpuTimeNs',
-  'realtimeTotalCpuTimeNs'
-];
-
 // A custom hook that builds on useLocation to parse the query string
 function useQuery() {
   const { search } = useLocation();
 
   return React.useMemo(() => new URLSearchParams(search), [search]);
+}
+
+// A mapping of error codes to their respective error types.
+// It should be compatible with org.apache.pinot.spi.exception.QueryErrorCode
+const queryErrorCodeMap = {
+  100: "JsonParsingError",
+  150: "SQLParsingError",
+  160: "SQLRuntimeError",
+  180: "AccessDenied",
+  190: "TableDoesNotExistError",
+  191: "TableIsDisabledError",
+  200: "QueryExecutionError",
+  210: "ServerShuttingDown",
+  211: "ServerOutOfCapacity",
+  230: "ServerTableMissing",
+  235: "ServerSegmentMissing",
+  240: "QuerySchedulingTimeoutError",
+  245: "ServerResourceLimitExceededError",
+  250: "ExecutionTimeoutError",
+  305: "",
+  400: "BrokerTimeoutError",
+  410: "BrokerResourceMissingError",
+  420: "BrokerInstanceMissingError",
+  425: "BrokerRequestSend",
+  427: "ServerNotResponding",
+  429: "TooManyRequests",
+  430: "WorkloadBudgetExceededError",
+  450: "InternalError",
+  500: "MergeResponseError",
+  503: "QueryCancellationError",
+  700: "QueryValidationError",
+  710: "UnknownColumnError",
+  720: "QueryPlanningError",
+  1000: "UnknownError"
+};
+
+const errorCodeDescription = (errorCode) => {
+    if (queryErrorCodeMap[errorCode]) {
+        return queryErrorCodeMap[errorCode];
+    }
+    return 'Unknown Error';
 }
 
 const QueryPage = () => {
@@ -175,7 +215,11 @@ const QueryPage = () => {
     columns: [],
     records: [],
   });
-  const [showException, setShowException] = useState<boolean>(false);
+  const [logicalTableList, setLogicalTableList] = useState<TableData>({
+    columns: [],
+    records: [],
+  });
+  const [showErrorType, setShowErrorType] = useState<ErrorViewType>(ErrorViewType.EXCEPTION);
 
   const [tableSchema, setTableSchema] = useState<TableData>({
     columns: [],
@@ -200,13 +244,14 @@ const QueryPage = () => {
     columns: [],
     records: [],
   });
+  const [resultViewType, setResultViewType] = useState(ResultViewType.TABULAR);
+  const [stageStats, setStageStats] = useState({});
 
   const [warnings, setWarnings] = useState<Array<string>>([]);
 
   const [checked, setChecked] = React.useState({
     tracing: queryParam.get('tracing') === 'true',
     useMSE: queryParam.get('useMSE') === 'true',
-    showResultJSON: false,
   });
 
   const queryExecuted = React.useRef(false);
@@ -233,7 +278,18 @@ const QueryPage = () => {
     if (modifiedEnabled && event.keyCode == 191) {
       handleComment(editor);
     }
-  }
+    // Map (Cmd/Ctrl) + \ KeyPress to toggle formatting the query
+    if (modifiedEnabled && event.keyCode == 220) {
+      handleFormatSQL(editor.getValue());
+    }
+  };
+
+  const handleQueryInterfaceKeyDownRef = React.useRef(handleQueryInterfaceKeyDown);
+
+  useEffect(() => {
+    handleQueryInterfaceKeyDownRef.current = handleQueryInterfaceKeyDown;
+  }, [handleQueryInterfaceKeyDown]);
+
 
   const handleComment = (cm: NativeCodeMirror.Editor) => {
     const selections = cm.listSelections();
@@ -289,7 +345,7 @@ const QueryPage = () => {
     setQueryLoader(true);
     queryExecuted.current = true;
     let params;
-    let queryOptions = [];
+    let queryOptions = ['applicationName=pinot-controller-console'];
     if(queryTimeout){
       queryOptions.push(`timeoutMs=${queryTimeout}`);
     }
@@ -319,8 +375,9 @@ const QueryPage = () => {
     const results = await PinotMethodUtils.getQueryResults(params);
     setResultError(results.exceptions || []);
     setResultData(results.result || { columns: [], records: [] });
-    setQueryStats(results.queryStats || { columns: responseStatCols, records: [] });
+    setQueryStats(results.queryStats || { columns: QUERY_STATS_COLUMNS, records: [] });
     setOutputResult(JSON.stringify(results.data, null, 2) || '');
+    setStageStats(results?.data?.stageStats || {});
     setWarnings(extractWarnings(results));
     setQueryLoader(false);
     queryExecuted.current = false;
@@ -382,17 +439,78 @@ const QueryPage = () => {
     }, 3000);
   };
 
-  const fetchData = async () => {
-    const result = await PinotMethodUtils.getQueryTablesList({bothType: false});
-    setTableList(result);
-    setFetching(false);
+  const fetchData = () => {
+    let tablesReady = false;
+    let logicalTablesReady = false;
+
+    const markReady = (section: 'tables' | 'logicalTables') => {
+      if (section === 'tables') {
+        if (tablesReady) {
+          return;
+        }
+        tablesReady = true;
+      } else {
+        if (logicalTablesReady) {
+          return;
+        }
+        logicalTablesReady = true;
+      }
+
+      if (tablesReady && logicalTablesReady) {
+        setFetching(false);
+      }
+    };
+
+    const cancelTables = runBootstrapRequest<TableData>({
+      request: PinotMethodUtils.getQueryTablesList({bothType: false}),
+      timeoutMs: QUERY_BOOTSTRAP_TIMEOUT_MS,
+      onInitialTimeout: () => {
+        setTableList(EMPTY_TABLE_LIST);
+        markReady('tables');
+      },
+      onSuccess: (result) => {
+        setTableList(result);
+        markReady('tables');
+      },
+      onError: (error) => {
+        console.warn('Unable to load query console table metadata during initial bootstrap.', error);
+        setTableList(EMPTY_TABLE_LIST);
+        markReady('tables');
+      },
+    });
+
+    const cancelLogicalTables = runBootstrapRequest<TableData>({
+      request: PinotMethodUtils.getQueryLogicalTablesList(),
+      timeoutMs: QUERY_BOOTSTRAP_TIMEOUT_MS,
+      onInitialTimeout: () => {
+        setLogicalTableList(EMPTY_LOGICAL_TABLE_LIST);
+        markReady('logicalTables');
+      },
+      onSuccess: (logicalTablesResult) => {
+        setLogicalTableList(logicalTablesResult);
+        markReady('logicalTables');
+      },
+      onError: (error) => {
+        console.warn('Unable to load query logical table metadata during initial bootstrap.', error);
+        setLogicalTableList(EMPTY_LOGICAL_TABLE_LIST);
+        markReady('logicalTables');
+      },
+    });
+
+    return () => {
+      cancelTables();
+      cancelLogicalTables();
+    };
   };
 
   useEffect(() => {
-    fetchData();
+    const cancelFetchData = fetchData();
     if(inputQuery){
       handleRunNow(inputQuery);
     }
+    return () => {
+      cancelFetchData();
+    };
   }, []);
 
   useEffect(()=>{
@@ -401,8 +519,7 @@ const QueryPage = () => {
       setInputQuery(query);
       setChecked({
         tracing: queryParam.get('tracing') === 'true',
-        useMSE: queryParam.get('useMse') === 'true',
-        showResultJSON: checked.showResultJSON,
+        useMSE: queryParam.get('useMse') === 'true'
       });
       setQueryTimeout(Number(queryParam.get('timeout') || '') || '');
       setBoolFlag(!boolFlag);
@@ -461,6 +578,7 @@ const QueryPage = () => {
       <Grid item>
         <QuerySideBar
           tableList={tableList}
+          logicalTableList={logicalTableList}
           fetchSQLData={fetchSQLData}
           tableSchema={tableSchema}
           selectedTable={selectedTable}
@@ -499,7 +617,9 @@ const QueryPage = () => {
                   }}
                   value={inputQuery}
                   onChange={handleOutputDataChange}
-                  onKeyDown={handleQueryInterfaceKeyDown}
+                  // Ensures the latest function is always called, preventing stale state issues due to closures.
+                  // Directly passing handleQueryInterfaceKeyDown may result in outdated state references.
+                  onKeyDown={(editor, event) => handleQueryInterfaceKeyDownRef.current(editor, event)}
                   className={classes.codeMirror}
                   autoCursor={false}
                 />
@@ -539,6 +659,7 @@ const QueryPage = () => {
                     variant="contained"
                     color="primary"
                     onClick={() => handleFormatSQL(inputQuery)}
+                    endIcon={<span style={{fontSize: '0.8em', lineHeight: 1}}>{navigator.platform.includes('Mac') ? '⌘\\' : 'Ctrl+\\'}</span>}
                 >
                   Format SQL
                 </Button>
@@ -549,6 +670,7 @@ const QueryPage = () => {
                     variant="contained"
                     color="primary"
                     onClick={() => handleRunNow()}
+                    endIcon={<span style={{fontSize: '0.8em', lineHeight: 1}}>{navigator.platform.includes('Mac') ? '⌘↵' : 'Ctrl+↵'}</span>}
                 >
                   Run Query
                 </Button>
@@ -577,44 +699,71 @@ const QueryPage = () => {
                                    </Alert>
                   )
                 }
-        
+
                 {/* Sql result errors */}
                 {resultError && resultError.length > 0 && (
                     <>
-                      <Alert 
-                        className={classes.sqlError} 
-                        severity="error" 
+                      <Alert
+                        className={classes.sqlError}
+                        severity="error"
                         action={
+
                           <FormControlLabel
-                            control={<Switch color="primary" checked={showException} onChange={(e) => setShowException(e.target.checked)} name="checkedA" />}
-                            label={<Typography variant='body2'>Show Exceptions</Typography>}
+                              labelPlacement='start'
+                              control={
+                                <ButtonGroup color='primary' size='small'>
+                                  <Button onClick={() => setShowErrorType(ErrorViewType.EXCEPTION)} variant={showErrorType === ErrorViewType.EXCEPTION ? "contained" : "outlined"}>Exception</Button>
+                                  <Button onClick={() => setShowErrorType(ErrorViewType.JSON)} variant={showErrorType === ErrorViewType.JSON ? "contained" : "outlined"}>Json</Button>
+                                  {
+                                    stageStats && Object.keys(stageStats).length > 0 &&
+                                    <Button onClick={() => setShowErrorType(ErrorViewType.VISUAL)} variant={showErrorType === ErrorViewType.VISUAL ? "contained" : "outlined"}>Visual</Button>
+                                  }
+                                </ButtonGroup>
+                              }
+                              label={<Typography style={{marginRight: "8px"}}>View</Typography>}
+                              style={{marginRight: 0}}
+                              className={classes.runNowBtn}
                           />
                         }
                       >
                         {
                           resultData.columns.length > 0 ? (
-                            <Typography variant='body2'>Partial results due to exceptions. Please toggle the switch to view details.</Typography>
+                            <Typography variant='body2'>Partial results due to exceptions. Stats may be partial.</Typography>
                           ) : (
-                            <Typography variant='body2'>Query failed with exceptions. Please toggle the switch to view details.</Typography>
+                            <Typography variant='body2'>Query failed with exceptions. Stats may be partial.</Typography>
                           )
                         }
                       </Alert>
                       <Box m={"16px"}></Box>
 
-                      {
-                        showException && resultError.map((error) => (
-                          <Box style={{paddingBottom: "10px"}}>
-                            <Alert className={classes.sqlError} severity="error">
-                              {error.errorCode && <Typography variant="body2">Error Code: {error.errorCode}</Typography>}
-                              {error.message}
-                            </Alert>
-                          </Box>
-                        ))
-                      }
+                      {showErrorType === ErrorViewType.EXCEPTION && (
+                          resultError.map((error, index) => (
+                              <Box key={error.errorCode ? error.errorCode : `error-${index}`} style={{paddingBottom: "10px"}}>
+                                <Alert className={classes.sqlError} severity="error">
+                                  {error.errorCode && <Typography variant="body2">Error Code: {error.errorCode} ({errorCodeDescription(error.errorCode)})</Typography>}
+                                  {error.message}
+                                </Alert>
+                              </Box>
+                          ))
+                      )}
+                      {showErrorType === ErrorViewType.JSON && (
+                          <SimpleAccordion
+                              headerTitle="Query Result (JSON Format)"
+                              showSearchBox={false}
+                          >
+                            <CodeMirror
+                                options={jsonoptions}
+                                value={outputResult}
+                                className={classes.queryOutput}
+                                autoCursor={false}
+                            />
+                          </SimpleAccordion>
+                      )}
+                      {showErrorType === ErrorViewType.VISUAL && <MseVisualizer stageStats={stageStats}/>}
                     </>
                   )
                 }
-        
+
                 <Grid item xs style={{ backgroundColor: 'white' }}>
                   {resultData.columns.length ? (
                     <>
@@ -657,19 +806,20 @@ const QueryPage = () => {
                         ) : null}
 
                         <FormControlLabel
+                          labelPlacement='start'
                           control={
-                            <Switch
-                              checked={checked.showResultJSON}
-                              onChange={handleChange}
-                              name="showResultJSON"
-                              color="primary"
-                            />
+                            <ButtonGroup color='primary' size='small'>
+                              <Button onClick={() => setResultViewType(ResultViewType.TABULAR)} variant={resultViewType === ResultViewType.TABULAR ? "contained" : "outlined"}>Tabular</Button>
+                              <Button onClick={() => setResultViewType(ResultViewType.JSON)} variant={resultViewType === ResultViewType.JSON ? "contained" : "outlined"}>Json</Button>
+                              <Button onClick={() => setResultViewType(ResultViewType.VISUAL)} variant={resultViewType === ResultViewType.VISUAL ? "contained" : "outlined"}>Visual</Button>
+                            </ButtonGroup>
                           }
-                          label="Show JSON format"
+                          label={<Typography style={{marginRight: "8px"}}>View</Typography>}
+                          style={{marginRight: 0}}
                           className={classes.runNowBtn}
                         />
                       </Grid>
-                      {!checked.showResultJSON ? (
+                      {resultViewType === ResultViewType.TABULAR && (
                         <CustomizedTables
                           title="Query Result"
                           data={resultData}
@@ -677,7 +827,8 @@ const QueryPage = () => {
                           showSearchBox={true}
                           inAccordionFormat={true}
                         />
-                      ) : resultData.columns.length ? (
+                      )}
+                      {resultViewType === ResultViewType.JSON && (
                         <SimpleAccordion
                           headerTitle="Query Result (JSON Format)"
                           showSearchBox={false}
@@ -689,7 +840,8 @@ const QueryPage = () => {
                             autoCursor={false}
                           />
                         </SimpleAccordion>
-                      ) : null}
+                      )}
+                      {resultViewType === ResultViewType.VISUAL && <MseVisualizer stageStats={stageStats} />}
                     </>
                   ) : null}
                 </Grid>
@@ -701,5 +853,35 @@ const QueryPage = () => {
     </>
   );
 };
+
+const MseVisualizer = ({ stageStats }) => {
+  const [flameGraphMode, setFlameGraphMode] = useState(FlamegraphMode.CLOCK_TIME);
+  return <Grid container direction="row" alignItems="stretch" spacing={2}>
+    <Grid item xs>
+      <SimpleAccordion
+        headerTitle="Query Stats Visualized"
+        showSearchBox={false}
+        key={1}
+      >
+        <VisualizeQueryStageStats stageStats={stageStats} />
+      </SimpleAccordion>
+    </Grid>
+    <Grid item xs>
+      <SimpleAccordion
+        headerTitle="Querœy Stats Visualized"
+        showSearchBox={false}
+        key={2}
+        additionalControls={
+          <ButtonGroup color='primary' size='small'>
+            <Button onClick={() => setFlameGraphMode(FlamegraphMode.CLOCK_TIME)} variant={flameGraphMode === FlamegraphMode.CLOCK_TIME ? "contained" : "outlined"}>Clock</Button>
+            <Button onClick={() => setFlameGraphMode(FlamegraphMode.ALLOCATION)} variant={flameGraphMode === FlamegraphMode.ALLOCATION ? "contained" : "outlined"}>Alloc</Button>
+          </ButtonGroup>
+        }
+      >
+        <FlameGraphQueryStageStats stageStats={stageStats} mode={flameGraphMode}/>
+      </SimpleAccordion>
+    </Grid>
+  </Grid>
+}
 
 export default QueryPage;

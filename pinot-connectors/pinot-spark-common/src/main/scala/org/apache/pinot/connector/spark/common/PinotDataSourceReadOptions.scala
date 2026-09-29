@@ -38,6 +38,32 @@ object PinotDataSourceReadOptions {
   var CONFIG_USE_GRPC_SERVER = "useGrpcServer"
   val CONFIG_QUERY_OPTIONS = "queryOptions"
   val CONFIG_FAIL_ON_INVALID_SEGMENTS = "failOnInvalidSegments"
+  val CONFIG_USE_HTTPS = "useHttps"
+  // Unified security switch: when set, it implies HTTPS for HTTP and TLS for gRPC (unless overridden)
+  val CONFIG_SECURE_MODE = "secureMode"
+  val CONFIG_KEYSTORE_PATH = "keystorePath"
+  val CONFIG_KEYSTORE_PASSWORD = "keystorePassword"
+  val CONFIG_TRUSTSTORE_PATH = "truststorePath"
+  val CONFIG_TRUSTSTORE_PASSWORD = "truststorePassword"
+  val CONFIG_AUTH_HEADER = "authHeader"
+  val CONFIG_AUTH_TOKEN = "authToken"
+  
+  // Proxy configuration
+  val CONFIG_PROXY_ENABLED = "proxy.enabled"
+  
+  // gRPC configuration
+  val CONFIG_GRPC_PORT = "grpc.port"
+  val CONFIG_GRPC_MAX_INBOUND_MESSAGE_SIZE = "grpc.max-inbound-message-size"
+  val CONFIG_GRPC_USE_PLAIN_TEXT = "grpc.use-plain-text"
+  val CONFIG_GRPC_TLS_KEYSTORE_TYPE = "grpc.tls.keystore-type"
+  val CONFIG_GRPC_TLS_KEYSTORE_PATH = "grpc.tls.keystore-path"
+  val CONFIG_GRPC_TLS_KEYSTORE_PASSWORD = "grpc.tls.keystore-password"
+  val CONFIG_GRPC_TLS_TRUSTSTORE_TYPE = "grpc.tls.truststore-type"
+  val CONFIG_GRPC_TLS_TRUSTSTORE_PATH = "grpc.tls.truststore-path"
+  val CONFIG_GRPC_TLS_TRUSTSTORE_PASSWORD = "grpc.tls.truststore-password"
+  val CONFIG_GRPC_TLS_SSL_PROVIDER = "grpc.tls.ssl-provider"
+  val CONFIG_GRPC_PROXY_URI = "grpc.proxy-uri"
+  
   val QUERY_OPTIONS_DELIMITER = ","
   private[pinot] val DEFAULT_CONTROLLER: String = "localhost:9000"
   private[pinot] val DEFAULT_USE_PUSH_DOWN_FILTERS: Boolean = true
@@ -45,6 +71,15 @@ object PinotDataSourceReadOptions {
   private[pinot] val DEFAULT_PINOT_SERVER_TIMEOUT_MS: Long = 10000
   private[pinot] val DEFAULT_USE_GRPC_SERVER: Boolean = false
   private[pinot] val DEFAULT_FAIL_ON_INVALID_SEGMENTS = false
+  private[pinot] val DEFAULT_USE_HTTPS: Boolean = false
+  private[pinot] val DEFAULT_SECURE_MODE: Boolean = false
+  private[pinot] val DEFAULT_PROXY_ENABLED: Boolean = false
+  private[pinot] val DEFAULT_GRPC_PORT: Int = 8090
+  private[pinot] val DEFAULT_GRPC_MAX_INBOUND_MESSAGE_SIZE: Long = 128 * 1024 * 1024 // 128MB
+  private[pinot] val DEFAULT_GRPC_USE_PLAIN_TEXT: Boolean = true
+  private[pinot] val DEFAULT_GRPC_TLS_KEYSTORE_TYPE: String = "JKS"
+  private[pinot] val DEFAULT_GRPC_TLS_TRUSTSTORE_TYPE: String = "JKS"
+  private[pinot] val DEFAULT_GRPC_TLS_SSL_PROVIDER: String = "JDK"
 
   private[pinot] val tableTypes = Seq("OFFLINE", "REALTIME", "HYBRID")
 
@@ -74,9 +109,48 @@ object PinotDataSourceReadOptions {
 
     // pinot cluster options
     val controller = options.getOrDefault(CONFIG_CONTROLLER, DEFAULT_CONTROLLER)
+    // Unified security mode: if provided, it controls defaults for both HTTPS and gRPC TLS
+    val secureModeDefined = options.containsKey(CONFIG_SECURE_MODE)
+    val secureModeValue = if (secureModeDefined) options.getBoolean(CONFIG_SECURE_MODE, DEFAULT_SECURE_MODE) else DEFAULT_SECURE_MODE
+    // Parse HTTPS configuration early so it can be used for broker discovery. Precedence: explicit useHttps, else secureMode, else default
+    val useHttps = if (options.containsKey(CONFIG_USE_HTTPS)) options.getBoolean(CONFIG_USE_HTTPS, DEFAULT_USE_HTTPS) else secureModeValue
+    val keystorePath = Option(options.get(CONFIG_KEYSTORE_PATH)).filter(_.nonEmpty)
+    val keystorePassword = Option(options.get(CONFIG_KEYSTORE_PASSWORD)).filter(_.nonEmpty)
+    val truststorePath = Option(options.get(CONFIG_TRUSTSTORE_PATH)).filter(_.nonEmpty)
+    val truststorePassword = Option(options.get(CONFIG_TRUSTSTORE_PASSWORD)).filter(_.nonEmpty)
+    val authHeader = Option(options.get(CONFIG_AUTH_HEADER)).filter(_.nonEmpty)
+    val authToken = Option(options.get(CONFIG_AUTH_TOKEN)).filter(_.nonEmpty)
+    
+    // Parse proxy configuration
+    val proxyEnabled = options.getBoolean(CONFIG_PROXY_ENABLED, DEFAULT_PROXY_ENABLED)
+    
+    // Parse gRPC configuration
+    val grpcPort = options.getInt(CONFIG_GRPC_PORT, DEFAULT_GRPC_PORT)
+    val grpcMaxInboundMessageSize = options.getLong(CONFIG_GRPC_MAX_INBOUND_MESSAGE_SIZE, DEFAULT_GRPC_MAX_INBOUND_MESSAGE_SIZE)
+    // gRPC plain-text: explicit flag wins; otherwise, if secureMode is true, we want TLS (plain-text = false)
+    // If secureMode is false, default to plaintext (true)
+    val grpcUsePlainText = if (options.containsKey(CONFIG_GRPC_USE_PLAIN_TEXT)) {
+      options.getBoolean(CONFIG_GRPC_USE_PLAIN_TEXT, DEFAULT_GRPC_USE_PLAIN_TEXT)
+    } else {
+      if (secureModeValue) false else true
+    }
+    val grpcTlsKeystoreType = options.getOrDefault(CONFIG_GRPC_TLS_KEYSTORE_TYPE, DEFAULT_GRPC_TLS_KEYSTORE_TYPE)
+    val grpcTlsKeystorePath = Option(options.get(CONFIG_GRPC_TLS_KEYSTORE_PATH)).filter(_.nonEmpty)
+    val grpcTlsKeystorePassword = Option(options.get(CONFIG_GRPC_TLS_KEYSTORE_PASSWORD)).filter(_.nonEmpty)
+    val grpcTlsTruststoreType = options.getOrDefault(CONFIG_GRPC_TLS_TRUSTSTORE_TYPE, DEFAULT_GRPC_TLS_TRUSTSTORE_TYPE)
+    val grpcTlsTruststorePath = Option(options.get(CONFIG_GRPC_TLS_TRUSTSTORE_PATH)).filter(_.nonEmpty)
+    val grpcTlsTruststorePassword = Option(options.get(CONFIG_GRPC_TLS_TRUSTSTORE_PASSWORD)).filter(_.nonEmpty)
+    val grpcTlsSslProvider = options.getOrDefault(CONFIG_GRPC_TLS_SSL_PROVIDER, DEFAULT_GRPC_TLS_SSL_PROVIDER)
+    val grpcProxyUri = Option(options.get(CONFIG_GRPC_PROXY_URI)).filter(_.nonEmpty)
+
+    // Configure HTTPS client if needed
+    if (useHttps) {
+      HttpUtils.configureHttpsClient(keystorePath, keystorePassword, truststorePath, truststorePassword)
+    }
+
     val broker = options.get(PinotDataSourceReadOptions.CONFIG_BROKER) match {
       case s if s == null || s.isEmpty =>
-        val brokerInstances = PinotClusterClient.getBrokerInstances(controller, tableName)
+        val brokerInstances = PinotClusterClient.getBrokerInstances(controller, tableName, useHttps, authHeader, authToken, proxyEnabled)
         Random.shuffle(brokerInstances).head
       case s => s
     }
@@ -103,6 +177,25 @@ object PinotDataSourceReadOptions {
       useGrpcServer,
       queryOptions,
       failOnInvalidSegments,
+      useHttps,
+      keystorePath,
+      keystorePassword,
+      truststorePath,
+      truststorePassword,
+      authHeader,
+      authToken,
+      proxyEnabled,
+      grpcPort,
+      grpcMaxInboundMessageSize,
+      grpcUsePlainText,
+      grpcTlsKeystoreType,
+      grpcTlsKeystorePath,
+      grpcTlsKeystorePassword,
+      grpcTlsTruststoreType,
+      grpcTlsTruststorePath,
+      grpcTlsTruststorePassword,
+      grpcTlsSslProvider,
+      grpcProxyUri
     )
   }
 }
@@ -118,4 +211,23 @@ private[pinot] case class PinotDataSourceReadOptions(
     pinotServerTimeoutMs: Long,
     useGrpcServer: Boolean,
     queryOptions: Set[String],
-    failOnInvalidSegments: Boolean)
+    failOnInvalidSegments: Boolean,
+    useHttps: Boolean,
+    keystorePath: Option[String],
+    keystorePassword: Option[String],
+    truststorePath: Option[String],
+    truststorePassword: Option[String],
+    authHeader: Option[String],
+    authToken: Option[String],
+    proxyEnabled: Boolean,
+    grpcPort: Int,
+    grpcMaxInboundMessageSize: Long,
+    grpcUsePlainText: Boolean,
+    grpcTlsKeystoreType: String,
+    grpcTlsKeystorePath: Option[String],
+    grpcTlsKeystorePassword: Option[String],
+    grpcTlsTruststoreType: String,
+    grpcTlsTruststorePath: Option[String],
+    grpcTlsTruststorePassword: Option[String],
+    grpcTlsSslProvider: String,
+    grpcProxyUri: Option[String])

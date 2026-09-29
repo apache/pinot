@@ -19,11 +19,17 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
@@ -31,27 +37,36 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
-import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
+import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,34 +77,76 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
   protected final PinotConfiguration _config;
   protected final String _brokerId;
-  protected final BrokerRoutingManager _routingManager;
+  protected final RoutingManager _routingManager;
   protected final AccessControlFactory _accessControlFactory;
   protected final QueryQuotaManager _queryQuotaManager;
   protected final TableCache _tableCache;
+  protected final ThreadAccountant _threadAccountant;
   protected final BrokerMetrics _brokerMetrics;
   protected final BrokerQueryEventListener _brokerQueryEventListener;
   protected final Set<String> _trackedHeaders;
   protected final BrokerRequestIdGenerator _requestIdGenerator;
   protected final long _brokerTimeoutMs;
+  protected final boolean _enableRowColumnLevelAuth;
   protected final QueryLogger _queryLogger;
   @Nullable
   protected final String _enableNullHandling;
+  @Nullable
+  protected final String _regexDictSizeThreshold;
+  protected final boolean _enableQueryCancellation;
+  @Nullable
+  protected final String _enableAutoRewriteAggregationType;
+  @Nullable
+  protected final MultiClusterRoutingContext _multiClusterRoutingContext;
 
-  public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
-      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache) {
+  /// Maps broker-generated query id to the query string.
+  protected final Map<Long, String> _queriesById;
+  /// Maps broker-generated query id to client-provided query id.
+  protected final Map<Long, String> _clientQueryIds;
+  /// Resolves the approximate-function rewrite defaults, live from the Helix cluster config. Registered as a
+  /// listener by the broker starter through [#getApproximateFunctionOverrideProvider()].
+  protected final ApproximateFunctionOverrideProvider _approximateFunctionOverrideProvider;
+
+  public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId,
+      BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext) {
     _config = config;
     _brokerId = brokerId;
+    _requestIdGenerator = requestIdGenerator;
     _routingManager = routingManager;
     _accessControlFactory = accessControlFactory;
     _queryQuotaManager = queryQuotaManager;
     _tableCache = tableCache;
+    _threadAccountant = threadAccountant;
+    _multiClusterRoutingContext = multiClusterRoutingContext;
+    _approximateFunctionOverrideProvider = new ApproximateFunctionOverrideProvider(config);
     _brokerMetrics = BrokerMetrics.get();
     _brokerQueryEventListener = BrokerQueryEventListenerFactory.getBrokerQueryEventListener();
     _trackedHeaders = BrokerQueryEventListenerFactory.getTrackedHeaders();
-    _requestIdGenerator = new BrokerRequestIdGenerator(brokerId);
     _brokerTimeoutMs = config.getProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
+    _enableRowColumnLevelAuth = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
+        Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH);
     _queryLogger = new QueryLogger(config);
     _enableNullHandling = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING);
+    _regexDictSizeThreshold = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_REGEX_DICT_SIZE_THRESHOLD);
+    _enableQueryCancellation = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION,
+        Broker.DEFAULT_BROKER_ENABLE_QUERY_CANCELLATION);
+    _enableAutoRewriteAggregationType =
+        config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE);
+    if (_enableQueryCancellation) {
+      _queriesById = new ConcurrentHashMap<>();
+      _clientQueryIds = new ConcurrentHashMap<>();
+    } else {
+      _queriesById = null;
+      _clientQueryIds = null;
+    }
+  }
+
+  /// Returns the provider that resolves the approximate-function rewrite defaults. The broker starter registers it
+  /// with the cluster config change handler so that the defaults reload without a restart.
+  public ApproximateFunctionOverrideProvider getApproximateFunctionOverrideProvider() {
+    return _approximateFunctionOverrideProvider;
   }
 
   @Override
@@ -99,18 +156,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestContext.setBrokerId(_brokerId);
     long requestId = _requestIdGenerator.get();
     requestContext.setRequestId(requestId);
-
-    if (httpHeaders != null && !_trackedHeaders.isEmpty()) {
-      MultivaluedMap<String, String> requestHeaders = httpHeaders.getRequestHeaders();
-      Map<String, List<String>> trackedHeadersMap = Maps.newHashMapWithExpectedSize(_trackedHeaders.size());
-      for (Map.Entry<String, List<String>> entry : requestHeaders.entrySet()) {
-        String key = entry.getKey().toLowerCase();
-        if (_trackedHeaders.contains(key)) {
-          trackedHeadersMap.put(key, entry.getValue());
-        }
-      }
-      requestContext.setRequestHttpHeaders(trackedHeadersMap);
-    }
+    setTrackedHeadersInRequestContext(requestContext, httpHeaders, _trackedHeaders);
 
     // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
     // check comes later.
@@ -118,7 +164,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);
     if (!authorizationResult.hasAccess()) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+      requestContext.setErrorCode(QueryErrorCode.ACCESS_DENIED);
       _brokerQueryEventListener.onQueryCompletion(requestContext);
       String failureMessage = authorizationResult.getFailureMessage();
       if (StringUtils.isNotBlank(failureMessage)) {
@@ -129,7 +175,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     JsonNode sql = request.get(Broker.Request.SQL);
     if (sql == null || !sql.isTextual()) {
-      requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+      requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
       _brokerQueryEventListener.onQueryCompletion(requestContext);
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
     }
@@ -143,25 +189,35 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         sqlNodeAndOptions = RequestUtils.parseQuery(query, request);
       } catch (Exception e) {
         // Do not log or emit metric here because it is pure user error
-        requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
-        return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
+        QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.SQL_PARSING);
+        requestContext.setErrorCode(errorCode);
+        return new BrokerResponseNative(errorCode, e.getMessage());
       }
     }
 
     // check app qps before doing anything
-    String application = sqlNodeAndOptions.getOptions().get(Broker.Request.QueryOptionKey.APPLICATION_NAME);
+    String application = sqlNodeAndOptions.getOptions().get(QueryOptionKey.APPLICATION_NAME);
     if (application != null && !_queryQuotaManager.acquireApplication(application)) {
       String errorMessage =
           "Request " + requestId + ": " + query + " exceeds query quota for application: " + application;
       LOGGER.info(errorMessage);
-      requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
-      return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
+      requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
+      return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
     }
 
     // Add null handling option from broker config only if there is no override in the query
     if (_enableNullHandling != null) {
+      sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
+    }
+
+    // Add auto rewrite aggregation type option from broker config only if there is no override in the query
+    if (_enableAutoRewriteAggregationType != null) {
       sqlNodeAndOptions.getOptions()
-          .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
+          .putIfAbsent(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE, _enableAutoRewriteAggregationType);
+    }
+
+    if (_regexDictSizeThreshold != null) {
+      sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, _regexDictSizeThreshold);
     }
 
     BrokerResponse brokerResponse =
@@ -169,14 +225,114 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             accessControl);
     brokerResponse.setBrokerId(_brokerId);
     brokerResponse.setRequestId(Long.toString(requestId));
-    _brokerQueryEventListener.onQueryCompletion(requestContext);
+    onQueryCompletion(requestContext, brokerResponse);
 
     return brokerResponse;
+  }
+
+  /// Called after every successfully executed query with the fully-populated [RequestContext]
+  /// and [BrokerResponse]. The default implementation fires the configured
+  /// [org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener]. Subclasses may
+  /// override to intercept the complete response (e.g. for async query-log pipelines) while still
+  /// calling `super` to preserve the SPI listener behaviour.
+  protected void onQueryCompletion(RequestContext requestContext, BrokerResponse brokerResponse) {
+    _brokerQueryEventListener.onQueryCompletion(requestContext);
   }
 
   protected abstract BrokerResponse handleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
+      throws Exception;
+
+  /// Validates whether the requester has access to all the tables.
+  protected TableAuthorizationResult hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
+      RequestContext requestContext, HttpHeaders httpHeaders) {
+    final long startTimeNs = System.nanoTime();
+    AccessControl accessControl = _accessControlFactory.create();
+
+    TableAuthorizationResult tableAuthorizationResult = accessControl.authorize(requesterIdentity, tableNames);
+
+    Set<String> failedTables = tableNames.stream()
+        .filter(table -> !accessControl.hasAccess(httpHeaders, TargetType.TABLE, table, Actions.Table.QUERY))
+        .collect(Collectors.toSet());
+
+    failedTables.addAll(tableAuthorizationResult.getFailedTables());
+
+    if (!failedTables.isEmpty()) {
+      tableAuthorizationResult = new TableAuthorizationResult(failedTables);
+    } else {
+      tableAuthorizationResult = TableAuthorizationResult.success();
+    }
+
+    if (!tableAuthorizationResult.hasAccess()) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+      LOGGER.warn("Access denied for requestId {}", requestContext.getRequestId());
+      requestContext.setErrorCode(QueryErrorCode.ACCESS_DENIED);
+    }
+
+    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - startTimeNs);
+
+    return tableAuthorizationResult;
+  }
+
+  /// Validates that tables can be queried with enableMultiClusterRouting if and only if they are logical tables.
+  /// Physical tables are cluster-specific and cannot be federated across clusters.
+  /// Multi-cluster routing is only supported for logical tables.
+  ///
+  /// @param tableNames Set of table names to validate
+  /// @param queryOptions Map of query options
+  /// @throws org.apache.pinot.spi.exception.QueryException if any physical table is queried with
+  ///         enableMultiClusterRouting=true
+  protected void validatePhysicalTablesWithMultiClusterRouting(Set<String> tableNames,
+      Map<String, String> queryOptions) {
+    Preconditions.checkNotNull(tableNames, "Table names cannot be null when validating multi-cluster routing");
+    Preconditions.checkNotNull(queryOptions, "Query options cannot be null");
+    boolean isMultiClusterRoutingEnabled = queryOptions.containsKey(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING)
+        && Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING));
+
+    if (isMultiClusterRoutingEnabled) {
+      for (String tableName : tableNames) {
+        if (!_tableCache.isLogicalTable(tableName)) {
+          throw QueryErrorCode.QUERY_VALIDATION.asException(
+              "Physical table '" + tableName + "' cannot be queried with enableMultiClusterRouting=true. "
+              + "Multi-cluster routing is only supported for logical tables. "
+              + "Please remove the enableMultiClusterRouting query option or use a logical table instead.");
+        }
+      }
+    }
+  }
+
+  /// Returns true if the QPS quota of query tables, database or application has been exceeded.
+  protected boolean hasExceededQPSQuota(@Nullable String database, Set<String> tableNames,
+      RequestContext requestContext) {
+    if (database != null && !_queryQuotaManager.acquireDatabase(database)) {
+      LOGGER.warn("Request {}: query exceeds quota for database: {}", requestContext.getRequestId(), database);
+      requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
+      return true;
+    }
+    for (String tableName : tableNames) {
+      if (!_queryQuotaManager.acquire(tableName)) {
+        LOGGER.warn("Request {}: query exceeds quota for table: {}", requestContext.getRequestId(), tableName);
+        requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
+        String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  protected void updatePhaseTimingForTables(Set<String> tableNames, BrokerQueryPhase phase, long time) {
+    for (String tableName : tableNames) {
+      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+      _brokerMetrics.addPhaseTiming(rawTableName, phase, time);
+    }
+  }
+
+  /// Attempts to cancel an ongoing query identified by its broker-generated id.
+  /// @return true if the query was successfully cancelled, false otherwise.
+  protected abstract boolean handleCancel(long queryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses)
       throws Exception;
 
   protected static void augmentStatistics(RequestContext statistics, BrokerResponse response) {
@@ -190,7 +346,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     statistics.setProcessingExceptions(processingExceptions);
     statistics.setNumExceptions(numExceptions);
+    statistics.setGroupsTrimmed(response.isGroupsTrimmed());
     statistics.setNumGroupsLimitReached(response.isNumGroupsLimitReached());
+    statistics.setMseLiteLeafStageLimitReached(response.isMseLiteLeafStageLimitReached());
     statistics.setProcessingTimeMillis(response.getTimeUsedMs());
     statistics.setNumDocsScanned(response.getNumDocsScanned());
     statistics.setTotalDocs(response.getTotalDocs());
@@ -213,6 +371,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setReduceTimeMillis(response.getBrokerReduceTimeMs());
     statistics.setOfflineThreadCpuTimeNs(response.getOfflineThreadCpuTimeNs());
     statistics.setRealtimeThreadCpuTimeNs(response.getRealtimeThreadCpuTimeNs());
+    statistics.setOfflineThreadMemAllocatedBytes(response.getOfflineThreadMemAllocatedBytes());
+    statistics.setRealtimeThreadMemAllocatedBytes(response.getRealtimeThreadMemAllocatedBytes());
+    statistics.setOfflineResponseSerMemAllocatedBytes(response.getOfflineResponseSerMemAllocatedBytes());
+    statistics.setRealtimeResponseSerMemAllocatedBytes(response.getRealtimeResponseSerMemAllocatedBytes());
+    statistics.setOfflineTotalMemAllocatedBytes(response.getOfflineTotalMemAllocatedBytes());
+    statistics.setRealtimeTotalMemAllocatedBytes(response.getRealtimeTotalMemAllocatedBytes());
     statistics.setOfflineSystemActivitiesCpuTimeNs(response.getOfflineSystemActivitiesCpuTimeNs());
     statistics.setRealtimeSystemActivitiesCpuTimeNs(response.getRealtimeSystemActivitiesCpuTimeNs());
     statistics.setOfflineResponseSerializationCpuTimeNs(response.getOfflineResponseSerializationCpuTimeNs());
@@ -222,5 +386,93 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setExplainPlanNumEmptyFilterSegments(response.getExplainPlanNumEmptyFilterSegments());
     statistics.setExplainPlanNumMatchAllFilterSegments(response.getExplainPlanNumMatchAllFilterSegments());
     statistics.setTraceInfo(response.getTraceInfo());
+  }
+
+  protected static void setTrackedHeadersInRequestContext(RequestContext requestContext,
+      HttpHeaders httpHeaders, Set<String> trackedHeaders) {
+    if (httpHeaders != null && !trackedHeaders.isEmpty()) {
+      MultivaluedMap<String, String> requestHeaders = httpHeaders.getRequestHeaders();
+      Map<String, List<String>> trackedHeadersMap = Maps.newHashMapWithExpectedSize(trackedHeaders.size());
+      for (Map.Entry<String, List<String>> entry : requestHeaders.entrySet()) {
+        String key = entry.getKey().toLowerCase();
+        if (trackedHeaders.contains(key)) {
+          trackedHeadersMap.put(key, entry.getValue());
+        }
+      }
+      requestContext.setRequestHttpHeaders(trackedHeadersMap);
+    }
+  }
+
+  @Override
+  public Map<Long, String> getRunningQueries() {
+    Preconditions.checkState(isQueryCancellationEnabled(), "Query cancellation is not enabled on broker");
+    return Collections.unmodifiableMap(_queriesById);
+  }
+
+  @Override
+  public boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
+      Map<String, Integer> serverResponses)
+      throws Exception {
+    Preconditions.checkState(isQueryCancellationEnabled(), "Query cancellation is not enabled on broker");
+    try {
+      return handleCancel(queryId, timeoutMs, executor, connMgr, serverResponses);
+    } finally {
+      onQueryFinish(queryId);
+    }
+  }
+
+  @Override
+  public boolean cancelQueryByClientId(String clientQueryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses)
+      throws Exception {
+    Preconditions.checkState(isQueryCancellationEnabled(), "Query cancellation is not enabled on broker");
+    OptionalLong requestId = getRequestIdByClientId(clientQueryId);
+    if (requestId.isPresent()) {
+      return cancelQuery(requestId.getAsLong(), timeoutMs, executor, connMgr, serverResponses);
+    } else {
+      LOGGER.warn("Query cancellation cannot be performed due to unknown client query id: {}", clientQueryId);
+      return false;
+    }
+  }
+
+  @Override
+  public OptionalLong getRequestIdByClientId(String clientQueryId) {
+    return _clientQueryIds.entrySet().stream()
+        .filter(e -> clientQueryId.equals(e.getValue()))
+        .mapToLong(Map.Entry::getKey)
+        .findFirst();
+  }
+
+  @Nullable
+  protected String extractClientRequestId(SqlNodeAndOptions sqlNodeAndOptions) {
+    return sqlNodeAndOptions.getOptions().get(QueryOptionKey.CLIENT_QUERY_ID);
+  }
+
+  /// Called when a query starts
+  /// TODO: This method was created to keep track of running queries for cancellation, but it is useful for other uses.
+  ///   But right now the semantics are not clear. For example, while MSE calls this method once, SSE calls it once per
+  ///   query AND subquery, which means this method is called multiple times for the same query.
+  protected void onQueryStart(long requestId, @Nullable String clientRequestId, String query, Object... extras) {
+    if (isQueryCancellationEnabled()) {
+      _queriesById.put(requestId, query);
+      if (StringUtils.isNotBlank(clientRequestId)) {
+        _clientQueryIds.put(requestId, clientRequestId);
+        LOGGER.debug("Keep track of running query: {} (with client id {})", requestId, clientRequestId);
+      } else {
+        LOGGER.debug("Keep track of running query: {}", requestId);
+      }
+    }
+  }
+
+  protected void onQueryFinish(long requestId) {
+    if (isQueryCancellationEnabled()) {
+      _queriesById.remove(requestId);
+      _clientQueryIds.remove(requestId);
+      LOGGER.debug("Remove track of running query: {}", requestId);
+    }
+  }
+
+  protected boolean isQueryCancellationEnabled() {
+    return _enableQueryCancellation;
   }
 }

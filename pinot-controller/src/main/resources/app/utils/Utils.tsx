@@ -31,6 +31,18 @@ import {
   TableData,
 } from 'Models';
 import Loading from '../components/Loading';
+import moment from "moment";
+import {RebalanceServerOption} from "../components/Homepage/Operations/RebalanceServer/RebalanceServerOptions";
+import { formatTimeInTimezone } from './TimezoneUtils';
+
+const getRebalanceConfigValue = (
+    rebalanceConfig: { [optionName: string]: string | boolean | number },
+    option: RebalanceServerOption
+) => {
+  return (
+      Object.keys(rebalanceConfig).includes(option.name) ? rebalanceConfig[option.name] : option.defaultValue
+  );
+}
 
 const sortArray = function (sortingArr, keyName, ascendingFlag) {
   if (ascendingFlag) {
@@ -309,6 +321,7 @@ const syncTableSchemaData = (data, showFieldType) => {
   const metricFields = data.metricFieldSpecs || [];
   const dateTimeField = data.dateTimeFieldSpecs || [];
   const complexFields = data.complexFieldSpecs || [];
+  const primaryKeys = new Set(data.primaryKeyColumns || []);
 
   dimensionFields.map((field) => {
     field.fieldType = 'Dimension';
@@ -329,9 +342,9 @@ const syncTableSchemaData = (data, showFieldType) => {
   const columnList = [...dimensionFields, ...metricFields, ...dateTimeField, ...complexFields];
   if (showFieldType) {
     return {
-      columns: ['Column', 'Type', 'Field Type', 'Multi Value'],
+      columns: ['Column', 'Type', 'Field Type', 'Multi Value', 'Primary Key'],
       records: columnList.map((field) => {
-        return [field.name, field.dataType, field.fieldType, getMultiValueField(field)];
+        return [field.name, field.dataType, field.fieldType, getMultiValueField(field), primaryKeys.has(field.name)];
       }),
     };
   }
@@ -363,6 +376,7 @@ const encodeString = (str: string) => {
 }
 
 const formatBytes = (bytes: number, decimals = 2) => {
+  if (bytes < 0) return 'N/A';
   if (bytes === 0) return '0 Bytes';
 
   const k = 1024;
@@ -422,7 +436,7 @@ export const getDisplaySegmentStatus = (idealState, externalView): DISPLAY_SEGME
     return DISPLAY_SEGMENT_STATUS.UPDATING;
   }
 
-  // does not match any condition -> assume PARTIAL state as we are waiting for segments to converge 
+  // does not match any condition -> assume PARTIAL state as we are waiting for segments to converge
   return DISPLAY_SEGMENT_STATUS.UPDATING;
 }
 
@@ -463,6 +477,25 @@ const getLoadingTableData = (columns: string[]): TableData => {
   };
 }
 
+const formatTime = (time: number, format?: string): string => {
+  return formatTimeInTimezone(time, format);
+}
+
+// Formats an epoch-millis value as an ISO-8601 string. Returns "—" for null / zero /
+// negative inputs (which Pinot's MV runtime metadata uses as the "never set" sentinel for
+// lastRefreshTime and similar fields). Safe to call from any UI component that surfaces
+// optional timestamps.
+const formatEpochMillis = (ms: number | null | undefined): string => {
+  if (!ms || ms <= 0) {
+    return '—';
+  }
+  try {
+    return new Date(ms).toISOString();
+  } catch {
+    return String(ms);
+  }
+}
+
 export default {
   sortArray,
   tableFormat,
@@ -477,5 +510,8 @@ export default {
   splitStringByLastUnderscore,
   pinotTableDetailsFormat,
   pinotTableDetailsFromArray,
-  getLoadingTableData
+  getLoadingTableData,
+  formatTime,
+  formatEpochMillis,
+  getRebalanceConfigValue
 };

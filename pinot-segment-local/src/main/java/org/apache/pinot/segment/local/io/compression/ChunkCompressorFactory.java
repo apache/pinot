@@ -23,33 +23,27 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 
 
-/**
- * Factory for Chunk compressors/de-compressors.
- */
+/// Factory for Chunk compressors/de-compressors.
 public class ChunkCompressorFactory {
 
   // Private constructor to avoid object instantiation
   private ChunkCompressorFactory() {
   }
 
-  /**
-   * Returns the chunk compressor for the specified name.
-   *
-   * @param compressionType Type of compressor.
-   * @return Compressor for the specified type.
-   */
+  /// Returns the chunk compressor for the specified name.
+  ///
+  /// @param compressionType Type of compressor.
+  /// @return Compressor for the specified type.
   public static ChunkCompressor getCompressor(ChunkCompressionType compressionType) {
     return getCompressor(compressionType, false);
   }
 
-  /**
-   * Returns the chunk compressor for the specified name.
-   *
-   * @param compressionType Type of compressor.
-   * @param upgradeToLengthPrefixed if true, guarantee the compressed chunk contains metadata about the decompressed
-   *                                size. Most formats do this anyway, but LZ4 requires a length prefix.
-   * @return Compressor for the specified type.
-   */
+  /// Returns the chunk compressor for the specified name.
+  ///
+  /// @param compressionType Type of compressor.
+  /// @param upgradeToLengthPrefixed if true, guarantee the compressed chunk contains metadata about the decompressed
+  ///                                size. Most formats do this anyway, but LZ4 requires a length prefix.
+  /// @return Compressor for the specified type.
   public static ChunkCompressor getCompressor(ChunkCompressionType compressionType, boolean upgradeToLengthPrefixed) {
     switch (compressionType) {
 
@@ -71,17 +65,21 @@ public class ChunkCompressorFactory {
       case GZIP:
         return new GzipCompressor();
 
+      case DELTA:
+        return DeltaCompressor.INSTANCE;
+
+      case DELTADELTA:
+        return DeltaDeltaCompressor.INSTANCE;
+
       default:
         throw new IllegalArgumentException("Illegal compressor name " + compressionType);
     }
   }
 
-  /**
-   * Returns the chunk decompressor for the specified name.
-   *
-   * @param compressionType Type of compression
-   * @return decompressor for the specified name
-   */
+  /// Returns the chunk decompressor for the specified name.
+  ///
+  /// @param compressionType Type of compression
+  /// @return decompressor for the specified name
   public static ChunkDecompressor getDecompressor(ChunkCompressionType compressionType) {
     switch (compressionType) {
       case PASS_THROUGH:
@@ -102,8 +100,14 @@ public class ChunkCompressorFactory {
       case GZIP:
         return new GzipDecompressor();
 
+      case DELTA:
+        return DeltaDecompressor.INSTANCE;
+
+      case DELTADELTA:
+        return DeltaDeltaDecompressor.INSTANCE;
+
       default:
-        throw new IllegalArgumentException("Illegal compressor name " + compressionType);
+        throw new IllegalArgumentException("Illegal decompressor name " + compressionType);
     }
   }
 }

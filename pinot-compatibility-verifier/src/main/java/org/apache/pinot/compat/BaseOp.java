@@ -20,6 +20,11 @@ package org.apache.pinot.compat;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import java.net.URI;
+import java.util.Properties;
+import org.apache.pinot.client.PinotClientException;
+import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.client.admin.PinotAdminTransport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,4 +87,19 @@ public abstract class BaseOp {
   }
 
   abstract boolean runOp(int generationNumber);
+
+  protected PinotAdminClient createPinotAdminClient()
+      throws PinotClientException {
+    URI controllerUri = URI.create(ClusterDescriptor.getInstance().getControllerUrl());
+    Properties properties = new Properties();
+    if (controllerUri.getScheme() != null) {
+      properties.setProperty(PinotAdminTransport.ADMIN_TRANSPORT_SCHEME, controllerUri.getScheme());
+    }
+    String host = controllerUri.getHost();
+    int port = controllerUri.getPort();
+    if (host == null || port == -1) {
+      throw new PinotClientException("Invalid controller URI: " + controllerUri);
+    }
+    return new PinotAdminClient(host + ":" + port, properties);
+  }
 }

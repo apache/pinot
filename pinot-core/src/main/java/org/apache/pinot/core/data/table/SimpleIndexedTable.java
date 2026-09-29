@@ -19,25 +19,23 @@
 package org.apache.pinot.core.data.table;
 
 import java.util.HashMap;
+import java.util.concurrent.ExecutorService;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-/**
- * {@link Table} implementation for aggregating TableRecords based on combination of keys
- */
+/// [Table] implementation for aggregating TableRecords based on combination of keys
 @NotThreadSafe
 public class SimpleIndexedTable extends IndexedTable {
 
   public SimpleIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext, int resultSize,
-      int trimSize, int trimThreshold, int initialCapacity) {
-    super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold, new HashMap<>(initialCapacity));
+      int trimSize, int trimThreshold, int initialCapacity, ExecutorService executorService) {
+    super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold, new HashMap<>(initialCapacity),
+        executorService);
   }
 
-  /**
-   * Non thread safe implementation of upsert to insert {@link Record} into the {@link Table}
-   */
+  /// Non thread safe implementation of upsert to insert [Record] into the [Table]
   @Override
   public boolean upsert(Key key, Record record) {
     if (_hasOrderBy) {

@@ -82,9 +82,9 @@ public class SegmentCompletionProtocolTest {
         .withInstanceId("Server_localhost_8099").withReason("ROW_LIMIT").withBuildTimeMillis(1000)
         .withWaitTimeMillis(2000).withExtraTimeSec(3000).withMemoryUsedBytes(4000).withSegmentSizeBytes(5000)
         .withNumRows(6000).withSegmentLocation("/tmp/segment").withStreamPartitionMsgOffset("7000");
-    SegmentCompletionProtocol.SegmentCommitRequest segmentCommitRequest =
-        new SegmentCompletionProtocol.SegmentCommitRequest(params);
-    uri = new URI(segmentCommitRequest.getUrl("localhost:8080", "http"));
+    SegmentCompletionProtocol.SegmentCommitStartRequest commitStartRequestWithAllParams =
+        new SegmentCompletionProtocol.SegmentCommitStartRequest(params);
+    uri = new URI(commitStartRequestWithAllParams.getUrl("localhost:8080", "http"));
     paramsMap =
         Arrays.stream(uri.getQuery().split("&")).collect(Collectors.toMap(e -> e.split("=")[0], e -> e.split("=")[1]));
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_SEGMENT_NAME), "foo__0__0__12345Z");

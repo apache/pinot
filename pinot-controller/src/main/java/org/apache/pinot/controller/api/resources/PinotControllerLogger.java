@@ -26,6 +26,7 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
@@ -47,12 +48,13 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import javax.ws.rs.core.UriBuilder;
 import org.apache.commons.collections4.MapUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.core5.http.HttpVersion;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LoggerUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -65,13 +67,12 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/**
- * Logger resource.
- */
+/// Logger resource.
 @Api(tags = "Logger", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY,
@@ -140,7 +141,7 @@ public class PinotControllerLogger {
   @Path("/loggers/download")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
-  @Authenticate(AccessType.DELETE)
+  @Authenticate(AccessType.READ)
   @ApiOperation(value = "Download a log file")
   public Response downloadLogFile(
       @ApiParam(value = "Log file path", required = true) @QueryParam("filePath") String filePath) {
@@ -184,8 +185,9 @@ public class PinotControllerLogger {
       @ApiParam(value = "Instance Name", required = true) @PathParam("instanceName") String instanceName) {
     try {
       URI uri = new URI(getInstanceBaseUri(instanceName) + "/loggers/files");
-      Map<String, String> headers = new HashMap<>();
-      if (authorization != null) {
+      Map<String, String> headers =
+          new HashMap<>(getServerAdminAuthHeaders(instanceName));
+      if (headers.isEmpty() && authorization != null) {
         headers.put(HttpHeaders.AUTHORIZATION, authorization);
       }
       SimpleHttpResponse simpleHttpResponse = _fileUploadDownloadClient.getHttpClient().sendGetRequest(uri, headers);
@@ -205,43 +207,53 @@ public class PinotControllerLogger {
   @Path("/loggers/instances/{instanceName}/download")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
-  @Authenticate(AccessType.DELETE)
+  @Authenticate(AccessType.READ)
   @ApiOperation(value = "Download a log file from a given instance")
   public Response downloadLogFileFromInstance(
       @HeaderParam(HttpHeaders.AUTHORIZATION) String authorization,
       @ApiParam(value = "Instance Name", required = true) @PathParam("instanceName") String instanceName,
       @ApiParam(value = "Log file path", required = true) @QueryParam("filePath") String filePath,
       @Context Map<String, String> headers) {
-    try {
-      URI uri = UriBuilder.fromUri(getInstanceBaseUri(instanceName)).path("/loggers/download")
-          .queryParam("filePath", filePath).build();
-      ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
-      if (MapUtils.isNotEmpty(headers)) {
-        for (Map.Entry<String, String> header : headers.entrySet()) {
+    URI uri = UriBuilder.fromUri(getInstanceBaseUri(instanceName)).path("/loggers/download")
+        .queryParam("filePath", filePath).build();
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+    Map<String, String> serviceAuthHeaders = getServerAdminAuthHeaders(instanceName);
+    if (MapUtils.isNotEmpty(headers)) {
+      for (Map.Entry<String, String> header : headers.entrySet()) {
+        if (serviceAuthHeaders.isEmpty() || !HttpHeaders.AUTHORIZATION.equalsIgnoreCase(header.getKey())) {
           requestBuilder.addHeader(header.getKey(), header.getValue());
         }
       }
-      if (authorization != null) {
-        requestBuilder.addHeader(HttpHeaders.AUTHORIZATION, authorization);
-      }
-      try (CloseableHttpResponse httpResponse = _fileUploadDownloadClient.getHttpClient()
-          .execute(requestBuilder.build())) {
-        if (httpResponse.getCode() >= 400) {
-          throw new WebApplicationException(IOUtils.toString(httpResponse.getEntity().getContent(), "UTF-8"),
-              Response.Status.fromStatusCode(httpResponse.getCode()));
-        }
-        Response.ResponseBuilder builder = Response.ok();
-        builder.entity(httpResponse.getEntity().getContent());
-        builder.contentLocation(uri);
-        builder.header(HttpHeaders.CONTENT_LENGTH, httpResponse.getEntity().getContentLength());
-        return builder.build();
-      }
-    } catch (IOException e) {
-      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
     }
+    if (serviceAuthHeaders.isEmpty() && authorization != null) {
+      requestBuilder.addHeader(HttpHeaders.AUTHORIZATION, authorization);
+    }
+    serviceAuthHeaders.forEach(requestBuilder::setHeader);
+
+    StreamingOutput streamingOutput = output -> {
+      try (CloseableHttpResponse response = _fileUploadDownloadClient.getHttpClient().execute(requestBuilder.build());
+          InputStream inputStream = response.getEntity().getContent()) {
+        // Stream the data using a buffer
+        byte[] buffer = new byte[1024];
+        int bytesRead;
+        while ((bytesRead = inputStream.read(buffer)) != -1) {
+          output.write(buffer, 0, bytesRead);
+        }
+        output.flush();
+      }
+    };
+    Response.ResponseBuilder builder = Response.ok();
+    builder.entity(streamingOutput);
+    builder.contentLocation(uri);
+    return builder.build();
   }
 
   private String getInstanceBaseUri(String instanceName) {
     return InstanceUtils.getInstanceBaseUri(_pinotHelixResourceManager.getHelixInstanceConfig(instanceName));
+  }
+
+  private Map<String, String> getServerAdminAuthHeaders(String instanceName) {
+    return InstanceTypeUtils.isServer(instanceName)
+        ? AuthProviderUtils.makeAuthHeadersMap(_pinotHelixResourceManager.getServerAdminAuthProvider()) : Map.of();
   }
 }

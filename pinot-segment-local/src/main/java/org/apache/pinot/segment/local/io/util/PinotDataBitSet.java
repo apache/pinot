@@ -43,21 +43,20 @@ public final class PinotDataBitSet implements Closeable {
     }
   }
 
-  /**
-   * Returns the number of bits required to encode the value.
-   * <p>NOTE: Use at least one bit even there is only one possible value
-   * <p>Examples: (maximum value (binary format) -> number of bits)
-   * <ul>
-   *   <li>0(0) -> 1</li>
-   *   <li>1(1) -> 1</li>
-   *   <li>2(10) -> 2</li>
-   *   <li>9(1001) -> 4</li>
-   *   <li>113(1110001) -> 7</li>
-   * </ul>
-   *
-   * @param maxValue Maximum possible value
-   * @return Number of bits required to encode the value
-   */
+  /// Returns the number of bits required to encode the value.
+  ///
+  /// NOTE: Use at least one bit even there is only one possible value
+  ///
+  /// Examples: (maximum value (binary format) -> number of bits)
+  ///
+  /// - 0(0) -> 1
+  /// - 1(1) -> 1
+  /// - 2(10) -> 2
+  /// - 9(1001) -> 4
+  /// - 113(1110001) -> 7
+  ///
+  /// @param maxValue Maximum possible value
+  /// @return Number of bits required to encode the value
   public static int getNumBitsPerValue(int maxValue) {
     // Use at least one bit even there is only one possible value
     if (maxValue <= 1) {

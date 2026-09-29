@@ -21,11 +21,10 @@ package org.apache.pinot.spi.utils.retry;
 import java.util.concurrent.ThreadLocalRandom;
 
 
-/**
- * Retry policy with exponential backoff delay between attempts.
- * <p>The delay between the i<sup>th</sup> and (i + 1)<sup>th</sup> attempts is between delayScaleFactor<sup>i</sup>
- * * initialDelayMs and delayScaleFactor<sup>(i + 1)</sup> * initialDelayMs.
- */
+/// Retry policy with exponential backoff delay between attempts.
+///
+/// The delay between the i<sup>th</sup> and (i + 1)<sup>th</sup> attempts is between delayScaleFactor<sup>i</sup>
+/// \* initialDelayMs and delayScaleFactor<sup>(i + 1)</sup> \* initialDelayMs.
 public class ExponentialBackoffRetryPolicy extends BaseRetryPolicy {
   private final ThreadLocalRandom _random = ThreadLocalRandom.current();
   private final long _initialDelayMs;

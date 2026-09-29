@@ -23,25 +23,24 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.combine.merger.ResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.exception.QueryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base implementation of the combine operator.
- * <p>Combine operator uses multiple worker threads to process segments in parallel, and uses the main thread to merge
- * the results blocks from the processed segments. It can early-terminate the query to save the system resources if it
- * detects that the merged results can already satisfy the query, or the query is already errored out or timed out.
- */
+/// Base implementation of the combine operator.
+///
+/// Combine operator uses multiple worker threads to process segments in parallel, and uses the main thread to merge
+/// the results blocks from the processed segments. It can early-terminate the query to save the system resources if it
+/// detects that the merged results can already satisfy the query, or the query is already errored out or timed out.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock> extends BaseCombineOperator<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleBlockCombineOperator.class);
@@ -54,31 +53,39 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
     super(resultsBlockMerger, operators, queryContext, executorService);
   }
 
+  /// @inheritDoc
+  ///
+  /// Handles exceptions here so that execution stats can be attached.
   @Override
   protected BaseResultsBlock getNextBlock() {
-    BaseResultsBlock mergedBlock;
+    try {
+      return mergeResultsAndAttachExecutionStats();
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while attaching execution stats (query: {})", _queryContext, e);
+      QueryErrorMessage errMsg =
+          QueryErrorMessage.safeMsg(QueryErrorCode.INTERNAL, "Caught exception while attaching execution stats");
+      return new ExceptionResultsBlock(errMsg);
+    }
+  }
+
+  /// Merges the results and waits for all worker threads to finish before attaching execution statistics.
+  private BaseResultsBlock mergeResultsAndAttachExecutionStats() {
+    BaseResultsBlock mergedBlock = null;
+    Exception mergeException = null;
     try {
       startProcess();
       mergedBlock = mergeResults();
-    } catch (InterruptedException e) {
-      throw new EarlyTerminationException("Interrupted while merging results blocks", e);
     } catch (Exception e) {
-      LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
-      mergedBlock = new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
+      mergeException = e;
     } finally {
+      // Wait for all worker threads to finish before reading execution stats. This ensures that no worker thread is
+      // still mutating operator state (e.g. _numDocsScanned) when attachExecutionStats() iterates over operators.
       stopProcess();
     }
-    /*
-     * _numTasks are number of async tasks submitted to the _executorService, but it does not mean Pinot server
-     * use those number of threads to concurrently process segments. Instead, if _executorService thread pool has
-     * less number of threads than _numTasks, the number of threads that used to concurrently process segments equals
-     * to the pool size.
-     * TODO: Get the actual number of query worker threads instead of using the default value.
-     */
-    int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
-    CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators, _totalWorkerThreadCpuTimeNs.get(),
-        numServerThreads);
-    return mergedBlock;
+    if (mergeException != null) {
+      return createExceptionResultsBlockAndAttachExecutionStats(mergeException, "merging results blocks");
+    }
+    return checkTerminateExceptionAndAttachExecutionStats(mergedBlock);
   }
 
   @Override
@@ -111,16 +118,22 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
   @Override
   protected void onProcessSegmentsException(Throwable t) {
     _processingException.compareAndSet(null, t);
-    _blockingQueue.offer(new ExceptionResultsBlock(t));
+    ExceptionResultsBlock errBlock;
+    if (t instanceof QueryException) {
+      errBlock = new ExceptionResultsBlock((QueryException) t);
+    } else {
+      LOGGER.warn("Caught exception while processing query: {}", _queryContext, t);
+      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.QUERY_EXECUTION, t.getMessage());
+      errBlock = new ExceptionResultsBlock(errMsg);
+    }
+    _blockingQueue.offer(errBlock);
   }
 
   @Override
   protected void onProcessSegmentsFinish() {
   }
 
-  /**
-   * Merges the results from the worker threads into a results block.
-   */
+  /// Merges the results from the worker threads into a results block.
   protected BaseResultsBlock mergeResults()
       throws Exception {
     T mergedBlock = null;
@@ -137,7 +150,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
       if (blockToMerge == null) {
         return getTimeoutResultsBlock(numBlocksMerged);
       }
-      if (blockToMerge.getProcessingExceptions() != null) {
+      if (blockToMerge.getErrorMessages() != null) {
         // Caught exception while processing segment, skip merging the remaining results blocks and directly return the
         // exception
         return blockToMerge;

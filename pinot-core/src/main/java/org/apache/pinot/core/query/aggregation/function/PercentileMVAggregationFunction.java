@@ -18,23 +18,19 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class PercentileMVAggregationFunction extends PercentileAggregationFunction {
 
-  public PercentileMVAggregationFunction(ExpressionContext expression, int percentile) {
-    super(expression, percentile, false);
+  public PercentileMVAggregationFunction(ExpressionContext expression, int percentile, boolean nullHandlingEnabled) {
+    super(expression, percentile, nullHandlingEnabled);
   }
 
-  public PercentileMVAggregationFunction(ExpressionContext expression, double percentile) {
-    super(expression, percentile, false);
+  public PercentileMVAggregationFunction(ExpressionContext expression, double percentile,
+      boolean nullHandlingEnabled) {
+    super(expression, percentile, nullHandlingEnabled);
   }
 
   @Override
@@ -47,44 +43,5 @@ public class PercentileMVAggregationFunction extends PercentileAggregationFuncti
     return _version == 0 ? AggregationFunctionType.PERCENTILE.getName().toLowerCase() + (int) _percentile + "mv("
         + _expression + ")"
         : AggregationFunctionType.PERCENTILE.getName().toLowerCase() + "mv(" + _expression + ", " + _percentile + ")";
-  }
-
-  @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
-    DoubleArrayList valueList = getValueList(aggregationResultHolder);
-    for (int i = 0; i < length; i++) {
-      for (double value : valuesArray[i]) {
-        valueList.add(value);
-      }
-    }
-  }
-
-  @Override
-  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
-    for (int i = 0; i < length; i++) {
-      DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
-      for (double value : valuesArray[i]) {
-        valueList.add(value);
-      }
-    }
-  }
-
-  @Override
-  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
-    for (int i = 0; i < length; i++) {
-      double[] values = valuesArray[i];
-      for (int groupKey : groupKeysArray[i]) {
-        DoubleArrayList valueList = getValueList(groupByResultHolder, groupKey);
-        for (double value : values) {
-          valueList.add(value);
-        }
-      }
-    }
   }
 }

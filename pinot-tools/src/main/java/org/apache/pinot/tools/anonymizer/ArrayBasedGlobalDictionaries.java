@@ -45,15 +45,13 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
     _columnToGlobalDictionary = new HashMap<>();
   }
 
-  /**
-   * First step towards building global dictionary
-   * by inserting the original values from segments
-   * into global dictionary
-   * @param origValue original value
-   * @param column column name
-   * @param columnMetadata column metadata
-   * @param cardinality total cardinality of column
-   */
+  /// First step towards building global dictionary
+  /// by inserting the original values from segments
+  /// into global dictionary
+  /// @param origValue original value
+  /// @param column column name
+  /// @param columnMetadata column metadata
+  /// @param cardinality total cardinality of column
   @Override
   public void addOrigValueToGlobalDictionary(Object origValue, String column, ColumnMetadata columnMetadata,
       int cardinality) {
@@ -67,10 +65,8 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
     }
   }
 
-  /**
-   * This is the second step where we complete the global dictionaries
-   * by sorting the original values to get sort order across all segments
-   */
+  /// This is the second step where we complete the global dictionaries
+  /// by sorting the original values to get sort order across all segments
   @Override
   public void sortOriginalValuesInGlobalDictionaries() {
     for (Map.Entry<String, OrigAndDerivedValueHolder> entry : _columnToGlobalDictionary.entrySet()) {
@@ -79,14 +75,12 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
     }
   }
 
-  /**
-   * This is the third and final step where we complete the global
-   * dictionaries by generating values:
-   *
-   * For numeric columns, we generate in order since
-   * we start with a base value.
-   * For string column, we first generate and then sort
-   */
+  /// This is the third and final step where we complete the global
+  /// dictionaries by generating values:
+  ///
+  /// For numeric columns, we generate in order since
+  /// we start with a base value.
+  /// For string column, we first generate and then sort
   @Override
   public void addDerivedValuesToGlobalDictionaries() {
     // update global dictionary for each column by adding
@@ -130,10 +124,8 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
     return derivedMultiValues;
   }
 
-  /**
-   * Per column holder to store both original values and corresponding
-   * derived values in global dictionary.
-   */
+  /// Per column holder to store both original values and corresponding
+  /// derived values in global dictionary.
   private static class OrigAndDerivedValueHolder {
     FieldSpec.DataType _dataType;
     Object[] _origValues;
@@ -358,7 +350,7 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
         values[i] = "null";
       } else {
         int origValLength = val.length();
-        values[i] = RandomStringUtils.randomAlphanumeric(origValLength);
+        values[i] = RandomStringUtils.secure().nextAlphanumeric(origValLength);
       }
     }
     Arrays.sort(values);

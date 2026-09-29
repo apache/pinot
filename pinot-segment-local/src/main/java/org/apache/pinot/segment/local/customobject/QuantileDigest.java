@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import com.google.common.base.Ticker;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
@@ -44,9 +43,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 
-/**
- * Re-implement io.airlift.stats.QuantileDigest with additional methods facilitating serialization.
- */
+/// Re-implement io.airlift.stats.QuantileDigest with additional methods facilitating serialization.
 public class QuantileDigest {
   private static final int MAX_BITS = 64;
   private static final double MAX_SIZE_FACTOR = 1.5;
@@ -87,22 +84,18 @@ public class QuantileDigest {
     FORWARD, REVERSE
   }
 
-  /**
-   * <p>Create a QuantileDigest with a maximum error guarantee of "maxError" and no decay.
-   *
-   * @param maxError the max error tolerance
-   */
+  /// Create a QuantileDigest with a maximum error guarantee of "maxError" and no decay.
+  ///
+  /// @param maxError the max error tolerance
   public QuantileDigest(double maxError) {
     this(maxError, 0);
   }
 
-  /**
-   * <p>Create a QuantileDigest with a maximum error guarantee of "maxError" and exponential decay
-   * with factor "alpha".</p>
-   *
-   * @param maxError the max error tolerance
-   * @param alpha    the exponential decay factor
-   */
+  /// Create a QuantileDigest with a maximum error guarantee of "maxError" and exponential decay
+  /// with factor "alpha".
+  ///
+  /// @param maxError the max error tolerance
+  /// @param alpha    the exponential decay factor
   public QuantileDigest(double maxError, double alpha) {
     this(maxError, alpha, Ticker.systemTicker(), true);
   }
@@ -137,9 +130,7 @@ public class QuantileDigest {
     add(value, 1);
   }
 
-  /**
-   * Adds a value to this digest. The value must be {@code >= 0}
-   */
+  /// Adds a value to this digest. The value must be `>= 0`
   public void add(long value, long count) {
     checkArgument(count > 0, "count must be > 0");
 
@@ -178,17 +169,15 @@ public class QuantileDigest {
     compress();
   }
 
-  /**
-   * Gets the values at the specified quantiles +/- maxError. The list of quantiles must be sorted
-   * in increasing order, and each value must be in the range [0, 1]
-   */
+  /// Gets the values at the specified quantiles +/- maxError. The list of quantiles must be sorted
+  /// in increasing order, and each value must be in the range \[0, 1\]
   public List<Long> getQuantiles(List<Double> quantiles) {
     checkArgument(Ordering.natural().isOrdered(quantiles), "quantiles must be sorted in increasing order");
     for (double quantile : quantiles) {
       checkArgument(quantile >= 0 && quantile <= 1, "quantile must be between [0,1]");
     }
 
-    final ImmutableList.Builder<Long> builder = ImmutableList.builder();
+    final List<Long> builder = new ArrayList<>();
     final PeekingIterator<Double> iterator = Iterators.peekingIterator(quantiles.iterator());
 
     postOrderTraversal(_root, new Callback() {
@@ -219,19 +208,15 @@ public class QuantileDigest {
       iterator.next();
     }
 
-    return builder.build();
+    return List.copyOf(builder);
   }
 
-  /**
-   * Gets the value at the specified quantile +/- maxError. The quantile must be in the range [0, 1]
-   */
+  /// Gets the value at the specified quantile +/- maxError. The quantile must be in the range \[0, 1\]
   public long getQuantile(double quantile) {
-    return getQuantiles(ImmutableList.of(quantile)).get(0);
+    return getQuantiles(List.of(quantile)).get(0);
   }
 
-  /**
-   * Number (decayed) of elements added to this quantile digest
-   */
+  /// Number (decayed) of elements added to this quantile digest
   public double getCount() {
     return _weightedCount / weight(TimeUnit.NANOSECONDS.toSeconds(_ticker.read()));
   }
@@ -247,7 +232,7 @@ public class QuantileDigest {
   public List<Bucket> getHistogram(List<Long> bucketUpperBounds) {
     checkArgument(Ordering.natural().isOrdered(bucketUpperBounds), "buckets must be sorted in increasing order");
 
-    final ImmutableList.Builder<Bucket> builder = ImmutableList.builder();
+    final ArrayList<Bucket> builder = new ArrayList<>();
     final PeekingIterator<Long> iterator = Iterators.peekingIterator(bucketUpperBounds.iterator());
 
     final AtomicDouble sum = new AtomicDouble();
@@ -288,7 +273,7 @@ public class QuantileDigest {
       iterator.next();
     }
 
-    return builder.build();
+    return List.copyOf(builder);
   }
 
   public long getMin() {
@@ -659,10 +644,8 @@ public class QuantileDigest {
     return result;
   }
 
-  /**
-   * Remove the node if possible or set its count to 0 if it has children and
-   * it needs to be kept around
-   */
+  /// Remove the node if possible or set its count to 0 if it has children and
+  /// it needs to be kept around
   private Node tryRemove(Node node) {
     if (node == null) {
       return null;
@@ -720,9 +703,7 @@ public class QuantileDigest {
     return callback.process(node);
   }
 
-  /**
-   * Computes the maximum error of the current digest
-   */
+  /// Computes the maximum error of the current digest
   public double getConfidenceFactor() {
     return computeMaxPathWeight(_root) * 1.0 / _weightedCount;
   }
@@ -754,10 +735,8 @@ public class QuantileDigest {
     }
   }
 
-  /**
-   * Computes the max "weight" of any path starting at node and ending at a leaf in the
-   * hypothetical complete tree. The weight is the sum of counts in the ancestors of a given node
-   */
+  /// Computes the max "weight" of any path starting at node and ending at a leaf in the
+  /// hypothetical complete tree. The weight is the sum of counts in the ancestors of a given node
   private double computeMaxPathWeight(Node node) {
     if (node == null || node._level == 0) {
       return 0;
@@ -880,16 +859,12 @@ public class QuantileDigest {
     return String.format("node_%x_%x", node._bits, node._level);
   }
 
-  /**
-   * Convert a java long (two's complement representation) to a 64-bit lexicographically-sortable binary
-   */
+  /// Convert a java long (two's complement representation) to a 64-bit lexicographically-sortable binary
   private static long longToBits(long value) {
     return value ^ 0x8000_0000_0000_0000L;
   }
 
-  /**
-   * Convert a 64-bit lexicographically-sortable binary to a java long (two's complement representation)
-   */
+  /// Convert a 64-bit lexicographically-sortable binary to a java long (two's complement representation)
   private static long bitsToLong(long bits) {
     return bits ^ 0x8000_0000_0000_0000L;
   }
@@ -1030,10 +1005,8 @@ public class QuantileDigest {
   }
 
   private static interface Callback {
-    /**
-     * @param node the node to process
-     * @return true if processing should continue
-     */
+    /// @param node the node to process
+    /// @return true if processing should continue
     boolean process(Node node);
   }
 

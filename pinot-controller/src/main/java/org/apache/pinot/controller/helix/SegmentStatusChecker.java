@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,8 +27,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -37,20 +38,25 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ControllerTimer;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.MissingConsumingSegmentFinder;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.controller.util.ServerQueryInfoFetcher;
+import org.apache.pinot.controller.util.ServerQueryInfoFetcher.ServerQueryInfo;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -58,14 +64,13 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Manages the segment status metrics, regarding tables with fewer replicas than requested
- * and segments in error state.
- */
+/// Manages the segment status metrics, regarding tables with fewer replicas than requested
+/// and segments in error state.
 public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusChecker.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusChecker.class);
   private static final ZNRecordSerializer RECORD_SERIALIZER = new ZNRecordSerializer();
@@ -74,31 +79,33 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   // log messages about disabled tables at most once a day
   private static final long DISABLED_TABLE_LOG_INTERVAL_MS = TimeUnit.DAYS.toMillis(1);
   private static final int MAX_SEGMENTS_TO_LOG = 10;
+  // Number of segments whose ZK metadata is read per batched request, see updateSegmentMetrics()
+  private static final int SEGMENT_METADATA_BATCH_SIZE = 10_000;
 
   private final int _waitForPushTimeSeconds;
   private final TableSizeReader _tableSizeReader;
   private final Set<String> _tierBackendGauges = new HashSet<>();
+  // Maps tableNameWithType -> set of compound tenant keys ("server.tenantName", "broker.tenantName",
+  // "tier.tenantName"), so stale gauges can be removed when a table's tenant assignment changes.
+  // Accessed only from the single-threaded periodic task execution loop (processTable / removeMetricsForTable).
+  private final Map<String, Set<String>> _tableTenantMap = new HashMap<>();
 
   private long _lastDisabledTableLogTimestamp = 0;
+  // Overridden by the tests so that the batching can be exercised without a table larger than the batch size
+  @VisibleForTesting
+  int _segmentMetadataBatchSize = SEGMENT_METADATA_BATCH_SIZE;
 
-  /**
-   * Constructs the segment status checker.
-   * @param pinotHelixResourceManager The resource checker used to interact with Helix
-   * @param config The controller configuration object
-   */
+  /// Constructs the segment status checker.
+  /// @param pinotHelixResourceManager The resource checker used to interact with Helix
+  /// @param config The controller configuration object
   public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
       TableSizeReader tableSizeReader) {
     super("SegmentStatusChecker", config.getStatusCheckerFrequencyInSeconds(),
-        config.getStatusCheckerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
-        controllerMetrics);
-
+            config.getStatusCheckerInitialDelayInSeconds(), config.getStatusCheckerCronExpression(),
+        pinotHelixResourceManager, leadControllerManager, controllerMetrics);
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
     _tableSizeReader = tableSizeReader;
-  }
-
-  @Override
-  protected void setUpTask() {
   }
 
   @Override
@@ -118,8 +125,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     try {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       updateTableConfigMetrics(tableNameWithType, tableConfig, context);
-      updateSegmentMetrics(tableNameWithType, tableConfig, context);
-      updateTableSizeMetrics(tableNameWithType);
+      if (updateSegmentMetrics(tableNameWithType, tableConfig, context)) {
+        updateTableSizeMetrics(tableNameWithType, tableConfig);
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while updating segment status for table {}", tableNameWithType, e);
       // Remove the metric for this table
@@ -164,14 +172,18 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     });
   }
 
-  /**
-   * Updates metrics related to the table config.
-   * If table config not found, resets the metrics
-   */
+  /// Updates metrics related to the table config.
+  /// If table config not found, resets the metrics
   private void updateTableConfigMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
     if (tableConfig == null) {
       LOGGER.warn("Found null table config for table: {}. Resetting table config metrics.", tableNameWithType);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, 0);
+      Set<String> tenantKeys = _tableTenantMap.remove(tableNameWithType);
+      if (tenantKeys != null) {
+        for (String key : tenantKeys) {
+          _controllerMetrics.removeTableGauge(tableNameWithType, key, ControllerGauge.TABLE_TENANT_INFO);
+        }
+      }
       return;
     }
     if (tableConfig.getTableType() == TableType.OFFLINE) {
@@ -196,26 +208,87 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
     int replication = tableConfig.getReplication();
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, replication);
+
+    updateTenantInfoGauge(tableNameWithType, tableConfig);
   }
 
-  private void updateTableSizeMetrics(String tableNameWithType)
+  /// Emits one `tableTenantInfo` gauge per (tenantType, tenantName) pair for a table so Prometheus can extract
+  /// both as labels and join them onto other table-scoped metrics.  Every gauge is always set to `1`.
+  /// TenantType values: `"server"` (server tenant), `"broker"` (broker tenant), `"tier"` (tier
+  /// server tenant).  The compound key `"<tenantType>.<tenantName>"` is embedded in the JMX metric name.
+  /// Gauges are only written on first registration or when the tenant assignment changes, not on every periodic cycle.
+  /// When assignments change, new gauges are registered before stale ones are removed to avoid a scrape-window gap.
+  private void updateTenantInfoGauge(String tableNameWithType, TableConfig tableConfig) {
+    TenantConfig tenantConfig = tableConfig.getTenantConfig();
+
+    Set<String> newKeys = new HashSet<>();
+    String serverTenant = (tenantConfig != null && tenantConfig.getServer() != null)
+        ? tenantConfig.getServer() : TagNameUtils.DEFAULT_TENANT_NAME;
+    newKeys.add("server." + serverTenant);
+
+    String brokerTenant = (tenantConfig != null && tenantConfig.getBroker() != null)
+        ? tenantConfig.getBroker() : TagNameUtils.DEFAULT_TENANT_NAME;
+    newKeys.add("broker." + brokerTenant);
+
+    List<TierConfig> tierConfigs = tableConfig.getTierConfigsList();
+    if (tierConfigs != null) {
+      for (TierConfig tierConfig : tierConfigs) {
+        String serverTag = tierConfig.getServerTag();
+        if (serverTag != null && serverTag.contains("_")) {
+          newKeys.add("tier." + TagNameUtils.getTenantFromTag(serverTag));
+        }
+      }
+    }
+
+    Set<String> previousKeys = _tableTenantMap.put(tableNameWithType, newKeys);
+    if (newKeys.equals(previousKeys)) {
+      return;
+    }
+    for (String key : newKeys) {
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, key, ControllerGauge.TABLE_TENANT_INFO, 1L);
+    }
+    if (previousKeys != null) {
+      for (String key : previousKeys) {
+        if (!newKeys.contains(key)) {
+          _controllerMetrics.removeTableGauge(tableNameWithType, key, ControllerGauge.TABLE_TENANT_INFO);
+        }
+      }
+    }
+  }
+
+  void updateTableSizeMetrics(String tableNameWithType, TableConfig tableConfig)
       throws InvalidConfigException {
-    _tableSizeReader.getTableSizeDetails(tableNameWithType, TABLE_CHECKER_TIMEOUT_MS);
+    TableSizeReader.TableSizeDetails tableSizeDetails =
+        _tableSizeReader.getTableSizeDetails(tableNameWithType, TABLE_CHECKER_TIMEOUT_MS, true,
+            TableSizeReader.CompressionStatsMode.AGGREGATE_SUMMARY);
+    boolean compressionStatsEnabled = tableConfig != null && tableConfig.getIndexingConfig() != null
+        && tableConfig.getIndexingConfig().isCompressionStatsEnabled();
+    if (!compressionStatsEnabled || tableSizeDetails == null) {
+      _tableSizeReader.clearCompressionMetrics(tableNameWithType);
+      return;
+    }
+    TableSizeReader.TableSubTypeSizeDetails subTypeSizeDetails = tableConfig.getTableType() == TableType.OFFLINE
+        ? tableSizeDetails._offlineSegments : tableSizeDetails._realtimeSegments;
+    if (subTypeSizeDetails != null) {
+      _tableSizeReader.updateCompressionMetrics(tableNameWithType, subTypeSizeDetails);
+    } else {
+      _tableSizeReader.clearCompressionMetrics(tableNameWithType);
+    }
   }
 
-  /**
-   * Runs a segment status pass over the given table.
-   * TODO: revisit the logic and reduce the ZK access
-   */
-  private void updateSegmentMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
+  /// Runs a segment status pass over the given table.
+  /// TODO: revisit the logic and reduce the ZK access
+  private boolean updateSegmentMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+
+    ServerQueryInfoFetcher serverQueryInfoFetcher = new ServerQueryInfoFetcher(_pinotHelixResourceManager);
 
     IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
 
     if (idealState == null) {
       LOGGER.warn("Table {} has null ideal state. Skipping segment status checks", tableNameWithType);
       removeMetricsForTable(tableNameWithType);
-      return;
+      return false;
     }
 
     if (!idealState.isEnabled()) {
@@ -224,10 +297,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
       removeMetricsForTable(tableNameWithType);
       context._disabledTables.add(tableNameWithType);
-      return;
+      return false;
     }
 
-    if (PinotLLCRealtimeSegmentManager.isTablePaused(idealState)) {
+    boolean tablePaused = PinotLLCRealtimeSegmentManager.isTablePaused(idealState);
+    if (tablePaused) {
       context._pausedTables.add(tableNameWithType);
     }
 
@@ -242,6 +316,21 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     // Get the segments excluding the replaced segments which are specified in the segment lineage entries and cannot
     // be queried from the table.
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+
+    if (propertyStore != null) {
+      String segmentsPath = ZKMetadataProvider.constructPropertyStorePathForResource(tableNameWithType);
+      List<String> segmentNames = propertyStore.getChildNames(segmentsPath, AccessOption.PERSISTENT);
+      long segmentNamesBytesSize = 0;
+      if (segmentNames != null) {
+        for (String segmentName : segmentNames) {
+          segmentNamesBytesSize += segmentName.getBytes().length;
+        }
+      }
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType,
+          ControllerGauge.PROPERTYSTORE_SEGMENT_CHILDREN_BYTE_SIZE,
+          segmentNamesBytesSize);
+    }
+
     Set<String> segments;
     if (segmentsIncludingReplaced.isEmpty()) {
       segments = Set.of();
@@ -265,15 +354,24 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, 100);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS, 0);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_COMPRESSED_SIZE, 0);
-      return;
+      return true;
     }
 
+    long evSnapshotTimestamp = System.currentTimeMillis();
     ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
+    if (externalView != null) {
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.EXTERNALVIEW_ZNODE_SIZE,
+          externalView.toString().length());
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.EXTERNALVIEW_ZNODE_BYTE_SIZE,
+          externalView.serialize(RECORD_SERIALIZER).length);
+    }
 
-    // Maximum number of replicas in ideal state
-    int maxISReplicas = Integer.MIN_VALUE;
-    // Minimum number of replicas in external view
-    int minEVReplicas = Integer.MAX_VALUE;
+    // Maximum number of replicas that is up (ONLINE/CONSUMING) in ideal state
+    int maxISReplicasUp = Integer.MIN_VALUE;
+    // Minimum number of replicas that is up (ONLINE/CONSUMING) in external view
+    int minEVReplicasUp = Integer.MAX_VALUE;
+    // Minimum percentage of replicas that is up (ONLINE/CONSUMING) in external view
+    int minEVReplicasUpPercent = 100;
     // Total compressed segment size in deep store
     long tableCompressedSize = 0;
     // Segments without ZK metadata
@@ -286,21 +384,53 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     List<String> partialOnlineSegments = new ArrayList<>();
     List<String> segmentsInvalidStartTime = new ArrayList<>();
     List<String> segmentsInvalidEndTime = new ArrayList<>();
-    for (String segment : segments) {
-      int numISReplicas = 0;
-      for (Map.Entry<String, String> entry : idealState.getInstanceStateMap(segment).entrySet()) {
-        String state = entry.getValue();
-        if (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING)) {
-          numISReplicas++;
+
+    // Track unavailable segments by reason for batched logging
+    List<String> unavailableSegmentsByState = new ArrayList<>();
+    List<String> unavailableSegmentsByInstance = new ArrayList<>();
+
+    // The segment ZK metadata and the znode stats are read with one batched request per SEGMENT_METADATA_BATCH_SIZE
+    // segments instead of one request per segment. The batch is bounded because the metadata of a whole batch is held
+    // in heap while it is being checked, which does not scale to tables with hundreds of thousands of segments.
+    List<String> segmentsToCheck = new ArrayList<>(segments);
+    List<SegmentZKMetadata> batchSegmentsZKMetadata = List.of();
+    List<Stat> batchSegmentStats = List.of();
+    int batchStartIndex = 0;
+    // Number of segments whose ZK metadata was read back, tracked over all the batches so that a table whose metadata
+    // could not be read at all is told apart from a table that is genuinely unhealthy
+    int numSegmentsWithZKMetadata = 0;
+
+    for (int i = 0; i < numSegments; i++) {
+      // The batches are aligned to multiples of the batch size, so a new one starts exactly on these indexes
+      if (i % _segmentMetadataBatchSize == 0) {
+        batchStartIndex = i;
+        int batchEndIndex = Math.min(i + _segmentMetadataBatchSize, numSegments);
+        batchSegmentStats = new ArrayList<>(batchEndIndex - batchStartIndex);
+        batchSegmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType,
+            segmentsToCheck.subList(batchStartIndex, batchEndIndex), batchSegmentStats);
+        for (SegmentZKMetadata segmentZKMetadata : batchSegmentsZKMetadata) {
+          if (segmentZKMetadata != null) {
+            numSegmentsWithZKMetadata++;
+          }
         }
       }
-      // Skip segments not ONLINE/CONSUMING in ideal state
-      if (numISReplicas == 0) {
+      String segment = segmentsToCheck.get(i);
+      Map<String, String> isStateMap = idealState.getInstanceStateMap(segment);
+      // Number of replicas in ideal state that is in ONLINE/CONSUMING state
+      int numISReplicasUp = 0;
+      for (Map.Entry<String, String> entry : isStateMap.entrySet()) {
+        String state = entry.getValue();
+        if (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING)) {
+          numISReplicasUp++;
+        }
+      }
+      // Skip segments with no ONLINE/CONSUMING in ideal state
+      if (numISReplicasUp == 0) {
         continue;
       }
-      maxISReplicas = Math.max(maxISReplicas, numISReplicas);
+      maxISReplicasUp = Math.max(maxISReplicasUp, numISReplicasUp);
 
-      SegmentZKMetadata segmentZKMetadata = _pinotHelixResourceManager.getSegmentZKMetadata(tableNameWithType, segment);
+      SegmentZKMetadata segmentZKMetadata = batchSegmentsZKMetadata.get(i - batchStartIndex);
       // Skip the segment when it doesn't have ZK metadata. Most likely the segment is just deleted.
       if (segmentZKMetadata == null) {
         segmentsWithoutZKMetadata.add(segment);
@@ -311,14 +441,23 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         tableCompressedSize += sizeInBytes;
       }
 
-      // NOTE: We want to skip segments that are just created/pushed to avoid false alerts because it is expected for
-      //       servers to take some time to load them. For consuming (IN_PROGRESS) segments, we use creation time from
-      //       the ZK metadata; for pushed segments, we use push time from the ZK metadata. Both of them are the time
-      //       when segment is newly created. For committed segments from real-time table, push time doesn't exist, and
-      //       creationTimeMs will be Long.MIN_VALUE, which is fine because we want to include them in the check.
-      long creationTimeMs = segmentZKMetadata.getStatus() == Status.IN_PROGRESS ? segmentZKMetadata.getCreationTime()
-          : segmentZKMetadata.getPushTime();
-      if (creationTimeMs > System.currentTimeMillis() - _waitForPushTimeSeconds * 1000L) {
+      // NOTE: We want to skip segments that were recently created/committed/pushed to avoid false alerts, because it
+      //       is expected for servers to take some time to load them. We use the segment ZK znode's modification time
+      //       (mtime), which tracks the last state change: creation for consuming (IN_PROGRESS) segments, the
+      //       CONSUMING -> COMMITTING -> ONLINE commit transition for real-time (LLC) segments, and the push time for
+      //       offline segments. Creation time is not a correct proxy for a COMMITTING/DONE segment: it marks when
+      //       consumption STARTED, which can be long before commit, so a segment still transitioning to ONLINE would
+      //       be flagged. If the znode stat is unavailable we fall back to creation time (mtime == creation for a
+      //       freshly created IN_PROGRESS segment).
+      //       The grace window is _waitForPushTimeSeconds. Once a segment is older than it and still
+      //       under-replicated, it is checked normally, so genuinely stuck commits and real replica losses still alert.
+      //       The comparison uses evSnapshotTimestamp instead of System.currentTimeMillis() because for large tables
+      //       with many segments, the status check can still take a while. A segment updated after the EV snapshot was
+      //       taken but before this individual segment check runs could be incorrectly flagged as OFFLINE when using
+      //       current time.
+      Stat segmentStat = batchSegmentStats.get(i - batchStartIndex);
+      long refTimeMs = segmentStat != null ? segmentStat.getMtime() : segmentZKMetadata.getCreationTime();
+      if (refTimeMs > evSnapshotTimestamp - _waitForPushTimeSeconds * 1000L) {
         continue;
       }
 
@@ -331,46 +470,73 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         }
       }
 
-      int numEVReplicas = 0;
+      int numEVReplicasUp = 0;
       if (externalView != null) {
         Map<String, String> stateMap = externalView.getStateMap(segment);
         if (stateMap != null) {
           for (Map.Entry<String, String> entry : stateMap.entrySet()) {
-            String state = entry.getValue();
-            if (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING)) {
-              numEVReplicas++;
+            String serverInstanceId = entry.getKey();
+            String segmentState = entry.getValue();
+            if (segmentState.equals(SegmentStateModel.ONLINE) || segmentState.equals(SegmentStateModel.CONSUMING)) {
+              if (isServerQueryable(serverQueryInfoFetcher.getServerQueryInfo(serverInstanceId))) {
+                numEVReplicasUp++;
+              } else {
+                unavailableSegmentsByInstance.add(segment
+                    + " (state: " + segmentState + " on unavailable " + serverInstanceId + ")");
+              }
+            } else {
+              unavailableSegmentsByState.add(segment + " (state: " + segmentState + " on " + serverInstanceId + ")");
             }
-            if (state.equals(SegmentStateModel.ERROR)) {
+            if (segmentState.equals(SegmentStateModel.ERROR)) {
               errorSegments.add(Pair.of(segment, entry.getKey()));
             }
           }
         }
       }
-      if (numEVReplicas == 0) {
+      if (numEVReplicasUp == 0) {
         offlineSegments.add(segment);
-      } else if (numEVReplicas < numISReplicas) {
+      } else if (numEVReplicasUp < numISReplicasUp) {
         partialOnlineSegments.add(segment);
       } else {
-        // Do not allow nReplicasEV to be larger than nReplicasIS
-        numEVReplicas = numISReplicas;
+        // Do not allow numEVReplicasUp to be larger than numISReplicasUp
+        numEVReplicasUp = numISReplicasUp;
       }
-      minEVReplicas = Math.min(minEVReplicas, numEVReplicas);
+
+      minEVReplicasUp = Math.min(minEVReplicasUp, numEVReplicasUp);
+      // Total number of replicas in ideal state (including ERROR/OFFLINE states)
+      int numISReplicasTotal = Math.max(isStateMap.size(), 1);
+      minEVReplicasUpPercent = Math.min(minEVReplicasUpPercent, numEVReplicasUp * 100 / numISReplicasTotal);
     }
 
-    if (maxISReplicas == Integer.MIN_VALUE) {
+    // Not a single segment's ZK metadata could be read, so the gauges computed above describe nothing. Leave the
+    // table's gauges alone instead of publishing all-green values that would silence the alerts a stale gauge fires.
+    if (numSegmentsWithZKMetadata == 0) {
+      LOGGER.error("Failed to read the ZK metadata of all {} segments of table: {}, skipping the metric update",
+          numSegments, tableNameWithType);
+      return false;
+    }
+
+    // Log unavailable segments in batches
+    if (!unavailableSegmentsByState.isEmpty()) {
+      LOGGER.warn("Table {} has {} segments marked unavailable due to non-ONLINE/CONSUMING states: {}",
+          tableNameWithType, unavailableSegmentsByState.size(), logSegments(unavailableSegmentsByState));
+    }
+    if (!unavailableSegmentsByInstance.isEmpty()) {
+      LOGGER.warn("Table {} has {} segments marked unavailable due to unavailable instances: {}",
+          tableNameWithType, unavailableSegmentsByInstance.size(), logSegments(unavailableSegmentsByInstance));
+    }
+
+    if (maxISReplicasUp == Integer.MIN_VALUE) {
       try {
-        maxISReplicas = Math.max(Integer.parseInt(idealState.getReplicas()), 1);
+        maxISReplicasUp = Math.max(Integer.parseInt(idealState.getReplicas()), 1);
       } catch (NumberFormatException e) {
-        maxISReplicas = 1;
+        maxISReplicasUp = 1;
       }
     }
-    // Do not allow minEVReplicas to be larger than maxISReplicas
-    minEVReplicas = Math.min(minEVReplicas, maxISReplicas);
 
-    if (minEVReplicas < maxISReplicas) {
-      LOGGER.warn("Table {} has at least one segment running with only {} replicas, below replication threshold :{}",
-          tableNameWithType, minEVReplicas, maxISReplicas);
-    }
+    // Do not allow minEVReplicasUp to be larger than maxISReplicasUp
+    minEVReplicasUp = Math.min(minEVReplicasUp, maxISReplicasUp);
+
     int numSegmentsWithoutZKMetadata = segmentsWithoutZKMetadata.size();
     if (numSegmentsWithoutZKMetadata > 0) {
       LOGGER.warn("Table {} has {} segments without ZK metadata: {}", tableNameWithType, numSegmentsWithoutZKMetadata,
@@ -403,9 +569,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
 
     // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
-    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, minEVReplicas);
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, minEVReplicasUp);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS,
-        minEVReplicas * 100L / maxISReplicas);
+        minEVReplicasUpPercent);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE,
         numErrorSegments);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE,
@@ -420,12 +586,25 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         numInvalidEndTime);
 
     if (tableType == TableType.REALTIME && tableConfig != null) {
-      List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigMaps(tableConfig).stream().map(
-          streamConfig -> new StreamConfig(tableConfig.getTableName(), streamConfig)
-      ).collect(Collectors.toList());
-      new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics,
-          streamConfigs).findAndEmitMetrics(idealState);
+      if (tablePaused) {
+        // Ingestion is intentionally paused, so PinotLLCRealtimeSegmentManager deliberately does not create a new
+        // CONSUMING segment after the current one commits. MissingConsumingSegmentFinder would otherwise read that as
+        // a missing segment and alert for as long as the pause lasts.
+        MissingConsumingSegmentFinder.resetMetrics(tableNameWithType, _controllerMetrics);
+      } else {
+        List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
+        new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics,
+            streamConfigs, idealState).findAndEmitMetrics(idealState);
+      }
     }
+    return true;
+  }
+
+  private boolean isServerQueryable(ServerQueryInfo serverInfo) {
+    return serverInfo != null
+        && serverInfo.isHelixEnabled()
+        && !serverInfo.isQueriesDisabled()
+        && !serverInfo.isShutdownInProgress();
   }
 
   private static String logSegments(List<?> segments) {
@@ -442,6 +621,13 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   private void removeMetricsForTable(String tableNameWithType) {
     LOGGER.info("Removing metrics from {} given it is not a table known by Helix", tableNameWithType);
+    Set<String> tenantKeys = _tableTenantMap.remove(tableNameWithType);
+    if (tenantKeys != null) {
+      for (String key : tenantKeys) {
+        _controllerMetrics.removeTableGauge(tableNameWithType, key, ControllerGauge.TABLE_TENANT_INFO);
+      }
+    }
+    _tableSizeReader.clearCompressionMetrics(tableNameWithType);
     for (ControllerGauge metric : ControllerGauge.values()) {
       if (!metric.isGlobal()) {
         _controllerMetrics.removeTableGauge(tableNameWithType, metric);
@@ -459,10 +645,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         _controllerMetrics.removeTableTimer(tableNameWithType, metric);
       }
     }
-  }
-
-  @Override
-  public void cleanUpTask() {
   }
 
   public static final class Context {

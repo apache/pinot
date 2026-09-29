@@ -30,7 +30,7 @@ type Props = {
 };
 
 
-const Instances = ({ clusterName, instanceType, instances, liveInstanceNames }: Props) => {
+const Instances = ({ instanceType, instances, liveInstanceNames }: Props) => {
   const order = [
     InstanceType.CONTROLLER,
     InstanceType.BROKER,
@@ -45,7 +45,6 @@ const Instances = ({ clusterName, instanceType, instances, liveInstanceNames }: 
           return (
             <AsyncInstanceTable
               key={startCase(key)}
-              cluster={clusterName}
               instanceType={key}
               showInstanceDetails
               instanceNames={instances?.[key] || null}

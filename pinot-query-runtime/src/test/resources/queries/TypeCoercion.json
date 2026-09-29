@@ -1,0 +1,98 @@
+{
+  "type_coercion": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "id", "type": "INT"},
+          {"name": "long_col", "type": "LONG"},
+          {"name": "ts_col", "type": "TIMESTAMP"}
+        ],
+        "inputs": [
+          [1, 1678861800000, "2023-03-15 06:30:00Z"],
+          [2, 1678886460000, "2023-03-16 12:00:00Z"],
+          [3, 1678886400000, "2023-03-14 12:00:01Z"],
+          [4, 1700000000000, "2023-11-14 22:13:20Z"],
+          [5, 1000000000000, "2026-11-14 22:13:20Z"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Direct comparison: TIMESTAMP = LONG",
+        "sql": "SELECT id FROM {tbl} WHERE ts_col = long_col",
+        "outputs": [
+          [1],
+          [4]
+        ]
+      },
+      {
+        "description": "Direct comparison: LONG = TIMESTAMP",
+        "sql": "SELECT id FROM {tbl} WHERE long_col = ts_col",
+        "outputs": [
+          [1],
+          [4]
+        ]
+      },
+      {
+        "description": "Direct comparison: TIMESTAMP > LONG",
+        "sql": "SELECT id FROM {tbl} WHERE ts_col > long_col",
+        "outputs": [
+          [2],
+          [5]
+        ]
+      },
+      {
+        "description": "Direct comparison: LONG > TIMESTAMP",
+        "sql": "SELECT id FROM {tbl} WHERE long_col > ts_col",
+        "outputs": [
+          [3]
+        ]
+      },
+      {
+        "description": "Direct comparison: TIMESTAMP < LONG",
+        "sql": "SELECT id FROM {tbl} WHERE ts_col < long_col",
+        "outputs": [
+          [3]
+        ]
+      },
+      {
+        "description": "Direct comparison: LONG < TIMESTAMP",
+        "sql": "SELECT id FROM {tbl} WHERE long_col < ts_col",
+        "outputs": [
+          [2],
+          [5]
+        ]
+      },
+      {
+        "description": "Comparison: TIMESTAMP = literal LONG (representing timestamp)",
+        "sql": "SELECT id FROM {tbl} WHERE ts_col = 1678861800000",
+        "outputs": [
+          [1]
+        ]
+      },
+      {
+        "description": "Comparison: LONG = literal TIMESTAMP",
+        "sql": "SELECT id FROM {tbl} WHERE long_col = CAST(1700000000000 AS TIMESTAMP)",
+        "outputs": [
+          [4]
+        ]
+      },
+      {
+        "description": "Join condition: t1.TIMESTAMP = t2.LONG",
+        "sql": "SELECT t1.id, t2.id FROM {tbl} t1 JOIN {tbl} t2 ON t1.ts_col = t2.long_col",
+        "outputs": [
+          [1, 1],
+          [4, 4]
+        ]
+      },
+      {
+        "description": "Join condition: t1.LONG = t2.TIMESTAMP",
+        "sql": "SELECT t1.id, t2.id FROM {tbl} t1 JOIN {tbl} t2 ON t1.long_col = t2.ts_col",
+        "outputs": [
+          [1, 1],
+          [4, 4]
+        ]
+      }
+    ]
+  }
+}

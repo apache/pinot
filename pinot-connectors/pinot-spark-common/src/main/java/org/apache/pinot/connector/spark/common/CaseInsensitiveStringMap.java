@@ -28,18 +28,15 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Copied from Apache Spark repository org.apache.spark.sql.util package in order to re-use
- * for Spark2 connectors besides Spark3.
- * This class is compatible with DataSourceOptions class used in Spark2.
- *
- * Case-insensitive map of string keys to string values.
- * <p>
- * This is used to pass options to v2 implementations to ensure consistent case insensitivity.
- * <p>
- * Methods that return keys in this map, like {@link #entrySet()} and {@link #keySet()}, return
- * keys converted to lower case. This map doesn't allow null key.
- */
+/// Copied from Apache Spark repository org.apache.spark.sql.util package.
+/// This class is compatible with DataSourceOptions class used in Spark 3.
+///
+/// Case-insensitive map of string keys to string values.
+///
+/// This is used to pass options to v2 implementations to ensure consistent case insensitivity.
+///
+/// Methods that return keys in this map, like [#entrySet()] and [#keySet()], return
+/// keys converted to lower case. This map doesn't allow null key.
 public class CaseInsensitiveStringMap implements Map<String, String> {
   private final Logger _logger = LoggerFactory.getLogger(CaseInsensitiveStringMap.class);
 
@@ -130,10 +127,8 @@ public class CaseInsensitiveStringMap implements Map<String, String> {
     return _delegate.entrySet();
   }
 
-  /**
-   * Returns the boolean value to which the specified key is mapped,
-   * or defaultValue if there is no mapping for the key. The key match is case-insensitive.
-   */
+  /// Returns the boolean value to which the specified key is mapped,
+  /// or defaultValue if there is no mapping for the key. The key match is case-insensitive.
   public boolean getBoolean(String key, boolean defaultValue) {
     String value = get(key);
     // We can't use `Boolean.parseBoolean` here, as it returns false for invalid strings.
@@ -148,36 +143,28 @@ public class CaseInsensitiveStringMap implements Map<String, String> {
     }
   }
 
-  /**
-   * Returns the integer value to which the specified key is mapped,
-   * or defaultValue if there is no mapping for the key. The key match is case-insensitive.
-   */
+  /// Returns the integer value to which the specified key is mapped,
+  /// or defaultValue if there is no mapping for the key. The key match is case-insensitive.
   public int getInt(String key, int defaultValue) {
     String value = get(key);
     return value == null ? defaultValue : Integer.parseInt(value);
   }
 
-  /**
-   * Returns the long value to which the specified key is mapped,
-   * or defaultValue if there is no mapping for the key. The key match is case-insensitive.
-   */
+  /// Returns the long value to which the specified key is mapped,
+  /// or defaultValue if there is no mapping for the key. The key match is case-insensitive.
   public long getLong(String key, long defaultValue) {
     String value = get(key);
     return value == null ? defaultValue : Long.parseLong(value);
   }
 
-  /**
-   * Returns the double value to which the specified key is mapped,
-   * or defaultValue if there is no mapping for the key. The key match is case-insensitive.
-   */
+  /// Returns the double value to which the specified key is mapped,
+  /// or defaultValue if there is no mapping for the key. The key match is case-insensitive.
   public double getDouble(String key, double defaultValue) {
     String value = get(key);
     return value == null ? defaultValue : Double.parseDouble(value);
   }
 
-  /**
-   * Returns the original case-sensitive map.
-   */
+  /// Returns the original case-sensitive map.
   public Map<String, String> asCaseSensitiveMap() {
     return Collections.unmodifiableMap(_original);
   }

@@ -19,7 +19,9 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -33,8 +35,11 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class SegmentLocalFSDirectoryTest {
-  private static final File TEST_DIRECTORY = new File(SingleFileIndexDirectoryTest.class.toString());
+public class SegmentLocalFSDirectoryTest implements PinotBuffersAfterClassCheckRule {
+  // Self-scoped unique dir (was derived from SingleFileIndexDirectoryTest.class) so parallel forks
+  // never share a directory.
+  private static final File TEST_DIRECTORY = new File(FileUtils.getTempDirectoryPath(),
+      SegmentLocalFSDirectoryTest.class.getSimpleName() + "-" + UUID.randomUUID());
   private SegmentDirectory _segmentDirectory;
   private SegmentMetadataImpl _metadata;
 

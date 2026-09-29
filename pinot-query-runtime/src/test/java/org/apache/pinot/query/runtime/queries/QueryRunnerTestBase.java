@@ -33,19 +33,19 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -61,20 +61,23 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.h2.jdbc.JdbcArray;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -103,47 +106,69 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected QueryEnvironment.QueryPlannerResult planQuery(String sql) {
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
-    return _queryEnvironment.planQuery(sql, sqlNodeAndOptions, requestId);
+    try (QueryEnvironment.CompiledQuery compiledQuery = _queryEnvironment.compile(sql, sqlNodeAndOptions)) {
+      return compiledQuery.planQuery(requestId);
+    }
   }
 
-  /**
-   * Dispatch query to each pinot-server. The logic should mimic QueryDispatcher.submit() but does not actually make
-   * ser/de dispatches.
-   */
+  /// Dispatch query to each pinot-server. The logic should mimic QueryDispatcher.submit() but does not actually make
+  /// ser/de dispatches.
   protected QueryDispatcher.QueryResult queryRunner(String sql, boolean trace) {
+    return queryRunner(sql, trace, Map.of());
+  }
+
+  /// Same as [#queryRunner(String, boolean)], but adds metadata the broker stamps outside the SQL text, e.g. the
+  /// `rlsFilters-<table>` entries carrying row-level-security filters.
+  protected QueryDispatcher.QueryResult queryRunner(String sql, boolean trace,
+      Map<String, String> extraRequestMetadata) {
+    long startTimeMs = System.currentTimeMillis();
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
-    QueryEnvironment.QueryPlannerResult queryPlannerResult = _queryEnvironment.planQuery(sql, sqlNodeAndOptions,
-        requestId);
+    Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
+    String cid = queryOptions.get(QueryOptionKey.CLIENT_QUERY_ID);
+    if (cid == null) {
+      cid = String.valueOf(requestId);
+    }
+    String workloadName = QueryOptionsUtils.getWorkloadName(queryOptions);
+    Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(queryOptions);
+    long timeoutMs = timeoutMsFromQueryOption != null ? timeoutMsFromQueryOption : Broker.DEFAULT_BROKER_TIMEOUT_MS;
+    Long extraPassiveTimeoutMsFromQueryOption = QueryOptionsUtils.getExtraPassiveTimeoutMs(queryOptions);
+    long extraPassiveTimeoutMs = extraPassiveTimeoutMsFromQueryOption != null ? extraPassiveTimeoutMsFromQueryOption
+        : Broker.DEFAULT_EXTRA_PASSIVE_TIMEOUT_MS;
+    long activeDeadlineMs = startTimeMs + timeoutMs;
+    long passiveDeadlineMs = activeDeadlineMs + extraPassiveTimeoutMs;
+    QueryEnvironment.QueryPlannerResult queryPlannerResult;
+    try (QueryEnvironment.CompiledQuery compiledQuery = _queryEnvironment.compile(sql, sqlNodeAndOptions)) {
+      queryPlannerResult = compiledQuery.planQuery(requestId);
+    }
     DispatchableSubPlan dispatchableSubPlan = queryPlannerResult.getQueryPlan();
-    Map<String, String> requestMetadataMap = new HashMap<>();
-    requestMetadataMap.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, String.valueOf(requestId));
-    Long timeoutMsInQueryOption = QueryOptionsUtils.getTimeoutMs(sqlNodeAndOptions.getOptions());
-    long timeoutMs =
-        timeoutMsInQueryOption != null ? timeoutMsInQueryOption : CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS;
-    requestMetadataMap.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, String.valueOf(timeoutMs));
-    requestMetadataMap.put(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "true");
-    requestMetadataMap.putAll(sqlNodeAndOptions.getOptions());
+    Map<String, String> requestMetadataMap = new HashMap<>(queryOptions);
+    requestMetadataMap.put(MetadataKeys.REQUEST_ID, Long.toString(requestId));
+    requestMetadataMap.put(MetadataKeys.CORRELATION_ID, cid);
+    requestMetadataMap.put(QueryOptionKey.TIMEOUT_MS, Long.toString(timeoutMs));
+    requestMetadataMap.put(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, Long.toString(extraPassiveTimeoutMs));
+    requestMetadataMap.putIfAbsent(QueryOptionKey.ENABLE_NULL_HANDLING, "true");
+    requestMetadataMap.putAll(extraRequestMetadata);
 
     // Putting trace testing here as extra options as it doesn't go along with the rest of the items.
     if (trace) {
-      requestMetadataMap.put(CommonConstants.Broker.Request.TRACE, "true");
+      requestMetadataMap.put(Broker.Request.TRACE, "true");
     }
 
     // Submission Stub logic are mimic {@link QueryServer}
-    List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
+    Set<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStagesWithoutRoot();
     List<CompletableFuture<?>> submissionStubs = new ArrayList<>();
-    for (int stageId = 0; stageId < stagePlans.size(); stageId++) {
-      if (stageId != 0) {
-        submissionStubs.addAll(processDistributedStagePlans(dispatchableSubPlan, requestId, stageId,
-            requestMetadataMap));
-      }
+    for (DispatchablePlanFragment stagePlan : stagePlans) {
+      int stageId = stagePlan.getPlanFragment().getFragmentId();
+      submissionStubs.addAll(processDistributedStagePlans(dispatchableSubPlan, requestId, stageId, requestMetadataMap));
     }
     try {
       CompletableFuture.allOf(submissionStubs.toArray(new CompletableFuture[0])).get(timeoutMs, TimeUnit.MILLISECONDS);
+    } catch (TimeoutException e) {
+      throw QueryErrorCode.BROKER_TIMEOUT.asException("Error occurred during stage submission: Timeout");
     } catch (Exception e) {
       // wrap and throw the exception here is for assert purpose on dispatch-time error
-      throw new RuntimeException("Error occurred during stage submission: " + QueryException.getTruncatedStackTrace(e));
+      throw new RuntimeException("Error occurred during stage submission: " + e.getMessage(), e);
     } finally {
       // Cancel all ongoing submission
       for (CompletableFuture<?> future : submissionStubs) {
@@ -152,28 +177,32 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         }
       }
     }
-    // exception will be propagated through for assert purpose on runtime error
-    return QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, Collections.emptyMap(),
-        _mailboxService);
+    QueryExecutionContext executionContext =
+        new QueryExecutionContext(QueryExecutionContext.QueryType.MSE, requestId, cid, workloadName, startTimeMs,
+            activeDeadlineMs, passiveDeadlineMs, "brokerId", "brokerId", "");
+    QueryThreadContext.MseWorkerInfo mseWorkerInfo = new QueryThreadContext.MseWorkerInfo(0, 0);
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo,
+        ThreadAccountantUtils.getNoOpAccountant())) {
+      // exception will be propagated through for assert purpose on runtime error
+      return QueryDispatcher.runReducer(dispatchableSubPlan, requestMetadataMap, _mailboxService);
+    }
   }
 
   protected List<CompletableFuture<?>> processDistributedStagePlans(DispatchableSubPlan dispatchableSubPlan,
       long requestId, int stageId, Map<String, String> requestMetadataMap) {
-    DispatchablePlanFragment dispatchableStagePlan = dispatchableSubPlan.getQueryStageList().get(stageId);
+    DispatchablePlanFragment dispatchableStagePlan = dispatchableSubPlan.getQueryStageMap().get(stageId);
     List<WorkerMetadata> stageWorkerMetadataList = dispatchableStagePlan.getWorkerMetadataList();
     List<CompletableFuture<?>> submissionStubs = new ArrayList<>();
     for (Map.Entry<QueryServerInstance, List<Integer>> entry : dispatchableStagePlan.getServerInstanceToWorkerIdMap()
         .entrySet()) {
       QueryServerEnclosure serverEnclosure = _servers.get(entry.getKey());
-      Tracing.ThreadAccountantOps.setupRunner(Long.toString(requestId), ThreadExecutionContext.TaskType.MSE);
-      ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
       List<WorkerMetadata> workerMetadataList =
           entry.getValue().stream().map(stageWorkerMetadataList::get).collect(Collectors.toList());
       StageMetadata stageMetadata =
           new StageMetadata(stageId, workerMetadataList, dispatchableStagePlan.getCustomProperties());
       StagePlan stagePlan = new StagePlan(dispatchableStagePlan.getPlanFragment().getFragmentRoot(), stageMetadata);
       for (WorkerMetadata workerMetadata : workerMetadataList) {
-        submissionStubs.add(serverEnclosure.processQuery(workerMetadata, stagePlan, requestMetadataMap, parentContext));
+        submissionStubs.add(serverEnclosure.processQuery(workerMetadata, stagePlan, requestMetadataMap));
       }
     }
     return submissionStubs;
@@ -283,6 +312,9 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
             "Got unexpected value type: " + value.getClass() + " for BYTES column, expected: String or byte[]");
         return value;
       case INT_ARRAY:
+        if (value instanceof List) {
+          return ((List) value).stream().mapToInt(i -> (int) i).toArray();
+        }
         if (value instanceof JdbcArray) {
           try {
             Object[] array = (Object[]) ((JdbcArray) value).getArray();
@@ -441,11 +473,6 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
 
   protected Connection _h2Connection;
 
-  protected Connection getH2Connection() {
-    assertNotNull(_h2Connection, "H2 Connection has not been initialized");
-    return _h2Connection;
-  }
-
   protected void setH2Connection()
       throws Exception {
     assertNull(_h2Connection);
@@ -560,6 +587,12 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public List<String> _partitionColumns;
       @JsonProperty("partitionCount")
       public Integer _partitionCount;
+      @JsonProperty("replicated")
+      public boolean _replicated;
+      @JsonProperty("isDimTable")
+      public boolean _isDimTable;
+      @JsonProperty("primaryKeyColumns")
+      public List<String> _primaryKeyColumns;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -581,6 +614,10 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public boolean _keepOutputRowOrder;
       @JsonProperty("expectedNumSegments")
       public Integer _expectedNumSegments;
+      @JsonProperty("ignoreV2Optimizer")
+      public Boolean _ignoreV2Optimizer = false;
+      @JsonProperty("ignoreLiteMode")
+      public Boolean _ignoreLiteMode = false;
     }
 
     public static class ColumnAndType {

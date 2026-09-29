@@ -25,9 +25,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 
 
-/**
- * Class to represent granularity from {@link DateTimeFieldSpec}
- */
+/// Class to represent granularity from [DateTimeFieldSpec]
 public class DateTimeGranularitySpec {
   // Colon format: 'size:timeUnit'
   private static final char COLON_SEPARATOR = ':';
@@ -45,9 +43,7 @@ public class DateTimeGranularitySpec {
   private final int _size;
   private final TimeUnit _timeUnit;
 
-  /**
-   * Constructs a dateTimeGranularitySpec granularity from a string
-   */
+  /// Constructs a dateTimeGranularitySpec granularity from a string
   public DateTimeGranularitySpec(String granularity) {
     Preconditions.checkArgument(StringUtils.isNotEmpty(granularity), "Must provide granularity");
 
@@ -101,9 +97,7 @@ public class DateTimeGranularitySpec {
     Preconditions.checkArgument(_size > 0, "Invalid size: %s in granularity: %s, must be positive", _size, granularity);
   }
 
-  /**
-   * Constructs a dateTimeGranularitySpec granularity given the components of a granularity
-   */
+  /// Constructs a dateTimeGranularitySpec granularity given the components of a granularity
   public DateTimeGranularitySpec(int size, TimeUnit timeUnit) {
     Preconditions.checkArgument(size > 0, "Invalid size: %s, must be positive", size);
     Preconditions.checkArgument(timeUnit != null, "Must provide time unit");
@@ -119,23 +113,19 @@ public class DateTimeGranularitySpec {
     return _timeUnit;
   }
 
-  /**
-   * Converts a granularity to millis.
-   *
-   * Using new format:
-   * <ul>
-   *   <li>1) granularityToMillis(HOURS|1) = 3600000 (60*60*1000)</li>
-   *   <li>2) granularityToMillis(MILLISECONDS|1) = 1</li>
-   *   <li>3) granularityToMillis(MINUTES|15) = 900000 (15*60*1000)</li>
-   * </ul>
-   *
-   * Using old format:
-   * <ul>
-   *   <li>1) granularityToMillis(1:HOURS) = 3600000 (60*60*1000)</li>
-   *   <li>2) granularityToMillis(1:MILLISECONDS) = 1</li>
-   *   <li>3) granularityToMillis(15:MINUTES) = 900000 (15*60*1000)</li>
-   * </ul>
-   */
+  /// Converts a granularity to millis.
+  ///
+  /// Using new format:
+  ///
+  /// - 1) granularityToMillis(HOURS|1) = 3600000 (60\*60\*1000)
+  /// - 2) granularityToMillis(MILLISECONDS|1) = 1
+  /// - 3) granularityToMillis(MINUTES|15) = 900000 (15\*60\*1000)
+  ///
+  /// Using old format:
+  ///
+  /// - 1) granularityToMillis(1:HOURS) = 3600000 (60\*60\*1000)
+  /// - 2) granularityToMillis(1:MILLISECONDS) = 1
+  /// - 3) granularityToMillis(15:MINUTES) = 900000 (15\*60\*1000)
   public long granularityToMillis() {
     return TimeUnit.MILLISECONDS.convert(_size, _timeUnit);
   }

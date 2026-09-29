@@ -42,12 +42,10 @@ public class SchemaValidatorFactory {
         .put(DEFAULT_AVRO_RECORD_READER_CLASS, DEFAULT_AVRO_SCHEMA_VALIDATOR_CLASS);
   }
 
-  /**
-   * Gets schema validator given the record recorder and the input file path
-   * @param pinotSchema pinot schema
-   * @param recordReaderClassName record reader class name
-   * @param inputFilePath local input file path
-   */
+  /// Gets schema validator given the record recorder and the input file path
+  /// @param pinotSchema pinot schema
+  /// @param recordReaderClassName record reader class name
+  /// @param inputFilePath local input file path
   public static IngestionSchemaValidator getSchemaValidator(Schema pinotSchema, String recordReaderClassName,
       String inputFilePath)
       throws Exception {

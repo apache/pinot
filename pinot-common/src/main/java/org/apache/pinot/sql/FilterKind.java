@@ -34,18 +34,17 @@ public enum FilterKind {
   NOT_IN,
   LIKE,
   REGEXP_LIKE,
-  TEXT_CONTAINS,
   TEXT_MATCH,
   JSON_MATCH,
   IS_NULL,
   IS_NOT_NULL,
-  VECTOR_SIMILARITY;
+  VECTOR_SIMILARITY,
+  VECTOR_SIMILARITY_RADIUS,
+  SEMANTIC_MATCH;
 
-  /**
-   * Helper method that returns true if the enum maps to a Range.
-   *
-   * @return True if the enum is of Range type, false otherwise.
-   */
+  /// Helper method that returns true if the enum maps to a Range.
+  ///
+  /// @return True if the enum is of Range type, false otherwise.
   public boolean isRange() {
     return this == GREATER_THAN || this == GREATER_THAN_OR_EQUAL || this == LESS_THAN || this == LESS_THAN_OR_EQUAL
         || this == BETWEEN || this == RANGE;

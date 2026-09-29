@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.core.util;
 
-/**
- * Utility class with various number related methods.
- */
+/// Utility class with various number related methods.
 public class NumberUtils {
 
   public static final NumericException NULL_EXCEPTION = new NumericException("Can't parse null string");
@@ -51,32 +49,28 @@ public class NumberUtils {
   private NumberUtils() {
   }
 
-  /**
-   * Parses whole input char sequence.
-   * Throws static, pre-allocated NumericException.
-   * If proper stack trace is required, caller has to catch it and throw another exception.
-   * @param cs char sequence to parse
-   * @return parsed long value
-   */
+  /// Parses whole input char sequence.
+  /// Throws static, pre-allocated NumericException.
+  /// If proper stack trace is required, caller has to catch it and throw another exception.
+  /// @param cs char sequence to parse
+  /// @return parsed long value
   public static long parseLong(CharSequence cs)
-  throws NumericException {
+      throws NumericException {
     if (cs == null) {
       throw NULL_EXCEPTION;
     }
     return parseLong(cs, 0, cs.length());
   }
 
-  /**
-   * Parses input char sequence between given indices.
-   * Throws static, pre-allocated NumericException.
-   * If proper stack trace is required, caller has to catch it and throw another exception.
-   * @param cs char sequence to parse
-   * @param start start index (inclusive)
-   * @param end end index (exclusive)
-   * @return parsed long value
-   */
+  /// Parses input char sequence between given indices.
+  /// Throws static, pre-allocated NumericException.
+  /// If proper stack trace is required, caller has to catch it and throw another exception.
+  /// @param cs char sequence to parse
+  /// @param start start index (inclusive)
+  /// @param end end index (exclusive)
+  /// @return parsed long value
   public static long parseLong(CharSequence cs, int start, int end)
-  throws NumericException {
+      throws NumericException {
     if (cs == null) {
       throw NULL_EXCEPTION;
     }
@@ -122,16 +116,14 @@ public class NumberUtils {
     }
   }
 
-  /**
-   * Parses input accepting regular long syntax plus:
-   * 1E1 -> 10
-   * 1.234 -> 1
-   * 1.123E1 -> 11
-   * @param cs - char sequence to parse
-   * @return parsed long value
-   */
+  /// Parses input accepting regular long syntax plus:
+  /// 1E1 -> 10
+  /// 1.234 -> 1
+  /// 1.123E1 -> 11
+  /// @param cs - char sequence to parse
+  /// @return parsed long value
   public static long parseJsonLong(CharSequence cs)
-  throws NumericException {
+      throws NumericException {
     if (cs == null) {
       throw NULL_EXCEPTION;
     }

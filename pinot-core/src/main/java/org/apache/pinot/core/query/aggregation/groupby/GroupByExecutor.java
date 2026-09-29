@@ -18,44 +18,35 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
-import java.util.Collection;
+import java.util.List;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
-/**
- * Interface class for executing the actual group-by operation.
- */
+/// Interface class for executing the actual group-by operation.
 public interface GroupByExecutor {
 
-  /**
-   * Performs the group-by aggregation on the given value block.
-   */
+  /// Performs the group-by aggregation on the given value block.
   void process(ValueBlock valueBlock);
 
-  /**
-   * Returns the result of group-by aggregation.
-   * <p>Should be called after all transform blocks has been processed.
-   *
-   * @return Result of aggregation
-   */
+  /// Returns the result of group-by aggregation.
+  ///
+  /// Should be called after all transform blocks has been processed.
+  ///
+  /// @return Result of aggregation
   AggregationGroupByResult getResult();
 
-  /**
-   * Returns the number of generated results
-   *
-   * @return Number of results
-   */
+  /// Returns the number of generated results
+  ///
+  /// @return Number of results
   int getNumGroups();
 
-  /**
-   * Trim the GroupBy result up to the threshold max(configurable_threshold * 5, minTrimSize)
-   * TODO: benchmark the performance of PQ vs. topK
-   * <p>Should be called after all transform blocks has been processed.
-   *
-   */
-  Collection<IntermediateRecord> trimGroupByResult(int trimSize, TableResizer tableResizer);
+  /// Trim the GroupBy result up to the threshold max(configurable_threshold \* 5, minTrimSize)
+  /// TODO: benchmark the performance of PQ vs. topK
+  ///
+  /// Should be called after all transform blocks has been processed.
+  List<IntermediateRecord> trimGroupByResult(int trimSize, TableResizer tableResizer, boolean sortedOutput);
 
   GroupKeyGenerator getGroupKeyGenerator();
 

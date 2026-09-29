@@ -22,10 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Adapter that causes metrics from a metric registry to be published to JMX.
- *
- */
+/// Adapter that causes metrics from a metric registry to be published to JMX.
 public class JmxReporterMetricsRegistryRegistrationListener implements MetricsRegistryRegistrationListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(JmxReporterMetricsRegistryRegistrationListener.class);
 

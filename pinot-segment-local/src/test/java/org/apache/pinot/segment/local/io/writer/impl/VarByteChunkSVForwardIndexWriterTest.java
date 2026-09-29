@@ -30,6 +30,7 @@ import java.util.SplittableRandom;
 import java.util.UUID;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -45,7 +46,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
 
 
-public class VarByteChunkSVForwardIndexWriterTest {
+public class VarByteChunkSVForwardIndexWriterTest implements PinotBuffersAfterMethodCheckRule {
   private static final File OUTPUT_DIR =
       new File(FileUtils.getTempDirectory(), VarByteChunkSVForwardIndexWriterTest.class.getSimpleName());
 
@@ -66,7 +67,9 @@ public class VarByteChunkSVForwardIndexWriterTest {
     int[] numbersOfDocs = {10, 1000};
     int[][] entryLengths = {{1, 1}, {0, 10}, {0, 100}, {100, 100}, {900, 1000}};
     int[] versions = {2, 3};
-    return Arrays.stream(ChunkCompressionType.values()).flatMap(chunkCompressionType -> IntStream.of(versions).boxed()
+    return Arrays.stream(ChunkCompressionType.values())
+        .filter(t -> t != ChunkCompressionType.DELTA && t != ChunkCompressionType.DELTADELTA)
+        .flatMap(chunkCompressionType -> IntStream.of(versions).boxed()
         .flatMap(version -> IntStream.of(numbersOfDocs).boxed().flatMap(
             totalDocs -> IntStream.of(numDocsPerChunks).boxed()
                 .flatMap(numDocsPerChunk -> Arrays.stream(entryLengths).map(lengths -> new Object[]{

@@ -20,23 +20,23 @@ package org.apache.pinot.segment.local.segment.index.map;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.MapUtils.PreparedMapKey;
 
 
 public class MapKeyIndexReader implements ForwardIndexReader {
   private final ForwardIndexReader _forwardIndexReader;
   private final FieldSpec _keyFieldSpec;
-  private final String _keyName;
+  private final PreparedMapKey _mapKey;
   private final Object _defaultNullValue;
 
   public MapKeyIndexReader(ForwardIndexReader forwardIndexReader, String keyName, FieldSpec keyFieldSpec) {
     _forwardIndexReader = forwardIndexReader;
-    _keyName = keyName;
+    _mapKey = new PreparedMapKey(keyName);
     _keyFieldSpec = keyFieldSpec;
     _defaultNullValue = keyFieldSpec.getDefaultNullValue();
   }
@@ -53,47 +53,58 @@ public class MapKeyIndexReader implements ForwardIndexReader {
 
   @Override
   public FieldSpec.DataType getStoredType() {
-    return _keyFieldSpec.getDataType();
+    return _keyFieldSpec.getDataType().getStoredType();
   }
 
   @Override
   public int getInt(int docId, ForwardIndexReaderContext context) {
-    return Integer.parseInt(extractMapValue(docId, context, _keyName).toString());
+    Object value = extractMapValue(docId, context);
+    return value instanceof Integer ? (Integer) value : Integer.parseInt(value.toString());
   }
 
   @Override
   public long getLong(int docId, ForwardIndexReaderContext context) {
-    return Long.parseLong(extractMapValue(docId, context, _keyName).toString());
+    Object value = extractMapValue(docId, context);
+    if (value instanceof Long) {
+      return (Long) value;
+    }
+    return value instanceof Integer ? (Integer) value : Long.parseLong(value.toString());
   }
 
+  /// No fast path here: Jackson's untyped binding never yields a `Float` - a JSON decimal comes back as `Double` -
+  /// so a `Float` check would be dead code. Narrowing the `Double` instead is not equivalent: for a double sitting
+  /// near the midpoint between two floats the two conversions differ by an ulp, because one rounds the double
+  /// directly while the other rounds its shortest decimal. `-1.340092769725468E-17` narrows to `-1.3400928E-17`
+  /// but parses to `-1.3400927E-17`. This method has always produced the parsed value, so it keeps doing that.
   @Override
   public float getFloat(int docId, ForwardIndexReaderContext context) {
-    return Float.parseFloat(extractMapValue(docId, context, _keyName).toString());
+    return Float.parseFloat(extractMapValue(docId, context).toString());
   }
 
   @Override
   public double getDouble(int docId, ForwardIndexReaderContext context) {
-    return Double.parseDouble(extractMapValue(docId, context, _keyName).toString());
+    Object value = extractMapValue(docId, context);
+    return value instanceof Double ? (Double) value : Double.parseDouble(value.toString());
   }
 
   @Override
   public String getString(int docId, ForwardIndexReaderContext context) {
-    return extractMapValue(docId, context, _keyName).toString();
+    String value = _forwardIndexReader.getMapEntryValueAsString(docId, context, _mapKey);
+    return value != null ? value : _defaultNullValue.toString();
   }
 
   @Override
   public byte[] getBytes(int docId, ForwardIndexReaderContext context) {
-    return (byte[]) extractMapValue(docId, context, _keyName);
+    return (byte[]) extractMapValue(docId, context);
   }
 
   @Override
   public BigDecimal getBigDecimal(int docId, ForwardIndexReaderContext context) {
-    return BigDecimalUtils.deserialize((byte[]) extractMapValue(docId, context, _keyName));
+    return BigDecimalUtils.deserialize((byte[]) extractMapValue(docId, context));
   }
 
-  private Object extractMapValue(int docId, ForwardIndexReaderContext context, String key) {
-    Map map = _forwardIndexReader.getMap(docId, context);
-    Object object = map.get(key);
+  private Object extractMapValue(int docId, ForwardIndexReaderContext context) {
+    Object object = _forwardIndexReader.getMapEntryValue(docId, context, _mapKey);
     if (object == null) {
       return _defaultNullValue;
     }

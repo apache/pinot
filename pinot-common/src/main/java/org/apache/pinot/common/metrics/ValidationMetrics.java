@@ -30,9 +30,7 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
-/**
- * Validation metrics utility class, which contains the glue code to publish metrics.
- */
+/// Validation metrics utility class, which contains the glue code to publish metrics.
 public class ValidationMetrics {
   private static final double MILLIS_PER_HOUR = TimeUnit.MILLISECONDS.convert(1, TimeUnit.HOURS);
 
@@ -40,9 +38,7 @@ public class ValidationMetrics {
   private final Map<String, Long> _gaugeValues = new HashMap<>();
   private final Set<PinotMetricName> _metricNames = new HashSet<>();
 
-  /**
-   * A simple gauge that returns whatever last value was stored in the _gaugeValues hash map.
-   */
+  /// A simple gauge that returns whatever last value was stored in the \_gaugeValues hash map.
   private class StoredValueGauge implements PinotGauge<Long> {
     private final String _key;
 
@@ -66,10 +62,8 @@ public class ValidationMetrics {
     }
   }
 
-  /**
-   * A simple gauge that returns the difference in hours between the current system time and the value stored in the
-   * _gaugeValues hash map.
-   */
+  /// A simple gauge that returns the difference in hours between the current system time and the value stored in the
+  /// \_gaugeValues hash map.
   private class CurrentTimeMillisDeltaGaugeHours implements PinotGauge<Double> {
     private final String _key;
 
@@ -121,120 +115,96 @@ public class ValidationMetrics {
   private final CurrentTimeMillisDeltaGaugeHoursFactory _currentTimeMillisDeltaGaugeHoursFactory =
       new CurrentTimeMillisDeltaGaugeHoursFactory();
 
-  /**
-   * Builds the validation metrics.
-   *
-   * @param metricsRegistry The metrics registry used to store all the gauges.
-   */
+  /// Builds the validation metrics.
+  ///
+  /// @param metricsRegistry The metrics registry used to store all the gauges.
   public ValidationMetrics(PinotMetricsRegistry metricsRegistry) {
     _metricsRegistry = metricsRegistry;
   }
 
-  /**
-   * Updates the missing segment count gauge.
-   *
-   * @param resource The resource for which the gauge is updated
-   * @param missingSegmentCount The number of missing segments
-   */
+  /// Updates the missing segment count gauge.
+  ///
+  /// @param resource The resource for which the gauge is updated
+  /// @param missingSegmentCount The number of missing segments
   public void updateMissingSegmentCountGauge(final String resource, final int missingSegmentCount) {
     makeGauge(resource, ValidationMetricName.MISSING_SEGMENT_COUNT, _storedValueGaugeFactory, missingSegmentCount);
   }
 
-  /**
-   * Cleans up the missing segment count gauge.
-   *
-   * @param resource The resource for which the gauge is removed
-   */
+  /// Cleans up the missing segment count gauge.
+  ///
+  /// @param resource The resource for which the gauge is removed
   public void cleanupMissingSegmentCountGauge(final String resource) {
     removeGauge(resource, ValidationMetricName.MISSING_SEGMENT_COUNT);
   }
 
-  /**
-   * Updates the offline segment delay gauge.
-   *
-   * @param resource The resource for which the gauge is updated
-   * @param lastOfflineSegmentTime The last offline segment end time, in milliseconds since the epoch, or Long.MIN_VALUE
-   *                               if there is no such time.
-   */
+  /// Updates the offline segment delay gauge.
+  ///
+  /// @param resource The resource for which the gauge is updated
+  /// @param lastOfflineSegmentTime The last offline segment end time, in milliseconds since the epoch, or
+  ///                               Long.MIN_VALUE if there is no such time.
   public void updateOfflineSegmentDelayGauge(final String resource, final long lastOfflineSegmentTime) {
     makeGauge(resource, ValidationMetricName.OFFLINE_SEGMENT_DELAY_HOURS, _currentTimeMillisDeltaGaugeHoursFactory,
         lastOfflineSegmentTime);
   }
 
-  /**
-   * Cleans up offline segment delay gauge.
-   *
-   * @param resource The resource for which the gauge is removed
-   */
+  /// Cleans up offline segment delay gauge.
+  ///
+  /// @param resource The resource for which the gauge is removed
   public void cleanupOfflineSegmentDelayGauge(final String resource) {
     removeGauge(resource, ValidationMetricName.OFFLINE_SEGMENT_DELAY_HOURS);
   }
 
-  /**
-   * Updates the last push time gauge.
-   *
-   * @param resource The resource for which the gauge is updated
-   * @param lastPushTimeMillis The last push time, in milliseconds since the epoch, or Long.MIN_VALUE if there is no
-   *                           such time.
-   */
+  /// Updates the last push time gauge.
+  ///
+  /// @param resource The resource for which the gauge is updated
+  /// @param lastPushTimeMillis The last push time, in milliseconds since the epoch, or Long.MIN_VALUE if there is no
+  ///                           such time.
   public void updateLastPushTimeGauge(final String resource, final long lastPushTimeMillis) {
     makeGauge(resource, ValidationMetricName.LAST_PUSH_TIME_DELAY_HOURS, _currentTimeMillisDeltaGaugeHoursFactory,
         lastPushTimeMillis);
   }
 
-  /**
-   * Cleans up the last push time gauge.
-   *
-   * @param resource The resource for which the gauge is removed
-   */
+  /// Cleans up the last push time gauge.
+  ///
+  /// @param resource The resource for which the gauge is removed
   public void cleanupLastPushTimeGauge(final String resource) {
     removeGauge(resource, ValidationMetricName.LAST_PUSH_TIME_DELAY_HOURS);
   }
 
-  /**
-   * Updates the total document count gauge.
-   *
-   * @param resource The resource for which the gauge is updated
-   * @param documentCount Total document count for the given resource name or table name
-   */
+  /// Updates the total document count gauge.
+  ///
+  /// @param resource The resource for which the gauge is updated
+  /// @param documentCount Total document count for the given resource name or table name
   public void updateTotalDocumentCountGauge(final String resource, final long documentCount) {
     makeGauge(resource, ValidationMetricName.TOTAL_DOCUMENT_COUNT, _storedValueGaugeFactory, documentCount);
   }
 
-  /**
-   * Cleans up the total document count gauge.
-   *
-   * @param resource The resource for which the gauge is removed
-   */
+  /// Cleans up the total document count gauge.
+  ///
+  /// @param resource The resource for which the gauge is removed
   public void cleanupTotalDocumentCountGauge(final String resource) {
     removeGauge(resource, ValidationMetricName.TOTAL_DOCUMENT_COUNT);
   }
 
-  /**
-   * Updates the non consuming partition count metric.
-   *
-   * @param resource The resource for which the gauge is updated
-   * @param partitionCount Number of partitions that do not have any segment in CONSUMING state.
-   */
+  /// Updates the non consuming partition count metric.
+  ///
+  /// @param resource The resource for which the gauge is updated
+  /// @param partitionCount Number of partitions that do not have any segment in CONSUMING state.
   public void updateNonConsumingPartitionCountMetric(final String resource, final int partitionCount) {
     makeGauge(resource, ValidationMetricName.NON_CONSUMING_PARTITION_COUNT, _storedValueGaugeFactory, partitionCount);
   }
 
-  /**
-   * Updates the segment count gauge.
-   *
-   * @param resource The resource for which the gauge is updated
-   * @param segmentCount Total segment count for the given resource name or table name
-   */
+  /// Updates the segment count gauge.
+  ///
+  /// @param resource The resource for which the gauge is updated
+  /// @param segmentCount Total segment count for the given resource name or table name
   public void updateSegmentCountGauge(final String resource, final long segmentCount) {
     makeGauge(resource, ValidationMetricName.SEGMENT_COUNT, _storedValueGaugeFactory, segmentCount);
   }
 
-  /**
-   * Cleans up the segment count gauge.
-   *
-   * @param resource The resource for which the gauge is removed
-   */
+  /// Cleans up the segment count gauge.
+  ///
+  /// @param resource The resource for which the gauge is removed
   public void cleanupSegmentCountGauge(final String resource) {
     removeGauge(resource, ValidationMetricName.SEGMENT_COUNT);
   }
@@ -269,9 +239,7 @@ public class ValidationMetrics {
     _gaugeValues.remove(fullGaugeName);
   }
 
-  /**
-   * Unregisters all validation metrics.
-   */
+  /// Unregisters all validation metrics.
   public void unregisterAllMetrics() {
     for (PinotMetricName metricName : _metricNames) {
       PinotMetricUtils.removeMetric(_metricsRegistry, metricName);
@@ -290,9 +258,7 @@ public class ValidationMetrics {
     return value;
   }
 
-  /**
-   * Names of validation metrics.
-   */
+  /// Names of validation metrics.
   public enum ValidationMetricName {
     MISSING_SEGMENT_COUNT("missingSegmentCount"),
     OFFLINE_SEGMENT_DELAY_HOURS("offlineSegmentDelayHours"),

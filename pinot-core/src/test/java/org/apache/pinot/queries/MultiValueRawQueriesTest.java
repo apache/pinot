@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -53,7 +54,8 @@ import static org.testng.Assert.*;
 
 
 public class MultiValueRawQueriesTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "MultiValueRawQueriesTest");
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), "MultiValueRawQueriesTest-" + UUID.randomUUID());
 
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME_1 = "testSegment1";
@@ -164,12 +166,10 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  /**
-   * Helper method to generate records based on the given base value.
-   *
-   * All columns will have the same value but different data types (BYTES values are encoded STRING values).
-   * For the {i}th unique record, the value will be {baseValue + i}.
-   */
+  /// Helper method to generate records based on the given base value.
+  ///
+  /// All columns will have the same value but different data types (BYTES values are encoded STRING values).
+  /// For the {i}th unique record, the value will be {baseValue + i}.
   private List<GenericRow> generateRecords(int baseValue) {
     List<GenericRow> uniqueRecords = new ArrayList<>(NUM_UNIQUE_RECORDS_PER_SEGMENT);
     for (int i = 0; i < NUM_UNIQUE_RECORDS_PER_SEGMENT; i++) {
@@ -188,8 +188,8 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       record.putValue(MV_RAW_DOUBLE_COL, mvValue);
       record.putValue(MV_RAW_STRING_COL, mvValue);
 
-      String stringVal = RandomStringUtils.randomAlphanumeric(10, 100);
-      String stringVal2 = RandomStringUtils.randomAlphanumeric(10, 100);
+      String stringVal = RandomStringUtils.secure().nextAlphanumeric(10, 100);
+      String stringVal2 = RandomStringUtils.secure().nextAlphanumeric(10, 100);
       record.putValue(MV_STRING_COL_2, Arrays.asList(stringVal, stringVal2));
       record.putValue(MV_RAW_STRING_COL_2, Arrays.asList(stringVal, stringVal2));
       _stringSet.add(stringVal);
@@ -384,10 +384,8 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
     }
   }
 
-  /**
-   * Today selection ORDER BY only on MV columns (irrespective of whether it's dictionary based or raw) doesn't work
-   * as the semantics of how such queries should behave isn't clear. Such queries should always fail.
-   */
+  /// Today selection ORDER BY only on MV columns (irrespective of whether it's dictionary based or raw) doesn't work
+  /// as the semantics of how such queries should behave isn't clear. Such queries should always fail.
   @Test
   public void testSelectionOrderBy() {
     {
@@ -2100,7 +2098,7 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       ResultTable resultTable = getBrokerResponse(query).getResultTable();
 
       DataSchema dataSchema = new DataSchema(new String[]{"countmv(valuein(mvRawStringCol2,'" + val1 + "','" + val2
-          + "'))"},
+            + "'))"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
       assertEquals(resultTable.getDataSchema(), dataSchema);
 

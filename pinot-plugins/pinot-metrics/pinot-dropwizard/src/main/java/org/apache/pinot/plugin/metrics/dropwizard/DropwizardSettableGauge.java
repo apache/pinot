@@ -22,12 +22,10 @@ import com.codahale.metrics.SettableGauge;
 import java.util.function.Supplier;
 import org.apache.pinot.spi.metrics.SettableValue;
 
-/**
- * DropwizardSettableGauge extends {@link SettableGauge} and implements {@link SettableValue}, allowing setting a value
- * or a value supplier to provide the gauge value
- *
- * @param <T> the type of the metric's value
- */
+/// DropwizardSettableGauge extends [SettableGauge] and implements [SettableValue], allowing setting a value
+/// or a value supplier to provide the gauge value
+///
+/// @param <T> the type of the metric's value
 public class DropwizardSettableGauge<T> implements SettableGauge<T>, SettableValue<T> {
   private Supplier<T> _valueSupplier;
 

@@ -1,0 +1,443 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.broker.routing.manager;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.QuerySource;
+import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.SegmentsToQuery;
+import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
+import org.apache.pinot.core.transport.ServerInstance;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+
+/// Unit tests for [MultiClusterRoutingManager].
+public class MultiClusterRoutingManagerTest {
+  private static final String TEST_TABLE = "testTable_OFFLINE";
+  private static final long REQUEST_ID = 12345L;
+
+  @Mock
+  private BrokerRoutingManager _localClusterRoutingManager;
+
+  @Mock
+  private RemoteClusterBrokerRoutingManager _remoteClusterRoutingManager1;
+
+  @Mock
+  private RemoteClusterBrokerRoutingManager _remoteClusterRoutingManager2;
+
+  private MultiClusterRoutingManager _multiClusterRoutingManager;
+
+  @BeforeMethod
+  public void setUp() {
+    MockitoAnnotations.openMocks(this);
+
+    List<RemoteClusterBrokerRoutingManager> remoteClusterManagers = Arrays.asList(
+        _remoteClusterRoutingManager1, _remoteClusterRoutingManager2);
+    _multiClusterRoutingManager = new MultiClusterRoutingManager(
+        _localClusterRoutingManager, remoteClusterManagers);
+  }
+
+  @Test
+  public void testRoutingExistsShortCircuits() {
+    when(_localClusterRoutingManager.routingExists(TEST_TABLE)).thenReturn(true);
+
+    boolean exists = _multiClusterRoutingManager.routingExists(TEST_TABLE);
+
+    assertTrue(exists);
+    verify(_remoteClusterRoutingManager1, never()).routingExists(anyString());
+  }
+
+  @Test
+  public void testRoutingExistsChecksRemote() {
+    when(_localClusterRoutingManager.routingExists(TEST_TABLE)).thenReturn(false);
+    when(_remoteClusterRoutingManager1.routingExists(TEST_TABLE)).thenReturn(false);
+    when(_remoteClusterRoutingManager2.routingExists(TEST_TABLE)).thenReturn(true);
+
+    boolean exists = _multiClusterRoutingManager.routingExists(TEST_TABLE);
+
+    assertTrue(exists);
+  }
+
+  @Test
+  public void testGetRoutingTableCombinesLocalAndRemote() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+
+    RoutingTable localTable = createRoutingTable("localServer", Arrays.asList("seg1"));
+    RoutingTable remoteTable = createRoutingTable("remoteServer", Arrays.asList("seg2"));
+
+    when(_localClusterRoutingManager.getRoutingTable(brokerRequest, TEST_TABLE, REQUEST_ID))
+        .thenReturn(localTable);
+    when(_remoteClusterRoutingManager1.getRoutingTable(brokerRequest, TEST_TABLE, REQUEST_ID))
+        .thenReturn(remoteTable);
+    when(_remoteClusterRoutingManager2.getRoutingTable(brokerRequest, TEST_TABLE, REQUEST_ID))
+        .thenReturn(null);
+
+    RoutingTable result = _multiClusterRoutingManager.getRoutingTable(brokerRequest, TEST_TABLE, REQUEST_ID);
+
+    assertNotNull(result);
+    assertEquals(result.getServerInstanceToSegmentsMap().size(), 2);
+  }
+
+  @Test
+  public void testGetRoutingTableHandlesRemoteException() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    RoutingTable localTable = createRoutingTable("localServer", Arrays.asList("seg1"));
+
+    when(_localClusterRoutingManager.getRoutingTable(brokerRequest, TEST_TABLE, REQUEST_ID))
+        .thenReturn(localTable);
+    when(_remoteClusterRoutingManager1.getRoutingTable(any(), anyString(), anyLong()))
+        .thenThrow(new RuntimeException("Remote error"));
+    when(_remoteClusterRoutingManager2.getRoutingTable(brokerRequest, TEST_TABLE, REQUEST_ID))
+        .thenReturn(null);
+
+    RoutingTable result = _multiClusterRoutingManager.getRoutingTable(brokerRequest, TEST_TABLE, REQUEST_ID);
+
+    assertNotNull(result);
+    assertEquals(result.getServerInstanceToSegmentsMap().size(), 1);
+  }
+
+  @Test
+  public void testGetRoutingTableReturnsNullWhenAllNull() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    when(_localClusterRoutingManager.getRoutingTable(brokerRequest, TEST_TABLE, REQUEST_ID))
+        .thenReturn(null);
+    when(_remoteClusterRoutingManager1.getRoutingTable(brokerRequest, TEST_TABLE, REQUEST_ID))
+        .thenReturn(null);
+    when(_remoteClusterRoutingManager2.getRoutingTable(brokerRequest, TEST_TABLE, REQUEST_ID))
+        .thenReturn(null);
+
+    RoutingTable result = _multiClusterRoutingManager.getRoutingTable(brokerRequest, TEST_TABLE, REQUEST_ID);
+
+    assertNull(result);
+  }
+
+  @Test
+  public void testGetTimeBoundaryInfoFindsFirst() {
+    TimeBoundaryInfo timeBoundaryInfo = mock(TimeBoundaryInfo.class);
+    when(_localClusterRoutingManager.getTimeBoundaryInfo(TEST_TABLE)).thenReturn(null);
+    when(_remoteClusterRoutingManager1.getTimeBoundaryInfo(TEST_TABLE)).thenReturn(timeBoundaryInfo);
+
+    TimeBoundaryInfo result = _multiClusterRoutingManager.getTimeBoundaryInfo(TEST_TABLE);
+
+    assertNotNull(result);
+    assertEquals(result, timeBoundaryInfo);
+    verify(_remoteClusterRoutingManager2, never()).getTimeBoundaryInfo(anyString());
+  }
+
+  @Test
+  public void testGetServingInstancesCombinesAll() {
+    Set<String> localInstances = new HashSet<>(Arrays.asList("server1"));
+    Set<String> remoteInstances = new HashSet<>(Arrays.asList("server2"));
+
+    when(_localClusterRoutingManager.getServingInstances(TEST_TABLE)).thenReturn(localInstances);
+    when(_remoteClusterRoutingManager1.getServingInstances(TEST_TABLE)).thenReturn(remoteInstances);
+    when(_remoteClusterRoutingManager2.getServingInstances(TEST_TABLE)).thenReturn(null);
+
+    Set<String> result = _multiClusterRoutingManager.getServingInstances(TEST_TABLE);
+
+    assertNotNull(result);
+    assertEquals(result.size(), 2);
+    assertTrue(result.contains("server1"));
+    assertTrue(result.contains("server2"));
+  }
+
+  @Test
+  public void testGetServingInstancesHandlesException() {
+    Set<String> localInstances = new HashSet<>(Arrays.asList("server1"));
+    when(_localClusterRoutingManager.getServingInstances(TEST_TABLE)).thenReturn(localInstances);
+    when(_remoteClusterRoutingManager1.getServingInstances(TEST_TABLE))
+        .thenThrow(new RuntimeException("Error"));
+
+    Set<String> result = _multiClusterRoutingManager.getServingInstances(TEST_TABLE);
+
+    assertNotNull(result);
+    assertEquals(result.size(), 1);
+  }
+
+  @Test
+  public void testGetSegmentsHandlesNulls() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    List<String> remoteSegments = Arrays.asList("seg1");
+
+    when(_localClusterRoutingManager.getSegments(brokerRequest, null)).thenReturn(null);
+    when(_remoteClusterRoutingManager1.getSegments(brokerRequest, null)).thenReturn(remoteSegments);
+    when(_remoteClusterRoutingManager2.getSegments(brokerRequest, null)).thenReturn(null);
+
+    List<String> result = _multiClusterRoutingManager.getSegments(brokerRequest);
+
+    assertNotNull(result);
+    assertEquals(result.size(), 1);
+    assertTrue(result.contains("seg1"));
+  }
+
+  @Test
+  public void testGetSegmentsReturnsNullWhenAllNull() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    when(_localClusterRoutingManager.getSegments(brokerRequest, null)).thenReturn(null);
+    when(_remoteClusterRoutingManager1.getSegments(brokerRequest, null)).thenReturn(null);
+    when(_remoteClusterRoutingManager2.getSegments(brokerRequest, null)).thenReturn(null);
+
+    List<String> result = _multiClusterRoutingManager.getSegments(brokerRequest);
+
+    assertNull(result);
+  }
+
+  @Test
+  public void testGetSegmentsWithSamplerName() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    List<String> localSegments = Arrays.asList("localSeg");
+    List<String> remoteSegments = Arrays.asList("remoteSeg");
+
+    when(_localClusterRoutingManager.getSegments(brokerRequest, "firstOnly")).thenReturn(localSegments);
+    when(_remoteClusterRoutingManager1.getSegments(brokerRequest, "firstOnly")).thenReturn(remoteSegments);
+    when(_remoteClusterRoutingManager2.getSegments(brokerRequest, "firstOnly")).thenReturn(null);
+
+    List<String> result = _multiClusterRoutingManager.getSegments(brokerRequest, "firstOnly");
+
+    assertNotNull(result);
+    assertEquals(result.size(), 2);
+    assertTrue(result.contains("localSeg"));
+    assertTrue(result.contains("remoteSeg"));
+    verify(_localClusterRoutingManager, never()).getSegments(brokerRequest);
+    verify(_remoteClusterRoutingManager1, never()).getSegments(brokerRequest);
+    verify(_remoteClusterRoutingManager2, never()).getSegments(brokerRequest);
+  }
+
+  @Test
+  public void testGetEnabledServerInstanceMapCombinesAll() {
+    ServerInstance server1 = createMockServerInstance("server1");
+    ServerInstance server2 = createMockServerInstance("server2");
+
+    Map<String, ServerInstance> localMap = new HashMap<>();
+    localMap.put("server1", server1);
+
+    Map<String, ServerInstance> remoteMap = new HashMap<>();
+    remoteMap.put("server2", server2);
+
+    when(_localClusterRoutingManager.getEnabledServerInstanceMap()).thenReturn(localMap);
+    when(_remoteClusterRoutingManager1.getEnabledServerInstanceMap()).thenReturn(remoteMap);
+    when(_remoteClusterRoutingManager2.getEnabledServerInstanceMap()).thenReturn(new HashMap<>());
+
+    Map<String, ServerInstance> result = _multiClusterRoutingManager.getEnabledServerInstanceMap();
+
+    assertEquals(result.size(), 2);
+    assertTrue(result.containsKey("server1"));
+    assertTrue(result.containsKey("server2"));
+  }
+
+  @Test
+  public void testGetRoutableServerInstanceMapCombinesAll() {
+    ServerInstance server1 = createMockServerInstance("server1");
+    ServerInstance server2 = createMockServerInstance("server2");
+
+    Map<String, ServerInstance> localRoutable = new HashMap<>();
+    localRoutable.put("server1", server1);
+
+    Map<String, ServerInstance> remoteRoutable = new HashMap<>();
+    remoteRoutable.put("server2", server2);
+
+    when(_localClusterRoutingManager.getRoutableServerInstanceMap()).thenReturn(localRoutable);
+    when(_remoteClusterRoutingManager1.getRoutableServerInstanceMap()).thenReturn(remoteRoutable);
+    when(_remoteClusterRoutingManager2.getRoutableServerInstanceMap()).thenReturn(new HashMap<>());
+
+    Map<String, ServerInstance> result = _multiClusterRoutingManager.getRoutableServerInstanceMap();
+
+    assertEquals(result.size(), 2);
+    assertTrue(result.containsKey("server1"));
+    assertTrue(result.containsKey("server2"));
+  }
+
+  /// Routable tables union across local and remote clusters. Without this override the RoutingManager
+  /// default returns empty and startup pre-connect would derive no channels on a multi-cluster broker.
+  @Test
+  public void testGetRoutableTablesCombinesAll() {
+    when(_localClusterRoutingManager.getRoutableTables()).thenReturn(Set.of("a_OFFLINE", "shared_OFFLINE"));
+    when(_remoteClusterRoutingManager1.getRoutableTables()).thenReturn(Set.of("b_REALTIME", "shared_OFFLINE"));
+    when(_remoteClusterRoutingManager2.getRoutableTables()).thenReturn(Set.of());
+
+    Set<String> result = _multiClusterRoutingManager.getRoutableTables();
+
+    // Union with the duplicate ("shared_OFFLINE") collapsed.
+    assertEquals(result, Set.of("a_OFFLINE", "b_REALTIME", "shared_OFFLINE"));
+  }
+
+  // Helper methods
+
+  private BrokerRequest createMockBrokerRequest(String tableName) {
+    BrokerRequest brokerRequest = mock(BrokerRequest.class);
+    QuerySource querySource = mock(QuerySource.class);
+    when(querySource.getTableName()).thenReturn(tableName);
+    when(brokerRequest.getQuerySource()).thenReturn(querySource);
+    return brokerRequest;
+  }
+
+  @Test
+  public void testGetTablePartitionInfoReturnsTheSingleClusterThatHasIt() {
+    TablePartitionReplicatedServersInfo partitionInfo = mock(TablePartitionReplicatedServersInfo.class);
+    when(_localClusterRoutingManager.getTablePartitionReplicatedServersInfo(TEST_TABLE)).thenReturn(null);
+    when(_remoteClusterRoutingManager1.getTablePartitionReplicatedServersInfo(TEST_TABLE)).thenReturn(partitionInfo);
+    when(_remoteClusterRoutingManager2.getTablePartitionReplicatedServersInfo(TEST_TABLE)).thenReturn(null);
+
+    assertEquals(_multiClusterRoutingManager.getTablePartitionReplicatedServersInfo(TEST_TABLE), partitionInfo);
+  }
+
+  /// A partial view would make a partition served only by another cluster look empty, so nothing is reported at all.
+  @Test
+  public void testGetTablePartitionInfoReturnsNullWhenSeveralClustersHaveIt() {
+    when(_localClusterRoutingManager.getTablePartitionReplicatedServersInfo(TEST_TABLE))
+        .thenReturn(mock(TablePartitionReplicatedServersInfo.class));
+    when(_remoteClusterRoutingManager1.getTablePartitionReplicatedServersInfo(TEST_TABLE))
+        .thenReturn(mock(TablePartitionReplicatedServersInfo.class));
+    when(_remoteClusterRoutingManager2.getTablePartitionReplicatedServersInfo(TEST_TABLE)).thenReturn(null);
+
+    assertNull(_multiClusterRoutingManager.getTablePartitionReplicatedServersInfo(TEST_TABLE));
+  }
+
+  @Test
+  public void testGetTablePartitionInfoIgnoresAFailingRemoteCluster() {
+    TablePartitionReplicatedServersInfo partitionInfo = mock(TablePartitionReplicatedServersInfo.class);
+    when(_localClusterRoutingManager.getTablePartitionReplicatedServersInfo(TEST_TABLE)).thenReturn(partitionInfo);
+    when(_remoteClusterRoutingManager1.getTablePartitionReplicatedServersInfo(TEST_TABLE))
+        .thenThrow(new RuntimeException("remote cluster is down"));
+    when(_remoteClusterRoutingManager2.getTablePartitionReplicatedServersInfo(TEST_TABLE)).thenReturn(null);
+
+    assertEquals(_multiClusterRoutingManager.getTablePartitionReplicatedServersInfo(TEST_TABLE), partitionInfo);
+  }
+
+  /// The usual case: the table lives in exactly one cluster, so the intersection is that cluster's own verdict.
+  @Test
+  public void testGetPrunedSegmentsReturnsTheSoleClusterVerdictVerbatim() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    when(_localClusterRoutingManager.getPrunedSegments(brokerRequest))
+        .thenReturn(Set.of("seg1", "seg2"));
+    withoutTheTable(brokerRequest, _remoteClusterRoutingManager1, _remoteClusterRoutingManager2);
+
+    assertEquals(_multiClusterRoutingManager.getPrunedSegments(brokerRequest), Set.of("seg1", "seg2"));
+  }
+
+  /// Intersection, not union: unioning would let one cluster's pruners speak for a segment another cluster would
+  /// still have queried, so the planner would skip data that matches -- a silent wrong answer rather than a slow one.
+  /// Here only "seg2" is eliminated everywhere; "seg1" and "seg3" each survive in one cluster.
+  @Test
+  public void testGetPrunedSegmentsIntersectsRatherThanUnions() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    when(_localClusterRoutingManager.getPrunedSegments(brokerRequest))
+        .thenReturn(Set.of("seg1", "seg2"));
+    when(_remoteClusterRoutingManager1.getPrunedSegments(brokerRequest))
+        .thenReturn(Set.of("seg2", "seg3"));
+    withoutTheTable(brokerRequest, _remoteClusterRoutingManager2);
+
+    Set<String> prunedSegments = _multiClusterRoutingManager.getPrunedSegments(brokerRequest);
+
+    assertEquals(prunedSegments, Set.of("seg2"));
+    assertFalse(prunedSegments.contains("seg1"));
+    assertFalse(prunedSegments.contains("seg3"));
+  }
+
+  @Test
+  public void testGetPrunedSegmentsIsEmptyWhenAClusterProvesNothing() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    when(_localClusterRoutingManager.getPrunedSegments(brokerRequest)).thenReturn(Set.of("seg1"));
+    when(_remoteClusterRoutingManager1.getPrunedSegments(brokerRequest)).thenReturn(Set.of());
+    withoutTheTable(brokerRequest, _remoteClusterRoutingManager2);
+
+    assertEquals(_multiClusterRoutingManager.getPrunedSegments(brokerRequest), Set.of());
+  }
+
+  /// A cluster that does not have the table constrains nothing. Were its absence folded into the same empty set the
+  /// pruners use for "proved nothing", every answer would collapse to "nothing proven" in the common deployment.
+  @Test
+  public void testGetPrunedSegmentsSkipsAClusterWithoutTheTable() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    when(_localClusterRoutingManager.getPrunedSegments(brokerRequest))
+        .thenReturn(Set.of("seg1", "seg2"));
+    // A cluster without the table reports null rather than an empty verdict, which is what keeps it from collapsing
+    // the intersection to "nothing proven".
+    withoutTheTable(brokerRequest, _remoteClusterRoutingManager1, _remoteClusterRoutingManager2);
+
+    assertEquals(_multiClusterRoutingManager.getPrunedSegments(brokerRequest), Set.of("seg1", "seg2"));
+  }
+
+  @Test
+  public void testGetPrunedSegmentsIsNullWhenNoClusterHasTheTable() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    withoutTheTable(brokerRequest, _localClusterRoutingManager, _remoteClusterRoutingManager1,
+        _remoteClusterRoutingManager2);
+
+    assertNull(_multiClusterRoutingManager.getPrunedSegments(brokerRequest));
+  }
+
+  /// The deliberate opposite of [#testGetTablePartitionInfoIgnoresAFailingRemoteCluster]: a cluster we could not ask
+  /// may still have routed any of these segments, so its silence cannot be read as agreement.
+  @Test
+  public void testGetPrunedSegmentsIsEmptyWhenAClusterThrows() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    when(_localClusterRoutingManager.getPrunedSegments(brokerRequest)).thenReturn(Set.of("seg1"));
+    when(_remoteClusterRoutingManager1.getPrunedSegments(brokerRequest))
+        .thenThrow(new RuntimeException("remote cluster is down"));
+    withoutTheTable(brokerRequest, _remoteClusterRoutingManager2);
+
+    assertEquals(_multiClusterRoutingManager.getPrunedSegments(brokerRequest), Set.of());
+  }
+
+  /// Makes the given clusters report that they have no routing for the table. Worth spelling out in every pruning
+  /// test: an unstubbed mock hands back an empty set, which means "ran the pruners and proved nothing" and would
+  /// collapse the intersection for a reason the test did not intend.
+  private static void withoutTheTable(BrokerRequest brokerRequest, BaseBrokerRoutingManager... clusters) {
+    for (BaseBrokerRoutingManager cluster : clusters) {
+      when(cluster.getPrunedSegments(brokerRequest)).thenReturn(null);
+    }
+  }
+
+  private RoutingTable createRoutingTable(String serverName, List<String> segments) {
+    Map<ServerInstance, SegmentsToQuery> serverMap = new HashMap<>();
+    ServerInstance server = createMockServerInstance(serverName);
+    SegmentsToQuery segmentsToQuery = new SegmentsToQuery(segments, List.of());
+    serverMap.put(server, segmentsToQuery);
+    return new RoutingTable(serverMap, List.of(), 0);
+  }
+
+  private ServerInstance createMockServerInstance(String instanceName) {
+    ServerInstance server = mock(ServerInstance.class);
+    when(server.getInstanceId()).thenReturn(instanceName);
+    return server;
+  }
+}

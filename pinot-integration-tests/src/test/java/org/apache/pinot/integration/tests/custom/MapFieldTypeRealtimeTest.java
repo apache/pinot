@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -92,7 +91,7 @@ public class MapFieldTypeRealtimeTest extends CustomDataQueryClusterIntegrationT
         .build();
   }
 
-  public File createAvroFile()
+  public List<File> createAvroFiles()
       throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     org.apache.avro.Schema stringMapAvroSchema =
@@ -107,10 +106,9 @@ public class MapFieldTypeRealtimeTest extends CustomDataQueryClusterIntegrationT
                 null));
     avroSchema.setFields(fields);
 
-    File avroFile = new File(_tempDir, "data.avro");
     long tsBase = System.currentTimeMillis();
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < NUM_DOCS; i++) {
         Map<String, String> stringMap = new HashMap<>();
         Map<String, Integer> intMap = new HashMap<>();
@@ -123,10 +121,10 @@ public class MapFieldTypeRealtimeTest extends CustomDataQueryClusterIntegrationT
         record.put(STRING_MAP_FIELD_NAME, stringMap);
         record.put(INT_MAP_FIELD_NAME, intMap);
         record.put(TIMESTAMP_FIELD_NAME, tsBase + i);
-        fileWriter.append(record);
+        writers.get(i % getNumAvroFiles()).append(record);
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return avroFile;
   }
 
   protected int getSelectionDefaultDocCount() {

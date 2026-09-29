@@ -80,8 +80,8 @@ public class JsonPathQueriesTest extends BaseJsonQueryTest {
     return SCHEMA;
   }
 
-  /** Test that a json path expression in SELECT list is properly converted to a JSON_EXTRACT_SCALAR function within
-   * an AS function. */
+  /// Test that a json path expression in SELECT list is properly converted to a JSON_EXTRACT_SCALAR function within
+  /// an AS function.
   @Test(enabled = false)
   public void testJsonSelect() {
     // SELECT using a simple json path expression.
@@ -93,8 +93,8 @@ public class JsonPathQueriesTest extends BaseJsonQueryTest {
     checkResult("SELECT jsonColumn.data[0].e[2].z[0].i1 FROM testTable", expecteds2);
   }
 
-  /** Test that a predicate comparing a json path expression with literal is properly converted into a JSON_MATCH
-   * function. */
+  /// Test that a predicate comparing a json path expression with literal is properly converted into a JSON_MATCH
+  /// function.
   @Test(enabled = false)
   public void testJsonFilter() {
     // Comparing json path expression with a string value.
@@ -126,7 +126,7 @@ public class JsonPathQueriesTest extends BaseJsonQueryTest {
         + "(jsonColumn, '\"$.id\" = 101')", expecteds3);
   }
 
-  /** Test that a json path expression in GROUP BY clause is properly converted into a JSON_EXTRACT_SCALAR function. */
+  /// Test that a json path expression in GROUP BY clause is properly converted into a JSON_EXTRACT_SCALAR function.
   @Test(enabled = false)
   public void testJsonGroupBy() {
     Object[][] expecteds1 =
@@ -137,7 +137,7 @@ public class JsonPathQueriesTest extends BaseJsonQueryTest {
         expecteds1);
   }
 
-  /** Test that a json path expression in HAVING clause is properly converted into a JSON_EXTRACT_SCALAR function. */
+  /// Test that a json path expression in HAVING clause is properly converted into a JSON_EXTRACT_SCALAR function.
   @Test(enabled = false)
   public void testJsonGroupByHaving() {
     Object[][] expecteds1 = {{"mouse", 8L}};
@@ -149,7 +149,7 @@ public class JsonPathQueriesTest extends BaseJsonQueryTest {
             + "HAVING jsonColumnWithoutIndex.name.last = 'mouse'", expecteds1);
   }
 
-  /** Test a complex SQL statement with json path expression in SELECT, WHERE, and GROUP BY clauses. */
+  /// Test a complex SQL statement with json path expression in SELECT, WHERE, and GROUP BY clauses.
   @Test(enabled = false)
   public void testJsonSelectFilterGroupBy() {
     Object[][] expecteds1 = {{"duck", 4L}};
@@ -161,7 +161,7 @@ public class JsonPathQueriesTest extends BaseJsonQueryTest {
             + " BY jsonColumnWithoutIndex.name.last", expecteds1);
   }
 
-  /** Test an aggregation function over json path expression in SELECT clause. */
+  /// Test an aggregation function over json path expression in SELECT clause.
   @Test(enabled = false)
   public void testTransformFunctionOverJsonPathSelectExpression() {
     // Apply string transform function on json path expression.
@@ -198,7 +198,7 @@ public class JsonPathQueriesTest extends BaseJsonQueryTest {
     }
   }
 
-  /** Test a numerical function over json path expression in SELECT clause. */
+  /// Test a numerical function over json path expression in SELECT clause.
   @Test(enabled = false)
   public void testNumericalFunctionOverJsonPathSelectExpression() {
 
@@ -222,7 +222,7 @@ public class JsonPathQueriesTest extends BaseJsonQueryTest {
   public void testTopLevelArrayPathExpressions() {
     // SELECT using json path expressions that refers to second element of a top-level array.
     Object[][] expecteds1 = {{"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,"
-        + "\"i2\":4}"}};
+            + "\"i2\":4}"}};
     checkResult("SELECT jsonColumn[1] FROM testTable WHERE intColumn=14", expecteds1);
 
     // SELECT using json path expressions that refers to item within second element of a top-level array.

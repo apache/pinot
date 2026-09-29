@@ -20,13 +20,15 @@ package org.apache.pinot.core.operator.query;
 
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IntermediateRecord;
@@ -47,15 +49,18 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.trace.Tracing;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>FilteredGroupByOperator</code> class provides the operator for group-by query on a single segment when
- * there are 1 or more filter expressions on aggregations.
- */
+/// The `FilteredGroupByOperator` class provides the operator for group-by query on a single segment when
+/// there are 1 or more filter expressions on aggregations.
 @SuppressWarnings("rawtypes")
 public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FilteredGroupByOperator.class);
   private static final String EXPLAIN_NAME = "GROUP_BY_FILTERED";
 
   private final QueryContext _queryContext;
@@ -81,7 +86,10 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // NOTE: The indexedTable expects that the data schema will have group by columns before aggregation columns
     int numGroupByExpressions = _groupByExpressions.length;
     int numAggregationFunctions = _aggregationFunctions.length;
-    int numColumns = numGroupByExpressions + numAggregationFunctions;
+    /// Grouping-set queries append a synthetic $groupingId key column after the union group-by columns.
+    int numExtraKeyColumns = queryContext.getNumExtraGroupByKeyColumns();
+    int numKeyColumns = numGroupByExpressions + numExtraKeyColumns;
+    int numColumns = numKeyColumns + numAggregationFunctions;
     String[] columnNames = new String[numColumns];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
 
@@ -94,9 +102,15 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
           projectOperator.getResultColumnContext(groupByExpression).getDataType());
     }
 
+    /// Synthetic grouping-id discriminator column for GROUP BY GROUPING SETS / ROLLUP / CUBE
+    if (numExtraKeyColumns > 0) {
+      columnNames[numGroupByExpressions] = GroupingSets.GROUPING_ID_COLUMN;
+      columnDataTypes[numGroupByExpressions] = DataSchema.ColumnDataType.INT;
+    }
+
     // Extract column names and data types for aggregation functions
     for (int i = 0; i < numAggregationFunctions; i++) {
-      int index = numGroupByExpressions + i;
+      int index = numKeyColumns + i;
       Pair<AggregationFunction, FilterContext> pair = queryContext.getFilteredAggregationFunctions().get(i);
       AggregationFunction aggregationFunction = pair.getLeft();
       String columnName = AggregationFunctionUtils.getResultColumnName(aggregationFunction, pair.getRight());
@@ -109,6 +123,11 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
   @Override
   protected GroupByResultsBlock getNextBlock() {
+    // Short-circuit LIMIT 0 case
+    if (_queryContext.getLimit() == 0) {
+      return new GroupByResultsBlock(_dataSchema, List.of(), _queryContext);
+    }
+
     int numAggregations = _aggregationFunctions.length;
     GroupByResultHolder[] groupByResultHolders = new GroupByResultHolder[numAggregations];
     IdentityHashMap<AggregationFunction, Integer> resultHolderIndexMap =
@@ -123,12 +142,13 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       BaseProjectOperator<?> projectOperator = aggregationInfo.getProjectOperator();
 
       // Perform aggregation group-by on all the blocks
+      AggregationFunctionColumnPair[] starTreeFunctionColumnPairs = aggregationInfo.getStarTreeFunctionColumnPairs();
       DefaultGroupByExecutor groupByExecutor;
 
-      if (aggregationInfo.isUseStarTree()) {
+      if (starTreeFunctionColumnPairs != null) {
         groupByExecutor =
             new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
-                groupKeyGenerator);
+                starTreeFunctionColumnPairs, groupKeyGenerator);
       } else {
         groupByExecutor =
             new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
@@ -151,6 +171,12 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       }
 
       _numDocsScanned += numDocsScanned;
+      QueryScanCostContext scanCost = getScanCostContext();
+      if (scanCost != null) {
+        scanCost.addDocsScanned(numDocsScanned);
+        scanCost.addEntriesScannedPostFilter(
+            (long) numDocsScanned * projectOperator.getNumColumnsProjected());
+      }
       _numEntriesScannedInFilter += projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * projectOperator.getNumColumnsProjected();
       GroupByResultHolder[] filterGroupByResults = groupByExecutor.getGroupByResultHolders();
@@ -165,7 +191,17 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
     // Check if the groups limit is reached
     boolean numGroupsLimitReached = groupKeyGenerator.getNumKeys() >= _queryContext.getNumGroupsLimit();
+    if (numGroupsLimitReached) {
+      ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED, 1);
+    }
     Tracing.activeRecording().setNumGroups(_queryContext.getNumGroupsLimit(), groupKeyGenerator.getNumKeys());
+
+    boolean numGroupsWarningLimitReached = groupKeyGenerator.getNumKeys() >= _queryContext.getNumGroupsWarningLimit();
+    if (numGroupsWarningLimitReached) {
+      LOGGER.warn("numGroups reached warning limit: {} (actual: {})",
+          _queryContext.getNumGroupsWarningLimit(), groupKeyGenerator.getNumKeys());
+      ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED, 1);
+    }
 
     // Trim the groups when iff:
     // - Query has ORDER BY clause
@@ -173,23 +209,55 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // - There are more groups than the trim size
     // TODO: Currently the groups are not trimmed if there is no ordering specified. Consider ordering on group-by
     //       columns if no ordering is specified.
-    int minGroupTrimSize = _queryContext.getMinSegmentGroupTrimSize();
-    if (_queryContext.getOrderByExpressions() != null && minGroupTrimSize > 0) {
-      int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
-      if (groupKeyGenerator.getNumKeys() > trimSize) {
-        TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
-        Collection<IntermediateRecord> intermediateRecords =
-            tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize);
-        GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
-        resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
-        return resultsBlock;
-      }
+    // TODO: extract common logic with GroupByOperator
+    int trimSize = _queryContext.getEffectiveSegmentGroupTrimSize();
+    boolean unsafeTrim = _queryContext.isUnsafeTrim();
+
+    GroupByResultsBlock resultsBlock;
+    /// Grouping-set queries use a per-set bucketed segment trim (keyed on the $groupingId discriminator) so
+    /// that a global top-K cannot starve low-magnitude sets such as the grand total. The broker still applies
+    /// the final ORDER BY + LIMIT across all sets.
+    if (_queryContext.isGroupingSets()) {
+      /// The $groupingId discriminator is the key column immediately after the union group-by columns.
+      return GroupByUtils.buildGroupingSetsResultsBlock(_queryContext, _dataSchema, groupKeyGenerator,
+          groupByResultHolders, groupKeyGenerator.getNumKeys(), _groupByExpressions.length, numGroupsLimitReached,
+          numGroupsWarningLimitReached);
+    }
+    // sort and trim segment results if needed
+    if (trimSize > 0 && groupKeyGenerator.getNumKeys() > trimSize) {
+      TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
+      // get sorted output if sort-aggregate
+      List<IntermediateRecord> intermediateRecords =
+          tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize, !unsafeTrim);
+      // Release the resources used by the group key generator
+      groupKeyGenerator.close();
+
+      ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
+      resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
+      // set trim flag only if it's not safe
+      resultsBlock.setGroupsTrimmed(unsafeTrim);
+      resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+      resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
+      return resultsBlock;
     }
 
-    AggregationGroupByResult aggGroupByResult =
-        new AggregationGroupByResult(groupKeyGenerator, _aggregationFunctions, groupByResultHolders);
-    GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, aggGroupByResult, _queryContext);
+    // when no trim needed
+    if (trimSize > 0 && _queryContext.shouldSortAggregateUnderSafeTrim()) {
+      // if orderBy groupBy key, sort the array even if it's smaller than trimSize
+      // to benefit combining
+      TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
+      List<IntermediateRecord> intermediateRecords =
+          tableResizer.sortInSegmentResults(groupKeyGenerator,
+              groupByResultHolders, trimSize);
+      groupKeyGenerator.close();
+      resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
+    } else {
+      AggregationGroupByResult aggGroupByResult =
+          new AggregationGroupByResult(groupKeyGenerator, _aggregationFunctions, groupByResultHolders);
+      resultsBlock = new GroupByResultsBlock(_dataSchema, aggGroupByResult, _queryContext);
+    }
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+    resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
     return resultsBlock;
   }
 

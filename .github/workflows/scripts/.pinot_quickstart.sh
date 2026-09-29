@@ -43,6 +43,32 @@ cleanup () {
   rm -rf '/tmp/pinot/data'
 }
 
+# Polls a query until its response satisfies the given jq filter, for at most 5 minutes.
+# Usage: wait_for_query <broker-port> <sql> <jq-filter> <description>
+wait_for_query () {
+  local PORT="$1"
+  local SQL="$2"
+  local FILTER="$3"
+  local DESC="$4"
+  local BODY
+  local QUERY_RES
+  BODY=$(jq -n --arg sql "${SQL}" '{sql: $sql, trace: false}')
+  for i in $(seq 1 150)
+  do
+    QUERY_RES=$(curl -s --max-time 30 -X POST --header 'Accept: application/json' \
+      --header 'Content-Type: application/json' -d "${BODY}" "http://localhost:${PORT}/query/sql")
+    if [ -n "${QUERY_RES}" ] && echo "${QUERY_RES}" | jq -e "${FILTER}" > /dev/null 2>&1; then
+      echo "Query check passed: ${DESC}"
+      return 0
+    fi
+    sleep 2
+  done
+  echo "Query check FAILED: ${DESC}"
+  echo "Query        : ${SQL}"
+  echo "Last response: ${QUERY_RES}"
+  return 1
+}
+
 # Print environment variables
 printenv
 
@@ -76,11 +102,11 @@ jdk_version() {
 JAVA_VER="$(jdk_version)"
 
 # Build
-echo "Building Pinot to JAVA 11 source code Using JDK ${JAVA_VER}"
+echo "Building Pinot Using JDK ${JAVA_VER}"
 PASS=0
 for i in $(seq 1 2)
 do
-  mvn clean install -B -ntp -T1C -DskipTests -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=11
+  mvn clean install -B -ntp -T1C -DskipTests -Pbin-dist -Dmaven.javadoc.skip=true
   if [ $? -eq 0 ]; then
     PASS=1
     break;
@@ -207,65 +233,89 @@ if [ "${PASS}" -eq 0 ]; then
   exit 1
 fi
 
-# Test quick-start-multi-stage
-bin/pinot-admin.sh QuickStart -type MULTI_STAGE &
+# Test quick-start-batch. The batch quickstart absorbed the MULTI_STAGE, JOIN, TIMESTAMP, JSON_INDEX and
+# COMPLEX_TYPE quickstarts, so one cluster now covers every batch feature they used to demo individually.
+bin/pinot-admin.sh QuickStart -type BATCH &
 PID=$!
 
 # Print the JVM settings
 jps -lvm
 
-PASS=0
+PASS=1
 
-# Wait for 1 minute for table to be set up, then at most 5 minutes to reach the desired state
+# Wait for 1 minute for the tables to be set up; each check below then polls for at most 5 minutes.
 sleep 60
-for i in $(seq 1 150)
-do
-  QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8000/query/sql`
-  if [ $? -eq 0 ]; then
-    COUNT_STAR_RES=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
-    if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]] && [ "${COUNT_STAR_RES}" -eq 97889 ]; then
-      PASS=1
-      break
-    fi
-  fi
-  sleep 2
-done
 
-PASS=0
+# Single-stage engine. This doubles as the liveness check: if the cluster never comes up there is no point
+# spending the full polling budget on the seven checks after it, so bail out immediately.
+if ! wait_for_query 8000 \
+  'select count(*) from baseballStats limit 1' \
+  '.resultTable.rows[0][0] == 97889' \
+  'single-stage count(*) on baseballStats'
+then
+  cleanup "${PID}"
+  echo 'Batch Quickstart failed: baseballStats never reached the expected row count.'
+  exit 1
+fi
 
-# Validate V2 query count(*) result
-for i in $(seq 1 150)
-do
-  QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"SET useMultistageEngine=true; select count(*) from baseballStats limit 1","trace":false}' http://localhost:8000/query/sql`
-  if [ $? -eq 0 ]; then
-    COUNT_STAR_RES=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
-    if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]] && [ "${COUNT_STAR_RES}" -eq 97889 ]; then
-      PASS=1
-      break
-    fi
-  fi
-  sleep 2
-done
+# Multi-stage engine
+wait_for_query 8000 \
+  'SET useMultistageEngine=true; select count(*) from baseballStats limit 1' \
+  '.resultTable.rows[0][0] == 97889' \
+  'multi-stage count(*) on baseballStats' || PASS=0
 
-PASS=0
+# Ordered so the assertion does not depend on how segments are spread across the 3 servers. Every row must have
+# resolved a team name, otherwise the join produced rows without matching the dimension table.
+wait_for_query 8000 \
+  'SET useMultistageEngine=true; SELECT a.playerName, a.teamID, b.teamName FROM baseballStats_OFFLINE AS a JOIN dimBaseballTeams_OFFLINE AS b ON a.teamID = b.teamID ORDER BY a.playerName, a.teamID LIMIT 10' \
+  '(.exceptions | length) == 0 and (.resultTable.rows | length) == 10 and (all(.resultTable.rows[]; .[2] != null and .[2] != ""))' \
+  'multi-stage join between baseballStats and dimBaseballTeams' || PASS=0
 
-# Validate V2 join query results
-for i in $(seq 1 150)
-do
-  QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"SET useMultistageEngine=true;SELECT a.playerName, a.teamID, b.teamName FROM baseballStats_OFFLINE AS a JOIN dimBaseballTeams_OFFLINE AS b ON a.teamID = b.teamID LIMIT 10","trace":false}' http://localhost:8000/query/sql`
-  if [ $? -eq 0 ]; then
-    RES_0=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
-    if [[ ${RES_0} = "\"David Allan\"" ]]; then
-      PASS=1
-      break
-    fi
-  fi
-  sleep 2
-done
+wait_for_query 8000 \
+  'SET useMultistageEngine=true; SELECT a.playerID, a.runs, a.yearID, b.runs, b.yearID FROM baseballStats_OFFLINE AS a JOIN baseballStats_OFFLINE AS b ON a.playerID = b.playerID WHERE a.runs > 160 AND b.runs < 2 LIMIT 10' \
+  '(.exceptions | length) == 0 and (.resultTable.rows | length) > 0 and (all(.resultTable.rows[]; .[1] > 160 and .[3] < 2))' \
+  'multi-stage self join on baseballStats' || PASS=0
+
+# Star schema benchmark. These tables ingest through their ingestionJobSpec.yaml rather than a minion task, so
+# assert on a non-zero row count: a mis-named or broken spec creates the table successfully but leaves it empty.
+wait_for_query 8000 \
+  'SET useMultistageEngine=true; select count(*) from lineorder' \
+  '(.exceptions | length) == 0 and .resultTable.rows[0][0] > 0' \
+  'SSB lineorder is populated' || PASS=0
+
+wait_for_query 8000 \
+  'SET useMultistageEngine=true; select c.C_NATION, sum(lo.LO_REVENUE) as revenue from lineorder lo join customer c on lo.LO_CUSTKEY = c.C_CUSTKEY group by c.C_NATION order by revenue desc limit 10' \
+  '(.exceptions | length) == 0 and (.resultTable.rows | length) > 0 and (all(.resultTable.rows[]; .[0] != null and .[1] > 0))' \
+  'SSB star-schema join between lineorder and customer' || PASS=0
+
+# Lookup join (formerly the JOIN quickstart). lookup() returns a row per fact row whether or not the dimension
+# table resolved, so assert that every returned value actually resolved to a team name.
+wait_for_query 8000 \
+  "select playerName, teamID, lookup('dimBaseballTeams', 'teamName', 'teamID', teamID) from baseballStats where teamID = 'BOS' order by playerName limit 10" \
+  '(.exceptions | length) == 0 and (.resultTable.rows | length) == 10 and (all(.resultTable.rows[]; .[2] != null and .[2] != ""))' \
+  'lookup() join against dimBaseballTeams' || PASS=0
+
+# JSON index (formerly the BATCH_JSON_INDEX quickstart)
+wait_for_query 8000 \
+  $'select json_extract_scalar(repo, \'$.name\', \'STRING\'), count(*) from githubEvents where json_match(actor, \'"$.login"=\'\'LombiqBot\'\'\') group by 1 order by 2 desc limit 10' \
+  '(.exceptions | length) == 0 and (.resultTable.rows | length) > 0' \
+  'json_match on githubEvents' || PASS=0
+
+# Complex type handling (formerly the BATCH_COMPLEX_TYPE quickstart)
+wait_for_query 8000 \
+  'select id, "payload.commits.author.name", "payload.commits.author.email" from githubComplexTypeEvents limit 10' \
+  '(.exceptions | length) == 0 and (.resultTable.rows | length) == 10' \
+  'flattened complex type columns on githubComplexTypeEvents' || PASS=0
+
+# Timestamp index (formerly the TIMESTAMP quickstart)
+wait_for_query 8000 \
+  'select ts, $ts$DAY, $ts$WEEK, $ts$MONTH from airlineStats limit 1' \
+  '(.exceptions | length) == 0 and (.resultTable.rows | length) == 1' \
+  'timestamp index generated columns on airlineStats' || PASS=0
 
 cleanup "${PID}"
 if [ "${PASS}" -eq 0 ]; then
-  echo 'Batch Quickstart failed: Cannot get correct result for count star query.'
+  echo 'Batch Quickstart failed: see the query check failures above.'
   exit 1
 fi
 

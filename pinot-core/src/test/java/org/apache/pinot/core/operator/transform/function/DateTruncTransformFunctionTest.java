@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -38,6 +36,7 @@ import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -82,8 +81,8 @@ public class DateTruncTransformFunctionTest {
       throws Exception {
     long zmillisInput = iso8601ToUtcEpochMillis(literalInput);
     GenericRow row = new GenericRow();
-    row.init(ImmutableMap.of(TIME_COLUMN, zmillisInput));
-    List<GenericRow> rows = ImmutableList.of(row);
+    row.putValue(TIME_COLUMN, zmillisInput);
+    List<GenericRow> rows = List.of(row);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN).build();
 
@@ -108,7 +107,8 @@ public class DateTruncTransformFunctionTest {
       }
 
       ProjectionBlock projectionBlock = new ProjectionOperator(dataSourceMap,
-          new DocIdSetOperator(new MatchAllFilterOperator(rows.size()), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
+          new DocIdSetOperator(new MatchAllFilterOperator(rows.size()), DocIdSetPlanNode.MAX_DOC_PER_CALL),
+          new QueryContext.Builder().build()).nextBlock();
 
       ExpressionContext expression = RequestContextUtils.getExpression(
           String.format("dateTrunc('%s', \"%s\", '%s', '%s')", unit, TIME_COLUMN, TimeUnit.MILLISECONDS, tz));

@@ -29,19 +29,23 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Implementation of PinotFS for a local filesystem. Methods in this class may throw a SecurityException at runtime
- * if access to the file is denied.
- */
+/// Implementation of PinotFS for a local filesystem. Methods in this class may throw a SecurityException at runtime
+/// if access to the file is denied.
 public class LocalPinotFS extends BasePinotFS {
+
+  public static final String BACKUP = ".backup";
+  public static final String TMP = ".tmp";
 
   @Override
   public void init(PinotConfiguration configuration) {
@@ -111,7 +115,8 @@ public class LocalPinotFS extends BasePinotFS {
       throws IOException {
     File file = toFile(fileUri);
     if (!recursive) {
-      return Arrays.stream(file.list()).map(s -> new File(file, s)).map(File::getAbsolutePath).toArray(String[]::new);
+      return Arrays.stream(listFileNames(file)).map(s -> new File(file, s)).map(File::getAbsolutePath)
+          .toArray(String[]::new);
     } else {
       try (Stream<Path> pathStream = Files.walk(Paths.get(fileUri))) {
         return pathStream.filter(s -> !s.equals(file.toPath())).map(Path::toString).toArray(String[]::new);
@@ -124,18 +129,37 @@ public class LocalPinotFS extends BasePinotFS {
       throws IOException {
     File file = toFile(fileUri);
     if (!recursive) {
-      return Arrays.stream(file.list()).map(s -> getFileMetadata(new File(file, s))).collect(Collectors.toList());
+      return Arrays.stream(listFileNames(file)).map(s -> getFileMetadata(new File(file, s)))
+          .collect(Collectors.toList());
     } else {
       try (Stream<Path> pathStream = Files.walk(Paths.get(fileUri))) {
-        return pathStream.filter(s -> !s.equals(file.toPath())).map(p -> getFileMetadata(p.toFile()))
+        return pathStream.filter(s -> !s.equals(file.toPath()))
+            .map(p -> getFileMetadata(p.toFile()))
             .collect(Collectors.toList());
       }
     }
   }
 
+  /// Returns the names of the entries directly under the given directory.
+  ///
+  /// [File#list()] returns `null` instead of throwing when the path does not exist, is not a directory, or cannot be
+  /// read, so translate that into the `IOException` the listing methods are contracted to throw for an invalid path.
+  private static String[] listFileNames(File file)
+      throws IOException {
+    String[] fileNames = file.list();
+    if (fileNames == null) {
+      throw new IOException("Failed to list files under: " + file.getAbsolutePath()
+          + " because it does not exist, is not a directory, or cannot be read");
+    }
+    return fileNames;
+  }
+
   private static FileMetadata getFileMetadata(File file) {
-    return new FileMetadata.Builder().setFilePath(file.getAbsolutePath()).setLastModifiedTime(file.lastModified())
-        .setLength(file.length()).setIsDirectory(file.isDirectory()).build();
+    return new FileMetadata.Builder().setFilePath(file.getAbsolutePath())
+        .setLastModifiedTime(file.lastModified())
+        .setLength(file.length())
+        .setIsDirectory(file.isDirectory())
+        .build();
   }
 
   @Override
@@ -193,19 +217,49 @@ public class LocalPinotFS extends BasePinotFS {
 
   private static void copy(File srcFile, File dstFile, boolean recursive)
       throws IOException {
-    if (dstFile.exists()) {
-      FileUtils.deleteQuietly(dstFile);
-    }
-    if (srcFile.isDirectory()) {
-      if (recursive) {
-        FileUtils.copyDirectory(srcFile, dstFile);
+
+    // Create a temporary file in the same directory as dstFile
+    File tmpFile = new File(dstFile.getParent(), dstFile.getName() + TMP);
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss.SSS");
+    sdf.setTimeZone(TimeZone.getTimeZone("UTC")); // Set time zone to UTC
+    File backupFile = new File(
+        dstFile.getParent(),
+        dstFile.getName() + BACKUP + "_" + sdf.format(new Date())
+    );
+
+    try {
+      // Step 1: Copy the file or directory into the temporary file
+      if (srcFile.isDirectory()) {
+        if (recursive) {
+          FileUtils.copyDirectory(srcFile, tmpFile);
+        } else {
+          throw new IOException(
+              srcFile.getAbsolutePath() + " is a directory and recursive copy is not enabled.");
+        }
       } else {
-        // Throws Exception on failure
-        throw new IOException(srcFile.getAbsolutePath() + " is a directory and recursive copy is not enabled.");
+        FileUtils.copyFile(srcFile, tmpFile);
       }
-    } else {
-      // Will create parent directories, throws Exception on failure
-      FileUtils.copyFile(srcFile, dstFile);
+
+      if (dstFile.exists() && !dstFile.renameTo(backupFile)) {
+        throw new IOException("Failed to rename destination file to backup file.");
+      }
+
+      // Step 2: Rename the temporary file to the destination file
+      if (!tmpFile.renameTo(dstFile)) {
+        throw new IOException("Failed to rename temporary file to destination file.");
+      }
+      FileUtils.deleteQuietly(backupFile);
+    } catch (Exception e) {
+      // Cleanup the temporary file in case of errors
+      // intentionally not deleting the backup file if anything goes wrong
+      FileUtils.deleteQuietly(tmpFile);
+      throw new LocalPinotFSException(e);
+    }
+  }
+
+  public static class LocalPinotFSException extends IOException {
+    LocalPinotFSException(Throwable e) {
+      super(e);
     }
   }
 }

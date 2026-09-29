@@ -40,9 +40,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * Monkeys and chaos.
- */
+/// Monkeys and chaos.
 // TODO: clean up this test
 public class ChaosMonkeyIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChaosMonkeyIntegrationTest.class);

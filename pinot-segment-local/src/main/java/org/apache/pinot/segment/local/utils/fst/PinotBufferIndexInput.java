@@ -23,12 +23,9 @@ import org.apache.lucene.store.IndexInput;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
-/**
- * PinotBufferIndexInput is a wrapper around PinotDataBuffer implementing IndexInput apis.
- * It acts as a bridge between lucene FST reader library and PinotDataBuffer, it lets FST index
- * load into PinotDataBuffer and helps in utilizing FST reader (org.apache.lucene.util.fst.FST).
- *
- */
+/// PinotBufferIndexInput is a wrapper around PinotDataBuffer implementing IndexInput apis.
+/// It acts as a bridge between lucene FST reader library and PinotDataBuffer, it lets FST index
+/// load into PinotDataBuffer and helps in utilizing FST reader (org.apache.lucene.util.fst.FST).
 public class PinotBufferIndexInput extends IndexInput {
   private final PinotDataBuffer _pinotDataBuffer;
   private final long _sliceOffset;

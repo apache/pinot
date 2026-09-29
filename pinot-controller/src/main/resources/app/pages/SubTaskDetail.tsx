@@ -17,14 +17,18 @@
  * under the License.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { get, find } from 'lodash';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { Grid, makeStyles, Box, List, ListItem, ListItemText, Typography, Divider } from '@material-ui/core';
 import SimpleAccordion from '../components/SimpleAccordion';
+import CustomButton from '../components/CustomButton';
+import { NotificationContext } from '../components/Notification/NotificationContext';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import { TaskProgressStatus } from 'Models';
 import moment from 'moment';
+import { formatTimeInTimezone } from '../utils/TimezoneUtils';
+import { useTimezone } from '../contexts/TimezoneContext';
 
 const jsonoptions = {
   lineNumbers: true,
@@ -69,20 +73,26 @@ const useStyles = makeStyles(() => ({
     '& .CodeMirror': { maxHeight: 400 },
   },
   taskDetailContainer: {
-    overflow: "auto", 
-    whiteSpace: "pre", 
+    overflow: "auto",
+    whiteSpace: "pre",
     height: 600
   }
 }));
 
 const TaskDetail = (props) => {
   const classes = useStyles();
-  const { subTaskID, taskID } = props.match.params;
+  const { currentTimezone } = useTimezone();
+  const { dispatch } = useContext(NotificationContext);
+  const { subTaskID, taskID, queueTableName } = props.match.params;
   const [taskDebugData, setTaskDebugData] = useState({});
   const [taskProgressData, setTaskProgressData] = useState<TaskProgressStatus[] | string>("");
+  const [logFiles, setLogFiles] = useState<string[]>([]);
+  const [logFilesError, setLogFilesError] = useState<string | null>(null);
+  const [logFilesLoading, setLogFilesLoading] = useState<boolean>(false);
+  const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
 
   const fetchTaskDebugData = async () => {
-    const debugRes = await PinotMethodUtils.getTaskDebugData(taskID);
+    const debugRes = await PinotMethodUtils.getTaskDebugData(taskID, queueTableName);
     const subTaskData = find(debugRes.data.subtaskInfos, (subTask) => get(subTask, 'taskId', '') === subTaskID);
     setTaskDebugData(subTaskData);
   };
@@ -92,10 +102,55 @@ const TaskDetail = (props) => {
       setTaskProgressData(get(taskProgressData, subTaskID, "No Status"));
   }
 
+  const fetchLogFiles = async (participant: string) => {
+    if (!participant) {
+      return;
+    }
+    setLogFilesLoading(true);
+    setLogFilesError(null);
+    try {
+      const files = await PinotMethodUtils.getInstanceLogFilesData(participant);
+      setLogFiles(files);
+    } catch (e) {
+      setLogFilesError(
+        get(e, 'response.data.error')
+          || get(e, 'response.data.message')
+          || (e as Error).message
+          || 'Unable to fetch logs'
+      );
+      setLogFiles([]);
+    } finally {
+      setLogFilesLoading(false);
+    }
+  };
+
+  const handleDownloadLog = async (participant: string, filePath: string) => {
+    setDownloadingFile(filePath);
+    try {
+      await PinotMethodUtils.downloadInstanceLogFileToBrowser(participant, filePath);
+    } catch (e) {
+      dispatch({
+        type: 'error',
+        message: `Failed to download ${filePath}: ${get(e, 'response.data.error') || (e as Error).message || 'unknown error'}`,
+        show: true,
+      });
+    } finally {
+      setDownloadingFile(null);
+    }
+  };
+
   useEffect(() => {
     fetchTaskDebugData();
     fetchTaskProgressData();
-  }, []);
+  }, [currentTimezone]);
+
+  const participant: string = get(taskDebugData, 'participant', '');
+
+  useEffect(() => {
+    if (participant) {
+      fetchLogFiles(participant);
+    }
+  }, [participant]);
 
   return (
     <Grid item xs className={classes.gridContainer}>
@@ -107,11 +162,18 @@ const TaskDetail = (props) => {
           <Grid item xs={12}>
             <strong>Status:</strong> {get(taskDebugData, 'state', '')}
           </Grid>
+          {get(taskDebugData, 'startTime') && (
+            <Grid item xs={12}>
+              <strong>Start Time:</strong> {formatTimeInTimezone(get(taskDebugData, 'startTime'), 'MMMM Do YYYY, HH:mm:ss z')}
+            </Grid>
+          )}
+          {get(taskDebugData, 'finishTime') && (
+            <Grid item xs={12}>
+              <strong>Finish Time:</strong> {formatTimeInTimezone(get(taskDebugData, 'finishTime'), 'MMMM Do YYYY, HH:mm:ss z')}
+            </Grid>
+          )}
           <Grid item xs={12}>
-            <strong>Start Time:</strong> {get(taskDebugData, 'startTime', '')}
-          </Grid>
-          <Grid item xs={12}>
-            <strong>Finish Time:</strong> {get(taskDebugData, 'finishTime', '')}
+            <strong>Triggered By:</strong> {get(taskDebugData, 'triggeredBy', '')}
           </Grid>
           <Grid item xs={12}>
             <strong>Minion Host Name:</strong> {get(taskDebugData, 'participant', '')}
@@ -162,9 +224,9 @@ const TaskDetail = (props) => {
                   {typeof taskProgressData !== "string" && taskProgressData.map((data, index) => (
                     <div key={index}>
                       <ListItem >
-                        <ListItemText 
-                          primary={moment(+data.ts).format('YYYY-MM-DD HH:mm:ss')} 
-                          secondary={<Typography variant='body2'>{data.status}</Typography>} 
+                        <ListItemText
+                          primary={formatTimeInTimezone(+data.ts, 'YYYY-MM-DD HH:mm:ss z')}
+                          secondary={<Typography variant='body2'>{data.status}</Typography>}
                         />
                       </ListItem>
                       <Divider />
@@ -172,6 +234,73 @@ const TaskDetail = (props) => {
                   ))}
                 </List>
               </div>
+            </SimpleAccordion>
+          </div>
+        </Grid>
+        <Grid item xs={12}>
+          <div className={classes.sqlDiv}>
+            <SimpleAccordion
+              headerTitle={`Minion Log Files${participant ? ` — ${participant}` : ''}`}
+              showSearchBox={false}
+            >
+              <Box p={2}>
+                {!participant && (
+                  <Typography variant='body2'>This subtask has not been assigned to a minion yet.</Typography>
+                )}
+                {participant && (
+                  <>
+                    <Box mb={1}>
+                      <CustomButton
+                        onClick={() => fetchLogFiles(participant)}
+                        tooltipTitle="Re-fetch log file list from the minion"
+                        enableTooltip={true}
+                        isDisabled={logFilesLoading}
+                      >
+                        {logFilesLoading ? 'Refreshing...' : 'Refresh'}
+                      </CustomButton>
+                    </Box>
+                    {logFilesError && (
+                      <Typography variant='body2' color='error'>
+                        Failed to load log files: {logFilesError}
+                      </Typography>
+                    )}
+                    {!logFilesError && logFiles.length === 0 && !logFilesLoading && (
+                      <Typography variant='body2'>No log files reported by minion.</Typography>
+                    )}
+                    {logFiles.length > 0 && (
+                      <List dense>
+                        {logFiles.map((filePath) => {
+                          const isDownloading = downloadingFile === filePath;
+                          return (
+                            <ListItem key={filePath} disableGutters>
+                              <ListItemText
+                                primary={
+                                  <a
+                                    href="#"
+                                    onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                                      e.preventDefault();
+                                      if (!isDownloading) {
+                                        handleDownloadLog(participant, filePath);
+                                      }
+                                    }}
+                                    style={{
+                                      color: isDownloading ? '#9e9e9e' : '#4285f4',
+                                      cursor: isDownloading ? 'default' : 'pointer',
+                                      textDecoration: 'underline',
+                                    }}
+                                  >
+                                    {filePath}{isDownloading ? ' (downloading...)' : ''}
+                                  </a>
+                                }
+                              />
+                            </ListItem>
+                          );
+                        })}
+                      </List>
+                    )}
+                  </>
+                )}
+              </Box>
             </SimpleAccordion>
           </div>
         </Grid>

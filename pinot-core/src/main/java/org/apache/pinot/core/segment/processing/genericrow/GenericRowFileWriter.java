@@ -30,14 +30,12 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * File writer for {@link GenericRow}. The writer will generate to 2 files, one for the offsets (BIG_ENDIAN) and one for
- * the actual data (NATIVE_ORDER). The generated files can be read by the {@link GenericRowFileReader}. There is no
- * version control for the files generated because the files should only be used as intermediate format and read in the
- * same host (different host might have different NATIVE_ORDER).
- *
- * TODO: Consider using ByteBuffer instead of OutputStream.
- */
+/// File writer for [GenericRow]. The writer will generate to 2 files, one for the offsets (BIG_ENDIAN) and one
+/// for the actual data (NATIVE_ORDER). The generated files can be read by the [GenericRowFileReader]. There is
+/// no version control for the files generated because the files should only be used as intermediate format and read
+/// in the same host (different host might have different NATIVE_ORDER).
+///
+/// TODO: Consider using ByteBuffer instead of OutputStream.
 public class GenericRowFileWriter implements Closeable, FileWriter<GenericRow> {
   private final DataOutputStream _offsetStream;
   private final BufferedOutputStream _dataStream;
@@ -52,9 +50,7 @@ public class GenericRowFileWriter implements Closeable, FileWriter<GenericRow> {
     _serializer = new GenericRowSerializer(fieldSpecs, includeNullFields);
   }
 
-  /**
-   * Writes the given row into the files.
-   */
+  /// Writes the given row into the files.
   public void write(GenericRow genericRow)
       throws IOException {
     _offsetStream.writeLong(_nextOffset);

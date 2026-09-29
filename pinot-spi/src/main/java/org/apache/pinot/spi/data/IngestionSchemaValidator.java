@@ -21,9 +21,7 @@ package org.apache.pinot.spi.data;
 import java.io.Serializable;
 
 
-/**
- * Validator to validate the schema between Pinot schema and input raw data schema
- */
+/// Validator to validate the schema between Pinot schema and input raw data schema
 public interface IngestionSchemaValidator extends Serializable {
 
   void init(Schema pinotSchema, String inputFilePath);

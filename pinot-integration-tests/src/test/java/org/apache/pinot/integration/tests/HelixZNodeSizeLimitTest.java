@@ -19,7 +19,6 @@
 
 package org.apache.pinot.integration.tests;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -30,11 +29,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * This test is created to show the bug in Helix 0.9.8 that if a ZooKeeper IdealState is larger than 1MB after
- * compression, it cannot be updated anymore. Somehow this test can also make sure in future we will support
- * large IdealStates
- */
+/// This test is created to show the bug in Helix 0.9.8 that if a ZooKeeper IdealState is larger than 1MB after
+/// compression, it cannot be updated anymore. Somehow this test can also make sure in future we will support
+/// large IdealStates
 public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
 
   @BeforeClass
@@ -85,9 +82,9 @@ public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
         Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
         for (int i = 0; i < 500_000; i++) {
           currentAssignment.put("segment_" + i,
-              ImmutableMap.of("Server_with_some_reasonable_long_prefix_" + (i % 10), "ONLINE"));
+              Map.of("Server_with_some_reasonable_long_prefix_" + (i % 10), "ONLINE"));
           currentAssignment.put("segment_" + i,
-              ImmutableMap.of("Server_with_some_reasonable_long_prefix_" + (i % 9), "ONLINE"));
+              Map.of("Server_with_some_reasonable_long_prefix_" + (i % 9), "ONLINE"));
         }
         return idealState;
       });

@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.tsdb.planner;
 
-import com.google.common.collect.ImmutableList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
@@ -31,6 +30,9 @@ import static org.testng.Assert.*;
 
 
 public class TimeSeriesPlanFragmenterTest {
+  private static final int SERIES_LIMIT = 1000;
+  private static final Map<String, String> QUERY_OPTIONS = Map.of();
+
   @Test
   public void testGetFragmentsWithMultipleLeafNodes() {
     /*
@@ -54,8 +56,8 @@ public class TimeSeriesPlanFragmenterTest {
      */
     LeafTimeSeriesPlanNode leafOne = createMockLeafNode("Leaf-1");
     LeafTimeSeriesPlanNode leafTwo = createMockLeafNode("Leaf-2");
-    BaseTimeSeriesPlanNode nodeTwo = new MockTimeSeriesPlanNode("Node-2", Collections.singletonList(leafOne));
-    BaseTimeSeriesPlanNode nodeOne = new MockTimeSeriesPlanNode("Node-1", ImmutableList.of(nodeTwo, leafTwo));
+    BaseTimeSeriesPlanNode nodeTwo = new MockTimeSeriesPlanNode("Node-2", List.of(leafOne));
+    BaseTimeSeriesPlanNode nodeOne = new MockTimeSeriesPlanNode("Node-1", List.of(nodeTwo, leafTwo));
     List<BaseTimeSeriesPlanNode> fragments = TimeSeriesPlanFragmenter.getFragments(nodeOne, false);
     // Test whether correct number of fragments generated
     assertEquals(fragments.size(), 3);
@@ -107,8 +109,8 @@ public class TimeSeriesPlanFragmenterTest {
      */
     LeafTimeSeriesPlanNode leafOne = createMockLeafNode("Leaf-1");
     LeafTimeSeriesPlanNode leafTwo = createMockLeafNode("Leaf-2");
-    BaseTimeSeriesPlanNode nodeTwo = new MockTimeSeriesPlanNode("Node-2", Collections.singletonList(leafOne));
-    BaseTimeSeriesPlanNode nodeOne = new MockTimeSeriesPlanNode("Node-1", ImmutableList.of(nodeTwo, leafTwo));
+    BaseTimeSeriesPlanNode nodeTwo = new MockTimeSeriesPlanNode("Node-2", List.of(leafOne));
+    BaseTimeSeriesPlanNode nodeOne = new MockTimeSeriesPlanNode("Node-1", List.of(nodeTwo, leafTwo));
     List<BaseTimeSeriesPlanNode> fragments = TimeSeriesPlanFragmenter.getFragments(nodeOne, true);
     assertEquals(fragments.size(), 2, "Expect only 2 fragments for single-server query");
     assertEquals(fragments.get(0).getId(), "Node-1");
@@ -135,8 +137,9 @@ public class TimeSeriesPlanFragmenterTest {
   }
 
   private LeafTimeSeriesPlanNode createMockLeafNode(String id) {
-    return new LeafTimeSeriesPlanNode(id, Collections.emptyList(), "someTableName", "someTimeColumn",
-        TimeUnit.SECONDS, 0L, "", "", null, Collections.emptyList());
+    return new LeafTimeSeriesPlanNode(id, List.of(), "someTableName", "someTimeColumn",
+        TimeUnit.SECONDS, 0L, "", "", null, List.of(),
+        SERIES_LIMIT, QUERY_OPTIONS);
   }
 
   static class MockTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {

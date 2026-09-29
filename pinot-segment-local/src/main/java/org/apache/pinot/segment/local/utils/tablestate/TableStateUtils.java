@@ -39,15 +39,13 @@ public class TableStateUtils {
   private TableStateUtils() {
   }
 
-  /**
-   * Returns all segments in a given state for a given table.
-   *
-   * @param helixManager instance of Helix manager
-   * @param tableNameWithType table for which we are obtaining segments in a given state
-   * @param state state of the segments to be returned
-   *
-   * @return List of segment names in a given state.
-   */
+  /// Returns all segments in a given state for a given table.
+  ///
+  /// @param helixManager instance of Helix manager
+  /// @param tableNameWithType table for which we are obtaining segments in a given state
+  /// @param state state of the segments to be returned
+  ///
+  /// @return List of segment names in a given state.
   public static List<String> getSegmentsInGivenStateForThisInstance(HelixManager helixManager, String tableNameWithType,
       String state) {
     HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
@@ -75,14 +73,12 @@ public class TableStateUtils {
     return segmentsInGivenState;
   }
 
-  /**
-   * Checks if all segments for the given @param tableNameWithType were succesfully loaded
-   * This function will get all segments in IDEALSTATE and CURRENTSTATE for the given table,
-   * and then check if all ONLINE segments in IDEALSTATE match with CURRENTSTATE.
-   * @param helixManager helix manager for the server instance
-   * @param tableNameWithType table name for which segment state is to be checked
-   * @return true if all segments for the given table are succesfully loaded. False otherwise
-   */
+  /// Checks if all segments for the given @param tableNameWithType were successfully loaded
+  /// This function will get all segments in IDEALSTATE and CURRENTSTATE for the given table,
+  /// and then check if all ONLINE segments in IDEALSTATE match with CURRENTSTATE.
+  /// @param helixManager helix manager for the server instance
+  /// @param tableNameWithType table name for which segment state is to be checked
+  /// @return true if all segments for the given table are successfully loaded. False otherwise
   public static boolean isAllSegmentsLoaded(HelixManager helixManager, String tableNameWithType) {
     List<String> onlineSegments =
         getSegmentsInGivenStateForThisInstance(helixManager, tableNameWithType, SegmentStateModel.ONLINE);

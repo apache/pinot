@@ -24,11 +24,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
 
-/**
- * Extension of {@link BaseImmutableDictionary} that implements immutable dictionary for byte[] type.
- */
+/// Extension of [BaseImmutableDictionary] that implements immutable dictionary for byte\[\] type.
 public class BytesDictionary extends BaseImmutableDictionary {
 
   public BytesDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
@@ -103,5 +102,34 @@ public class BytesDictionary extends BaseImmutableDictionary {
   @Override
   public byte[] getBytesValue(int dictId) {
     return getBytes(dictId);
+  }
+
+  @Override
+  public int getValueSize(int dictId) {
+    return getByteSize(dictId);
+  }
+
+  @Override
+  public void read32BitsMurmur3HashValues(int[] dictIds, int length, int[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = MurmurHashFunctions.murmurHash3X64Bit32(buffer, readBytes(dictIds[i], buffer), 0);
+    }
+  }
+
+  @Override
+  public void read64BitsMurmur3HashValues(int[] dictIds, int length, long[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = MurmurHashFunctions.murmurHash3X64Bit64(buffer, readBytes(dictIds[i], buffer), 0);
+    }
+  }
+
+  @Override
+  public void read128BitsMurmur3HashValues(int[] dictIds, int length, long[][] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = MurmurHashFunctions.murmurHash3X64Bit128AsLongs(buffer, readBytes(dictIds[i], buffer), 0);
+    }
   }
 }

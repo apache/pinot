@@ -48,20 +48,20 @@ public class FieldConfig extends BaseJsonConfig {
   public static final String TEXT_INDEX_DEFAULT_RAW_VALUE = "n";
   public static final String TEXT_INDEX_STOP_WORD_INCLUDE_KEY = "stopWordInclude";
   public static final String TEXT_INDEX_STOP_WORD_EXCLUDE_KEY = "stopWordExclude";
+  public static final String TEXT_INDEX_CASE_SENSITIVE_KEY = "caseSensitive";
   public static final String TEXT_INDEX_LUCENE_USE_COMPOUND_FILE = "luceneUseCompoundFile";
   public static final String TEXT_INDEX_LUCENE_MAX_BUFFER_SIZE_MB = "luceneMaxBufferSizeMB";
   public static final String TEXT_INDEX_LUCENE_ANALYZER_CLASS = "luceneAnalyzerClass";
   public static final String TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS = "luceneAnalyzerClassArgs";
   public static final String TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES = "luceneAnalyzerClassArgTypes";
   public static final String TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS = "luceneQueryParserClass";
+  public static final String TEXT_INDEX_LUCENE_USE_LBS_MERGE_POLICY = "luceneUseLogByteSizeMergePolicy";
+  public static final String TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE = "luceneDocIdTranslatorMode";
   public static final String TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS =
       "org.apache.lucene.analysis.standard.StandardAnalyzer";
   public static final String TEXT_INDEX_DEFAULT_LUCENE_QUERY_PARSER_CLASS =
       "org.apache.lucene.queryparser.classic.QueryParser";
   public static final String TEXT_INDEX_STOP_WORD_SEPERATOR = ",";
-  // "native" for native, default is Lucene
-  public static final String TEXT_FST_TYPE = "fstType";
-  public static final String TEXT_NATIVE_FST_LITERAL = "native";
   // Config to disable forward index
   public static final String FORWARD_INDEX_DISABLED = "forwardIndexDisabled";
   public static final String DEFAULT_FORWARD_INDEX_DISABLED = Boolean.FALSE.toString();
@@ -79,12 +79,6 @@ public class FieldConfig extends BaseJsonConfig {
   private final CompressionCodec _compressionCodec;
   private final Map<String, String> _properties;
   private final TimestampConfig _timestampConfig;
-
-  @Deprecated
-  public FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
-      @Nullable CompressionCodec compressionCodec, @Nullable Map<String, String> properties) {
-    this(name, encodingType, indexType, null, compressionCodec, null, null, properties, null);
-  }
 
   public FieldConfig(String name, EncodingType encodingType, @Nullable List<IndexType> indexTypes,
       @Nullable CompressionCodec compressionCodec, @Nullable Map<String, String> properties) {
@@ -126,25 +120,79 @@ public class FieldConfig extends BaseJsonConfig {
   }
 
   // If null, there won't be any index
+  // NOTE: TIMESTAMP is ignored. In order to create TIMESTAMP index, configure 'timestampConfig' instead.
   public enum IndexType {
-    INVERTED, SORTED, TEXT, FST, H3, JSON, TIMESTAMP, VECTOR, RANGE
+    /// Inverted index mapping values to document IDs for efficient equality predicates.
+    INVERTED,
+    /// Marks the column as the sort column; segments store values in sorted order.
+    SORTED,
+    /// Full-text search index over string columns.
+    TEXT,
+    /// Finite-state-transducer index for prefix and regex matching on string columns.
+    FST,
+    /// Case-insensitive variant of the FST index.
+    IFST,
+    /// Geospatial index for H3 hexagonal grid lookups.
+    H3,
+    /// JSON-path index over JSON-typed columns.
+    JSON,
+    /// Ignored — configure `timestampConfig` on the table instead.
+    TIMESTAMP,
+    /// Vector index for approximate-nearest-neighbor search.
+    VECTOR,
+    /// Range index for efficient inequality predicates on numeric/string columns.
+    RANGE,
+    /// OPEN_STRUCT index storing semi-structured entries as per-key materialized columns.
+    OPEN_STRUCT
   }
 
   public enum CompressionCodec {
     //@formatter:off
+    /// No compression. This is the default for `METRIC` columns and has no `codecSpec` equivalent:
+    /// the DSL has no identity codec and rejects a blank spec, so this remains the only way to state
+    /// "uncompressed" explicitly.
     PASS_THROUGH(true, false),
+    /// Snappy compression for raw forward indexes. For single-value INT/LONG raw columns on a cluster
+    /// where every server reads the V7 format, `codecSpec="SNAPPY"` is the codec-pipeline equivalent;
+    /// other column shapes keep using this value.
     SNAPPY(true, false),
+    /// Zstandard compression for raw forward indexes. For single-value INT/LONG raw columns on a cluster
+    /// where every server reads the V7 format, `codecSpec="ZSTD(3)"` is the codec-pipeline equivalent;
+    /// other column shapes keep using this value.
     ZSTANDARD(true, false),
+    /// LZ4 compression for raw forward indexes. For single-value INT/LONG raw columns on a cluster
+    /// where every server reads the V7 format, `codecSpec="LZ4"` is the codec-pipeline equivalent;
+    /// other column shapes keep using this value.
     LZ4(true, false),
+    /// GZIP (DEFLATE) compression for raw forward indexes. For single-value INT/LONG raw columns on a
+    /// cluster where every server reads the V7 format, `codecSpec="GZIP"` is the codec-pipeline
+    /// equivalent; other column shapes keep using this value.
     GZIP(true, false),
 
-    // For MV dictionary encoded forward index, add a second level dictionary encoding for the multi-value entries
+    /// Second-level dictionary encoding of the multi-value entries of a dictionary-encoded MV forward
+    /// index. No `codecSpec` equivalent: `codecSpec` applies only to RAW forward indexes, so this
+    /// remains the only way to express it.
     MV_ENTRY_DICT(false, true),
 
-    // CLP is a special type of compression codec that isn't generally applicable to all RAW columns and has a special
-    // handling for log lines (see {@link CLPForwardIndexCreatorV1} and {@link CLPForwardIndexCreatorV2)
+    /// CLP is a special type of compression codec that isn't generally applicable to all RAW columns and has
+    /// special handling for log lines (see `CLPForwardIndexCreatorV1` and `CLPForwardIndexCreatorV2`).
+    /// The CLP family has no `codecSpec` equivalent and remains the only way to express it: these are
+    /// whole-index formats for STRING columns rather than chunk codecs, and they are validated against the
+    /// column's stored type instead of the raw/dictionary applicability flags below.
     CLP(false, false),
-    CLPV2(false, false);
+    CLPV2(false, false),
+    CLPV2_ZSTD(false, false),
+    CLPV2_LZ4(false, false),
+
+    /// Delta encoding for raw forward indexes. Rejected by table-config validation on every column with a
+    /// forward index: it is applicable to neither raw nor dictionary-encoded forward indexes. Use
+    /// `codecSpec="DELTA,LZ4"` on SV INT/LONG raw columns instead, which writes the codec-pipeline format
+    /// rather than the legacy chunk format.
+    DELTA(false, false),
+    /// Second-order delta encoding for raw forward indexes. Rejected by table-config validation for the
+    /// same reason as [#DELTA]; use `codecSpec="DELTADELTA,LZ4"` on SV INT/LONG raw columns instead.
+    DELTADELTA(false, false);
+
     //@formatter:on
 
     private final boolean _applicableToRawIndex;
@@ -190,6 +238,8 @@ public class FieldConfig extends BaseJsonConfig {
     return _tierOverwrites;
   }
 
+  /// Returns the raw forward-index compression codec, or `null` when using `codecSpec` or the
+  /// default. Still the only way to express `MV_ENTRY_DICT` and the CLP family — not deprecated.
   @Nullable
   public CompressionCodec getCompressionCodec() {
     return _compressionCodec;

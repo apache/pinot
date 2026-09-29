@@ -65,6 +65,21 @@ public class DoubleOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   }
 
   @Override
+  public DataType getValueType() {
+    return DataType.DOUBLE;
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    return getDictId(Double.valueOf(stringValue), null);
+  }
+
+  @Override
+  public int indexOf(double doubleValue) {
+    return getDictId(doubleValue, null);
+  }
+
+  @Override
   public int compare(int dictId1, int dictId2) {
     return Double.compare(getDoubleValue(dictId1), getDoubleValue(dictId2));
   }
@@ -171,20 +186,6 @@ public class DoubleOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.DOUBLE;
-  }
-
-  @Override
-  public int indexOf(String stringValue) {
-    return getDictId(Double.valueOf(stringValue), null);
-  }
-
-  @Override
-  public int indexOf(double doubleValue) {
-    return getDictId(doubleValue, null);
-  }
-
   public Double get(int dictId) {
     return getDoubleValue(dictId);
   }

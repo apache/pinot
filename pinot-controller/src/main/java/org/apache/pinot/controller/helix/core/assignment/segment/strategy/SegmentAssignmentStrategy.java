@@ -23,45 +23,35 @@ import java.util.Map;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 
 
-/**
- * Interface for segment assignment strategies
- */
+/// Interface for segment assignment strategies
 public interface SegmentAssignmentStrategy {
 
-  /**
-   * Initializes the segment assignment strategy.
-   *
-   * @param helixManager Helix manager
-   * @param tableConfig Table config
-   */
+  /// Initializes the segment assignment strategy.
+  ///
+  /// @param helixManager Helix manager
+  /// @param tableConfig Table config
   void init(HelixManager helixManager, TableConfig tableConfig);
 
-  /**
-   * Assigns segment to instances. The assignment strategy will be configured in
-   * OfflineSegmentAssignment and RealtimeSegmentAssignment classes and depending on type of
-   * assignment strategy, this function will be called to assign a new segment
-   *
-   * @param segmentName Name of the segment to be assigned
-   * @param currentAssignment Current segment assignment of the table (map from segment name to instance state map)
-   * @param instancePartitions Instance partitions
-   * @return List of instances to assign the segment to
-   */
+  /// Assigns a segment to instances. The assignment strategy will be configured in the OfflineSegmentAssignment and
+  /// RealtimeSegmentAssignment classes, and depending on the type of assignment strategy, this method will be called
+  /// to assign a new segment.
+  ///
+  /// @param segmentName Name of the segment to be assigned
+  /// @param currentAssignment Current segment assignment of the table (map from segment name to instance state map)
+  /// @param instancePartitions Instance partitions
+  /// @return List of instances to assign the segment to
   List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
-      InstancePartitions instancePartitions, InstancePartitionsType instancePartitionsType);
+      InstancePartitions instancePartitions);
 
-  /**
-   * Re-assigns segment to instances. The assignment strategy will be configured in
-   * OfflineSegmentAssignment and RealtimeSegmentAssignment classes and depending on type of
-   * assignment strategy, this function will be called to re-assign a segment
-   * when the InstancePartitions has been changed.
-   *
-   * @param currentAssignment Current segment assignment of the table (map from segment name to instance state map)
-   * @param instancePartitions Instance partitions
-   * @return Rebalanced assignment for the segments per assignment strategy
-   */
+  /// Re-assigns segments to instances. The assignment strategy will be configured in the OfflineSegmentAssignment and
+  /// RealtimeSegmentAssignment classes, and depending on the type of assignment strategy, this method will be called
+  /// to re-assign segments when the InstancePartitions has been changed.
+  ///
+  /// @param currentAssignment Current segment assignment of the table (map from segment name to instance state map)
+  /// @param instancePartitions Instance partitions
+  /// @return Rebalanced assignment for the segments as per the assignment strategy
   Map<String, Map<String, String>> reassignSegments(Map<String, Map<String, String>> currentAssignment,
-      InstancePartitions instancePartitions, InstancePartitionsType instancePartitionsType);
+      InstancePartitions instancePartitions);
 }

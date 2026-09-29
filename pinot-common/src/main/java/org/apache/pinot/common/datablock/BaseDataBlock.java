@@ -19,21 +19,16 @@
 package org.apache.pinot.common.datablock;
 
 import com.google.common.base.Preconditions;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.CustomObject;
-import org.apache.pinot.common.datatable.DataTableImplV4;
-import org.apache.pinot.common.datatable.DataTableUtils;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
@@ -43,49 +38,47 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.MapUtils;
 import org.roaringbitmap.RoaringBitmap;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 
-
-/**
- * Base data block mostly replicating implementation of {@link DataTableImplV4}.
- *
- * +-----------------------------------------------+
- * | 13 integers of header:                        |
- * | VERSION                                       |
- * | NUM_ROWS                                      |
- * | NUM_COLUMNS                                   |
- * | EXCEPTIONS SECTION START OFFSET               |
- * | EXCEPTIONS SECTION LENGTH                     |
- * | DICTIONARY_MAP SECTION START OFFSET           |
- * | DICTIONARY_MAP SECTION LENGTH                 |
- * | DATA_SCHEMA SECTION START OFFSET              |
- * | DATA_SCHEMA SECTION LENGTH                    |
- * | FIXED_SIZE_DATA SECTION START OFFSET          |
- * | FIXED_SIZE_DATA SECTION LENGTH                |
- * | VARIABLE_SIZE_DATA SECTION START OFFSET       |
- * | VARIABLE_SIZE_DATA SECTION LENGTH             |
- * +-----------------------------------------------+
- * | EXCEPTIONS SECTION                            |
- * +-----------------------------------------------+
- * | DICTIONARY_MAP SECTION                        |
- * +-----------------------------------------------+
- * | DATA_SCHEMA SECTION                           |
- * +-----------------------------------------------+
- * | FIXED_SIZE_DATA SECTION                       |
- * +-----------------------------------------------+
- * | VARIABLE_SIZE_DATA SECTION                    |
- * +-----------------------------------------------+
- * | METADATA LENGTH                               |
- * | METADATA SECTION                              |
- * +-----------------------------------------------+
- *
- * To support both row and columnar data format. the size of the data payload will be exactly the same. the only
- * difference is the data layout in FIXED_SIZE_DATA and VARIABLE_SIZE_DATA section, see each impl for details.
- */
+/// Base data block mostly replicating implementation of [org.apache.pinot.common.datatable.DataTableImplV4].
+///
+/// +-----------------------------------------------+
+/// | 13 integers of header:                        |
+/// | VERSION                                       |
+/// | NUM_ROWS                                      |
+/// | NUM_COLUMNS                                   |
+/// | EXCEPTIONS SECTION START OFFSET               |
+/// | EXCEPTIONS SECTION LENGTH                     |
+/// | DICTIONARY_MAP SECTION START OFFSET           |
+/// | DICTIONARY_MAP SECTION LENGTH                 |
+/// | DATA_SCHEMA SECTION START OFFSET              |
+/// | DATA_SCHEMA SECTION LENGTH                    |
+/// | FIXED_SIZE_DATA SECTION START OFFSET          |
+/// | FIXED_SIZE_DATA SECTION LENGTH                |
+/// | VARIABLE_SIZE_DATA SECTION START OFFSET       |
+/// | VARIABLE_SIZE_DATA SECTION LENGTH             |
+/// +-----------------------------------------------+
+/// | EXCEPTIONS SECTION                            |
+/// +-----------------------------------------------+
+/// | DICTIONARY_MAP SECTION                        |
+/// +-----------------------------------------------+
+/// | DATA_SCHEMA SECTION                           |
+/// +-----------------------------------------------+
+/// | FIXED_SIZE_DATA SECTION                       |
+/// +-----------------------------------------------+
+/// | VARIABLE_SIZE_DATA SECTION                    |
+/// +-----------------------------------------------+
+/// | METADATA LENGTH                               |
+/// | METADATA SECTION                              |
+/// +-----------------------------------------------+
+///
+/// To support both row and columnar data format. the size of the data payload will be exactly the same. the only
+/// difference is the data layout in FIXED_SIZE_DATA and VARIABLE_SIZE_DATA section, see each impl for details.
 @SuppressWarnings("DuplicatedCode")
 public abstract class BaseDataBlock implements DataBlock {
   protected static final int HEADER_SIZE = Integer.BYTES * 13;
-  // _errCodeToExceptionMap stores exceptions as a map of errorCode->errorMessage
+  /// _errCodeToExceptionMap stores exceptions as a map of errorCode->errorMessage
+  /// Only values from QueryErrorCode are allowed as keys, but readers should not assume that given newer components
+  /// may have more error codes.
   protected Map<Integer, String> _errCodeToExceptionMap;
 
   protected final int _numRows;
@@ -98,14 +91,12 @@ public abstract class BaseDataBlock implements DataBlock {
   @Nullable
   private List<ByteBuffer> _serialized;
 
-  /**
-   * construct a base data block.
-   * @param numRows num of rows in the block
-   * @param dataSchema schema of the data in the block
-   * @param stringDictionary dictionary encoding map
-   * @param fixedSizeDataBytes byte[] for fix-sized columns.
-   * @param variableSizeDataBytes byte[] for variable length columns (arrays).
-   */
+  /// construct a base data block.
+  /// @param numRows num of rows in the block
+  /// @param dataSchema schema of the data in the block
+  /// @param stringDictionary dictionary encoding map
+  /// @param fixedSizeDataBytes byte\[\] for fix-sized columns.
+  /// @param variableSizeDataBytes byte\[\] for variable length columns (arrays).
   public BaseDataBlock(int numRows, @Nullable DataSchema dataSchema, String[] stringDictionary,
       byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
     _numRows = numRows;
@@ -132,17 +123,15 @@ public abstract class BaseDataBlock implements DataBlock {
     _errCodeToExceptionMap = new HashMap<>();
   }
 
-  /**
-   * return the offset in {@code _fixedSizeDataBytes} of the row/column ID.
-   * @param rowId row ID
-   * @param colId column ID
-   * @return the offset in the fixed size buffer for the row/columnID.
-   */
+  /// return the offset in `_fixedSizeDataBytes` of the row/column ID.
+  /// @param rowId row ID
+  /// @param colId column ID
+  /// @return the offset in the fixed size buffer for the row/columnID.
   protected abstract int getOffsetInFixedBuffer(int rowId, int colId);
 
   @Override
   public Map<String, String> getMetadata() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 
   @Nullable
@@ -287,6 +276,26 @@ public abstract class BaseDataBlock implements DataBlock {
   }
 
   @Override
+  public BigDecimal[] getBigDecimalArray(int rowId, int colId) {
+    int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
+    int size = _fixedSizeData.getInt(offsetInFixed + 4);
+    int offsetInVar = _fixedSizeData.getInt(offsetInFixed);
+
+    BigDecimal[] bigDecimals = new BigDecimal[size];
+    try (PinotInputStream stream = _variableSizeData.openInputStream(offsetInVar)) {
+      for (int i = 0; i < size; i++) {
+        int byteLength = stream.readInt();
+        byte[] bytes = new byte[byteLength];
+        stream.readFully(bytes);
+        bigDecimals[i] = BigDecimalUtils.deserialize(bytes);
+      }
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+    return bigDecimals;
+  }
+
+  @Override
   public String[] getStringArray(int rowId, int colId) {
     int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
     int size = _fixedSizeData.getInt(offsetInFixed + 4);
@@ -301,6 +310,26 @@ public abstract class BaseDataBlock implements DataBlock {
       throw new UncheckedIOException(e);
     }
     return strings;
+  }
+
+  @Override
+  public ByteArray[] getBytesArray(int rowId, int colId) {
+    int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
+    int size = _fixedSizeData.getInt(offsetInFixed + 4);
+    int offsetInVar = _fixedSizeData.getInt(offsetInFixed);
+
+    ByteArray[] bytes = new ByteArray[size];
+    try (PinotInputStream stream = _variableSizeData.openInputStream(offsetInVar)) {
+      for (int i = 0; i < size; i++) {
+        int byteLength = stream.readInt();
+        byte[] value = new byte[byteLength];
+        stream.readFully(value);
+        bytes[i] = new ByteArray(value);
+      }
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+    return bytes;
   }
 
   @Override
@@ -353,45 +382,6 @@ public abstract class BaseDataBlock implements DataBlock {
   // Ser/De and exception handling
   // --------------------------------------------------------------------------
 
-  /**
-   * Helper method to serialize dictionary map.
-   */
-  protected byte[] serializeStringDictionary()
-      throws IOException {
-    if (_stringDictionary.length == 0) {
-      return new byte[4];
-    }
-    UnsynchronizedByteArrayOutputStream byteArrayOutputStream = new UnsynchronizedByteArrayOutputStream(1024);
-    DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-
-    dataOutputStream.writeInt(_stringDictionary.length);
-    for (String entry : _stringDictionary) {
-      byte[] valueBytes = entry.getBytes(UTF_8);
-      dataOutputStream.writeInt(valueBytes.length);
-      dataOutputStream.write(valueBytes);
-    }
-
-    return byteArrayOutputStream.toByteArray();
-  }
-
-  /**
-   * Helper method to deserialize dictionary map.
-   */
-  protected String[] deserializeStringDictionary(ByteBuffer buffer)
-      throws IOException {
-    int dictionarySize = buffer.getInt();
-    String[] stringDictionary = new String[dictionarySize];
-    for (int i = 0; i < dictionarySize; i++) {
-      stringDictionary[i] = DataTableUtils.decodeString(buffer);
-    }
-    return stringDictionary;
-  }
-
-  @Override
-  public void addException(ProcessingException processingException) {
-    _errCodeToExceptionMap.put(processingException.getErrorCode(), processingException.getMessage());
-  }
-
   @Override
   public void addException(int errCode, String errMsg) {
     _errCodeToExceptionMap.put(errCode, errMsg);
@@ -408,7 +398,14 @@ public abstract class BaseDataBlock implements DataBlock {
     if (_serialized == null) {
       _serialized = DataBlockUtils.serialize(this);
     }
-    return _serialized;
+    // Return a copy of the serialized data to avoid external modification.
+    List<ByteBuffer> copy = new ArrayList<>(_serialized.size());
+    for (ByteBuffer page: _serialized) {
+      ByteBuffer pageCopy = page.duplicate();
+      pageCopy.order(page.order());
+      copy.add(pageCopy);
+    }
+    return copy;
   }
 
   @Override
@@ -441,6 +438,6 @@ public abstract class BaseDataBlock implements DataBlock {
   @Nullable
   @Override
   public List<DataBuffer> getStatsByStage() {
-    return Collections.emptyList();
+    return List.of();
   }
 }

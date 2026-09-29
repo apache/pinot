@@ -25,9 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 
 
-/**
- * Query specific scheduling context
- */
+/// Query specific scheduling context
 public class SchedulerQueryContext {
 
   private final ServerQueryRequest _queryRequest;
@@ -61,10 +59,8 @@ public class SchedulerQueryContext {
     return _schedulerGroup;
   }
 
-  /**
-   * Convenience method to get query arrival time
-   * @return
-   */
+  /// Convenience method to get query arrival time
+  /// @return
   public long getArrivalTimeMs() {
     return _queryRequest.getTimerContext().getQueryArrivalTimeMs();
   }

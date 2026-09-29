@@ -21,11 +21,9 @@ package org.apache.pinot.core.query.utils;
 import org.apache.pinot.spi.config.table.TableType;
 
 
-/**
- * Utils to generate and manage the unique query id within a cluster.
- * Request id might not be unique across brokers or for request hitting a hybrid table. To generate a unique query id
- * within a cluster, we want to combine the broker id, request id and table type.
- */
+/// Utils to generate and manage the unique query id within a cluster.
+/// Request id might not be unique across brokers or for request hitting a hybrid table. To generate a unique query id
+/// within a cluster, we want to combine the broker id, request id and table type.
 public class QueryIdUtils {
   private QueryIdUtils() {
   }
@@ -34,11 +32,15 @@ public class QueryIdUtils {
   public static final String REALTIME_SUFFIX = "_R";
 
   public static String getQueryId(String brokerId, long requestId, TableType tableType) {
-    return brokerId + "_" + requestId + (tableType == TableType.OFFLINE ? OFFLINE_SUFFIX : REALTIME_SUFFIX);
+    return withTypeSuffix(brokerId + "_" + requestId, tableType);
   }
 
   public static boolean hasTypeSuffix(String queryId) {
     return queryId.endsWith(OFFLINE_SUFFIX) || queryId.endsWith(REALTIME_SUFFIX);
+  }
+
+  public static String withTypeSuffix(String queryId, TableType tableType) {
+    return tableType == TableType.OFFLINE ? withOfflineSuffix(queryId) : withRealtimeSuffix(queryId);
   }
 
   public static String withOfflineSuffix(String queryId) {

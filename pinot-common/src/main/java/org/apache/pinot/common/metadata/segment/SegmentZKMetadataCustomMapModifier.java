@@ -24,15 +24,12 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * The <code>SegmentZKMetadataCustomMapModifier</code> class provides util methods to serialize/de-serialize the segment
- * ZK metadata custom map modifier HTTP header and modify the custom map field in {@link SegmentZKMetadata}.
- */
+/// The `SegmentZKMetadataCustomMapModifier` class provides util methods to serialize/de-serialize the
+/// segment ZK metadata custom map modifier HTTP header and modify the custom map field in [SegmentZKMetadata].
 public class SegmentZKMetadataCustomMapModifier {
   public enum ModifyMode {
     REPLACE,  // Replace the current map
@@ -45,7 +42,7 @@ public class SegmentZKMetadataCustomMapModifier {
   private final ModifyMode _modifyMode;
   private final Map<String, String> _map;
 
-  public SegmentZKMetadataCustomMapModifier(@Nonnull ModifyMode modifyMode, @Nullable Map<String, String> map) {
+  public SegmentZKMetadataCustomMapModifier(ModifyMode modifyMode, @Nullable Map<String, String> map) {
     _modifyMode = modifyMode;
     if (map == null || map.isEmpty()) {
       _map = null;
@@ -54,7 +51,7 @@ public class SegmentZKMetadataCustomMapModifier {
     }
   }
 
-  public SegmentZKMetadataCustomMapModifier(@Nonnull String jsonString)
+  public SegmentZKMetadataCustomMapModifier(String jsonString)
       throws IOException {
     JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonString);
     _modifyMode = ModifyMode.valueOf(jsonNode.get(MAP_MODIFY_MODE_KEY).asText());

@@ -21,61 +21,49 @@ package org.apache.pinot.spi.auth;
 import org.apache.commons.lang3.StringUtils;
 
 
-/**
- * Implementation of the AuthorizationResult interface that provides basic
- * authorization results including access status and failure messages.
- */
+/// Implementation of the AuthorizationResult interface that provides basic
+/// authorization results including access status and failure messages.
 public class BasicAuthorizationResultImpl implements AuthorizationResult {
 
   private static final BasicAuthorizationResultImpl SUCCESS = new BasicAuthorizationResultImpl(true);
   private final boolean _hasAccess;
   private final String _failureMessage;
 
-  /**
-   * Constructs a BasicAuthorizationResultImpl with the specified access status and failure message.
-   *
-   * @param hasAccess      true if access is granted, false otherwise.
-   * @param failureMessage the failure message if access is denied.
-   */
+  /// Constructs a BasicAuthorizationResultImpl with the specified access status and failure message.
+  ///
+  /// @param hasAccess      true if access is granted, false otherwise.
+  /// @param failureMessage the failure message if access is denied.
   public BasicAuthorizationResultImpl(boolean hasAccess, String failureMessage) {
     _hasAccess = hasAccess;
     _failureMessage = failureMessage;
   }
 
-  /**
-   * Constructs a BasicAuthorizationResultImpl with the specified access status and an empty failure message.
-   *
-   * @param hasAccess true if access is granted, false otherwise.
-   */
+  /// Constructs a BasicAuthorizationResultImpl with the specified access status and an empty failure message.
+  ///
+  /// @param hasAccess true if access is granted, false otherwise.
   public BasicAuthorizationResultImpl(boolean hasAccess) {
     _hasAccess = hasAccess;
     _failureMessage = StringUtils.EMPTY;
   }
 
-  /**
-   * Creates a BasicAuthorizationResultImpl with access granted and no failure message.
-   *
-   * @return a BasicAuthorizationResultImpl with access granted and an empty failure message.
-   */
+  /// Creates a BasicAuthorizationResultImpl with access granted and no failure message.
+  ///
+  /// @return a BasicAuthorizationResultImpl with access granted and an empty failure message.
   public static BasicAuthorizationResultImpl success() {
     return SUCCESS;
   }
 
-  /**
-   * Indicates whether access is granted.
-   *
-   * @return true if access is granted, false otherwise.
-   */
+  /// Indicates whether access is granted.
+  ///
+  /// @return true if access is granted, false otherwise.
   @Override
   public boolean hasAccess() {
     return _hasAccess;
   }
 
-  /**
-   * Provides the failure message if access is denied.
-   *
-   * @return the failure message if access is denied, otherwise an empty string.
-   */
+  /// Provides the failure message if access is denied.
+  ///
+  /// @return the failure message if access is denied, otherwise an empty string.
   @Override
   public String getFailureMessage() {
     return _failureMessage;

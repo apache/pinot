@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,9 +32,9 @@ import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -44,13 +43,12 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.testng.Assert.*;
 
 
-/**
- * Integration test that provides example of {@link PinotTaskGenerator} and {@link PinotTaskExecutor} and tests simple
- * minion functionality.
- */
+/// Integration test that provides example of [PinotTaskGenerator] and
+/// [org.apache.pinot.minion.executor.PinotTaskExecutor] and tests simple minion functionality.
 public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   // Accessed by the plug-in classes
   public static final String TASK_TYPE = "TestTask";
@@ -94,7 +92,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     addDummySchema(TABLE_NAME_1);
     addDummySchema(TABLE_NAME_2);
     addDummySchema(TABLE_NAME_3);
-    TableTaskConfig taskConfig = new TableTaskConfig(Collections.singletonMap(TASK_TYPE, Collections.emptyMap()));
+    TableTaskConfig taskConfig = new TableTaskConfig(Map.of(TASK_TYPE, Map.of()));
     addTableConfig(
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_1).setTaskConfig(taskConfig).build());
     addTableConfig(
@@ -109,14 +107,14 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   public void testTaskTimeout() {
     PinotTaskGenerator taskGenerator = _taskManager.getTaskGeneratorRegistry().getTaskGenerator(TASK_TYPE);
     assertNotNull(taskGenerator);
-    assertEquals(taskGenerator.getTaskTimeoutMs(), 600_000L);
+    assertEquals(taskGenerator.getTaskTimeoutMs(any(String.class)), 600_000L);
   }
 
   @Test
   public void testTaskMaxAttempts() {
     PinotTaskGenerator taskGenerator = _taskManager.getTaskGeneratorRegistry().getTaskGenerator(TASK_TYPE);
     assertNotNull(taskGenerator);
-    assertEquals(taskGenerator.getMaxAttemptsPerTask(), 2);
+    assertEquals(taskGenerator.getMaxAttemptsPerTask(any(String.class)), 2);
   }
 
   private void verifyTaskCount(String task, int errors, int waiting, int running, int total) {
@@ -136,7 +134,8 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     assertEquals(_helixTaskResourceManager.getTasksInProgress(TASK_TYPE).size(), 0);
 
     // Should create the task queues and generate a task in the same minion instance
-    List<String> task1 = _taskManager.scheduleAllTasksForAllTables(null).get(TASK_TYPE);
+    List<String> task1 =
+        _taskManager.scheduleTasks(new TaskSchedulingContext()).get(TASK_TYPE).getScheduledTaskNames();
     assertNotNull(task1);
     assertEquals(task1.size(), 1);
     assertTrue(_helixTaskResourceManager.getTaskQueues()
@@ -150,7 +149,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     verifyTaskCount(task1.get(0), 0, 1, 1, 2);
     // Should generate one more task, with two sub-tasks. Both of these sub-tasks will wait
     // since we have one minion instance that is still running one of the sub-tasks.
-    List<String> task2 = _taskManager.scheduleTaskForAllTables(TASK_TYPE, null);
+    List<String> task2 = _taskManager.scheduleTasks(new TaskSchedulingContext()).get(TASK_TYPE).getScheduledTaskNames();
     assertNotNull(task2);
     assertEquals(task2.size(), 1);
     assertTrue(_helixTaskResourceManager.getTasksInProgress(TASK_TYPE).contains(task2.get(0)));
@@ -159,8 +158,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     // Should not generate more tasks since SimpleMinionClusterIntegrationTests.NUM_TASKS is 2.
     // Our test task generator does not generate if there are already this many sub-tasks in the
     // running+waiting count already.
-    assertNull(_taskManager.scheduleAllTasksForAllTables(null).get(TASK_TYPE));
-    assertNull(_taskManager.scheduleTaskForAllTables(TASK_TYPE, null));
+    MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext(), _taskManager);
 
     // Wait at most 60 seconds for all tasks IN_PROGRESS
     TestUtils.waitForCondition(input -> {

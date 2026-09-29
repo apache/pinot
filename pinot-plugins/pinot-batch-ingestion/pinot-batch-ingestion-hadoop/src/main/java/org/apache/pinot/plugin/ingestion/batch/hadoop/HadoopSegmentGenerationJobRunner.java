@@ -22,10 +22,8 @@ import com.google.common.base.Preconditions;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -69,13 +67,10 @@ import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY
 public class HadoopSegmentGenerationJobRunner extends Configured implements IngestionJobRunner, Serializable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HadoopSegmentGenerationJobRunner.class);
 
-  public static final String SEGMENT_GENERATION_JOB_SPEC = "segmentGenerationJobSpec";
+  // Kept for backward compatibility; callers should prefer SegmentGenerationJobUtils.SEGMENT_GENERATION_JOB_SPEC
+  public static final String SEGMENT_GENERATION_JOB_SPEC = SegmentGenerationJobUtils.SEGMENT_GENERATION_JOB_SPEC;
 
-  // Field names in job spec's executionFrameworkSpec/extraConfigs section
-  private static final String DEPS_JAR_DIR_FIELD = "dependencyJarDir";
-  private static final String STAGING_DIR_FIELD = "stagingDir";
-
-  // Sub-dirs under directory specified by STAGING_DIR_FIELD
+  // Sub-dirs under the staging directory
   private static final String SEGMENT_TAR_SUBDIR_NAME = "segmentTar";
   private static final String DEPS_JAR_SUBDIR_NAME = "dependencyJars";
 
@@ -158,7 +153,8 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     outputDirFS.mkdir(outputDirURI);
 
     //Get staging directory for temporary output pinot segments
-    String stagingDir = _spec.getExecutionFrameworkSpec().getExtraConfigs().get(STAGING_DIR_FIELD);
+    String stagingDir =
+        _spec.getExecutionFrameworkSpec().getExtraConfigs().get(SegmentGenerationJobUtils.STAGING_DIR);
     Preconditions.checkNotNull(stagingDir, "Please set config: stagingDir under 'executionFrameworkSpec.extraConfigs'");
     URI stagingDirURI = URI.create(stagingDir);
     if (stagingDirURI.getScheme() == null) {
@@ -249,7 +245,8 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       packPluginsToDistributedCache(job, outputDirFS, stagingDirURI);
 
       // Add dependency jars, if we're provided with a directory containing these.
-      String dependencyJarsSrcDir = _spec.getExecutionFrameworkSpec().getExtraConfigs().get(DEPS_JAR_DIR_FIELD);
+      String dependencyJarsSrcDir =
+          _spec.getExecutionFrameworkSpec().getExtraConfigs().get(SegmentGenerationJobUtils.DEPENDENCY_JAR_DIR);
       if (dependencyJarsSrcDir != null) {
         Path dependencyJarsDestPath = new Path(stagingDirURI.toString(), DEPS_JAR_SUBDIR_NAME);
         addJarsToDistributedCache(job, new File(dependencyJarsSrcDir), outputDirFS, dependencyJarsDestPath.toUri(),
@@ -280,8 +277,8 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
 
       LOGGER.info("Moving segment tars from staging directory [{}] to output directory [{}]", stagingDirURI,
           outputDirURI);
-      moveFiles(outputDirFS, new Path(stagingDir, SEGMENT_TAR_SUBDIR_NAME).toUri(), outputDirURI,
-          _spec.isOverwriteOutput());
+      SegmentGenerationJobUtils.moveFiles(outputDirFS, new Path(stagingDir, SEGMENT_TAR_SUBDIR_NAME).toUri(),
+          outputDirURI, _spec.isOverwriteOutput());
     } finally {
       LOGGER.info("Trying to clean up staging directory: [{}]", stagingDirURI);
       outputDirFS.delete(stagingDirURI, true);
@@ -300,51 +297,18 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     }
   }
 
-  /**
-   * Move all files from the <sourceDir> to the <destDir>, but don't delete existing contents of destDir.
-   * If <overwrite> is true, and the source file exists in the destination directory, then replace it, otherwise
-   * log a warning and continue. We assume that source and destination directories are on the same filesystem,
-   * so that move() can be used.
-   *
-   * @param fs
-   * @param sourceDir
-   * @param destDir
-   * @param overwrite
-   * @throws IOException
-   * @throws URISyntaxException
-   */
-  private void moveFiles(PinotFS fs, URI sourceDir, URI destDir, boolean overwrite)
-      throws IOException, URISyntaxException {
-    for (String sourcePath : fs.listFiles(sourceDir, true)) {
-      URI sourceFileUri = SegmentGenerationUtils.getFileURI(sourcePath, sourceDir);
-      String sourceFilename = SegmentGenerationUtils.getFileName(sourceFileUri);
-      URI destFileUri =
-          SegmentGenerationUtils.getRelativeOutputPath(sourceDir, sourceFileUri, destDir).resolve(sourceFilename);
-
-      if (!overwrite && fs.exists(destFileUri)) {
-        LOGGER.warn("Can't overwrite existing output segment tar file: {}", destFileUri);
-      } else {
-        fs.move(sourceFileUri, destFileUri, true);
-      }
-    }
-  }
-
-  /**
-   * Can be overridden to plug in custom mapper.
-   */
+  /// Can be overridden to plug in custom mapper.
   protected Class<? extends Mapper<LongWritable, Text, LongWritable, Text>> getMapperClass() {
     return HadoopSegmentCreationMapper.class;
   }
 
-  /**
-   * We have to put our jar (which contains the mapper) in the distributed cache and add it to the classpath,
-   * as otherwise it's not available (since the pinot-all jar - which is bigger - is what we've set as our job jar).
-   *
-   * @param job
-   * @param outputDirFS
-   * @param stagingDirURI
-   * @throws Exception
-   */
+  /// We have to put our jar (which contains the mapper) in the distributed cache and add it to the classpath,
+  /// as otherwise it's not available (since the pinot-all jar - which is bigger - is what we've set as our job jar).
+  ///
+  /// @param job
+  /// @param outputDirFS
+  /// @param stagingDirURI
+  /// @throws Exception
   protected void addMapperJarToDistributedCache(Job job, PinotFS outputDirFS, URI stagingDirURI)
       throws Exception {
     File ourJar = new File(getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
@@ -364,7 +328,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       return;
     }
 
-    ArrayList<File> validPluginDirectories = new ArrayList();
+    ArrayList<File> validPluginDirectories = new ArrayList<>();
 
     for (String pluginsDirPath : pluginDirectories) {
       File pluginsDir = new File(pluginsDirPath);

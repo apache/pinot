@@ -22,13 +22,11 @@ package org.apache.pinot.segment.spi.index;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.utils.CsvParser;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 
@@ -40,12 +38,25 @@ public class TextIndexConfig extends IndexConfig {
   private static final boolean LUCENE_INDEX_REUSE_MUTABLE_INDEX = false;
   private static final int LUCENE_INDEX_NRT_CACHING_DIRECTORY_MAX_BUFFER_SIZE_MB = 0;
   private static final boolean LUCENE_INDEX_DEFAULT_USE_AND_FOR_MULTI_TERM_QUERIES = false;
+  private static final boolean LUCENE_USE_LOG_BYTE_SIZE_MERGE_POLICY = false;
+  private static final DocIdTranslatorMode LUCENE_TRANSLATOR_MODE = null;
+  private static final boolean LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX = false;
+  private static final boolean LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE = false;
+
+  // keep in sync with constructor!
+  private static final List<String> PROPERTY_NAMES = List.of(
+      "disabled", "rawValue", "queryCache", "useANDForMultiTermQueries", "stopWordsInclude", "stopWordsExclude",
+      "luceneUseCompoundFile", "luceneMaxBufferSizeMB", "luceneAnalyzerClass", "luceneAnalyzerClassArgs",
+      "luceneAnalyzerClassArgTypes", "luceneQueryParserClass", "enablePrefixSuffixMatchingInPhraseQueries",
+      "reuseMutableIndex", "luceneNRTCachingDirectoryMaxBufferSizeMB", "useLogByteSizeMergePolicy",
+      "docIdTranslatorMode", "caseSensitive", "storeInSegmentFile"
+  );
 
   public static final TextIndexConfig DISABLED =
-      new TextIndexConfig(true, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
-         LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null, null, null, null, false, false, 0);
+      new TextIndexConfig(true, null, false, false, List.of(), List.of(), false,
+          LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null, null, null, null, false, false, 0, false, null,
+          LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX, LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE);
 
-  private final FSTType _fstType;
   @Nullable
   private final Object _rawValueForTextIndex;
   private final boolean _enableQueryCache;
@@ -61,9 +72,73 @@ public class TextIndexConfig extends IndexConfig {
   private final boolean _enablePrefixSuffixMatchingInPhraseQueries;
   private final boolean _reuseMutableIndex;
   private final int _luceneNRTCachingDirectoryMaxBufferSizeMB;
+  private final boolean _useLogByteSizeMergePolicy;
+  private final DocIdTranslatorMode _docIdTranslatorMode;
+  private final boolean _caseSensitive;
+  private final boolean _storeInSegmentFile;
+
+  public enum DocIdTranslatorMode {
+    // build and keep mapping
+    Default,
+    // build mapping and check if it can be dropped
+    TryOptimize,
+    // mapping is not necessary, use lucene ids
+    Skip;
+
+    static DocIdTranslatorMode of(String mode) {
+      if (mode == null) {
+        return null;
+      }
+      for (DocIdTranslatorMode value : values()) {
+        if (value.name().equalsIgnoreCase(mode)) {
+          return value;
+        }
+      }
+
+      return null;
+    }
+  }
+
+  public TextIndexConfig(Boolean disabled, Object rawValueForTextIndex, boolean enableQueryCache,
+      boolean useANDForMultiTermQueries, List<String> stopWordsInclude, List<String> stopWordsExclude,
+      Boolean luceneUseCompoundFile, Integer luceneMaxBufferSizeMB, String luceneAnalyzerClass,
+      String luceneAnalyzerClassArgs, String luceneAnalyzerClassArgTypes, String luceneQueryParserClass,
+      Boolean enablePrefixSuffixMatchingInPhraseQueries, Boolean reuseMutableIndex,
+      Integer luceneNRTCachingDirectoryMaxBufferSizeMB, Boolean useLogByteSizeMergePolicy,
+      DocIdTranslatorMode docIdTranslatorMode) {
+    this(disabled, rawValueForTextIndex, enableQueryCache, useANDForMultiTermQueries,
+        stopWordsInclude, stopWordsExclude, luceneUseCompoundFile, luceneMaxBufferSizeMB, luceneAnalyzerClass,
+        luceneAnalyzerClassArgs, luceneAnalyzerClassArgTypes, luceneQueryParserClass,
+        enablePrefixSuffixMatchingInPhraseQueries, reuseMutableIndex,
+        luceneNRTCachingDirectoryMaxBufferSizeMB, useLogByteSizeMergePolicy, docIdTranslatorMode,
+        LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX, LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE);
+  }
+
+  /// @deprecated Use the new constructor with storeInSegmentFile parameter instead.
+  /// This constructor will be removed in a future version.
+  @Deprecated
+  public TextIndexConfig(Boolean luceneUseCompoundFile, Object rawValue,
+                        boolean noRawData, boolean enableQueryCache, List<String> stopWordsInclude,
+                        List<String> stopWordsExclude, Boolean useAndForMultiTermQueries,
+                        Integer maxResultCacheSize, String stopWordsIncludeKey, String stopWordsExcludeKey,
+                        String useAndForMultiTermQueriesKey, String maxResultCacheSizeKey,
+                        Boolean enablePrefixSuffixMatching, Boolean enablePrefixSuffixPhraseMatching,
+                        Integer maxResultCacheSizeKeyInt, Boolean storeInSegmentFile,
+                        DocIdTranslatorMode docIdTranslatorMode, Boolean enablePrefixSuffixMatchingKey) {
+    // Call the new constructor with default storeInSegmentFile value
+    this(storeInSegmentFile, rawValue, enableQueryCache,
+         useAndForMultiTermQueries != null ? useAndForMultiTermQueries : false,
+         stopWordsInclude != null ? stopWordsInclude : new ArrayList<>(),
+         stopWordsExclude != null ? stopWordsExclude : new ArrayList<>(),
+         luceneUseCompoundFile, maxResultCacheSize, null, null, null, null,
+         enablePrefixSuffixPhraseMatching != null ? enablePrefixSuffixPhraseMatching : false,
+         false, 0, false, docIdTranslatorMode,
+         enablePrefixSuffixMatchingKey != null ? enablePrefixSuffixMatchingKey : false,
+         storeInSegmentFile != null ? storeInSegmentFile : false);
+  }
 
   @JsonCreator
-  public TextIndexConfig(@JsonProperty("disabled") Boolean disabled, @JsonProperty("fst") FSTType fstType,
+  public TextIndexConfig(@JsonProperty("disabled") Boolean disabled,
       @JsonProperty("rawValue") @Nullable Object rawValueForTextIndex,
       @JsonProperty("queryCache") boolean enableQueryCache,
       @JsonProperty("useANDForMultiTermQueries") boolean useANDForMultiTermQueries,
@@ -72,14 +147,17 @@ public class TextIndexConfig extends IndexConfig {
       @JsonProperty("luceneUseCompoundFile") Boolean luceneUseCompoundFile,
       @JsonProperty("luceneMaxBufferSizeMB") Integer luceneMaxBufferSizeMB,
       @JsonProperty("luceneAnalyzerClass") String luceneAnalyzerClass,
-      @JsonProperty("luceneAnalyzerClassArgs") String luceneAnalyzerClassArgs,
-      @JsonProperty("luceneAnalyzerClassArgTypes") String luceneAnalyzerClassArgTypes,
+      @JsonProperty("luceneAnalyzerClassArgs") Object luceneAnalyzerClassArgs,
+      @JsonProperty("luceneAnalyzerClassArgTypes") Object luceneAnalyzerClassArgTypes,
       @JsonProperty("luceneQueryParserClass") String luceneQueryParserClass,
       @JsonProperty("enablePrefixSuffixMatchingInPhraseQueries") Boolean enablePrefixSuffixMatchingInPhraseQueries,
       @JsonProperty("reuseMutableIndex") Boolean reuseMutableIndex,
-      @JsonProperty("luceneNRTCachingDirectoryMaxBufferSizeMB") Integer luceneNRTCachingDirectoryMaxBufferSizeMB) {
+      @JsonProperty("luceneNRTCachingDirectoryMaxBufferSizeMB") Integer luceneNRTCachingDirectoryMaxBufferSizeMB,
+      @JsonProperty("useLogByteSizeMergePolicy") Boolean useLogByteSizeMergePolicy,
+      @JsonProperty("docIdTranslatorMode") DocIdTranslatorMode docIdTranslatorMode,
+      @JsonProperty("caseSensitive") Boolean caseSensitive,
+      @JsonProperty("storeInSegmentFile") Boolean storeInSegmentFile) {
     super(disabled);
-    _fstType = fstType;
     _rawValueForTextIndex = rawValueForTextIndex;
     _enableQueryCache = enableQueryCache;
     _useANDForMultiTermQueries = useANDForMultiTermQueries;
@@ -94,11 +172,13 @@ public class TextIndexConfig extends IndexConfig {
 
     // Note that we cannot depend on jackson's default behavior to automatically coerce the comma delimited args to
     // List<String>. This is because the args may contain comma and other special characters such as space. Therefore,
-    // we use our own csv parser to parse the values directly.
-    _luceneAnalyzerClassArgs = CsvParser.parse(luceneAnalyzerClassArgs, true, false);
-    _luceneAnalyzerClassArgTypes = CsvParser.parse(luceneAnalyzerClassArgTypes, false, true);
+    // we use our own csv parser to parse the values directly when the input is a String.
+    // However, when round-tripping (serializing then deserializing), Jackson may produce a List<String> directly,
+    // so we also handle that case.
+    _luceneAnalyzerClassArgs = parseToList(luceneAnalyzerClassArgs, true, false);
+    _luceneAnalyzerClassArgTypes = parseToList(luceneAnalyzerClassArgTypes, false, true);
     _luceneQueryParserClass = luceneQueryParserClass == null
-            ? FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_QUERY_PARSER_CLASS : luceneQueryParserClass;
+        ? FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_QUERY_PARSER_CLASS : luceneQueryParserClass;
     _enablePrefixSuffixMatchingInPhraseQueries =
         enablePrefixSuffixMatchingInPhraseQueries == null ? LUCENE_INDEX_ENABLE_PREFIX_SUFFIX_MATCH_IN_PHRASE_SEARCH
             : enablePrefixSuffixMatchingInPhraseQueries;
@@ -106,10 +186,42 @@ public class TextIndexConfig extends IndexConfig {
     _luceneNRTCachingDirectoryMaxBufferSizeMB =
         luceneNRTCachingDirectoryMaxBufferSizeMB == null ? LUCENE_INDEX_NRT_CACHING_DIRECTORY_MAX_BUFFER_SIZE_MB
             : luceneNRTCachingDirectoryMaxBufferSizeMB;
+    _useLogByteSizeMergePolicy = useLogByteSizeMergePolicy == null ? LUCENE_USE_LOG_BYTE_SIZE_MERGE_POLICY
+        : useLogByteSizeMergePolicy;
+    _docIdTranslatorMode = docIdTranslatorMode == null ? LUCENE_TRANSLATOR_MODE : docIdTranslatorMode;
+    _caseSensitive = caseSensitive == null ? LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX : caseSensitive;
+    _storeInSegmentFile = storeInSegmentFile == null ? LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE : storeInSegmentFile;
   }
 
-  public FSTType getFstType() {
-    return _fstType;
+  /// Parses the input value to a List of Strings.
+  /// Handles both String (CSV format) and List<String> (from JSON array) inputs.
+  /// This enables proper round-trip serialization/deserialization since the getter returns List<String>
+  /// which Jackson serializes as a JSON array, but the original input format was CSV string.
+  ///
+  /// @param value the input value (can be String, List, or null)
+  /// @param escapeComma if true, don't split on escaped commas when parsing String
+  /// @param trim whether to trim each value
+  /// @return parsed list of strings, empty list if input is null or empty
+  @SuppressWarnings("unchecked")
+  private static List<String> parseToList(final @Nullable Object value, final boolean escapeComma, final boolean trim) {
+    if (value == null) {
+      return List.of();
+    }
+    if (value instanceof List) {
+      final List<?> list = (List<?>) value;
+      if (list.isEmpty()) {
+        return List.of();
+      }
+      // Convert each element to String and optionally trim
+      final List<String> result = new ArrayList<>();
+      for (final Object item : list) {
+        final String strItem = item == null ? "" : item.toString();
+        result.add(trim ? strItem.trim() : strItem);
+      }
+      return result;
+    }
+    // String or other types - use CSV parser
+    return CsvParser.parse(value.toString(), escapeComma, trim);
   }
 
   @Nullable
@@ -117,11 +229,9 @@ public class TextIndexConfig extends IndexConfig {
     return _rawValueForTextIndex;
   }
 
-  /**
-   * Whether Lucene query result cache should be enabled.
-   *
-   * While it helps a lot with performance for repeated queries, on the downside it causes heap issues.
-   */
+  /// Whether Lucene query result cache should be enabled.
+  ///
+  /// While it helps a lot with performance for repeated queries, on the downside it causes heap issues.
   public boolean isEnableQueryCache() {
     return _enableQueryCache;
   }
@@ -138,56 +248,43 @@ public class TextIndexConfig extends IndexConfig {
     return _stopWordsExclude;
   }
 
-  /**
-   * Whether Lucene IndexWriter uses compound file format. Improves indexing speed but may cause file descriptor issues
-   */
+  /// Whether Lucene IndexWriter uses compound file format. Improves indexing speed but may cause file descriptor issues
   public boolean isLuceneUseCompoundFile() {
     return _luceneUseCompoundFile;
   }
 
-  /**
-   * Lucene buffer size. Helps with indexing speed but may cause heap issues
-   */
+  /// Lucene buffer size. Helps with indexing speed but may cause heap issues
   public int getLuceneMaxBufferSizeMB() {
     return _luceneMaxBufferSizeMB;
   }
 
-  /**
-   * Lucene analyzer fully qualified class name specifying which analyzer class to use for indexing
-   */
+  /// Lucene analyzer fully qualified class name specifying which analyzer class to use for indexing
   public String getLuceneAnalyzerClass() {
     return _luceneAnalyzerClass;
   }
 
-  /**
-   * Lucene analyzer arguments in String type. At runtime, the string representation are best-effort coerced into the
-   * proper type with the fully-qualified value type specified in luceneAnalyzerClassArgTypes
-   */
+  /// Lucene analyzer arguments in String type. At runtime, the string representation are best-effort coerced into the
+  /// proper type with the fully-qualified value type specified in luceneAnalyzerClassArgTypes
   public List<String> getLuceneAnalyzerClassArgs() {
     return _luceneAnalyzerClassArgs;
   }
 
-  /**
-   * Lucene analyzer fully qualified argument value types for each argument. At runtime, the values specified in the
-   * luceneAnalyserClassArgs (string representation) are best-effort coerced into the specified value type.
-   */
+  /// Lucene analyzer fully qualified argument value types for each argument. At runtime, the values specified in the
+  /// luceneAnalyserClassArgs (string representation) are best-effort coerced into the specified value type.
   public List<String> getLuceneAnalyzerClassArgTypes() {
     return _luceneAnalyzerClassArgTypes;
   }
 
-  /**
-   * Lucene query parser fully qualified class name specifying which lucene query parser class to use for query parsing
-   */
+  /// Lucene query parser fully qualified class name specifying which lucene query parser class to use for query parsing
   public String getLuceneQueryParserClass() {
     return _luceneQueryParserClass;
   }
 
-  /**
-   *  Whether to enable prefix and suffix wildcard term matching (i.e., .*value for prefix and value.* for suffix
-   *  term matching) in a phrase query. By default, Pinot today treats .* in a phrase query like ".*value str1 value.*"
-   *  as literal. If this flag is enabled, .*value will be treated as suffix matching and value.* will be treated as
-   *  prefix matching.
-   */
+  /// Whether to enable prefix and suffix wildcard term matching (i.e., .\*value for prefix and value.\* for suffix
+  /// term matching) in a phrase query. By default, Pinot today treats .\* in a phrase query like ".\*value str1
+  /// value.\*"
+  /// as literal. If this flag is enabled, .\*value will be treated as suffix matching and value.\* will be treated as
+  /// prefix matching.
   public boolean isEnablePrefixSuffixMatchingInPhraseQueries() {
     return _enablePrefixSuffixMatchingInPhraseQueries;
   }
@@ -196,13 +293,30 @@ public class TextIndexConfig extends IndexConfig {
     return _reuseMutableIndex;
   }
 
+  public boolean isUseLogByteSizeMergePolicy() {
+    return _useLogByteSizeMergePolicy;
+  }
+
+  public DocIdTranslatorMode getDocIdTranslatorMode() {
+    return _docIdTranslatorMode;
+  }
+
   public int getLuceneNRTCachingDirectoryMaxBufferSizeMB() {
     return _luceneNRTCachingDirectoryMaxBufferSizeMB;
   }
 
+  public boolean isCaseSensitive() {
+    return _caseSensitive;
+  }
+
+  /// Whether to store text index in segment file and cleanup the directory structure.
+  /// @return true if text index should be stored in segment file and directory cleaned up,
+  ///         false to keep directory structure
+  public boolean isStoreInSegmentFile() {
+    return _storeInSegmentFile;
+  }
+
   public static abstract class AbstractBuilder {
-    @Nullable
-    protected FSTType _fstType;
     @Nullable
     protected Object _rawValueForTextIndex;
     protected boolean _enableQueryCache = false;
@@ -219,13 +333,16 @@ public class TextIndexConfig extends IndexConfig {
         LUCENE_INDEX_ENABLE_PREFIX_SUFFIX_MATCH_IN_PHRASE_SEARCH;
     protected boolean _reuseMutableIndex = LUCENE_INDEX_REUSE_MUTABLE_INDEX;
     protected int _luceneNRTCachingDirectoryMaxBufferSizeMB = LUCENE_INDEX_NRT_CACHING_DIRECTORY_MAX_BUFFER_SIZE_MB;
+    protected boolean _useLogByteSizeMergePolicy = LUCENE_USE_LOG_BYTE_SIZE_MERGE_POLICY;
+    @Nullable
+    protected DocIdTranslatorMode _docIdTranslatorMode = LUCENE_TRANSLATOR_MODE;
+    protected boolean _caseSensitive = LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX;
+    protected boolean _storeInSegmentFile = LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE;
 
-    public AbstractBuilder(@Nullable FSTType fstType) {
-      _fstType = fstType;
+    public AbstractBuilder() {
     }
 
     public AbstractBuilder(TextIndexConfig other) {
-      _fstType = other._fstType;
       _enableQueryCache = other._enableQueryCache;
       _useANDForMultiTermQueries = other._useANDForMultiTermQueries;
       _stopWordsInclude =
@@ -241,15 +358,20 @@ public class TextIndexConfig extends IndexConfig {
       _enablePrefixSuffixMatchingInPhraseQueries = other._enablePrefixSuffixMatchingInPhraseQueries;
       _reuseMutableIndex = other._reuseMutableIndex;
       _luceneNRTCachingDirectoryMaxBufferSizeMB = other._luceneNRTCachingDirectoryMaxBufferSizeMB;
+      _useLogByteSizeMergePolicy = other._useLogByteSizeMergePolicy;
+      _docIdTranslatorMode = other._docIdTranslatorMode;
+      _caseSensitive = other._caseSensitive;
+      _storeInSegmentFile = other._storeInSegmentFile;
     }
 
     public TextIndexConfig build() {
-      return new TextIndexConfig(false, _fstType, _rawValueForTextIndex, _enableQueryCache, _useANDForMultiTermQueries,
+      return new TextIndexConfig(false, _rawValueForTextIndex, _enableQueryCache, _useANDForMultiTermQueries,
           _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile, _luceneMaxBufferSizeMB, _luceneAnalyzerClass,
           CsvParser.serialize(_luceneAnalyzerClassArgs, true, false),
           CsvParser.serialize(_luceneAnalyzerClassArgTypes, true, false),
           _luceneQueryParserClass, _enablePrefixSuffixMatchingInPhraseQueries, _reuseMutableIndex,
-          _luceneNRTCachingDirectoryMaxBufferSizeMB);
+          _luceneNRTCachingDirectoryMaxBufferSizeMB, _useLogByteSizeMergePolicy, _docIdTranslatorMode, _caseSensitive,
+          _storeInSegmentFile);
     }
 
     public abstract AbstractBuilder withProperties(@Nullable Map<String, String> textIndexProperties);
@@ -329,6 +451,26 @@ public class TextIndexConfig extends IndexConfig {
       _luceneNRTCachingDirectoryMaxBufferSizeMB = luceneNRTCachingDirectoryMaxBufferSizeMB;
       return this;
     }
+
+    public AbstractBuilder withUseLogByteSizeMergePolicy(boolean useLogByteSizeMergePolicy) {
+      _useLogByteSizeMergePolicy = useLogByteSizeMergePolicy;
+      return this;
+    }
+
+    public AbstractBuilder withDocIdTranslatorMode(String mode) {
+      _docIdTranslatorMode = DocIdTranslatorMode.of(mode);
+      return this;
+    }
+
+    public AbstractBuilder withCaseSensitive(boolean caseSensitive) {
+      _caseSensitive = caseSensitive;
+      return this;
+    }
+
+    public AbstractBuilder withStoreInSegmentFile(boolean storeInSegmentFile) {
+      _storeInSegmentFile = storeInSegmentFile;
+      return this;
+    }
   }
 
   @Override
@@ -349,23 +491,30 @@ public class TextIndexConfig extends IndexConfig {
         && _luceneMaxBufferSizeMB == that._luceneMaxBufferSizeMB
         && _enablePrefixSuffixMatchingInPhraseQueries == that._enablePrefixSuffixMatchingInPhraseQueries
         && _reuseMutableIndex == that._reuseMutableIndex
+        && _useLogByteSizeMergePolicy == that._useLogByteSizeMergePolicy
+        && _docIdTranslatorMode == that._docIdTranslatorMode
         && _luceneNRTCachingDirectoryMaxBufferSizeMB == that._luceneNRTCachingDirectoryMaxBufferSizeMB
-        && _fstType == that._fstType
         && Objects.equals(_rawValueForTextIndex, that._rawValueForTextIndex)
         && Objects.equals(_stopWordsInclude, that._stopWordsInclude)
         && Objects.equals(_stopWordsExclude, that._stopWordsExclude)
         && Objects.equals(_luceneAnalyzerClass, that._luceneAnalyzerClass)
         && Objects.equals(_luceneAnalyzerClassArgs, that._luceneAnalyzerClassArgs)
         && Objects.equals(_luceneAnalyzerClassArgTypes, that._luceneAnalyzerClassArgTypes)
-        && Objects.equals(_luceneQueryParserClass, that._luceneQueryParserClass);
+        && Objects.equals(_luceneQueryParserClass, that._luceneQueryParserClass)
+        && _caseSensitive == that._caseSensitive && _storeInSegmentFile == that._storeInSegmentFile;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), _fstType, _rawValueForTextIndex, _enableQueryCache,
-        _useANDForMultiTermQueries, _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile,
+    return Objects.hash(super.hashCode(), _rawValueForTextIndex, _enableQueryCache, _useANDForMultiTermQueries,
+        _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile,
         _luceneMaxBufferSizeMB, _luceneAnalyzerClass, _luceneAnalyzerClassArgs, _luceneAnalyzerClassArgTypes,
         _luceneQueryParserClass, _enablePrefixSuffixMatchingInPhraseQueries, _reuseMutableIndex,
-        _luceneNRTCachingDirectoryMaxBufferSizeMB);
+        _luceneNRTCachingDirectoryMaxBufferSizeMB, _useLogByteSizeMergePolicy, _docIdTranslatorMode, _caseSensitive,
+        _storeInSegmentFile);
+  }
+
+  public static boolean isProperty(String prop) {
+    return PROPERTY_NAMES.contains(prop);
   }
 }

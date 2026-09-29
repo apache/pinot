@@ -27,9 +27,7 @@ import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Forward index creator for dictionary-encoded unsorted single-value column.
- */
+/// Forward index creator for dictionary-encoded unsorted single-value column.
 public class SingleValueUnsortedForwardIndexCreator implements ForwardIndexCreator {
   private final FixedBitSVForwardIndexWriter _writer;
 

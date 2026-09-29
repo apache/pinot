@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.dociditerators;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.SortedDocIdSet;
@@ -35,19 +34,19 @@ public class SortedDocIdIteratorTest {
 
   @Test
   public void testPairWithSameStartAndEnd() {
-    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(Collections.singletonList(new Pairs.IntPair(1, 1)));
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(List.of(new Pairs.IntPair(1, 1)));
     BlockDocIdIterator iterator = sortedDocIdSet.iterator();
     List<Integer> result = new ArrayList<>();
     int docId;
     while ((docId = iterator.next()) != Constants.EOF) {
       result.add(docId);
     }
-    assertEquals(result, Collections.singletonList(1));
+    assertEquals(result, List.of(1));
   }
 
   @Test
   public void testOneDocIdRange() {
-    List<Pairs.IntPair> docIdRanges = Collections.singletonList(new Pairs.IntPair(5, 15));
+    List<Pairs.IntPair> docIdRanges = List.of(new Pairs.IntPair(5, 15));
     SortedDocIdIterator docIdIterator = new SortedDocIdSet(docIdRanges).iterator();
     assertEquals(docIdIterator.next(), 5);
     assertEquals(docIdIterator.next(), 6);

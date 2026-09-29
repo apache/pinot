@@ -195,22 +195,7 @@ kubectl get nodes
 
 ## How to setup a Pinot cluster for demo
 
-### Update helm dependency
-
-```bash
-helm dependency update
-```
-
 ### Start Pinot with Helm
-
-- For helm v3.X.X
-
-```bash
-kubectl create ns pinot-quickstart
-helm install pinot -n pinot-quickstart .
-```
-
-- For helm v3.X.X
 
 ```bash
 kubectl create ns pinot-quickstart
@@ -220,46 +205,6 @@ helm install -n pinot-quickstart pinot . --dry-run --debug
 
 # Install the Helm chart with:
 helm install -n pinot-quickstart pinot .
-```
-
-- For helm v2.12.1
-
-If cluster is just initialized, ensure helm is initialized by running:
-
-```bash
-helm init --service-account tiller
-```
-
-Then deploy pinot cluster by:
-
-```bash
-helm install --namespace "pinot-quickstart" --name "pinot" .
-```
-
-### Troubleshooting (For helm v2.12.1)
-
-- Error: Please run below command if encountering issue:
-
-```
-Error: could not find tiller".
-```
-
-- Resolution:
-
-```bash
-kubectl -n kube-system delete deployment tiller-deploy
-kubectl -n kube-system delete service/tiller-deploy
-helm init --service-account tiller
-```
-
-- Error: Please run below command if encountering permission issue:
-
-```Error: release pinot failed: namespaces "pinot-quickstart" is forbidden: User "system:serviceaccount:kube-system:default" cannot get resource "namespaces" in API group "" in the namespace "pinot-quickstart"```
-
-- Resolution:
-
-```bash
-kubectl apply -f helm-rbac.yaml
 ```
 
 #### To check deployment status
@@ -309,9 +254,9 @@ Please use below script to do local port-forwarding and open Pinot query console
 
 ## Configuring the Chart
 
-This chart includes a ZooKeeper chart as a dependency to the Pinot
-cluster in its `requirement.yaml` by default. The chart can be customized using the
-following configurable parameters:
+This chart includes a built-in ZooKeeper StatefulSet using the
+[official Apache ZooKeeper Docker image](https://hub.docker.com/_/zookeeper).
+The chart can be customized using the following configurable parameters:
 
 | Parameter                                      | Description                                                                                                                                                                | Default                                                            |
 |------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
@@ -415,15 +360,22 @@ following configurable parameters:
 | `minion.updateStrategy.type`                   | StatefulSet update strategy to use.                                                                                                                                        | `RollingUpdate`                                                    |
 | `minion.extra.configs`                         | Extra configs append to 'pinot-minion.conf' file to start Pinot Minion                                                                                                     | `pinot.set.instance.id.to.hostname=true`                           |
 |------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
-| `zookeeper.enabled`                            | If True, installs Zookeeper Chart                                                                                                                                          | `true`                                                             |
-| `zookeeper.resources`                          | Zookeeper resource requests and limits                                                                                                                                     | `{}`                                                               |
-| `zookeeper.env`                                | Environmental variables provided to Zookeeper Zookeeper                                                                                                                    | `{ZK_HEAP_SIZE: "256M"}`                                           |
-| `zookeeper.storage`                            | Zookeeper Persistent volume size                                                                                                                                           | `2Gi`                                                              |
-| `zookeeper.image.tag`                          | Zookeeper Image Version
-| `zookeeper.image.PullPolicy`                   | Zookeeper Container pull policy                                                                                                                                            | `IfNotPresent`                                                     |
-| `zookeeper.url`                                | URL of Zookeeper Cluster (unneeded if installing Zookeeper Chart)                                                                                                          | `""`                                                               |
-| `zookeeper.port`                               | Port of Zookeeper Cluster                                                                                                                                                  | `2181`                                                             |
+| `zookeeper.enabled`                            | If True, installs ZooKeeper StatefulSet                                                                                                                                    | `true`                                                             |
+| `zookeeper.urlOverride`                        | URL of external ZooKeeper cluster (used when `zookeeper.enabled` is false)                                                                                                 | `"my-zookeeper:2181/my-pinot"`                                     |
+| `zookeeper.port`                               | ZooKeeper client port                                                                                                                                                      | `2181`                                                             |
+| `zookeeper.replicaCount`                       | Number of ZooKeeper replicas                                                                                                                                               | `1`                                                                |
+| `zookeeper.image.repository`                   | ZooKeeper Docker image repository                                                                                                                                          | `zookeeper`                                                        |
+| `zookeeper.image.tag`                          | ZooKeeper Docker image tag                                                                                                                                                 | `3.9.3`                                                            |
+| `zookeeper.image.pullPolicy`                   | ZooKeeper container pull policy                                                                                                                                            | `IfNotPresent`                                                     |
+| `zookeeper.resources`                          | ZooKeeper resource requests and limits                                                                                                                                     | `{requests: {memory: "1.25Gi"}}`                                   |
+| `zookeeper.heapSize`                           | ZooKeeper JVM heap size in MB                                                                                                                                              | `"1024"`                                                           |
+| `zookeeper.jvmFlags`                           | Extra JVM flags for ZooKeeper                                                                                                                                              | `"-Djute.maxbuffer=4000000"`                                       |
+| `zookeeper.persistence.enabled`                | Use PVCs to persist ZooKeeper data                                                                                                                                         | `true`                                                             |
+| `zookeeper.persistence.size`                   | Default PV storage size for ZooKeeper                                                                                                                                      | `"8Gi"`                                                            |
+| `zookeeper.persistence.storageClass`           | Storage class of backing PVC                                                                                                                                               | `""`                                                               |
 | `zookeeper.affinity`                           | Defines affinities and anti-affinities for pods as defined in: <https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity> preferences | `{}`                                                               |
+| `zookeeper.nodeSelector`                       | Node labels for ZooKeeper pod assignment                                                                                                                                   | `{}`                                                               |
+| `zookeeper.tolerations`                        | List of node tolerations for ZooKeeper pods                                                                                                                                | `[]`                                                               |
 |------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
 
 Specify parameters using `--set key=value[,key=value]` argument to `helm install`

@@ -24,7 +24,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
-import java.nio.file.attribute.FileAttribute;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
@@ -34,25 +33,22 @@ import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
 
 
-/**
- * Implementation of {@link DictionaryBasedInvertedIndexCreator} that uses off-heap memory.
- * <p>We use 2 passes to create the inverted index.
- * <ul>
- *   <li>
- *     In the first pass (adding values phase), when add() method is called, store the dictIds into the forward index
- *     value buffer (for multi-valued column also store number of values for each docId into forward index length
- *     buffer). We also compute the inverted index length for each dictId while adding values.
- *   </li>
- *   <li>
- *     In the second pass (processing values phase), when seal() method is called, all the dictIds should already been
- *     added. We first reorder the values into the inverted index buffers by going over the dictIds in forward index
- *     value buffer (for multi-valued column we also need forward index length buffer to get the docId for each dictId).
- *     <p>Once we have the inverted index buffers, we simply go over them and create the bitmap for each dictId and
- *     serialize them into a file.
- *   </li>
- * </ul>
- * <p>Based on the number of values we need to store, we use direct memory or MMap file to allocate the buffer.
- */
+/// Implementation of [DictionaryBasedInvertedIndexCreator] that uses off-heap memory.
+///
+/// We use 2 passes to create the inverted index.
+///
+/// - In the first pass (adding values phase), when add() method is called, store the dictIds into the forward index
+///   value buffer (for multi-valued column also store number of values for each docId into forward index length
+///   buffer). We also compute the inverted index length for each dictId while adding values.
+/// - In the second pass (processing values phase), when seal() method is called, all the dictIds should already been
+///   added. We first reorder the values into the inverted index buffers by going over the dictIds in forward index
+///   value buffer (for multi-valued column we also need forward index length buffer to get the docId for each
+///   dictId).
+///
+///   Once we have the inverted index buffers, we simply go over them and create the bitmap for each dictId and
+///   serialize them into a file.
+///
+/// Based on the number of values we need to store, we use direct memory or MMap file to allocate the buffer.
 public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedInvertedIndexCreator {
   // Use MMapBuffer if the value buffer size is larger than 2G
   private static final int NUM_VALUES_THRESHOLD_FOR_MMAP_BUFFER = 500_000_000;
@@ -84,12 +80,10 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
   private PinotDataBuffer _invertedIndexValueBuffer;
   private PinotDataBuffer _invertedIndexLengthBuffer;
 
-  /**
-   * Like calling {@link #OffHeapBitmapInvertedIndexCreator(File, FieldSpec, int, int, int, String)} with the default
-   * {@link V1Constants.Indexes#BITMAP_INVERTED_INDEX_FILE_EXTENSION}.
-   *
-   * @see #OffHeapBitmapInvertedIndexCreator(File, FieldSpec, int, int, int, String)
-   */
+  /// Like calling [#OffHeapBitmapInvertedIndexCreator(File, FieldSpec, int, int, int, String)] with the default
+  /// [V1Constants.Indexes#BITMAP_INVERTED_INDEX_FILE_EXTENSION].
+  ///
+  /// @see #OffHeapBitmapInvertedIndexCreator(File, FieldSpec, int, int, int, String)
   public OffHeapBitmapInvertedIndexCreator(File indexDir, FieldSpec fieldSpec, int cardinality, int numDocs,
       int numValues)
       throws IOException {
@@ -97,29 +91,26 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
         V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
   }
 
-  /**
-   * Like calling {@link #OffHeapBitmapInvertedIndexCreator(File, String, boolean, int, int, int, String)} with
-   * the column name and single value specified by the given {@link FieldSpec}.
-   *
-   * @see #OffHeapBitmapInvertedIndexCreator(File, String, boolean, int, int, int, String)
-   */
+  /// Like calling [#OffHeapBitmapInvertedIndexCreator(File, String, boolean, int, int, int, String)] with
+  /// the column name and single value specified by the given [FieldSpec].
+  ///
+  /// @see #OffHeapBitmapInvertedIndexCreator(File, String, boolean, int, int, int, String)
   public OffHeapBitmapInvertedIndexCreator(File indexDir, FieldSpec fieldSpec, int cardinality, int numDocs,
       int numValues, String extension)
       throws IOException {
     this(indexDir, fieldSpec.getName(), fieldSpec.isSingleValueField(), cardinality, numDocs, numValues, extension);
   }
 
-  /**
-   * @param indexDir The directory where the index will be created.
-   * @param columnName The name of the column being indexed.
-   * @param singleValue True iff the column is single value.
-   * @param cardinality How many different values the column has.
-   * @param numDocs How many documents are expected.
-   * @param numValues How many values the index will have. This should be equal to numDocs in single value columns, but
-   *                  may be higher in multivalued columns.
-   * @param extension The suffix added to the file. Although is called extension, it behaves like
-   * {@link java.nio.file.Files#createTempFile(String, String, FileAttribute[])} suffix parameter.
-   */
+  /// @param indexDir The directory where the index will be created.
+  /// @param columnName The name of the column being indexed.
+  /// @param singleValue True iff the column is single value.
+  /// @param cardinality How many different values the column has.
+  /// @param numDocs How many documents are expected.
+  /// @param numValues How many values the index will have. This should be equal to numDocs in single value columns, but
+  ///                  may be higher in multivalued columns.
+  /// @param extension The suffix added to the file. Although is called extension, it behaves like
+  /// [java.nio.file.Files#createTempFile(String, String, java.nio.file.attribute.FileAttribute[])] suffix
+  /// parameter.
   public OffHeapBitmapInvertedIndexCreator(File indexDir, String columnName, boolean singleValue, int cardinality,
       int numDocs, int numValues, String extension)
       throws IOException {

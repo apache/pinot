@@ -20,16 +20,13 @@ package org.apache.pinot.common.messages;
 
 import com.google.common.base.Preconditions;
 import java.util.UUID;
-import javax.annotation.Nonnull;
 import org.apache.helix.model.Message;
 
-/**
- * This Helix message is sent from the controller to the servers to remove TableDataManager when the table is deleted.
- */
+/// This Helix message is sent from the controller to the servers to remove TableDataManager when the table is deleted.
 public class TableDeletionMessage extends Message {
   public static final String DELETE_TABLE_MSG_SUB_TYPE = "DELETE_TABLE";
 
-  public TableDeletionMessage(@Nonnull String tableNameWithType) {
+  public TableDeletionMessage(String tableNameWithType) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setResourceName(tableNameWithType);
     setMsgSubType(DELETE_TABLE_MSG_SUB_TYPE);

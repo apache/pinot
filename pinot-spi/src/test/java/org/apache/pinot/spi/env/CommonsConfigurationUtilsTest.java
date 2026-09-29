@@ -119,8 +119,8 @@ public class CommonsConfigurationUtilsTest {
     testPropertyValueWithSpecialCharacters("$${");
 
     for (int i = 0; i < NUM_ROUNDS; i++) {
-      testPropertyValueWithSpecialCharacters(RandomStringUtils.randomAscii(5));
-      testPropertyValueWithSpecialCharacters(StringUtils.remove(RandomStringUtils.random(5), '\0'));
+      testPropertyValueWithSpecialCharacters(RandomStringUtils.secure().nextAscii(5));
+      testPropertyValueWithSpecialCharacters(StringUtils.remove(RandomStringUtils.secure().next(5), '\0'));
     }
   }
 

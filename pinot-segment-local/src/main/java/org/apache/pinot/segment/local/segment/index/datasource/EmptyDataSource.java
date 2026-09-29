@@ -20,27 +20,24 @@ package org.apache.pinot.segment.local.segment.index.datasource;
 
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * The {@code EmptyImmutableDataSource} class is the data source for a column in the immutable segment with 0 rows.
- */
+/// The `EmptyImmutableDataSource` class is the data source for a column in the immutable segment with 0 rows.
 public class EmptyDataSource extends BaseDataSource {
 
-  public EmptyDataSource(ColumnMetadata columnMetadata) {
-    super(new EmptyDataSourceMetadata(columnMetadata), ColumnIndexContainer.Empty.INSTANCE);
+  public EmptyDataSource(FieldSpec fieldSpec) {
+    super(new EmptyDataSourceMetadata(fieldSpec), ColumnIndexContainer.Empty.INSTANCE);
   }
 
   private static class EmptyDataSourceMetadata implements DataSourceMetadata {
     final FieldSpec _fieldSpec;
 
-    EmptyDataSourceMetadata(ColumnMetadata columnMetadata) {
-      _fieldSpec = columnMetadata.getFieldSpec();
+    EmptyDataSourceMetadata(FieldSpec fieldSpec) {
+      _fieldSpec = fieldSpec;
     }
 
     @Override

@@ -38,9 +38,7 @@ import static org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapU
 import static org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils.STAR_TREE_INDEX_KEY;
 
 
-/**
- * The {@code StarTreeIndexCombiner} class combines multiple star-tree indexes into a single index file.
- */
+/// The `StarTreeIndexCombiner` class combines multiple star-tree indexes into a single index file.
 public class StarTreeIndexCombiner implements Closeable {
   private final FileChannel _fileChannel;
 
@@ -50,9 +48,7 @@ public class StarTreeIndexCombiner implements Closeable {
     _fileChannel = new RandomAccessFile(indexFile, "rw").getChannel();
   }
 
-  /**
-   * Combines the index files inside the given directory into the single index file, then cleans the directory.
-   */
+  /// Combines the index files inside the given directory into the single index file, then cleans the directory.
   public List<Pair<IndexKey, IndexValue>> combine(StarTreeV2BuilderConfig builderConfig, File starTreeIndexDir)
       throws IOException {
     List<Pair<IndexKey, IndexValue>> indexMap = new ArrayList<>();
@@ -66,6 +62,7 @@ public class StarTreeIndexCombiner implements Closeable {
       File dimensionIndexFile =
           new File(starTreeIndexDir, dimension + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
       indexMap.add(Pair.of(new IndexKey(IndexType.FORWARD_INDEX, dimension), writeFile(dimensionIndexFile)));
+      writeNullValueVectorIfExists(starTreeIndexDir, dimension, indexMap);
     }
 
     // Write metric (function-column pair) indexes
@@ -74,10 +71,25 @@ public class StarTreeIndexCombiner implements Closeable {
       File metricIndexFile =
           new File(starTreeIndexDir, metric + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
       indexMap.add(Pair.of(new IndexKey(IndexType.FORWARD_INDEX, metric), writeFile(metricIndexFile)));
+      writeNullValueVectorIfExists(starTreeIndexDir, metric, indexMap);
     }
 
     FileUtils.cleanDirectory(starTreeIndexDir);
     return indexMap;
+  }
+
+  /// Writes the null value vector for the given column if the builder created one.
+  ///
+  /// Only a null-aware star-tree creates them, and only for columns that actually contain null values, so a missing
+  /// file simply means there is nothing to record.
+  private void writeNullValueVectorIfExists(File starTreeIndexDir, String column,
+      List<Pair<IndexKey, IndexValue>> indexMap)
+      throws IOException {
+    File nullValueVectorFile =
+        new File(starTreeIndexDir, column + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
+    if (nullValueVectorFile.exists()) {
+      indexMap.add(Pair.of(new IndexKey(IndexType.NULL_VALUE_VECTOR, column), writeFile(nullValueVectorFile)));
+    }
   }
 
   private IndexValue writeFile(File srcFile)

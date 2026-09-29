@@ -26,17 +26,15 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * A {@link StreamPartitionMsgOffset} implementation for the Kinesis partition group consumption
- * A partition group consists of 1 shard. The KinesisCheckpoint maintains the shardId and sequenceNumber.
- * The sequenceNumber is the id (equivalent to offset in kafka) for the messages in the shard.
- * From the Kinesis documentation:
- * Each data record has a sequence number that is unique per partition-key within its shard.
- * Kinesis Data Streams assigns the sequence number after you write to the stream with client.putRecords or client
- * .putRecord.
- * Sequence numbers for the same partition key generally increase over time.
- * The longer the time period between write requests, the larger the sequence numbers become.
- */
+/// A [StreamPartitionMsgOffset] implementation for the Kinesis partition group consumption
+/// A partition group consists of 1 shard. The KinesisCheckpoint maintains the shardId and sequenceNumber.
+/// The sequenceNumber is the id (equivalent to offset in kafka) for the messages in the shard.
+/// From the Kinesis documentation:
+/// Each data record has a sequence number that is unique per partition-key within its shard.
+/// Kinesis Data Streams assigns the sequence number after you write to the stream with client.putRecords or client
+/// .putRecord.
+/// Sequence numbers for the same partition key generally increase over time.
+/// The longer the time period between write requests, the larger the sequence numbers become.
 public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
   private final String _shardId;
   private final String _sequenceNumber;
@@ -50,7 +48,7 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
     try {
       ObjectNode objectNode = (ObjectNode) JsonUtils.stringToJsonNode(offsetStr);
       Preconditions.checkArgument(objectNode.size() == 1);
-      Map.Entry<String, JsonNode> entry = objectNode.fields().next();
+      Map.Entry<String, JsonNode> entry = objectNode.properties().iterator().next();
       _shardId = entry.getKey();
       _sequenceNumber = entry.getValue().asText();
     } catch (Exception e) {

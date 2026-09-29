@@ -23,13 +23,12 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
 
 
-/**
- * A combined filter operator consisting of one main filter operator and one sub filter operator. The result block is
- * the AND result of the main and sub filter.
- */
+/// A combined filter operator consisting of one main filter operator and one sub filter operator. The result block is
+/// the AND result of the main and sub filter.
 public class CombinedFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_COMBINED";
 
@@ -62,7 +61,11 @@ public class CombinedFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getTrues() {
     Tracing.activeRecording().setNumChildren(2);
     BlockDocIdSet mainFilterDocIdSet = _mainFilterOperator.nextBlock().getNonScanFilterBLockDocIdSet();
+    BlockDocIdSet optimizedMainFilterDocIdSet = mainFilterDocIdSet.getOptimizedDocIdSet();
+    if (optimizedMainFilterDocIdSet instanceof EmptyDocIdSet) {
+      return EmptyDocIdSet.getInstance();
+    }
     BlockDocIdSet subFilterDocIdSet = _subFilterOperator.nextBlock().getBlockDocIdSet();
-    return new AndDocIdSet(Arrays.asList(mainFilterDocIdSet, subFilterDocIdSet), _queryOptions);
+    return new AndDocIdSet(Arrays.asList(optimizedMainFilterDocIdSet, subFilterDocIdSet), _queryOptions);
   }
 }

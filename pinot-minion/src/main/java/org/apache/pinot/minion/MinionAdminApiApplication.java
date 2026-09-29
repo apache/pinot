@@ -37,13 +37,10 @@ import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 
 
-/**
- * Admin APP for Pinot Minion.
- * <ul>
- *   <li>Starts a http server.</li>
- *   <li>Sets up swagger.</li>
- * </ul>
- */
+/// Admin APP for Pinot Minion.
+///
+/// - Starts a http server.
+/// - Sets up swagger.
 public class MinionAdminApiApplication extends ResourceConfig {
   private static final String RESOURCE_PACKAGE = "org.apache.pinot.minion.api.resources";
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";

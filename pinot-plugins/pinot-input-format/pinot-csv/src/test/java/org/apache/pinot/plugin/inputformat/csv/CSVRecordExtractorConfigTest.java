@@ -21,9 +21,7 @@ package org.apache.pinot.plugin.inputformat.csv;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for {@link CSVRecordExtractorConfig}
- */
+/// Tests for [CSVRecordExtractorConfig]
 public class CSVRecordExtractorConfigTest {
 
   @Test

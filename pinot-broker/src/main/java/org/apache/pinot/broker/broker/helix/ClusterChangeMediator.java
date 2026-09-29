@@ -44,15 +44,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code ClusterChangeMediator} handles the changes from Helix cluster.
- * <p>
- * <p>If there is no change callback in 1 hour, proactively check changes so that the changes are getting processed even
- * when callbacks stop working.
- * <p>NOTE: disable Helix batch-mode and perform deduplication in this class. This can save us the extra threads for
- * handling Helix batch-mode, and let us track the cluster change queue time.
- * <p>NOTE: disable Helix pre-fetch to reduce the ZK accesses.
- */
+/// The `ClusterChangeMediator` handles the changes from Helix cluster.
+///
+/// If there is no change callback in 1 hour, proactively check changes so that the changes are getting processed even
+/// when callbacks stop working.
+///
+/// NOTE: disable Helix batch-mode and perform deduplication in this class. This can save us the extra threads for
+/// handling Helix batch-mode, and let us track the cluster change queue time.
+///
+/// NOTE: disable Helix pre-fetch to reduce the ZK accesses.
 @BatchMode(enabled = false)
 @PreFetch(enabled = false)
 public class ClusterChangeMediator
@@ -146,18 +146,14 @@ public class ClusterChangeMediator
     _lastProcessTimeMap.put(changeType, endTime);
   }
 
-  /**
-   * Starts the cluster change mediator.
-   */
+  /// Starts the cluster change mediator.
   public void start() {
     LOGGER.info("Starting ClusterChangeMediator");
     _running = true;
     _clusterChangeHandlingThread.start();
   }
 
-  /**
-   * Stops the cluster change mediator.
-   */
+  /// Stops the cluster change mediator.
   public void stop() {
     LOGGER.info("Stopping ClusterChangeMediator");
     _running = false;
@@ -210,12 +206,10 @@ public class ClusterChangeMediator
     enqueueChange(ChangeType.LIVE_INSTANCE);
   }
 
-  /**
-   * Helper method to enqueue a change from the Helix callback to be processed by the cluster change handling thread. If
-   * the handling thread is dead, directly process the change.
-   *
-   * @param changeType Type of the change
-   */
+  /// Helper method to enqueue a change from the Helix callback to be processed by the cluster change handling
+  /// thread. If the handling thread is dead, directly process the change.
+  ///
+  /// @param changeType Type of the change
   private void enqueueChange(ChangeType changeType) {
     // Do not enqueue or process changes if already stopped
     if (!_running) {

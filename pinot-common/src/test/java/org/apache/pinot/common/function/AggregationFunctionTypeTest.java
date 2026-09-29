@@ -31,6 +31,7 @@ public class AggregationFunctionTypeTest {
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MiN"), AggregationFunctionType.MIN);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MaX"), AggregationFunctionType.MAX);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("SuM"), AggregationFunctionType.SUM);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("SuMInT"), AggregationFunctionType.SUMINT);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("AvG"), AggregationFunctionType.AVG);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MoDe"), AggregationFunctionType.MODE);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("FiRsTwItHtImE"),
@@ -87,6 +88,8 @@ public class AggregationFunctionTypeTest {
         AggregationFunctionType.DISTINCTCOUNTULL);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnTrAwUll"),
         AggregationFunctionType.DISTINCTCOUNTRAWULL);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnTsMaRtUlL"),
+        AggregationFunctionType.DISTINCTCOUNTSMARTULL);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)

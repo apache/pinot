@@ -51,6 +51,8 @@ spec:
 {{ toYaml .Values.minionStateless.affinity | indent 8 }}
       tolerations:
 {{ toYaml .Values.minionStateless.tolerations | indent 8 }}
+      initContainers:
+{{ toYaml .Values.minionStateless.initContainers | indent 8 }}
       containers:
       - name: minion-stateless
         securityContext:

@@ -24,7 +24,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
@@ -33,6 +32,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -59,40 +60,44 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
   private final File _indexDir;
   private final File _segmentDirectory;
-  private final SegmentLock _segmentLock;
   private final ReadMode _readMode;
+  private final SegmentDirectoryLoaderContext _segmentDirectoryLoaderContext;
+  private final SegmentLock _segmentLock = new SegmentLock();
   private SegmentMetadataImpl _segmentMetadata;
   private ColumnIndexDirectory _columnIndexDirectory;
   private StarTreeIndexReader _starTreeIndexReader;
   private String _tier;
+  private boolean _hasMultiColumnTextIndex;
 
   // Create an empty SegmentLocalFSDirectory object mainly used to
   // prepare env for subsequent processing on the segment.
-  public SegmentLocalFSDirectory(File directory) {
-    _indexDir = directory;
+  public SegmentLocalFSDirectory(File indexDir) {
+    _indexDir = indexDir;
     _segmentDirectory = null;
-    _segmentLock = new SegmentLock();
     _readMode = null;
+    _segmentDirectoryLoaderContext = null;
   }
 
-  public SegmentLocalFSDirectory(File directory, ReadMode readMode)
+  public SegmentLocalFSDirectory(File indexDir, ReadMode readMode)
       throws IOException, ConfigurationException {
-    this(directory, new SegmentMetadataImpl(directory), readMode);
+    this(indexDir, new SegmentMetadataImpl(indexDir), readMode, null);
   }
 
   @VisibleForTesting
-  public SegmentLocalFSDirectory(File directoryFile, SegmentMetadataImpl metadata, ReadMode readMode) {
+  public SegmentLocalFSDirectory(File indexDir, SegmentMetadataImpl metadata, ReadMode readMode)
+      throws IOException, ConfigurationException {
+    this(indexDir, metadata, readMode, null);
+  }
 
-    Preconditions.checkNotNull(directoryFile);
-    Preconditions.checkNotNull(metadata);
-
-    _indexDir = directoryFile;
-    _segmentDirectory = getSegmentPath(directoryFile, metadata.getVersion());
-    Preconditions.checkState(_segmentDirectory.exists(), "Segment directory: " + directoryFile + " must exist");
-
-    _segmentLock = new SegmentLock();
+  public SegmentLocalFSDirectory(File indexDir, SegmentMetadataImpl metadata, ReadMode readMode,
+      @Nullable SegmentDirectoryLoaderContext segmentDirectoryLoaderContext) {
+    _indexDir = indexDir;
+    _segmentDirectory = getSegmentPath(indexDir, metadata.getVersion());
+    Preconditions.checkState(_segmentDirectory.exists(), "Segment directory: " + indexDir + " must exist");
     _segmentMetadata = metadata;
     _readMode = readMode;
+    _segmentDirectoryLoaderContext = segmentDirectoryLoaderContext;
+
     try {
       load();
     } catch (IOException | ConfigurationException e) {
@@ -176,13 +181,9 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     // or default columns will not exist.
 
     // check that v3 subdirectory exists since the format may not have been converted
-    if (_segmentDirectory.exists()) {
-      try {
-        return FileUtils.sizeOfDirectory(_segmentDirectory.toPath().toFile());
-      } catch (IllegalArgumentException e) {
-        LOGGER.error("Failed to read disk size for directory: {}", _segmentDirectory.getAbsolutePath());
-        return -1;
-      }
+    if (_segmentDirectory != null && _segmentDirectory.exists()) {
+      // A concurrent reload may be rewriting this directory in place, so use the delete-tolerant walk.
+      return org.apache.pinot.common.utils.FileUtils.sizeOfDirectory(_segmentDirectory);
     } else {
       if (!SegmentDirectoryPaths.isV3Directory(_segmentDirectory)) {
         LOGGER
@@ -209,7 +210,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   @Override
   public Set<String> getColumnsWithIndex(IndexType<?, ?, ?> type) {
     if (_columnIndexDirectory == null) {
-      return Collections.emptySet();
+      return Set.of();
     }
     return _columnIndexDirectory.getColumnsWithIndex(type);
   }
@@ -258,7 +259,8 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
         break;
       case v3:
         try {
-          _columnIndexDirectory = new SingleFileIndexDirectory(_segmentDirectory, _segmentMetadata, _readMode);
+          _columnIndexDirectory = new SingleFileIndexDirectory(_segmentDirectory, _segmentMetadata,
+              _segmentDirectoryLoaderContext, _readMode);
         } catch (ConfigurationException e) {
           LOGGER.error("Failed to create columnar index directory", e);
           throw new RuntimeException(e);
@@ -267,6 +269,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       default:
         break;
     }
+
     if (_segmentMetadata.getStarTreeV2MetadataList() != null) {
       try {
         _starTreeIndexReader = new StarTreeIndexReader(_segmentDirectory, _segmentMetadata, _readMode);
@@ -274,6 +277,10 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
         throw new RuntimeException(e);
       }
     }
+
+    _hasMultiColumnTextIndex = _segmentMetadata.getMultiColumnTextMetadata() != null
+        && SegmentDirectoryPaths.findTextIndexIndexFile(_segmentDirectory, MultiColumnTextIndexConstants.INDEX_DIR_NAME)
+        != null;
   }
 
   @Override
@@ -360,6 +367,11 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     @Override
     public boolean hasStarTreeIndex() {
       return _starTreeIndexReader != null;
+    }
+
+    @Override
+    public boolean hasMultiColumnTextIndex() {
+      return _hasMultiColumnTextIndex;
     }
 
     @Override

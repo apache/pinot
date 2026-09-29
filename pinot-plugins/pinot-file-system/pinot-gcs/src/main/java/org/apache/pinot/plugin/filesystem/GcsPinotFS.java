@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.filesystem;
 
 import com.google.api.gax.paging.Page;
+import com.google.api.gax.rpc.FixedHeaderProvider;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.storage.Blob;
@@ -32,8 +33,8 @@ import com.google.cloud.storage.StorageBatchResult;
 import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -42,10 +43,14 @@ import java.nio.channels.Channels;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -64,14 +69,20 @@ public class GcsPinotFS extends BasePinotFS {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GcsPinotFS.class);
   // See https://cloud.google.com/storage/docs/json_api/v1/how-tos/batch
-  private static final int BATCH_LIMIT = 100;
+  private static final int DELETE_BATCH_LIMIT = 100;
   private Storage _storage;
 
   @Override
   public void init(PinotConfiguration config) {
+    String version = GcsPinotFS.class.getPackage().getImplementationVersion();
+    if (version == null) {
+      version = "unknown";
+    }
+    String userAgent = "apache-pinot/" + version + " (GPN:apache-pinot)";
     Credentials credentials = null;
     try {
-      StorageOptions.Builder storageBuilder = StorageOptions.newBuilder();
+      StorageOptions.Builder storageBuilder = StorageOptions.newBuilder()
+          .setHeaderProvider(FixedHeaderProvider.create(Map.of("User-Agent", userAgent)));
       if (!Strings.isNullOrEmpty(config.getProperty(PROJECT_ID))) {
         LOGGER.info("Configs are: {}, {}", PROJECT_ID, config.getProperty(PROJECT_ID));
         String projectId = config.getProperty(PROJECT_ID);
@@ -119,9 +130,8 @@ public class GcsPinotFS extends BasePinotFS {
       if (existsDirectoryOrBucket(gcsUri)) {
         return true;
       }
-      Blob blob =
-          _storage.create(BlobInfo.newBuilder(BlobId.of(gcsUri.getBucketName(), directoryPath)).build(), new byte[0]);
-      return blob.exists();
+      _storage.create(BlobInfo.newBuilder(BlobId.of(gcsUri.getBucketName(), directoryPath)).build(), new byte[0]);
+      return true;
     } catch (Exception e) {
       throw new IOException(e);
     }
@@ -132,6 +142,31 @@ public class GcsPinotFS extends BasePinotFS {
       throws IOException {
     LOGGER.info("Deleting uri {} force {}", segmentUri, forceDelete);
     return delete(new GcsUri(segmentUri), forceDelete);
+  }
+
+  @Override
+  public boolean deleteBatch(List<URI> segmentUris, boolean forceDelete)
+      throws IOException {
+    boolean result = true;
+    List<BlobId> blobIds = new ArrayList<>();
+    Iterator<URI> iterator = segmentUris.iterator();
+    while (iterator.hasNext()) {
+      GcsUri gcsUri = new GcsUri(iterator.next());
+      if (existsDirectoryOrBucket(gcsUri)) {
+        result &= delete(gcsUri, forceDelete);
+      } else {
+        Blob blob = getBlob(gcsUri);
+        if (blob != null) {
+          blobIds.add(blob.getBlobId());
+        }
+        if (blobIds.size() >= DELETE_BATCH_LIMIT || (!blobIds.isEmpty() && !iterator.hasNext())) {
+          List<Boolean> deleted = _storage.delete(blobIds);
+          result &= deleted.stream().allMatch(Boolean::booleanValue);
+          blobIds.clear();
+        }
+      }
+    }
+    return result;
   }
 
   @Override
@@ -184,7 +219,7 @@ public class GcsPinotFS extends BasePinotFS {
 
   private String[] listFilesFromGcsUri(GcsUri gcsFileUri, boolean recursive)
       throws IOException {
-    ImmutableList.Builder<String> builder = ImmutableList.builder();
+    ArrayList<String> builder = new ArrayList<>();
     String prefix = gcsFileUri.getPrefix();
     String bucketName = gcsFileUri.getBucketName();
     visitFiles(gcsFileUri, recursive, blob -> {
@@ -192,7 +227,7 @@ public class GcsPinotFS extends BasePinotFS {
         builder.add(GcsUri.createGcsUri(bucketName, blob.getName()).toString());
       }
     });
-    String[] listedFiles = builder.build().toArray(new String[0]);
+    String[] listedFiles = builder.toArray(new String[0]);
     LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, gcsFileUri, recursive);
     return listedFiles;
   }
@@ -200,7 +235,7 @@ public class GcsPinotFS extends BasePinotFS {
   @Override
   public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
       throws IOException {
-    ImmutableList.Builder<FileMetadata> listBuilder = ImmutableList.builder();
+    List<FileMetadata> listBuilder = new ArrayList<>();
     GcsUri gcsFileUri = new GcsUri(fileUri);
     String prefix = gcsFileUri.getPrefix();
     String bucketName = gcsFileUri.getBucketName();
@@ -213,16 +248,72 @@ public class GcsPinotFS extends BasePinotFS {
             new FileMetadata.Builder().setFilePath(GcsUri.createGcsUri(bucketName, blob.getName()).toString())
                 .setLength(blob.getSize()).setIsDirectory(isDirectory);
         if (!isDirectory) {
-          // Note: if it's a directory, updateTime is set to null, and calling this getter leads to NPE.
-          // public Long getUpdateTime() { return updateTime; }. So skip this for directory.
-          fileBuilder.setLastModifiedTime(blob.getUpdateTime());
+          OffsetDateTime blobUpdateTime = blob.getUpdateTimeOffsetDateTime();
+          if (blobUpdateTime != null) {
+            fileBuilder.setLastModifiedTime(blobUpdateTime.toInstant().toEpochMilli());
+          }
         }
         listBuilder.add(fileBuilder.build());
       }
     });
-    ImmutableList<FileMetadata> listedFiles = listBuilder.build();
+    List<FileMetadata> listedFiles = List.copyOf(listBuilder);
     LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.size(), gcsFileUri, recursive);
     return listedFiles;
+  }
+
+  @Override
+  public List<FileMetadata> listFilesWithMetadata(final URI fileUri, final boolean recursive,
+      final Predicate<String> pathFilter, final int maxResults)
+      throws IOException {
+    if (maxResults <= 0) {
+      LOGGER.warn("listFilesWithMetadata called with maxResults={}, returning empty list", maxResults);
+      return new ArrayList<>();
+    }
+    final List<FileMetadata> result = new ArrayList<>();
+    final GcsUri gcsFileUri = new GcsUri(fileUri);
+    final String prefix = gcsFileUri.getPrefix();
+    final String bucketName = gcsFileUri.getBucketName();
+    try {
+      Page<Blob> page;
+      if (recursive) {
+        page = _storage.list(bucketName, Storage.BlobListOption.prefix(prefix));
+      } else {
+        page = _storage.list(bucketName, Storage.BlobListOption.prefix(prefix),
+            Storage.BlobListOption.currentDirectory());
+      }
+      while (page != null && result.size() < maxResults) {
+        for (final Blob blob : page.getValues()) {
+          if (blob.getName().equals(prefix)) {
+            continue;
+          }
+          final boolean isDirectory = blob.getName().endsWith(GcsUri.DELIMITER);
+          if (isDirectory) {
+            continue;
+          }
+          final String filePath = GcsUri.createGcsUri(bucketName, blob.getName()).toString();
+          if (pathFilter.test(filePath)) {
+            final FileMetadata.Builder fileBuilder = new FileMetadata.Builder()
+                .setFilePath(filePath)
+                .setLength(blob.getSize())
+                .setIsDirectory(false);
+            OffsetDateTime blobUpdateTime = blob.getUpdateTimeOffsetDateTime();
+            if (blobUpdateTime != null) {
+              fileBuilder.setLastModifiedTime(blobUpdateTime.toInstant().toEpochMilli());
+            }
+            result.add(fileBuilder.build());
+            if (result.size() >= maxResults) {
+              break;
+            }
+          }
+        }
+        page = page.hasNextPage() ? page.getNextPage() : null;
+      }
+    } catch (Exception t) {
+      throw new IOException(t);
+    }
+    LOGGER.info("Listed {} files (max: {}) from URI: {}, is recursive: {}",
+        result.size(), maxResults, gcsFileUri, recursive);
+    return result;
   }
 
   @Override
@@ -255,7 +346,12 @@ public class GcsPinotFS extends BasePinotFS {
   @Override
   public long lastModified(URI uri)
       throws IOException {
-    return getBlob(new GcsUri(uri)).getUpdateTime();
+    Blob blob = getBlob(new GcsUri(uri));
+    if (blob == null) {
+      return 0L;
+    }
+    OffsetDateTime updateTime = blob.getUpdateTimeOffsetDateTime();
+    return updateTime != null ? updateTime.toInstant().toEpochMilli() : 0L;
   }
 
   @Override
@@ -265,10 +361,16 @@ public class GcsPinotFS extends BasePinotFS {
       LOGGER.info("touch {}", uri);
       GcsUri gcsUri = new GcsUri(uri);
       Blob blob = getBlob(gcsUri);
-      long updateTime = blob.getUpdateTime();
+      if (blob == null) {
+        // PinotFS contract: if the file does not exist, create an empty file
+        BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(gcsUri.getBucketName(), gcsUri.getPath())).build();
+        _storage.create(blobInfo, new byte[0]);
+        return true;
+      }
+      // Any successful GCS objects.patch call advances the blob's updateTime server-side,
+      // so returning true on success (and propagating StorageException on failure) is correct.
       _storage.update(blob.toBuilder().setMetadata(blob.getMetadata()).build());
-      long newUpdateTime = getBlob(gcsUri).getUpdateTime();
-      return newUpdateTime > updateTime;
+      return true;
     } catch (StorageException e) {
       throw new IOException(e);
     }
@@ -279,6 +381,9 @@ public class GcsPinotFS extends BasePinotFS {
       throws IOException {
     try {
       Blob blob = getBlob(new GcsUri(uri));
+      if (blob == null) {
+        throw new FileNotFoundException("File '" + uri + "' does not exist");
+      }
       return Channels.newInputStream(blob.reader());
     } catch (StorageException e) {
       throw new IOException(e);
@@ -311,13 +416,11 @@ public class GcsPinotFS extends BasePinotFS {
     return gcsUri.getPath().endsWith(GcsUri.DELIMITER);
   }
 
-  /**
-   * Returns true if this is an existing directory
-   *
-   * @param gcsUri
-   * @return true if the directory exists
-   * @throws IOException
-   */
+  /// Returns true if this is an existing directory
+  ///
+  /// @param gcsUri
+  /// @return true if the directory exists
+  /// @throws IOException
   private boolean existsDirectoryOrBucket(GcsUri gcsUri)
       throws IOException {
     String prefix = gcsUri.getPrefix();
@@ -395,7 +498,7 @@ public class GcsPinotFS extends BasePinotFS {
       throws IOException {
     try {
       if (!exists(segmentUri)) {
-        return forceDelete;
+        return false;
       }
       if (existsDirectoryOrBucket(segmentUri)) {
         if (!forceDelete && !isEmptyDirectory(segmentUri)) {
@@ -428,7 +531,7 @@ public class GcsPinotFS extends BasePinotFS {
     for (Blob blob : page.iterateAll()) {
       results.add(batch.delete(blob.getBlobId()));
       batchSize++;
-      if (batchSize >= BATCH_LIMIT) {
+      if (batchSize >= DELETE_BATCH_LIMIT) {
         batch.submit();
         deleteSucceeded &= results.stream().allMatch(r -> r != null && r.get());
         results = new ArrayList<>();
@@ -445,17 +548,19 @@ public class GcsPinotFS extends BasePinotFS {
   private boolean copyFile(GcsUri srcUri, GcsUri dstUri)
       throws IOException {
     Blob blob = getBlob(srcUri);
-    Blob newBlob =
-        _storage.create(BlobInfo.newBuilder(BlobId.of(dstUri.getBucketName(), dstUri.getPath())).build(), new byte[0]);
-    CopyWriter copyWriter = blob.copyTo(newBlob.getBlobId());
+    if (blob == null) {
+      throw new FileNotFoundException("Source file '" + srcUri + "' does not exist");
+    }
+    BlobId dstBlobId = BlobId.of(dstUri.getBucketName(), dstUri.getPath());
+    CopyWriter copyWriter = blob.copyTo(dstBlobId);
     copyWriter.getResult();
-    return copyWriter.isDone() && blob.exists();
+    return copyWriter.isDone();
   }
 
   private boolean copy(GcsUri srcUri, GcsUri dstUri)
       throws IOException {
     if (!exists(srcUri)) {
-      throw new IOException(String.format("Source URI '%s' does not exist", srcUri));
+      throw new IOException("Source URI '" + srcUri + "' does not exist");
     }
     if (srcUri.equals(dstUri)) {
       return true;
@@ -466,16 +571,14 @@ public class GcsPinotFS extends BasePinotFS {
     }
     // copy directory
     if (srcUri.hasSubpath(dstUri) || dstUri.hasSubpath(srcUri)) {
-      throw new IOException(String.format("Cannot copy from or to a subdirectory: '%s' -> '%s'", srcUri, dstUri));
+      throw new IOException("Cannot copy from or to a subdirectory: '" + srcUri + "' -> '" + dstUri + "'");
     }
-    /**
-     * If an non-empty blob exists and does not end with "/"
-     * gcs will create a 0 length blob ending with "/".
-     * So you can have something like a file with a subdirectory.
-     * This is due to gcs behavior:
-     *
-     * @see https://cloud.google.com/storage/docs/gsutil/addlhelp/HowSubdirectoriesWork
-     */
+    /// If an non-empty blob exists and does not end with "/"
+    /// gcs will create a 0 length blob ending with "/".
+    /// So you can have something like a file with a subdirectory.
+    /// This is due to gcs behavior:
+    ///
+    /// @see https://cloud.google.com/storage/docs/gsutil/addlhelp/HowSubdirectoriesWork
     if (!existsDirectoryOrBucket(dstUri)) {
       mkdir(dstUri.getUri());
     }

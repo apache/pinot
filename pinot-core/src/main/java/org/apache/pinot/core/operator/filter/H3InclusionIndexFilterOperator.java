@@ -21,8 +21,8 @@ package org.apache.pinot.core.operator.filter;
 import com.google.common.base.CaseFormat;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongSet;
-import java.util.Collections;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
@@ -37,6 +37,7 @@ import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.locationtech.jts.geom.Geometry;
 import org.roaringbitmap.buffer.BufferFastAggregation;
@@ -44,9 +45,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * A filter operator that uses H3 index for geospatial data inclusion
- */
+/// A filter operator that uses H3 index for geospatial data inclusion
 public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "INCLUSION_FILTER_H3_INDEX";
   private static final String LITERAL_H3_CELLS_CACHE_NAME = "st_contain_literal_h3_cells";
@@ -54,6 +53,7 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
   private final IndexSegment _segment;
   private final QueryContext _queryContext;
   private final Predicate _predicate;
+  private final String _column;
   private final H3IndexReader _h3IndexReader;
   private final Geometry _geometry;
   private final boolean _isPositiveCheck;
@@ -70,12 +70,13 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
     _isPositiveCheck = BooleanUtils.toBoolean(eqPredicate.getValue());
 
     if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
-      _h3IndexReader = segment.getDataSource(arguments.get(0).getIdentifier()).getH3Index();
+      _column = arguments.get(0).getIdentifier();
       _geometry = GeometrySerializer.deserialize(arguments.get(1).getLiteral().getBytesValue());
     } else {
-      _h3IndexReader = segment.getDataSource(arguments.get(1).getIdentifier()).getH3Index();
+      _column = arguments.get(1).getIdentifier();
       _geometry = GeometrySerializer.deserialize(arguments.get(0).getLiteral().getBytesValue());
     }
+    _h3IndexReader = segment.getDataSource(_column).getH3Index();
     // must be some h3 index
     assert _h3IndexReader != null : "the column must have H3 index setup.";
   }
@@ -114,13 +115,17 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
       MutableRoaringBitmap fullNotMatch = potentialMatch.clone();
       fullNotMatch.flip(0L, _numDocs);
       fullNotMatch.andNot(fullMatch);
+      // The flip turns non-matching docs into full not-matches, but null geometries have no posting and must not be
+      // reported as matches for the negative check when query null handling is enabled, so exclude them.
+      ImmutableRoaringBitmap nullDocIds = getNullDocIds();
+      if (nullDocIds != null) {
+        fullNotMatch.andNot(nullDocIds);
+      }
       return getFilterBlock(fullNotMatch, potentialMatch);
     }
   }
 
-  /**
-   * Returns the filter block document IDs based on the given the partial match doc ids.
-   */
+  /// Returns the filter block document IDs based on the given the partial match doc ids.
   private BlockDocIdSet getFilterBlock(MutableRoaringBitmap fullMatchDocIds, MutableRoaringBitmap partialMatchDocIds) {
     ExpressionFilterOperator expressionFilterOperator =
         new ExpressionFilterOperator(_segment, _queryContext, _predicate, _numDocs);
@@ -135,9 +140,25 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
     };
   }
 
+  /// Returns the null document IDs for the indexed column when query null handling is enabled and the column has a
+  /// non-empty null-value vector, otherwise `null`. Used to exclude null rows from the negative-check complement
+  /// result, which is built across all document IDs and would otherwise include null rows that have no H3 posting.
+  @Nullable
+  private ImmutableRoaringBitmap getNullDocIds() {
+    if (!_queryContext.isNullHandlingEnabled()) {
+      return null;
+    }
+    NullValueVectorReader nullValueVector = _segment.getDataSource(_column).getNullValueVector();
+    if (nullValueVector == null) {
+      return null;
+    }
+    ImmutableRoaringBitmap nullDocIds = nullValueVector.getNullBitmap();
+    return nullDocIds != null && !nullDocIds.isEmpty() ? nullDocIds : null;
+  }
+
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

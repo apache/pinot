@@ -26,10 +26,8 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Bit-compressed dictionary-encoded forward index reader for single-value columns. The values returned are dictionary
- * ids.
- */
+/// Bit-compressed dictionary-encoded forward index reader for single-value columns. The values returned are dictionary
+/// ids.
 public final class FixedBitSVForwardIndexReaderV2 implements ForwardIndexReader<ForwardIndexReaderContext> {
   private final FixedBitIntReader _reader;
   private final int _numDocs;
@@ -65,6 +63,16 @@ public final class FixedBitSVForwardIndexReaderV2 implements ForwardIndexReader<
   public void readDictIds(int[] docIds, int length, int[] dictIdBuffer, ForwardIndexReaderContext context) {
     int firstDocId = docIds[0];
     int lastDocId = docIds[length - 1];
+    if (firstDocId <= lastDocId) {
+      readDictIdsAsc(docIds, length, dictIdBuffer, context);
+    } else {
+      readDictIdsDesc(docIds, length, dictIdBuffer, context);
+    }
+  }
+
+  private void readDictIdsAsc(int[] docIds, int length, int[] dictIdBuffer, ForwardIndexReaderContext context) {
+    int firstDocId = docIds[0];
+    int lastDocId = docIds[length - 1];
     int index = 0;
 
     // Use bulk read if the doc ids are sequential
@@ -95,6 +103,13 @@ public final class FixedBitSVForwardIndexReaderV2 implements ForwardIndexReader<
           dictIdBuffer[i] = _reader.readUnchecked(docIds[i]);
         }
       }
+    }
+  }
+
+  private void readDictIdsDesc(int[] docIds, int length, int[] dictIdBuffer, ForwardIndexReaderContext context) {
+    // TODO: Implement bulk read for descending order
+    for (int i = 0; i < length; i++) {
+      dictIdBuffer[i] = _reader.read(docIds[i]);
     }
   }
 

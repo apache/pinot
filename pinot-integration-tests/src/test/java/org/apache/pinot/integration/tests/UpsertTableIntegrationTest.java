@@ -21,10 +21,10 @@ package org.apache.pinot.integration.tests;
 import com.google.common.base.Joiner;
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskState;
@@ -34,21 +34,24 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.integration.tests.models.DummyTableUpsertMetadataManager;
-import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
-import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -61,13 +64,11 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Input data - Scores of players
- * Schema
- *  - Dimension fields: playerId:int (primary key), name:string, game:string, deleted:boolean
- *  - Metric fields: score:float
- *  - DataTime fields: timestampInEpoch:long
- */
+/// Input data - Scores of players
+/// Schema
+///  - Dimension fields: playerId:int (primary key), name:string, game:string, deleted:boolean
+///  - Metric fields: score:float
+///  - DataTime fields: timestampInEpoch:long
 public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
   private static final String INPUT_DATA_SMALL_TAR_FILE = "gameScores_csv.tar.gz";
   private static final String INPUT_DATA_LARGE_TAR_FILE = "gameScores_large_csv.tar.gz";
@@ -182,13 +183,16 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   private void waitForAllDocsLoaded(String tableName, long timeoutMs, long expectedCountStarWithoutUpsertResult) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        return queryCountStarWithoutUpsert(tableName) == expectedCountStarWithoutUpsertResult;
-      } catch (Exception e) {
-        return null;
+    TestUtils.waitForCondition(() -> {
+      // Query 10 times to get result from both servers (query should be distributed to both servers in a round-robin
+      // fashion, but query more times to be more robust)
+      for (int i = 0; i < 10; i++) {
+        if (queryCountStarWithoutUpsert(tableName) != expectedCountStarWithoutUpsertResult) {
+          return false;
+        }
       }
-    }, timeoutMs, "Failed to load all documents");
+      return true;
+    }, 100L, timeoutMs, "Failed to load all documents", null);
   }
 
   private void waitForNumQueriedSegmentsToConverge(String tableName, long timeoutMs, int expectedNumSegmentsQueried) {
@@ -199,11 +203,20 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
       int expectedNumConsumingSegmentsQueried) {
     // Do not tolerate exception here because it is always followed by the docs check
     TestUtils.waitForCondition(aVoid -> {
-      ExecutionStats executionStats =
-          getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName).getExecutionStats();
-      return executionStats.getNumSegmentsQueried() == expectedNumSegmentsQueried && (
-          expectedNumConsumingSegmentsQueried < 0
-              || executionStats.getNumConsumingSegmentsQueried() == expectedNumConsumingSegmentsQueried);
+      // Query 10 times to get result from both servers (query should be distributed to both servers in a round-robin
+      // fashion, but query more times to be more robust)
+      for (int i = 0; i < 10; i++) {
+        ExecutionStats executionStats =
+            getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName).getExecutionStats();
+        if (executionStats.getNumSegmentsQueried() != expectedNumSegmentsQueried) {
+          return false;
+        }
+        if (expectedNumConsumingSegmentsQueried >= 0
+            && executionStats.getNumConsumingSegmentsQueried() != expectedNumConsumingSegmentsQueried) {
+          return false;
+        }
+      }
+      return true;
     }, timeoutMs, "Failed to load all segments");
   }
 
@@ -258,7 +271,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
 
     // TEST 2: Revive a previously deleted primary key
     // Revive pk - 100 by adding a record with a newer timestamp
-    List<String> revivedRecord = Collections.singletonList("100,Zook-New,,0.0,1684707335000,false");
+    List<String> revivedRecord = List.of("100,Zook-New,,0.0,1684707335000,false");
     pushCsvIntoKafka(revivedRecord, kafkaTopicName, 0);
     // Wait for the new record (13 with skipUpsert=true) to be indexed
     waitForAllDocsLoaded(tableName, 600_000L, 13);
@@ -310,6 +323,59 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     upsertConfig.setDeleteRecordColumn(DELETE_COL);
     testDeleteWithPartialUpsert(getKafkaTopic() + "-partial-upsert-with-deletes", "gameScoresPartialUpsertWithDelete",
         upsertConfig);
+  }
+
+  @Test
+  public void testPartialUpsertPostUpdateTransforms()
+      throws Exception {
+    String tableName = "partialUpsertPostTransforms";
+    String kafkaTopicName = getKafkaTopic() + "-post-transforms";
+    createKafkaTopic(kafkaTopicName);
+
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(tableName)
+        .addSingleValueDimension("id", FieldSpec.DataType.INT)
+        .addMetric("score", FieldSpec.DataType.FLOAT)
+        .addMetric("bonus", FieldSpec.DataType.FLOAT)
+        .addMetric("total", FieldSpec.DataType.FLOAT)
+        .addDateTime(TIME_COL_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .setPrimaryKeyColumns(List.of("id"))
+        .build();
+    addSchema(schema);
+
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setComparisonColumn(TIME_COL_NAME);
+    upsertConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("total", "plus(score,bonus)")));
+
+    Map<String, String> csvDecoderProperties =
+        getCSVDecoderProperties(CSV_DELIMITER, "id,score,bonus,total," + TIME_COL_NAME);
+    csvDecoderProperties.put(
+        StreamConfigProperties.constructStreamProperty("kafka", "decoder.prop.nullStringValue"), "NULL");
+    TableConfig tableConfig =
+        createCSVUpsertTableConfig(tableName, kafkaTopicName, getNumKafkaPartitions(), csvDecoderProperties,
+            upsertConfig, "id");
+    addTableConfig(tableConfig);
+
+    // Test scenario:
+    // First record: id=1, score=5, bonus=NULL, total=NULL, timestamp=1000
+    // Second record: id=1, score=NULL, bonus=10, total=NULL, timestamp=2000
+    // After partial upsert (using timestamp as comparison column), the merged row for id=1 is:
+    //   score=5 (from first record), bonus=10 (from second record), total=NULL
+    // Post-update transform computes total=score+bonus=5+10=15
+    // Expected: score=5, bonus=10, total=15
+    // First record sets score, second sets bonus. Post-upsert transform should compute total from the merged row.
+    List<String> records = List.of("1,5,NULL,NULL,1000", "1,NULL,10,NULL,2000");
+    pushCsvIntoKafka(records, kafkaTopicName, 0);
+    waitForAllDocsLoaded(tableName, 600_000L, records.size());
+
+    ResultSet resultSet =
+        getPinotConnection().execute("SELECT score, bonus, total FROM " + tableName + " WHERE id = 1")
+            .getResultSet(0);
+    assertEquals(resultSet.getRowCount(), 1);
+    assertEquals(resultSet.getDouble(0, 0), 5.0, 0.01);
+    assertEquals(resultSet.getDouble(0, 1), 10.0, 0.01);
+    assertEquals(resultSet.getDouble(0, 2), 15.0, 0.01);
+    dropRealtimeTable(tableName);
   }
 
   protected void testDeleteWithPartialUpsert(String kafkaTopicName, String tableName, UpsertConfig upsertConfig)
@@ -367,7 +433,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
 
     // TEST 2: Revive a previously deleted primary key
     // Revive pk - 100 by adding a record with a newer timestamp
-    List<String> revivedRecord = Collections.singletonList("100,Zook,,0.0,1684707335000,false");
+    List<String> revivedRecord = List.of("100,Zook,,0.0,1684707335000,false");
     pushCsvIntoKafka(revivedRecord, kafkaTopicName, 0);
     // Wait for the new record (13 with skipUpsert=true) to be indexed
     waitForAllDocsLoaded(tableName, 600_000L, 13);
@@ -391,9 +457,9 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
   public void testDefaultMetadataManagerClass()
       throws Exception {
     PinotConfiguration serverConf = getServerConf(NUM_SERVERS);
-    serverConf.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
-            HelixInstanceDataManagerConfig.UPSERT_CONFIG_PREFIX,
-            TableUpsertMetadataManagerFactory.UPSERT_DEFAULT_METADATA_MANAGER_CLASS),
+    serverConf.setProperty(Joiner.on(".")
+            .join(Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX, Server.Upsert.CONFIG_PREFIX,
+                Server.Upsert.DEFAULT_METADATA_MANAGER_CLASS),
         DummyTableUpsertMetadataManager.class.getName());
     BaseServerStarter serverStarter = startOneServer(serverConf);
 
@@ -445,7 +511,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     String tableName = "gameScoresWithCompaction";
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(DELETE_COL);
-    upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
     TableConfig tableConfig = setUpTable(tableName, kafkaTopicName, upsertConfig);
     tableConfig.setTaskConfig(getCompactionTaskConfig());
     updateTableConfig(tableConfig);
@@ -463,12 +529,13 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     // 3. Resume consumption to trigger the snapshot
     // 4. Wait until new consuming segments show up
     // 5. Schedule compaction task which compact the segments based on the snapshot
-    sendPostRequest(_controllerRequestURLBuilder.forPauseConsumption(tableName));
+    getOrCreateAdminClient().getTableClient().pauseConsumption(tableName);
     waitForNumQueriedSegmentsToConverge(tableName, 600_000L, 3, 0);
-    sendPostRequest(_controllerRequestURLBuilder.forResumeConsumption(tableName));
+    getOrCreateAdminClient().getTableClient().resumeConsumption(tableName, null);
     waitForNumQueriedSegmentsToConverge(tableName, 600_000L, 5, 2);
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
-    assertNotNull(_taskManager.scheduleAllTasksForTable(realtimeTableName, null)
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Set.of(realtimeTableName)))
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
     // 2 segments should be compacted (351 rows -> 1 row; 500 rows -> 2 rows), 1 segment (149 rows) should be deleted
@@ -490,7 +557,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     TableConfig tableConfig = setUpTable(tableName, kafkaTopicName, upsertConfig);
     TableTaskConfig taskConfig = getCompactionTaskConfig();
     taskConfig.getConfigsForTaskType(MinionConstants.UpsertCompactionTask.TASK_TYPE)
-        .put("validDocIdsType", ValidDocIdsType.IN_MEMORY.name());
+        .put("validDocIdsType", ValidDocIdsType.IN_MEMORY_WITH_DELETE.name());
     tableConfig.setTaskConfig(taskConfig);
     updateTableConfig(tableConfig);
 
@@ -501,7 +568,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
 
     // NOTE: When in-memory valid doc ids are used, no need to pause/resume consumption to trigger the snapshot.
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
-    assertNotNull(_taskManager.scheduleAllTasksForTable(realtimeTableName, null)
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Set.of(realtimeTableName)))
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
     // 1 segment should be compacted (500 rows -> 2 rows)
@@ -540,11 +608,12 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     assertEquals(queryCountStar(tableName), 1);
 
     // Force commit the segments to ensure the deleting rows are part of the committed segments
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName));
+    getOrCreateAdminClient().getTableClient().forceCommit(tableName);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 5, 2);
 
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
-    assertNotNull(_taskManager.scheduleAllTasksForTable(realtimeTableName, null)
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Set.of(realtimeTableName)))
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
     // 1 segment should be compacted (351 rows -> 1 rows), 2 segments (500 rows, 151 rows) should be deleted
@@ -584,6 +653,6 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     tableTaskConfigs.put(MinionConstants.UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, "0d");
     tableTaskConfigs.put(MinionConstants.UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT, "1");
     return new TableTaskConfig(
-        Collections.singletonMap(MinionConstants.UpsertCompactionTask.TASK_TYPE, tableTaskConfigs));
+        Map.of(MinionConstants.UpsertCompactionTask.TASK_TYPE, tableTaskConfigs));
   }
 }

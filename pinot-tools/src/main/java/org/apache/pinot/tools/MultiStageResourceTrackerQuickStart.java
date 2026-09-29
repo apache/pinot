@@ -20,7 +20,6 @@ package org.apache.pinot.tools;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -37,13 +36,13 @@ public class MultiStageResourceTrackerQuickStart extends SingleStageResourceTrac
 
   @Override
   protected Map<String, String> getQueryOptions() {
-    return Collections.singletonMap("queryOptions",
+    return Map.of("queryOptions",
         CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE + "=true");
   }
 
   @Override
   public List<String> types() {
-    return Collections.singletonList("MULTI_STAGE_RESOURCE_TRACKING");
+    return List.of("MULTI_STAGE_RESOURCE_TRACKING");
   }
 
   public static void main(String[] args)

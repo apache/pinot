@@ -21,11 +21,11 @@ package org.apache.pinot.segment.local.segment.index.creator;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -49,7 +49,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class SegmentGenerationWithTimeColumnTest {
+public class SegmentGenerationWithTimeColumnTest implements PinotBuffersAfterMethodCheckRule {
   private static final String STRING_COL_NAME = "someString";
   private static final String TIME_COL_NAME = "date";
   private static final String TIME_COL_FORMAT_NO_ZONE = "yyyyMMdd";
@@ -118,9 +118,7 @@ public class SegmentGenerationWithTimeColumnTest {
     Assert.assertEquals(metadata.getEndTime(), sdfToMillisWithTimeZone(_maxTime + timeZoneSuffix));
   }
 
-  /**
-   * Tests using DateTimeFieldSpec as time column
-   */
+  /// Tests using DateTimeFieldSpec as time column
   @Test
   public void testSimpleDateSegmentGenerationNewNoTimeZone()
       throws Exception {
@@ -179,9 +177,7 @@ public class SegmentGenerationWithTimeColumnTest {
     testEpochDateSegmentGeneration();
   }
 
-  /**
-   * Tests using DateTimeFieldSpec as time column
-   */
+  /// Tests using DateTimeFieldSpec as time column
   @Test
   public void testEpochDateSegmentGenerationNew()
       throws Exception {
@@ -199,9 +195,7 @@ public class SegmentGenerationWithTimeColumnTest {
     buildSegment(_tableConfig, schema, false, true, "");
   }
 
-  /**
-   * Tests using DateTimeFieldSpec as time column
-   */
+  /// Tests using DateTimeFieldSpec as time column
   @Test(expectedExceptions = IllegalStateException.class)
   public void testSegmentGenerationWithInvalidTimeNew()
       throws Exception {
@@ -247,18 +241,12 @@ public class SegmentGenerationWithTimeColumnTest {
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
-      HashMap<String, Object> map = new HashMap<>();
-
+      GenericRow row = new GenericRow();
       for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-        Object value;
-
-        value = getRandomValueForColumn(fieldSpec, isSimpleDate, isInvalidDate, timeZoneSuffix);
-        map.put(fieldSpec.getName(), value);
+        row.putValue(fieldSpec.getName(),
+            getRandomValueForColumn(fieldSpec, isSimpleDate, isInvalidDate, timeZoneSuffix));
       }
-
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(map);
-      rows.add(genericRow);
+      rows.add(row);
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();

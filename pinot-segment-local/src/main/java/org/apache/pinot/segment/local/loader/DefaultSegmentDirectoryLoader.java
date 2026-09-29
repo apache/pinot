@@ -21,42 +21,41 @@ package org.apache.pinot.segment.local.loader;
 import java.io.File;
 import java.net.URI;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentLoader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Default implementation of {@link SegmentDirectoryLoader}
- */
+/// Default implementation of [SegmentDirectoryLoader]
 @SegmentLoader(name = "default")
 public class DefaultSegmentDirectoryLoader implements SegmentDirectoryLoader {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultSegmentDirectoryLoader.class);
 
-  /**
-   * Creates and loads the {@link SegmentLocalFSDirectory} which is the default implementation of
-   * {@link SegmentDirectory}
-   * @param indexDir segment index directory
-   * @param segmentLoaderContext context for instantiation of the SegmentDirectory
-   * @return instance of {@link SegmentLocalFSDirectory}
-   */
+  /// Creates and loads the [SegmentLocalFSDirectory] which is the default implementation of
+  /// [SegmentDirectory].
+  ///
+  /// The [SegmentDirectoryLoaderContext] is forwarded into the [SegmentLocalFSDirectory]
+  /// so downstream consumers (e.g. `SingleFileIndexDirectory#createRemoteBuffers`) can use it to
+  /// propagate the table's task configuration into remote/empty index buffers.
+  ///
+  /// @param indexDir segment index directory
+  /// @param segmentLoaderContext context for instantiation of the SegmentDirectory
+  /// @return instance of [SegmentLocalFSDirectory]
   @Override
   public SegmentDirectory load(URI indexDir, SegmentDirectoryLoaderContext segmentLoaderContext)
       throws Exception {
-    PinotConfiguration segmentDirectoryConfigs = segmentLoaderContext.getSegmentDirectoryConfigs();
     File directory = new File(indexDir);
     if (!directory.exists()) {
       return new SegmentLocalFSDirectory(directory);
     }
-    return new SegmentLocalFSDirectory(directory,
-        ReadMode.valueOf(segmentDirectoryConfigs.getProperty(IndexLoadingConfig.READ_MODE_KEY)));
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(directory);
+    return new SegmentLocalFSDirectory(directory, metadata, segmentLoaderContext.getReadMode(),
+        segmentLoaderContext);
   }
 
   @Override

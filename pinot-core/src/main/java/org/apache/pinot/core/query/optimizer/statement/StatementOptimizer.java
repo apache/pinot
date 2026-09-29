@@ -20,16 +20,13 @@ package org.apache.pinot.core.query.optimizer.statement;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * Interface for optimizing a particular class of SQL statement. Optimizers that implement this interface may modify
- * several or all parts of the SQL statement.
- */
+/// Interface for optimizing a particular class of SQL statement. Optimizers that implement this interface may modify
+/// several or all parts of the SQL statement.
 public interface StatementOptimizer {
 
-  /** Optimize the given SQL statement. */
-  void optimize(PinotQuery query, @Nullable TableConfig tableConfig, @Nullable Schema schema);
+  /// Optimize the given SQL statement.
+  void optimize(PinotQuery query, @Nullable Schema schema);
 }

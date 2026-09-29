@@ -29,9 +29,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 
 
-/**
- * The <code>GroupByPlanNode</code> class provides the execution plan for group-by query on a single segment.
- */
+/// The `GroupByPlanNode` class provides the execution plan for group-by query on a single segment.
 public class GroupByPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final SegmentContext _segmentContext;

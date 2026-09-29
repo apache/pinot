@@ -57,7 +57,7 @@ public class PinotSegmentLifecycleEventListenerManager {
       if (annotation.enabled()) {
         try {
           PinotSegmentLifecycleEventListener pinotSegmentLifecycleEventListener =
-              (PinotSegmentLifecycleEventListener) clazz.newInstance();
+              (PinotSegmentLifecycleEventListener) clazz.getDeclaredConstructor().newInstance();
           pinotSegmentLifecycleEventListener.init(helixZkManager);
           _eventTypeToListenersMap.compute(pinotSegmentLifecycleEventListener.getType(), (key, list) -> {
             if (list == null) {

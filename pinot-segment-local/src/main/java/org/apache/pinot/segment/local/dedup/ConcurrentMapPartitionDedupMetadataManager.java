@@ -116,9 +116,6 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
       return true;
     }
     try {
-      if (_metadataTTL > 0) {
-        _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupRecordInfo.getDedupTime()));
-      }
       AtomicBoolean present = new AtomicBoolean(false);
       _primaryKeyToSegmentAndTimeMap.compute(HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
           (primaryKey, segmentAndTime) -> {
@@ -131,6 +128,8 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
             present.set(true);
             return segmentAndTime;
           });
+      // Bump after the map is updated to avoid racing removeExpiredPrimaryKeys.
+      updateLargestSeenTime(dedupRecordInfo.getDedupTime());
       if (!present.get()) {
         updatePrimaryKeyGauge();
       }
@@ -141,7 +140,7 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
   }
 
   @Override
-  protected long getNumPrimaryKeys() {
+  public long getNumPrimaryKeys() {
     return _primaryKeyToSegmentAndTimeMap.size();
   }
 

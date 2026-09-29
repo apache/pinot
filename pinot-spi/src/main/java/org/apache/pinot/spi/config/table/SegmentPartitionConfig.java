@@ -27,6 +27,7 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 public class SegmentPartitionConfig extends BaseJsonConfig {
+  @Deprecated
   public static final int INVALID_NUM_PARTITIONS = -1;
 
   private final Map<String, ColumnPartitionConfig> _columnPartitionMap;
@@ -42,30 +43,25 @@ public class SegmentPartitionConfig extends BaseJsonConfig {
     return _columnPartitionMap;
   }
 
-  /**
-   * Returns the partition function for the given column, null if there isn't one.
-   *
-   * @param column Column for which to return the partition function.
-   * @return Partition function for the column.
-   */
+  @Nullable
+  public ColumnPartitionConfig getColumnPartitionConfig(String column) {
+    return _columnPartitionMap.get(column);
+  }
+
+  @Deprecated
   @Nullable
   public String getFunctionName(String column) {
     ColumnPartitionConfig columnPartitionConfig = _columnPartitionMap.get(column);
     return (columnPartitionConfig != null) ? columnPartitionConfig.getFunctionName() : null;
   }
 
-  /**
-   * Returns the number of partitions for the specified column.
-   * Returns {@link #INVALID_NUM_PARTITIONS} if it does not exist for the column.
-   *
-   * @param column Column for which to get number of partitions.
-   * @return Number of partitions of the column.
-   */
+  @Deprecated
   public int getNumPartitions(String column) {
     ColumnPartitionConfig config = _columnPartitionMap.get(column);
     return (config != null) ? config.getNumPartitions() : INVALID_NUM_PARTITIONS;
   }
 
+  @Deprecated
   @Nullable
   public Map<String, String> getFunctionConfig(String column) {
     ColumnPartitionConfig config = _columnPartitionMap.get(column);

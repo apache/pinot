@@ -25,7 +25,9 @@ metadata:
 data:
   pinot-controller.conf: |-
     controller.helix.cluster.name={{ .Values.cluster.name }}
+{{- if .Values.controller.configureControllerPort }}
     controller.port={{ .Values.controller.service.port }}
+{{- end }}
 {{- if .Values.controller.vip.enabled }}
     controller.vip.host={{ .Values.controller.vip.host }}
     controller.vip.port={{ .Values.controller.vip.port }}

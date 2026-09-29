@@ -23,23 +23,30 @@
 <img src="https://imgur.com/wBkyzNm.png" align="center" alt="Apache Pinot"/>
 
 ---------------------------------------
-[![Build Status](https://github.com/apache/pinot/actions/workflows/pinot_tests.yml/badge.svg?event=push)](https://github.com/apache/pinot/actions/workflows/pinot_tests.yml)
+[![Unit Tests](https://github.com/apache/pinot/actions/workflows/pinot_unit_tests.yml/badge.svg?event=push)](https://github.com/apache/pinot/actions/workflows/pinot_unit_tests.yml)
+[![Integration Tests](https://github.com/apache/pinot/actions/workflows/pinot_integration_tests.yml/badge.svg?event=push)](https://github.com/apache/pinot/actions/workflows/pinot_integration_tests.yml)
+[![Quickstart Tests](https://github.com/apache/pinot/actions/workflows/pinot_quickstart_tests.yml/badge.svg?event=push)](https://github.com/apache/pinot/actions/workflows/pinot_quickstart_tests.yml)
+[![Compatibility Checks](https://github.com/apache/pinot/actions/workflows/pinot_compatibility_checks.yml/badge.svg?event=push)](https://github.com/apache/pinot/actions/workflows/pinot_compatibility_checks.yml)
 [![Release](https://img.shields.io/github/release/apache/pinot/all.svg)](https://pinot.apache.org/download/)
 [![codecov.io](https://codecov.io/github/apache/pinot/branch/master/graph/badge.svg)](https://codecov.io/github/apache/pinot)
 [![Join the chat at https://communityinviter.com/apps/apache-pinot/apache-pinot](https://img.shields.io/badge/slack-apache--pinot-brightgreen?logo=slack)](https://communityinviter.com/apps/apache-pinot/apache-pinot)
 [![Twitter Follow](https://img.shields.io/twitter/follow/apachepinot.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=apachepinot)
 [![License](https://img.shields.io/github/license/apache/pinot.svg)](LICENSE)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/apache/pinot)
+
 
 </div>
 
 - [What is Apache Pinot?](#what-is-apache-pinot)
-- [Features](#features)
-- [When should I use Pinot?](#when-should-i-use-pinot)
-- [Building Pinot](#building-pinot)
-- [Deploying Pinot to Kubernetes](#deploying-pinot-to-kubernetes)
-- [Join the Community](#join-the-community)
-- [Documentation](#documentation)
-- [License](#license)
+  - [Features](#features)
+  - [When should I use Pinot?](#when-should-i-use-pinot)
+  - [Contributing to Pinot](#contributing-to-pinot)
+  - [Apache Pinot YouTube Channel](#apache-pinot-youtube-channel)
+  - [Building Pinot](#building-pinot)
+  - [Deploying Pinot to Kubernetes](#deploying-pinot-to-kubernetes)
+  - [Join the Community](#join-the-community)
+  - [Documentation](#documentation)
+  - [License](#license)
 
 # What is Apache Pinot?
 
@@ -95,7 +102,7 @@ SELECT sum(clicks), sum(impressions) FROM AdAnalyticsTable
 
 ## Contributing to Pinot
 
-Want to contribute to apache/pinot? 👋🍷
+Want to contribute to Apache Pinot? 👋🍷
 
 Want to join the ranks of open source committers to Apache Pinot? Then check out the [Contribution Guide](https://docs.pinot.apache.org/developers/developers-and-contributors/contribution-guidelines) for how you can get involved in the code.
 
@@ -103,7 +110,12 @@ If you have a bug or an idea for a new feature, browse the [open issues](https:/
 
 We also tagged some [beginner issues](https://github.com/apache/pinot/issues?q=is%3Aopen+is%3Aissue+label%3Abeginner-task) new contributors can tackle.
 
+## Apache Pinot YouTube Channel
 
+Share Your Pinot Videos with the Community!
+
+Have a Pinot use case, tutorial, or conference/meetup recording to share? We’d love to feature it on the [Pinot OSS YouTube channel](https://www.youtube.com/@Apache_Pinot/videos)!
+Drop your video or a link to your session in the [#pinot-youtube-channel](https://apache-pinot.slack.com/archives/C08GH2MAVT4) on Pinot Slack, and we’ll showcase it for the community!
 
 ## Building Pinot
 
@@ -112,10 +124,13 @@ We also tagged some [beginner issues](https://github.com/apache/pinot/issues?q=i
 $ git clone https://github.com/apache/pinot.git
 $ cd pinot
 
+# Pinot services require JDK 25+ to build and run
+# Java/JDBC clients and SPI artifacts continue to target Java 11 bytecode
+
 # Build Pinot
 # -Pbin-dist is required to build the binary distribution
 # -Pbuild-shaded-jar is required to build the shaded jar, which is necessary for some features like spark connectors
-$ mvn clean install -DskipTests -Pbin-dist -Pbuild-shaded-jar
+$ ./mvnw clean install -DskipTests -Pbin-dist -Pbuild-shaded-jar
 
 # Run the Quick Demo
 $ cd build/
@@ -124,16 +139,44 @@ $ bin/quick-start-batch.sh
 
 For UI development setup refer this [doc](https://github.com/apache/pinot/blob/master/pinot-controller/src/main/resources/Readme.md).
 
-Normal Pinot builds are done using the `mvn clean install` command.
+Normal Pinot builds are done using the `./mvnw clean install` command.
 
 However this command can take a long time to run.
 
-For faster builds it is recommended to use `mvn verify -Ppinot-fastdev`, which disables some plugins that are not actually needed for development.
+For faster builds it is recommended to use `./mvnw verify -Ppinot-fastdev`, which disables some plugins that are not actually needed for development.
 
 More detailed instructions can be found at [Quick Demo](https://docs.pinot.apache.org/basics/getting-started/quick-start) section in the documentation.
 
+### macOS Build Requirements
+
+If you're building Pinot on macOS and encounter issues with the gRPC Java plugin during the build process, you may need to configure the protobuf Maven plugin to use a specific executable path. This is a known issue on macOS ARM (Apple Silicon) systems.
+
+#### Automatic Profile Activation (macOS ARM64)
+
+Pinot's Maven build now includes dedicated profiles for Apple Silicon (ARM64) Macs to ensure reliable protobuf compilation with Homebrew-installed binaries:
+
+- **Primary profile:** Activates automatically if `/opt/homebrew/bin/protoc-gen-grpc-java` exists (default for Apple Silicon Macs).
+- **Fallback profile:** Activates if `/usr/local/bin/protoc-gen-grpc-java` exists and the primary path does not (for Intel Macs or custom Homebrew setups).
+
+You do **not** need to manually edit the `pom.xml` or set the plugin executable path. The correct profile will be selected based on your system and Homebrew installation.
+
+##### To install the required tools:
+```bash
+brew install protobuf
+brew install protoc-gen-grpc-java
+```
+
+If you installed Homebrew to a non-default location, ensure the `protoc-gen-grpc-java` binary is available in either `/opt/homebrew/bin/` or `/usr/local/bin/`.
+
+To verify which profile is active, run:
+```bash
+./mvnw help:active-profiles
+```
+
+If you encounter issues, check that the `protoc-gen-grpc-java` binary is present in one of the expected locations and is executable.
+
 ## Deploying Pinot to Kubernetes
-Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Trino](https://docs.pinot.apache.org/integrations/trino) [Presto](https://docs.pinot.apache.org/integrations/presto), and the data visualization tool, [Apache Superset](kubernetes/helm/superset.yaml).
+Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Trino](https://docs.pinot.apache.org/integrations/trino), and the data visualization tool, [Apache Superset](helm/superset.yaml).
 
 ## Join the Community
  - Ask questions on [Apache Pinot Slack](https://join.slack.com/t/apache-pinot/shared_invite/zt-5z7pav2f-yYtjZdVA~EDmrGkho87Vzw)
@@ -149,6 +192,7 @@ Check out [Pinot documentation](https://docs.pinot.apache.org/) for a complete d
 - [Quick Demo](https://docs.pinot.apache.org/getting-started/running-pinot-locally)
 - [Pinot Architecture](https://docs.pinot.apache.org/basics/architecture)
 - [Pinot Query Language](https://docs.pinot.apache.org/users/user-guide-query/pinot-query-language)
+- [Release policy](RELEASE_POLICY.md)
 
 ## License
 Apache Pinot is under [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)

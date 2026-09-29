@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.JdkSslContext;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,6 +36,7 @@ import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.pinot.client.utils.BrokerSelectorUtils;
 import org.apache.pinot.client.utils.ConnectionUtils;
@@ -49,16 +51,15 @@ import org.asynchttpclient.Dsl;
 import org.asynchttpclient.Response;
 
 
-/**
- * Maintains table -> list of brokers, supports update
- * TODO can we introduce a SSE based controller endpoint to make the update reactive in the client?
- */
+/// Maintains table -> list of brokers, supports update
+/// TODO can we introduce a SSE based controller endpoint to make the update reactive in the client?
 public class BrokerCache {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private static class BrokerInstance {
     private String _host;
     private Integer _port;
+    private Integer _grpcPort;
 
     public String getHost() {
       return _host;
@@ -74,6 +75,14 @@ public class BrokerCache {
 
     public void setPort(Integer port) {
       _port = port;
+    }
+
+    public Integer getGrpcPort() {
+      return _grpcPort;
+    }
+
+    public void setGrpcPort(Integer grpcPort) {
+      _grpcPort = grpcPort;
     }
   }
 
@@ -91,6 +100,7 @@ public class BrokerCache {
   private final Map<String, String> _headers;
   private final Properties _properties;
   private volatile BrokerData _brokerData;
+  private final boolean _useGrpcPort;
 
   public BrokerCache(Properties properties, String controllerUrl) {
     String scheme = properties.getProperty(SCHEME, CommonConstants.HTTP_PROTOCOL);
@@ -117,13 +127,20 @@ public class BrokerCache {
         .setConnectTimeout(Duration.ofMillis(connectTimeoutMs))
         .setHandshakeTimeout(handshakeTimeoutMs)
         .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua_broker_cache", appId))
-        .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
+        .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]))
+        // Reuse a JVM-wide Netty I/O thread pool and timer across all BrokerCache instances so
+        // that the periodic broker refresh does not multiply Netty threads by the number of
+        // client connections. AHC will not shut these down on close() because they are externally
+        // supplied (see ChannelManager#allowReleaseEventLoopGroup / AHC#allowStopNettyTimer).
+        .setEventLoopGroup(PinotClientNettyResources.eventLoopGroup())
+        .setNettyTimer(PinotClientNettyResources.timer());
 
     _client = Dsl.asyncHttpClient(builder.build());
     ControllerRequestURLBuilder controllerRequestURLBuilder =
         ControllerRequestURLBuilder.baseUrl(scheme + "://" + controllerUrl);
     _address = controllerRequestURLBuilder.forLiveBrokerTablesGet();
     _headers = ConnectionUtils.getHeadersFromProperties(properties);
+    _useGrpcPort = Boolean.parseBoolean(properties.getProperty("useGrpcPort", "false"));
     _properties = properties;
   }
 
@@ -147,9 +164,19 @@ public class BrokerCache {
     for (Map.Entry<String, List<BrokerInstance>> tableToBrokers : responses.entrySet()) {
       List<String> brokersForTable = new ArrayList<>();
       tableToBrokers.getValue().forEach(br -> {
-        String brokerHostPort = br.getHost() + ":" + br.getPort();
-        brokersForTable.add(brokerHostPort);
-        brokers.add(brokerHostPort);
+        if (_useGrpcPort) {
+          // Intentionally skip the broker if the grpc port is not set.
+          Integer grpcPort = br.getGrpcPort();
+          if ((grpcPort != null) && (grpcPort > 0)) {
+            String brokerHostPort = br.getHost() + ":" + grpcPort;
+            brokersForTable.add(brokerHostPort);
+            brokers.add(brokerHostPort);
+          }
+        } else {
+          String brokerHostPort = br.getHost() + ":" + br.getPort();
+          brokersForTable.add(brokerHostPort);
+          brokers.add(brokerHostPort);
+        }
       });
       String tableName = tableToBrokers.getKey();
       tableToBrokersMap.put(tableName, brokersForTable);
@@ -189,24 +216,31 @@ public class BrokerCache {
     _brokerData = getBrokerData(responses);
   }
 
+  @Nullable
   public String getBroker(String... tableNames) {
-    List<String> brokers = null;
     // If tableNames is not-null, filter out nulls
-    tableNames =
-        tableNames == null ? tableNames : Arrays.stream(tableNames).filter(Objects::nonNull).toArray(String[]::new);
-    if (!(tableNames == null || tableNames.length == 0)) {
-       // returning list of common brokers hosting all the tables.
-       brokers = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
-           _brokerData.getTableToBrokerMap());
+    tableNames = tableNames == null ? tableNames
+        : Arrays.stream(tableNames).filter(Objects::nonNull).toArray(String[]::new);
+    if (tableNames != null && tableNames.length != 0) {
+      String randomBroker =
+          BrokerSelectorUtils.getRandomBroker(Arrays.asList(tableNames), _brokerData.getTableToBrokerMap());
+      if (randomBroker != null) {
+        return randomBroker;
+      }
     }
-
-    if (brokers == null || brokers.isEmpty()) {
-      brokers = _brokerData.getBrokers();
+    List<String> brokers = _brokerData.getBrokers();
+    if (!brokers.isEmpty()) {
+      return brokers.get(ThreadLocalRandom.current().nextInt(brokers.size()));
     }
-    return brokers.get(ThreadLocalRandom.current().nextInt(brokers.size()));
+    return null;
   }
 
   public List<String> getBrokers() {
     return _brokerData.getBrokers();
+  }
+
+  public void close()
+      throws IOException {
+    _client.close();
   }
 }

@@ -24,32 +24,73 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler.ServerStats;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker;
 
 
-/**
- * {@code QueryLogger} is responsible for logging query responses in a configurable
- * fashion. Query logging can be useful to capture production traffic to assist with
- * debugging or regression testing.
- */
+/// `QueryLogger` is responsible for logging query responses in a configurable
+/// fashion. Query logging can be useful to capture production traffic to assist with
+/// debugging or regression testing.
 @SuppressWarnings("UnstableApiUsage")
 public class QueryLogger {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryLogger.class);
   private static final QueryLogEntry[] QUERY_LOG_ENTRY_VALUES = QueryLogEntry.values();
 
+  private static final String FINGERPRINT_FAILED_QUERY_REDACTED = "FINGERPRINT_FAILED_QUERY_REDACTED";
+  private static final String FULLY_REDACTED = "REDACTED";
+
+  /// Marks the pre-processing "query received" record so a deployment can route or suppress it
+  /// independently of the completion record, which shares this logger. The two cannot be told apart
+  /// by logger name, and telling them apart by message text is brittle -- it breaks the moment the
+  /// wording changes. Follows the existing marker convention in this module (MSE_STATS_MARKER,
+  /// QUERY_RESPONSE_EXCEPTION), so a log4j2 MarkerFilter is all that is needed:
+  ///
+  ///   <MarkerFilter marker="QUERY_RECEIVED" onMatch="DENY" onMismatch="NEUTRAL"/>
+  ///
+  /// Kept enabled by default: this record is the only trace of a query that never completes.
+  private static final Marker QUERY_RECEIVED_MARKER = MarkerFactory.getMarker("QUERY_RECEIVED");
+
+  public enum SqlRedactionMode {
+    // Log the full SQL query text with backslashes and line endings escaped.
+    // e.g. "SELECT name FROM users WHERE id = 42 AND status = 'active'"
+    NONE,
+    // Replace literal values with placeholders using the query fingerprint, preserving query structure.
+    // Requires query fingerprinting to be enabled (will be auto-enabled if not configured).
+    // e.g. "SELECT name FROM users WHERE id = ? AND status = ?"
+    LITERAL_VALUES,
+    // Omit the SQL text entirely from logs, replacing it with "[REDACTED]".
+    // Use when no part of the query should appear in logs.
+    FULL;
+
+    public static SqlRedactionMode fromString(String value) {
+      try {
+        return valueOf(value.toUpperCase());
+      } catch (IllegalArgumentException e) {
+        // The default config value is NONE. If the user intended to enable redaction but made a typo,
+        // it's safer to default to FULL instead of NONE to avoid accidentally logging sensitive information.
+        LOGGER.warn("Invalid SQL redaction mode '{}', defaulting to FULL", value);
+        return FULL;
+      }
+    }
+  }
+
   private final int _maxQueryLengthToLog;
   private final RateLimiter _logRateLimiter;
   private final boolean _enableIpLogging;
+  private final boolean _logBeforeProcessing;
+  private final SqlRedactionMode _sqlRedactionMode;
   private final Logger _logger;
   private final RateLimiter _droppedLogRateLimiter;
   private final AtomicLong _numDroppedLogs = new AtomicLong(0L);
@@ -59,26 +100,60 @@ public class QueryLogger {
             Broker.DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND)),
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_LENGTH, Broker.DEFAULT_BROKER_QUERY_LOG_LENGTH),
         config.getProperty(Broker.CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING,
-            Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING), LOGGER, RateLimiter.create(1)
+            Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING),
+        config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_BEFORE_PROCESSING,
+            Broker.DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING),
+        SqlRedactionMode.fromString(config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_SQL_REDACTION,
+            Broker.DEFAULT_BROKER_QUERY_LOG_SQL_REDACTION)),
+        LOGGER, RateLimiter.create(1)
         // log once a second for dropped log count
     );
   }
 
   @VisibleForTesting
-  QueryLogger(RateLimiter logRateLimiter, int maxQueryLengthToLog, boolean enableIpLogging, Logger logger,
-      RateLimiter droppedLogRateLimiter) {
+  QueryLogger(RateLimiter logRateLimiter, int maxQueryLengthToLog, boolean enableIpLogging, boolean logBeforeProcessing,
+      SqlRedactionMode sqlRedactionMode, Logger logger, RateLimiter droppedLogRateLimiter) {
     _logRateLimiter = logRateLimiter;
     _maxQueryLengthToLog = maxQueryLengthToLog;
     _enableIpLogging = enableIpLogging;
     _logger = logger;
     _droppedLogRateLimiter = droppedLogRateLimiter;
+    _logBeforeProcessing = logBeforeProcessing;
+    _sqlRedactionMode = sqlRedactionMode;
   }
 
-  public void log(QueryLogParams params) {
+  /// Logs the query received message before processing begins.
+  /// This method checks the rate limiter and returns whether logging was allowed.
+  /// The return value should be passed to logQueryCompleted.
+  ///
+  /// @param requestId the request ID
+  /// @param query the SQL query
+  /// @param queryFingerprint the query fingerprint (used when redaction is enabled)
+  /// @return true if the rate limiter allowed this query (not rate-limited), false if rate-limited
+  public boolean logQueryReceived(long requestId, String query, @Nullable QueryFingerprint queryFingerprint) {
+    if (!checkRateLimiter()) {
+      return false;
+    }
+
+    if (_logBeforeProcessing) {
+      _logger.info(QUERY_RECEIVED_MARKER, "SQL query for request {}: {}", requestId,
+          redactQuery(query, queryFingerprint));
+    }
+
+    tryLogDropped();
+    return true;
+  }
+
+  /// Logs the query completion stats after processing completes.
+  ///
+  /// @param params the query log parameters
+  /// @param wasLogged true if logQueryReceived returned true, false otherwise.
+  ///                  When false, the completion log will only be emitted if force-log
+  ///                  conditions are met (exceptions, slow queries).
+  public void logQueryCompleted(QueryLogParams params, boolean wasLogged) {
     _logger.debug("Broker Response: {}", params._response);
 
-    if (!(_logRateLimiter.tryAcquire() || shouldForceLog(params))) {
-      _numDroppedLogs.incrementAndGet();
+    if (!wasLogged && !shouldForceLog(params)) {
       return;
     }
 
@@ -89,10 +164,22 @@ public class QueryLogger {
     }
 
     // always log the query last - don't add this to the QueryLogEntry enum
-    queryLogBuilder.append("query=")
-        .append(StringUtils.substring(params._requestContext.getQuery(), 0, _maxQueryLengthToLog));
+    String redacted = redactQuery(params._requestContext.getQuery(), params._requestContext.getQueryFingerprint());
+    queryLogBuilder.append("query=").append(StringUtils.substring(redacted, 0, _maxQueryLengthToLog));
     _logger.info(queryLogBuilder.toString());
 
+    tryLogDropped();
+  }
+
+  private boolean checkRateLimiter() {
+    boolean allowed = _logRateLimiter.tryAcquire();
+    if (!allowed) {
+      _numDroppedLogs.incrementAndGet();
+    }
+    return allowed;
+  }
+
+  private void tryLogDropped() {
     if (_droppedLogRateLimiter.tryAcquire()) {
       // use getAndSet to 0 so that there will be no race condition between
       // loggers that increment this counter and this thread
@@ -112,7 +199,42 @@ public class QueryLogger {
     return _logRateLimiter.getRate();
   }
 
-  private boolean shouldForceLog(QueryLogParams params) {
+  public SqlRedactionMode getSqlRedactionMode() {
+    return _sqlRedactionMode;
+  }
+
+  public String redactQuery(String query) {
+    return redactQuery(query, null);
+  }
+
+  public String redactQuery(String query, @Nullable QueryFingerprint queryFingerprint) {
+    switch (_sqlRedactionMode) {
+      case FULL:
+        return FULLY_REDACTED;
+      case LITERAL_VALUES:
+        return queryFingerprint != null ? queryFingerprint.getFingerprint() : FINGERPRINT_FAILED_QUERY_REDACTED;
+      case NONE:
+      default:
+        return toSingleLine(query);
+    }
+  }
+
+  /// Escapes backslashes, CR and LF as `\\`, `\r` and `\n` so the query occupies a single log line.
+  /// A line ending can terminate a `--` or `//` comment, so replacing it with a space changes SQL semantics.
+  /// Escaping existing backslashes distinguishes literal escape sequences from encoded line endings.
+  /// Decode these three escape sequences in a single pass before replaying untruncated logged SQL.
+  @Nullable
+  private static String toSingleLine(@Nullable String query) {
+    if (query == null || (query.indexOf('\\') < 0 && query.indexOf('\n') < 0 && query.indexOf('\r') < 0)) {
+      return query;
+    }
+    return query.replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n");
+  }
+
+  private boolean shouldForceLog(@Nullable QueryLogParams params) {
+    if (params == null) {
+      return false;
+    }
     return params._response.isPartialResult() || params._response.getTimeUsedMs() > TimeUnit.SECONDS.toMillis(1);
   }
 
@@ -120,26 +242,44 @@ public class QueryLogger {
     private final RequestContext _requestContext;
     private final String _table;
     private final BrokerResponse _response;
+    private final QueryEngine _queryEngine;
     @Nullable
     private final RequesterIdentity _identity;
     @Nullable
     private final ServerStats _serverStats;
+    public final String _workloadName;
 
     public QueryLogParams(RequestContext requestContext, String table, BrokerResponse response,
-        @Nullable RequesterIdentity identity, @Nullable ServerStats serverStats) {
+        QueryEngine queryEngine, @Nullable RequesterIdentity identity, @Nullable ServerStats serverStats,
+        String workloadName) {
       _requestContext = requestContext;
       // NOTE: Passing table name separately because table name within request context is always raw table name.
       _table = table;
       _response = response;
+      _queryEngine = queryEngine;
       _identity = identity;
       _serverStats = serverStats;
+      _workloadName = workloadName;
+    }
+
+    public enum QueryEngine {
+      SINGLE_STAGE("singleStage"),
+      MULTI_STAGE("multiStage");
+
+      private final String _name;
+
+      QueryEngine(String name) {
+        _name = name;
+      }
+
+      private String getName() {
+        return _name;
+      }
     }
   }
 
-  /**
-   * NOTE: please maintain the order of this query log entry enum. If you want to add a new
-   * entry, add it to the end of the existing list.
-   */
+  /// NOTE: please maintain the order of this query log entry enum. If you want to add a new
+  /// entry, add it to the end of the existing list.
   private enum QueryLogEntry {
     REQUEST_ID("requestId") {
       @Override
@@ -152,6 +292,14 @@ public class QueryLogger {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._table);
+      }
+    },
+    QUERY_HASH("queryHash") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        QueryFingerprint queryFingerprint = params._requestContext.getQueryFingerprint();
+        String queryHash = queryFingerprint != null ? queryFingerprint.getQueryHash() : Broker.DEFAULT_QUERY_HASH;
+        builder.append(queryHash);
       }
     },
     TIME_MS("timeMs") {
@@ -200,10 +348,22 @@ public class QueryLogger {
             .append(params._response.getNumServersQueried());
       }
     },
+    GROUPS_TRIMMED("groupsTrimmed") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.isGroupsTrimmed());
+      }
+    },
     GROUP_LIMIT_REACHED("groupLimitReached") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._response.isNumGroupsLimitReached());
+      }
+    },
+    GROUP_WARNING_LIMIT_REACHED("groupWarningLimitReached") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.isNumGroupsWarningLimitReached());
       }
     },
     BROKER_REDUCE_TIME_MS("brokerReduceTimeMs") {
@@ -254,6 +414,52 @@ public class QueryLogger {
         } else {
           builder.append(CommonConstants.UNKNOWN);
         }
+      }
+    },
+    QUERY_ENGINE("queryEngine") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._queryEngine.getName());
+      }
+    },
+    OFFLINE_MEM_ALLOCATED_BYTES("offlineMemAllocatedBytes(total/thread/resSer)", ':') {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.getOfflineTotalMemAllocatedBytes()).append('/')
+            .append(params._response.getOfflineThreadMemAllocatedBytes()).append('/')
+            .append(params._response.getOfflineResponseSerMemAllocatedBytes());
+      }
+    },
+    REALTIME_MEM_ALLOCATED_BYTES("realtimeMemAllocatedBytes(total/thread/resSer)", ':') {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.getRealtimeTotalMemAllocatedBytes()).append('/')
+            .append(params._response.getRealtimeThreadMemAllocatedBytes()).append('/')
+            .append(params._response.getRealtimeResponseSerMemAllocatedBytes());
+      }
+    },
+    POOLS("pools") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.getPools());
+      }
+    },
+    RLS_FILTERS_APPLIED("rlsFiltersApplied") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.getRLSFiltersApplied());
+      }
+    },
+    APPROXIMATE_FUNCTION_APPLIED("approximateFunctionApplied") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.isApproximateFunctionApplied());
+      }
+    },
+    WORKLOAD_NAME("workloadName") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._workloadName);
       }
     };
 

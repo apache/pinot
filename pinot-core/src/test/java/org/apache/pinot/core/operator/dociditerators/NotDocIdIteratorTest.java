@@ -45,7 +45,7 @@ public class NotDocIdIteratorTest {
     bitmap4.add(docIds4);
     OrDocIdIterator orDocIdIterator = new OrDocIdIterator(new BlockDocIdIterator[]{
         new RangelessBitmapDocIdIterator(bitmap1), new RangelessBitmapDocIdIterator(
-        bitmap2), new RangelessBitmapDocIdIterator(bitmap3)
+            bitmap2), new RangelessBitmapDocIdIterator(bitmap3)
     });
     NotDocIdIterator notDocIdIterator = new NotDocIdIterator(new RangelessBitmapDocIdIterator(bitmap1), 25);
 

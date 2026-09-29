@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
@@ -37,10 +36,10 @@ import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
-import org.apache.pinot.segment.spi.index.IndexType;
-import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -59,17 +58,16 @@ import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-/**
- * Configuration properties used in the creation of index segments.
- */
+/// Configuration properties used in the creation of index segments.
 public class SegmentGeneratorConfig implements Serializable {
   public enum TimeColumnType {
     EPOCH, SIMPLE_DATE
   }
 
-  public static final String GENERATE_INV_BEFORE_PUSH_DEPREC_PROP = "generate.inverted.index.before.push";
   private final TableConfig _tableConfig;
   private final Schema _schema;
+  private final Map<String, FieldIndexConfigs> _indexConfigsByColName;
+  private final Map<String, Map<String, String>> _columnProperties = new HashMap<>();
   // NOTE: Use TreeMap to guarantee the order. The custom properties will be written into the segment metadata.
   private final TreeMap<String, String> _customProperties = new TreeMap<>();
   private final List<String> _columnSortOrder = new ArrayList<>();
@@ -90,6 +88,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private SegmentVersion _segmentVersion = SegmentVersion.v3;
   private RecordReaderConfig _readerConfig = null;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs = null;
+  private MultiColumnTextIndexConfig _multiColumnTextIndexConfig;
   private boolean _enableDefaultStarTree = false;
   private String _creatorVersion = null;
   private SegmentNameGenerator _segmentNameGenerator = null;
@@ -101,10 +100,8 @@ public class SegmentGeneratorConfig implements Serializable {
   private DateTimeFormatSpec _dateTimeFormatSpec = null;
   // Use on-heap or off-heap memory to generate index (currently only affect inverted index and star-tree v2)
   private boolean _onHeap = false;
-  /**
-   * Whether null handling is enabled by default. This value is only used if
-   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-   */
+  /// Whether null handling is enabled by default. This value is only used if
+  /// [Schema#isEnableColumnBasedNullHandling()] is false.
   private boolean _defaultNullHandlingEnabled = false;
   private boolean _continueOnError = false;
   private boolean _rowTimeValueCheck = false;
@@ -118,41 +115,34 @@ public class SegmentGeneratorConfig implements Serializable {
   private boolean _realtimeConversion = false;
   // consumerDir contains data from the consuming segment, and is used during _realtimeConversion optimization
   private File _consumerDir;
-  private final Map<String, FieldIndexConfigs> _indexConfigsByColName;
-
-  // constructed from FieldConfig
-  private final Map<String, Map<String, String>> _columnProperties = new HashMap<>();
-
   private SegmentZKPropsConfig _segmentZKPropsConfig;
+  // Whether the mutable segment is compacted
+  private boolean _mutableSegmentCompacted = false;
+  // Available when converting a mutable segment to immutable segment with both sorting and reusing mutable text index
+  // enabled. Index is mutable docId, value is immutable docId.
+  private int[] _mutableToImmutableDocIdMap;
 
-  /**
-   * Constructs the SegmentGeneratorConfig with table config and schema.
-   * NOTE: The passed in table config and schema might be changed.
-   *
-   * @param tableConfig table config of the segment. Used for getting time column information and indexing information
-   * @param schema schema of the segment to be generated. The time column information should be taken from table config.
-   *               However, for maintaining backward compatibility, taking it from schema if table config is null.
-   *               This will not work once we start supporting multiple time columns (DateTimeFieldSpec)
-   */
+  // Type of the instance (SERVER/MINION) that is trying to create the segment.
+  private InstanceType _instanceType;
+  private boolean _compressionStatsEnabled;
+
+  /// Constructs the SegmentGeneratorConfig with table config and schema.
+  /// NOTE: The passed in table config and schema might be changed.
   public SegmentGeneratorConfig(TableConfig tableConfig, Schema schema) {
-    this(tableConfig, schema, false);
-  }
-
-  public SegmentGeneratorConfig(TableConfig tableConfig, Schema schema, boolean createInvertedIndex) {
     Preconditions.checkNotNull(tableConfig);
     Preconditions.checkNotNull(schema);
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     _tableConfig = tableConfig;
     _schema = schema;
+    _indexConfigsByColName = FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
     setTableName(tableConfig.getTableName());
 
     // NOTE: SegmentGeneratorConfig#setSchema doesn't set the time column anymore. timeColumnName is expected to be
     // read from table config.
-    String timeColumnName = null;
-    if (tableConfig.getValidationConfig() != null) {
-      timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    if (timeColumnName != null) {
+      setTime(timeColumnName, schema);
     }
-    setTime(timeColumnName, schema);
 
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     String segmentVersion = indexingConfig.getSegmentFormatVersion();
@@ -176,6 +166,8 @@ public class SegmentGeneratorConfig implements Serializable {
     // Star-tree configs
     setStarTreeIndexConfigs(indexingConfig.getStarTreeIndexConfigs());
     setEnableDefaultStarTree(indexingConfig.isEnableDefaultStarTree());
+    _multiColumnTextIndexConfig = indexingConfig.getMultiColumnTextIndexConfig();
+    _compressionStatsEnabled = indexingConfig.isCompressionStatsEnabled();
 
     List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
     if (fieldConfigs != null) {
@@ -193,47 +185,38 @@ public class SegmentGeneratorConfig implements Serializable {
       _rowTimeValueCheck = ingestionConfig.isRowTimeValueCheck();
       _segmentTimeValueCheck = ingestionConfig.isSegmentTimeValueCheck();
     }
+  }
 
-    _indexConfigsByColName = FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
+  /// Returns the [TableConfig] that was used to initialize this object.
+  ///
+  /// Remember that this object is mutable. Therefore it may have modified since the object was created. Changes on this
+  /// object may or may not modify the initial table config, so the object returned by this method may not contain the
+  /// same information stored on this SegmentGeneratorConfig. For example, if someone called
+  /// [#setTimeColumnName(String)] on the SegmentGeneratorConfig, the TableConfig returned by this method
+  /// will not be modified accordingly.
+  public TableConfig getTableConfig() {
+    return _tableConfig;
+  }
 
-    // NOTE: By default inverted indexes are not created during segment creation
-    // There are 2 ways to configure creating inverted index during segment generation:
-    //       - Set 'generate.inverted.index.before.push' to 'true' in custom config (deprecated)
-    //       - Enable 'createInvertedIndexDuringSegmentGeneration' in indexing config
-    // TODO: Clean up the table configs with the deprecated settings, and always use the one in the indexing config
-    // TODO 2: Decide what to do with this. Index-spi is based on the idea that TableConfig is the source of truth
-    List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
-    if (!createInvertedIndex && CollectionUtils.isNotEmpty(invertedIndexColumns)) {
-      Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
-      boolean customConfigEnabled =
-          customConfigs != null && Boolean.parseBoolean(customConfigs.get(GENERATE_INV_BEFORE_PUSH_DEPREC_PROP));
-      boolean indexingConfigEnable = indexingConfig.isCreateInvertedIndexDuringSegmentGeneration();
-      if (!customConfigEnabled && !indexingConfigEnable) {
-        //noinspection rawtypes
-        IndexType inverted = StandardIndexes.inverted();
-        for (String column : invertedIndexColumns) {
-          _indexConfigsByColName.computeIfPresent(column,
-              (k, v) -> new FieldIndexConfigs.Builder(v).undeclare(inverted).build());
-        }
-      }
-    }
+  public Schema getSchema() {
+    return _schema;
+  }
+
+  public Map<String, FieldIndexConfigs> getIndexConfigsByColName() {
+    return _indexConfigsByColName;
   }
 
   public Map<String, Map<String, String>> getColumnProperties() {
     return Collections.unmodifiableMap(_columnProperties);
   }
 
-  /**
-   * Set time column details using the given time column
-   */
-  private void setTime(@Nullable String timeColumnName, Schema schema) {
-    if (timeColumnName != null) {
-      DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
-      if (dateTimeFieldSpec != null) {
-        _segmentTimeColumnDataType = dateTimeFieldSpec.getDataType();
-        setTimeColumnName(dateTimeFieldSpec.getName());
-        setDateTimeFormatSpec(dateTimeFieldSpec.getFormatSpec());
-      }
+  /// Set time column details using the given time column
+  private void setTime(String timeColumnName, Schema schema) {
+    DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
+    if (dateTimeFieldSpec != null) {
+      _segmentTimeColumnDataType = dateTimeFieldSpec.getDataType();
+      setTimeColumnName(dateTimeFieldSpec.getName());
+      setDateTimeFormatSpec(dateTimeFieldSpec.getFormatSpec());
     }
   }
 
@@ -257,6 +240,7 @@ public class SegmentGeneratorConfig implements Serializable {
     }
   }
 
+  @Nullable
   public DateTimeFormatSpec getDateTimeFormatSpec() {
     return _dateTimeFormatSpec;
   }
@@ -347,9 +331,7 @@ public class SegmentGeneratorConfig implements Serializable {
     return _segmentNamePostfix;
   }
 
-  /**
-   * If you are adding a sequence Id to the segment, please use setSequenceId.
-   */
+  /// If you are adding a sequence Id to the segment, please use setSequenceId.
   public void setSegmentNamePostfix(String postfix) {
     _segmentNamePostfix = postfix;
   }
@@ -370,20 +352,17 @@ public class SegmentGeneratorConfig implements Serializable {
     return _sequenceId;
   }
 
-  /**
-   * Use this method to add partitionId if it is generated externally during segment upload
-   */
+  /// Use this method to add partitionId if it is generated externally during segment upload
   public void setUploadedSegmentPartitionId(int partitionId) {
     _uploadedSegmentPartitionId = partitionId;
   }
 
-  /**
-   * This method should be used instead of setPostfix if you are adding a sequence number.
-   */
+  /// This method should be used instead of setPostfix if you are adding a sequence number.
   public void setSequenceId(int sequenceId) {
     _sequenceId = sequenceId;
   }
 
+  @Nullable
   public TimeUnit getSegmentTimeUnit() {
     return _segmentTimeUnit;
   }
@@ -424,23 +403,6 @@ public class SegmentGeneratorConfig implements Serializable {
     _segmentVersion = segmentVersion;
   }
 
-  /**
-   * Returns the {@link TableConfig} that was used to initialize this object.
-   *
-   * Remember that this object is mutable. Therefore it may have modified since the object was created. Changes on this
-   * object may or may not modify the initial table config, so the object returned by this method may not contain the
-   * same information stored on this SegmentGeneratorConfig. For example, if someone called
-   * {@link #setTimeColumnName(String)} on the SegmentGeneratorConfig, the TableConfig returned by this method
-   * will not be modified accordingly.
-   */
-  public TableConfig getTableConfig() {
-    return _tableConfig;
-  }
-
-  public Schema getSchema() {
-    return _schema;
-  }
-
   public RecordReaderConfig getReaderConfig() {
     return _readerConfig;
   }
@@ -459,6 +421,11 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public void setStarTreeIndexConfigs(List<StarTreeIndexConfig> starTreeIndexConfigs) {
     _starTreeIndexConfigs = starTreeIndexConfigs;
+  }
+
+  @Nullable
+  public MultiColumnTextIndexConfig getMultiColumnTextIndexConfig() {
+    return _multiColumnTextIndexConfig;
   }
 
   public boolean isEnableDefaultStarTree() {
@@ -492,10 +459,8 @@ public class SegmentGeneratorConfig implements Serializable {
     }
   }
 
-  /**
-   * Infers the segment name generator type based on segment generator config properties. Will default to simple
-   * SegmentNameGeneratorType.
-   */
+  /// Infers the segment name generator type based on segment generator config properties. Will default to simple
+  /// SegmentNameGeneratorType.
   public String inferSegmentNameGeneratorType() {
     if (_segmentName != null) {
       return BatchConfigProperties.SegmentNameGeneratorType.FIXED;
@@ -557,11 +522,9 @@ public class SegmentGeneratorConfig implements Serializable {
     return _segmentPartitionConfig;
   }
 
-  /**
-   * Returns a comma separated list of qualifying field name strings
-   * @param type FieldType to filter on
-   * @return list of qualifying fields names.
-   */
+  /// Returns a comma separated list of qualifying field name strings
+  /// @param type FieldType to filter on
+  /// @return list of qualifying fields names.
   private List<String> getQualifyingFields(FieldType type, boolean excludeVirtualColumns) {
     List<String> fields = new ArrayList<>();
 
@@ -579,42 +542,16 @@ public class SegmentGeneratorConfig implements Serializable {
     return fields;
   }
 
-  /**
-   * Whether null handling is enabled by default. This value is only used if
-   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-   *
-   * @deprecated Use {@link #isDefaultNullHandlingEnabled()} instead
-   */
-  @Deprecated
-  public boolean isNullHandlingEnabled() {
-    return _defaultNullHandlingEnabled;
-  }
-
-  /**
-   * Whether null handling is enabled by default. This value is only used if
-   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-   */
+  /// Whether null handling is enabled by default. This value is only used if
+  /// [Schema#isEnableColumnBasedNullHandling()] is false.
   public boolean isDefaultNullHandlingEnabled() {
     return _defaultNullHandlingEnabled;
   }
 
-  /**
-   * Whether null handling is enabled by default. This value is only used if
-   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-   *
-   * @deprecated Use {@link #setDefaultNullHandlingEnabled(boolean)} instead
-   */
-  @Deprecated
-  public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
-    setDefaultNullHandlingEnabled(nullHandlingEnabled);
-  }
-
-  /**
-   * Whether null handling is enabled by default. This value is only used if
-   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-   */
-  public void setDefaultNullHandlingEnabled(boolean nullHandlingEnabled) {
-    _defaultNullHandlingEnabled = nullHandlingEnabled;
+  /// Whether null handling is enabled by default. This value is only used if
+  /// [Schema#isEnableColumnBasedNullHandling()] is false.
+  public void setDefaultNullHandlingEnabled(boolean defaultNullHandlingEnabled) {
+    _defaultNullHandlingEnabled = defaultNullHandlingEnabled;
   }
 
   public boolean isContinueOnError() {
@@ -706,6 +643,7 @@ public class SegmentGeneratorConfig implements Serializable {
     _failOnEmptySegment = failOnEmptySegment;
   }
 
+  @Nullable
   public SegmentZKPropsConfig getSegmentZKPropsConfig() {
     return _segmentZKPropsConfig;
   }
@@ -714,7 +652,39 @@ public class SegmentGeneratorConfig implements Serializable {
     _segmentZKPropsConfig = segmentZKPropsConfig;
   }
 
-  public Map<String, FieldIndexConfigs> getIndexConfigsByColName() {
-    return _indexConfigsByColName;
+  public boolean isMutableSegmentCompacted() {
+    return _mutableSegmentCompacted;
+  }
+
+  public void setMutableSegmentCompacted(boolean mutableSegmentCompacted) {
+    _mutableSegmentCompacted = mutableSegmentCompacted;
+  }
+
+  @Nullable
+  public int[] getMutableToImmutableDocIdMap() {
+    return _mutableToImmutableDocIdMap;
+  }
+
+  public void setMutableToImmutableDocIdMap(int[] mutableToImmutableDocIdMap) {
+    _mutableToImmutableDocIdMap = mutableToImmutableDocIdMap;
+  }
+
+  @Nullable
+  public InstanceType getInstanceType() {
+    return _instanceType;
+  }
+
+  public void setInstanceType(InstanceType instanceType) {
+    _instanceType = instanceType;
+  }
+
+  /// Returns whether this segment build records compression statistics.
+  public boolean isCompressionStatsEnabled() {
+    return _compressionStatsEnabled;
+  }
+
+  /// Sets whether this segment build records compression statistics.
+  public void setCompressionStatsEnabled(boolean compressionStatsEnabled) {
+    _compressionStatsEnabled = compressionStatsEnabled;
   }
 }

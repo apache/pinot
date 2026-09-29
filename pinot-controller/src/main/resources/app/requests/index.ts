@@ -31,6 +31,7 @@ import {
   TableSchema,
   SQLResult,
   ClusterName,
+  PackageVersions,
   ZKGetList,
   ZKConfig,
   OperationResponse,
@@ -45,18 +46,21 @@ import {
   SegmentDebugDetails,
   QuerySchemas,
   TableType,
-  InstanceState, SegmentMetadata,
+  InstanceState,
+  SegmentMetadata,
   SchemaInfo,
   SegmentStatusInfo,
-  ServerToSegmentsCount
+  ServerToSegmentsCount,
+  ConsumingSegmentsInfo,
+  PauseStatusDetails
 } from 'Models';
+
+import { baseApi, baseApiWithErrors, transformApi } from '../utils/axios-config';
 
 const headers = {
   'Content-Type': 'application/json; charset=UTF-8',
   'Accept': 'text/plain, */*; q=0.01'
 };
-
-import { baseApi, baseApiWithErrors, transformApi } from '../utils/axios-config';
 
 export const getTenants = (): Promise<AxiosResponse<Tenants>> =>
   baseApi.get('/tenants');
@@ -84,7 +88,7 @@ export const getSchema = (name: string): Promise<AxiosResponse<OperationResponse
 
 export const putSchema = (name: string, params: string, reload?: boolean): Promise<AxiosResponse<OperationResponse>> => {
   let queryParams = {};
-  
+
   if(reload) {
     queryParams["reload"] = reload;
   }
@@ -95,8 +99,8 @@ export const putSchema = (name: string, params: string, reload?: boolean): Promi
 export const getSegmentMetadata = (tableName: string, segmentName: string): Promise<AxiosResponse<SegmentMetadata>> =>
   baseApi.get(`/segments/${tableName}/${segmentName}/metadata?columns=*`);
 
-export const getTableSize = (name: string, verbose: boolean = false): Promise<AxiosResponse<TableSize>> =>
-  baseApi.get(`/tables/${name}/size?verbose=${verbose}`);
+export const getTableSize = (name: string, verbose: boolean = false, includeReplacedSegments: boolean = false): Promise<AxiosResponse<TableSize>> =>
+  baseApi.get(`/tables/${name}/size?verbose=${verbose}&includeReplacedSegments=${includeReplacedSegments}`);
 
 export const getIdealState = (name: string): Promise<AxiosResponse<IdealState>> =>
   baseApi.get(`/tables/${name}/idealstate`);
@@ -107,8 +111,27 @@ export const getExternalView = (name: string): Promise<AxiosResponse<IdealState>
 export const getServerToSegmentsCount = (name: string, tableType: TableType, verbose: boolean = false): Promise<AxiosResponse<ServerToSegmentsCount[]>> =>
   baseApi.get(`/segments/${name}/servers?type=${tableType}&verbose=${verbose}`);
 
-export const getSegmentsStatus = (name: string): Promise<AxiosResponse<SegmentStatusInfo[]>> =>
-  baseApi.get(`/tables/${name}/segmentsStatus`);
+export const getSegmentsStatus = (name: string, includeReplacedSegments: boolean = false): Promise<AxiosResponse<SegmentStatusInfo[]>> =>
+  baseApi.get(`/tables/${name}/segmentsStatus?includeReplacedSegments=${includeReplacedSegments}`);
+
+// Fetch consuming segments information for a table
+// API: GET /tables/{tableName}/consumingSegmentsInfo
+export const getConsumingSegmentsInfo = (name: string): Promise<AxiosResponse<ConsumingSegmentsInfo>> =>
+  baseApi.get(`/tables/${name}/consumingSegmentsInfo`);
+
+// Pause or resume consumption of a realtime table
+// API: POST /tables/{tableName}/pauseConsumption
+export const pauseConsumption = (name: string, comment?: string): Promise<AxiosResponse<PauseStatusDetails>> =>
+  baseApi.post(`/tables/${name}/pauseConsumption`, null, { params: { comment } });
+
+// API: POST /tables/{tableName}/resumeConsumption
+export const resumeConsumption = (name: string, comment?: string, consumeFrom?: string): Promise<AxiosResponse<PauseStatusDetails>> =>
+  baseApi.post(`/tables/${name}/resumeConsumption`, null, { params: { comment, consumeFrom } });
+
+// Fetch pause status for a realtime table
+// API: GET /tables/{tableName}/pauseStatus
+export const getPauseStatus = (name: string): Promise<AxiosResponse<PauseStatusDetails>> =>
+  baseApi.get(`/tables/${name}/pauseStatus`);
 
 export const getInstances = (): Promise<AxiosResponse<Instances>> =>
   baseApi.get('/instances');
@@ -133,6 +156,16 @@ export const dropInstance = (name: string): Promise<AxiosResponse<OperationRespo
 
 export const getPeriodicTaskNames = (): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/periodictask/names`, { headers });
+
+// Runs a periodic task against a table. If tableName is omitted, runs against all tables.
+export const runPeriodicTask = (
+  taskName: string,
+  tableName?: string,
+  tableType?: string
+): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/periodictask/run`, {
+    params: { taskname: taskName, tableName, type: tableType },
+  });
 
 export const getTaskTypes = (): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/tasktypes`, { headers: { ...headers, Accept: 'application/json' } });
@@ -166,18 +199,18 @@ export const executeTask = (data): Promise<AxiosResponse<OperationResponse>> =>
 
 export const getJobDetail = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/scheduler/jobDetails?tableName=${tableName}&taskType=${taskType}`, { headers: { ...headers, Accept: 'application/json' } });
-  
+
 export const getMinionMeta = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/${tableName}/metadata`, { headers: { ...headers, Accept: 'application/json' } });
-  
+
 export const getTasks = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/${tableName}/state`, { headers: { ...headers, Accept: 'application/json' } });
 
 export const getTaskRuntimeConfig = (taskName: string): Promise<AxiosResponse<TaskRuntimeConfig>> =>
   baseApi.get(`/tasks/task/${taskName}/runtime/config`, { headers: { ...headers, Accept: 'application/json' }});
 
-export const getTaskDebug = (taskName: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.get(`/tasks/task/${taskName}/debug?verbosity=1`, { headers: { ...headers, Accept: 'application/json' } });
+export const getTaskDebug = (taskName: string, tableName: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/task/${taskName}/debug?verbosity=1&tableName=${tableName}`, { headers: { ...headers, Accept: 'application/json' } });
 
 export const getTaskProgress = (taskName: string, subTaskName: string): Promise<AxiosResponse<TaskProgressResponse>> =>
   baseApi.get(`/tasks/subtask/${taskName}/progress`, { headers: { ...headers, Accept: 'application/json' }, params: {subtaskNames: subTaskName} });
@@ -188,6 +221,57 @@ export const getTaskGeneratorDebug = (taskName: string, taskType: string): Promi
 export const getTaskTypeDebug = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/debug?verbosity=1`, { headers: { ...headers, Accept: 'application/json' } });
 
+// All admin / status helpers below intentionally use `baseApiWithErrors` so that
+// 4xx/5xx responses actually reject. `baseApi` swallows error responses (see
+// axios-config.ts: "control will never go to catch block"), which would otherwise
+// let the UI render "Running"/"Successfully deleted task" on top of a failed call.
+export const getTasksSummary = (tenant?: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.get(`/tasks/summary`, { headers: { ...headers, Accept: 'application/json' }, params: tenant ? { tenant } : {} });
+
+export const getTaskCounts = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.get(`/tasks/${taskType}/taskcounts`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getTaskStates = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.get(`/tasks/${taskType}/taskstates`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getCronSchedulerInformation = (): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.get(`/tasks/scheduler/information`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const deleteSingleTask = (taskName: string, forceDelete = false): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.delete(`/tasks/task/${taskName}`, {
+    headers: { ...headers, Accept: 'application/json' },
+    params: { forceDelete }
+  });
+
+export const getInstanceLogFiles = (instanceName: string): Promise<AxiosResponse<string[]>> =>
+  baseApiWithErrors.get(`/loggers/instances/${instanceName}`, { headers: { ...headers, Accept: 'application/json' } });
+
+// Fetches the log file as a Blob through the authenticated axios client so that
+// auth headers (basic / bearer) attached by the request interceptor are preserved.
+// Plain anchor downloads cannot reuse those headers, so we route through axios
+// and trigger a download via createObjectURL on the client side.
+export const downloadInstanceLogFile = (
+  instanceName: string,
+  filePath: string
+): Promise<AxiosResponse<Blob>> =>
+  baseApiWithErrors.get(`/loggers/instances/${instanceName}/download`, {
+    params: { filePath },
+    responseType: 'blob',
+  });
+
+// `runPeriodicTask` (above) is shared with legacy callers and stays on baseApi
+// to preserve their behavior. The error-aware variant is used by the new Run
+// Periodic Task dialog so a failed invocation surfaces an error toast rather
+// than a misleading success.
+export const runPeriodicTaskWithErrors = (
+  taskName: string,
+  tableName?: string,
+  tableType?: string
+): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.get(`/periodictask/run`, {
+    params: { taskname: taskName, tableName, type: tableType },
+  });
+
 export const getTables = (params): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tables`, { params, headers: { ...headers, Accept: 'application/json' } });
 
@@ -197,14 +281,35 @@ export const getClusterConfig = (): Promise<AxiosResponse<ClusterConfig>> =>
 export const getQueryTables = (type?: string): Promise<AxiosResponse<QueryTables>> =>
   baseApi.get(`/tables${type ? `?type=${type}`: ''}`);
 
+export const getLogicalTables = (): Promise<AxiosResponse<string[]>> =>
+  baseApi.get(`/logicalTables`);
+
+export const getLogicalTable = (name: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/logicalTables/${name}`);
+
+export const putLogicalTable = (name: string, params: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/logicalTables/${name}`, params, { headers });
+
+export const deleteLogicalTable = (name: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.delete(`/logicalTables/${name}`, { headers });
+
 export const getTableSchema = (name: string): Promise<AxiosResponse<TableSchema>> =>
   baseApi.get(`/tables/${name}/schema`);
 
 export const getQueryResult = (params: Object): Promise<AxiosResponse<SQLResult>> =>
   transformApi.post(`/sql`, params, {headers});
 
+export const getTimeSeriesQueryResult = (params: Object): Promise<AxiosResponse<any>> =>
+  transformApi.post(`/query/timeseries`, params);
+
+export const getTimeSeriesLanguages = (): Promise<AxiosResponse<string[]>> =>
+  baseApi.get('/timeseries/languages');
+
 export const getClusterInfo = (): Promise<AxiosResponse<ClusterName>> =>
   baseApi.get('/cluster/info');
+
+export const getVersions = (): Promise<AxiosResponse<PackageVersions>> =>
+  baseApi.get('/version');
 
 export const zookeeperGetList = (params: string): Promise<AxiosResponse<ZKGetList>> =>
   baseApi.get(`/zk/ls?path=${params}`);
@@ -218,8 +323,8 @@ export const zookeeperGetStat = (params: string): Promise<AxiosResponse<ZKConfig
 export const zookeeperGetListWithStat = (params: string): Promise<AxiosResponse<ZKConfig>> =>
   baseApi.get(`/zk/lsl?path=${params}`);
 
-export const zookeeperPutData = (params: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.put(`/zk/put?${params}`, null, { headers });
+export const zookeeperPutData = (params: string, data?: any): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/zk/put?${params}`, data, { headers });
 
 export const zookeeperDeleteNode = (params: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`/zk/delete?path=${params}`);
@@ -232,6 +337,9 @@ export const getServerListOfTenant = (name: string): Promise<AxiosResponse<Serve
 
 export const reloadSegment = (tableName: string, instanceName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.post(`/segments/${tableName}/${instanceName}/reload`, null, {headers});
+
+export const resetSegment = (tableName: string, segmentName: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.post(`/segments/${tableName}/${segmentName}/reset`, null, {headers});
 
 export const reloadAllSegments = (tableName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.post(`/segments/${tableName}/reload?type=${tableType}`, null, {headers});
@@ -255,8 +363,8 @@ export const getTableJobs = (tableName: string, jobTypes?: string): Promise<Axio
 export const getSegmentReloadStatus = (jobId: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/segments/segmentReloadStatus/${jobId}`, {headers});
 
-export const deleteTable = (tableName: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.delete(`/tables/${tableName}`, {headers});
+export const deleteTable = (tableName: string, retention?: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.delete(`/tables/${tableName}${retention ? `?retention=${retention}` : ''}`, {headers});
 
 export const deleteSchema = (schemaName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`/schemas/${schemaName}`, {headers});
@@ -286,7 +394,7 @@ export const getInfo = (): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/auth/info`);
 
 export const authenticateUser = (authToken): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.get(`/auth/verify`, {headers:{"Authorization": authToken}});
+  baseApi.get(`/auth/verify/v2`, {headers:{"Authorization": authToken}});
 
 export const getSegmentDebugInfo = (tableName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`debug/tables/${tableName}?type=${tableType}&verbosity=10`);
@@ -310,3 +418,14 @@ export const requestDeleteUser = (userObject: UserObject): Promise<AxiosResponse
 
 export const requestUpdateUser = (userObject: UserObject, passwordChanged: boolean): Promise<AxiosResponse<any>> =>
     baseApi.put(`/users/${userObject.username}?component=${userObject.component}&passwordChanged=${passwordChanged}`, JSON.stringify(userObject), {headers});
+
+// Materialized Views
+
+export const getMaterializedViewList = (): Promise<AxiosResponse<any>> =>
+    baseApi.get('/materializedViews');
+
+export const getMaterializedView = (viewTableName: string): Promise<AxiosResponse<any>> =>
+    baseApi.get(`/materializedViews/${viewTableName}`);
+
+export const deleteMaterializedView = (viewTableName: string): Promise<AxiosResponse<any>> =>
+    baseApi.delete(`/materializedViews/${viewTableName}`, {headers});

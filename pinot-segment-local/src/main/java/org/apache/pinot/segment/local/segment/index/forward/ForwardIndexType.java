@@ -19,17 +19,26 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
-import com.google.common.collect.Maps;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
-import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
+import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriterV7;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.ForwardIndexHandler;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -40,30 +49,32 @@ import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
-import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
-import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexUtil;
+import org.apache.pinot.segment.spi.index.RangeIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ForwardIndexType.class);
+
   public static final String INDEX_DISPLAY_NAME = "forward";
-  // For multi-valued column, forward-index.
-  // Maximum number of multi-values per row. We assert on this.
-  public static final int MAX_MULTI_VALUES_PER_ROW = 1000;
   private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT = 100;
   private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT = 100_000;
   //@formatter:off
@@ -87,7 +98,122 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   @Override
   public ForwardIndexConfig getDefaultConfig() {
-    return ForwardIndexConfig.DEFAULT;
+    return ForwardIndexConfig.getDefault(FieldConfig.EncodingType.DICTIONARY);
+  }
+
+  @Override
+  public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
+    ForwardIndexConfig forwardIndexConfig = indexConfigs.getConfig(StandardIndexes.forward());
+    if (forwardIndexConfig.isEnabled()) {
+      validateForwardIndexEnabled(forwardIndexConfig, indexConfigs, fieldSpec);
+    } else {
+      validateForwardIndexDisabled(indexConfigs, fieldSpec, tableConfig);
+    }
+  }
+
+  private void validateForwardIndexEnabled(ForwardIndexConfig forwardIndexConfig, FieldIndexConfigs indexConfigs,
+      FieldSpec fieldSpec) {
+    String column = fieldSpec.getName();
+    CompressionCodec compressionCodec = forwardIndexConfig.getCompressionCodec();
+    DictionaryIndexConfig dictionaryConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
+    String codecSpec = forwardIndexConfig.getCodecSpec();
+    if (codecSpec != null) {
+      validateCodecSpec(codecSpec, forwardIndexConfig, fieldSpec);
+    }
+    // Dictionary-encoded forward index requires a dictionary to translate dict ids back to values.
+    if (forwardIndexConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY) {
+      Preconditions.checkState(dictionaryConfig.isEnabled(),
+          "Dictionary must be enabled for dictionary-encoded forward index column: %s", column);
+    }
+    if (dictionaryConfig.isEnabled()) {
+      Preconditions.checkState(compressionCodec == null || compressionCodec.isApplicableToDictEncodedIndex(),
+          "Compression codec: %s is not applicable to dictionary encoded column: %s", compressionCodec, column);
+    } else {
+      boolean isCLPCodec = compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2
+          || compressionCodec == CompressionCodec.CLPV2_ZSTD || compressionCodec == CompressionCodec.CLPV2_LZ4;
+      if (isCLPCodec) {
+        Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
+            "Cannot apply CLP compression codec to column: %s of stored type other than STRING", column);
+      } else {
+        Preconditions.checkState(compressionCodec == null || compressionCodec.isApplicableToRawIndex(),
+            "Compression codec: %s is not applicable to raw column: %s", compressionCodec, column);
+      }
+    }
+  }
+
+  /// Validates a codec pipeline against the effective table config and schema before segment creation.
+  private static void validateCodecSpec(String codecSpec, ForwardIndexConfig forwardIndexConfig,
+      FieldSpec fieldSpec) {
+    String column = fieldSpec.getName();
+    Preconditions.checkState(forwardIndexConfig.getEncodingType() == FieldConfig.EncodingType.RAW,
+        "codecSpec requires RAW forward-index encoding for column: %s", column);
+    validateCodecPipelineShape(codecSpec, fieldSpec);
+    try {
+      FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
+      CodecPipelineExecutor executor = CodecPipelineExecutor.create(codecSpec, storedType);
+      int canonicalSpecBytes = executor.getCanonicalSpec().getBytes(StandardCharsets.UTF_8).length;
+      Preconditions.checkArgument(
+          canonicalSpecBytes <= FixedByteChunkForwardIndexWriterV7.MAX_CODEC_SPEC_LENGTH_BYTES,
+          "Canonical codec spec is %s bytes; the V7 header allows at most %s", canonicalSpecBytes,
+          FixedByteChunkForwardIndexWriterV7.MAX_CODEC_SPEC_LENGTH_BYTES);
+      FixedByteChunkForwardIndexWriterV7.validateAndNormalizeNumDocsPerChunk(executor, storedType.size(),
+          forwardIndexConfig.getTargetDocsPerChunk());
+    } catch (IllegalArgumentException e) {
+      throw new IllegalStateException(
+          "Codec pipeline validation failed for column '" + column + "' (codecSpec='" + codecSpec + "'): "
+              + e.getMessage(), e);
+    }
+  }
+
+  /// Enforces the shape supported by the V7 codec-pipeline writer. The factory calls this as
+  /// defense in depth for direct callers that bypass table-config validation.
+  static void validateCodecPipelineShape(String codecSpec, FieldSpec fieldSpec) {
+    String column = fieldSpec.getName();
+    Preconditions.checkArgument(fieldSpec.isSingleValueField(),
+        "codecSpec '%s' uses the V7 codec-pipeline writer, which only supports single-value columns. "
+            + "Column '%s' is multi-value.", codecSpec, column);
+    FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
+    Preconditions.checkArgument(storedType == FieldSpec.DataType.INT || storedType == FieldSpec.DataType.LONG,
+        "codecSpec '%s' uses the V7 codec-pipeline writer, which only supports INT and LONG columns. "
+            + "Column '%s' has type: %s.", codecSpec, column, storedType);
+  }
+
+  private void validateForwardIndexDisabled(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec,
+      TableConfig tableConfig) {
+    String column = fieldSpec.getName();
+    ForwardIndexConfig forwardIndexConfig = indexConfigs.getConfig(StandardIndexes.forward());
+    Preconditions.checkState(forwardIndexConfig.getCodecSpec() == null,
+        "codecSpec cannot be configured when the forward index is disabled for column: %s", column);
+
+    // TODO: Revisit this. We should allow dropping forward index after segment is sealed.
+    Preconditions.checkState(tableConfig.getTableType() != TableType.REALTIME,
+        "Cannot disable forward index for column: %s, as the table type is REALTIME", column);
+
+    // Check for the range index since the index itself relies on the existence of the forward index to work.
+    RangeIndexConfig rangeIndexConfig = indexConfigs.getConfig(StandardIndexes.range());
+    if (rangeIndexConfig.isEnabled()) {
+      Preconditions.checkState(fieldSpec.isSingleValueField(),
+          "Feature not supported for multi-value columns with range index. Cannot disable forward index for column: "
+              + "%s. Disable range index on this column to use this feature.", column);
+      Preconditions.checkState(rangeIndexConfig.getVersion() == BitSlicedRangeIndexCreator.VERSION,
+          "Feature not supported for single-value columns with range index version < 2. Cannot disable forward index "
+              + "for column: %s. Either disable range index or create range index with version >= 2 to use this "
+              + "feature.", column);
+    }
+
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    Preconditions.checkState(!indexingConfig.isOptimizeDictionaryForMetrics() && !indexingConfig.isOptimizeDictionary(),
+        "Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics) not supported "
+            + "with forward index disabled for column: %s", column);
+
+    boolean hasDictionary = indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled();
+    boolean hasInvertedIndex = indexConfigs.getConfig(StandardIndexes.inverted()).isEnabled();
+    if (!hasDictionary || !hasInvertedIndex) {
+      LOGGER.warn("Forward index has been disabled for column: {}. Either dictionary ({}) and / or inverted index ({}) "
+              + "has been disabled. If the forward index needs to be regenerated or another index added please refresh "
+              + "or back-fill the forward index as it cannot be rebuilt without dictionary and inverted index.", column,
+          hasDictionary ? "enabled" : "disabled", hasInvertedIndex ? "enabled" : "disabled");
+    }
   }
 
   @Override
@@ -95,35 +221,102 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     return INDEX_DISPLAY_NAME;
   }
 
+  /// Resolves per-column [ForwardIndexConfig] in a single pass over [TableConfig], reconciling the legacy signals
+  /// (`indexingConfig.noDictionaryColumns`, `indexingConfig.noDictionaryConfig`, `fieldConfig.encodingType`,
+  /// `fieldConfig.compressionCodec`) with the modern `fieldConfig.indexes.forward` JSON block. The deserializer
+  /// fails fast on conflicting signals.
   @Override
-  public ColumnConfigDeserializer<ForwardIndexConfig> createDeserializer() {
-    // reads tableConfig.fieldConfigList and decides what to create using the FieldConfig properties and encoding
-    ColumnConfigDeserializer<ForwardIndexConfig> fromOld = (tableConfig, schema) -> {
-      Map<String, DictionaryIndexConfig> dictConfigs = StandardIndexes.dictionary().getConfig(tableConfig, schema);
+  protected ColumnConfigDeserializer<ForwardIndexConfig> createDeserializer() {
+    return (tableConfig, schema) -> {
+      Map<String, ForwardIndexConfig> result = new HashMap<>();
 
-      Map<String, ForwardIndexConfig> fwdConfig =
-          Maps.newHashMapWithExpectedSize(Math.max(dictConfigs.size(), schema.size()));
+      // Legacy noDictionary signals — both indicate RAW forward index for the listed columns.
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      Set<String> noDictionaryColumns = new HashSet<>();
+      if (indexingConfig.getNoDictionaryColumns() != null) {
+        noDictionaryColumns.addAll(indexingConfig.getNoDictionaryColumns());
+      }
+      Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
+      if (noDictionaryConfig != null) {
+        noDictionaryColumns.addAll(noDictionaryConfig.keySet());
+      }
 
       Collection<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
       if (fieldConfigs != null) {
         for (FieldConfig fieldConfig : fieldConfigs) {
+          String column = fieldConfig.getName();
+          // Pop processed columns so the post-loop scan only emits defaults for columns with no FieldConfig at all.
+          boolean inNoDictionaryList = noDictionaryColumns.remove(column);
+
+          JsonNode forwardIndexNode = fieldConfig.getIndexes().get(INDEX_DISPLAY_NAME);
+
+          // `forwardIndexDisabled` short-circuits everything else.
           Map<String, String> properties = fieldConfig.getProperties();
           if (properties != null && isDisabled(properties)) {
-            fwdConfig.put(fieldConfig.getName(), ForwardIndexConfig.DISABLED);
-          } else {
-            ForwardIndexConfig config = createConfigFromFieldConfig(fieldConfig);
-            if (!config.equals(ForwardIndexConfig.DEFAULT)) {
-              fwdConfig.put(fieldConfig.getName(), config);
+            JsonNode codecSpecNode = forwardIndexNode != null ? forwardIndexNode.get("codecSpec") : null;
+            Preconditions.checkState(codecSpecNode == null || codecSpecNode.isNull(),
+                "codecSpec cannot be configured when the forward index is disabled for column: %s", column);
+            result.put(column, ForwardIndexConfig.getDisabled());
+            continue;
+          }
+
+          // Resolve the forward-index encoding. `FieldConfig.encodingType` is never null (the FieldConfig constructor
+          // defaults it to DICTIONARY when unset), so the per-column override here is the legacy
+          // `noDictionaryColumns` / `noDictionaryConfig` membership — historically these may be set alongside a
+          // FieldConfig that left `encodingType` at the default DICTIONARY.
+          FieldConfig.CompressionCodec fcCodec = fieldConfig.getCompressionCodec();
+          FieldConfig.EncodingType encodingType =
+              inNoDictionaryList ? FieldConfig.EncodingType.RAW : fieldConfig.getEncodingType();
+
+          if (forwardIndexNode != null) {
+            Preconditions.checkState(forwardIndexNode.isObject(), "Invalid forward index config for column: %s",
+                column);
+
+            // Conflict: encodingType mismatch between resolved FieldConfig encoding and indexes.forward.
+            JsonNode innerEncodingNode = forwardIndexNode.get("encodingType");
+            if (innerEncodingNode != null && !innerEncodingNode.isNull()) {
+              FieldConfig.EncodingType inner = FieldConfig.EncodingType.valueOf(innerEncodingNode.asText());
+              Preconditions.checkState(inner == encodingType,
+                  "Conflicting forward-index encoding for column: %s — FieldConfig.encodingType=%s but "
+                      + "indexes.forward.encodingType=%s", column, encodingType, inner);
             }
-            // It is important to do not explicitly add the default value here in order to avoid exclusive problems with
-            // the default `fromIndexes` deserializer.
+
+            // Conflict: compressionCodec mismatch between FieldConfig and indexes.forward.
+            JsonNode innerCodecNode = forwardIndexNode.get("compressionCodec");
+            if (innerCodecNode != null && !innerCodecNode.isNull() && fcCodec != null) {
+              FieldConfig.CompressionCodec inner = FieldConfig.CompressionCodec.valueOf(innerCodecNode.asText());
+              Preconditions.checkState(inner == fcCodec,
+                  "Conflicting forward-index compressionCodec for column: %s — FieldConfig.compressionCodec=%s "
+                      + "but indexes.forward.compressionCodec=%s", column, fcCodec, inner);
+            }
+
+            // Inject the resolved encodingType / compressionCodec into the JSON when absent so the resulting
+            // ForwardIndexConfig always matches the column-level signals.
+            ObjectNode configNode = (ObjectNode) forwardIndexNode.deepCopy();
+            if (innerEncodingNode == null || innerEncodingNode.isNull()) {
+              configNode.put("encodingType", encodingType.name());
+            }
+            if ((innerCodecNode == null || innerCodecNode.isNull()) && fcCodec != null) {
+              configNode.put("compressionCodec", fcCodec.name());
+            }
+            try {
+              result.put(column, JsonUtils.jsonNodeToObject(configNode, ForwardIndexConfig.class));
+            } catch (IOException e) {
+              throw new UncheckedIOException(e);
+            }
+          } else {
+            result.put(column, createConfigFromFieldConfig(fieldConfig, encodingType));
           }
         }
       }
-      return fwdConfig;
+
+      // Columns listed in noDictionaryColumns/noDictionaryConfig that have no FieldConfig at all — emit a RAW default.
+      // (Columns with a FieldConfig were already removed from `noDictionaryColumns` above.)
+      for (String column : noDictionaryColumns) {
+        result.put(column, ForwardIndexConfig.getDefault(FieldConfig.EncodingType.RAW));
+      }
+      return result;
     };
-    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
-        .withExclusiveAlternative(fromOld);
   }
 
   private boolean isDisabled(Map<String, String> props) {
@@ -131,9 +324,10 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
         props.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED, FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
   }
 
-  private ForwardIndexConfig createConfigFromFieldConfig(FieldConfig fieldConfig) {
-    ForwardIndexConfig.Builder builder = new ForwardIndexConfig.Builder();
-    builder.withCompressionCodec(fieldConfig.getCompressionCodec());
+  private ForwardIndexConfig createConfigFromFieldConfig(FieldConfig fieldConfig,
+      FieldConfig.EncodingType resolvedEncodingType) {
+    ForwardIndexConfig.Builder builder = new ForwardIndexConfig.Builder(resolvedEncodingType)
+        .withCompressionCodec(fieldConfig.getCompressionCodec());
     Map<String, String> properties = fieldConfig.getProperties();
     if (properties != null) {
       builder.withLegacyProperties(properties);
@@ -150,6 +344,11 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   }
 
   @Override
+  public boolean shouldCreateIndex(IndexCreationContext context, ForwardIndexConfig indexConfig) {
+    return context.getFieldSpec().getDataType() != FieldSpec.DataType.OPEN_STRUCT;
+  }
+
+  @Override
   public ForwardIndexCreator createIndexCreator(IndexCreationContext context, ForwardIndexConfig indexConfig)
       throws Exception {
     return ForwardIndexCreatorFactory.createIndexCreator(context, indexConfig);
@@ -157,8 +356,22 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    return new ForwardIndexHandler(segmentDirectory, configsByCol, schema, tableConfig);
+      Schema schema, TableConfig tableConfig) {
+    return new ForwardIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
+  }
+
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, ForwardIndexConfig indexConfig) {
+    // Forward index supports both DICT and RAW encodings; it does not require a dictionary to function.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, ForwardIndexConfig indexConfig) {
+    // The forward index encoding is reconciled with FieldConfig.encodingType independently of dictionary state
+    // (apache/pinot#18364), so adding or removing a dictionary alone does not change the on-disk forward index
+    // layout — the existing forward index can be reused.
+    return false;
   }
 
   @Override
@@ -167,15 +380,16 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   }
 
   public String getFileExtension(ColumnMetadata columnMetadata) {
+    boolean isRaw = columnMetadata.getForwardIndexEncoding() == FieldConfig.EncodingType.RAW;
     if (columnMetadata.isSingleValue()) {
-      if (!columnMetadata.hasDictionary()) {
+      if (isRaw) {
         return V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION;
       } else if (columnMetadata.isSorted()) {
         return V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
       } else {
         return V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
       }
-    } else if (!columnMetadata.hasDictionary()) {
+    } else if (isRaw) {
       return V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION;
     } else {
       return V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
@@ -187,39 +401,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     if (columnMetadata == null) {
       return EXTENSIONS;
     }
-    return Collections.singletonList(getFileExtension(columnMetadata));
-  }
-
-  /**
-   * Returns the forward index reader for the given column.
-   *
-   * This method will return the default reader, skipping any index overload.
-   */
-  public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata)
-      throws IOException {
-    PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.forward());
-    return read(dataBuffer, columnMetadata);
-  }
-
-  /**
-   * Returns the forward index reader for the given column.
-   *
-   * This method will return the default reader, skipping any index overload.
-   */
-  public static ForwardIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
-    return ForwardIndexReaderFactory.createIndexReader(dataBuffer, metadata);
-  }
-
-  /**
-   * Returns the forward index reader for the given column.
-   *
-   * This method will delegate on {@link StandardIndexes}, so the correct reader will be returned even when using
-   * index overload.
-   */
-  public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
-      ColumnMetadata metadata)
-      throws IndexReaderConstraintException, IOException {
-    return StandardIndexes.forward().getReaderFactory().createIndexReader(segmentReader, fieldIndexConfigs, metadata);
+    return List.of(getFileExtension(columnMetadata));
   }
 
   @Nullable
@@ -230,7 +412,8 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     }
     String column = context.getFieldSpec().getName();
     String segmentName = context.getSegmentName();
-    FieldSpec.DataType storedType = context.getFieldSpec().getDataType().getStoredType();
+    FieldSpec.DataType dataType = context.getFieldSpec().getDataType();
+    FieldSpec.DataType storedType = dataType.getStoredType();
     int fixedLengthBytes = context.getFixedLengthBytes();
     boolean isSingleValue = context.getFieldSpec().isSingleValueField();
     if (!context.hasDictionary()) {
@@ -256,7 +439,9 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
             // CLP (V1) always have clp encoding enabled whereas V2 is dynamic
             clpMutableForwardIndex.forceClpEncoding();
             return clpMutableForwardIndex;
-          } else if (config.getCompressionCodec() == CompressionCodec.CLPV2) {
+          } else if (config.getCompressionCodec() == CompressionCodec.CLPV2
+              || config.getCompressionCodec() == CompressionCodec.CLPV2_ZSTD
+              || config.getCompressionCodec() == CompressionCodec.CLPV2_LZ4) {
             CLPMutableForwardIndexV2 clpMutableForwardIndex =
                 new CLPMutableForwardIndexV2(column, context.getMemoryManager());
             return clpMutableForwardIndex;
@@ -266,13 +451,15 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
         }
       } else {
         // TODO: Add support for variable width (bytes, string, big decimal) MV RAW column types
-        assert storedType.isFixedWidth();
+        Preconditions.checkState(dataType.isFixedWidth(), "Unsupported stored type: %s for no-dictionary MV column: %s",
+            storedType, column);
         String allocationContext =
             IndexUtil.buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
                 V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
         // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
-        return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),
-            context.getCapacity(), storedType.size(), context.getMemoryManager(), allocationContext, false, storedType);
+        return new FixedByteMVMutableForwardIndex(context.getMaxNumMultiValues(), context.getAvgNumMultiValues(),
+            context.getCapacity(), dataType.size(), context.getMemoryManager(), allocationContext, false, storedType,
+            dataType);
       }
     } else {
       if (isSingleValue) {
@@ -284,7 +471,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
         String allocationContext = IndexUtil.buildAllocationContext(segmentName, column,
             V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
         // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
-        return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),
+        return new FixedByteMVMutableForwardIndex(context.getMaxNumMultiValues(), context.getAvgNumMultiValues(),
             context.getCapacity(), Integer.BYTES, context.getMemoryManager(), allocationContext, true,
             FieldSpec.DataType.INT);
       }

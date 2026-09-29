@@ -33,17 +33,15 @@ class PinotPluginConfiguration {
 
   private final String _parentRealmId;
 
-  /**
-   * Expose plugin configuration based on Properties
-   *
-   * Possible entries:
-   * key: importFrom.[realmId]
-   *  value: comma-separated list of packages
-   * key: parent.realmId
-   *  value: pinot, in case you want to make use of all pinot-framework classes first
-   *
-   * @param properties properties-based configuration
-   */
+  /// Expose plugin configuration based on Properties
+  ///
+  /// Possible entries:
+  /// key: importFrom.\[realmId\]
+  ///  value: comma-separated list of packages
+  /// key: parent.realmId
+  ///  value: pinot, in case you want to make use of all pinot-framework classes first
+  ///
+  /// @param properties properties-based configuration
   PinotPluginConfiguration(Properties properties) {
     Map<String, List<String>> importsFromRealm = new HashMap<>();
     properties.forEach((k, v) -> {

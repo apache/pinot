@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.local.io.util.ValueReader;
 import org.apache.pinot.segment.local.io.util.VarLengthValueReader;
@@ -45,7 +46,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-public class ValueReaderComparisonTest {
+public class ValueReaderComparisonTest implements PinotBuffersAfterMethodCheckRule {
 
   // Number of rounds to run the test for, change this number to test locally for catching the corner cases.
   private static final int NUM_ROUNDS = 1;
@@ -368,11 +369,11 @@ public class ValueReaderComparisonTest {
     } else {
       assert byteOrder == ByteOrder.BIG_ENDIAN : "little endian unsupported by VarLengthValueWriter";
       Path file = Files.createTempFile(ValueReaderComparisonTest.class.getName() + "-" + UUID.randomUUID(), ".tmp");
-      VarLengthValueWriter writer = new VarLengthValueWriter(file.toFile(), storedValues.length);
-      for (byte[] storedValue : storedValues) {
-        writer.add(storedValue);
+      try (VarLengthValueWriter writer = new VarLengthValueWriter(file.toFile(), storedValues.length)) {
+        for (byte[] storedValue : storedValues) {
+          writer.add(storedValue);
+        }
       }
-      writer.close();
       PinotDataBuffer buffer =
           PinotDataBuffer.mapFile(file.toFile(), true, 0, Files.size(file), byteOrder, "ValueReaderComparisonTest");
       return Pair.of(new VarLengthValueReader(buffer), buffer);

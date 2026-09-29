@@ -32,11 +32,16 @@ public class EnrichmentConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Enricher properties")
   private final JsonNode _properties;
 
+  @JsonPropertyDescription("The transformation that is applied before the complex type transformation")
+  private final boolean _preComplexTypeTransform;
+
   @JsonCreator
   public EnrichmentConfig(@JsonProperty("enricherType") String enricherType,
-      @JsonProperty("properties") JsonNode properties) {
+      @JsonProperty("properties") JsonNode properties,
+      @JsonProperty("preComplexTypeTransform") boolean preComplexTypeTransform) {
     _enricherType = enricherType;
     _properties = properties;
+    _preComplexTypeTransform = preComplexTypeTransform;
   }
 
   public String getEnricherType() {
@@ -45,5 +50,9 @@ public class EnrichmentConfig extends BaseJsonConfig {
 
   public JsonNode getProperties() {
     return _properties;
+  }
+
+  public boolean isPreComplexTypeTransform() {
+    return _preComplexTypeTransform;
   }
 }

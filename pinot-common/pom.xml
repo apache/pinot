@@ -24,13 +24,14 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-common</artifactId>
   <name>Pinot Common</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
+    <thrift.bin.path>/usr/local/bin/thrift</thrift.bin.path>
   </properties>
 
   <build>
@@ -44,21 +45,23 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <!-- Pinned to Java 11 bytecode for external consumers (e.g. plugins
+               loaded by older JVMs). Hard-coded literal so -Djdk.version=21
+               on the CLI cannot silently bump the bytecode level. -->
+          <release>11</release>
+          <source>11</source>
+          <target>11</target>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <configuration combine.children="override">
-          <properties>
-            <property>
-              <name>usedefaultlisteners</name>
-              <value>false</value>  <!-- This will disable all default listeners -->
-            </property>
-          </properties>
-          <!--Disabling tests as Pinot currently uses Yammer and these tests fail for DropwizardMetricsFactory-->
-          <excludes>
-            <exclude>**/DropwizardBrokerPrometheusMetricsTest.java</exclude>
-            <exclude>**/DropwizardServerPrometheusMetricsTest.java</exclude>
-            <exclude>**/DropwizardMinionPrometheusMetricsTest.java</exclude>
-            <exclude>**/DropwizardControllerPrometheusMetricsTest.java</exclude>
-          </excludes>
+        <configuration>
+          <!-- Keep this module's historical fork reuse, but honor the root parallel-fork knob. -->
+          <forkCount>${unit.test.fork.count}</forkCount>
+          <reuseForks>true</reuseForks>
         </configuration>
       </plugin>
 
@@ -89,7 +92,66 @@
           </java>
         </configuration>
       </plugin>
-      <!-- Creates a Java class for the custom parser from Parser.jj -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <configuration>
+          <artifactSet>
+            <excludes>
+              <!-- Experimental Fory support is activated only when applications add Fory to their classpath. -->
+              <exclude>org.apache.fory:fory-json</exclude>
+              <exclude>org.apache.fory:fory-core</exclude>
+            </excludes>
+          </artifactSet>
+        </configuration>
+      </plugin>
+      <!-- Stage 1 of SQL parser codegen: FMPP plugs Pinot's custom grammar (config.fmpp +
+           templates/Parser.jj) into Calcite's parser template and writes the JavaCC grammar to
+           target/generated-sources/javacc/Parser.jj. Declared before javacc-maven-plugin so it runs
+           first within the generate-sources phase (same-phase goals execute in POM declaration order). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>generate-fmpp-sources</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target name="generate-parser">
+                <taskdef name="fmpp" classname="fmpp.tools.AntTask" classpathref="maven.compile.classpath" />
+                <!-- FMPP unconditionally rewrites its output, so generating straight into the JavaCC
+                     source dir would bump Parser.jj's timestamp every build and force JavaCC + the
+                     entire module to recompile. Instead generate into a staging dir, then copy into
+                     the JavaCC source dir only when the grammar content actually changed (compared
+                     byte-for-byte via the 'different' selector, ignoring timestamps). This keeps
+                     incremental builds fast while guaranteeing the grammar is regenerated after a
+                     clean. It replaces the old 'sqlparser' profile, whose file-based activation was
+                     evaluated before 'clean' deleted the file it keyed on, breaking 'clean install'. -->
+                <mkdir dir="${project.build.directory}/generated-sources/fmpp" />
+                <fmpp configuration="src/main/codegen/config.fmpp" sourceRoot="src/main/codegen/templates" outputRoot="${project.build.directory}/generated-sources/fmpp" />
+                <mkdir dir="${project.build.directory}/generated-sources/javacc" />
+                <copy todir="${project.build.directory}/generated-sources/javacc">
+                  <fileset dir="${project.build.directory}/generated-sources/fmpp/javacc">
+                    <include name="Parser.jj" />
+                    <different targetdir="${project.build.directory}/generated-sources/javacc" ignoreFileTimes="true" />
+                  </fileset>
+                </copy>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+        <dependencies>
+          <dependency>
+            <groupId>net.sourceforge.fmpp</groupId>
+            <artifactId>fmpp</artifactId>
+            <version>${fmpp.version}</version>
+          </dependency>
+        </dependencies>
+      </plugin>
+      <!-- Stage 2 of SQL parser codegen: compile the generated Parser.jj into SqlParserImpl. -->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>javacc-maven-plugin</artifactId>
@@ -116,7 +178,13 @@
   <dependencies>
     <dependency>
       <groupId>io.prometheus.jmx</groupId>
-      <artifactId>jmx_prometheus_javaagent</artifactId>
+      <artifactId>collector</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.prometheus</groupId>
+      <artifactId>prometheus-metrics-exporter-httpserver</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -125,6 +193,15 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-timeseries-spi</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.arrow</groupId>
+      <artifactId>arrow-vector</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.arrow</groupId>
+      <artifactId>arrow-memory-netty</artifactId>
     </dependency>
 
     <dependency>
@@ -191,7 +268,7 @@
       <artifactId>zstd-jni</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.lz4</groupId>
+      <groupId>at.yawk.lz4</groupId>
       <artifactId>lz4-java</artifactId>
     </dependency>
     <dependency>
@@ -209,6 +286,11 @@
     <dependency>
       <groupId>com.jayway.jsonpath</groupId>
       <artifactId>json-path</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.fory</groupId>
+      <artifactId>fory-json</artifactId>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.apache.zookeeper</groupId>
@@ -248,7 +330,7 @@
     </dependency>
     <dependency>
       <groupId>io.github.hakky54</groupId>
-      <artifactId>sslcontext-kickstart-for-netty</artifactId>
+      <artifactId>ayza-for-netty</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.re2j</groupId>
@@ -258,13 +340,12 @@
       <groupId>com.google.auto.service</groupId>
       <artifactId>auto-service-annotations</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.nimbusds</groupId>
+      <artifactId>nimbus-jose-jwt</artifactId>
+    </dependency>
 
     <!-- Test -->
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-yammer</artifactId>
-      <scope>test</scope>
-    </dependency>
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
@@ -281,13 +362,15 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-dropwizard</artifactId>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Suite API used by OrderedTestNGSuite (and its test) to read the declared class order -->
     <dependency>
-      <groupId>net.sourceforge.fmpp</groupId>
-      <artifactId>fmpp</artifactId>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-suite</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
   <profiles>
@@ -295,7 +378,7 @@
       <id>profile-buildthrift</id>
       <activation>
         <file>
-          <exists>/usr/local/bin/thrift</exists>
+          <exists>${thrift.bin.path}</exists>
         </file>
         <property>
           <name>buildThrift</name>
@@ -314,21 +397,21 @@
                   <target>
                     <delete dir="target/generated-sources/gen-javabean" />
                     <mkdir dir="target/generated-sources" />
-                    <exec executable="/usr/local/bin/thrift">
+                    <exec executable="${thrift.bin.path}">
                       <arg value="--gen" />
                       <arg value="java:beans" />
                       <arg value="-o" />
                       <arg value="target/generated-sources" />
                       <arg value="src/thrift/query.thrift" />
                     </exec>
-                    <exec executable="/usr/local/bin/thrift">
+                    <exec executable="${thrift.bin.path}">
                       <arg value="--gen" />
                       <arg value="java:beans" />
                       <arg value="-o" />
                       <arg value="target/generated-sources" />
                       <arg value="src/thrift/request.thrift" />
                     </exec>
-                    <exec executable="/usr/local/bin/thrift">
+                    <exec executable="${thrift.bin.path}">
                       <arg value="--gen" />
                       <arg value="java:beans" />
                       <arg value="-o" />
@@ -365,56 +448,6 @@
       <properties>
         <shade.phase.prop>none</shade.phase.prop>
       </properties>
-    </profile>
-    <profile>
-      <!-- The Ant task doesn't care about unchanged (re)sources and will always generate.
-      This causes the maven-compiler-plugin to detect changes and always recompile the Java sources.
-
-      If there are changes in src/main/codegen, either enforcer activation of this profile by using -Psqlparser or by
-      removing the generated-sources/javacc directory
-
-      NOTICE: In Maven the profile activation is decided BEFORE plugin execution.
-      When running clean+verify, the profile will not be activated (because the file still exists),
-        clean will remove it and compiler-plugin will fail because of a missing class.
-        Either run 'mvn clean && mvn verify' or 'mvn verify -Psqlparser'
-       -->
-      <id>sqlparser</id>
-      <activation>
-        <file>
-          <missing>${project.build.directory}/generated-sources/javacc/Parser.jj</missing>
-        </file>
-      </activation>
-      <build>
-        <plugins>
-          <!-- "Plugs in" the Calcite's Parser.jj with the variables present in config.fmpp. These contain the custom rules
-     as well as the class to which the custom implementation will get generated -->
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-antrun-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>generate-fmpp-sources</id>
-                <phase>generate-sources</phase>
-                <goals>
-                  <goal>run</goal>
-                </goals>
-                <configuration>
-                  <target name="generate-code">
-                    <taskdef name="fmpp" classname="fmpp.tools.AntTask" classpathref="maven.compile.classpath"/>
-                    <fmpp configuration="src/main/codegen/config.fmpp"
-                        sourceRoot="src/main/codegen/templates"
-                        outputRoot="${project.build.directory}/generated-sources/"/>
-                  </target>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin> <!-- Enforce javacc-maven-plugin executions after fmpp-maven-plugin -->
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>javacc-maven-plugin</artifactId>
-          </plugin>
-        </plugins>
-      </build>
     </profile>
   </profiles>
 </project>

@@ -59,6 +59,8 @@ spec:
 {{ toYaml .Values.broker.affinity | indent 8 }}
       tolerations:
 {{ toYaml .Values.broker.tolerations | indent 8 }}
+      initContainers:
+{{ toYaml .Values.broker.initContainers | indent 8 }}
       containers:
       - name: broker
         securityContext:

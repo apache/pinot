@@ -19,23 +19,20 @@
 package org.apache.pinot.core.operator.transform.transformer.timeunit;
 
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 
 
-/**
- * Implementation of {@link TimeUnitTransformer} to handle time units defined in {@link TimeUnit}.
- */
+/// Implementation of [TimeUnitTransformer] to handle time units defined in [TimeUnit].
 public class JavaTimeUnitTransformer implements TimeUnitTransformer {
   private final TimeUnit _inputTimeUnit;
   private final TimeUnit _outputTimeUnit;
 
-  public JavaTimeUnitTransformer(@Nonnull TimeUnit inputTimeUnit, @Nonnull TimeUnit outputTimeUnit) {
+  public JavaTimeUnitTransformer(TimeUnit inputTimeUnit, TimeUnit outputTimeUnit) {
     _inputTimeUnit = inputTimeUnit;
     _outputTimeUnit = outputTimeUnit;
   }
 
   @Override
-  public void transform(@Nonnull long[] input, @Nonnull long[] output, int length) {
+  public void transform(long[] input, long[] output, int length) {
     for (int i = 0; i < length; i++) {
       output[i] = _outputTimeUnit.convert(input[i], _inputTimeUnit);
     }

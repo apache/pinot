@@ -18,174 +18,111 @@
  */
 package org.apache.pinot.plugin.inputformat.csv;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.io.StringReader;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVPrinter;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordReader;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
-/**
- * Tests the {@link CSVRecordExtractor} using a schema containing groovy transform functions
- */
-public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
-  private static final char CSV_MULTI_VALUE_DELIMITER = ';';
-  private final File _dataFile = new File(_tempDir, "events.csv");
 
-  /**
-   * Create a CSVRecordReader
-   */
-  @Override
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
+/// Tests [CSVRecordExtractor] — see its class Javadoc for the cell-handling contract. Reader-level concerns
+/// (header parsing, escapes, alternate delimiters) belong in [CSVRecordReaderTest], not here.
+public class CSVRecordExtractorTest {
+
+  // === Single value — every cell is a String ===
+
+  @Test
+  public void testStringPreserved()
       throws IOException {
-    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
-    csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
-    CSVRecordReader csvRecordReader = new CSVRecordReader();
-    csvRecordReader.init(_dataFile, fieldsToRead, csvRecordReaderConfig);
-    return csvRecordReader;
+    Object result = extract("a", "hello", "a", null);
+    assertEquals(result, "hello");
   }
 
-  /**
-   * Create a CSV input file using the input records
-   */
-  @Override
-  public void createInputFile()
+  @Test
+  public void testNumericLookingCellStaysString()
       throws IOException {
-    String[] header = _sourceFieldNames.toArray(new String[0]);
-    try (FileWriter fileWriter = new FileWriter(_dataFile);
-        CSVPrinter csvPrinter = new CSVPrinter(fileWriter, CSVFormat.DEFAULT.withHeader(header))) {
+    // CSV does not parse numbers — `42` is a String, not an Integer.
+    Object result = extract("a", "42", "a", null);
+    assertEquals(result, "42");
+  }
 
-      for (Map<String, Object> inputRecord : _inputRecords) {
-        Object[] record = new Object[header.length];
-        for (int i = 0; i < header.length; i++) {
-          Object value = inputRecord.get(header[i]);
-          if (value instanceof Collection) {
-            record[i] = StringUtils.join(((List) value).toArray(), CSV_MULTI_VALUE_DELIMITER);
-          } else {
-            record[i] = value;
-          }
-        }
-        csvPrinter.printRecord(record);
-      }
+  @Test
+  public void testBooleanLookingCellStaysString()
+      throws IOException {
+    Object result = extract("a", "true", "a", null);
+    assertEquals(result, "true");
+  }
+
+  // === Empty / unset cell → null ===
+
+  @Test
+  public void testEmptyCellReturnsNull()
+      throws IOException {
+    // `,,` between commas — empty cell.
+    assertNull(extract("a,b,c", "x,,z", "b", null));
+  }
+
+  @Test
+  public void testQuotedEmptyCellReturnsNull()
+      throws IOException {
+    // `""` is parsed as the empty string by Apache Commons CSV; the extractor treats both the same as null.
+    assertNull(extract("a,b,c", "x,\"\",z", "b", null));
+  }
+
+  // === Multi-value delimiter ===
+
+  @Test
+  public void testMultiValueDelimiterSplitsToArray()
+      throws IOException {
+    Object[] result = (Object[]) extract("a", "x;y;z", "a", ';');
+    assertEquals(result, new Object[]{"x", "y", "z"});
+  }
+
+  @Test
+  public void testMultiValueSingleElementCollapsesToString()
+      throws IOException {
+    // CSV cannot distinguish between a multi-value column with one entry and a single-value column —
+    // a single element after splitting is returned as a bare String, not wrapped in an array.
+    Object result = extract("a", "x", "a", ';');
+    assertEquals(result, "x");
+  }
+
+  @Test
+  public void testNoMultiValueDelimiterKeepsRawString()
+      throws IOException {
+    // Without a configured multi-value delimiter, the cell is returned verbatim even if it contains the
+    // would-be delimiter character.
+    Object result = extract("a", "x;y;z", "a", null);
+    assertEquals(result, "x;y;z");
+  }
+
+  // === Helpers ===
+
+  /// Build a single-row [CSVRecord] from `header` and `row` (comma-separated), then extract `column` with
+  /// optional multi-value delimiter.
+  private static Object extract(String header, String row, String column, @Nullable Character mvDelimiter)
+      throws IOException {
+    CSVRecord record;
+    try (CSVParser parser = CSVFormat.Builder.create()
+        .setHeader(header.split(","))
+        .build()
+        .parse(new StringReader(row))) {
+      record = parser.iterator().next();
     }
-  }
-
-  @Override
-  protected void checkValue(Map<String, Object> inputRecord, GenericRow genericRow) {
-    for (Map.Entry<String, Object> entry : inputRecord.entrySet()) {
-      String columnName = entry.getKey();
-      Object expectedValue = entry.getValue();
-      Object actualValue = genericRow.getValue(columnName);
-      if (expectedValue instanceof Collection) {
-        List expectedArray = (List) expectedValue;
-        if (expectedArray.size() == 1) {
-          // in CSV, cannot differentiate between array with single element vs actual single element
-          Assert.assertEquals(actualValue, String.valueOf(expectedArray.get(0)));
-        } else {
-          Object[] actualArray = (Object[]) actualValue;
-          for (int j = 0; j < actualArray.length; j++) {
-            Assert.assertEquals(actualArray[j], String.valueOf(expectedArray.get(j)));
-          }
-        }
-      } else {
-        Assert.assertEquals(actualValue, expectedValue == null ? null : String.valueOf(expectedValue));
-      }
-    }
-  }
-
-  @Test
-  public void testRemovingSurroundingSpaces() throws IOException {
-    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
-
-    // Create a CSV file where records have two values and the second value contains an extra space.
-    File spaceFile = new File(_tempDir, "space.csv");
-    BufferedWriter writer = new BufferedWriter(new FileWriter(spaceFile));
-    writer.write("col1 ,col2\n");
-    writer.write(" value11, value12");
-    writer.close();
-
-    CSVRecordReader csvRecordReader = new CSVRecordReader();
-    HashSet<String> fieldsToRead = new HashSet<>();
-    fieldsToRead.add("col1");
-    fieldsToRead.add("col2");
-    csvRecordReader.init(spaceFile, fieldsToRead, csvRecordReaderConfig);
-    GenericRow genericRow = new GenericRow();
-    csvRecordReader.rewind();
-
-    // check if parsing succeeded.
-    Assert.assertTrue(csvRecordReader.hasNext());
-    csvRecordReader.next(genericRow);
-    Assert.assertEquals(genericRow.getValue("col1"), "value11");
-    Assert.assertEquals(genericRow.getValue("col2"), "value12");
-  }
-
-  @Test
-  public void testIgnoringSurroundingSpaces() throws IOException {
-    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
-
-    // Create a CSV file where records have two values and the second value contains an extra space.
-    File spaceFile = new File(_tempDir, "space.csv");
-    BufferedWriter writer = new BufferedWriter(new FileWriter(spaceFile));
-    writer.write("col1 ,col2\n");
-    writer.write("\"value11\",\" value12\"");
-    writer.close();
-
-    CSVRecordReader csvRecordReader = new CSVRecordReader();
-    HashSet<String> fieldsToRead = new HashSet<>();
-    fieldsToRead.add("col1");
-    fieldsToRead.add("col2");
-    csvRecordReader.init(spaceFile, fieldsToRead, csvRecordReaderConfig);
-    GenericRow genericRow = new GenericRow();
-    csvRecordReader.rewind();
-
-    // check if parsing succeeded.
-    Assert.assertTrue(csvRecordReader.hasNext());
-    csvRecordReader.next(genericRow);
-    Assert.assertEquals(genericRow.getValue("col1"), "value11");
-    Assert.assertEquals(genericRow.getValue("col2"), " value12");
-  }
-  /**
-   * Check if we can parse a CSV file that has escaped comma characters within fields.
-   */
-  @Test
-  public void testEscapeCharacterInCSV()
-      throws Exception {
-    // Create CSV config with backslash as escape character.
-    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
-    csvRecordReaderConfig.setEscapeCharacter('\\');
-
-    // Create a CSV file where records have two values and the second value contains an escaped comma.
-    File escapedFile = new File(_tempDir, "escape.csv");
-    BufferedWriter writer = new BufferedWriter(new FileWriter(escapedFile));
-    writer.write("first,second\n");
-    writer.write("string1, string2\\, string3");
-    writer.close();
-
-    // Try to parse CSV file with escaped comma.
-    CSVRecordReader csvRecordReader = new CSVRecordReader();
-    HashSet<String> fieldsToRead = new HashSet<>();
-    fieldsToRead.add("first");
-    fieldsToRead.add("second");
-    csvRecordReader.init(escapedFile, fieldsToRead, csvRecordReaderConfig);
-    GenericRow genericRow = new GenericRow();
-    csvRecordReader.rewind();
-
-    // check if parsing succeeded.
-    Assert.assertTrue(csvRecordReader.hasNext());
-    csvRecordReader.next(genericRow);
-    Assert.assertEquals(genericRow.getValue("first"), "string1");
-    Assert.assertEquals(genericRow.getValue("second"), "string2, string3");
+    CSVRecordExtractorConfig config = new CSVRecordExtractorConfig();
+    config.setColumnNames(Set.of(header.split(",")));
+    config.setMultiValueDelimiter(mvDelimiter);
+    CSVRecordExtractor extractor = new CSVRecordExtractor();
+    extractor.init(null, config);
+    GenericRow gen = new GenericRow();
+    extractor.extract(record, gen);
+    return gen.getValue(column);
   }
 }

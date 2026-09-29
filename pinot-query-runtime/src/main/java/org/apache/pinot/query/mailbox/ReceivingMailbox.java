@@ -18,217 +18,293 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.errorprone.annotations.ThreadSafe;
-import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.GuardedBy;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
+import org.apache.pinot.spi.accounting.TrackingScope;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Mailbox that's used to receive data. Ownership of the ReceivingMailbox is with the MailboxService, which is unlike
- * the {@link SendingMailbox} whose ownership lies with the send operator. This is because the ReceivingMailbox can be
- * initialized even before the corresponding OpChain is registered on the receiver, whereas the SendingMailbox is
- * initialized when the send operator is running.
- *
- * There is a single ReceivingMailbox for each {@link org.apache.pinot.query.runtime.operator.MailboxReceiveOperator}.
- * The offer methods will be called when new blocks are received from different sources. For example local workers will
- * directly call {@link #offer(TransferableBlock, long)} while each remote worker opens a GPRC channel where messages
- * are sent in raw format and {@link #offerRaw(ByteBuffer, long)} is called from them.
- */
+/// Mailbox that's used to receive data. Ownership of the [ReceivingMailbox] is with the [MailboxService], unlike the
+/// [SendingMailbox] whose ownership lies with the send operator. This is because the [ReceivingMailbox] can be
+/// initialized even before the corresponding OpChain is registered on the receiver, whereas the [SendingMailbox] is
+/// initialized when the send operator is running.
+///
+/// There is a single [ReceivingMailbox] for each pair of (sender, receiver). This means that each receive operator will
+/// have multiple [ReceivingMailbox] instances, one for each sender. They are coordinated by a
+/// [org.apache.pinot.query.runtime.operator.utils.BlockingMultiStreamConsumer].
+///
+/// A [ReceivingMailbox] can have at most one reader and one writer at any given time. This means that different threads
+/// writing to the same mailbox must be externally synchronized.
+///
+/// The offer methods will be called when new blocks are received from different sources. For example local workers will
+/// directly call [#offer(MseBlock, List, long)] while each remote worker opens a gPRC channel where messages are sent
+/// in raw format and [#offerRaw(List, long)] is called from them.
+///
+/// All exceptions thrown from the offer methods should be handled within this class, and converted into a proper error
+/// block to be consumed by the reader.
+///
+/// Resource tracking (CPU / memory usage):
+///
+/// - For blocks received from local workers:
+///   [#offer(MseBlock, List, long)] is invoked by the sender's query execution thread.
+///   Since this thread is already associated with the query, resource usage is tracked automatically.
+///
+/// - For blocks received from remote workers:
+///   [#offerRaw(List, long)] is invoked by a shared gRPC executor thread.
+///   Because this thread is shared across multiple queries, resource usage is not tracked by default.
+///
+///   To enable tracking, [#registerReceiveOperatorThreadContext(QueryThreadContext)] can be used to register the
+///   mailbox receive operator’s [QueryThreadContext].
+///
+///   NOTE:
+///   Blocks may arrive before or after the mailbox receive operator is constructed. Therefore, resource usage must be
+///   accumulated even before the [QueryThreadContext] is registered, and then reconciled when registration occurs.
 @ThreadSafe
 public class ReceivingMailbox {
   public static final int DEFAULT_MAX_PENDING_BLOCKS = 5;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ReceivingMailbox.class);
-  private static final TransferableBlock CANCELLED_ERROR_BLOCK =
-      TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("Cancelled by receiver"));
 
   private final String _id;
   // TODO: Make the queue size configurable
-  // TODO: Revisit if this is the correct way to apply back pressure
-  private final BlockingQueue<TransferableBlock> _blocks = new ArrayBlockingQueue<>(DEFAULT_MAX_PENDING_BLOCKS);
-  private final AtomicReference<TransferableBlock> _errorBlock = new AtomicReference<>();
-  private volatile boolean _isEarlyTerminated = false;
-  private long _lastArriveTime = System.currentTimeMillis();
+  // TODO: Apply backpressure at the sender side when the queue is full.
+  /// The queue where blocks are going to be stored.
+  private final CancellableBlockingQueue _blocks;
 
-  @Nullable
-  private volatile Reader _reader;
   private final StatMap<StatKey> _stats = new StatMap<>(StatKey.class);
 
-  public ReceivingMailbox(String id) {
+  /// Following variables are protected with synchronized block.
+  private long _lastArriveTime = System.currentTimeMillis();
+  private QueryThreadContext _receiveOperatorThreadContext;
+  private long _untrackedCpuTimeNs;
+  private long _untrackedAllocatedBytes;
+
+  public ReceivingMailbox(String id, int maxPendingBlocks) {
     _id = id;
+    _blocks = new CancellableBlockingQueue(id, maxPendingBlocks);
+  }
+
+  public ReceivingMailbox(String id) {
+    this(id, DEFAULT_MAX_PENDING_BLOCKS);
   }
 
   public void registeredReader(Reader reader) {
-    if (_reader != null) {
-      throw new IllegalArgumentException("Only one reader is supported");
+    _blocks.registerReader(reader);
+  }
+
+  /// Registers the [QueryThreadContext] of the mailbox receive operator.
+  public synchronized void registerReceiveOperatorThreadContext(@Nullable QueryThreadContext threadContext) {
+    assert _receiveOperatorThreadContext == null;
+    // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
+    //       is not set up.
+    if (threadContext == null) {
+      return;
     }
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("==[MAILBOX]== Reader registered for mailbox: " + _id);
+    _receiveOperatorThreadContext = threadContext;
+    if (_untrackedCpuTimeNs > 0 || _untrackedAllocatedBytes > 0) {
+      updateResourceUsage(threadContext, _untrackedCpuTimeNs, _untrackedAllocatedBytes);
+      _untrackedCpuTimeNs = 0;
+      _untrackedAllocatedBytes = 0;
     }
-    _reader = reader;
+  }
+
+  @VisibleForTesting
+  void updateResourceUsage(QueryThreadContext threadContext, long cpuTimeNs, long allocatedBytes) {
+    ThreadAccountant accountant = threadContext.getAccountant();
+    QueryExecutionContext executionContext = threadContext.getExecutionContext();
+    accountant.updateUntrackedResourceUsage(executionContext.getCid(), cpuTimeNs, allocatedBytes, TrackingScope.QUERY);
+    accountant.updateUntrackedResourceUsage(executionContext.getWorkloadName(), cpuTimeNs, allocatedBytes,
+        TrackingScope.WORKLOAD);
   }
 
   public String getId() {
     return _id;
   }
 
-  /**
-   * Offers a raw block into the mailbox within the timeout specified, returns whether the block is successfully added.
-   * If the block is not added, an error block is added to the mailbox.
-   * <p>
-   * Contrary to {@link #offer(TransferableBlock, long)}, the block may be an
-   * {@link TransferableBlock#isErrorBlock() error block}.
-   */
-  public ReceivingMailboxStatus offerRaw(ByteBuffer byteBuffer, long timeoutMs)
-      throws IOException {
-    TransferableBlock block;
-    long now = System.currentTimeMillis();
-    _stats.merge(StatKey.WAIT_CPU_TIME_MS, now - _lastArriveTime);
-    _lastArriveTime = now;
-    _stats.merge(StatKey.DESERIALIZED_BYTES, byteBuffer.remaining());
-    _stats.merge(StatKey.DESERIALIZED_MESSAGES, 1);
-
-    now = System.currentTimeMillis();
-    DataBlock dataBlock = DataBlockUtils.readFrom(byteBuffer);
-    _stats.merge(StatKey.DESERIALIZATION_TIME_MS, System.currentTimeMillis() - now);
-
-    if (dataBlock instanceof MetadataBlock) {
-      Map<Integer, String> exceptions = dataBlock.getExceptions();
-      if (exceptions.isEmpty()) {
-        block = TransferableBlockUtils.wrap(dataBlock);
-      } else {
-        setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(exceptions));
-        return ReceivingMailboxStatus.FIRST_ERROR;
-      }
-    } else {
-      block = TransferableBlockUtils.wrap(dataBlock);
-    }
-    return offerPrivate(block, timeoutMs);
-  }
-
-  public ReceivingMailboxStatus offer(TransferableBlock block, long timeoutMs) {
-    long now = System.currentTimeMillis();
-    _stats.merge(StatKey.WAIT_CPU_TIME_MS, now - _lastArriveTime);
-    _lastArriveTime = now;
-    _stats.merge(StatKey.IN_MEMORY_MESSAGES, 1);
-    return offerPrivate(block, timeoutMs);
-  }
-
-  /**
-   * Offers a non-error block into the mailbox within the timeout specified, returns whether the block is successfully
-   * added. If the block is not added, an error block is added to the mailbox.
-   */
-  private ReceivingMailboxStatus offerPrivate(TransferableBlock block, long timeoutMs) {
-    TransferableBlock errorBlock = _errorBlock.get();
-    if (errorBlock != null) {
-      LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
-      return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.CANCELLED
-          : ReceivingMailboxStatus.ERROR;
-    }
-    if (timeoutMs <= 0) {
-      LOGGER.debug("Mailbox: {} is already timed out", _id);
-      setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(
-          new TimeoutException("Timed out while offering data to mailbox: " + _id)));
-      return ReceivingMailboxStatus.TIMEOUT;
-    }
+  /// Offers a raw block into the mailbox within the timeout specified, returns the status of the mailbox.
+  ///
+  /// NOTE:
+  /// This method is executed by a shared gRPC executor thread rather than a query execution thread.
+  /// Therefore, CPU and memory usage must be tracked explicitly and independently.
+  public ReceivingMailboxStatus offerRaw(List<ByteBuffer> byteBuffers, long timeoutMs) {
+    ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
+    updateWaitCpuTime();
+    MseBlock block;
+    List<DataBuffer> stats;
     try {
-      long now = System.currentTimeMillis();
-      boolean accepted = _blocks.offer(block, timeoutMs, TimeUnit.MILLISECONDS);
-      _stats.merge(StatKey.OFFER_CPU_TIME_MS, System.currentTimeMillis() - now);
-      if (accepted) {
-        errorBlock = _errorBlock.get();
-        if (errorBlock == null) {
+      long startTimeMs = System.currentTimeMillis();
+      int totalBytes = 0;
+      for (ByteBuffer bb : byteBuffers) {
+        totalBytes += bb.remaining();
+      }
+      DataBlock dataBlock = DataBlockUtils.deserialize(byteBuffers);
+      stats = dataBlock.getStatsByStage();
+      _stats.merge(StatKey.DESERIALIZED_MESSAGES, 1);
+      _stats.merge(StatKey.DESERIALIZED_BYTES, totalBytes);
+      _stats.merge(StatKey.DESERIALIZATION_TIME_MS, System.currentTimeMillis() - startTimeMs);
+
+      if (dataBlock instanceof MetadataBlock) {
+        Map<Integer, String> exceptions = dataBlock.getExceptions();
+        if (exceptions.isEmpty()) {
+          block = SuccessMseBlock.INSTANCE;
+        } else {
+          MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
+          Map<QueryErrorCode, String> exceptionsByQueryError = QueryErrorCode.fromKeyMap(exceptions);
+          block =
+              new ErrorMseBlock(metadataBlock.getStageId(), metadataBlock.getWorkerId(), metadataBlock.getServerId(),
+                  exceptionsByQueryError);
+        }
+      } else {
+        block = new SerializedDataBlock(dataBlock);
+      }
+    } catch (Exception e) {
+      // Use the terminate exception when query is explicitly terminated.
+      TerminationException terminateException = null;
+      synchronized (this) {
+        if (_receiveOperatorThreadContext != null) {
+          terminateException = _receiveOperatorThreadContext.getExecutionContext().getTerminateException();
+        }
+      }
+      if (terminateException != null) {
+        block = ErrorMseBlock.fromException(terminateException);
+      } else {
+        String errorMessage = "Caught exception while deserializing DataBlock on mailbox: " + _id;
+        LOGGER.error(errorMessage, e);
+        block = ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, errorMessage + ": " + e);
+      }
+      stats = List.of();
+    }
+    ReceivingMailboxStatus status = offerPrivate(block, stats, timeoutMs);
+    long cpuTimeNs = resourceSnapshot.getCpuTimeNs();
+    long allocatedBytes = resourceSnapshot.getAllocatedBytes();
+    synchronized (this) {
+      if (_receiveOperatorThreadContext != null) {
+        updateResourceUsage(_receiveOperatorThreadContext, cpuTimeNs, allocatedBytes);
+      } else {
+        _untrackedCpuTimeNs += cpuTimeNs;
+        _untrackedAllocatedBytes += allocatedBytes;
+      }
+    }
+    return status;
+  }
+
+  /// Offers a block into the mailbox within the timeout specified, returns the status of the mailbox.
+  public ReceivingMailboxStatus offer(MseBlock block, List<DataBuffer> serializedStats, long timeoutMs) {
+    updateWaitCpuTime();
+    _stats.merge(StatKey.IN_MEMORY_MESSAGES, 1);
+    return offerPrivate(block, serializedStats, timeoutMs);
+  }
+
+  /// Offers a block into the mailbox within the timeout specified, returns the status of the mailbox.
+  private ReceivingMailboxStatus offerPrivate(MseBlock block, List<DataBuffer> stats, long timeoutMs) {
+    long start = System.currentTimeMillis();
+    try {
+      ReceivingMailboxStatus result;
+      if (block.isEos()) {
+        result = _blocks.offerEos((MseBlock.Eos) block, stats);
+      } else {
+        result = _blocks.offerData((MseBlock.Data) block, timeoutMs, TimeUnit.MILLISECONDS);
+      }
+
+      switch (result) {
+        case SUCCESS:
+        case LAST_BLOCK:
+          _stats.merge(StatKey.OFFER_CPU_TIME_MS, System.currentTimeMillis() - start);
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("==[MAILBOX]== Block " + block + " ready to read from mailbox: " + _id);
           }
-          notifyReader();
-          return _isEarlyTerminated ? ReceivingMailboxStatus.EARLY_TERMINATED : ReceivingMailboxStatus.SUCCESS;
-        } else {
-          LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
-          _blocks.clear();
-          return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.CANCELLED
-              : ReceivingMailboxStatus.ERROR;
-        }
-      } else {
-        LOGGER.debug("Failed to offer block into mailbox: {} within: {}ms", _id, timeoutMs);
-        setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(
-            new TimeoutException("Timed out while waiting for receive operator to consume data from mailbox: " + _id)));
-        return ReceivingMailboxStatus.TIMEOUT;
+          break;
+        case WAITING_EOS:
+        case ALREADY_TERMINATED:
+        default:
+          // Nothing to do
       }
-    } catch (InterruptedException e) {
-      LOGGER.error("Interrupted while offering block into mailbox: {}", _id);
-      setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(e));
-      return ReceivingMailboxStatus.ERROR;
+      return result;
+    } catch (Exception e) {
+      _stats.merge(StatKey.OFFER_CPU_TIME_MS, System.currentTimeMillis() - start);
+
+      // Use the terminate exception when query is explicitly terminated.
+      TerminationException terminateException = QueryThreadContext.getTerminateException();
+      if (terminateException != null) {
+        return _blocks.offerEos(ErrorMseBlock.fromException(terminateException), stats);
+      }
+
+      // TODO: Revisit if we should log the exception.
+      if (e instanceof TimeoutException) {
+        return _blocks.offerEos(ErrorMseBlock.fromError(QueryErrorCode.EXECUTION_TIMEOUT,
+            "Timed out while waiting for receive operator to consume data from mailbox: " + _id), stats);
+      }
+      if (e instanceof InterruptedException) {
+        return _blocks.offerEos(ErrorMseBlock.fromError(QueryErrorCode.INTERNAL,
+            "Interrupted on mailbox: " + _id + " while offering blocks"), stats);
+      }
+
+      LOGGER.error("Caught unexpected exception on mailbox: {} while offering blocks", _id, e);
+      return _blocks.offerEos(ErrorMseBlock.fromException(e), stats);
     }
   }
 
-  /**
-   * Sets an error block into the mailbox. No more blocks are accepted after calling this method.
-   */
-  public void setErrorBlock(TransferableBlock errorBlock) {
-    if (_errorBlock.compareAndSet(null, errorBlock)) {
-      _blocks.clear();
-      notifyReader();
-    }
+  private synchronized void updateWaitCpuTime() {
+    long now = System.currentTimeMillis();
+    _stats.merge(StatKey.WAIT_CPU_TIME_MS, now - _lastArriveTime);
+    _lastArriveTime = now;
   }
 
-  /**
-   * Returns the first block from the mailbox, or {@code null} if there is no block received yet. Error block is
-   * returned if exists.
-   */
+  /// Sets an error block into the mailbox. No more blocks are accepted after calling this method.
+  public void setErrorBlock(ErrorMseBlock errorBlock, List<DataBuffer> serializedStats) {
+    _blocks.offerEos(errorBlock, serializedStats);
+  }
+
+  /// Returns the first block from the mailbox, or `null` if there is no block received yet.
   @Nullable
-  public TransferableBlock poll() {
-    Preconditions.checkState(_reader != null, "A reader must be registered");
-    TransferableBlock errorBlock = _errorBlock.get();
-    return errorBlock != null ? errorBlock : _blocks.poll();
+  public MseBlockWithStats poll() {
+    return _blocks.poll();
   }
 
-  /**
-   * Early terminate the mailbox, called when upstream doesn't expect any more data block.
-   */
+  /// Early terminate the mailbox, called when upstream doesn't expect any more *data* block.
   public void earlyTerminate() {
-    _isEarlyTerminated = true;
+    _blocks.earlyTerminate();
   }
 
-  /**
-   * Cancels the mailbox. No more blocks are accepted after calling this method. Should only be called by the receive
-   * operator to clean up the remaining blocks.
-   */
+  /// Cancels the mailbox. No more blocks are accepted after calling this method and [#poll] will always return
+  /// an error block.
   public void cancel() {
     LOGGER.debug("Cancelling mailbox: {}", _id);
-    if (_errorBlock.compareAndSet(null, CANCELLED_ERROR_BLOCK)) {
-      _blocks.clear();
-    }
+    _blocks.offerEos(ErrorMseBlock.fromException(null), List.of());
   }
 
+  /// Returns the number of pending **data** blocks in the mailbox.
+  ///
+  /// Remember that the EOS block is not counted here.
   public int getNumPendingBlocks() {
-    return _blocks.size();
-  }
-
-  private void notifyReader() {
-    Reader reader = _reader;
-    if (reader != null) {
-      LOGGER.debug("Notifying reader");
-      reader.blockReadyToRead();
-    } else {
-      LOGGER.debug("No reader to notify");
-    }
+    return _blocks.exactSize();
   }
 
   public StatMap<StatKey> getStatMap() {
@@ -240,7 +316,26 @@ public class ReceivingMailbox {
   }
 
   public enum ReceivingMailboxStatus {
-    SUCCESS, FIRST_ERROR, ERROR, TIMEOUT, CANCELLED, EARLY_TERMINATED
+    /// The block was successfully added to the mailbox.
+    ///
+    /// More blocks can be sent.
+    SUCCESS,
+    /// The block is rejected because downstream has early terminated and now is only waiting for EOS in order to
+    /// get the stats.
+    ///
+    /// More blocks can be sent, but data blocks will be rejected.
+    WAITING_EOS,
+    /// The received message is the last block the mailbox will ever read.
+    ///
+    /// This happens for example when an EOS block is added to the mailbox.
+    ///
+    /// No more blocks can be sent.
+    LAST_BLOCK,
+    /// The mailbox has been closed for write. There may still be pending blocks to read, but no more blocks
+    /// can be added.
+    ///
+    /// No more blocks can be sent.
+    ALREADY_TERMINATED
   }
 
   public enum StatKey implements StatMap.Key {
@@ -254,7 +349,9 @@ public class ReceivingMailbox {
     },
     IN_MEMORY_MESSAGES(StatMap.Type.INT),
     OFFER_CPU_TIME_MS(StatMap.Type.LONG),
-    WAIT_CPU_TIME_MS(StatMap.Type.LONG);
+    WAIT_CPU_TIME_MS(StatMap.Type.LONG),
+    ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
+    GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;
 
@@ -265,6 +362,391 @@ public class ReceivingMailbox {
     @Override
     public StatMap.Type getType() {
       return _type;
+    }
+  }
+
+  public static class MseBlockWithStats {
+    private final MseBlock _block;
+    private final List<DataBuffer> _serializedStats;
+
+    public MseBlockWithStats(MseBlock block, List<DataBuffer> serializedStats) {
+      _block = block;
+      _serializedStats = serializedStats;
+    }
+
+    public MseBlock getBlock() {
+      return _block;
+    }
+
+    public List<DataBuffer> getSerializedStats() {
+      return _serializedStats;
+    }
+  }
+
+  /// The state of the queue.
+  ///
+  /// ```
+  /// +-------------------+   offerEos    +-------------------+
+  /// |    FULL_OPEN      | ----------->  |  UPSTREAM_FINISHED|
+  /// +-------------------+               +-------------------+
+  ///       |                                 |
+  ///       | earlyTerminate                  | poll -- when all pending data is read
+  ///       v                                 v
+  /// +-------------------+   offerEos   +-------------------+
+  /// |   WAITING_EOS     | -----------> |   FULL_CLOSED     |
+  /// +-------------------+              +-------------------+
+  /// ```
+  private enum State {
+    /// The queue is open for both read and write.
+    ///
+    /// - [#poll()] returns the pending blocks in the queue, or null if the queue is empty.
+    /// - [#offer] accepts both data and EOS blocks.
+    ///
+    /// Transitions to [State#UPSTREAM_FINISHED] when an EOS block is offered or to [State#WAITING_EOS] when
+    /// [#earlyTerminate()] is called.
+    FULL_OPEN,
+    /// The downstream is not interested in reading more data but is waiting for an EOS block to get the stats.
+    ///
+    /// - [#poll()] returns null.
+    /// - [#offer] rejects all data blocks.
+    ///
+    /// Transitions to [State#FULL_CLOSED] when an EOS block is offered.
+    WAITING_EOS,
+    /// The upstream has indicated that no more data will be sent.
+    ///
+    /// - [#poll()] returns the pending blocks in the queue and then the EOS block.
+    /// - [#offer] rejects all blocks.
+    ///
+    /// Transitions to [State#FULL_CLOSED] when the EOS block is read by [#poll()].
+    UPSTREAM_FINISHED,
+    /// The queue is closed for both read and write.
+    ///
+    /// - [#poll()] always returns the EOS block, which is always not null.
+    /// - [#offer] rejects all blocks.
+    ///
+    /// No transitions out of this state.
+    FULL_CLOSED
+  }
+
+  /// This is a special bounded blocking queue implementation similar to ArrayBlockingQueue, but:
+  /// - Only accepts a single reader (aka downstream).
+  /// - Only accepts a multiple concurrent writers (aka upstream)
+  /// - Can be [closed for write][#closeForWrite(MseBlock.Eos, List)].
+  /// - Can be [#earlyTerminate()]d.
+  ///
+  /// Read the [State] enum to understand the different states and their transitions.
+  ///
+  /// All methods of this class are thread-safe and may block, although only [#offer] should block for a long time.
+  @ThreadSafe
+  private static class CancellableBlockingQueue {
+    private final String _id;
+    @Nullable
+    private volatile Reader _reader;
+    /// This is set when the queue is in [State#FULL_CLOSED] or [State#UPSTREAM_FINISHED].
+    @Nullable
+    @GuardedBy("_lock")
+    private MseBlockWithStats _eos;
+    /// The current state of the queue.
+    ///
+    /// All changes to this field must be done by calling [#changeState(State, String)] in order to log the state
+    /// transitions.
+    @GuardedBy("_lock")
+    private State _state = State.FULL_OPEN;
+    /// The items in the queue.
+    ///
+    /// This is a circular array where [#_putIndex] is the index to add the next item and [#_takeIndex] is the index to
+    /// take the next item from. Only data blocks are stored in this array, the EOS block is stored in [#_eos].
+    ///
+    /// Like in normal blocking queues, elements are added when upstream threads call [#offer] and removed when the
+    /// downstream thread calls [#poll]. Unlike normal blocking queues, elements will be [removed][#drainDataBlocks()]
+    /// when transitioning to [State#WAITING_EOS] or [State#FULL_CLOSED].
+    @GuardedBy("_lock")
+    private final MseBlock.Data[] _dataBlocks;
+    @GuardedBy("_lock")
+    private int _takeIndex;
+    @GuardedBy("_lock")
+    private int _putIndex;
+    @GuardedBy("_lock")
+    private int _count;
+    /// Threads waiting to add more data to the queue.
+    ///
+    /// This is used to prevent the following situation:
+    /// 1. The queue is full.
+    /// 2. Thread A tries to add data. Thread A will be blocked waiting for space in the queue.
+    /// 3. Thread B adds an EOS block, which will transition the queue to [State#UPSTREAM_FINISHED].
+    /// 4. Thread C reads data from the queue in a loop, the scheduler doesn't give time to Thread A.
+    /// 5. Thread C consumes all data from the queue and then reads the EOS block.
+    /// 6. Finally Thread A is unblocked and adds data to the queue, even though the queue is already closed for write
+    ///
+    /// As a result the block from A will be lost. Instead, we use this counter to return null in [#poll] when the
+    /// queue is empty but there are still threads trying to add data to the queue.
+    @GuardedBy("_lock")
+    private int _pendingData;
+    private final ReentrantLock _lock = new ReentrantLock();
+    private final Condition _notFull = _lock.newCondition();
+
+    public CancellableBlockingQueue(String id, int capacity) {
+      _id = id;
+      _dataBlocks = new MseBlock.Data[capacity];
+    }
+
+    /// Notifies the downstream that there is data to read.
+    private void notifyReader() {
+      Reader reader = _reader;
+      if (reader != null) {
+        LOGGER.debug("Notifying reader");
+        reader.blockReadyToRead();
+      } else {
+        LOGGER.debug("No reader to notify");
+      }
+    }
+
+    /// Offers a successful or erroneous EOS block into the queue, returning the status of the operation.
+    ///
+    /// This method never blocks for long, as it doesn't need to wait for space in the queue.
+    public ReceivingMailboxStatus offerEos(MseBlock.Eos block, List<DataBuffer> stats) {
+      ReentrantLock lock = _lock;
+      lock.lock();
+      try {
+        switch (_state) {
+          case FULL_CLOSED:
+          case UPSTREAM_FINISHED:
+            // The queue is closed for write. Always reject the block.
+            LOGGER.debug("Mailbox: {} is already closed for write, ignoring the late {} block", _id, block);
+            return ReceivingMailboxStatus.ALREADY_TERMINATED;
+          case WAITING_EOS:
+            // We got the EOS block we expected. Close the queue for both read and write.
+            changeState(State.FULL_CLOSED, "received EOS block");
+            _eos = new MseBlockWithStats(block, stats);
+            notifyReader();
+            return ReceivingMailboxStatus.LAST_BLOCK;
+          case FULL_OPEN:
+            changeState(State.UPSTREAM_FINISHED, "received EOS block");
+            _eos = new MseBlockWithStats(block, stats);
+            notifyReader();
+            if (block.isError()) {
+              drainDataBlocks();
+            }
+            return ReceivingMailboxStatus.LAST_BLOCK;
+          default:
+            throw new IllegalStateException("Unexpected state: " + _state);
+        }
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    /// Offers a data block into the queue within the timeout specified, returning the status of the operation.
+    public ReceivingMailboxStatus offerData(MseBlock.Data block, long timeout, TimeUnit timeUnit)
+        throws InterruptedException, TimeoutException {
+      ReentrantLock lock = _lock;
+      lock.lockInterruptibly();
+      try {
+        while (true) {
+          switch (_state) {
+            case FULL_CLOSED:
+            case UPSTREAM_FINISHED:
+              // The queue is closed for write. Always reject the block.
+              LOGGER.debug("Mailbox: {} is already closed for write, ignoring the late data block", _id);
+              return ReceivingMailboxStatus.ALREADY_TERMINATED;
+            case WAITING_EOS:
+              // The downstream is not interested in reading more data.
+              LOGGER.debug("Mailbox: {} is not interesting in late data block", _id);
+              return ReceivingMailboxStatus.WAITING_EOS;
+            case FULL_OPEN:
+              if (offerDataToBuffer(block, timeout, timeUnit)) {
+                notifyReader();
+                return ReceivingMailboxStatus.SUCCESS;
+              }
+              // otherwise transitioned to FULL_CLOSED or WAITING_EOS while waiting for space in the queue
+              // and we need to re-evaluate the state
+              break;
+            default:
+              throw new IllegalStateException("Unexpected state: " + _state);
+          }
+        }
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    /// Offers a data block into the queue within the timeout specified, returning true if the block was added
+    /// successfully.
+    ///
+    /// This method can only be called while the queue is in the FULL_OPEN state and the lock is held.
+    ///
+    /// This method can time out, in which case we automatically transition to the [State#FULL_CLOSED] state.
+    /// But instead of returning false, we throw a [TimeoutException]. This is because the caller may want to
+    /// distinguish between a timeout and other reasons for not being able to add the block to the queue in order to
+    /// report different error messages.
+    ///
+    /// @return true if the block was added successfully, false if the state changed while waiting.
+    /// @throws InterruptedException if the thread is interrupted while waiting for space in the queue.
+    /// @throws TimeoutException if the timeout specified elapsed before space was available in the queue.
+    @GuardedBy("_lock")
+    private boolean offerDataToBuffer(MseBlock.Data block, long timeout, TimeUnit timeUnit)
+        throws InterruptedException, TimeoutException {
+
+      assert _state == State.FULL_OPEN;
+
+      long nanos = timeUnit.toNanos(timeout);
+      MseBlock.Data[] items = _dataBlocks;
+      _pendingData++;
+      try {
+        while (_count == items.length && nanos > 0L) {
+          nanos = _notFull.awaitNanos(nanos);
+
+          switch (_state) {
+            case FULL_OPEN: // we are in the same state, continue waiting for space
+              break;
+            case FULL_CLOSED:
+            case WAITING_EOS:
+              // The queue is closed and the reader is not interested in reading more data.
+              return false;
+            case UPSTREAM_FINISHED:
+              // Another thread offered the EOS while we were waiting for space.
+              assert _eos != null;
+              if (_eos._block.isSuccess()) { // If closed with EOS, the reader is still interested in reading our block
+                continue;
+              }
+              // if closed with an error, the reader is not interested in reading our block
+              return false;
+            default:
+              throw new IllegalStateException("Unexpected state: " + _state);
+          }
+        }
+        if (nanos <= 0L) {
+          throw new TimeoutException();
+        }
+        items[_putIndex] = block;
+        if (++_putIndex == items.length) {
+          _putIndex = 0;
+        }
+        _count++;
+        return true;
+      } finally {
+        _pendingData--;
+      }
+    }
+
+    /// Returns the first block from the queue, or `null` if there is no block in the queue. The returned block will be
+    /// an error block if the queue has been cancelled or has encountered an error.
+    ///
+    /// This method may block briefly while acquiring the lock, but it doesn't actually require waiting for data in the
+    /// queue.
+    @Nullable
+    public MseBlockWithStats poll() {
+      Preconditions.checkState(_reader != null, "A reader must be registered");
+      ReentrantLock lock = _lock;
+      lock.lock();
+      try {
+        switch (_state) {
+          case FULL_CLOSED:
+            // The queue is closed for both read and write. Always return the error block.
+            assert _eos != null;
+            return _eos;
+          case WAITING_EOS:
+            // The downstream is not interested in reading more data but is waiting for an EOS block to get the stats.
+            // Polls returns null and only EOS blocks are accepted by offer.
+            assert _eos == null;
+            return null;
+          case UPSTREAM_FINISHED:
+            // The upstream has indicated that no more data will be sent. Poll returns pending blocks and then the EOS
+            // block.
+            if (_count == 0) {
+              if (_pendingData > 0) {
+                // There are still threads trying to add data to the queue. We should wait for them to finish.
+                LOGGER.debug("Mailbox: {} has pending {} data blocks, waiting for them to finish", _id, _pendingData);
+                return null;
+              } else {
+                changeState(State.FULL_CLOSED, "read all data blocks");
+                return _eos;
+              }
+            }
+            break;
+          case FULL_OPEN:
+            if (_count == 0) {
+              assert _eos == null;
+              return null;
+            }
+            break;
+          default:
+            throw new IllegalStateException("Unexpected state: " + _state);
+        }
+        assert _count > 0 : "if we reach here, there must be data in the queue";
+        MseBlock.Data[] items = _dataBlocks;
+        MseBlock.Data block = items[_takeIndex];
+        assert block != null : "data block in the queue must not be null";
+        items[_takeIndex] = null;
+        if (++_takeIndex == items.length) {
+          _takeIndex = 0;
+        }
+        _count--;
+        _notFull.signal();
+
+        return new MseBlockWithStats(block, List.of());
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    @GuardedBy("_lock")
+    private void changeState(State newState, String desc) {
+      LOGGER.debug("Mailbox: {} {}, transitioning from {} to {}", _id, desc, _state, newState);
+      _state = newState;
+    }
+
+    @GuardedBy("_lock")
+    private void drainDataBlocks() {
+      Arrays.fill(_dataBlocks, null);
+      _notFull.signalAll();
+      _count = 0;
+    }
+
+    public int exactSize() {
+      ReentrantLock lock = _lock;
+      lock.lock();
+      try {
+        return _count;
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    /// Called by the downstream to indicate that no more data blocks will be read.
+    public void earlyTerminate() {
+      ReentrantLock lock = _lock;
+      lock.lock();
+      try {
+        switch (_state) {
+          case FULL_CLOSED:
+          case WAITING_EOS:
+            LOGGER.debug("Mailbox: {} is already closed for read", _id);
+            return;
+          case UPSTREAM_FINISHED:
+            drainDataBlocks();
+            changeState(State.FULL_CLOSED, "early terminated");
+            break;
+          case FULL_OPEN:
+            drainDataBlocks();
+            changeState(State.WAITING_EOS, "early terminated");
+            break;
+          default:
+            throw new IllegalStateException("Unexpected state: " + _state);
+        }
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    public void registerReader(Reader reader) {
+      if (_reader != null) {
+        throw new IllegalArgumentException("Only one reader is supported");
+      }
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("==[MAILBOX]== Reader registered for mailbox: " + _id);
+      }
+      _reader = reader;
     }
   }
 }

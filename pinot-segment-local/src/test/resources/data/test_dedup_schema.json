@@ -1,5 +1,5 @@
 {
-  "schemaName": "test_pinot_table",
+  "schemaName": "testTable",
   "dimensionFieldSpecs": [
     {
       "name": "event_id",

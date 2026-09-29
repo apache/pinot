@@ -19,7 +19,7 @@
 package org.apache.pinot.tsdb.spi.series;
 
 import java.time.Duration;
-import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.testng.annotations.Test;
 
@@ -32,7 +32,7 @@ public class TimeSeriesTest {
   @Test
   public void testTimeSeriesAcceptsDoubleValues() {
     Double[] values = new Double[10];
-    TimeSeries timeSeries = new TimeSeries("anything", null, TIME_BUCKETS, values, Collections.emptyList(),
+    TimeSeries timeSeries = new TimeSeries("anything", null, TIME_BUCKETS, values, List.of(),
         new Object[0]);
     assertEquals(timeSeries.getDoubleValues(), values);
   }
@@ -40,7 +40,7 @@ public class TimeSeriesTest {
   @Test
   public void testTimeSeriesAcceptsBytesValues() {
     byte[][] byteValues = new byte[10][1231];
-    TimeSeries timeSeries = new TimeSeries("anything", null, TIME_BUCKETS, byteValues, Collections.emptyList(),
+    TimeSeries timeSeries = new TimeSeries("anything", null, TIME_BUCKETS, byteValues, List.of(),
         new Object[0]);
     assertEquals(timeSeries.getBytesValues(), byteValues);
   }
@@ -48,7 +48,7 @@ public class TimeSeriesTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testTimeSeriesDeniesWhenValuesNotDoubleOrBytes() {
     Object[] someValues = new Long[10];
-    TimeSeries timeSeries = new TimeSeries("anything", null, TIME_BUCKETS, someValues, Collections.emptyList(),
+    TimeSeries timeSeries = new TimeSeries("anything", null, TIME_BUCKETS, someValues, List.of(),
         new Object[0]);
   }
 }

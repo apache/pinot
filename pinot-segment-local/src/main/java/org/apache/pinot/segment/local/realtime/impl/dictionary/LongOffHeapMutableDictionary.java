@@ -65,6 +65,21 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   }
 
   @Override
+  public DataType getValueType() {
+    return DataType.LONG;
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    return getDictId(Long.valueOf(stringValue), null);
+  }
+
+  @Override
+  public int indexOf(long longValue) {
+    return getDictId(longValue, null);
+  }
+
+  @Override
   public int compare(int dictId1, int dictId2) {
     return Long.compare(getLongValue(dictId1), getLongValue(dictId2));
   }
@@ -168,21 +183,6 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
 
     Arrays.sort(sortedValues);
     return sortedValues;
-  }
-
-  @Override
-  public DataType getValueType() {
-    return DataType.LONG;
-  }
-
-  @Override
-  public int indexOf(String stringValue) {
-    return getDictId(Long.valueOf(stringValue), null);
-  }
-
-  @Override
-  public int indexOf(long longValue) {
-    return getDictId(longValue, null);
   }
 
   @Override

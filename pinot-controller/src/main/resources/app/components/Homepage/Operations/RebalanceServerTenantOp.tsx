@@ -22,7 +22,7 @@ import { DialogContent, DialogContentText, makeStyles } from '@material-ui/core'
 import Dialog from '../../CustomDialog';
 
 const useStyles = makeStyles((theme) => ({
-  
+
 }));
 
 type Props = {

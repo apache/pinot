@@ -38,16 +38,15 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>StreamingReduceService</code> class provides service to reduce grpc response gathered from multiple servers
- * to {@link BrokerResponseNative}.
- */
+/// The `StreamingReduceService` class provides service to reduce grpc response gathered from multiple
+/// servers to [BrokerResponseNative].
 @ThreadSafe
 public class StreamingReduceService extends BaseReduceService {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamingReduceService.class);
@@ -56,6 +55,7 @@ public class StreamingReduceService extends BaseReduceService {
     super(config);
   }
 
+  /// [org.apache.pinot.spi.query.QueryThreadContext] must already be set up before calling this method.
   public BrokerResponseNative reduceOnStreamResponse(BrokerRequest brokerRequest,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap, long reduceTimeOutMs,
       BrokerMetrics brokerMetrics)
@@ -114,6 +114,13 @@ public class StreamingReduceService extends BaseReduceService {
 
     // Set execution statistics and Update broker metrics.
     aggregator.setStats(rawTableName, brokerResponseNative, brokerMetrics);
+
+    // If configured, filter out SERVER_SEGMENT_MISSING exceptions emitted by servers. This must happen after
+    // aggregator.setStats(), because the aggregator appends server exceptions during setStats.
+    if (queryOptions != null && QueryOptionsUtils.isIgnoreMissingSegments(queryOptions)) {
+      brokerResponseNative.getExceptions().removeIf(
+          ex -> ex.getErrorCode() == QueryErrorCode.SERVER_SEGMENT_MISSING.getId());
+    }
 
     updateAlias(queryContext, brokerResponseNative);
     return brokerResponseNative;

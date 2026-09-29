@@ -24,20 +24,14 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
-/**
- * Handles cluster changes such as external view changes, instance config changes, live instance changes etc.
- */
+/// Handles cluster changes such as external view changes, instance config changes, live instance changes etc.
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public interface ClusterChangeHandler {
 
-  /**
-   * Initializes the cluster change handler with the given connected Helix manager.
-   */
+  /// Initializes the cluster change handler with the given connected Helix manager.
   void init(HelixManager helixManager);
 
-  /**
-   * Processes the cluster change of the given type (e.g. EXTERNAL_VIEW, INSTANCE_CONFIG, LIVE_INSTANCE).
-   */
+  /// Processes the cluster change of the given type (e.g. EXTERNAL_VIEW, INSTANCE_CONFIG, LIVE_INSTANCE).
   void processClusterChange(HelixConstants.ChangeType changeType);
 }

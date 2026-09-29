@@ -27,15 +27,14 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
-/**
- * <p>A wrapper class to read column values of a row for a given {@link IndexSegment} and docId.<br>
- * The advantage of having wrapper over segment and docId is column values are read only when
- * {@link LazyRow#getValue(String)} is invoked.
- * This is useful to reduce the disk reads incurred due to loading the complete previous row during merge step.
- *
- * <p>The LazyRow has an internal state and should not be used concurrently. To reuse the LazyRow, create an instance
- * using no arg constructor and re-initialise using {@link LazyRow#init(IndexSegment, int)}
- */
+/// A wrapper class to read column values of a row for a given [IndexSegment] and docId.
+///
+/// The advantage of having wrapper over segment and docId is column values are read only when
+/// [LazyRow#getValue(String)] is invoked.
+/// This is useful to reduce the disk reads incurred due to loading the complete previous row during merge step.
+///
+/// The LazyRow has an internal state and should not be used concurrently. To reuse the LazyRow, create an instance
+/// using no arg constructor and re-initialise using [LazyRow#init(IndexSegment, int)]
 public class LazyRow {
   private final Map<String, Object> _fieldToValueMap = new HashMap<>();
   private final Set<String> _nullValueFields = new HashSet<>();
@@ -51,11 +50,9 @@ public class LazyRow {
     _docId = docId;
   }
 
-  /**
-   * Computes a field's value in an indexed row.
-   * @param fieldName
-   * @return Returns value or null for persisted null values
-   */
+  /// Computes a field's value in an indexed row.
+  /// @param fieldName
+  /// @return Returns value or null for persisted null values
   @Nullable
   public Object getValue(String fieldName) {
 
@@ -91,6 +88,7 @@ public class LazyRow {
   public void clear() {
     _fieldToValueMap.clear();
     _nullValueFields.clear();
+    _segment = null;
   }
 
   public Set<String> getColumnNames() {

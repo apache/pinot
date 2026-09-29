@@ -18,25 +18,45 @@
  */
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 
-/**
- * Virtual column provider interface, which is used to instantiate the various components (dictionary, reader, etc) that
- * comprise a proper column.
- */
+/// Virtual column provider interface, which is used to instantiate the various components (dictionary, reader, etc)
+/// that comprise a proper column.
 public interface VirtualColumnProvider {
+
   ForwardIndexReader<?> buildForwardIndex(VirtualColumnContext context);
 
   Dictionary buildDictionary(VirtualColumnContext context);
 
-  ColumnMetadata buildMetadata(VirtualColumnContext context);
-
   InvertedIndexReader<?> buildInvertedIndex(VirtualColumnContext context);
 
-  ColumnIndexContainer buildColumnIndexContainer(VirtualColumnContext context);
+  ColumnMetadata buildMetadata(VirtualColumnContext context);
+
+  /// Returns the null value vector of the virtual column, or `null` when the column has no null value.
+  ///
+  /// Virtual columns almost always carry a real value for every document, hence the default. A provider whose value
+  /// can be genuinely unavailable must override this, otherwise the placeholder stored in the forward index is
+  /// indistinguishable from a real value once null handling is enabled.
+  @Nullable
+  default NullValueVectorReader buildNullValueVector(VirtualColumnContext context) {
+    return null;
+  }
+
+  default ColumnIndexContainer buildColumnIndexContainer(VirtualColumnContext context) {
+    return new VirtualColumnIndexContainer(buildForwardIndex(context), buildInvertedIndex(context),
+        buildDictionary(context), buildNullValueVector(context));
+  }
+
+  default DataSource buildDataSource(VirtualColumnContext context) {
+    return new ImmutableDataSource(buildMetadata(context), buildColumnIndexContainer(context));
+  }
 }

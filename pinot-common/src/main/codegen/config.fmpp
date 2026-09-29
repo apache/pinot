@@ -17,7 +17,7 @@
 # under the License.
 #
 
-# Copied from Calcite 1.37.0 babel and modified for Pinot syntax. Update this file when upgrading Calcite version.
+# Copied from Calcite 1.42.0 babel and modified for Pinot syntax. Update this file when upgrading Calcite version.
 
 data: {
   default: tdd("../default_config.fmpp")
@@ -35,6 +35,7 @@ data: {
     # List of additional classes and packages to import.
     # Example: "org.apache.calcite.sql.*", "java.util.List".
     imports: [
+      "org.apache.calcite.sql.babel.postgres.SqlSetOptions",
       "org.apache.pinot.sql.parsers.parser.*"
     ]
 
@@ -43,6 +44,34 @@ data: {
     keywords: [
       "FILE"
       "ARCHIVE"
+      # Pinot types allowed in CAST function
+      # LONG - for BIGINT
+      # BIG_DECIMAL - for DECIMAL
+      # STRING - for VARCHAR
+      # BYTES - for VARBINARY
+      "LONG"
+      "BIG_DECIMAL"
+      "STRING"
+      "BYTES"
+      # Pinot DDL (CREATE/DROP/SHOW TABLE) keywords
+      "DIMENSION"
+      "METRIC"
+      "GRANULARITY"
+      "OFFLINE"
+      "REALTIME"
+      "PROPERTIES"
+      "TABLES"
+      "TABLE_TYPE"
+      # Pinot DDL (CREATE / SHOW / DROP MATERIALIZED VIEW(S)) keywords.
+      # MATERIALIZED is shared by every MV verb; VIEWS is the plural-form lexeme used by the
+      # Catalog-listing verb `SHOW MATERIALIZED VIEWS [FROM db]`. VIEW (singular) is a core
+      # Calcite keyword and is not redeclared here.
+      "MATERIALIZED"
+      "REFRESH"
+      "VIEWS"
+      # IF is not a SQL reserved word but Calcite core does not declare it as a token; we need it
+      # for DDL "IF [NOT] EXISTS" clauses.
+      "IF"
     ]
 
     # List of non-reserved keywords to add;
@@ -52,8 +81,30 @@ data: {
       "ARCHIVE"
       # Pinot allows using DEFAULT as the catalog name
       "DEFAULT_"
-      # Pinot allows using DATETIME as column name
+      # Pinot allows using LONG/BIG_DECIMAL/STRING/BYTES/DATETIME/VARIANT/UUID as column name
+      "LONG"
+      "BIG_DECIMAL"
+      "STRING"
+      "BYTES"
       "DATETIME"
+      "VARIANT"
+      "UUID"
+      # UNSIGNED became a reserved keyword in Calcite 1.41.0 (CALCITE-1466, unsigned integer types). Keep it
+      # non-reserved so existing queries/columns that use "unsigned" as an identifier keep working.
+      "UNSIGNED"
+      # Pinot DDL keywords kept non-reserved so users can still use them as identifiers
+      "DIMENSION"
+      "METRIC"
+      "GRANULARITY"
+      "OFFLINE"
+      "REALTIME"
+      "PROPERTIES"
+      "TABLES"
+      "TABLE_TYPE"
+      "IF"
+      "MATERIALIZED"
+      "REFRESH"
+      "VIEWS"
 
       # The following keywords are reserved in core Calcite,
       # are reserved in some version of SQL,
@@ -552,6 +603,10 @@ data: {
     statementParserMethods: [
       "SqlInsertFromFile()"
       "SqlPhysicalExplain()"
+      "SqlPinotCreateMaterializedView()"
+      "SqlPinotCreateTable()"
+      "SqlPinotDrop()"
+      "SqlPinotShow()"
     ]
 
     # List of methods for parsing custom literals.
@@ -599,11 +654,13 @@ data: {
     # Binary operators tokens.
     # Example: "< INFIX_CAST: \"::\" >".
     binaryOperatorsTokens: [
+      "< INFIX_CAST: \"::\" >"
     ]
 
     # Binary operators initialization.
     # Example: "InfixCast".
     extraBinaryExpressions: [
+      "InfixCast"
       "SqlAtTimeZone"
     ]
 
@@ -629,6 +686,14 @@ data: {
     customIdentifierToken: "< IDENTIFIER: (<LETTER>|<DIGIT>|[\"\\200\"-\"\\377\"]) (<LETTER>|<DIGIT>|<DOLLAR>|[\"\\200\"-\"\\377\"])* >"
 
     includeParsingStringLiteralAsArrayLiteral: true
+    # Calcite 1.42 babel enables includeIntervalWithoutQualifier / includeStarExclude / includeSelectBy (bare INTERVAL
+    # in CAST, SELECT * EXCLUDE/REPLACE, and the SELECT ... BY clause). Pinot intentionally keeps all three OFF: the
+    # grammar productions are synced into Parser.jj but stay inactive because Pinot's multi-stage engine has no
+    # downstream support for these features yet. includeIntervalWithoutQualifier and includeStarExclude mirror the
+    # upstream core defaults (both false in default_config.fmpp); includeSelectBy has no upstream core default (upstream
+    # Parser.jj guards it with a literal "!false"), so Pinot defines it false in default_config.fmpp to keep all three
+    # guarded uniformly via "default.parser.<flag>". Enable them in a dedicated, tested change if/when they are
+    # supported end-to-end.
   }
 }
 

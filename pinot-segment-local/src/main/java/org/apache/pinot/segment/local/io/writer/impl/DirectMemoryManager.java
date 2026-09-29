@@ -28,9 +28,7 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 // Allocates memory using direct allocation
 public class DirectMemoryManager extends RealtimeIndexOffHeapMemoryManager {
 
-  /**
-   * @see RealtimeIndexOffHeapMemoryManager
-   */
+  /// @see RealtimeIndexOffHeapMemoryManager
   public DirectMemoryManager(final String segmentName, ServerMetrics serverMetrics) {
     super(serverMetrics, segmentName);
   }
@@ -40,14 +38,11 @@ public class DirectMemoryManager extends RealtimeIndexOffHeapMemoryManager {
     this(segmentName, new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
   }
 
-  /**
-   *
-   * @param size size of memory
-   * @param allocationContext String describing context of allocation (typically segment:column name).
-   * @return PinotDataBuffer via direct allocation
-   *
-   * @see RealtimeIndexOffHeapMemoryManager#allocate(long, String)
-   */
+  /// @param size size of memory
+  /// @param allocationContext String describing context of allocation (typically segment:column name).
+  /// @return PinotDataBuffer via direct allocation
+  ///
+  /// @see RealtimeIndexOffHeapMemoryManager#allocate(long, String)
   @Override
   protected PinotDataBuffer allocateInternal(long size, String allocationContext) {
     return PinotDataBuffer.allocateDirect(size, PinotDataBuffer.NATIVE_ORDER, allocationContext);

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
@@ -26,14 +27,13 @@ import org.apache.pinot.segment.local.customobject.SerializedCPCSketch;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * The {@code DistinctCountRawCPCAggregationFunction} shares the same usage as the
- * {@link DistinctCountCPCSketchAggregationFunction}, and returns the sketch as a base64 encoded string.
- */
+/// The `DistinctCountRawCPCAggregationFunction` shares the same usage as the
+/// [DistinctCountCPCSketchAggregationFunction], and returns the sketch as a base64 encoded string.
 public class DistinctCountRawCPCSketchAggregationFunction extends DistinctCountCPCSketchAggregationFunction {
 
-  public DistinctCountRawCPCSketchAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments);
+  public DistinctCountRawCPCSketchAggregationFunction(List<ExpressionContext> arguments,
+      boolean nullHandlingEnabled) {
+    super(arguments, nullHandlingEnabled);
   }
 
   @Override
@@ -46,8 +46,12 @@ public class DistinctCountRawCPCSketchAggregationFunction extends DistinctCountC
     return ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
-  public SerializedCPCSketch extractFinalResult(CpcSketchAccumulator intermediateResult) {
+  public SerializedCPCSketch extractFinalResult(@Nullable CpcSketchAccumulator intermediateResult) {
+    if (intermediateResult == null) {
+      return null;
+    }
     intermediateResult.setLgNominalEntries(_lgNominalEntries);
     intermediateResult.setThreshold(_accumulatorThreshold);
     return new SerializedCPCSketch(intermediateResult.getResult());

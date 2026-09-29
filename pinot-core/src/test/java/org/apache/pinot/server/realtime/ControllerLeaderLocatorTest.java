@@ -44,11 +44,9 @@ import static org.mockito.Mockito.when;
 public class ControllerLeaderLocatorTest {
   private static final String TEST_TABLE = "testTable";
 
-  /**
-   * Tests the invalidate logic for cached controller leader
-   * We set the value for lastCacheInvalidateMillis as we do not want to rely on operations being executed within or
-   * after the time thresholds in the tests
-   */
+  /// Tests the invalidate logic for cached controller leader
+  /// We set the value for lastCacheInvalidateMillis as we do not want to rely on operations being executed within or
+  /// after the time thresholds in the tests
   @Test
   public void testInvalidateCachedControllerLeader() {
     HelixManager helixManager = mock(HelixManager.class);

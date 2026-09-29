@@ -24,17 +24,16 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 
-/**
- * A Pinot result set group, containing the results given back by Pinot for a given query.
- */
-public class ResultSetGroup {
+/// A Pinot result set group, containing the results given back by Pinot for a given query.
+public class ResultSetGroup implements BaseResultSetGroup {
   private final List<ResultSet> _resultSets;
   private final ExecutionStats _executionStats;
   private final List<PinotClientException> _exceptions;
+  private final BrokerResponse _brokerResponse;
 
-  ResultSetGroup(BrokerResponse brokerResponse) {
+  public ResultSetGroup(BrokerResponse brokerResponse) {
+    _brokerResponse = brokerResponse;
     _resultSets = new ArrayList<>();
-
     if (brokerResponse.getResultTable() != null) {
       _resultSets.add(new ResultTableResultSet(brokerResponse.getResultTable()));
     } else {
@@ -70,22 +69,18 @@ public class ResultSetGroup {
     return exceptions;
   }
 
-  /**
-   * Returns the number of result sets in this result set group, or 0 if there are no result sets; there is one result
-   * set per aggregation function in the original query and one result set in the case of a selection query.
-   *
-   * @return The number of result sets in this result set
-   */
+  /// Returns the number of result sets in this result set group, or 0 if there are no result sets; there is one result
+  /// set per aggregation function in the original query and one result set in the case of a selection query.
+  ///
+  /// @return The number of result sets in this result set
   public int getResultSetCount() {
     return _resultSets.size();
   }
 
-  /**
-   * Obtains the result set at the given index, starting from zero.
-   *
-   * @param index The index for which to obtain the result set
-   * @return The result set at the given index
-   */
+  /// Obtains the result set at the given index, starting from zero.
+  ///
+  /// @param index The index for which to obtain the result set
+  /// @return The result set at the given index
   public ResultSet getResultSet(int index) {
     return _resultSets.get(index);
   }
@@ -96,6 +91,10 @@ public class ResultSetGroup {
 
   public List<PinotClientException> getExceptions() {
     return _exceptions;
+  }
+
+  public BrokerResponse getBrokerResponse() {
+    return _brokerResponse;
   }
 
   @Override

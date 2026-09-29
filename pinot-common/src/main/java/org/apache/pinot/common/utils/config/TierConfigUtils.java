@@ -19,7 +19,6 @@
 package org.apache.pinot.common.utils.config;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
-import org.apache.pinot.common.tier.FixedTierSegmentSelector;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
@@ -43,18 +42,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Util methods for TierConfig
- */
+/// Util methods for TierConfig
 public final class TierConfigUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TierConfigUtils.class);
 
   private TierConfigUtils() {
   }
 
-  /**
-   * Returns whether relocation of segments to tiers has been enabled for this table
-   */
+  /// Returns whether relocation of segments to tiers has been enabled for this table
   public static boolean shouldRelocateToTiers(TableConfig tableConfig) {
     return CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList());
   }
@@ -63,25 +58,21 @@ public final class TierConfigUtils {
     return tierName == null ? "default" : tierName;
   }
 
-  /**
-   * Consider configured tiers and compute default instance partitions for the segment
-   *
-   * @return InstancePartitions if the one can be derived from the given sorted tiers, null otherwise
-   */
+  /// Consider configured tiers and compute default instance partitions for the segment
+  ///
+  /// @return InstancePartitions if the one can be derived from the given sorted tiers, null otherwise
   @Nullable
-  public static InstancePartitions getTieredInstancePartitionsForSegment(String tableNameWithType, String segmentName,
-      @Nullable List<Tier> sortedTiers, HelixManager helixManager) {
+  public static InstancePartitions getTieredInstancePartitionsForSegment(TableConfig tableConfig,
+      SegmentZKMetadata segmentZKMetadata, @Nullable List<Tier> sortedTiers, HelixManager helixManager) {
     if (CollectionUtils.isEmpty(sortedTiers)) {
       return null;
     }
 
     // Find first applicable tier
+    String tableNameWithType = tableConfig.getTableName();
     for (Tier tier : sortedTiers) {
-      if (tier.getSegmentSelector().selectSegment(tableNameWithType, segmentName)) {
-        // Compute default instance partitions
-        PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
-        return InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(helixManager, tableNameWithType,
-            tier.getName(), storage.getServerTag());
+      if (tier.getSegmentSelector().selectSegment(tableNameWithType, segmentZKMetadata)) {
+        return getTieredInstancePartitions(tableConfig, tier, helixManager);
       }
     }
 
@@ -89,9 +80,16 @@ public final class TierConfigUtils {
     return null;
   }
 
+  public static InstancePartitions getTieredInstancePartitions(TableConfig tableConfig, Tier tier,
+      HelixManager helixManager) {
+    PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
+    return InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(helixManager, tableConfig, tier.getName(),
+        storage.getServerTag());
+  }
+
   @Nullable
   public static String getDataDirForTier(TableConfig tableConfig, String tierName) {
-    return getDataDirForTier(tableConfig, tierName, Collections.emptyMap());
+    return getDataDirForTier(tableConfig, tierName, Map.of());
   }
 
   @Nullable
@@ -135,46 +133,48 @@ public final class TierConfigUtils {
     return dataDir;
   }
 
-  /**
-   * Gets sorted list of tiers for given storage type from provided list of TierConfig
-   */
-  public static List<Tier> getSortedTiersForStorageType(List<TierConfig> tierConfigList, String storageType,
-      HelixManager helixManager) {
-    return getSortedTiersForStorageType(tierConfigList, storageType, helixManager, null);
+  /// Gets sorted list of tiers for given storage type from provided list of TierConfig
+  public static List<Tier> getSortedTiersForStorageType(List<TierConfig> tierConfigList, String storageType) {
+    return getSortedTiersForStorageType(tierConfigList, storageType, null);
   }
 
   public static List<Tier> getSortedTiersForStorageType(List<TierConfig> tierConfigList, String storageType,
-      HelixManager helixManager, @Nullable Map<String, Set<String>> providedTierToSegmentsMap) {
+      @Nullable Map<String, Set<String>> providedTierToSegmentsMap) {
     List<Tier> sortedTiers = new ArrayList<>();
     for (TierConfig tierConfig : tierConfigList) {
       if (storageType.equalsIgnoreCase(tierConfig.getStorageType())) {
         String tierName = tierConfig.getName();
         Set<String> providedSegmentsForTier =
             providedTierToSegmentsMap == null ? null : providedTierToSegmentsMap.get(tierName);
-        sortedTiers.add(TierFactory.getTier(tierConfig, helixManager, providedSegmentsForTier));
+        sortedTiers.add(TierFactory.getTier(tierConfig, providedSegmentsForTier));
       }
     }
     sortedTiers.sort(TierConfigUtils.getTierComparator());
     return sortedTiers;
   }
 
-  /**
-   * Gets sorted list of tiers from provided list of TierConfig
-   */
-  public static List<Tier> getSortedTiers(List<TierConfig> tierConfigList, HelixManager helixManager) {
+  /// Gets sorted list of tiers from provided list of TierConfig
+  public static List<Tier> getSortedTiers(List<TierConfig> tierConfigList) {
     List<Tier> sortedTiers = new ArrayList<>();
     for (TierConfig tierConfig : tierConfigList) {
-      sortedTiers.add(TierFactory.getTier(tierConfig, helixManager));
+      sortedTiers.add(TierFactory.getTier(tierConfig));
     }
     sortedTiers.sort(TierConfigUtils.getTierComparator());
     return sortedTiers;
   }
 
-  /**
-   * Comparator for sorting the {@link Tier}. In the sort order
-   * 1) {@link FixedTierSegmentSelector} are always before others
-   * 2) For {@link TimeBasedTierSegmentSelector}, tiers with an older age bucket appear before a younger age bucket,
-   */
+  public static Tier getTier(List<TierConfig> tierConfigList, String tierName) {
+    for (TierConfig tierConfig : tierConfigList) {
+      if (tierName.equals(tierConfig.getName())) {
+        return TierFactory.getTier(tierConfig);
+      }
+    }
+    throw new IllegalArgumentException("No tier found with name: " + tierName);
+  }
+
+  /// Comparator for sorting the [Tier]. In the sort order
+  /// 1) [org.apache.pinot.common.tier.FixedTierSegmentSelector] are always before others
+  /// 2) For [TimeBasedTierSegmentSelector], tiers with an older age bucket appear before a younger age bucket,
   public static Comparator<Tier> getTierComparator() {
     return (o1, o2) -> {
       TierSegmentSelector s1 = o1.getSegmentSelector();

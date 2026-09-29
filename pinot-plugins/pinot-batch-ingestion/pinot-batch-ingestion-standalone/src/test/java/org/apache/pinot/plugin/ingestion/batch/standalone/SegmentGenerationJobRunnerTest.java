@@ -24,7 +24,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.Collections;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
@@ -106,10 +106,8 @@ public class SegmentGenerationJobRunnerTest {
     // FUTURE - validate contents of file?
   }
 
-  /**
-   * Enabling consistent data push should generate segment names with timestamps in order to differentiate between
-   * the non-unique raw segment names.
-   */
+  /// Enabling consistent data push should generate segment names with timestamps in order to differentiate between
+  /// the non-unique raw segment names.
   @Test
   public void testSegmentGenerationWithConsistentPush()
       throws Exception {
@@ -239,10 +237,10 @@ public class SegmentGenerationJobRunnerTest {
   private File makeSchemaFile(File testDir, String schemaName) throws IOException {
     File schemaFile = new File(testDir, "schema");
     Schema schema = new SchemaBuilder()
-      .setSchemaName(schemaName)
-      .addSingleValueDimension("col1", DataType.STRING)
-      .addMetric("col2", DataType.INT)
-      .build();
+        .setSchemaName(schemaName)
+        .addSingleValueDimension("col1", DataType.STRING)
+        .addMetric("col2", DataType.INT)
+        .build();
     FileUtils.write(schemaFile, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
     return schemaFile;
   }
@@ -297,7 +295,7 @@ public class SegmentGenerationJobRunnerTest {
     PinotFSSpec pfsSpec = new PinotFSSpec();
     pfsSpec.setScheme("file");
     pfsSpec.setClassName(LocalPinotFS.class.getName());
-    jobSpec.setPinotFSSpecs(Collections.singletonList(pfsSpec));
+    jobSpec.setPinotFSSpecs(List.of(pfsSpec));
 
     return jobSpec;
   }

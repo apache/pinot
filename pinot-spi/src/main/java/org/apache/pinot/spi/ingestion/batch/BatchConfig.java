@@ -23,9 +23,7 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
-/**
- * Provides all config related to the batch data source, as configured in the table config's ingestion config
- */
+/// Provides all config related to the batch data source, as configured in the table config's ingestion config
 public class BatchConfig {
   private final Map<String, String> _batchConfigMap;
   private final String _tableNameWithType;
@@ -71,7 +69,7 @@ public class BatchConfig {
 
     String inputFormat = batchConfigsMap.get(BatchConfigProperties.INPUT_FORMAT);
     if (inputFormat != null) {
-      _inputFormat = FileFormat.valueOf(inputFormat.toUpperCase());
+      _inputFormat = FileFormat.fromString(inputFormat);
     } else {
       _inputFormat = null;
     }

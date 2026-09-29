@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.queries;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -41,6 +39,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -51,9 +50,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Queries test for H3 index.
- */
+/// Queries test for H3 index.
 public class H3IndexQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "H3IndexQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
@@ -71,13 +68,25 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
           .addSingleValueDimension(NON_H3_INDEX_COLUMN, DataType.BYTES)
           .addSingleValueDimension(H3_INDEX_GEOMETRY_COLUMN, DataType.BYTES)
           .addSingleValueDimension(NON_H3_INDEX_GEOMETRY_COLUMN, DataType.BYTES).build();
-  private static final Map<String, String> H3_INDEX_PROPERTIES = Collections.singletonMap("resolutions", "5");
+  private static final Map<String, String> H3_INDEX_PROPERTIES = Map.of("resolutions", "5");
+  private static final List<FieldConfig> H3_FIELD_CONFIGS = List.of(
+      new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3), null,
+          H3_INDEX_PROPERTIES),
+      new FieldConfig(H3_INDEX_GEOMETRY_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3),
+          null, H3_INDEX_PROPERTIES));
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-      .setFieldConfigList(ImmutableList
-          .of(new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
-                  H3_INDEX_PROPERTIES),
-              new FieldConfig(H3_INDEX_GEOMETRY_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3,
-                  null, H3_INDEX_PROPERTIES))).build();
+      .setFieldConfigList(H3_FIELD_CONFIGS).build();
+  // Null handling enabled so the segment stores a null-value vector, and continueOnError enabled so the H3 index
+  // creator skips (rather than fails on) the null geometries during segment creation.
+  private static final TableConfig NULL_ENABLED_TABLE_CONFIG =
+      new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setFieldConfigList(H3_FIELD_CONFIGS)
+          .setNullHandlingEnabled(true).setIngestionConfig(continueOnErrorIngestionConfig()).build();
+
+  private static IngestionConfig continueOnErrorIngestionConfig() {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setContinueOnError(true);
+    return ingestionConfig;
+  }
 
   private IndexSegment _indexSegment;
 
@@ -98,18 +107,24 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
 
   public void setUp(List<GenericRow> records)
       throws Exception {
+    setUp(records, TABLE_CONFIG, false);
+  }
+
+  private void setUp(List<GenericRow> records, TableConfig tableConfig, boolean nullHandlingEnabled)
+      throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
 
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
+    segmentGeneratorConfig.setDefaultNullHandlingEnabled(nullHandlingEnabled);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
     _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
   }
 
@@ -123,6 +138,15 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
     record.putValue(NON_H3_INDEX_COLUMN, value);
     record.putValue(H3_INDEX_GEOMETRY_COLUMN, geometryValue);
     record.putValue(NON_H3_INDEX_GEOMETRY_COLUMN, geometryValue);
+    records.add(record);
+  }
+
+  private void addNullRecord(List<GenericRow> records) {
+    GenericRow record = new GenericRow();
+    record.putValue(H3_INDEX_COLUMN, null);
+    record.putValue(NON_H3_INDEX_COLUMN, null);
+    record.putValue(H3_INDEX_GEOMETRY_COLUMN, null);
+    record.putValue(NON_H3_INDEX_GEOMETRY_COLUMN, null);
     records.add(record);
   }
 
@@ -295,6 +319,57 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
     }
   }
 
+  /// With query null handling enabled, rows whose geometry is null have no H3 posting and must not leak into
+  /// match-all, complement (negative check), or lower-bound H3-index results. Each query below matches every non-null
+  /// row, so the correct answer is the non-null record count; before the fix the null rows were wrongly counted too.
+  ///
+  /// Note: this compares against the expected count rather than the scan path, because the geospatial transform
+  /// functions do not tolerate the null/empty geometry input on the scan path (they throw a BufferUnderflowException),
+  /// so the scan path cannot serve as an oracle for all-null rows here. The H3-index path never deserializes the
+  /// column values, so it is unaffected.
+  @Test
+  public void testH3IndexWithNullHandling()
+      throws Exception {
+    int numNonNullRecords = 0;
+    List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
+    for (int i = 0; i < NUM_RECORDS; i++) {
+      if (i % 2 == 0) {
+        double longitude = -122.5 + RANDOM.nextDouble();
+        double latitude = 37 + RANDOM.nextDouble();
+        addRecord(records, longitude, latitude);
+        numNonNullRecords++;
+      } else {
+        addNullRecord(records);
+      }
+    }
+    setUp(records, NULL_ENABLED_TABLE_CONFIG, true);
+
+    // Match-all (no bound): every non-null row matches, null rows are excluded.
+    validateNullHandlingResult("SELECT COUNT(*) FROM testTable WHERE ST_Distance(%s, ST_Point(-122, 37.5, 1)) > -1",
+        H3_INDEX_COLUMN, numNonNullRecords);
+    // Lower bound only: distance is always positive for non-null rows, null rows are excluded.
+    validateNullHandlingResult("SELECT COUNT(*) FROM testTable WHERE ST_Distance(%s, ST_Point(-122, 37.5, 1)) > 0",
+        H3_INDEX_COLUMN, numNonNullRecords);
+    // Negative ST_Within against a polygon that contains none of the points: every non-null row satisfies "= 0",
+    // exercising the inclusion operator complement; null rows are excluded.
+    validateNullHandlingResult(
+        "SELECT COUNT(*) FROM testTable WHERE ST_Within(%s, ST_GeomFromText('POLYGON ((\n"
+            + "             122.0008564 -37.5004316, \n"
+            + "             121.9991291 -37.5005168, \n"
+            + "             121.9990325 -37.4995294, \n"
+            + "             122.0001268 -37.4993506,  \n"
+            + "             122.0008564 -37.5004316))')) = 0",
+        H3_INDEX_GEOMETRY_COLUMN, numNonNullRecords);
+  }
+
+  private void validateNullHandlingResult(String queryTemplate, String h3Column, long expectedCount) {
+    String h3IndexQuery = "SET enableNullHandling=true;\n" + String.format(queryTemplate, h3Column);
+    AggregationOperator h3IndexOperator = getOperator(h3IndexQuery);
+    long h3IndexCount = (long) h3IndexOperator.nextBlock().getResults().get(0);
+    // The H3-index path must exclude the null rows (which have no posting) from the match-all / complement result.
+    Assert.assertEquals(h3IndexCount, expectedCount);
+  }
+
   @Test
   public void stContainPointVeryCloseToBorderTest()
       throws Exception {
@@ -380,12 +455,12 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void queryStContainsWithMultipleFilters()
+  public void queryStContainsWithMultipleFiltersFirstFilterEmpty()
       throws Exception {
     List<GenericRow> records = new ArrayList<>(1);
     addRecord(records, -122.0007277, 37.5005785);
     setUp(records);
-    // Test point is closed to border of a polygon but outside.
+    // Test point is close to border of a polygon but outside.
     String query = "SELECT COUNT(*) FROM testTable WHERE ST_Contains(ST_GeomFromText('POLYGON ((\n"
         + "             -122.0008564 37.5004316, \n"
         + "             -121.9991291 37.5005168, \n"
@@ -398,6 +473,34 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
         + "             -121.9990325 37.4995294, \n"
         + "             -122.0001268 37.4993506, \n"
         + "             -122.0008564 37.5004316))'), h3Column_geometry) = 0";
+
+    AggregationOperator aggregationOperator = getOperator(query);
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 1, 0, 1);
+    List<Object> aggregationResult = resultsBlock.getResults();
+    Assert.assertNotNull(aggregationResult);
+    Assert.assertEquals((long) aggregationResult.get(0), 0);
+  }
+
+  @Test
+  public void queryStContainsWithMultipleFiltersSecondFilterEmpty()
+      throws Exception {
+    List<GenericRow> records = new ArrayList<>(1);
+    addRecord(records, -122.0007277, 37.5005785);
+    setUp(records);
+    // Test point is close to border of a polygon but outside.
+    String query = "SELECT COUNT(*) FROM testTable WHERE ST_Contains(ST_GeomFromText('POLYGON ((\n"
+        + "             -122.0008564 37.5004316, \n"
+        + "             -121.9991291 37.5005168, \n"
+        + "             -121.9990325 37.4995294, \n"
+        + "             -122.0001268 37.4993506,  \n"
+        + "             -122.0008564 37.5004316))'), h3Column_geometry) = 0 AND "
+        + "             ST_Contains(ST_GeomFromText('POLYGON (( \n"
+        + "             -122.0008564 37.5004316, \n"
+        + "             -121.9991291 37.5005168, \n"
+        + "             -121.9990325 37.4995294, \n"
+        + "             -122.0001268 37.4993506, \n"
+        + "             -122.0008564 37.5004316))'), h3Column_geometry) = 1";
 
     AggregationOperator aggregationOperator = getOperator(query);
     AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();

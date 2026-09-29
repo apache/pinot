@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -25,19 +26,17 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
-import org.roaringbitmap.IntIterator;
 
 
-/**
- * This function is used for LastWithTime calculations for data column with double type.
- * <p>The function can be used as LastWithTime(dataExpression, timeExpression, 'double')
- * <p>Following arguments are supported:
- * <ul>
- *   <li>dataExpression: expression that contains the double data column to be calculated last on</li>
- *   <li>timeExpression: expression that contains the column to be used to decide which data is last, can be any
- *   Numeric column</li>
- * </ul>
- */
+/// This function is used for LastWithTime calculations for data column with double type.
+///
+/// The function can be used as LastWithTime(dataExpression, timeExpression, 'double')
+///
+/// Following arguments are supported:
+///
+/// - dataExpression: expression that contains the double data column to be calculated last on
+/// - timeExpression: expression that contains the column to be used to decide which data is last, can be any
+///   Numeric column
 public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<Double> {
   private final static ValueLongPair<Double> DEFAULT_VALUE_TIME_PAIR = new DoubleLongPair(Double.NaN, Long.MIN_VALUE);
 
@@ -67,8 +66,7 @@ public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggr
     double[] doubleValues = blockValSet.getDoubleValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
 
-    IntIterator nullIdxIterator = orNullIterator(blockValSet, timeValSet);
-    forEachNotNull(length, nullIdxIterator, (from, to) -> {
+    forEachNotNull(length, blockValSet, timeValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         double data = doubleValues[i];
         long time = timeValues[i];
@@ -83,8 +81,7 @@ public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggr
     double[] doubleValues = blockValSet.getDoubleValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
 
-    IntIterator nullIdxIterator = orNullIterator(blockValSet, timeValSet);
-    forEachNotNull(length, nullIdxIterator, (from, to) -> {
+    forEachNotNull(length, blockValSet, timeValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         double value = doubleValues[i];
         long time = timeValues[i];
@@ -98,6 +95,17 @@ public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggr
   @Override
   public String getResultColumnName() {
     return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'DOUBLE')";
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(ValueLongPair<Double> doubleLongPair) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleLongPair.getValue(),
+        ObjectSerDeUtils.DOUBLE_LONG_PAIR_SER_DE.serialize((DoubleLongPair) doubleLongPair));
+  }
+
+  @Override
+  public ValueLongPair<Double> deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.DOUBLE_LONG_PAIR_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

@@ -1,0 +1,246 @@
+{
+  "lookup_join_basic": {
+    "comment": "Tests lookup join with a dimension table: inner/left join, fact-side filter, and aggregation above the join. V1 and V2 pass end-to-end. Lite mode is skipped because the broker lacks DimensionTableDataManager. The V2 path is additionally validated at the planner level by LookupJoinPlanTest. Exercises WorkerManager.assignWorkersToNonRootFragment lookup-join branch on the V1 path.",
+    "tables": {
+      "fact_tbl": {
+        "schema": [
+          {"name": "dim_key", "type": "INT"},
+          {"name": "metric", "type": "INT"}
+        ],
+        "inputs": [
+          [1, 100],
+          [2, 200],
+          [3, 300],
+          [1, 400],
+          [4, 500]
+        ]
+      },
+      "dim_tbl": {
+        "schema": [
+          {"name": "id", "type": "INT"},
+          {"name": "name", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, "alpha"],
+          [2, "beta"],
+          [3, "gamma"]
+        ],
+        "replicated": true,
+        "isDimTable": true,
+        "primaryKeyColumns": ["id"]
+      }
+    },
+    "queries": [
+      {
+        "description": "Basic lookup join - inner join with dim table",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.dim_key, {dim_tbl}.name FROM {fact_tbl} JOIN {dim_tbl} ON {fact_tbl}.dim_key = {dim_tbl}.id ORDER BY {fact_tbl}.dim_key, {dim_tbl}.name",
+        "outputs": [
+          [1, "alpha"],
+          [1, "alpha"],
+          [2, "beta"],
+          [3, "gamma"]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Left outer lookup join - unmatched fact row (dim_key=4) preserved with null dim column",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.dim_key, {dim_tbl}.name FROM {fact_tbl} LEFT JOIN {dim_tbl} ON {fact_tbl}.dim_key = {dim_tbl}.id",
+        "outputs": [
+          [1, "alpha"],
+          [1, "alpha"],
+          [2, "beta"],
+          [3, "gamma"],
+          [4, null]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Lookup join with filter on fact-side column - filter applied before the join",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.dim_key, {fact_tbl}.metric, {dim_tbl}.name FROM {fact_tbl} JOIN {dim_tbl} ON {fact_tbl}.dim_key = {dim_tbl}.id WHERE {fact_tbl}.metric >= 200",
+        "outputs": [
+          [2, 200, "beta"],
+          [3, 300, "gamma"],
+          [1, 400, "alpha"]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Aggregation above lookup join - counts matched fact rows per dim name",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.name, COUNT(*) FROM {fact_tbl} JOIN {dim_tbl} ON {fact_tbl}.dim_key = {dim_tbl}.id GROUP BY {dim_tbl}.name",
+        "outputs": [
+          ["alpha", 2],
+          ["beta", 1],
+          ["gamma", 1]
+        ],
+        "ignoreLiteMode": true
+      }
+    ]
+  },
+  "lookup_join_literal_key": {
+    "comment": "Regression test for issue 19188. One dimension primary-key component comes from a literal in the join condition. Calcite classifies that condition as a non-equi condition, so it is absent from the join keys. Before the fix the lookup key held one value against a two-column primary key and the join returned 0 rows.",
+    "tables": {
+      "fact_tbl": {
+        "schema": [
+          {"name": "rate_start_date", "type": "LONG"}
+        ],
+        "inputs": [
+          [1]
+        ]
+      },
+      "dim_tbl": {
+        "schema": [
+          {"name": "currency", "type": "STRING"},
+          {"name": "rate_start_date", "type": "LONG"},
+          {"name": "rate", "type": "INT"}
+        ],
+        "inputs": [
+          ["gbp", 1, 125],
+          ["usd", 1, 100]
+        ],
+        "replicated": true,
+        "isDimTable": true,
+        "primaryKeyColumns": ["currency", "rate_start_date"]
+      }
+    },
+    "queries": [
+      {
+        "description": "Lookup join with a literal dimension primary-key component",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.currency, {dim_tbl}.rate FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.currency = 'gbp' AND {dim_tbl}.rate_start_date = {fact_tbl}.rate_start_date",
+        "outputs": [
+          ["gbp", 125]
+        ],
+        "ignoreLiteMode": true
+      }
+    ]
+  },
+  "lookup_join_composite_key": {
+    "comment": "Covers lookup joins against a two-column dimension primary key. The lookup key must hold one value per primary key column, in the order the dimension table schema declares them. These cases check that the key is complete, that it is ordered by the primary key instead of by the join condition, and that a join condition which cannot produce a complete key gives an error instead of 0 rows.",
+    "tables": {
+      "fact_tbl": {
+        "schema": [
+          {"name": "currency", "type": "STRING"},
+          {"name": "rate_start_date", "type": "LONG"},
+          {"name": "amount", "type": "INT"}
+        ],
+        "inputs": [
+          ["gbp", 1, 10],
+          ["usd", 1, 20],
+          ["gbp", 2, 30],
+          ["eur", 1, 40],
+          ["eur", 9, 50]
+        ]
+      },
+      "dim_tbl": {
+        "schema": [
+          {"name": "currency", "type": "STRING"},
+          {"name": "rate_start_date", "type": "LONG"},
+          {"name": "rate", "type": "INT"}
+        ],
+        "inputs": [
+          ["gbp", 1, 125],
+          ["usd", 1, 100],
+          ["gbp", 2, 130]
+        ],
+        "replicated": true,
+        "isDimTable": true,
+        "primaryKeyColumns": ["currency", "rate_start_date"]
+      }
+    },
+    "queries": [
+      {
+        "description": "Literal primary-key component in the ON clause",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.amount, {dim_tbl}.currency, {dim_tbl}.rate FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.currency = 'gbp' AND {dim_tbl}.rate_start_date = {fact_tbl}.rate_start_date",
+        "outputs": [
+          [10, "gbp", 125],
+          [20, "gbp", 125],
+          [30, "gbp", 130],
+          [40, "gbp", 125]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Same literal primary-key component, written in the WHERE clause. The planner moves it into the join condition, so the operator sees the same plan.",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.amount, {dim_tbl}.currency, {dim_tbl}.rate FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.rate_start_date = {fact_tbl}.rate_start_date WHERE {dim_tbl}.currency = 'gbp'",
+        "outputs": [
+          [10, "gbp", 125],
+          [20, "gbp", 125],
+          [30, "gbp", 130],
+          [40, "gbp", 125]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Left join with a literal primary-key component. Before the fix every row was null-padded, which gave wrong values instead of missing rows.",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.amount, {dim_tbl}.rate FROM {fact_tbl} LEFT JOIN {dim_tbl} ON {dim_tbl}.currency = 'gbp' AND {dim_tbl}.rate_start_date = {fact_tbl}.rate_start_date",
+        "outputs": [
+          [10, 125],
+          [20, 125],
+          [30, 130],
+          [40, 125],
+          [50, null]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Both primary-key columns equi-joined, conditions written in primary key order",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.amount, {dim_tbl}.rate FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.currency = {fact_tbl}.currency AND {dim_tbl}.rate_start_date = {fact_tbl}.rate_start_date",
+        "outputs": [
+          [10, 125],
+          [20, 100],
+          [30, 130]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Both primary-key columns equi-joined, conditions written in reverse primary key order. Before the fix the key values were swapped and the join returned 0 rows.",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.amount, {dim_tbl}.rate FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.rate_start_date = {fact_tbl}.rate_start_date AND {dim_tbl}.currency = {fact_tbl}.currency",
+        "outputs": [
+          [10, 125],
+          [20, 100],
+          [30, 130]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "A literal on a primary-key column that an equi-join key already binds. The equi-join key builds the key and the literal runs as a filter after the lookup. If the literal replaced the equi-join key, the usd fact row would read the gbp dimension row and add a wrong row.",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.amount, {dim_tbl}.rate FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.currency = {fact_tbl}.currency AND {dim_tbl}.rate_start_date = {fact_tbl}.rate_start_date AND {dim_tbl}.currency = 'gbp'",
+        "outputs": [
+          [10, 125],
+          [30, 130]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "A constant binds the LONG primary-key column. The planner coerces the operands of the comparison, so the constant arrives with the type of the column, and the operator checks that before it builds the key. A constant of another type would miss every row.",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.amount, {dim_tbl}.rate FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.currency = {fact_tbl}.currency AND {dim_tbl}.rate_start_date = 1",
+        "outputs": [
+          [10, 125],
+          [20, 100],
+          [30, 125]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "The join condition leaves a primary-key column open. Before the fix the join returned 0 rows.",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.amount, {dim_tbl}.rate FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.rate_start_date = {fact_tbl}.rate_start_date",
+        "outputs": [],
+        "expectedException": ".*cannot determine primary key columns: \\[currency\\].*",
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "A set predicate cannot give a single key value, so the primary-key column stays open",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.amount, {dim_tbl}.rate FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.currency IN ('gbp', 'usd') AND {dim_tbl}.rate_start_date = {fact_tbl}.rate_start_date",
+        "outputs": [],
+        "expectedException": ".*cannot determine primary key columns: \\[currency\\].*",
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "A join key on a dimension column that is not part of the primary key. Before the fix this condition was dropped and the join returned rows that do not match it.",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.amount, {dim_tbl}.rate FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.currency = {fact_tbl}.currency AND {dim_tbl}.rate_start_date = {fact_tbl}.rate_start_date AND {dim_tbl}.rate = {fact_tbl}.amount",
+        "outputs": [],
+        "expectedException": ".*join key on column: rate, which is not a primary key column.*",
+        "ignoreLiteMode": true
+      }
+    ]
+  }
+}

@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -31,16 +32,25 @@ public class JoinNode extends BasePlanNode {
   private final List<Integer> _rightKeys;
   private final List<RexExpression> _nonEquiConditions;
   private final JoinStrategy _joinStrategy;
+  @Nullable
+  private final RexExpression _matchCondition;
 
   public JoinNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs, JoinRelType joinType,
       List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions,
       JoinStrategy joinStrategy) {
+    this(stageId, dataSchema, nodeHint, inputs, joinType, leftKeys, rightKeys, nonEquiConditions, joinStrategy, null);
+  }
+
+  public JoinNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs, JoinRelType joinType,
+      List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions,
+      JoinStrategy joinStrategy, RexExpression matchCondition) {
     super(stageId, dataSchema, nodeHint, inputs);
     _joinType = joinType;
     _leftKeys = leftKeys;
     _rightKeys = rightKeys;
     _nonEquiConditions = nonEquiConditions;
     _joinStrategy = joinStrategy;
+    _matchCondition = matchCondition;
   }
 
   public JoinRelType getJoinType() {
@@ -63,9 +73,14 @@ public class JoinNode extends BasePlanNode {
     return _joinStrategy;
   }
 
+  @Nullable
+  public RexExpression getMatchCondition() {
+    return _matchCondition;
+  }
+
   @Override
   public String explain() {
-    return "JOIN";
+    return _joinStrategy == JoinStrategy.ASOF ? "ASOF JOIN" : "JOIN";
   }
 
   @Override
@@ -76,7 +91,7 @@ public class JoinNode extends BasePlanNode {
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
     return new JoinNode(_stageId, _dataSchema, _nodeHint, inputs, _joinType, _leftKeys, _rightKeys, _nonEquiConditions,
-        _joinStrategy);
+        _joinStrategy, _matchCondition);
   }
 
   @Override
@@ -93,15 +108,16 @@ public class JoinNode extends BasePlanNode {
     JoinNode joinNode = (JoinNode) o;
     return _joinType == joinNode._joinType && Objects.equals(_leftKeys, joinNode._leftKeys) && Objects.equals(
         _rightKeys, joinNode._rightKeys) && Objects.equals(_nonEquiConditions, joinNode._nonEquiConditions)
-        && _joinStrategy == joinNode._joinStrategy;
+        && _joinStrategy == joinNode._joinStrategy && Objects.equals(_matchCondition, joinNode._matchCondition);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), _joinType, _leftKeys, _rightKeys, _nonEquiConditions, _joinStrategy);
+    return Objects.hash(super.hashCode(), _joinType, _leftKeys, _rightKeys, _nonEquiConditions, _joinStrategy,
+        _matchCondition);
   }
 
   public enum JoinStrategy {
-    HASH, LOOKUP
+    HASH, LOOKUP, ASOF
   }
 }

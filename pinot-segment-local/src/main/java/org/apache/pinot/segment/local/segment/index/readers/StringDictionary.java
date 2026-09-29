@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.readers;
 import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
 
 public class StringDictionary extends BaseImmutableDictionary {
@@ -74,9 +75,25 @@ public class StringDictionary extends BaseImmutableDictionary {
     return getUnpaddedString(dictId, getBuffer());
   }
 
+  /// Same as getStringValue(int) but allows reusing buffer, instead of allocating on each call.
+  public String getStringValue(int dictId, byte[] buffer) {
+    return getUnpaddedString(dictId, buffer);
+  }
+
+  /// Allocate buffer to use with getString(int, byte\[\]) method.
+  @Override
+  public byte[] getBuffer() {
+    return super.getBuffer();
+  }
+
   @Override
   public byte[] getBytesValue(int dictId) {
     return getUnpaddedBytes(dictId, getBuffer());
+  }
+
+  @Override
+  public int getValueSize(int dictId) {
+    return getUnpaddedByteSize(dictId);
   }
 
   @Override
@@ -156,6 +173,30 @@ public class StringDictionary extends BaseImmutableDictionary {
     byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {
       outValues[i] = getUnpaddedBytes(dictIds[i], buffer);
+    }
+  }
+
+  @Override
+  public void read32BitsMurmur3HashValues(int[] dictIds, int length, int[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = MurmurHashFunctions.murmurHash3X64Bit32(buffer, readUnpaddedBytes(dictIds[i], buffer), 0);
+    }
+  }
+
+  @Override
+  public void read64BitsMurmur3HashValues(int[] dictIds, int length, long[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = MurmurHashFunctions.murmurHash3X64Bit64(buffer, readUnpaddedBytes(dictIds[i], buffer), 0);
+    }
+  }
+
+  @Override
+  public void read128BitsMurmur3HashValues(int[] dictIds, int length, long[][] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = MurmurHashFunctions.murmurHash3X64Bit128AsLongs(buffer, readUnpaddedBytes(dictIds[i], buffer), 0);
     }
   }
 }

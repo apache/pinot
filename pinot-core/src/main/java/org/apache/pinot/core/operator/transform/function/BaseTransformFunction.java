@@ -33,9 +33,7 @@ import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Base class for transform function providing the default implementation for all data types.
- */
+/// Base class for transform function providing the default implementation for all data types.
 public abstract class BaseTransformFunction implements TransformFunction {
   protected static final TransformResultMetadata INT_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.INT, true, false);
@@ -57,6 +55,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.JSON, true, false);
   protected static final TransformResultMetadata BYTES_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BYTES, true, false);
+  protected static final TransformResultMetadata UUID_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.UUID, true, false);
 
   protected static final TransformResultMetadata INT_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.INT, false, false);
@@ -66,7 +66,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.FLOAT, false, false);
   protected static final TransformResultMetadata DOUBLE_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.DOUBLE, false, false);
-  // TODO: Support MV BIG_DECIMAL
   protected static final TransformResultMetadata BIG_DECIMAL_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BIG_DECIMAL, false, false);
   protected static final TransformResultMetadata BOOLEAN_MV_NO_DICTIONARY_METADATA =
@@ -79,6 +78,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.JSON, false, false);
   protected static final TransformResultMetadata BYTES_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BYTES, false, false);
+  protected static final TransformResultMetadata UUID_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.UUID, false, false);
   protected static final TransformResultMetadata UNKNOWN_METADATA =
       new TransformResultMetadata(DataType.UNKNOWN, true, false);
 
@@ -96,6 +97,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
   protected long[][] _longValuesMV;
   protected float[][] _floatValuesMV;
   protected double[][] _doubleValuesMV;
+  protected BigDecimal[][] _bigDecimalValuesMV;
   protected String[][] _stringValuesMV;
   protected byte[][][] _bytesValuesMV;
 
@@ -119,11 +121,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
       boolean nullHandlingEnabled) {
     init(arguments, columnContextMap);
     _nullHandlingEnabled = nullHandlingEnabled;
-  }
-
-  @Override
-  public Dictionary getDictionary() {
-    return null;
   }
 
   @Override
@@ -525,6 +522,10 @@ public abstract class BaseTransformFunction implements TransformFunction {
           double[][] doubleValuesMV = transformToDoubleValuesMV(valueBlock);
           ArrayCopyUtils.copy(doubleValuesMV, _intValuesMV, length);
           break;
+        case BIG_DECIMAL:
+          BigDecimal[][] bigDecimalValuesMV = transformToBigDecimalValuesMV(valueBlock);
+          ArrayCopyUtils.copy(bigDecimalValuesMV, _intValuesMV, length);
+          break;
         case STRING:
           String[][] stringValuesMV = transformToStringValuesMV(valueBlock);
           ArrayCopyUtils.copy(stringValuesMV, _intValuesMV, length);
@@ -576,6 +577,10 @@ public abstract class BaseTransformFunction implements TransformFunction {
         case DOUBLE:
           double[][] doubleValuesMV = transformToDoubleValuesMV(valueBlock);
           ArrayCopyUtils.copy(doubleValuesMV, _longValuesMV, length);
+          break;
+        case BIG_DECIMAL:
+          BigDecimal[][] bigDecimalValuesMV = transformToBigDecimalValuesMV(valueBlock);
+          ArrayCopyUtils.copy(bigDecimalValuesMV, _longValuesMV, length);
           break;
         case STRING:
           String[][] stringValuesMV = transformToStringValuesMV(valueBlock);
@@ -629,6 +634,10 @@ public abstract class BaseTransformFunction implements TransformFunction {
           double[][] doubleValuesMV = transformToDoubleValuesMV(valueBlock);
           ArrayCopyUtils.copy(doubleValuesMV, _floatValuesMV, length);
           break;
+        case BIG_DECIMAL:
+          BigDecimal[][] bigDecimalValuesMV = transformToBigDecimalValuesMV(valueBlock);
+          ArrayCopyUtils.copy(bigDecimalValuesMV, _floatValuesMV, length);
+          break;
         case STRING:
           String[][] stringValuesMV = transformToStringValuesMV(valueBlock);
           ArrayCopyUtils.copy(stringValuesMV, _floatValuesMV, length);
@@ -681,6 +690,10 @@ public abstract class BaseTransformFunction implements TransformFunction {
           float[][] floatValuesMV = transformToFloatValuesMV(valueBlock);
           ArrayCopyUtils.copy(floatValuesMV, _doubleValuesMV, length);
           break;
+        case BIG_DECIMAL:
+          BigDecimal[][] bigDecimalValuesMV = transformToBigDecimalValuesMV(valueBlock);
+          ArrayCopyUtils.copy(bigDecimalValuesMV, _doubleValuesMV, length);
+          break;
         case STRING:
           String[][] stringValuesMV = transformToStringValuesMV(valueBlock);
           ArrayCopyUtils.copy(stringValuesMV, _doubleValuesMV, length);
@@ -696,6 +709,62 @@ public abstract class BaseTransformFunction implements TransformFunction {
       }
     }
     return _doubleValuesMV;
+  }
+
+  protected void initBigDecimalValuesMV(int length) {
+    if (_bigDecimalValuesMV == null || _bigDecimalValuesMV.length < length) {
+      _bigDecimalValuesMV = new BigDecimal[length][];
+    }
+  }
+
+  @Override
+  public BigDecimal[][] transformToBigDecimalValuesMV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initBigDecimalValuesMV(length);
+    Dictionary dictionary = getDictionary();
+    if (dictionary != null) {
+      int[][] dictIdsMV = transformToDictIdsMV(valueBlock);
+      for (int i = 0; i < length; i++) {
+        int[] dictIds = dictIdsMV[i];
+        int numValues = dictIds.length;
+        BigDecimal[] bigDecimalValues = new BigDecimal[numValues];
+        dictionary.readBigDecimalValues(dictIds, numValues, bigDecimalValues);
+        _bigDecimalValuesMV[i] = bigDecimalValues;
+      }
+    } else {
+      DataType resultDataType = getResultMetadata().getDataType();
+      switch (resultDataType.getStoredType()) {
+        case INT:
+          int[][] intValuesMV = transformToIntValuesMV(valueBlock);
+          ArrayCopyUtils.copy(intValuesMV, _bigDecimalValuesMV, length);
+          break;
+        case LONG:
+          long[][] longValuesMV = transformToLongValuesMV(valueBlock);
+          ArrayCopyUtils.copy(longValuesMV, _bigDecimalValuesMV, length);
+          break;
+        case FLOAT:
+          float[][] floatValuesMV = transformToFloatValuesMV(valueBlock);
+          ArrayCopyUtils.copy(floatValuesMV, _bigDecimalValuesMV, length);
+          break;
+        case DOUBLE:
+          double[][] doubleValuesMV = transformToDoubleValuesMV(valueBlock);
+          ArrayCopyUtils.copy(doubleValuesMV, _bigDecimalValuesMV, length);
+          break;
+        case STRING:
+          String[][] stringValuesMV = transformToStringValuesMV(valueBlock);
+          ArrayCopyUtils.copy(stringValuesMV, _bigDecimalValuesMV, length);
+          break;
+        case UNKNOWN:
+          // Copy the values to ensure behaviour consistency with non null-handling.
+          for (int i = 0; i < length; i++) {
+            _bigDecimalValuesMV[i] = NullValuePlaceHolder.BIG_DECIMAL_ARRAY;
+          }
+          break;
+        default:
+          throw new IllegalStateException(String.format("Cannot read MV %s as BIG_DECIMAL", resultDataType));
+      }
+    }
+    return _bigDecimalValuesMV;
   }
 
   protected void initStringValuesMV(int length) {
@@ -737,6 +806,10 @@ public abstract class BaseTransformFunction implements TransformFunction {
           double[][] doubleValuesMV = transformToDoubleValuesMV(valueBlock);
           ArrayCopyUtils.copy(doubleValuesMV, _stringValuesMV, length);
           break;
+        case BIG_DECIMAL:
+          BigDecimal[][] bigDecimalValuesMV = transformToBigDecimalValuesMV(valueBlock);
+          ArrayCopyUtils.copy(bigDecimalValuesMV, _stringValuesMV, length);
+          break;
         case UNKNOWN:
           // Copy the values to ensure behaviour consistency with non null-handling.
           for (int i = 0; i < length; i++) {
@@ -771,9 +844,25 @@ public abstract class BaseTransformFunction implements TransformFunction {
         _bytesValuesMV[i] = bytesValues;
       }
     } else {
-      assert getResultMetadata().getDataType().getStoredType() == DataType.STRING;
-      String[][] stringValuesMV = transformToStringValuesMV(valueBlock);
-      ArrayCopyUtils.copy(stringValuesMV, _bytesValuesMV, length);
+      DataType resultDataType = getResultMetadata().getDataType();
+      switch (resultDataType.getStoredType()) {
+        case BIG_DECIMAL:
+          BigDecimal[][] bigDecimalValuesMV = transformToBigDecimalValuesMV(valueBlock);
+          ArrayCopyUtils.copy(bigDecimalValuesMV, _bytesValuesMV, length);
+          break;
+        case STRING:
+          String[][] stringValuesMV = transformToStringValuesMV(valueBlock);
+          ArrayCopyUtils.copy(stringValuesMV, _bytesValuesMV, length);
+          break;
+        case UNKNOWN:
+          // Copy the values to ensure behaviour consistency with non null-handling.
+          for (int i = 0; i < length; i++) {
+            _bytesValuesMV[i] = NullValuePlaceHolder.BYTES_ARRAY;
+          }
+          break;
+        default:
+          throw new IllegalStateException(String.format("Cannot read MV %s as BYTES", resultDataType));
+      }
     }
     return _bytesValuesMV;
   }

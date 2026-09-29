@@ -18,18 +18,15 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This {@code MailboxReceiveOperator} receives data from a {@link ReceivingMailbox} and serve it out from the
- * {@link #nextBlock()} API.
- */
+/// This `MailboxReceiveOperator` receives data from a [org.apache.pinot.query.mailbox.ReceivingMailbox] and
+/// serve it out from the [#nextBlock()] API.
 public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_RECEIVE";
@@ -49,19 +46,19 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
-    TransferableBlock block = _multiConsumer.readBlockBlocking();
+  protected MseBlock getNextBlock() {
+    MseBlock block = _multiConsumer.readMseBlockBlocking();
     // When early termination flag is set, caller is expecting an EOS block to be returned, however since the 2 stages
     // between sending/receiving mailbox are setting early termination flag asynchronously, there's chances that the
     // next block pulled out of the ReceivingMailbox to be an already buffered normal data block. This requires the
     // MailboxReceiveOperator to continue pulling and dropping data block until an EOS block is observed.
-    while (_isEarlyTerminated && !block.isEndOfStreamBlock()) {
-      block = _multiConsumer.readBlockBlocking();
+    while (_isEarlyTerminated && block.isData()) {
+      block = _multiConsumer.readMseBlockBlocking();
     }
-    if (block.isSuccessfulEndOfStreamBlock()) {
-      updateEosBlock(block, _statMap);
-    } else if (block.isDataBlock()) {
-      sampleAndCheckInterruption();
+    if (block.isData()) {
+      checkTerminationAndSampleUsage();
+    } else {
+      onEos();
     }
     return block;
   }

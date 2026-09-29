@@ -19,8 +19,10 @@
 package org.apache.pinot.query.planner.validation;
 
 import java.util.List;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -32,21 +34,23 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 
 
-/**
- * This class is used to validate the arrayToMv usage.
- * Only leaf nodes are allowed to use arrayToMv function.
- */
+/// This class is used to validate the arrayToMv usage.
+/// Only leaf nodes are allowed to use arrayToMv function.
 public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean> {
   public static final ArrayToMvValidationVisitor INSTANCE = new ArrayToMvValidationVisitor();
 
   @Override
   public Void visitFilter(FilterNode node, Boolean isIntermediateStage) {
     if (isIntermediateStage && containsArrayToMv(node.getCondition())) {
-      throw new UnsupportedOperationException("Function 'ArrayToMv' is not supported in FILTER Intermediate Stage");
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "Function 'ArrayToMv' is not supported in FILTER Intermediate Stage");
     }
     node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;
@@ -55,9 +59,17 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   @Override
   public Void visitJoin(JoinNode node, Boolean isIntermediateStage) {
     if (containsArrayToMv(node.getNonEquiConditions())) {
-      throw new UnsupportedOperationException("Function 'ArrayToMv' is not supported in JOIN Intermediate Stage");
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "Function 'ArrayToMv' is not supported in JOIN Intermediate Stage");
     }
     node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
+    return null;
+  }
+
+  @Deprecated(forRemoval = true, since = "1.6.0")
+  @Override
+  public Void visitEnrichedJoin(EnrichedJoinNode node, Boolean isIntermediateStage) {
+    visitJoin(node, isIntermediateStage);
     return null;
   }
 
@@ -75,13 +87,25 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
 
   @Override
   public Void visitAggregate(AggregateNode node, Boolean isIntermediateStage) {
-    if (isIntermediateStage && containsArrayToMv(node.getAggCalls())) {
-      throw new UnsupportedOperationException("Function 'ArrayToMv' is not supported in AGGREGATE Intermediate Stage");
+    if (!isIntermediateStage) {
+      // No need to traverse underlying ProjectNode in leaf stage
+      return null;
     }
-    if (isIntermediateStage) {
-      node.getInputs().forEach(e -> e.visit(this, true));
+    if (containsArrayToMv(node.getAggCalls())) {
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "Function 'ArrayToMv' is not supported in AGGREGATE Intermediate Stage");
     }
-    // No need to traverse underlying ProjectNode in leaf stage
+    DataSchema.ColumnDataType[] columnDataTypes = node.getDataSchema().getColumnDataTypes();
+    for (Integer key : node.getGroupKeys()) {
+      if (key >= 0 && key < columnDataTypes.length
+          && columnDataTypes[key] != null
+          && columnDataTypes[key].isArray()) {
+        throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+            "Multi-valued columns are not supported as a grouping key in the intermediate stage. "
+                + "Use ARRAY_TO_MV() to group by multi-value column");
+      }
+    }
+    node.getInputs().forEach(e -> e.visit(this, true));
     return null;
   }
 
@@ -89,7 +113,7 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   public Void visitProject(ProjectNode node, Boolean isIntermediateStage) {
     // V1 project node contains arrayToMv function is not supported as it will be transferred using toString.
     if (containsArrayToMv(node.getProjects())) {
-      throw new UnsupportedOperationException(
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
           "Function 'ArrayToMv' is not supported in PROJECT " + (isIntermediateStage ? "Intermediate Stage"
               : "Leaf Stage"));
     }
@@ -116,7 +140,8 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   @Override
   public Void visitWindow(WindowNode node, Boolean isIntermediateStage) {
     if (isIntermediateStage && containsArrayToMv(node.getAggCalls())) {
-      throw new UnsupportedOperationException("Function 'ArrayToMv' is not supported in WINDOW Intermediate Stage");
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "Function 'ArrayToMv' is not supported in WINDOW Intermediate Stage");
     }
     node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;
@@ -137,6 +162,12 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   @Override
   public Void visitExplained(ExplainedNode node, Boolean isIntermediateStage) {
     node.getInputs().forEach(input -> input.visit(this, isIntermediateStage));
+    return null;
+  }
+
+  @Override
+  public Void visitUnnest(UnnestNode node, Boolean isIntermediateStage) {
+    node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;
   }
 

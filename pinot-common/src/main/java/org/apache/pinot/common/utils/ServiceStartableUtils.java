@@ -24,13 +24,14 @@ import java.util.concurrent.TimeUnit;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
+import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_TIMEZONE;
 
 
 public class ServiceStartableUtils {
@@ -43,12 +44,13 @@ public class ServiceStartableUtils {
   private static final String PINOT_INSTANCE_CONFIG_KEY_PREFIX_TEMPLATE = "pinot.%s.";
   protected static String _timeZone;
 
-  /**
-   * Applies the ZK cluster config to the given instance config if it does not already exist.
-   *
-   * In the ZK cluster config:
-   * - pinot.all.* will be replaced to role specific config, e.g. pinot.controller.* for controllers
-   */
+  /// Applies the ZK cluster config to:
+  /// - The given instance config if it does not already exist.
+  /// - Set the timezone.
+  /// - Initialize the default values in [ForwardIndexConfig].
+  ///
+  /// In the ZK cluster config:
+  /// - pinot.all.\* will be replaced to role specific config, e.g. pinot.controller.\* for controllers
   public static void applyClusterConfig(PinotConfiguration instanceConfig, String zkAddress, String clusterName,
       ServiceRole serviceRole) {
     int zkClientSessionConfig =
@@ -70,7 +72,9 @@ public class ServiceStartableUtils {
           zkClient.readData(String.format(CLUSTER_CONFIG_ZK_PATH_TEMPLATE, clusterName, clusterName), true);
       if (clusterConfigZNRecord == null) {
         LOGGER.warn("Failed to find cluster config for cluster: {}, skipping applying cluster config", clusterName);
-        setupTimezone(instanceConfig);
+        setTimezone(instanceConfig);
+        initForwardIndexConfig(instanceConfig);
+        initFieldSpecConfig(instanceConfig);
         return;
       }
 
@@ -90,9 +94,12 @@ public class ServiceStartableUtils {
         }
       }
     } finally {
-      zkClient.close();
+      ZkStarter.closeAsync(zkClient);
     }
-    setupTimezone(instanceConfig);
+    setTimezone(instanceConfig);
+    initForwardIndexConfig(instanceConfig);
+    initFieldSpecConfig(instanceConfig);
+    initRequestUtilsConfig(instanceConfig);
   }
 
   private static void addConfigIfNotExists(PinotConfiguration instanceConfig, String key, String value) {
@@ -101,10 +108,67 @@ public class ServiceStartableUtils {
     }
   }
 
-  private static void setupTimezone(PinotConfiguration instanceConfig) {
+  private static void setTimezone(PinotConfiguration instanceConfig) {
     TimeZone localTimezone = TimeZone.getDefault();
-    _timeZone = instanceConfig.getProperty(CONFIG_OF_TIMEZONE, localTimezone.getID());
+    _timeZone = instanceConfig.getProperty(CommonConstants.CONFIG_OF_TIMEZONE, localTimezone.getID());
     System.setProperty("user.timezone", _timeZone);
     LOGGER.info("Timezone: {}", _timeZone);
+  }
+
+  private static void initForwardIndexConfig(PinotConfiguration instanceConfig) {
+    String defaultRawIndexWriterVersion =
+        instanceConfig.getProperty(CommonConstants.ForwardIndexConfigs.CONFIG_OF_DEFAULT_RAW_INDEX_WRITER_VERSION);
+    if (defaultRawIndexWriterVersion != null) {
+      LOGGER.info("Setting forward index default raw index writer version to: {}", defaultRawIndexWriterVersion);
+      ForwardIndexConfig.setDefaultRawIndexWriterVersion(Integer.parseInt(defaultRawIndexWriterVersion));
+    }
+    String defaultTargetMaxChunkSize =
+        instanceConfig.getProperty(CommonConstants.ForwardIndexConfigs.CONFIG_OF_DEFAULT_TARGET_MAX_CHUNK_SIZE);
+    if (defaultTargetMaxChunkSize != null) {
+      LOGGER.info("Setting forward index default target max chunk size to: {}", defaultTargetMaxChunkSize);
+      ForwardIndexConfig.setDefaultTargetMaxChunkSize(defaultTargetMaxChunkSize);
+    }
+    String defaultTargetDocsPerChunk =
+        instanceConfig.getProperty(CommonConstants.ForwardIndexConfigs.CONFIG_OF_DEFAULT_TARGET_DOCS_PER_CHUNK);
+    if (defaultTargetDocsPerChunk != null) {
+      LOGGER.info("Setting forward index default target docs per chunk to: {}", defaultTargetDocsPerChunk);
+      ForwardIndexConfig.setDefaultTargetDocsPerChunk(Integer.parseInt(defaultTargetDocsPerChunk));
+    }
+  }
+
+  public static void initFieldSpecConfig(PinotConfiguration instanceConfig) {
+    String defaultJsonSanitizationStrategy =
+        instanceConfig.getProperty(CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_MAX_LENGTH_EXCEED_STRATEGY);
+    if (defaultJsonSanitizationStrategy != null) {
+      try {
+        FieldSpec.MaxLengthExceedStrategy strategy =
+            FieldSpec.MaxLengthExceedStrategy.valueOf(defaultJsonSanitizationStrategy);
+        LOGGER.info("Setting default JSON sanitization strategy to: {}", defaultJsonSanitizationStrategy);
+        FieldSpec.setDefaultJsonMaxLengthExceedStrategy(strategy);
+      } catch (IllegalArgumentException e) {
+        LOGGER.warn("Invalid default JSON sanitization strategy: {}, using default: {}",
+            defaultJsonSanitizationStrategy, FieldSpec.getDefaultJsonMaxLengthExceedStrategy());
+      }
+    }
+
+    String defaultJsonMaxLength =
+        instanceConfig.getProperty(CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_MAX_LENGTH);
+    if (defaultJsonMaxLength != null) {
+      try {
+        int maxLength = Integer.parseInt(defaultJsonMaxLength);
+        LOGGER.info("Setting default JSON max length to: {}", defaultJsonMaxLength);
+        FieldSpec.setDefaultJsonMaxLength(maxLength);
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Invalid default JSON max length: {}, using default: {}",
+            defaultJsonMaxLength, FieldSpec.getDefaultJsonMaxLength());
+      }
+    }
+  }
+
+  public static void initRequestUtilsConfig(PinotConfiguration instanceConfig) {
+    boolean useLegacyLiteralUnescaping =
+        instanceConfig.getProperty(CommonConstants.Helix.CONFIG_OF_SSE_LEGACY_LITERAL_UNESCAPING,
+            CommonConstants.Helix.DEFAULT_SSE_LEGACY_LITERAL_UNESCAPING);
+    RequestUtils.setUseLegacyLiteralUnescaping(useLegacyLiteralUnescaping);
   }
 }
