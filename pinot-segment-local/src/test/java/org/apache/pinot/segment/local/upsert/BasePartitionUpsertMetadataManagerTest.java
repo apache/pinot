@@ -127,7 +127,9 @@ public class BasePartitionUpsertMetadataManagerTest {
     DocIdsSnapshot queryable = segment.loadDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
     assertEquals(first.metadata().snapshotConsumedUpToOffset(), "100");
     assertEquals(queryable.metadata().snapshotConsumedUpToOffset(), "100");
-    assertNotEquals(first.metadata().docIdsCrc32(), queryable.metadata().docIdsCrc32());
+    assertEquals(first.metadata().docIdsType(), DocIdsSnapshot.DocIdsType.VALID_DOC_IDS);
+    assertEquals(queryable.metadata().docIdsType(), DocIdsSnapshot.DocIdsType.QUERYABLE_DOC_IDS);
+    assertNotEquals(first.metadata().docIdsCrc(), queryable.metadata().docIdsCrc());
     assertEquals(first.docIds(), valid.getMutableRoaringBitmap());
 
     // An unchanged segment keeps its saved timestamp and trigger, even if a newer consumer triggers a snapshot round.
@@ -145,7 +147,7 @@ public class BasePartitionUpsertMetadataManagerTest {
     DocIdsSnapshot retried = segment.loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
     assertEquals(retried.metadata().snapshotConsumedUpToOffset(), "300");
     assertEquals(retried.docIds(), valid.getMutableRoaringBitmap());
-    assertNotEquals(retried.metadata().docIdsCrc32(), first.metadata().docIdsCrc32());
+    assertNotEquals(retried.metadata().docIdsCrc(), first.metadata().docIdsCrc());
 
     // Shutdown or explicit snapshots without a consumer must not inherit an earlier startup's offset.
     manager.markSegmentAsUpdated(segment);

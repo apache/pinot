@@ -22,6 +22,7 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import org.apache.pinot.segment.local.upsert.DocIdsSnapshot.DocIdsType;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -40,11 +41,13 @@ public class DocIdsSnapshotTest {
       throws Exception {
     ThreadSafeMutableRoaringBitmap bitmap = bitmap(1, 4, 6, 10, 15, 17, 18, 20);
     long before = System.currentTimeMillis();
-    byte[] bytes = DocIdsSnapshot.capture(bitmap, new DocIdsSnapshot.Trigger("table__0__2__0", "123")).getBytes();
+    byte[] bytes = DocIdsSnapshot.capture(bitmap, DocIdsType.VALID_DOC_IDS,
+        new DocIdsSnapshot.Trigger("table__0__2__0", "123")).getBytes();
     long after = System.currentTimeMillis();
     DocIdsSnapshot snapshot = DocIdsSnapshot.fromBytes(bytes);
     assertEquals(snapshot.docIds(), bitmap.getMutableRoaringBitmap());
-    assertEquals(snapshot.metadata().docIdsCrc32(), 3650129781L);
+    assertEquals(snapshot.metadata().docIdsCrc(), 3650129781L);
+    assertEquals(snapshot.metadata().docIdsType(), DocIdsType.VALID_DOC_IDS);
     assertTrue(snapshot.metadata().snapshotCapturedAtMs() >= before);
     assertTrue(snapshot.metadata().snapshotCapturedAtMs() <= after);
     assertEquals(snapshot.metadata().snapshotConsumedUpToOffset(), "123");
@@ -59,9 +62,7 @@ public class DocIdsSnapshotTest {
   @Test
   public void testChecksumTracksMembershipRatherThanCardinalityOrContainerLayout()
       throws Exception {
-    assertNotEquals(DocIdsSnapshot.fromBytes(DocIdsSnapshot.capture(bitmap(1, 2), null).getBytes())
-            .metadata().docIdsCrc32(),
-        DocIdsSnapshot.fromBytes(DocIdsSnapshot.capture(bitmap(1, 3), null).getBytes()).metadata().docIdsCrc32());
+    assertNotEquals(crc(bitmap(1, 2)), crc(bitmap(1, 3)));
     MutableRoaringBitmap array = new MutableRoaringBitmap();
     for (int i = 0; i < 1000; i++) {
       array.add(i);
@@ -69,12 +70,8 @@ public class DocIdsSnapshotTest {
     MutableRoaringBitmap runs = array.clone();
     assertTrue(runs.runOptimize());
     assertNotEquals(array.serializedSizeInBytes(), runs.serializedSizeInBytes());
-    assertEquals(DocIdsSnapshot.fromBytes(DocIdsSnapshot.capture(new ThreadSafeMutableRoaringBitmap(array), null)
-            .getBytes()).metadata().docIdsCrc32(),
-        DocIdsSnapshot.fromBytes(DocIdsSnapshot.capture(new ThreadSafeMutableRoaringBitmap(runs), null)
-            .getBytes()).metadata().docIdsCrc32());
-    assertEquals(DocIdsSnapshot.fromBytes(DocIdsSnapshot.capture(bitmap(), null).getBytes())
-        .metadata().docIdsCrc32(), 0L);
+    assertEquals(crc(new ThreadSafeMutableRoaringBitmap(array)), crc(new ThreadSafeMutableRoaringBitmap(runs)));
+    assertEquals(crc(bitmap()), 0L);
   }
 
   @Test
@@ -83,7 +80,7 @@ public class DocIdsSnapshotTest {
     ThreadSafeMutableRoaringBitmap bitmap = bitmap(1, 2, 3);
     byte[] legacy = bitmap.getBytes();
     assertNull(DocIdsSnapshot.fromBytes(legacy).metadata());
-    byte[] bytes = DocIdsSnapshot.capture(bitmap, null).getBytes();
+    byte[] bytes = DocIdsSnapshot.capture(bitmap, DocIdsType.VALID_DOC_IDS, null).getBytes();
     byte[] truncated = Arrays.copyOf(bytes, bytes.length - 1);
     assertNull(DocIdsSnapshot.fromBytes(truncated).metadata());
     assertEquals(DocIdsSnapshot.fromBytes(truncated).docIds(), bitmap.getMutableRoaringBitmap());
@@ -94,11 +91,18 @@ public class DocIdsSnapshotTest {
 
   @Test
   public void testAgeAndAbsentTrigger() {
-    DocIdsSnapshot.Metadata metadata = new DocIdsSnapshot.Metadata(1L, 100L, null, null);
+    DocIdsSnapshot.Metadata metadata = new DocIdsSnapshot.Metadata(1L, DocIdsType.QUERYABLE_DOC_IDS, 100L, null, null);
     assertEquals(metadata.toResponse(130L).get("snapshotAgeMs"), 30L);
+    assertEquals(metadata.toResponse(130L).get("docIdsType"), "QUERYABLE_DOC_IDS");
     assertFalse(metadata.toResponse(99L).containsKey("snapshotAgeMs"));
     assertFalse(metadata.toResponse(130L).containsKey("snapshotConsumedUpToOffset"));
     assertFalse(metadata.toResponse(130L).containsKey("snapshotConsumingSegmentName"));
+  }
+
+  private static long crc(ThreadSafeMutableRoaringBitmap bitmap)
+      throws Exception {
+    return DocIdsSnapshot.fromBytes(DocIdsSnapshot.capture(bitmap, DocIdsType.VALID_DOC_IDS, null).getBytes())
+        .metadata().docIdsCrc();
   }
 
   private static ThreadSafeMutableRoaringBitmap bitmap(int... ids) {

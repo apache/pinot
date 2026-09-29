@@ -49,6 +49,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.local.upsert.DocIdsSnapshot.DocIdsType;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.local.utils.SegmentPreloadUtils;
 import org.apache.pinot.segment.local.utils.WatermarkUtils;
@@ -1006,7 +1007,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         // NOTE: Segment out of TTL without snapshot might have null validDocIds
         if (validDocIds != null) {
           ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsSnapshot =
-              DocIdsSnapshot.capture(validDocIds, _snapshotTrigger.get());
+              DocIdsSnapshot.capture(validDocIds, DocIdsType.VALID_DOC_IDS, _snapshotTrigger.get());
           segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot);
           numPrimaryKeysInSnapshot += validDocIdsSnapshot.getCardinality();
         }
@@ -1014,7 +1015,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
           if (queryableDocIds != null) {
             ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsSnapshot =
-                DocIdsSnapshot.capture(queryableDocIds, _snapshotTrigger.get());
+                DocIdsSnapshot.capture(queryableDocIds, DocIdsType.QUERYABLE_DOC_IDS, _snapshotTrigger.get());
             segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot);
             numQueryableDocIdsInSnapshot += queryableDocIdsSnapshot.getCardinality();
           }
@@ -1056,7 +1057,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           // NOTE: Segment out of TTL without snapshot might have null validDocIds
           if (validDocIds != null) {
             ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsSnapshot =
-                DocIdsSnapshot.capture(validDocIds, _snapshotTrigger.get());
+                DocIdsSnapshot.capture(validDocIds, DocIdsType.VALID_DOC_IDS, _snapshotTrigger.get());
             segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot);
             // The segment has its validDocIds snapshot file on disk now, so handle it as a segment with snapshot
             // from now on, even if persisting the queryableDocIds snapshot below fails.
@@ -1067,7 +1068,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
             ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
             if (queryableDocIds != null) {
               ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsSnapshot =
-                  DocIdsSnapshot.capture(queryableDocIds, _snapshotTrigger.get());
+                  DocIdsSnapshot.capture(queryableDocIds, DocIdsType.QUERYABLE_DOC_IDS, _snapshotTrigger.get());
               segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot);
               numQueryableDocIdsInSnapshot += queryableDocIdsSnapshot.getCardinality();
             }
