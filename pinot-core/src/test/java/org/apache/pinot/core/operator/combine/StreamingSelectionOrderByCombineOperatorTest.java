@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.combine;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -732,11 +733,16 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     assertSegmentsScanned(result, 2, segments.size());
     // The ASC count above does not prove this segment was force-activated: its stored null is Integer.MIN_VALUE, so
     // the metadata min would activate it anyway. On DESC the metadata max is the highest non-null and sits below the
-    // high range, so keeping that max would never acquire it. Its nulls sort first, which is what parity checks.
+    // high range, so keeping that max would never acquire it. Its nulls sort first on DESC (valCol DESC breaks ties),
+    // so they must lead the result. Checked against fixed rows, not MinMax: MinMax prunes on that same max, so with
+    // fewer worker threads than segments it can skip this segment and drop its nulls.
     @Language("sql") String desc =
         "SET allowReverseOrder=true; SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol DESC, valCol DESC "
             + "LIMIT 5";
-    assertParity(segments, desc, true);
+    Result descResult = run(segments, desc, true, true, true, 3);
+    assertEquals(descResult._rows.stream().map(Arrays::asList).collect(Collectors.toList()),
+        List.of(Arrays.asList(null, 1002), Arrays.asList(null, 1001), Arrays.asList(null, 1000), List.of(2099, 2099),
+            List.of(2098, 2098)));
     QueryContext descContext = hintedContext(desc);
     descContext.setNullHandlingEnabled(true);
     List<InstrumentedSegmentOperator> children = instrument(segments, descContext);
