@@ -106,6 +106,7 @@ import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.unsafe.MmapMemoryConfig;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -659,6 +660,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Starting Pinot server (Version: {})", PinotVersion.VERSION);
     LOGGER.info("Server configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     long startTimeMs = System.currentTimeMillis();
+
+    // Load the index plugins before joining the cluster, so that an invalid plugin set (for example more than
+    // IndexService.MAX_INDEX_TYPES index types) fails server startup instead of every later segment load.
+    LOGGER.info("Loaded {} index types", IndexService.getInstance().getAllIndexes().size());
 
     LOGGER.info("Initializing server metrics");
     ServerConf serverConf = new ServerConf(_serverConf);

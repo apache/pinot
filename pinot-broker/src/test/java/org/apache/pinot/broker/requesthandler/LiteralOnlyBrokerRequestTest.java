@@ -97,18 +97,56 @@ public class LiteralOnlyBrokerRequestTest {
     assertEquals((int[]) resultTable.getRows().get(0)[0], new int[]{1, 2});
     assertEquals((String[]) resultTable.getRows().get(0)[1], new String[]{"one", "two"});
 
-    brokerResponse = requestHandler.handleRequest("SELECT ARRAY[X'00', X'0102'] AS bytes");
-    resultTable = brokerResponse.getResultTable();
-    assertEquals(resultTable.getDataSchema().getColumnName(0), "bytes");
-    assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.BYTES_ARRAY);
-    assertEquals(resultTable.getRows().size(), 1);
-    assertEquals(resultTable.getRows().get(0), new Object[]{new String[]{"00", "0102"}});
+    // The SQL-standard and PostgreSQL spellings must produce the same BYTES_ARRAY response.
+    for (String arrayLiteral : List.of("ARRAY[X'00', X'0102']", "ARRAY['\\x00'::bytea, '\\x0102'::bytea]",
+        "ARRAY[CAST('\\x00' AS BYTEA), CAST('\\x0102' AS BYTEA)]")) {
+      brokerResponse = requestHandler.handleRequest("SELECT " + arrayLiteral + " AS bytes");
+      resultTable = brokerResponse.getResultTable();
+      assertEquals(resultTable.getDataSchema().getColumnName(0), "bytes");
+      assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.BYTES_ARRAY);
+      assertEquals(resultTable.getRows().size(), 1);
+      assertEquals(resultTable.getRows().get(0), new Object[]{new String[]{"00", "0102"}});
+    }
 
     brokerResponse = requestHandler.handleRequest(
         "SELECT ARRAYS_OVERLAP(ARRAY[X'00', X'0102'], ARRAY[X'03', X'0102']) AS overlaps");
     resultTable = brokerResponse.getResultTable();
     assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.BOOLEAN);
     assertEquals(resultTable.getRows().get(0)[0], true);
+  }
+
+  /// A scalar bytea constant must be answered by the literal-only path exactly like `X'...'`, in both spellings.
+  @Test
+  public void testScalarBytesLiteralBrokerRequestFromSQL()
+      throws Exception {
+    SingleConnectionBrokerRequestHandler requestHandler =
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, null, null, null,
+            mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
+            ThreadAccountantUtils.getNoOpAccountant(), null, null);
+
+    for (String literal : List.of("X'0102'", "'\\x0102'::bytea", "CAST('\\x0102' AS BYTEA)")) {
+      assertTrue(isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery("SELECT " + literal)));
+      BrokerResponse brokerResponse = requestHandler.handleRequest("SELECT " + literal + " AS b");
+      ResultTable resultTable = brokerResponse.getResultTable();
+      assertTrue(brokerResponse.getExceptions().isEmpty(), literal);
+      assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.BYTES, literal);
+      assertEquals(resultTable.getRows().get(0)[0], "0102", literal);
+    }
+
+    // An empty bytea constant is legal in PostgreSQL and yields zero-length BYTES.
+    BrokerResponse brokerResponse = requestHandler.handleRequest("SELECT '\\x'::bytea AS b");
+    assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
+        DataSchema.ColumnDataType.BYTES);
+    assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], "");
+
+    // Constant folding over bytea elements still happens at parse time, so the query stays literal-only.
+    String folded = "SELECT ARRAY_LENGTH(ARRAY['\\x00'::bytea, '\\x0102'::bytea]) AS n";
+    assertTrue(isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(folded)));
+    brokerResponse = requestHandler.handleRequest(folded);
+    assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
+        DataSchema.ColumnDataType.INT);
+    assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], 2);
   }
 
   @Test

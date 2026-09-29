@@ -174,6 +174,49 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   @Test
+  public void testInitializationErrorStopMsgSkippedAfterTableShutdown()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      // Shutdown drained the old table's segment map, so nothing is registered under this segment name even though a
+      // recreated same-name table may already be consuming it.
+      when(tableDataManager.getSegmentDataManager(SEGMENT_NAME_STR)).thenReturn(null);
+      when(tableDataManager.isShutDown()).thenReturn(true);
+
+      segmentDataManager.postStopConsumedMsgForInitializationError();
+
+      Assert.assertFalse(segmentDataManager._postConsumeStoppedCalled);
+    }
+  }
+
+  @Test(timeOut = 10_000)
+  public void testStopConsumedMsgRetryStopsAfterTableShutdown()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      // The controller rejects the first attempt (e.g. the table's ideal state is already gone) and the table is shut
+      // down before the retry: the loop must give up instead of sleeping and retrying on behalf of a recreated table.
+      segmentDataManager._stopConsumedResponseStatus = SegmentCompletionProtocol.ControllerResponseStatus.FAILED;
+      when(tableDataManager.isShutDown()).thenReturn(true);
+
+      segmentDataManager.invokePostStopConsumedMsg("Consuming segment initialization error");
+
+      Assert.assertEquals(segmentDataManager._postConsumeStoppedAttempts, 1);
+    }
+  }
+
+  @Test
+  public void testDestroyBeforeConsumptionStarts()
+      throws Exception {
+    FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    // Never started: the real stop() must tolerate the missing consumer thread (the fake normally overrides it), and
+    // destroy() must still close the stream consumer.
+    segmentDataManager.invokeRealStop();
+    segmentDataManager.destroy();
+    Assert.assertTrue(segmentDataManager.isStreamConsumerClosed());
+  }
+
+  @Test
   public void testPostStopConsumedMsgDoesNotCheckRegisteredSegmentManager()
       throws Exception {
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
@@ -898,7 +941,7 @@ public class RealtimeSegmentDataManagerTest {
       driver.init(generatorConfig, recordReader);
       driver.build();
     }
-    return Long.parseLong(new SegmentMetadataImpl(new File(resourceDir, segmentName)).getCrc());
+    return new SegmentMetadataImpl(new File(resourceDir, segmentName)).getCrc();
   }
 
   @Test
@@ -1469,6 +1512,9 @@ public class RealtimeSegmentDataManagerTest {
     private boolean _notifySegmentBuildFailedWithDeterministicErrorCalled = false;
     public boolean _throwExceptionFromConsume = false;
     public boolean _postConsumeStoppedCalled = false;
+    public int _postConsumeStoppedAttempts = 0;
+    public SegmentCompletionProtocol.ControllerResponseStatus _stopConsumedResponseStatus =
+        SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED;
     public Map<Integer, ConsumerCoordinator> _consumerCoordinatorMap;
     public boolean _stubConsumeLoop = true;
     public RealtimeTableDataManager _tableDataManager;
@@ -1606,12 +1652,18 @@ public class RealtimeSegmentDataManagerTest {
       super.postStopConsumedMsg(reason);
     }
 
+    /// Runs the production stop() instead of this fake's override.
+    public void invokeRealStop()
+        throws InterruptedException {
+      super.stop();
+    }
+
     @Override
     SegmentCompletionProtocol.Response postSegmentStoppedConsuming(ConsumptionStopIndicator indicator) {
       _postConsumeStoppedCalled = true;
+      _postConsumeStoppedAttempts++;
       return new SegmentCompletionProtocol.Response(
-          new SegmentCompletionProtocol.Response.Params().withStatus(
-              SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED));
+          new SegmentCompletionProtocol.Response.Params().withStatus(_stopConsumedResponseStatus));
     }
 
     @Override

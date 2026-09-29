@@ -1076,7 +1076,10 @@ public class DataSchema {
         case MAP:
           return MAP;
         case OPEN_STRUCT:
-          return OBJECT;
+          // Selecting the column itself reads the whole struct back as its JSON document, so JSON is both what the
+          // value is and a type the wire format can carry. OBJECT has no serializer, which made `SELECT *` on any
+          // table with an OPEN_STRUCT column fail with "Error serializing response".
+          return JSON;
         case UNKNOWN:
           return UNKNOWN;
         default:

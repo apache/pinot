@@ -27,6 +27,7 @@ import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -351,6 +352,19 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
         return;
       default:
         throw new IllegalStateException("ANY_VALUE unsupported type: " + bvs.getValueType());
+    }
+  }
+
+  /// Service registration for ANY_VALUE.
+  public static final class Provider implements AggregationFunctionProvider {
+    @Override
+    public AggregationFunctionType getType() {
+      return AggregationFunctionType.ANYVALUE;
+    }
+
+    @Override
+    public AggregationFunction<?, ?> create(FunctionContext function, boolean nullHandlingEnabled) {
+      return new AnyValueAggregationFunction(function.getArguments(), nullHandlingEnabled);
     }
   }
 }

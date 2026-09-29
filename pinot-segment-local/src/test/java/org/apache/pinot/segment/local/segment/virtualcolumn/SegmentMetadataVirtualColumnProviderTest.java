@@ -74,7 +74,7 @@ public class SegmentMetadataVirtualColumnProviderTest {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getIndexCreationTime()).thenReturn(CREATION_TIME_MS);
     when(segmentMetadata.getTimeInterval()).thenReturn(new Interval(START_TIME_MS, END_TIME_MS, DateTimeZone.UTC));
-    when(segmentMetadata.getCrc()).thenReturn(String.valueOf(CRC));
+    when(segmentMetadata.getCrc()).thenReturn(CRC);
     when(segmentMetadata.getTotalDocs()).thenReturn(NUM_DOCS);
     return segmentMetadata;
   }

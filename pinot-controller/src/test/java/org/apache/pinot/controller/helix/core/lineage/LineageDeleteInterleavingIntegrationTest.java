@@ -429,7 +429,7 @@ public class LineageDeleteInterleavingIntegrationTest {
   }
 
   private void addSegmentWithTime(String tableNameWithType, String segmentName, long startTimeMs, long endTimeMs) {
-    String crc = Long.toString(System.nanoTime());
+    long crc = System.nanoTime();
     SegmentMetadata metadata = SegmentMetadataMockUtils.mockSegmentMetadata(tableNameWithType, segmentName, 100, crc,
         startTimeMs, endTimeMs, TimeUnit.MILLISECONDS);
     _resourceManager.addNewSegment(tableNameWithType, metadata, "downloadUrl");
