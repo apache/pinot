@@ -198,7 +198,7 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
     }
     RelCollation collation = RelCollations.of(fieldCollations);
     RelNode sortedInput = LogicalSort.create(input, collation, null, null);
-    return PinotLogicalSortExchange.create(sortedInput, RelDistributions.hash(joinKeys), collation, true, false,
+    return PinotLogicalSortExchange.create(sortedInput, RelDistributions.hash(joinKeys), collation, true, true,
         prePartitioned);
   }
 }
