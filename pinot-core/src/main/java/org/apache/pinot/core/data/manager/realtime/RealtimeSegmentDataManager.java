@@ -1752,6 +1752,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata)
       throws Exception {
     if (_parallelSegmentConsumptionPolicy.isAllowedDuringDownload()) {
+      if (_partitionUpsertMetadataManager != null
+          && _partitionUpsertMetadataManager.shouldRevertMetadataOnInconsistency(_realtimeSegment)) {
+        // Table config validation rejects this in PROTECTED mode. It still happens when the mode is switched after the
+        // table is created, or when the server-level default allows partial upsert consumption during commit.
+        _segmentLogger.error("Next consuming segment starts during download while this replace reverts upsert "
+            + "metadata. Its snapshot can miss the rows the revert restores. Use DISALLOW_ALWAYS or "
+            + "ALLOW_DURING_BUILD_ONLY");
+        _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD,
+            1L);
+      }
       closeStreamConsumerAndReleaseSemaphore();
     }
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);

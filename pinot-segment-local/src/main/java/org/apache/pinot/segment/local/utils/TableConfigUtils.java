@@ -91,6 +91,7 @@ import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
 import org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
@@ -108,6 +109,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -1211,6 +1213,7 @@ public final class TableConfigUtils {
 
       validateTTLForUpsertConfig(tableConfig, schema);
       validatePartialUpsertStrategies(tableConfig, schema);
+      validateConsumptionDuringDownloadWithUpsertRevert(tableConfig);
       Preconditions.checkState(
           !(PinotMd5Mode.isPinotMd5Disabled() && upsertConfig.getHashFunction() == HashFunction.MD5),
           "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
@@ -1223,6 +1226,28 @@ public final class TableConfigUtils {
           !(PinotMd5Mode.isPinotMd5Disabled() && dedupConfig.getHashFunction() == HashFunction.MD5),
           "Dedup hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
     }
+  }
+
+  /// Rejects consuming the next segment during a download on tables that revert upsert metadata in PROTECTED mode,
+  /// because the next segment's snapshot would run before the revert and miss the rows it restores.
+  @VisibleForTesting
+  static void validateConsumptionDuringDownloadWithUpsertRevert(TableConfig tableConfig) {
+    if (tableConfig.getTableType() != TableType.REALTIME || !isTableTypeInconsistentDuringConsumption(tableConfig)
+        || ConsumingSegmentConsistencyModeListener.getInstance().getConsistencyMode()
+        != ConsumingSegmentConsistencyModeListener.Mode.PROTECTED) {
+      return;
+    }
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    StreamIngestionConfig streamIngestionConfig =
+        ingestionConfig != null ? ingestionConfig.getStreamIngestionConfig() : null;
+    ParallelSegmentConsumptionPolicy policy =
+        streamIngestionConfig != null ? streamIngestionConfig.getParallelSegmentConsumptionPolicy() : null;
+    boolean consumesDuringDownload = policy != null ? policy.isAllowedDuringDownload()
+        : tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit();
+    Preconditions.checkState(!consumesDuringDownload,
+        "Tables with partial upsert, dropOutOfOrderRecord or outOfOrderRecordColumn revert upsert metadata in "
+            + "PROTECTED consistency mode, so they cannot consume the next segment during a segment download. "
+            + "Set parallelSegmentConsumptionPolicy to DISALLOW_ALWAYS or ALLOW_DURING_BUILD_ONLY");
   }
 
   /// Checks if a data type is valid for time-based comparison operations (upsert/dedup).

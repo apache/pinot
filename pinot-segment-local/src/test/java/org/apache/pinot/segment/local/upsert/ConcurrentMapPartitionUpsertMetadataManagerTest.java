@@ -2463,6 +2463,28 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testShouldRevertMetadataOnlyForConsumingSegmentsInProtectedMode()
+      throws IOException {
+    PartitionUpsertMetadataManager upsertMetadataManager = new ConcurrentMapPartitionUpsertMetadataManager(
+        REALTIME_TABLE_NAME, 0,
+        _contextBuilder.setConsistencyMode(UpsertConfig.ConsistencyMode.NONE).setDropOutOfOrderRecord(true).build());
+    MutableSegment mutableSegment = mock(MutableSegment.class);
+    ImmutableSegmentImpl immutableSegment = mock(ImmutableSegmentImpl.class);
+    ConsumingSegmentConsistencyModeListener consistencyModeListener =
+        ConsumingSegmentConsistencyModeListener.getInstance();
+    try {
+      assertFalse(upsertMetadataManager.shouldRevertMetadataOnInconsistency(mutableSegment));
+      consistencyModeListener.setMode(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED);
+      assertTrue(upsertMetadataManager.shouldRevertMetadataOnInconsistency(mutableSegment));
+      assertFalse(upsertMetadataManager.shouldRevertMetadataOnInconsistency(immutableSegment));
+    } finally {
+      consistencyModeListener.reset();
+      upsertMetadataManager.stop();
+      upsertMetadataManager.close();
+    }
+  }
+
+  @Test
   public void testNoRevertForImmutableSegmentReplacement()
       throws IOException {
     // Test that revert logic is NOT applied when replacing immutable segment with another immutable segment

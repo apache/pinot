@@ -64,6 +64,7 @@ import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
@@ -83,6 +84,7 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotDataType;
@@ -2680,6 +2682,75 @@ public class TableConfigUtilsTest {
       assertEquals(e.getMessage(),
           "MetadataTTL must have time column: timeColumn in numeric type, found: STRING");
     }
+  }
+
+  @Test
+  public void testRejectConsumptionDuringDownloadWhenUpsertMetadataReverts() {
+    UpsertConfig partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    UpsertConfig allowDuringCommitConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    allowDuringCommitConfig.setAllowPartialUpsertConsumptionDuringCommit(true);
+    UpsertConfig dropOutOfOrderConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    dropOutOfOrderConfig.setDropOutOfOrderRecord(true);
+    UpsertConfig fullUpsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+
+    ConsumingSegmentConsistencyModeListener consistencyModeListener =
+        ConsumingSegmentConsistencyModeListener.getInstance();
+    try {
+      // Without PROTECTED mode nothing is reverted, so every policy is allowed
+      checkConsumptionDuringDownload(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, false);
+
+      consistencyModeListener.setMode(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED);
+      checkConsumptionDuringDownload(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, true);
+      checkConsumptionDuringDownload(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_DURING_DOWNLOAD_ONLY,
+          true);
+      checkConsumptionDuringDownload(dropOutOfOrderConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, true);
+      checkConsumptionDuringDownload(allowDuringCommitConfig, null, true);
+      checkConsumptionDuringDownload(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY,
+          false);
+      checkConsumptionDuringDownload(partialUpsertConfig, ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS, false);
+      checkConsumptionDuringDownload(partialUpsertConfig, null, false);
+      // An explicit policy wins over the deprecated flag, and full upsert without out-of-order handling never reverts
+      checkConsumptionDuringDownload(allowDuringCommitConfig, ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS, false);
+      checkConsumptionDuringDownload(fullUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, false);
+
+      // The check is part of the upsert validation
+      Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+          .addSingleValueDimension("myCol", DataType.STRING)
+          .setPrimaryKeyColumns(List.of("myCol"))
+          .build();
+      TableConfig tableConfig =
+          createTableConfigWithConsumptionPolicy(dropOutOfOrderConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
+      IllegalStateException e = expectThrows(IllegalStateException.class,
+          () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema));
+      assertTrue(e.getMessage().contains("DISALLOW_ALWAYS or ALLOW_DURING_BUILD_ONLY"), e.getMessage());
+    } finally {
+      consistencyModeListener.reset();
+    }
+  }
+
+  private void checkConsumptionDuringDownload(UpsertConfig upsertConfig, ParallelSegmentConsumptionPolicy policy,
+      boolean expectRejected) {
+    TableConfig tableConfig = createTableConfigWithConsumptionPolicy(upsertConfig, policy);
+    if (expectRejected) {
+      IllegalStateException e = expectThrows(IllegalStateException.class,
+          () -> TableConfigUtils.validateConsumptionDuringDownloadWithUpsertRevert(tableConfig));
+      assertTrue(e.getMessage().contains("DISALLOW_ALWAYS or ALLOW_DURING_BUILD_ONLY"), e.getMessage());
+    } else {
+      TableConfigUtils.validateConsumptionDuringDownloadWithUpsertRevert(tableConfig);
+    }
+  }
+
+  private TableConfig createTableConfigWithConsumptionPolicy(UpsertConfig upsertConfig,
+      ParallelSegmentConsumptionPolicy policy) {
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(getStreamConfigs()));
+    streamIngestionConfig.setParallelSegmentConsumptionPolicy(policy);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
+        .setIngestionConfig(ingestionConfig)
+        .build();
   }
 
   @Test

@@ -74,6 +74,11 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   /// Replaces the upsert metadata for the old segment with the new immutable segment.
   void replaceSegment(ImmutableSegment segment, IndexSegment oldSegment);
 
+  /// Returns true when replacing the given segment reverts its keys to their previous locations.
+  default boolean shouldRevertMetadataOnInconsistency(IndexSegment oldSegment) {
+    return false;
+  }
+
   /// Removes the upsert metadata for the given segment.
   void removeSegment(IndexSegment segment);
 

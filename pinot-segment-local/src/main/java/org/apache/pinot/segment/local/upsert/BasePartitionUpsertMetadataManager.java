@@ -716,6 +716,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   ///
   /// @param oldSegment the old segment being replaced
   /// @return true if metadata revert should be performed on inconsistency
+  @Override
   public boolean shouldRevertMetadataOnInconsistency(IndexSegment oldSegment) {
     return ConsumingSegmentConsistencyModeListener.getInstance().getConsistencyMode()
         == ConsumingSegmentConsistencyModeListener.Mode.PROTECTED
