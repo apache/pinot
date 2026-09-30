@@ -105,6 +105,20 @@ public class PluginManagerServiceProviderTest {
   }
 
   @Test
+  public void testDuplicateProviderIsNotConstructed()
+      throws Exception {
+    ConstructedOnceImpl._constructionCount = 0;
+    PluginManager pluginManager = new PluginManager();
+    loadDescriptorOnlyPlugin(pluginManager, "spi-service-provider-constructor-dedup-plugin",
+        ConstructedOnceImpl.class.getName());
+    List<PluginManager.ServiceProvider<TestDiscoveryService>> providers =
+        withContextClassLoader(createDescriptorClassLoader(ConstructedOnceImpl.class.getName()),
+            () -> pluginManager.loadServiceProviders(TestDiscoveryService.class));
+    assertEquals(providers.size(), 1);
+    assertEquals(ConstructedOnceImpl._constructionCount, 1);
+  }
+
+  @Test
   public void testDiscoveryOrderContextClassLoaderFirst()
       throws Exception {
     PluginManager pluginManager = new PluginManager();
@@ -236,6 +250,16 @@ public class PluginManagerServiceProviderTest {
   public static class ThrowingImpl implements TestDiscoveryService {
     public ThrowingImpl() {
       throw new IllegalStateException("Intentional constructor failure");
+    }
+  }
+
+  public static class ConstructedOnceImpl implements TestDiscoveryService {
+    private static int _constructionCount;
+
+    public ConstructedOnceImpl() {
+      if (++_constructionCount > 1) {
+        throw new IllegalStateException("Duplicate provider construction");
+      }
     }
   }
 }
