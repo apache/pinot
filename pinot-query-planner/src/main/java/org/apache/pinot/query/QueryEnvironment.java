@@ -64,6 +64,7 @@ import org.apache.pinot.calcite.rel.rules.PinotRelDistributionTraitRule;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.rel.rules.PinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rex.PinotRexExecutor;
+import org.apache.pinot.calcite.rex.SearchSealer;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
 import org.apache.pinot.calcite.sql2rel.PinotRelDecorrelator;
@@ -458,11 +459,13 @@ public class QueryEnvironment {
     try {
       RexBuilder rexBuilder = new RexBuilder(_typeFactory);
       RelOptCluster cluster = RelOptCluster.create(plannerContext.getRelOptPlanner(), rexBuilder);
+      SearchSealer searchSealer = plannerContext.getSearchSealer();
       SqlToRelConverter converter =
           new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
               PinotConvertletTable.INSTANCE, _config.getSqlToRelConverterConfig());
       RelRoot relRoot;
-      try {
+      // Large IN lists skip SqlToRelConverter's expansion into OR; PinotConvertletTable builds one SEARCH for each.
+      try (SearchSealer.MarkedInLists ignored = searchSealer.markInLists(sqlNode)) {
         relRoot = converter.convertQuery(sqlNode, false, true);
       } catch (Throwable e) {
         throw new RuntimeException("Failed to convert query to relational expression:\n" + sqlNode, e);
@@ -484,6 +487,8 @@ public class QueryEnvironment {
       } catch (Throwable e) {
         throw new RuntimeException("Failed to trim unused fields from query:\n" + RelOptUtil.toString(rootNode), e);
       }
+      // Hide the large SEARCH calls from the optimizer. SearchSealer#unseal restores them at the end of optimize().
+      rootNode = searchSealer.seal(rootNode);
       return relRoot.withRel(rootNode);
     } catch (QueryException e) {
       throw e;
@@ -517,7 +522,8 @@ public class QueryEnvironment {
       listener.populateRuleTimings();
       RelOptPlanner traitPlanner = plannerContext.getRelTraitPlanner();
       traitPlanner.setRoot(optimized);
-      return traitPlanner.findBestExp();
+      // Everything after optimization (EXPLAIN, plan node conversion, physical planning) sees plain SEARCH calls.
+      return plannerContext.getSearchSealer().unseal(traitPlanner.findBestExp());
     } catch (Throwable e) {
       throw QueryErrorCode.QUERY_PLANNING.asException("Error optimizing query: " + e.getMessage(), e);
     }
@@ -938,6 +944,13 @@ public class QueryEnvironment {
     @Value.Default
     default int defaultSortExchangeCopyLimit() {
       return PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY.config.getFetchLimitThreshold();
+    }
+
+    /// See [CommonConstants.Broker#CONFIG_OF_SEALED_IN_LIST_THRESHOLD]. Can be overridden per query with
+    /// [CommonConstants.Broker.Request.QueryOptionKey#SEALED_IN_LIST_THRESHOLD].
+    @Value.Default
+    default int defaultSealedInListThreshold() {
+      return CommonConstants.Broker.DEFAULT_SEALED_IN_LIST_THRESHOLD;
     }
   }
 
