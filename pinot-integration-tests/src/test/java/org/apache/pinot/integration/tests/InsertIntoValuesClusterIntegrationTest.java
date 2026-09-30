@@ -22,18 +22,24 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingest.InsertConsistencyMode;
 import org.apache.pinot.spi.ingest.InsertType;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -87,7 +93,8 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
     startZk();
     startController();
     startBroker();
-    startServer();
+    startServers(2);
+    startKafkaWithoutTopic();
   }
 
   @AfterClass
@@ -96,6 +103,7 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
       stopServer();
       stopBroker();
       stopController();
+      stopKafka();
       stopZk();
     } finally {
       FileUtils.deleteQuietly(_tempDir);
@@ -106,14 +114,20 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
       throws Exception {
     Schema schema = new Schema.SchemaBuilder()
         .setSchemaName(tableName)
-        .addSingleValueDimension("id", FieldSpec.DataType.INT)
-        .addSingleValueDimension("name", FieldSpec.DataType.STRING)
-        .addMetric("score", FieldSpec.DataType.FLOAT)
+        .addSingleValueDimension("id", DataType.INT)
+        .addSingleValueDimension("name", DataType.STRING)
+        .addMetric("score", DataType.FLOAT)
         .build();
     addSchema(schema);
 
+    createOfflineTableVariant(tableName, null);
+  }
+
+  private void createOfflineTableVariant(String tableName, String timeColumnName)
+      throws Exception {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(tableName)
+        .setTimeColumnName(timeColumnName)
         .build();
     sendPostRequest(
         _controllerRequestURLBuilder.forTableCreate(),
@@ -123,6 +137,13 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
 
   private String buildInsertRequestJson(String tableName, TableType tableType, String requestId,
       String payloadHash)
+      throws Exception {
+    return buildInsertRequestJson(tableName, tableType, requestId, payloadHash,
+        List.of(Map.of("id", 1, "name", "test", "score", 90.0)));
+  }
+
+  private String buildInsertRequestJson(String tableName, TableType tableType, String requestId,
+      String payloadHash, List<Map<String, Object>> fields)
       throws Exception {
     Map<String, Object> request = new HashMap<>();
     request.put("tableName", tableName);
@@ -139,18 +160,54 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
       request.put("payloadHash", payloadHash);
     }
 
-    /// Minimal rows
-    java.util.List<Map<String, Object>> rowList = new java.util.ArrayList<>();
-    Map<String, Object> row = new HashMap<>();
-    Map<String, Object> fieldMap = new HashMap<>();
-    fieldMap.put("id", 1);
-    fieldMap.put("name", "test");
-    fieldMap.put("score", 90.0);
-    row.put("fieldToValueMap", fieldMap);
-    rowList.add(row);
+    List<Map<String, Object>> rowList = new ArrayList<>();
+    for (Map<String, Object> fieldMap : fields) {
+      rowList.add(Map.of("fieldToValueMap", fieldMap));
+    }
     request.put("rows", rowList);
 
     return JsonUtils.objectToString(request);
+  }
+
+  private void createRealtimeTable(String tableName, String kafkaTopic, boolean fullUpsert)
+      throws Exception {
+    createKafkaTopic(kafkaTopic);
+    Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder()
+        .setSchemaName(tableName)
+        .addSingleValueDimension("id", DataType.INT)
+        .addSingleValueDimension("name", DataType.STRING)
+        .addMetric("score", DataType.FLOAT)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS");
+    if (fullUpsert) {
+      schemaBuilder.setPrimaryKeyColumns(List.of("id"));
+    }
+    addSchema(schemaBuilder.build());
+
+    TableConfig tableConfig;
+    Map<String, String> csvDecoder = getCSVDecoderProperties(",", "id,name,score,ts");
+    if (fullUpsert) {
+      UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+      upsertConfig.setComparisonColumn("ts");
+      tableConfig = createCSVUpsertTableConfig(tableName, kafkaTopic, getNumKafkaPartitions(), csvDecoder,
+          upsertConfig, "id");
+    } else {
+      Map<String, String> streamConfigs = getStreamConfigMap();
+      String topicProperty =
+          StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_TOPIC_NAME);
+      streamConfigs.put(topicProperty, kafkaTopic);
+      streamConfigs.putAll(csvDecoder);
+      tableConfig = new TableConfigBuilder(TableType.REALTIME)
+          .setTableName(tableName)
+          .setTimeColumnName("ts")
+          .setStreamConfigs(streamConfigs)
+          .build();
+    }
+    addTableConfig(tableConfig);
+  }
+
+  @Override
+  protected String getTimeColumnName() {
+    return "ts";
   }
 
   private JsonNode postInsertRequest(String payload)
@@ -411,10 +468,10 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
     String tableName = "insertTypedValues";
     Schema schema = new Schema.SchemaBuilder()
         .setSchemaName(tableName)
-        .addSingleValueDimension("id", FieldSpec.DataType.INT)
-        .addSingleValueDimension("data", FieldSpec.DataType.BYTES)
-        .addMetric("amount", FieldSpec.DataType.BIG_DECIMAL)
-        .addMetric("delta", FieldSpec.DataType.DOUBLE)
+        .addSingleValueDimension("id", DataType.INT)
+        .addSingleValueDimension("data", DataType.BYTES)
+        .addMetric("amount", DataType.BIG_DECIMAL)
+        .addMetric("delta", DataType.DOUBLE)
         .build();
     addSchema(schema);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
@@ -452,5 +509,113 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
         return false;
       }
     }, 30_000, "Typed INSERT values (negative INT, BYTES, BIG_DECIMAL, negative DOUBLE) did not round-trip");
+  }
+
+  @Test
+  public void testRealtimeUploadBesideConsumingSegmentAndHybridTypeSelection()
+      throws Exception {
+    String tableName = "insertRealtimeHybrid";
+    String kafkaTopic = tableName + "-stream";
+    String realtimeTable = tableName + "_REALTIME";
+    long timestamp = System.currentTimeMillis();
+    createRealtimeTable(tableName, kafkaTopic, false);
+    pushCsvIntoKafka(List.of("1,stream,10.0," + timestamp), kafkaTopic, null);
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode response = postQuery("SELECT COUNT(*) FROM " + realtimeTable);
+        return response.path("resultTable").path("rows").path(0).path(0).asInt() == 1
+            && response.path("numConsumingSegmentsQueried").asInt() > 0;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 60_000, "The stream row did not become queryable from a consuming segment");
+
+    createOfflineTableVariant(tableName, "ts");
+    List<Map<String, Object>> realtimeRows = List.of(
+        Map.of("id", 2, "name", "uploaded", "score", 20.0, "ts", timestamp + 1));
+    JsonNode ambiguous = postInsertRequest(buildInsertRequestJson(tableName, null, null, null, realtimeRows));
+    assertEquals(ambiguous.path("state").asText(), "REJECTED");
+    assertEquals(ambiguous.path("errorCode").asText(), "TABLE_RESOLUTION_ERROR");
+
+    JsonNode realtimeInsert = postInsertRequest(
+        buildInsertRequestJson(tableName, TableType.REALTIME, null, null, realtimeRows));
+    assertEquals(realtimeInsert.path("state").asText(), "VISIBLE", realtimeInsert.toString());
+    assertEquals(realtimeInsert.path("segmentNames").size(), 1, realtimeInsert.toString());
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode response = postQuery("SELECT COUNT(*) FROM " + realtimeTable);
+        return response.path("resultTable").path("rows").path(0).path(0).asInt() == 2
+            && response.path("numConsumingSegmentsQueried").asInt() > 0
+            && response.path("numSegmentsQueried").asInt()
+                > response.path("numConsumingSegmentsQueried").asInt();
+      } catch (Exception e) {
+        return false;
+      }
+    }, 60_000, "Uploaded REALTIME row was not queryable alongside the consuming row");
+    JsonNode uploaded = postQuery("SELECT name FROM " + realtimeTable + " WHERE id = 2");
+    assertEquals(uploaded.path("resultTable").path("rows").path(0).path(0).asText(), "uploaded");
+
+    JsonNode offlineInsert = postInsertRequest(buildInsertRequestJson(tableName, TableType.OFFLINE, null, null,
+        List.of(Map.of("id", 3, "name", "offline", "score", 30.0, "ts", timestamp + 2))));
+    assertEquals(offlineInsert.path("state").asText(), "VISIBLE", offlineInsert.toString());
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode response = postQuery("SELECT COUNT(*) FROM " + tableName + "_OFFLINE");
+        return response.path("resultTable").path("rows").path(0).path(0).asInt() == 1;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 60_000, "Explicit OFFLINE insert into the hybrid table was not queryable");
+  }
+
+  @Test
+  public void testPartitionedFullUpsertUploadedRowWinsOverConsumingRow()
+      throws Exception {
+    String tableName = "insertFullUpsert";
+    String kafkaTopic = tableName + "-stream";
+    String realtimeTable = tableName + "_REALTIME";
+    long timestamp = System.currentTimeMillis();
+    createRealtimeTable(tableName, kafkaTopic, true);
+    pushCsvIntoKafka(List.of("1,old,10.0," + timestamp), kafkaTopic, 0);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode response = postQuery("SELECT name FROM " + realtimeTable + " WHERE id = 1");
+        return "old".equals(response.path("resultTable").path("rows").path(0).path(0).asText())
+            && response.path("numConsumingSegmentsQueried").asInt() > 0;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 60_000, "The old primary-key row did not become queryable from a consuming segment");
+
+    PartitionFunction partitionFunction =
+        PartitionFunctionFactory.getPartitionFunction("Murmur", getNumKafkaPartitions(), null);
+    int otherId = 2;
+    while (partitionFunction.getPartition(Integer.toString(otherId)) == partitionFunction.getPartition("1")) {
+      otherId++;
+    }
+    int secondId = otherId;
+    List<Map<String, Object>> rows = List.of(
+        Map.of("id", 1, "name", "new", "score", 20.0, "ts", timestamp + 1),
+        Map.of("id", secondId, "name", "other", "score", 30.0, "ts", timestamp + 1));
+    JsonNode insert = postInsertRequest(buildInsertRequestJson(tableName, TableType.REALTIME, null, null, rows));
+    assertEquals(insert.path("state").asText(), "VISIBLE", insert.toString());
+    assertEquals(insert.path("segmentNames").size(), 2, "Each partition should produce one segment: " + insert);
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode response = postQuery("SELECT id, name, score FROM " + realtimeTable + " ORDER BY id");
+        JsonNode actual = response.path("resultTable").path("rows");
+        return actual.size() == 2
+            && actual.get(0).get(0).asInt() == 1
+            && "new".equals(actual.get(0).get(1).asText())
+            && actual.get(0).get(2).asDouble() == 20.0
+            && actual.get(1).get(0).asInt() == secondId
+            && "other".equals(actual.get(1).get(1).asText())
+            && response.path("numConsumingSegmentsQueried").asInt() > 0;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 60_000, "The newer uploaded primary-key row did not win across both partitions");
   }
 }
