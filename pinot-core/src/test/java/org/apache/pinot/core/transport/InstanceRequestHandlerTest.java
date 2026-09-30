@@ -131,8 +131,10 @@ public class InstanceRequestHandlerTest {
     assertEquals(handler.getQueryProgressStats("test-query").getProcessedWorkUnits(), 1);
 
     queryFinishLatch.countDown();
-    TestUtils.waitForCondition((aVoid) -> handler.getRunningQueryIds().isEmpty(), 10_000L,
-        "Timed out waiting for query to finish");
+    TestUtils.waitForCondition((aVoid) -> {
+      QueryProgressStats stats = handler.getQueryProgressStats("test-query");
+      return handler.getRunningQueryIds().isEmpty() && stats != null && stats.getProcessedWorkUnits() == 3;
+    }, 10_000L, "Timed out waiting for completed query progress");
 
     QueryProgressStats completedProgressStats = handler.getQueryProgressStats("test-query");
     assertEquals(completedProgressStats.getProcessedWorkUnits(), 3);
