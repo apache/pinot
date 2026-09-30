@@ -63,6 +63,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -271,6 +272,34 @@ public class MailboxReceiveOperatorTest {
       assertEquals(stats.getLong(BaseMailboxReceiveOperator.StatKey.AUTO_SAMPLED_ROWS), 130L);
       assertEquals(stats.getInt(BaseMailboxReceiveOperator.StatKey.AUTO_SAMPLE_STREAMS), 2);
       assertEquals(stats.getInt(BaseMailboxReceiveOperator.StatKey.AUTO_CANDIDATE_STREAMS), 1);
+    }
+  }
+
+  @Test
+  public void shouldReleaseShortAutoSamplesOnTerminalAndTeardown() {
+    for (String termination : List.of("eos", "error", "close", "cancel")) {
+      Object[] row = new Object[]{1, 1};
+      when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+      when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row),
+          termination.equals("error")
+              ? OperatorTestUtil.errorWithEmptyStats(new RuntimeException("test error"))
+              : OperatorTestUtil.eosWithEmptyStats());
+      try (MailboxReceiveOperator operator = getOperator(_stageMetadata1,
+          RelDistribution.Type.SINGLETON, Long.MAX_VALUE, true)) {
+        MseBlock.Data block = (MseBlock.Data) operator.nextBlock();
+        assertTrue(operator.hasBufferedState());
+        switch (termination) {
+          case "eos", "error" -> assertTrue(operator.nextBlock().isEos());
+          case "close" -> operator.close();
+          case "cancel" -> operator.cancel(new RuntimeException("test cancel"));
+          default -> throw new AssertionError(termination);
+        }
+        assertFalse(operator.hasBufferedState(), termination);
+        operator.close();
+        assertFalse(operator.hasBufferedState(), "Repeated teardown must be safe");
+        assertEquals(block.asRowHeap().getRows().get(0), row);
+        assertEquals(operator.copyStatMaps().getLong(BaseMailboxReceiveOperator.StatKey.AUTO_SAMPLED_ROWS), 1L);
+      }
     }
   }
 
