@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
@@ -130,6 +131,7 @@ public class PinotTableRestletResourceTest {
 
     PinotTableRestletResource resource = new PinotTableRestletResource();
     resource._pinotHelixResourceManager = helixResourceManager;
+    resource._controllerConf = new ControllerConf();
 
     TableConfigValidator rejecting = (tc, s) -> {
       throw new ConfigValidationException("rejected-by-registry-probe");
