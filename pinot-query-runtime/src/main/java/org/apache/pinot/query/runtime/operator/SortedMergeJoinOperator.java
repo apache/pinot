@@ -24,16 +24,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
-import org.apache.pinot.calcite.rel.hint.PinotHintOptions.JoinHintOptions;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
@@ -41,9 +38,7 @@ import org.apache.pinot.query.runtime.operator.join.JoinedRowView;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.BooleanUtils;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,7 +50,8 @@ import org.slf4j.LoggerFactory;
 /// assumes both the left and right inputs are already sorted in ascending order on their respective join keys and
 /// advances two cursors in lock-step (a two-pointer merge). Only one block per side is held in memory at a time, plus a
 /// small buffer for the run of right rows that share the current join key (needed to support one-to-many and
-/// many-to-many matches).
+/// many-to-many matches). Duplicate matches are emitted in bounded blocks, so a downstream LIMIT can stop within
+/// a single join key. This operator is driven by one consumer thread and is not thread-safe.
 ///
 /// This makes memory usage proportional to the largest single-key run on the right side rather than the entire right
 /// input, which is the key advantage for pre-sorted, pre-partitioned data layouts.
@@ -76,10 +72,8 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
   private static final String EMIT_MATCHED_KEY_SCOPE = "SortedMergeJoinOperator#emitMatchedKey";
   private static final String BUFFER_RIGHT_RUN_SCOPE = "SortedMergeJoinOperator#bufferRightRun";
   private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES = Set.of(JoinRelType.INNER, JoinRelType.LEFT);
-  // Target number of output rows per emitted block. A single equi-key run may overshoot this; that is acceptable.
+  // A duplicate-key cross product resumes across output blocks instead of materializing the complete run.
   private static final int TARGET_BLOCK_SIZE_ROWS = 1024;
-  protected static final int DEFAULT_MAX_ROWS_IN_JOIN = 1024 * 1024; // 2^20, around 1MM rows
-  protected static final JoinOverFlowMode DEFAULT_JOIN_OVERFLOW_MODE = JoinOverFlowMode.THROW;
 
   private final Cursor _leftCursor;
   private final Cursor _rightCursor;
@@ -101,8 +95,11 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
   // Reused buffer holding the run of right rows that share the current join key.
   private final List<Object[]> _rightRun = new ArrayList<>();
 
-  private long _numEmittedRows;
-  // Monotonically increasing count of input rows examined. Used as the tick for
+  @Nullable
+  private Object[] _rightRunAnchor;
+  private int _rightRunIndex;
+  private boolean _leftRowMatched;
+  // Monotonically increasing count of examined input rows and candidate pairs. Used as the tick for
   // checkTerminationAndSampleUsagePeriodically, which only samples when the counter is a multiple of 8192. The number
   // of rows accumulated in the current output block cannot serve as that tick: it is capped at TARGET_BLOCK_SIZE_ROWS,
   // so it would sample on every call while the block is empty and then never again once it is not.
@@ -142,9 +139,9 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
     }
     _hasNonEquiConditions = !_nonEquiEvaluators.isEmpty();
     Map<String, String> metadata = context.getOpChainMetadata();
-    PlanNode.NodeHint nodeHint = node.getNodeHint();
-    _maxRowsInJoin = getMaxRowsInJoin(metadata, nodeHint);
-    _joinOverflowMode = getJoinOverflowMode(metadata, nodeHint);
+    _maxRowsInJoin = BaseJoinOperator.getMaxRowsInJoin(metadata, node.getNodeHint());
+    Preconditions.checkArgument(_maxRowsInJoin > 0, "maxRowsInJoin must be positive");
+    _joinOverflowMode = BaseJoinOperator.getJoinOverflowMode(metadata, node.getNodeHint());
   }
 
   private static int[] toIntArray(List<Integer> list) {
@@ -178,6 +175,22 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
     return List.of(_leftCursor.getInput(), _rightCursor.getInput());
   }
 
+  /// INNER and LEFT merge joins preserve the left key order, including after residual filtering and null padding.
+  public boolean isSortedOn(List<RelFieldCollation> collations) {
+    if (collations.isEmpty() || collations.size() > _leftKeyIds.length) {
+      return false;
+    }
+    for (int i = 0; i < collations.size(); i++) {
+      RelFieldCollation collation = collations.get(i);
+      if (collation.getFieldIndex() != _leftKeyIds[i]
+          || collation.getDirection() != RelFieldCollation.Direction.ASCENDING
+          || collation.nullDirection != RelFieldCollation.NullDirection.LAST) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
@@ -193,205 +206,137 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
     if (_eos != null) {
       return _eos;
     }
-    // If a downstream operator (e.g. a LIMIT) has signalled early termination, stop producing promptly.
-    // Returning EOS here lets the consumer's drain loop exit instead of pulling the full cross-product of the
-    // already-buffered inputs.
     if (_isEarlyTerminated) {
+      _rightRun.clear();
+      _rightRunAnchor = null;
       _eos = SuccessMseBlock.INSTANCE;
       return _eos;
     }
-    List<Object[]> rows = new ArrayList<>(Math.min(TARGET_BLOCK_SIZE_ROWS, 64));
-    while (rows.size() < TARGET_BLOCK_SIZE_ROWS) {
+    int blockSize = Math.min(TARGET_BLOCK_SIZE_ROWS, _maxRowsInJoin);
+    List<Object[]> rows = new ArrayList<>(Math.min(blockSize, 64));
+    while (rows.size() < blockSize) {
       boolean leftHasRow = _leftCursor.advanceToNextRow();
       if (_leftCursor.isError()) {
         _eos = _leftCursor.getEos();
         return _eos;
+      }
+      if (!leftHasRow) {
+        _eos = SuccessMseBlock.INSTANCE;
+        break;
+      }
+      Object[] leftRow = _leftCursor.peek();
+      if (_rightRunAnchor != null) {
+        if (compareKeys(_rightRunAnchor, _leftKeyIds, leftRow, _leftKeyIds) == 0) {
+          emitMatchedKey(rows, leftRow, blockSize);
+          continue;
+        }
+        _rightRun.clear();
+        _rightRunAnchor = null;
       }
       boolean rightHasRow = _rightCursor.advanceToNextRow();
       if (_rightCursor.isError()) {
         _eos = _rightCursor.getEos();
         return _eos;
       }
-
-      if (!leftHasRow) {
-        // Left input is exhausted. INNER and LEFT joins emit nothing for unmatched right rows.
+      if (!rightHasRow) {
+        if (_needUnmatchedLeftRows) {
+          rows.add(joinRow(leftRow, null));
+          _leftCursor.consume();
+          checkTerminationAndSampleUsagePeriodically(++_numRowsProcessed, MERGE_LOOP_SCOPE);
+          continue;
+        }
         _eos = SuccessMseBlock.INSTANCE;
         break;
       }
-      if (!rightHasRow) {
-        // Right input is exhausted. Remaining left rows are unmatched.
-        if (_needUnmatchedLeftRows) {
-          Object[] leftRow = _leftCursor.peek();
-          if (!addRow(rows, joinRow(leftRow, null))) {
-            break;
-          }
-          _leftCursor.consume();
-        } else {
-          _eos = SuccessMseBlock.INSTANCE;
-          break;
-        }
-        continue;
-      }
-
-      Object[] leftRow = _leftCursor.peek();
       Object[] rightRow = _rightCursor.peek();
       // Null join keys never match per SQL semantics.
       if (hasNullKey(leftRow, _leftKeyIds)) {
-        if (_needUnmatchedLeftRows && !addRow(rows, joinRow(leftRow, null))) {
-          break;
+        if (_needUnmatchedLeftRows) {
+          rows.add(joinRow(leftRow, null));
         }
         _leftCursor.consume();
-        continue;
-      }
-      if (hasNullKey(rightRow, _rightKeyIds)) {
-        _rightCursor.consume();
-        continue;
-      }
-
-      int cmp = compareKeys(leftRow, _leftKeyIds, rightRow, _rightKeyIds);
-      if (cmp < 0) {
-        if (_needUnmatchedLeftRows && !addRow(rows, joinRow(leftRow, null))) {
-          break;
-        }
-        _leftCursor.consume();
-      } else if (cmp > 0) {
+      } else if (hasNullKey(rightRow, _rightKeyIds)) {
         _rightCursor.consume();
       } else {
-        if (_hasNonEquiConditions) {
-          emitMatchedKeyWithFilter(rows);
-        } else {
-          emitMatchedKeyEquiOnly(rows);
-        }
-        if (_eos != null) {
+        int cmp = compareKeys(leftRow, _leftKeyIds, rightRow, _rightKeyIds);
+        if (cmp < 0) {
+          if (_needUnmatchedLeftRows) {
+            rows.add(joinRow(leftRow, null));
+          }
+          _leftCursor.consume();
+        } else if (cmp > 0) {
+          _rightCursor.consume();
+        } else if (!bufferRightRun(leftRow)) {
           break;
         }
       }
       checkTerminationAndSampleUsagePeriodically(++_numRowsProcessed, MERGE_LOOP_SCOPE);
     }
-
     if (!rows.isEmpty()) {
       return new RowHeapDataBlock(rows, _resultSchema);
-    }
-    // No rows produced in this pass: the loop only exits with empty rows once an EOS has been reached.
-    if (_eos == null) {
-      _eos = SuccessMseBlock.INSTANCE;
     }
     return _eos;
   }
 
-  /// Buffers the run of right rows that share the current join key (reusing [#_rightRun] across keys).
-  ///
-  /// This buffer is the operator's peak memory: a single hot join key with a very large right-side run would
-  /// otherwise grow it without bound before a single output row is produced. It is therefore capped by the same
-  /// `maxRowsInJoin` budget the emit path uses, honouring `joinOverflowMode`: THROW aborts the query,
-  /// BREAK truncates the run and early-terminates. Note the budget is applied here to *buffered* right rows and
-  /// in [#addRow] to *emitted* rows, matching how `BaseJoinOperator` treats its own right table.
-  ///
-  /// Returns `false` if the operator terminated while buffering.
+  /// Buffers the right rows for one join key. Unlike a hash join, the resource limit applies to this buffered run,
+  /// rather than the entire right input. Output is separately emitted in blocks bounded by `maxRowsInJoin`, so the
+  /// total streamed result may exceed that budget without retaining it in memory.
   private boolean bufferRightRun(Object[] anchor) {
-    List<Object[]> rightRun = _rightRun;
-    rightRun.clear();
     while (_rightCursor.advanceToNextRow()) {
       Object[] rightRow = _rightCursor.peek();
       if (compareKeys(anchor, _leftKeyIds, rightRow, _rightKeyIds) != 0) {
         break;
       }
-      if (rightRun.size() >= _maxRowsInJoin) {
+      if (_rightRun.size() >= _maxRowsInJoin) {
+        _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, (long) _rightRun.size());
         if (_joinOverflowMode == JoinOverFlowMode.THROW) {
-          _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, (long) rightRun.size());
-          throwForJoinRowLimitExceeded(
+          BaseJoinOperator.throwForJoinRowLimitExceeded(
               "Cannot process sorted merge join, reached number of rows limit while buffering the right rows for a "
                   + "single join key: " + _maxRowsInJoin);
         }
-        // BREAK mode: stop buffering and early-terminate both inputs (propagates to children).
         _statMap.merge(StatKey.MAX_ROWS_IN_JOIN_REACHED, true);
-        _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, (long) rightRun.size());
         earlyTerminate();
         _eos = SuccessMseBlock.INSTANCE;
         return false;
       }
-      rightRun.add(rightRow);
+      _rightRun.add(rightRow);
       _rightCursor.consume();
       checkTerminationAndSampleUsagePeriodically(++_numRowsProcessed, BUFFER_RIGHT_RUN_SCOPE);
     }
+    if (_rightCursor.isError()) {
+      _eos = _rightCursor.getEos();
+      return false;
+    }
+    _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, (long) _rightRun.size());
+    _rightRunAnchor = anchor;
     return true;
   }
 
-  /// Equi-only fast path: no residual filter, emit joined rows directly without lazy view allocation.
-  private void emitMatchedKeyEquiOnly(List<Object[]> rows) {
-    Object[] anchor = _leftCursor.peek();
-    if (!bufferRightRun(anchor)) {
-      return;
-    }
-    List<Object[]> rightRun = _rightRun;
-
-    while (_leftCursor.advanceToNextRow()) {
-      Object[] leftRow = _leftCursor.peek();
-      if (compareKeys(anchor, _leftKeyIds, leftRow, _leftKeyIds) != 0) {
-        break;
-      }
-      for (Object[] rightRow : rightRun) {
-        if (!addRow(rows, joinRow(leftRow, rightRow))) {
-          return;
-        }
-      }
-      _leftCursor.consume();
+  /// Resumes the duplicate-key cross product for the current left row. The match flag survives output block
+  /// boundaries, so a LEFT join only emits null padding after every residual predicate candidate was rejected.
+  private void emitMatchedKey(List<Object[]> rows, Object[] leftRow, int blockSize) {
+    while (_rightRunIndex < _rightRun.size() && rows.size() < blockSize) {
+      Object[] rightRow = _rightRun.get(_rightRunIndex++);
       checkTerminationAndSampleUsagePeriodically(++_numRowsProcessed, EMIT_MATCHED_KEY_SCOPE);
-    }
-  }
-
-  /// Non-equi path: evaluate residual predicates via lazy view before materializing the joined row.
-  private void emitMatchedKeyWithFilter(List<Object[]> rows) {
-    Object[] anchor = _leftCursor.peek();
-    if (!bufferRightRun(anchor)) {
-      return;
-    }
-    List<Object[]> rightRun = _rightRun;
-
-    while (_leftCursor.advanceToNextRow()) {
-      Object[] leftRow = _leftCursor.peek();
-      if (compareKeys(anchor, _leftKeyIds, leftRow, _leftKeyIds) != 0) {
-        break;
-      }
-      boolean matched = false;
-      for (Object[] rightRow : rightRun) {
+      if (!_hasNonEquiConditions) {
+        rows.add(joinRow(leftRow, rightRow));
+        _leftRowMatched = true;
+      } else {
         List<Object> resultRowView = joinRowView(leftRow, rightRow);
         if (matchNonEquiConditions(resultRowView)) {
-          if (!addRow(rows, resultRowView.toArray())) {
-            return;
-          }
-          matched = true;
+          rows.add(resultRowView.toArray());
+          _leftRowMatched = true;
         }
       }
-      if (!matched && _needUnmatchedLeftRows && !addRow(rows, joinRow(leftRow, null))) {
-        return;
+    }
+    if (_rightRunIndex == _rightRun.size()) {
+      if (!_leftRowMatched && _needUnmatchedLeftRows) {
+        rows.add(joinRow(leftRow, null));
       }
       _leftCursor.consume();
-      checkTerminationAndSampleUsagePeriodically(++_numRowsProcessed, EMIT_MATCHED_KEY_SCOPE);
+      _rightRunIndex = 0;
+      _leftRowMatched = false;
     }
-  }
-
-  /// Appends a joined row to the current output block, applying the `maxRowsInJoin` budget. Returns `false`
-  /// if the row was refused because the budget was exhausted in BREAK mode, in which case the operator has already been
-  /// terminated and callers must stop producing; THROW mode raises instead of returning.
-  private boolean addRow(List<Object[]> rows, Object[] row) {
-    if (_numEmittedRows >= _maxRowsInJoin) {
-      if (_joinOverflowMode == JoinOverFlowMode.THROW) {
-        _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, _numEmittedRows);
-        throwForJoinRowLimitExceeded(
-            "Cannot process sorted merge join, reached number of rows limit: " + _maxRowsInJoin);
-      } else {
-        // BREAK mode: stop emitting and early-terminate both inputs (propagates to children).
-        _statMap.merge(StatKey.MAX_ROWS_IN_JOIN_REACHED, true);
-        _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, _numEmittedRows);
-        earlyTerminate();
-        _eos = SuccessMseBlock.INSTANCE;
-        return false;
-      }
-    }
-    rows.add(row);
-    _numEmittedRows++;
-    return true;
   }
 
   private static boolean hasNullKey(Object[] row, int[] keyIds) {
@@ -465,53 +410,6 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
     return true;
   }
 
-  private boolean needUnmatchedLeftRows() {
-    return _joinType == JoinRelType.LEFT;
-  }
-
-  private static int getMaxRowsInJoin(Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
-    if (nodeHint != null) {
-      Map<String, String> joinOptions = nodeHint.getHintOptions().get(PinotHintOptions.JOIN_HINT_OPTIONS);
-      if (joinOptions != null) {
-        String maxRowsInJoinStr = joinOptions.get(JoinHintOptions.MAX_ROWS_IN_JOIN);
-        if (maxRowsInJoinStr != null) {
-          return Integer.parseInt(maxRowsInJoinStr);
-        }
-      }
-    }
-    Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(opChainMetadata);
-    return maxRowsInJoin != null ? maxRowsInJoin : DEFAULT_MAX_ROWS_IN_JOIN;
-  }
-
-  private static JoinOverFlowMode getJoinOverflowMode(Map<String, String> contextMetadata,
-      @Nullable PlanNode.NodeHint nodeHint) {
-    if (nodeHint != null) {
-      Map<String, String> joinOptions = nodeHint.getHintOptions().get(PinotHintOptions.JOIN_HINT_OPTIONS);
-      if (joinOptions != null) {
-        String joinOverflowModeStr = joinOptions.get(JoinHintOptions.JOIN_OVERFLOW_MODE);
-        if (joinOverflowModeStr != null) {
-          return JoinOverFlowMode.valueOf(joinOverflowModeStr);
-        }
-      }
-    }
-    JoinOverFlowMode joinOverflowMode = QueryOptionsUtils.getJoinOverflowMode(contextMetadata);
-    return joinOverflowMode != null ? joinOverflowMode : DEFAULT_JOIN_OVERFLOW_MODE;
-  }
-
-  private static void throwForJoinRowLimitExceeded(String reason) {
-    throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
-        reason
-            + ".\nConsider increasing the limit for the maximum number of rows in a join either via:\n"
-            + "  - The query option '" + QueryOptionKey.MAX_ROWS_IN_JOIN + "'\n"
-            + "  - The hint '" + JoinHintOptions.MAX_ROWS_IN_JOIN + "' in the '" + PinotHintOptions.JOIN_HINT_OPTIONS
-            + "'\n"
-            + "Alternatively, if partial results are acceptable, the join overflow mode can be set to '"
-            + JoinOverFlowMode.BREAK.name() + "' either via:\n"
-            + "  - The query option '" + QueryOptionKey.JOIN_OVERFLOW_MODE + "'\n"
-            + "  - The hint '" + JoinHintOptions.JOIN_OVERFLOW_MODE + "' in the '"
-            + PinotHintOptions.JOIN_HINT_OPTIONS + "'\n");
-  }
-
   /// A lazy, block-at-a-time cursor over a [MultiStageOperator] input. Only one data block is held in memory at a
   /// time. Use [#advanceToNextRow()] to ensure a current row is available, [#peek()] to read it without
   /// consuming, and [#consume()] to move to the next row.
@@ -583,7 +481,7 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
       }
     },
     MAX_ROWS_IN_JOIN_REACHED(StatMap.Type.BOOLEAN),
-    /// The max number of joined rows emitted by this operator.
+    /// The maximum number of right rows buffered for a single join key.
     MAX_ROWS_IN_JOIN(StatMap.Type.LONG) {
       @Override
       public long merge(long value1, long value2) {

@@ -37,6 +37,7 @@ import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -195,6 +196,7 @@ public class SortedMergeJoinOperatorTest {
     MultiStageOperator right = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA)
         .addRow(10, "k")
         .addRow(20, "k")
+        .addRow(30, "k")
         .buildWithEos();
     PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.JOIN_HINT_OPTIONS,
         Map.of(PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "2")));
@@ -381,53 +383,86 @@ public class SortedMergeJoinOperatorTest {
   @Test
   public void shouldRespectMaxRowsInJoinBreakMode() {
     MultiStageOperator left = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA)
-        .addRow(1, "k")
+        .addRow(1, "a")
         .addRow(2, "k")
-        .addRow(3, "k")
-        .addRow(4, "k")
         .buildWithEos();
     MultiStageOperator right = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA)
-        .addRow(10, "k")
+        .addRow(10, "a")
         .addRow(20, "k")
+        .addRow(30, "k")
+        .addRow(40, "k")
         .buildWithEos();
     PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.JOIN_HINT_OPTIONS,
         Map.of(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "BREAK",
-            PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "5")));
+            PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "2")));
     SortedMergeJoinOperator operator =
         getOperator(left, right, RESULT_SCHEMA, JoinRelType.INNER, List.of(1), List.of(1), nodeHint);
     List<Object[]> rows = drain(operator);
-    assertEquals(rows.size(), 5, "Should emit exactly the limit then break (potential 4 x 2 = 8)");
+    assertEquals(rows.size(), 1, "The overflowing right key must not be materialized");
+    assertEquals(rows.get(0), new Object[]{1, "a", 10, "a"});
     StatMap<SortedMergeJoinOperator.StatKey> statMap =
         OperatorTestUtil.getStatMap(SortedMergeJoinOperator.StatKey.class, operator.calculateStats());
     assertTrue(statMap.getBoolean(SortedMergeJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED));
   }
 
-  /// Guards against the sorted merge join ignoring downstream early termination. The inputs are large enough to span
-  /// several output blocks (many distinct keys, 1:1 matches), so after the first data block there are still more blocks
-  /// to produce. Before the fix, calling [MultiStageOperator#earlyTerminate()] had no effect and the next
-  /// `nextBlock()` would return another data block from the remaining input; now it must return a clean success
-  /// EOS promptly.
+  @DataProvider
+  public Object[][] residualFilter() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "residualFilter")
+  public void shouldStreamDuplicateKeyAcrossOutputBlocks(boolean withResidualFilter) {
+    MultiStageOperator left = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA)
+        .addRow(5, "k")
+        .finishBlock()
+        .addRow(6, "k")
+        .addRow(7, "m")
+        .buildWithEos();
+    BlockListMultiStageOperator.Builder rightBuilder = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA);
+    for (int i = 0; i < 1500; i++) {
+      rightBuilder.addRow(10 + i, "k");
+      if (i == 749) {
+        rightBuilder.finishBlock();
+      }
+    }
+    MultiStageOperator right = rightBuilder.addRow(0, "m").buildWithEos();
+    List<RexExpression> residuals = withResidualFilter
+        ? List.of(new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.LESS_THAN.name(),
+            List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(2)))) : List.of();
+    PlanNode.NodeHint hint = new PlanNode.NodeHint(Map.of(PinotHintOptions.JOIN_HINT_OPTIONS,
+        Map.of(PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "1500")));
+    SortedMergeJoinOperator operator = new SortedMergeJoinOperator(OperatorTestUtil.getTracingContext(), left,
+        CHILD_SCHEMA, right, new JoinNode(-1, RESULT_SCHEMA, hint, List.of(), JoinRelType.LEFT, List.of(1), List.of(1),
+            residuals, JoinNode.JoinStrategy.SORTED));
+    List<Object[]> rows = new ArrayList<>();
+    MseBlock block = operator.nextBlock();
+    while (block.isData()) {
+      assertTrue(((MseBlock.Data) block).getNumRows() <= 1024, "A duplicate run must yield bounded output blocks");
+      rows.addAll(((MseBlock.Data) block).asRowHeap().getRows());
+      block = operator.nextBlock();
+    }
+    assertFalse(block.isError());
+    assertEquals(rows.size(), 3001, "Total streamed output may exceed the buffered-run budget");
+    for (int i = 0; i < 3000; i++) {
+      assertEquals(rows.get(i), new Object[]{i < 1500 ? 5 : 6, "k", 10 + i % 1500, "k"});
+    }
+    assertEquals(rows.get(3000), withResidualFilter
+        ? new Object[]{7, "m", null, null} : new Object[]{7, "m", 0, "m"});
+  }
+
   @Test
   public void shouldStopProducingAfterEarlyTerminate() {
     BlockListMultiStageOperator.Builder leftBuilder = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA);
-    BlockListMultiStageOperator.Builder rightBuilder = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA);
-    // Distinct, ascending, zero-padded string keys so lexicographic order matches insertion order (the operator
-    // requires inputs pre-sorted on the join key). 4000 keys with 1:1 matches produce ~4 output blocks.
     for (int i = 0; i < 4000; i++) {
-      String key = String.format("k%04d", i);
-      leftBuilder.addRow(i, key);
-      rightBuilder.addRow(i, key);
+      leftBuilder.addRow(i, "k");
     }
-    MultiStageOperator left = leftBuilder.buildWithEos();
-    MultiStageOperator right = rightBuilder.buildWithEos();
-    SortedMergeJoinOperator operator =
-        getOperator(left, right, RESULT_SCHEMA, JoinRelType.INNER, List.of(1), List.of(1));
-
+    MultiStageOperator right = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA).addRow(1, "k").buildWithEos();
+    SortedMergeJoinOperator operator = getOperator(leftBuilder.buildWithEos(), right, RESULT_SCHEMA,
+        JoinRelType.INNER, List.of(1), List.of(1));
     MseBlock first = operator.nextBlock();
     assertTrue(first.isData());
-
+    assertEquals(((MseBlock.Data) first).getNumRows(), 1024);
     operator.earlyTerminate();
-
     MseBlock next = operator.nextBlock();
     assertTrue(next.isEos());
     assertFalse(next.isError());
@@ -531,6 +566,8 @@ public class SortedMergeJoinOperatorTest {
         .addRow(2, "b")
         .buildWithEos();
     MultiStageOperator right = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA)
+        .addRow(1, "a")
+        .finishBlock()
         .buildWithError(ErrorMseBlock.fromException(new RuntimeException("testRightError")));
     SortedMergeJoinOperator operator =
         getOperator(left, right, RESULT_SCHEMA, JoinRelType.INNER, List.of(0), List.of(0));
