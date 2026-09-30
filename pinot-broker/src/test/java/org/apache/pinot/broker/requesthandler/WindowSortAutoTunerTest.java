@@ -43,7 +43,7 @@ public class WindowSortAutoTunerTest {
     assertTrue(tuner.newSession(17L).useSenderSort(1, 2, 31, 41));
     WindowSortAutoTuner.Session senderSession = tuner.newSession(17L);
     assertTrue(senderSession.useSenderSort(1, 2, 31, 41));
-    senderSession.observe(null);
+    senderSession.observe(null, 0);
     assertTrue(tuner.newSession(17L).useSenderSort(1, 2, 31, 41));
 
     assertFalse(tuner.newSession(18L).useSenderSort(1, 2, 31, 41));
@@ -85,13 +85,13 @@ public class WindowSortAutoTunerTest {
     WindowSortAutoTuner.Session first = tuner.newSession(17L);
     assertFalse(first.useSenderSort(1, 2, 31, 41));
     assertTrue(first.shouldProfile(1, 2, 31, 41));
-    first.observe(presorted);
+    first.observe(presorted, 0);
 
     for (int i = 0; i < 7; i++) {
       WindowSortAutoTuner.Session skipped = tuner.newSession(17L);
       assertFalse(skipped.useSenderSort(1, 2, 31, 41));
       assertFalse(skipped.shouldProfile(1, 2, 31, 41));
-      skipped.observe(candidate);
+      skipped.observe(candidate, 0);
     }
     WindowSortAutoTuner.Session probe = tuner.newSession(17L);
     assertFalse(probe.useSenderSort(1, 2, 31, 41));
@@ -99,12 +99,12 @@ public class WindowSortAutoTunerTest {
     WindowSortAutoTuner.Session follower = tuner.newSession(17L);
     assertFalse(follower.useSenderSort(1, 2, 31, 41));
     assertFalse(follower.shouldProfile(1, 2, 31, 41));
-    follower.observe(candidate);
-    probe.observe(candidate);
+    follower.observe(candidate, 0);
+    probe.observe(candidate, 0);
     WindowSortAutoTuner.Session second = tuner.newSession(17L);
     assertFalse(second.useSenderSort(1, 2, 31, 41));
     assertTrue(second.shouldProfile(1, 2, 31, 41));
-    second.observe(candidate);
+    second.observe(candidate, 0);
     assertTrue(tuner.newSession(17L).useSenderSort(1, 2, 31, 41));
 
     WindowSortAutoTuner tiny = new WindowSortAutoTuner();
@@ -164,7 +164,7 @@ public class WindowSortAutoTunerTest {
       WindowSortAutoTuner.Session session = tuner.newSession(17L);
       assertFalse(session.useSenderSort(1, 2, 31, 41));
       assertFalse(session.useSenderSort(1, 3, 32, 42));
-      session.observe(stats);
+      session.observe(stats, 0);
     }
     assertFalse(tuner.newSession(17L).useSenderSort(1, 2, 31, 41));
     assertFalse(tuner.newSession(17L).useSenderSort(1, 3, 32, 42));
@@ -190,7 +190,7 @@ public class WindowSortAutoTunerTest {
     assertFalse(inFlightProbe.useSenderSort(1, 2, 31, 41));
     assertFalse(tuner.newSession(17L).useSenderSort(1, 2, 31, 41),
         "An in-flight receiver probe must not leave the sender plan ready");
-    inFlightProbe.observe(strong);
+    inFlightProbe.observe(strong, 0);
     assertTrue(observe(tuner, 17L, 1, 2, 31, 41, null));
 
     for (int i = 0; i < 6; i++) {
@@ -253,10 +253,10 @@ public class WindowSortAutoTunerTest {
     }
     WindowSortAutoTuner.Session probe = tuner.newSession(17L);
     assertFalse(probe.useSenderSort(1, 2, 31, 41));
-    oldCold.observe(strong);
+    oldCold.observe(strong, 0);
     assertFalse(observe(tuner, 17L, 1, 2, 31, 41, strong));
     assertFalse(tuner.newSession(17L).useSenderSort(1, 2, 31, 41));
-    probe.observe(strong);
+    probe.observe(strong, 0);
     assertTrue(tuner.newSession(17L).useSenderSort(1, 2, 31, 41));
   }
 
@@ -264,7 +264,7 @@ public class WindowSortAutoTunerTest {
       int inputHash, int collationHash, List<MultiStageQueryStats.StageStats.Closed> stats) {
     WindowSortAutoTuner.Session session = tuner.newSession(queryHash);
     boolean decision = session.useSenderSort(receiverStageId, senderStageId, inputHash, collationHash);
-    session.observe(stats);
+    session.observe(stats, 0);
     return decision;
   }
 

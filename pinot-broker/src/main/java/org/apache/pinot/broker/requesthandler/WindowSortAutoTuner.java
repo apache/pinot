@@ -141,10 +141,6 @@ public final class WindowSortAutoTuner {
 
     /// Call only after a successful query. Stats are stage-indexed; ambiguous or incomplete evidence resets the
     /// candidate to the receiver-sort plan. A sender-sort query does not provide a new receiver-sort sample.
-    public void observe(@Nullable List<MultiStageQueryStats.StageStats.Closed> stageStats) {
-      observe(stageStats, 0);
-    }
-
     /// The elapsed time spans dispatch through broker reduction, excluding planning and response construction.
     public void observe(@Nullable List<MultiStageQueryStats.StageStats.Closed> stageStats, long elapsedNanos) {
       if (!_observed.compareAndSet(false, true)) {
@@ -176,8 +172,8 @@ public final class WindowSortAutoTuner {
             || (snapshot.pendingProbe() == 0 && decision.probeToken() != 0)) {
           continue;
         }
-        _observations.asMap().compute(key, (ignored, evidence) -> {
-          if (evidence == null || evidence.generation() != decision.generation()) {
+        _observations.asMap().computeIfPresent(key, (ignored, evidence) -> {
+          if (evidence.generation() != decision.generation()) {
             return evidence;
           }
           if (evidence.pendingProbe() != 0) {
