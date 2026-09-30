@@ -106,6 +106,7 @@ public class SegmentMetadataMockUtils {
     SegmentMetadata segmentMetadata =
         mockSegmentMetadata(tableName, segmentName, numTotalDocs, crc, startTime, endTime, timeUnit);
     ColumnMetadata colMeta = mock(ColumnMetadata.class);
+    when(colMeta.getColumnName()).thenReturn(partitionColumn);
     when(colMeta.getPartitions()).thenReturn(Set.of(partitionId));
     when(colMeta.getPartitionFunction()).thenReturn(new MurmurPartitionFunction(numPartitions, null));
     TreeMap<String, ColumnMetadata> columnMetadataMap = new TreeMap<>();
@@ -117,6 +118,7 @@ public class SegmentMetadataMockUtils {
   public static SegmentMetadata mockSegmentMetadataWithPartitionInfo(String rawTableName, String segmentName,
       String columnName, int partitionNumber) {
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
+    when(columnMetadata.getColumnName()).thenReturn(columnName);
     Set<Integer> partitions = Set.of(partitionNumber);
     when(columnMetadata.getPartitions()).thenReturn(partitions);
     when(columnMetadata.getPartitionFunction()).thenReturn(new MurmurPartitionFunction(5, null));
