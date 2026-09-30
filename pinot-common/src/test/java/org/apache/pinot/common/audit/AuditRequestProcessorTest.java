@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
@@ -623,5 +624,78 @@ public class AuditRequestProcessorTest {
     InputStream capturedStream = streamCaptor.getValue();
     byte[] readBytes = ByteStreams.toByteArray(capturedStream);
     assertThat(new String(readBytes, StandardCharsets.UTF_8)).isEqualTo(nestedJson);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Media-type gating and binary-body handling.
+  //
+  // Controller segment uploads are multipart/form-data wrapping a gzipped tar. Captured as a
+  // body, those bytes decode to one U+FFFD per invalid byte, and each of those costs three bytes
+  // again when the record is serialised -- so a binary body inflates the audit record roughly
+  // 2.4x instead of being truncated. These tests pin both the gate and the fallback.
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testMultipartBodyIsNotCopiedIntoTheAuditRecord() {
+    assertThat(AuditRequestProcessor.isTextualMediaType(MediaType.MULTIPART_FORM_DATA_TYPE)).isFalse();
+  }
+
+  @Test
+  public void testOctetStreamBodyIsNotCopiedIntoTheAuditRecord() {
+    assertThat(AuditRequestProcessor.isTextualMediaType(MediaType.APPLICATION_OCTET_STREAM_TYPE)).isFalse();
+  }
+
+  @Test
+  public void testTextualMediaTypesAreStillCaptured() {
+    assertThat(AuditRequestProcessor.isTextualMediaType(MediaType.APPLICATION_JSON_TYPE)).isTrue();
+    assertThat(AuditRequestProcessor.isTextualMediaType(MediaType.TEXT_PLAIN_TYPE)).isTrue();
+    assertThat(AuditRequestProcessor.isTextualMediaType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).isTrue();
+    assertThat(AuditRequestProcessor.isTextualMediaType(MediaType.APPLICATION_XML_TYPE)).isTrue();
+    assertThat(AuditRequestProcessor.isTextualMediaType(new MediaType("application", "merge-patch+json"))).isTrue();
+  }
+
+  @Test
+  public void testMissingMediaTypeKeepsExistingBehaviour() {
+    assertThat(AuditRequestProcessor.isTextualMediaType(null)).isTrue();
+  }
+
+  @Test
+  public void testBinaryBodyIsReplacedWithItsSizeInsteadOfReplacementChars() {
+    byte[] binary = new byte[2048];
+    new java.util.Random(42).nextBytes(binary);
+    ByteArrayInputStream originalStream = new ByteArrayInputStream(binary);
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(originalStream);
+
+    String result = _processor.readRequestBody(_requestContext, binary.length);
+
+    assertThat(result).doesNotContain("\ufffd");
+    assertThat(result).isEqualTo(String.format(AuditRequestProcessor.BINARY_BODY_MARKER, binary.length));
+  }
+
+  /// A body cut mid-character yields a single U+FFFD, which must NOT be mistaken for binary --
+  /// otherwise ordinary truncated JSON would stop being audited.
+  @Test
+  public void testTruncatedUtf8TextIsStillTreatedAsText() {
+    String text = "{\"table\":\"caf\u00e9_metrics\"}";
+    byte[] utf8 = text.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    int cutMidCharacter = utf8.length - 6;
+    ByteArrayInputStream originalStream = new ByteArrayInputStream(utf8);
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(originalStream);
+
+    String result = _processor.readRequestBody(_requestContext, cutMidCharacter);
+
+    assertThat(result).startsWith("{\"table\"");
+    assertThat(result).endsWith(AuditRequestProcessor.TRUNCATION_MARKER);
+  }
+
+  @Test
+  public void testReplacementCharRatioClassifier() {
+    assertThat(AuditRequestProcessor.isMostlyReplacementChars("")).isFalse();
+    assertThat(AuditRequestProcessor.isMostlyReplacementChars("{\"a\":1}")).isFalse();
+    // one bad character in an otherwise textual body: still text
+    assertThat(AuditRequestProcessor.isMostlyReplacementChars("{\"a\":\"aaaaaaaaaaaaaaaaaaaa\ufffd\"}")).isFalse();
+    assertThat(AuditRequestProcessor.isMostlyReplacementChars("\ufffd\ufffd\ufffd\ufffd\ufffd")).isTrue();
   }
 }
