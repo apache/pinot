@@ -140,11 +140,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         Broker.DEFAULT_BROKER_QUERY_PROGRESS_ENABLED);
     _enableAutoRewriteAggregationType =
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE);
-    // Process-wide static because the SQL parser has no access to the broker config. Set here rather
-    // than parsed per query; a broker restart is needed to pick up a config change.
-    QueryOptionsUtils.setSqlQueryOptionValidationMode(SqlQueryOptionValidationMode.valueOf(
-        config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE,
-            Broker.DEFAULT_BROKER_QUERY_OPTION_VALIDATION_MODE).trim().toUpperCase(Locale.ROOT)));
     if (_enableQueryCancellation || _enableQueryProgress) {
       _queriesById = new ConcurrentHashMap<>();
       _clientQueryIds = new ConcurrentHashMap<>();
