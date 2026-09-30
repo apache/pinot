@@ -55,7 +55,7 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getNulls() {
-    return _nullBitmap != null ? new BitmapDocIdSet(_nullBitmap, _numDocs) : EmptyDocIdSet.getInstance();
+    return _nullBitmap != null ? new BitmapDocIdSet(_nullBitmap, _numDocs) : EmptyDocIdSet.unscanned();
   }
 
   /// The not-false documents are the ones matching the predicate over the stored values together with the null ones.
@@ -65,6 +65,9 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
     BlockDocIdSet matches = getNextBlockWithoutNullHandling();
     if (_nullBitmap == null) {
       return matches;
+    }
+    if (matches instanceof EmptyDocIdSet) {
+      return new BitmapDocIdSet(_nullBitmap, _numDocs, matches.getNumEntriesScannedInFilter());
     }
     return new OrDocIdSet(List.of(matches, new BitmapDocIdSet(_nullBitmap, _numDocs)), _numDocs);
   }
@@ -96,6 +99,9 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
   }
 
   private BlockDocIdSet excludeNulls(BlockDocIdSet blockDocIdSet, ImmutableRoaringBitmap nullBitmap) {
+    if (blockDocIdSet instanceof EmptyDocIdSet) {
+      return blockDocIdSet;
+    }
     return new AndDocIdSet(List.of(blockDocIdSet,
         new BitmapDocIdSet(ImmutableRoaringBitmap.flip(nullBitmap, 0, (long) _numDocs), _numDocs)),
         _queryContext.getQueryOptions());

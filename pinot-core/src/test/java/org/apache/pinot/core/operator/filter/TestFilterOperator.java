@@ -61,7 +61,7 @@ public class TestFilterOperator extends BaseFilterOperator {
       return new MatchAllDocIdSet(_numDocs);
     }
     if (_trueDocIds.length == 0) {
-      return EmptyDocIdSet.getInstance();
+      return EmptyDocIdSet.unscanned();
     }
     return new TestBlockDocIdSet(_trueDocIds);
   }
@@ -69,7 +69,7 @@ public class TestFilterOperator extends BaseFilterOperator {
   @Override
   protected BlockDocIdSet getNulls() {
     if (_nullDocIds.length == 0) {
-      return EmptyDocIdSet.getInstance();
+      return EmptyDocIdSet.unscanned();
     }
     return new TestBlockDocIdSet(_nullDocIds);
   }

@@ -27,7 +27,6 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
-import org.apache.pinot.core.operator.docidsets.ShortCircuitingDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.BufferFastAggregation;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -54,18 +53,17 @@ public class OrFilterOperator extends BaseFilterOperator {
     long totalEntriesScanned = 0L;
     for (BaseFilterOperator filterOperator : _filterOperators) {
       BlockDocIdSet blockDocIdSet = filterOperator.getTrues();
-      BlockDocIdSet optimizedDocIdSet = blockDocIdSet.getOptimizedDocIdSet();
       totalEntriesScanned += blockDocIdSet.getNumEntriesScannedInFilter();
-      if (optimizedDocIdSet instanceof MatchAllDocIdSet) {
+      if (blockDocIdSet instanceof MatchAllDocIdSet) {
         return new MatchAllDocIdSet(_numDocs);
       }
-      if (optimizedDocIdSet instanceof EmptyDocIdSet) {
+      if (blockDocIdSet instanceof EmptyDocIdSet) {
         continue;
       }
-      blockDocIdSets.add(optimizedDocIdSet);
+      blockDocIdSets.add(blockDocIdSet);
     }
     if (blockDocIdSets.isEmpty()) {
-      return new ShortCircuitingDocIdSet(totalEntriesScanned);
+      return new EmptyDocIdSet(totalEntriesScanned);
     }
     return new OrDocIdSet(blockDocIdSets, _numDocs);
   }
@@ -85,14 +83,14 @@ public class OrFilterOperator extends BaseFilterOperator {
       notFalses.add(childNotFalses);
     }
     if (notFalses.isEmpty()) {
-      return EmptyDocIdSet.getInstance();
+      return EmptyDocIdSet.unscanned();
     }
     return notFalses.size() == 1 ? notFalses.get(0) : new OrDocIdSet(notFalses, _numDocs);
   }
 
   @Override
   protected BlockDocIdSet getNulls() {
-    return mayHaveNulls() ? deriveNulls(_queryOptions) : EmptyDocIdSet.getInstance();
+    return mayHaveNulls() ? deriveNulls(_queryOptions) : EmptyDocIdSet.unscanned();
   }
 
   @Override
