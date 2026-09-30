@@ -55,6 +55,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertTrue;
 
 
 public class OpChainConverterDispatcherTest {
@@ -142,7 +143,9 @@ public class OpChainConverterDispatcherTest {
     }
   }
 
+  // Verify the legacy receiver fallback used by mixed-version plans.
   @Test
+  @SuppressWarnings("deprecation")
   public void testSortedReceiveOperatorSelection() {
     int stageId = 0;
     int senderStageId = 1;
@@ -156,13 +159,13 @@ public class OpChainConverterDispatcherTest {
     MailboxReceiveNode mergeReceiveNode = new MailboxReceiveNode(stageId, DATA_SCHEMA, senderStageId,
         PinotRelExchangeType.STREAMING, RelDistribution.Type.SINGLETON, List.of(), COLLATIONS, true, true, null);
     try (OpChain opChain = PlanNodeToOpChain.convert(mergeReceiveNode, context)) {
-      Assert.assertTrue(opChain.getRoot() instanceof SortedMailboxMergeReceiveOperator);
+      assertTrue(opChain.getRoot() instanceof SortedMailboxMergeReceiveOperator);
     }
 
     MailboxReceiveNode legacyReceiveNode = new MailboxReceiveNode(stageId, DATA_SCHEMA, senderStageId,
         PinotRelExchangeType.STREAMING, RelDistribution.Type.SINGLETON, List.of(), COLLATIONS, true, false, null);
     try (OpChain opChain = PlanNodeToOpChain.convert(legacyReceiveNode, context)) {
-      Assert.assertTrue(opChain.getRoot() instanceof SortedMailboxReceiveOperator);
+      assertTrue(opChain.getRoot() instanceof SortedMailboxReceiveOperator);
     }
   }
 
