@@ -93,7 +93,7 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
   private final JoinOverFlowMode _joinOverflowMode;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
   // Reused buffer holding the run of right rows that share the current join key.
-  private final List<Object[]> _rightRun = new ArrayList<>();
+  private List<Object[]> _rightRun = new ArrayList<>();
 
   @Nullable
   private Object[] _rightRunAnchor;
@@ -202,13 +202,38 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
   }
 
   @Override
+  protected void releaseBuffers() {
+    _rightRun = new ArrayList<>();
+    _rightRunAnchor = null;
+    _leftCursor.releaseRows();
+    _rightCursor.releaseRows();
+  }
+
+  @Override
+  protected boolean hasBufferedState() {
+    return !_rightRun.isEmpty() || _rightRunAnchor != null
+        || _leftCursor.hasBufferedRows() || _rightCursor.hasBufferedRows();
+  }
+
+  @Override
   protected MseBlock getNextBlock() {
+    try {
+      MseBlock block = getNextBlockInternal();
+      if (_eos != null) {
+        releaseBuffers();
+      }
+      return block;
+    } catch (RuntimeException e) {
+      releaseBuffers();
+      throw e;
+    }
+  }
+
+  private MseBlock getNextBlockInternal() {
     if (_eos != null) {
       return _eos;
     }
     if (_isEarlyTerminated) {
-      _rightRun.clear();
-      _rightRunAnchor = null;
       _eos = SuccessMseBlock.INSTANCE;
       return _eos;
     }
@@ -447,6 +472,15 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
         }
       }
       return true;
+    }
+
+    void releaseRows() {
+      _rows = List.of();
+      _index = 0;
+    }
+
+    boolean hasBufferedRows() {
+      return !_rows.isEmpty();
     }
 
     Object[] peek() {
