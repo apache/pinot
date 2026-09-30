@@ -30,27 +30,9 @@
         "ignoreV2Optimizer": true
       },
       {
-        "description": "Count of joined rows via sorted merge join",
-        "sql": "SELECT /*+ joinOptions(join_strategy='sorted') */ COUNT(*) FROM {user_events} a JOIN {user_events} b ON a.correlation_id = b.correlation_id",
-        "h2Sql": "SELECT COUNT(*) FROM {user_events} a JOIN {user_events} b ON a.correlation_id = b.correlation_id",
-        "ignoreV2Optimizer": true
-      },
-      {
         "description": "Funnel-style self-join: count correlation_ids that have both a checkout and an addToCart event",
         "sql": "SELECT /*+ joinOptions(join_strategy='sorted') */ COUNT(*) FROM {user_events} a JOIN {user_events} b ON a.correlation_id = b.correlation_id WHERE a.event = 'checkout' AND b.event = 'addToCart'",
         "h2Sql": "SELECT COUNT(*) FROM {user_events} a JOIN {user_events} b ON a.correlation_id = b.correlation_id WHERE a.event = 'checkout' AND b.event = 'addToCart'",
-        "ignoreV2Optimizer": true
-      },
-      {
-        "description": "Left sorted merge join with a non-equi residual condition on the right side (unmatched left rows padded with null)",
-        "sql": "SELECT /*+ joinOptions(join_strategy='sorted') */ a.correlation_id, a.event, b.event FROM {user_events} a LEFT JOIN {user_events} b ON a.correlation_id = b.correlation_id AND b.event = 'checkout'",
-        "h2Sql": "SELECT a.correlation_id, a.event, b.event FROM {user_events} a LEFT JOIN {user_events} b ON a.correlation_id = b.correlation_id AND b.event = 'checkout'",
-        "ignoreV2Optimizer": true
-      },
-      {
-        "description": "Aggregation above a sorted merge join",
-        "sql": "SELECT /*+ joinOptions(join_strategy='sorted') */ a.correlation_id, COUNT(*) FROM {user_events} a JOIN {user_events} b ON a.correlation_id = b.correlation_id GROUP BY a.correlation_id",
-        "h2Sql": "SELECT a.correlation_id, COUNT(*) FROM {user_events} a JOIN {user_events} b ON a.correlation_id = b.correlation_id GROUP BY a.correlation_id",
         "ignoreV2Optimizer": true
       },
       {

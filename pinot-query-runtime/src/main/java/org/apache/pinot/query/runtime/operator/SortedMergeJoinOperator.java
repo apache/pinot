@@ -77,7 +77,6 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
 
   private final Cursor _leftCursor;
   private final Cursor _rightCursor;
-  private final JoinRelType _joinType;
   private final boolean _needUnmatchedLeftRows;
   private final int[] _leftKeyIds;
   private final int[] _rightKeyIds;
@@ -110,9 +109,9 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
   public SortedMergeJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node) {
     super(context);
-    _joinType = node.getJoinType();
-    Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(_joinType),
-        "Join type: %s is not supported for sorted merge join", _joinType);
+    JoinRelType joinType = node.getJoinType();
+    Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(joinType),
+        "Join type: %s is not supported for sorted merge join", joinType);
     List<Integer> leftKeys = node.getLeftKeys();
     List<Integer> rightKeys = node.getRightKeys();
     Preconditions.checkState(!leftKeys.isEmpty(), "Sorted merge join operator requires join keys");
@@ -120,7 +119,7 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
         "Left and right join keys must have the same size, got: %s and %s", leftKeys.size(), rightKeys.size());
     _leftCursor = new Cursor(leftInput);
     _rightCursor = new Cursor(rightInput);
-    _needUnmatchedLeftRows = (_joinType == JoinRelType.LEFT);
+    _needUnmatchedLeftRows = joinType == JoinRelType.LEFT;
     _leftKeyIds = toIntArray(leftKeys);
     _rightKeyIds = toIntArray(rightKeys);
     _keyStoredTypes = new ColumnDataType[_leftKeyIds.length];
@@ -344,15 +343,10 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
     while (_rightRunIndex < _rightRun.size() && rows.size() < blockSize) {
       Object[] rightRow = _rightRun.get(_rightRunIndex++);
       checkTerminationAndSampleUsagePeriodically(++_numRowsProcessed, EMIT_MATCHED_KEY_SCOPE);
-      if (!_hasNonEquiConditions) {
+      if (!_hasNonEquiConditions || matchNonEquiConditions(
+          JoinedRowView.of(leftRow, rightRow, _resultColumnSize, _leftColumnSize))) {
         rows.add(joinRow(leftRow, rightRow));
         _leftRowMatched = true;
-      } else {
-        List<Object> resultRowView = joinRowView(leftRow, rightRow);
-        if (matchNonEquiConditions(resultRowView)) {
-          rows.add(resultRowView.toArray());
-          _leftRowMatched = true;
-        }
       }
     }
     if (_rightRunIndex == _rightRun.size()) {
@@ -420,14 +414,7 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
     return resultRow;
   }
 
-  private List<Object> joinRowView(@Nullable Object[] leftRow, @Nullable Object[] rightRow) {
-    return JoinedRowView.of(leftRow, rightRow, _resultColumnSize, _leftColumnSize);
-  }
-
   private boolean matchNonEquiConditions(List<Object> row) {
-    if (_nonEquiEvaluators.isEmpty()) {
-      return true;
-    }
     for (TransformOperand evaluator : _nonEquiEvaluators) {
       if (!BooleanUtils.isTrueInternalValue(evaluator.apply(row))) {
         return false;
