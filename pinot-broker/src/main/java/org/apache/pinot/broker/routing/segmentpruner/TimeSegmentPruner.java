@@ -62,20 +62,16 @@ public class TimeSegmentPruner implements SegmentPruner {
   private final String _timeColumn;
   private final DateTimeFormatSpec _timeFormatSpec;
 
-  /// Interval tree over [#_intervalMap], or `null` once a segment change has invalidated it.
-  ///
-  /// A rebuild is O(n log n) over every segment of the table, while a change usually touches a single segment, so the
-  /// tree is invalidated on change and rebuilt on read by [#getIntervalTree()] instead of being rebuilt per change.
-  /// That matters because the controller broadcasts a segment refresh message to every broker whenever a REALTIME
-  /// segment commits, while queries are spread across the brokers: one broker absorbs several refreshes per query it
-  /// serves, and rebuilding on read collapses them into one rebuild.
-  ///
-  /// Rebuilding on read rather than on a timer is required, not just convenient: [#prune(BrokerRequest, Set)] takes
-  /// the segments it returns from the tree, so a segment the tree does not know about is dropped from the routing
-  /// rather than merely left unpruned.
+  /// Rebuilt under the lock on this pruner and read by [#prune(BrokerRequest, Set)] without locking. Each tree is
+  /// immutable, so a query always sees a complete tree.
   private volatile IntervalTree<String> _intervalTree;
-  /// Guarded by the lock on this pruner, both for writes and for the reads that [#getIntervalTree()] makes.
+  /// Guarded by the lock on this pruner, except in [#init], which runs before the pruner is used.
   private final Map<String, Interval> _intervalMap = new HashMap<>();
+  /// True while [#_intervalTree] may lag [#_intervalMap]: set before the map is updated and cleared once the tree
+  /// matches it again. If an update throws part way (e.g. with an OutOfMemoryError), the next update rebuilds the tree
+  /// even when it changes nothing, instead of skipping the rebuild and leaving segments missing from the tree. Guarded
+  /// by the lock on this pruner.
+  private boolean _intervalTreeStale;
 
   public TimeSegmentPruner(TableConfig tableConfig, DateTimeFieldSpec timeFieldSpec) {
     _tableNameWithType = tableConfig.getTableName();
@@ -84,7 +80,7 @@ public class TimeSegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public synchronized void init(IdealState idealState, ExternalView externalView, List<String> onlineSegments,
+  public void init(IdealState idealState, ExternalView externalView, List<String> onlineSegments,
       List<ZNRecord> znRecords) {
     // Bulk load time info for all online segments
     for (int idx = 0; idx < onlineSegments.size(); idx++) {
@@ -120,6 +116,8 @@ public class TimeSegmentPruner implements SegmentPruner {
       Set<String> onlineSegments, List<String> pulledSegments, List<ZNRecord> znRecords) {
     // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
     //       ones. The refreshed segment ZK metadata change won't be picked up.
+    boolean treeWasStale = _intervalTreeStale;
+    _intervalTreeStale = true;
     int numSegmentsBefore = _intervalMap.size();
     for (int idx = 0; idx < pulledSegments.size(); idx++) {
       String segment = pulledSegments.get(idx);
@@ -130,35 +128,29 @@ public class TimeSegmentPruner implements SegmentPruner {
     // view change that adds and removes no segment (e.g. a replica changing state) leaves the tree correct as is.
     boolean segmentsChanged = _intervalMap.size() != numSegmentsBefore;
     segmentsChanged |= _intervalMap.keySet().retainAll(onlineSegments);
-    if (segmentsChanged) {
-      _intervalTree = null;
+    if (segmentsChanged || treeWasStale) {
+      _intervalTree = new IntervalTree<>(_intervalMap);
     }
+    _intervalTreeStale = false;
   }
 
   @Override
   public synchronized void refreshSegment(String segment, @Nullable ZNRecord znRecord) {
     Interval interval = extractIntervalFromSegmentZKMetaZNRecord(segment, znRecord);
+    boolean treeWasStale = _intervalTreeStale;
+    _intervalTreeStale = true;
+    Interval previousInterval = _intervalMap.put(segment, interval);
     // A segment is commonly refreshed onto the time interval it already has (e.g. an OFFLINE segment replaced with a
     // new build of the same time range), which leaves the tree correct as is
-    if (!interval.equals(_intervalMap.put(segment, interval))) {
-      _intervalTree = null;
+    if (treeWasStale || !interval.equals(previousInterval)) {
+      _intervalTree = new IntervalTree<>(_intervalMap);
     }
+    _intervalTreeStale = false;
   }
 
-  /// Returns the interval tree, rebuilding it first if a segment change has invalidated it.
   @VisibleForTesting
   IntervalTree<String> getIntervalTree() {
-    IntervalTree<String> intervalTree = _intervalTree;
-    if (intervalTree == null) {
-      synchronized (this) {
-        intervalTree = _intervalTree;
-        if (intervalTree == null) {
-          intervalTree = new IntervalTree<>(_intervalMap);
-          _intervalTree = intervalTree;
-        }
-      }
-    }
-    return intervalTree;
+    return _intervalTree;
   }
 
   /// NOTE: Pruning is done by searching \_intervalTree based on request time interval and check if the results
@@ -166,6 +158,7 @@ public class TimeSegmentPruner implements SegmentPruner {
   ///       M: # of qualified intersected segments).
   @Override
   public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
+    IntervalTree<String> intervalTree = _intervalTree;
     Expression filterExpression = brokerRequest.getPinotQuery().getFilterExpression();
     if (filterExpression == null) {
       return segments;
@@ -181,9 +174,6 @@ public class TimeSegmentPruner implements SegmentPruner {
       return Set.of();
     }
 
-    // Read the tree only once it is known to be needed, so that queries without a prunable time filter never pay for
-    // a rebuild
-    IntervalTree<String> intervalTree = getIntervalTree();
     Set<String> selectedSegments = new HashSet<>();
     for (Interval interval : intervals) {
       for (String segment : intervalTree.searchAll(interval)) {

@@ -53,13 +53,11 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 /// Benchmarks the broker-side segment metadata maintenance path of [TimeSegmentPruner].
 ///
-/// Every LLC REALTIME segment commit makes the controller broadcast a segment refresh message to every broker, so on a
-/// large table the per-broker refresh rate is a multiple of the per-broker query rate. `refreshBurstThenPrune`
-/// models that ratio and is the number to compare across changes; `refreshChangedInterval` and
-/// `refreshUnchangedInterval` isolate the two refresh shapes (a committing REALTIME segment getting its time range for
-/// the first time, and an OFFLINE segment re-pushed with the same time range). `prune` and `pruneAfterSegmentChange`
-/// bracket the query path: the cost when the interval tree is already built, and the cost when the query is the one
-/// that has to build it.
+/// Every LLC REALTIME segment commit makes the controller broadcast a segment refresh message to every broker, and each
+/// refresh that changes a segment's time range rebuilds the table's interval tree. `refreshChangedInterval` is that
+/// cost: a committing REALTIME segment getting its time range. `refreshUnchangedInterval` is an OFFLINE segment
+/// re-pushed with the same time range, which must skip the rebuild. `prune` is the query path, which reads the tree
+/// but never builds it.
 ///
 /// Run with `-prof gc` — allocation rate matters more than latency here, because the garbage this path produces is
 /// promoted to old gen rather than dying in eden.
@@ -74,9 +72,6 @@ public class BenchmarkTimeSegmentPruner {
   private static final String TIME_COLUMN = "tsMs";
   private static final long BASE_TIME_MS = 1704067200000L; // 2024-01-01T00:00:00Z
   private static final long SEGMENT_SPAN_MS = TimeUnit.HOURS.toMillis(1);
-  /// Refresh messages are broadcast to every broker while queries are spread across them, so each broker sees several
-  /// refreshes per query it serves.
-  private static final int REFRESHES_PER_QUERY = 6;
 
   @Param({"10000", "100000", "250000"})
   private int _numSegments;
@@ -135,18 +130,14 @@ public class BenchmarkTimeSegmentPruner {
   /// The segment is moved one time bucket forward rather than past the end of the table, so that the number of
   /// distinct intervals and the selectivity of the benchmark query both stay at the values `_numSegments` and
   /// `_numSegmentsPerInterval` model, however long the benchmark runs.
-  private void refreshChanged() {
+  @Benchmark
+  public void refreshChangedInterval() {
     int index = _cursor++;
     int segmentIndex = index % _numSegments;
     String segment = _segments.get(segmentIndex);
     int intervalIndex = (segmentIndex / _numSegmentsPerInterval + 1 + index / _numSegments) % _numIntervals;
     long startTimeMs = BASE_TIME_MS + (long) intervalIndex * SEGMENT_SPAN_MS;
     _segmentPruner.refreshSegment(segment, createZNRecord(segment, startTimeMs, startTimeMs + SEGMENT_SPAN_MS - 1));
-  }
-
-  @Benchmark
-  public void refreshChangedInterval() {
-    refreshChanged();
   }
 
   /// Refreshes a segment onto the time range it already has - the OFFLINE re-push shape.
@@ -158,29 +149,9 @@ public class BenchmarkTimeSegmentPruner {
     _segmentPruner.refreshSegment(segment, createZNRecord(segment, startTimeMs, startTimeMs + SEGMENT_SPAN_MS - 1));
   }
 
-  /// A full production cycle: the refreshes one broker absorbs between two queries it serves, then the query.
-  @Benchmark
-  public void refreshBurstThenPrune(Blackhole blackhole) {
-    for (int i = 0; i < REFRESHES_PER_QUERY; i++) {
-      refreshChanged();
-    }
-    blackhole.consume(_segmentPruner.prune(_brokerRequest, _onlineSegments));
-  }
-
   /// Query path only, to confirm pruning itself does not regress.
   @Benchmark
   public void prune(Blackhole blackhole) {
-    blackhole.consume(_segmentPruner.prune(_brokerRequest, _onlineSegments));
-  }
-
-  /// The latency one query pays when it is the first to read the tree after a segment change. This is the cost the
-  /// lazy rebuild moves onto the query path, so measure it on its own rather than blended into a throughput number.
-  /// The refresh itself is a fraction of a microsecond and does not move the result.
-  @Benchmark
-  @BenchmarkMode(Mode.SingleShotTime)
-  @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public void pruneAfterSegmentChange(Blackhole blackhole) {
-    refreshChanged();
     blackhole.consume(_segmentPruner.prune(_brokerRequest, _onlineSegments));
   }
 

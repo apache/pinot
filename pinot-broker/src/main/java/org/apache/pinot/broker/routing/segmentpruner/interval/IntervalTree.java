@@ -40,8 +40,8 @@ import javax.annotation.Nullable;
 /// is held as the sorted array `{ [5, 10], [8, 15], [10, 20], [10, 30], [12, 20] }`.
 ///
 /// The tree is held implicitly and its payload in flat arrays because a tree is rebuilt whenever the segments of a
-/// table change, and on a table with hundreds of thousands of segments an object per interval dominates broker
-/// allocation. See [org.apache.pinot.broker.routing.segmentpruner.TimeSegmentPruner] for how rebuilds are batched.
+/// table change, including on every REALTIME segment commit, and on a table with hundreds of thousands of segments an
+/// object per interval dominates broker allocation.
 ///
 /// Instances are immutable and safe to publish to readers through a volatile field.
 public class IntervalTree<VALUE> {

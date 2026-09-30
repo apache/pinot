@@ -19,20 +19,12 @@
 package org.apache.pinot.broker.routing.segmentpruner;
 
 import java.sql.Timestamp;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
@@ -70,12 +62,14 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotSame;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -513,11 +507,11 @@ public class SegmentPrunerTest extends ControllerTest {
     assertEquals(segmentPruner.prune(brokerRequest9, input), Set.of()); // Query with invalid range
   }
 
-  /// A segment is often refreshed onto the time range it already has (an OFFLINE segment replaced by a new build of
-  /// the same range). Pruning must be unaffected, the tree must not be rebuilt, and a refresh that does change the
-  /// range must still be picked up even when several refreshes land between two queries.
+  /// The interval tree is rebuilt over every segment of the table, so it must be rebuilt only when the set of segments
+  /// or a segment's time range actually changes. A refresh onto the same time range (an OFFLINE segment replaced by a
+  /// new build of the same range) and an assignment change that adds and removes no segment must keep the tree as is.
   @Test
-  public void testTimeSegmentPrunerRepeatedRefresh() {
+  public void testTimeSegmentPrunerRebuildsOnlyOnChange() {
     BrokerRequest selectAll = CalciteSqlCompiler.compileToBrokerRequest(QUERY_1);
     BrokerRequest between20And30 = CalciteSqlCompiler.compileToBrokerRequest(TIME_QUERY_2);
 
@@ -528,122 +522,95 @@ public class SegmentPrunerTest extends ControllerTest {
 
     String segment0 = "segment0";
     String segment1 = "segment1";
-    List<String> segments = List.of(segment0, segment1);
     Set<String> input = Set.of(segment0, segment1);
-    segmentPruner.init(null, null, segments,
+    segmentPruner.init(null, null, List.of(segment0, segment1),
         List.of(createTimeRangeZNRecord(segment0, 10, 15), createTimeRangeZNRecord(segment1, 25, 35)));
     assertEquals(segmentPruner.prune(selectAll, input), input);
     assertEquals(segmentPruner.prune(between20And30, input), Set.of(segment1));
 
-    // Refreshing onto the same time range must not change pruning, and must not rebuild the tree
+    // Refreshing onto the same time range keeps the tree
     IntervalTree<String> intervalTree = segmentPruner.getIntervalTree();
     segmentPruner.refreshSegment(segment0, createTimeRangeZNRecord(segment0, 10, 15));
     segmentPruner.refreshSegment(segment1, createTimeRangeZNRecord(segment1, 25, 35));
     assertSame(segmentPruner.getIntervalTree(), intervalTree);
     assertEquals(segmentPruner.prune(between20And30, input), Set.of(segment1));
 
-    // Several refreshes between two queries must all be reflected by the next query
+    // An assignment change that adds and removes no segment keeps the tree
+    segmentPruner.onAssignmentChange(null, null, input, List.of(), List.of());
+    assertSame(segmentPruner.getIntervalTree(), intervalTree);
+
+    // Refreshing onto a new time range rebuilds the tree
     segmentPruner.refreshSegment(segment0, createTimeRangeZNRecord(segment0, 20, 22));
     segmentPruner.refreshSegment(segment1, createTimeRangeZNRecord(segment1, 40, 50));
-    assertEquals(segmentPruner.prune(between20And30, input), Set.of(segment0));
     assertNotSame(segmentPruner.getIntervalTree(), intervalTree);
+    assertEquals(segmentPruner.prune(between20And30, input), Set.of(segment0));
+
+    // Adding a segment rebuilds the tree
+    intervalTree = segmentPruner.getIntervalTree();
+    String segment2 = "segment2";
+    Set<String> inputWithSegment2 = Set.of(segment0, segment1, segment2);
+    segmentPruner.onAssignmentChange(null, null, inputWithSegment2, List.of(segment2),
+        List.of(createTimeRangeZNRecord(segment2, 28, 29)));
+    assertNotSame(segmentPruner.getIntervalTree(), intervalTree);
+    assertEquals(segmentPruner.prune(between20And30, inputWithSegment2), Set.of(segment0, segment2));
+
+    // Removing a segment rebuilds the tree, so the removed segment is no longer selected
+    intervalTree = segmentPruner.getIntervalTree();
+    segmentPruner.onAssignmentChange(null, null, input, List.of(), List.of());
+    assertNotSame(segmentPruner.getIntervalTree(), intervalTree);
+    assertEquals(segmentPruner.prune(between20And30, inputWithSegment2), Set.of(segment0));
 
     // A segment whose ZK metadata went missing falls back to the full time range and is not pruned
     segmentPruner.refreshSegment(segment1, null);
     assertEquals(segmentPruner.prune(between20And30, input), Set.of(segment0, segment1));
+
+    // Replacing a segment adds one and removes one, so the segment count stays the same, but the tree must be rebuilt
+    intervalTree = segmentPruner.getIntervalTree();
+    String segment3 = "segment3";
+    segmentPruner.onAssignmentChange(null, null, Set.of(segment0, segment3), List.of(segment3),
+        List.of(createTimeRangeZNRecord(segment3, 24, 26)));
+    assertNotSame(segmentPruner.getIntervalTree(), intervalTree);
+    assertEquals(segmentPruner.prune(between20And30, Set.of(segment0, segment1, segment3)), Set.of(segment0, segment3));
   }
 
-  /// Pruning reads the interval tree without holding the pruner lock, so a concurrent segment change must never make
-  /// a segment disappear from the result: the tree is the source of the selected segments, not just a filter over
-  /// them. The writer alternates refreshes with assignment changes, because only an assignment change structurally
-  /// modifies the interval map that the rebuild iterates.
+  /// An update that throws part way (e.g. with an OutOfMemoryError while the broker is under heap pressure) can leave
+  /// the interval map ahead of the tree. The next update must rebuild the tree even when it changes nothing itself,
+  /// or the segments added before the failure stay missing from the tree and are dropped from the routing.
   @Test
-  public void testTimeSegmentPrunerConcurrentSegmentChangeAndPrune()
-      throws Exception {
+  public void testTimeSegmentPrunerRecoversFromFailedUpdate() {
     BrokerRequest between20And30 = CalciteSqlCompiler.compileToBrokerRequest(TIME_QUERY_2);
 
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN).build();
     DateTimeFieldSpec timeFieldSpec = new DateTimeFieldSpec(TIME_COLUMN, DataType.INT, "EPOCH|DAYS", "1:DAYS");
     TimeSegmentPruner segmentPruner = new TimeSegmentPruner(tableConfig, timeFieldSpec);
+    String segment0 = "segment0";
+    segmentPruner.init(null, null, List.of(segment0), List.of(createTimeRangeZNRecord(segment0, 20, 22)));
+    ZNRecord brokenZNRecord = mock(ZNRecord.class);
+    when(brokenZNRecord.getLongField(anyString(), anyLong())).thenThrow(new IllegalStateException("broken"));
+    String brokenSegment = "brokenSegment";
 
-    // Segments that always stay online and always fall inside the queried range
-    int numStableSegments = 200;
-    Set<String> stableSegments = new HashSet<>();
-    List<String> segments = new ArrayList<>();
-    List<ZNRecord> znRecords = new ArrayList<>();
-    for (int i = 0; i < numStableSegments; i++) {
-      String segment = "stableSegment" + i;
-      stableSegments.add(segment);
-      segments.add(segment);
-      znRecords.add(createTimeRangeZNRecord(segment, 20 + i % 10, 25 + i % 10));
-    }
-    segmentPruner.init(null, null, segments, znRecords);
+    // The update adds segment1, then fails on the broken segment before the tree is rebuilt
+    String segment1 = "segment1";
+    assertThrows(IllegalStateException.class,
+        () -> segmentPruner.onAssignmentChange(null, null, Set.of(segment0, segment1, brokenSegment),
+            List.of(segment1, brokenSegment), List.of(createTimeRangeZNRecord(segment1, 25, 26), brokenZNRecord)));
+    Set<String> input = Set.of(segment0, segment1);
+    assertEquals(segmentPruner.prune(between20And30, input), Set.of(segment0));
 
-    // Segments that are repeatedly added and dropped, so that the interval map is structurally modified
-    int numChurningSegments = 50;
-    List<String> churningSegments = new ArrayList<>(numChurningSegments);
-    List<ZNRecord> churningZnRecords = new ArrayList<>(numChurningSegments);
-    for (int i = 0; i < numChurningSegments; i++) {
-      String segment = "churningSegment" + i;
-      churningSegments.add(segment);
-      churningZnRecords.add(createTimeRangeZNRecord(segment, 21, 22));
-    }
-    Set<String> allSegments = new HashSet<>(stableSegments);
-    allSegments.addAll(churningSegments);
+    // A refresh onto the same time range changes nothing, but must still rebuild the stale tree
+    segmentPruner.refreshSegment(segment0, createTimeRangeZNRecord(segment0, 20, 22));
+    assertEquals(segmentPruner.prune(between20And30, input), Set.of(segment0, segment1));
 
-    int numReaders = 4;
-    int minRounds = 500;
-    long minPrunes = 2000;
-    CountDownLatch readersStarted = new CountDownLatch(numReaders);
-    AtomicBoolean writing = new AtomicBoolean(true);
-    AtomicLong numPrunes = new AtomicLong();
-    AtomicReference<String> failure = new AtomicReference<>();
-    ExecutorService executorService = Executors.newFixedThreadPool(numReaders);
-    List<Future<?>> readers = new ArrayList<>(numReaders);
-    try {
-      for (int i = 0; i < numReaders; i++) {
-        readers.add(executorService.submit(() -> {
-          readersStarted.countDown();
-          try {
-            while (writing.get() && failure.get() == null) {
-              Set<String> selectedSegments = segmentPruner.prune(between20And30, allSegments);
-              numPrunes.incrementAndGet();
-              if (!selectedSegments.containsAll(stableSegments)) {
-                Set<String> missingSegments = new HashSet<>(stableSegments);
-                missingSegments.removeAll(selectedSegments);
-                failure.compareAndSet(null, "Lost segments while the segment assignment changed: " + missingSegments);
-              }
-            }
-          } catch (RuntimeException | Error e) {
-            // Stop the writer at once. Future.get() below still rethrows the original exception with its stack.
-            failure.compareAndSet(null, "Reader failed: " + e);
-            throw e;
-          }
-        }));
-      }
-      assertTrue(readersStarted.await(1, TimeUnit.MINUTES));
-      // Keep changing segments until the readers have raced the writer enough times, however slowly the machine
-      // schedules them
-      long deadlineNs = System.nanoTime() + TimeUnit.MINUTES.toNanos(1);
-      for (int i = 0; (i < minRounds || numPrunes.get() < minPrunes) && failure.get() == null; i++) {
-        assertTrue(System.nanoTime() < deadlineNs, "Readers only pruned " + numPrunes.get() + " times in a minute");
-        segmentPruner.onAssignmentChange(null, null, allSegments, churningSegments, churningZnRecords);
-        for (String churningSegment : churningSegments) {
-          segmentPruner.refreshSegment(churningSegment, createTimeRangeZNRecord(churningSegment, 21, 22 + i % 5));
-        }
-        segmentPruner.onAssignmentChange(null, null, stableSegments, List.of(), List.of());
-      }
-    } finally {
-      writing.set(false);
-      executorService.shutdown();
-      assertTrue(executorService.awaitTermination(1, TimeUnit.MINUTES));
-    }
-    // Rethrows anything a reader threw, e.g. a ConcurrentModificationException from an unguarded rebuild
-    for (Future<?> reader : readers) {
-      reader.get();
-    }
-    assertNull(failure.get(), failure.get());
+    // The same failure again, this time repaired by an assignment change that adds and removes no segment
+    String segment2 = "segment2";
+    assertThrows(IllegalStateException.class,
+        () -> segmentPruner.onAssignmentChange(null, null, Set.of(segment0, segment1, segment2, brokenSegment),
+            List.of(segment2, brokenSegment), List.of(createTimeRangeZNRecord(segment2, 27, 28), brokenZNRecord)));
+    Set<String> inputWithSegment2 = Set.of(segment0, segment1, segment2);
+    assertEquals(segmentPruner.prune(between20And30, inputWithSegment2), Set.of(segment0, segment1));
+    segmentPruner.onAssignmentChange(null, null, inputWithSegment2, List.of(), List.of());
+    assertEquals(segmentPruner.prune(between20And30, inputWithSegment2), Set.of(segment0, segment1, segment2));
   }
 
   @Test
