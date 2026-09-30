@@ -538,32 +538,31 @@ public class PluginManager {
 
   private static <S> void collectServiceProviders(ServiceLoader<S> serviceLoader, Class<S> serviceClass, String source,
       List<ServiceProvider<S>> providers, Map<String, Class<?>> seenProviderClasses) {
-    Iterator<S> iterator = serviceLoader.iterator();
+    Iterator<ServiceLoader.Provider<S>> iterator = serviceLoader.stream().iterator();
     while (true) {
-      S provider;
       try {
         if (!iterator.hasNext()) {
           return;
         }
-        provider = iterator.next();
+        ServiceLoader.Provider<S> candidate = iterator.next();
+        Class<? extends S> providerClass = candidate.type();
+        String providerClassName = providerClass.getName();
+        Class<?> seenClass = seenProviderClasses.putIfAbsent(providerClassName, providerClass);
+        if (seenClass != null) {
+          // Same provider already discovered through an overlapping classloader. A different Class object with the
+          // same name indicates version skew between classloaders; the first discovered copy wins.
+          if (seenClass != providerClass) {
+            LOGGER.warn("Ignoring duplicate service provider class: {} (classloader: {}, discovered from: {}); keeping "
+                    + "the copy from classloader: {}", providerClassName, providerClass.getClassLoader(), source,
+                seenClass.getClassLoader());
+          }
+          continue;
+        }
+        providers.add(new ServiceProvider<>(candidate.get(), source));
       } catch (ServiceConfigurationError e) {
         throw new IllegalStateException(
             "Failed to load a " + serviceClass.getName() + " service provider from: " + source, e);
       }
-      Class<?> providerClass = provider.getClass();
-      String providerClassName = providerClass.getName();
-      Class<?> seenClass = seenProviderClasses.putIfAbsent(providerClassName, providerClass);
-      if (seenClass != null) {
-        // Same provider already discovered through an overlapping classloader. A different Class object with the
-        // same name indicates version skew between classloaders; the first discovered copy wins.
-        if (seenClass != providerClass) {
-          LOGGER.warn("Ignoring duplicate service provider class: {} (classloader: {}, discovered from: {}); keeping "
-                  + "the copy from classloader: {}", providerClassName, providerClass.getClassLoader(), source,
-              seenClass.getClassLoader());
-        }
-        continue;
-      }
-      providers.add(new ServiceProvider<>(provider, source));
     }
   }
 
