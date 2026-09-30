@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.pinot.query.QueryEnvironment.CompiledQuery;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
@@ -1291,7 +1292,10 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   @Test
   public void testGlobalOrderedWindowSenderHasExplicitMatchingSortInput() {
     String query = "SET windowSortOnSender=true; SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d";
-    DispatchableSubPlan plan = _queryEnvironment.planQuery(query);
+    DispatchableSubPlan plan;
+    try (CompiledQuery compiled = _queryEnvironment.compile(query)) {
+      plan = compiled.planQuery(0).getQueryPlan();
+    }
     MailboxSendNode sendNode = findWindowInputSendNode(plan);
 
     assertTrue(sendNode.isSort(), "The ordered window exchange should advertise sorted sender streams");
@@ -1312,9 +1316,12 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertTrue(receiveNode.isSort());
     assertTrue(receiveNode.isSortedOnSender());
 
-    String explain = _queryEnvironment.explainQuery(
+    String explain;
+    try (CompiledQuery compiled = _queryEnvironment.compile(
         "SET windowSortOnSender=true; EXPLAIN IMPLEMENTATION PLAN FOR "
-            + "SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d", RANDOM_REQUEST_ID_GEN.nextLong());
+            + "SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d")) {
+      explain = compiled.explain(RANDOM_REQUEST_ID_GEN.nextLong(), null).getExplainPlan();
+    }
     assertTrue(explain.contains("[SORTED]"), explain);
     assertTrue(explain.contains("SORT LIMIT 2147483647"), explain);
   }
@@ -1335,7 +1342,10 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   @Test
   public void testPartitionedOrderedWindowUsesReceiverFullSort() {
     String query = "SELECT col1, SUM(col3) OVER (PARTITION BY col1 ORDER BY col3) FROM d";
-    MailboxSendNode sendNode = findWindowInputSendNode(_queryEnvironment.planQuery(query));
+    MailboxSendNode sendNode;
+    try (CompiledQuery compiled = _queryEnvironment.compile(query)) {
+      sendNode = findWindowInputSendNode(compiled.planQuery(0).getQueryPlan());
+    }
 
     assertFalse(sendNode.isSort(), "The partitioned exchange must not advertise a globally sorted sender stream");
     assertFalse(sendNode.hasExplicitSortInput(), "The partitioned exchange must not sort before hash distribution");
