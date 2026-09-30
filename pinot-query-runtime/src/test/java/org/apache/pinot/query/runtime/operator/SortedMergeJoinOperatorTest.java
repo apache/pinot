@@ -204,6 +204,7 @@ public class SortedMergeJoinOperatorTest {
         getOperator(left, right, RESULT_SCHEMA, JoinRelType.INNER, List.of(1), List.of(1), nodeHint);
     MseBlock block = operator.nextBlock();
     assertTrue(block.isError(), "THROW overflow mode should produce an error block");
+    assertFalse(operator.hasBufferedState());
   }
 
   @Test(expectedExceptions = IllegalStateException.class)
@@ -403,6 +404,7 @@ public class SortedMergeJoinOperatorTest {
     StatMap<SortedMergeJoinOperator.StatKey> statMap =
         OperatorTestUtil.getStatMap(SortedMergeJoinOperator.StatKey.class, operator.calculateStats());
     assertTrue(statMap.getBoolean(SortedMergeJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED));
+    assertFalse(operator.hasBufferedState());
   }
 
   @DataProvider
@@ -442,6 +444,7 @@ public class SortedMergeJoinOperatorTest {
       block = operator.nextBlock();
     }
     assertFalse(block.isError());
+    assertFalse(operator.hasBufferedState());
     assertEquals(rows.size(), 3001, "Total streamed output may exceed the buffered-run budget");
     for (int i = 0; i < 3000; i++) {
       assertEquals(rows.get(i), new Object[]{i < 1500 ? 5 : 6, "k", 10 + i % 1500, "k"});
@@ -467,6 +470,33 @@ public class SortedMergeJoinOperatorTest {
     assertTrue(next.isEos());
     assertFalse(next.isError());
     assertSame(next, SuccessMseBlock.INSTANCE);
+    assertFalse(operator.hasBufferedState());
+  }
+
+  @Test(dataProvider = "residualFilter")
+  public void shouldReleaseBufferedRowsWithoutChangingOutput(boolean cancel) {
+    MultiStageOperator left = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA)
+        .addRow(1, "k")
+        .addRow(2, "k")
+        .buildWithEos();
+    BlockListMultiStageOperator.Builder rightBuilder = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA);
+    for (int i = 0; i < 1500; i++) {
+      rightBuilder.addRow(i, "k");
+    }
+    SortedMergeJoinOperator operator = getOperator(left, rightBuilder.buildWithEos(), RESULT_SCHEMA,
+        JoinRelType.INNER, List.of(1), List.of(1));
+    MseBlock.Data output = (MseBlock.Data) operator.nextBlock();
+    assertTrue(operator.hasBufferedState());
+    if (cancel) {
+      operator.cancel(new RuntimeException("cancelled"));
+    } else {
+      operator.close();
+    }
+    assertFalse(operator.hasBufferedState());
+    operator.close();
+    assertFalse(operator.hasBufferedState());
+    assertEquals(output.getNumRows(), 1024);
+    assertEquals(output.asRowHeap().getRows().get(0), new Object[]{1, "k", 0, "k"});
   }
 
   @Test
@@ -555,6 +585,7 @@ public class SortedMergeJoinOperatorTest {
         getOperator(left, right, RESULT_SCHEMA, JoinRelType.INNER, List.of(0), List.of(0));
     MseBlock block = operator.nextBlock();
     assertTrue(block.isError());
+    assertFalse(operator.hasBufferedState());
     assertTrue(((ErrorMseBlock) block).getErrorMessages()
         .get(QueryErrorCode.UNKNOWN).contains("testLeftError"));
   }
@@ -573,6 +604,7 @@ public class SortedMergeJoinOperatorTest {
         getOperator(left, right, RESULT_SCHEMA, JoinRelType.INNER, List.of(0), List.of(0));
     MseBlock block = operator.nextBlock();
     assertTrue(block.isError());
+    assertFalse(operator.hasBufferedState());
     assertTrue(((ErrorMseBlock) block).getErrorMessages()
         .get(QueryErrorCode.UNKNOWN).contains("testRightError"));
   }
