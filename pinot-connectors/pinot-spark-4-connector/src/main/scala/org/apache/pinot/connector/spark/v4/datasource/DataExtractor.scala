@@ -61,7 +61,7 @@ private[pinot] object DataExtractor {
       case FieldSpec.DataType.BOOLEAN => BooleanType
       case FieldSpec.DataType.JSON => StringType
       case _ =>
-        throw PinotException(s"Unsupported pinot data type '$dataType")
+        throw PinotException(s"Unsupported pinot data type '$dataType'")
     }
 
   /** Convert Pinot DataTable to Seq of InternalRow */
