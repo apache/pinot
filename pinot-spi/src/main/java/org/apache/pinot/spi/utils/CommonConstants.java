@@ -884,9 +884,8 @@ public class CommonConstants {
         /// This bounds each server's derived output for high-cardinality unions at the cost of an approximate
         /// top-K (a group ranked below the keep on one server may still be globally in the top-K once servers
         /// merge); when it drops groups, the response is flagged as trimmed. The broker still applies the final
-        /// ORDER BY + LIMIT across all sets. Non-positive or unset (default) disables the server-side trim, so
-        /// all derived groups are kept and only the broker trims -- the exact (but higher memory/network)
-        /// policy. Ignored without an ORDER BY.
+        /// ORDER BY + LIMIT across all sets. Non-positive or unset (default) disables this per-set trim; the
+        /// server's global derived-group cap still applies. Ignored without an ORDER BY.
         public static final String GROUPING_SETS_MIN_SERVER_TRIM_SIZE = "groupingSetsMinServerTrimSize";
 
         // When safeTrim (ORDER BY groupKeys without HAVING clause), do sort aggregate when LIMIT is below this value
@@ -923,7 +922,7 @@ public class CommonConstants {
         /// cardinalities) for which [#GROUPING_SETS_BASE_AGGREGATION] is used; above it the per-row expansion
         /// path is used. Defaults to the query's `numGroupsLimit` when unset: if the base grouping alone could
         /// approach the group limit, base groups could be dropped -- corrupting the derived totals -- and the
-        /// derived output (up to estimate x numSets rows per server) could grow unbounded. Ignored when base
+        /// derive could do excessive work even though its output is capped. Ignored when base
         /// aggregation is disabled.
         public static final String GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS = "groupingSetsBaseAggregationMaxGroups";
 

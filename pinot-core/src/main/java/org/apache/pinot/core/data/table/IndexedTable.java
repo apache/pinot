@@ -60,6 +60,7 @@ public abstract class IndexedTable extends BaseTable {
   private int _numResizes;
   private long _resizeTimeNs;
   private boolean _markedTrimmed;
+  private boolean _numGroupsLimitReached;
 
   /// Constructor for the IndexedTable.
   ///
@@ -135,6 +136,12 @@ public abstract class IndexedTable extends BaseTable {
   /// and coarse subtotals exact like the expansion path.
   public void upsertExisting(Key key, Record newRecord) {
     updateExistingRecord(key, newRecord);
+  }
+
+  /// Merges a record only when its key is already present, reporting whether it was retained. Used when a
+  /// grouping-set derived table has reached its group limit and cannot admit a new full-layout group.
+  public boolean upsertExistingIfPresent(Key key, Record newRecord) {
+    return updateExistingRecordIfPresent(key, newRecord);
   }
 
   private Record updateRecord(Record existingRecord, Record newRecord) {
@@ -302,6 +309,16 @@ public abstract class IndexedTable extends BaseTable {
   /// it was rebuilt from the survivors of an external trim such as the grouping-sets per-set server trim.
   public void markTrimmed() {
     _markedTrimmed = true;
+  }
+
+  /// Records that the grouping-set derive or mixed-layout merge dropped a group at the server group limit.
+  public void markNumGroupsLimitReached() {
+    _numGroupsLimitReached = true;
+    markTrimmed();
+  }
+
+  public boolean isNumGroupsLimitReached() {
+    return _numGroupsLimitReached;
   }
 
   public long getResizeTimeMs() {

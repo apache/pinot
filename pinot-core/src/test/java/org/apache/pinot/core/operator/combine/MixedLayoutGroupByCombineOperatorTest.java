@@ -32,6 +32,7 @@ import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -41,6 +42,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 /// Tests that [GroupByCombineOperator] correctly merges a MIX of BASE-layout blocks (grouping-set base
@@ -160,6 +162,63 @@ public class MixedLayoutGroupByCombineOperatorTest {
     assertEquals(grandTotal, 15.0,
         "the grand total must include overflowed base groups (exact totals like the expansion path)");
     assertEquals(mergedBlock.isNumGroupsLimitReached(), true);
+  }
+
+  @Test
+  public void testMixedLayoutsCannotGrowPastDerivedGroupLimit()
+      throws Exception {
+    QueryContext queryContext = queryContext();
+    queryContext.setNumGroupsLimit(2);
+    queryContext.setNumGroupsWarningLimit(2);
+    DataSchema baseSchema = new DataSchema(new String[]{"d1", "sum(m1)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.DOUBLE});
+    List<IntermediateRecord> baseRecords = List.of(
+        IntermediateRecord.withoutOrderByValues(new Key(new Object[]{"a"}), new Record(new Object[]{"a", 1.0})));
+    DataSchema fullSchema = new DataSchema(new String[]{"d1", "$groupingId", "sum(m1)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE});
+    List<IntermediateRecord> fullRecords = List.of(
+        IntermediateRecord.withoutOrderByValues(new Key(new Object[]{"c", 0}),
+            new Record(new Object[]{"c", 0, 5.0})),
+        IntermediateRecord.withoutOrderByValues(new Key(new Object[]{null, 1}),
+            new Record(new Object[]{null, 1, 7.0})));
+    GroupByCombineOperator combineOperator = new GroupByCombineOperator(List.of(
+        mockOperator(new GroupByResultsBlock(baseSchema, baseRecords, queryContext)),
+        mockOperator(new GroupByResultsBlock(fullSchema, fullRecords, queryContext))), queryContext,
+        _executorService);
+
+    GroupByResultsBlock mergedBlock = (GroupByResultsBlock) combineOperator.nextBlock();
+    IndexedTable table = (IndexedTable) mergedBlock.getTable();
+    assertEquals(table.size(), 2, "full-layout groups must not bypass the derive limit");
+    assertTrue(mergedBlock.isGroupsTrimmed());
+    assertTrue(mergedBlock.isNumGroupsLimitReached());
+    assertTrue(mergedBlock.isNumGroupsWarningLimitReached());
+    Iterator<Record> iterator = table.iterator();
+    boolean foundGrandTotal = false;
+    while (iterator.hasNext()) {
+      Object[] values = iterator.next().getValues();
+      if (((Number) values[1]).intValue() == 1) {
+        foundGrandTotal = true;
+        assertEquals(((Number) values[2]).doubleValue(), 8.0,
+            "the retained grand total must include both layouts");
+      }
+    }
+    assertTrue(foundGrandTotal);
+  }
+
+  @Test
+  public void testFullLayoutWithoutGroupingIdIsRejected() {
+    QueryContext queryContext = queryContext();
+    DataSchema badSchema = new DataSchema(new String[]{"d1", "notGroupingId", "sum(m1)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE});
+    List<IntermediateRecord> records = List.of(
+        IntermediateRecord.withoutOrderByValues(new Key(new Object[]{"a", 0}),
+            new Record(new Object[]{"a", 0, 1.0})));
+    GroupByCombineOperator combineOperator = new GroupByCombineOperator(
+        List.of(mockOperator(new GroupByResultsBlock(badSchema, records, queryContext))), queryContext,
+        _executorService);
+
+    assertTrue(combineOperator.nextBlock() instanceof ExceptionResultsBlock,
+        "a full-layout block without $groupingId must fail closed");
   }
 
   @AfterClass
