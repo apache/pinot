@@ -107,6 +107,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_UPLOAD_SUCCESS("segments", false),
   // Emitted only by Server to Deep-store segment uploader.
   SEGMENT_UPLOAD_TIMEOUT("segments", false),
+  METADATA_TAR_UPLOAD_FAILURE("segments", false),
+  METADATA_TAR_UPLOAD_SUCCESS("segments", false),
+  // Emitted only by the Server to Deep-store metadata tar uploader.
+  METADATA_TAR_UPLOAD_TIMEOUT("segments", false),
   NUM_RESIZES("numResizes", false),
   RESIZE_TIME_MS("resizeTimeMs", false),
   STAR_TREE_INDEX_BUILD_FAILURES("segments", false),

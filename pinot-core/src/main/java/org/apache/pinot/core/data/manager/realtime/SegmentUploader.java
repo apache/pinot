@@ -31,4 +31,12 @@ public interface SegmentUploader {
   /// Uploads the given segmentFile to the deep-store. Returns the URI where the segment is uploaded. The upload will
   /// wait for the specified timeout.
   URI uploadSegment(File segmentFile, LLCSegmentName segmentName, int timeoutInMillis);
+
+  /**
+   * Best-effort upload of the segment metadata tar (metadata.properties + creation.meta) to the segment store, next
+   * to the committed segment. Returns the URI it was uploaded to, or null if unsupported or on failure.
+   */
+  default URI uploadMetadataTar(File metadataTarFile, LLCSegmentName segmentName, int timeoutInMillis) {
+    return null;
+  }
 }
