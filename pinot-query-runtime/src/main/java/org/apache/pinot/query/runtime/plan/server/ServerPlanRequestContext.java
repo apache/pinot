@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.plan.server;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.PinotQuery;
@@ -26,6 +27,7 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.StagePlan;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 
 
@@ -36,6 +38,8 @@ import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 ///     [org.apache.pinot.query.runtime.operator.OpChain] part.
 public class ServerPlanRequestContext {
   private final StagePlan _stagePlan;
+  @Nullable
+  private final WorkerMetadata _workerMetadata;
   private final QueryExecutor _leafQueryExecutor;
   private final ExecutorService _executorService;
   @Nullable
@@ -47,11 +51,28 @@ public class ServerPlanRequestContext {
 
   public ServerPlanRequestContext(StagePlan stagePlan, QueryExecutor leafQueryExecutor,
       ExecutorService executorService, @Nullable PipelineBreakerResult pipelineBreakerResult) {
+    this(stagePlan, leafQueryExecutor, executorService, pipelineBreakerResult, null);
+  }
+
+  public ServerPlanRequestContext(StagePlan stagePlan, QueryExecutor leafQueryExecutor,
+      ExecutorService executorService, @Nullable PipelineBreakerResult pipelineBreakerResult,
+      @Nullable WorkerMetadata workerMetadata) {
     _stagePlan = stagePlan;
+    _workerMetadata = workerMetadata;
     _leafQueryExecutor = leafQueryExecutor;
     _executorService = executorService;
     _pipelineBreakerResult = pipelineBreakerResult;
     _pinotQuery = new PinotQuery();
+  }
+
+  /// Proves that this worker reads one physical table, without logical-table expansion or interleaved hybrid runs.
+  /// Only this worker's segment map is read: unrelated workers' legacy maps remain lazily decoded.
+  public boolean isSinglePhysicalTable() {
+    if (_workerMetadata == null || _workerMetadata.getLogicalTableSegmentsMap() != null) {
+      return false;
+    }
+    Map<String, List<String>> tables = _workerMetadata.getTableSegmentsMap();
+    return tables != null && tables.size() == 1;
   }
 
   public StagePlan getStagePlan() {

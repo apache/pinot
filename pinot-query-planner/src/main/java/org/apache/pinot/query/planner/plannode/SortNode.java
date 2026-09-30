@@ -41,6 +41,22 @@ public class SortNode extends BasePlanNode {
     return _collations;
   }
 
+  /// Returns whether this is a selection ORDER BY over one scan, with only projections and filters below it.
+  /// This checks the plan shape; callers must independently prove that the scan resolves to one physical request.
+  public boolean isLeafSelectionSort() {
+    if (_collations.isEmpty() || _inputs.size() != 1) {
+      return false;
+    }
+    PlanNode node = _inputs.get(0);
+    while (node instanceof ProjectNode || node instanceof FilterNode) {
+      if (node.getInputs().size() != 1) {
+        return false;
+      }
+      node = node.getInputs().get(0);
+    }
+    return node instanceof TableScanNode && node.getInputs().isEmpty();
+  }
+
   public int getFetch() {
     return _fetch;
   }

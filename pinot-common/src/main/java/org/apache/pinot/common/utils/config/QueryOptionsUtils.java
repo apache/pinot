@@ -1028,6 +1028,10 @@ public class QueryOptionsUtils {
     throw new IllegalArgumentException(optionName + " must be either true or false, got: " + optionValue);
   }
 
+  public static boolean isStreamingSortedMailboxReceiveEnabled(Map<String, String> options) {
+    return Boolean.parseBoolean(options.get(QueryOptionKey.STREAMING_SORTED_MAILBOX_RECEIVE));
+  }
+
   public static int getSortExchangeCopyThreshold(Map<String, String> options, int i) {
     String sortExchangeCopyThreshold = options.get(QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD);
     if (sortExchangeCopyThreshold != null) {
