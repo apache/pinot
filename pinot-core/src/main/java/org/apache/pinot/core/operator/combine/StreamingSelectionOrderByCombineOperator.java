@@ -217,27 +217,17 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
   /// ASC, descending by the column max value for DESC. Cursors without a min/max are placed first because they must
   /// always be processed (mirrors [MinMaxValueBasedSelectionOrderByCombineOperator]).
   private void sortCursorsByMinMax() {
-    if (_asc) {
-      Arrays.sort(_sortedCursors, (o1, o2) -> {
-        if (o1._minValue == null) {
-          return o2._minValue == null ? 0 : -1;
-        }
-        if (o2._minValue == null) {
-          return 1;
-        }
-        return o1._minValue.compareTo(o2._minValue);
-      });
-    } else {
-      Arrays.sort(_sortedCursors, (o1, o2) -> {
-        if (o1._maxValue == null) {
-          return o2._maxValue == null ? 0 : -1;
-        }
-        if (o2._maxValue == null) {
-          return 1;
-        }
-        return o2._maxValue.compareTo(o1._maxValue);
-      });
-    }
+    Arrays.sort(_sortedCursors, (o1, o2) -> {
+      Comparable bound1 = _asc ? o1._minValue : o1._maxValue;
+      Comparable bound2 = _asc ? o2._minValue : o2._maxValue;
+      if (bound1 == null) {
+        return bound2 == null ? 0 : -1;
+      }
+      if (bound2 == null) {
+        return 1;
+      }
+      return _asc ? bound1.compareTo(bound2) : bound2.compareTo(bound1);
+    });
   }
 
   @Override
