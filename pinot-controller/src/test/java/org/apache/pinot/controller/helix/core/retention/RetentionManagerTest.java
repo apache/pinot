@@ -61,6 +61,7 @@ import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -452,7 +453,8 @@ public class RetentionManagerTest {
     String realtimeTableSchemaJson = schema.toSingleLineJsonString();
     ZNRecord tableZNRecord = new ZNRecord(tableName);
     tableZNRecord.setSimpleField("schemaJSON", realtimeTableSchemaJson);
-    when(mockPropertyStore.get("/SCHEMAS/" + tableName, null, AccessOption.PERSISTENT)).thenReturn(tableZNRecord);
+    when(mockPropertyStore.get(eq("/SCHEMAS/" + tableName), any(Stat.class), eq(AccessOption.PERSISTENT)))
+        .thenReturn(tableZNRecord);
 
     InstanceConfig instanceConfig = new InstanceConfig("Broker_localhost_1234");
     instanceConfig.setHostName("localhost");
