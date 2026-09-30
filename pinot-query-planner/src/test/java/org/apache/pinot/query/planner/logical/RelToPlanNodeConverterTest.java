@@ -20,7 +20,9 @@ package org.apache.pinot.query.planner.logical;
 
 import com.google.common.collect.ImmutableList;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
@@ -445,5 +447,93 @@ public class RelToPlanNodeConverterTest {
         rexBuilder.makeFieldAccess(rexBuilder.makeCorrel(leftRowType, correlationId), fieldName, true);
     return LogicalProject.create(LogicalValues.createOneRow(cluster), List.of(),
         List.of(fieldAccess), List.of(fieldName));
+  }
+
+  /// Every converted node must carry the estimate the optimizer had for it. This is the only point
+  /// where the RelNode (which holds the estimate) and the PlanNode (which the runtime reports stats
+  /// against) coexist, so a node missed here can never be compared against its actual row count.
+  @Test
+  public void testEveryConvertedNodeRecordsAnEstimatedRowCount() {
+    TypeFactory typeFactory = TypeFactory.INSTANCE;
+    RelOptCluster cluster = createCluster(typeFactory);
+    RelDataType rowType = typeFactory.builder()
+        .add("id", SqlTypeName.INTEGER)
+        .add("arr", typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.INTEGER), -1))
+        .build();
+    LogicalValues left = LogicalValues.create(cluster, rowType, ImmutableList.of());
+    CorrelationId correlationId = new CorrelationId(0);
+    LogicalProject project = buildCorrelatedProject(cluster, rowType, correlationId, "arr");
+    Uncollect uncollect = Uncollect.create(project.getTraitSet(), project, false, List.of());
+    LogicalCorrelate correlate =
+        LogicalCorrelate.create(left, uncollect, correlationId, ImmutableBitSet.of(1), JoinRelType.INNER);
+
+    RelToPlanNodeConverter converter = capturingConverter();
+    PlanNode root = converter.toPlanNode(correlate);
+
+    Map<PlanNode, Double> estimates = converter.getEstimatedRowCounts();
+    Assert.assertFalse(estimates.isEmpty(), "No estimates were captured at all");
+
+    List<PlanNode> missing = new ArrayList<>();
+    collectMissingEstimates(root, estimates, missing);
+    Assert.assertTrue(missing.isEmpty(),
+        "Every converted node should have an estimate; missing for: " + missing);
+  }
+
+  /// Nothing may be captured unless asked for -- the capture walks Calcite's metadata handlers, and
+  /// a query that did not request estimates must not pay for them.
+  @Test
+  public void testNothingCapturedWhenNotRequested() {
+    TypeFactory typeFactory = TypeFactory.INSTANCE;
+    RelOptCluster cluster = createCluster(typeFactory);
+    RelDataType rowType = typeFactory.builder().add("id", SqlTypeName.INTEGER).build();
+
+    RelToPlanNodeConverter converter = new RelToPlanNodeConverter(null,
+        CommonConstants.Broker.DEFAULT_BROKER_DEFAULT_HASH_FUNCTION);
+    converter.toPlanNode(LogicalValues.create(cluster, rowType, ImmutableList.of()));
+
+    Assert.assertTrue(converter.getEstimatedRowCounts().isEmpty(),
+        "Estimates were captured even though capture was not requested");
+  }
+
+  /// The estimates must be keyed by node identity, not by value.
+  ///
+  /// [org.apache.pinot.query.planner.plannode.BasePlanNode] defines structural equals/hashCode, so
+  /// an equals-keyed map would merge two nodes that merely look alike -- the branches of a UNION ALL,
+  /// say -- and report one branch's estimate for the other. Asserting the property rather than the
+  /// concrete map class: an unmodifiable wrapper would break an `instanceof IdentityHashMap` check
+  /// without changing behavior, and a wrongly populated IdentityHashMap would satisfy it.
+  @Test
+  public void testEstimatesAreKeyedByIdentityNotByValue() {
+    TypeFactory typeFactory = TypeFactory.INSTANCE;
+    RelOptCluster cluster = createCluster(typeFactory);
+    RelDataType rowType = typeFactory.builder().add("id", SqlTypeName.INTEGER).build();
+
+    RelToPlanNodeConverter converter = capturingConverter();
+    PlanNode first = converter.toPlanNode(LogicalValues.create(cluster, rowType, ImmutableList.of()));
+    PlanNode second = converter.toPlanNode(LogicalValues.create(cluster, rowType, ImmutableList.of()));
+
+    Assert.assertNotSame(first, second, "test needs two distinct instances");
+    Assert.assertEquals(first, second, "test needs two structurally equal nodes to be meaningful");
+
+    Map<PlanNode, Double> estimates = converter.getEstimatedRowCounts();
+    Assert.assertEquals(estimates.size(), 2,
+        "Structurally equal nodes were merged into one entry, so estimates can be misattributed");
+    Assert.assertTrue(estimates.containsKey(first) && estimates.containsKey(second),
+        "Both instances must keep their own entry");
+  }
+
+  private static RelToPlanNodeConverter capturingConverter() {
+    return new RelToPlanNodeConverter(null, CommonConstants.Broker.DEFAULT_BROKER_DEFAULT_HASH_FUNCTION,
+        !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE, false, true);
+  }
+
+  private static void collectMissingEstimates(PlanNode node, Map<PlanNode, Double> estimates,
+      List<PlanNode> missing) {
+    if (!estimates.containsKey(node)) {
+      missing.add(node);
+    }
+    for (PlanNode input : node.getInputs()) {
+      collectMissingEstimates(input, estimates, missing);
+    }
   }
 }

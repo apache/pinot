@@ -19,6 +19,8 @@
 package org.apache.pinot.query.planner;
 
 import java.util.List;
+import java.util.Map;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 
 
 /// The `SubPlan` is the logical sub query plan that should be scheduled together from the result of
@@ -30,11 +32,24 @@ public class SubPlan {
   private final SubPlanMetadata _subPlanMetadata;
   /// The list of children sub query plans.
   private final List<SubPlan> _children;
+  /// Row count the optimizer estimated for each plan node, for later comparison against the counts
+  /// the runtime reports. Broker-side only and never serialized; empty when not captured.
+  private final Map<PlanNode, Double> _estimatedRowCounts;
 
   public SubPlan(PlanFragment subPlanRoot, SubPlanMetadata subPlanMetadata, List<SubPlan> children) {
+    this(subPlanRoot, subPlanMetadata, children, Map.of());
+  }
+
+  public SubPlan(PlanFragment subPlanRoot, SubPlanMetadata subPlanMetadata, List<SubPlan> children,
+      Map<PlanNode, Double> estimatedRowCounts) {
     _subPlanRoot = subPlanRoot;
     _subPlanMetadata = subPlanMetadata;
     _children = children;
+    _estimatedRowCounts = estimatedRowCounts;
+  }
+
+  public Map<PlanNode, Double> getEstimatedRowCounts() {
+    return _estimatedRowCounts;
   }
 
   public PlanFragment getSubPlanRoot() {
