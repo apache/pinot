@@ -360,13 +360,13 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     if (_partitionUpsertMetadataManager != null) {
       _partitionUpsertMetadataManager.untrackSegmentForUpsertView(this);
     }
-    // Wait for in-flight column reads (see tryAcquireReadLock) and make later ones skip this segment
+    // Publish the flag before queueing for the write lock so that readers arriving from here on skip this segment
+    // without touching the lock at all, instead of parking behind the queued writer for as long as the drain takes.
+    _destroyed = true;
+    // Then drain the readers that entered before the flag was published: they hold the read lock and must finish
+    // before any index is closed below.
     _destroyLock.writeLock().lock();
-    try {
-      _destroyed = true;
-    } finally {
-      _destroyLock.writeLock().unlock();
-    }
+    _destroyLock.writeLock().unlock();
     // StarTreeIndexContainer refers to other column index containers, so close it firstly.
     if (_starTreeIndexContainer != null) {
       try {
@@ -405,6 +405,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   /// Blocks [#destroy()] while the caller reads this segment's columns through a cached reference. Returns false,
   /// without holding the lock, once the segment is destroyed. A true return must be paired with [#releaseReadLock()].
   public boolean tryAcquireReadLock() {
+    // Unlocked early-out. Safe because the flag is monotonic: destroy() is its only writer and never clears it, so a
+    // true reading is definitive. A false reading proves nothing and still has to be re-established under the lock.
+    if (_destroyed) {
+      return false;
+    }
     _destroyLock.readLock().lock();
     if (_destroyed) {
       _destroyLock.readLock().unlock();
