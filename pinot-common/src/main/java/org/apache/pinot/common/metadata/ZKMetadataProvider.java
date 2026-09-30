@@ -614,8 +614,14 @@ public class ZKMetadataProvider {
 
   @Nullable
   public static Schema getSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, String schemaName) {
-    ImmutablePair<Schema, Integer> schemaWithVersion = getSchemaWithVersion(propertyStore, schemaName);
-    return schemaWithVersion != null ? schemaWithVersion.getLeft() : null;
+    try {
+      ZNRecord schemaZNRecord =
+          propertyStore.get(constructPropertyStorePathForSchema(schemaName), null, AccessOption.PERSISTENT);
+      return schemaZNRecord != null ? SchemaSerDeUtils.fromZNRecord(schemaZNRecord) : null;
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while getting schema: {}", schemaName, e);
+      return null;
+    }
   }
 
   /// Get the schema and ZK version from one read.
