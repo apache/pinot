@@ -46,28 +46,25 @@ public class PlanFragmenterTest {
   @DataProvider
   public Object[][] leafSortCases() {
     return new Object[][]{
-        {"table", false, true, false, false, true, true, false},
-        {"table", true, true, false, false, true, true, true},
-        {"table", true, true, true, false, true, true, false},
-        {"table", true, true, false, true, true, true, false},
-        {"table", true, false, false, false, true, true, false},
-        {"table", true, true, false, false, false, true, false},
-        {"table", true, true, false, false, true, false, false},
-        {"table_OFFLINE", true, true, true, false, true, true, true}
+        {"table", false, List.of("OFFLINE"), false, true, true, false},
+        {"table", true, List.of("OFFLINE"), false, true, true, true},
+        {"table", true, List.of("OFFLINE", "REALTIME"), false, true, true, false},
+        {"table", true, List.of("OFFLINE"), true, true, true, false},
+        {"table", true, List.of(), false, true, true, false},
+        {"table", true, List.of("OFFLINE"), false, false, true, false},
+        {"table", true, List.of("OFFLINE"), false, true, false, false},
+        {"table_OFFLINE", true, List.of("OFFLINE", "REALTIME"), false, true, true, true}
     };
   }
 
   @Test(dataProvider = "leafSortCases")
-  public void shouldMergeOnlyProvenPhysicalLeafSort(String tableName, boolean enabled, boolean offline,
-      boolean realtime, boolean logical, boolean cacheAvailable, boolean matchingCollation, boolean expected) {
+  public void shouldMergeOnlyProvenPhysicalLeafSort(String tableName, boolean enabled, List<String> tableTypes,
+      boolean logical, boolean cacheAvailable, boolean matchingCollation, boolean expected) {
     TableCache cache = mock(TableCache.class);
     when(cache.getActualTableName(tableName)).thenReturn(tableName);
     when(cache.isLogicalTable(tableName)).thenReturn(logical);
-    if (offline) {
-      when(cache.getTableConfig("table_OFFLINE")).thenReturn(mock(TableConfig.class));
-    }
-    if (realtime) {
-      when(cache.getTableConfig("table_REALTIME")).thenReturn(mock(TableConfig.class));
+    for (String tableType : tableTypes) {
+      when(cache.getTableConfig("table_" + tableType)).thenReturn(mock(TableConfig.class));
     }
     DataSchema schema = new DataSchema(new String[]{"key"}, new ColumnDataType[]{ColumnDataType.INT});
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0));

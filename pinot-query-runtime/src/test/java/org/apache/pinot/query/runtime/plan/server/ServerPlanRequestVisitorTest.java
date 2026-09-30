@@ -34,6 +34,7 @@ import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -83,28 +84,23 @@ public class ServerPlanRequestVisitorTest {
     WorkerMetadata offline = new WorkerMetadata(0, Map.of());
     offline.setTableSegmentsMap(Map.of("OFFLINE", List.of("segment")));
     ServerPlanRequestContext context = new ServerPlanRequestContext(
-        new StagePlan(send, new StageMetadata(STAGE_ID, List.of(offline), Map.of())), null, null, null, offline);
-    assertTrue(context.isSinglePhysicalTable());
+        new StagePlan(send, new StageMetadata(STAGE_ID, List.of(offline, mock(WorkerMetadata.class)), Map.of())),
+        null, null, null, offline);
+    assertTrue(context.isSinglePhysicalTable(), "Unrelated workers cannot interleave this mailbox stream");
     ServerPlanRequestVisitor.walkPlanNode(send, context);
     assertSame(context.getLeafStageBoundaryNode(), sort);
     assertNotNull(context.getPinotQuery().getOrderByList());
 
-    WorkerMetadata realtime = new WorkerMetadata(1, Map.of());
-    realtime.setTableSegmentsMap(Map.of("REALTIME", List.of("segment")));
-    context = new ServerPlanRequestContext(
-        new StagePlan(send, new StageMetadata(STAGE_ID, List.of(offline, realtime), Map.of())), null, null, null,
-        offline);
-    assertTrue(context.isSinglePhysicalTable(), "Another worker's table type cannot interleave this mailbox stream");
     offline.setTableSegmentsMap(Map.of("OFFLINE", List.of("segment"), "REALTIME", List.of("segment")));
+    context = new ServerPlanRequestContext(context.getStagePlan(), null, null, null, offline);
     assertFalse(context.isSinglePhysicalTable());
     ServerPlanRequestVisitor.walkPlanNode(send, context);
     assertSame(context.getLeafStageBoundaryNode(), scan);
     assertNull(context.getPinotQuery().getOrderByList());
 
+    offline.setTableSegmentsMap(Map.of("OFFLINE", List.of("segment")));
     offline.setLogicalTableSegmentsMap(Map.of("physical_OFFLINE", List.of("segment")));
-    assertFalse(new ServerPlanRequestContext(
-        new StagePlan(send, new StageMetadata(STAGE_ID, List.of(offline), Map.of())), null, null, null, offline)
-        .isSinglePhysicalTable());
+    assertFalse(context.isSinglePhysicalTable());
   }
 
   /// An ordinary receiver-sorted exchange does not establish sender ordering. Its SortNode remains eligible for V1
