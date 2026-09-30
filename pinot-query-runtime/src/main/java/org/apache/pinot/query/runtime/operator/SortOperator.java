@@ -38,7 +38,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 /// input can promise and on whether the fetch bounds the result. Rather than branching inside one operator, the
 /// [#create] factory picks one of three implementations, each of which reports itself in the explain plan:
 ///
-///   - [LimitSortOperator] (`SORT_LIMIT`) - there is no collation, so no ordering is required at all. Nothing is
+///   - [LimitSortOperator] (`SORT_LIMIT`) - no collation is required, or the input proves the same ordering. Nothing is
 ///     sorted and nothing is accumulated: blocks stream through with `offset` rows skipped and at most `fetch` rows
 ///     emitted.
 ///   - [TopNSortOperator] (`SORT_TOP_N`) - the result is bounded by `fetch` (or by the broker response limit), so a
@@ -60,6 +60,7 @@ public abstract class SortOperator extends MultiStageOperator {
   protected static final int DEFAULT_MAX_ROWS_PER_BLOCK = 10_000;
 
   protected final MultiStageOperator _input;
+  private List<RelFieldCollation> _collations = List.of();
   protected final DataSchema _dataSchema;
   protected final int _offset;
   /// Maximum number of rows to retain before `offset` is applied, i.e. `fetch + offset`, or the broker response limit
@@ -115,16 +116,24 @@ public abstract class SortOperator extends MultiStageOperator {
     }
     List<RelFieldCollation> collations = node.getCollations();
     DataSchema dataSchema = node.getDataSchema();
-    if (collations.isEmpty()) {
-      return new LimitSortOperator(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock);
-    }
-    if (numRowsToKeep == Integer.MAX_VALUE) {
+    SortOperator operator;
+    if (collations.isEmpty() || input.isSortedOn(collations)) {
+      operator = new LimitSortOperator(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock);
+    } else if (numRowsToKeep == Integer.MAX_VALUE) {
       // Nothing bounds the result, so a bounded heap cannot be used and every row has to be buffered and sorted.
-      return new FullSortOperator(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock, collations,
+      operator = new FullSortOperator(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock, collations,
+          defaultHolderCapacity);
+    } else {
+      operator = new TopNSortOperator(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock, collations,
           defaultHolderCapacity);
     }
-    return new TopNSortOperator(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock, collations,
-        defaultHolderCapacity);
+    operator._collations = List.copyOf(collations);
+    return operator;
+  }
+
+  @Override
+  public boolean isSortedOn(List<RelFieldCollation> collations) {
+    return !collations.isEmpty() && _collations.equals(collations);
   }
 
   @Override
