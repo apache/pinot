@@ -28,6 +28,7 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.MseMeter;
 import org.apache.pinot.common.metrics.MseMetrics;
@@ -75,6 +76,12 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
   /// Implementations should not allocate new loggers for each call but instead reuse some (probably static and final)
   /// attribute.
   protected abstract Logger logger();
+
+  /// Returns whether every output block belongs to one stream ordered on exactly these fields, directions and null
+  /// policies. A plan flag alone does not establish this guarantee; unproven producers return false.
+  public boolean isSortedOn(List<RelFieldCollation> collations) {
+    return false;
+  }
 
   public abstract OperatorTypeDescriptor getOperatorType();
 
