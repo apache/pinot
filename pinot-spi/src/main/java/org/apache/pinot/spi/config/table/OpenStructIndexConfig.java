@@ -56,9 +56,18 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// **Per-key index settings** are specified via `valueFieldConfigs` — each entry is a standard
 /// [FieldConfig] (modern `indexes` format) for one materialized OPEN_STRUCT key. Keys without an
 /// entry fall back to `defaultValueFieldConfig`. When neither is set, the built-in default is
-/// DICTIONARY encoding with an inverted index. A per-key config selects the dictionary vs raw
-/// encoding and the dictionary, inverted, range and bloom filter indexes; forward-index tuning is not
-/// configurable per key (a raw key always uses LZ4 compression), and a per-key `codecSpec` is rejected.
+/// DICTIONARY encoding with an inverted index. A per-key config honors only:
+/// - `encodingType`: DICTIONARY (the default) builds a dictionary-encoded key, and RAW builds a raw
+///   forward index with LZ4 compression, unless the key's inverted index is enabled, which requires a
+///   dictionary and makes the key dictionary-encoded.
+/// - The `inverted`, `range` and `bloom` entries under `indexes`. A per-key config without an
+///   `inverted` entry builds no inverted index.
+///
+/// `indexes.forward` and `indexes.dictionary` may only restate how the key is built: its forward
+/// encoding and whether it has a dictionary. Table-config validation rejects every other per-key
+/// setting, which a materialized key would silently ignore:
+/// forward-index tuning (such as `codecSpec`, `compressionCodec` or chunk sizes), dictionary tuning, and
+/// the `indexTypes`, `properties`, `timestampConfig` and `tierOverwrites` fields.
 public class OpenStructIndexConfig extends IndexConfig {
   public static final OpenStructIndexConfig DISABLED = new OpenStructIndexConfig(false);
   public static final OpenStructIndexConfig DEFAULT = new OpenStructIndexConfig(true);

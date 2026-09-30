@@ -58,6 +58,10 @@ public class OpenStructIndexType
 
   public static final String INDEX_DISPLAY_NAME = "open_struct";
   private static final List<String> EXTENSIONS = List.of(".open_struct.idx");
+  private static final String FIXED_FORWARD_INDEX =
+      "materialized keys always use a dictionary-encoded or LZ4 raw forward index";
+  private static final String KEY_ENCODING_RULE = "a key is dictionary-encoded when its encodingType is DICTIONARY or "
+      + "its inverted index is enabled, and raw with LZ4 otherwise";
 
   protected OpenStructIndexType() {
     super(StandardIndexes.OPEN_STRUCT_ID);
@@ -136,17 +140,31 @@ public class OpenStructIndexType
   }
 
   /// Validates one per-key [FieldConfig] of OPEN_STRUCT `column`; `target` names it in error messages.
+  ///
+  /// A materialized key honors only its `encodingType` and its `inverted`, `range` and `bloom` indexes, both when
+  /// `OpenStructColumnSplitter` builds it and when a reload resolves its index configs through
+  /// `FieldIndexConfigsUtil.fromFieldConfig`. Every other setting would be silently dropped, so it is rejected here:
+  /// `indexes.forward` and `indexes.dictionary` may only restate how the key is built, and the legacy
+  /// `compressionCodec`, `indexTypes`, `timestampConfig`, `properties` and `tierOverwrites` fields are never read.
   private static void validatePerKeyFieldConfig(FieldConfig fieldConfig, String column, String target) {
+    checkPerKeySetting(fieldConfig.getCompressionCodec() == null, column, "compressionCodec", target,
+        FIXED_FORWARD_INDEX);
+    checkPerKeySetting(fieldConfig.getIndexTypes().isEmpty(), column, "indexTypes", target,
+        "declare per-key indexes under 'indexes'");
+    checkPerKeySetting(fieldConfig.getTimestampConfig() == null, column, "timestampConfig", target,
+        "materialized keys do not build TIMESTAMP indexes");
+    Map<String, String> properties = fieldConfig.getProperties();
+    checkPerKeySetting(properties == null || properties.isEmpty(), column, "properties", target,
+        "configure the key through encodingType and 'indexes'");
+    checkPerKeySetting(isUnset(fieldConfig.getTierOverwrites()), column, "tierOverwrites", target,
+        "per-key configs are not tier-specific");
+
     JsonNode indexes = fieldConfig.getIndexes();
-    if (indexes == null) {
-      return;
-    }
     JsonNode forwardIndex = indexes.get(StandardIndexes.forward().getPrettyName());
     // The OPEN_STRUCT splitter builds its own per-key forward-index configs (dict-vs-raw decision plus a
     // fixed LZ4 raw compression), so a per-key codecSpec would be silently discarded. Reject it explicitly.
     Preconditions.checkState(forwardIndex == null || !forwardIndex.hasNonNull("codecSpec"),
-        "OPEN_STRUCT column '%s': codecSpec is not supported for %s; materialized keys always use a "
-            + "dictionary-encoded or LZ4 raw forward index", column, target);
+        "OPEN_STRUCT column '%s': codecSpec is not supported for %s; " + FIXED_FORWARD_INDEX, column, target);
     Iterator<String> indexNames = indexes.fieldNames();
     while (indexNames.hasNext()) {
       String indexName = indexNames.next();
@@ -154,6 +172,79 @@ public class OpenStructIndexType
           "OPEN_STRUCT key '%s' declares unsupported index '%s'; supported indexes are %s",
           fieldConfig.getName(), indexName, OpenStructSupportedIndexes.ALLOWED_PRETTY_NAMES);
     }
+    // Mirrors OpenStructColumnSplitter: a key gets a dictionary and a dictionary-encoded forward index when its
+    // encodingType is DICTIONARY or its inverted index is enabled. Inverted is the only vetted per-key index that
+    // requires a dictionary, so it overrides a RAW encodingType.
+    boolean dictionaryEncoded = fieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW
+        || isEnabled(indexes.get(StandardIndexes.inverted().getPrettyName()));
+    if (forwardIndex != null && !forwardIndex.isNull()) {
+      validatePerKeyForwardIndex(forwardIndex, dictionaryEncoded, column, target);
+    }
+    // An empty `indexes.dictionary` still enables the dictionary, so only an absent or null one is skipped.
+    JsonNode dictionary = indexes.get(StandardIndexes.dictionary().getPrettyName());
+    if (dictionary != null && !dictionary.isNull()) {
+      validatePerKeyDictionary(dictionary, dictionaryEncoded, column, target);
+    }
+  }
+
+  /// The splitter replaces a key's forward-index config with a dictionary-encoded or LZ4 raw one, so
+  /// `indexes.forward` may only restate that encoding or keep the index enabled.
+  private static void validatePerKeyForwardIndex(JsonNode forwardIndex, boolean dictionaryEncoded, String column,
+      String target) {
+    Preconditions.checkState(forwardIndex.isObject(), "OPEN_STRUCT column '%s': indexes.forward of %s must be a JSON "
+        + "object", column, target);
+    for (Map.Entry<String, JsonNode> field : forwardIndex.properties()) {
+      String name = field.getKey();
+      JsonNode value = field.getValue();
+      if (value.isNull()) {
+        continue;
+      }
+      if (name.equals("encodingType")) {
+        FieldConfig.EncodingType builtEncoding =
+            dictionaryEncoded ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW;
+        Preconditions.checkState(value.asText().equals(builtEncoding.name()),
+            "OPEN_STRUCT column '%s': indexes.forward.encodingType %s of %s does not match the %s forward index it is "
+                + "built with; %s", column, value.asText(), target, dictionaryEncoded ? "dictionary-encoded" : "raw",
+            KEY_ENCODING_RULE);
+      } else {
+        checkPerKeySetting(name.equals("disabled") && !value.asBoolean(), column, "indexes.forward." + name, target,
+            FIXED_FORWARD_INDEX);
+      }
+    }
+  }
+
+  /// A key's per-key dictionary config is never read: the key has a dictionary exactly when it is dictionary-encoded.
+  /// `indexes.dictionary` may only restate that.
+  private static void validatePerKeyDictionary(JsonNode dictionary, boolean dictionaryEncoded, String column,
+      String target) {
+    Preconditions.checkState(dictionary.isObject(), "OPEN_STRUCT column '%s': indexes.dictionary of %s must be a "
+        + "JSON object", column, target);
+    for (Map.Entry<String, JsonNode> field : dictionary.properties()) {
+      if (!field.getKey().equals("disabled")) {
+        checkPerKeySetting(field.getValue().isNull(), column, "indexes.dictionary." + field.getKey(), target,
+            KEY_ENCODING_RULE);
+      }
+    }
+    boolean disabled = dictionary.path("disabled").asBoolean(false);
+    Preconditions.checkState(disabled != dictionaryEncoded,
+        "OPEN_STRUCT column '%s': indexes.dictionary of %s %s the dictionary, but the key is built %s one; %s", column,
+        target, disabled ? "disables" : "enables", dictionaryEncoded ? "with" : "without", KEY_ENCODING_RULE);
+  }
+
+  /// Returns `true` for a present index config that is not disabled, as `IndexConfig` deserializes it.
+  private static boolean isEnabled(@Nullable JsonNode indexConfig) {
+    return indexConfig != null && !indexConfig.isNull() && !indexConfig.path("disabled").asBoolean(false);
+  }
+
+  private static void checkPerKeySetting(boolean supported, String column, String setting, String target,
+      String reason) {
+    Preconditions.checkState(supported, "OPEN_STRUCT column '%s': %s is not supported for %s; %s", column, setting,
+        target, reason);
+  }
+
+  /// Returns `true` for an absent, JSON null or empty JSON value.
+  private static boolean isUnset(@Nullable JsonNode node) {
+    return node == null || node.isNull() || node.isMissingNode() || (node.isContainerNode() && node.size() == 0);
   }
 
   private void validateIgnoredKeys(OpenStructIndexConfig config, FieldSpec fieldSpec) {
