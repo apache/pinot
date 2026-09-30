@@ -34,6 +34,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.Operator;
@@ -196,7 +197,7 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
       _phase2NumColumns = 0;
       _phase2DataSourceMap = null;
       // Single-phase: all output expressions are order-by expressions, so their types are known up front.
-      _dataSchema = buildSinglePhaseDataSchema();
+      _dataSchema = buildDataSchema(_projectOperator::getResultColumnContext);
     }
     _numPhase1Columns = _phase1Expressions.size();
   }
@@ -216,7 +217,7 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
       // never have to reconstruct a schema the segment already knows. Two-phase leaves _dataSchema null until the
       // first fetch, which never happens here, so build it from column metadata alone.
       if (_twoPhase && _dataSchema == null) {
-        _dataSchema = buildTwoPhaseDataSchema(this::resolveResultColumnContext);
+        _dataSchema = buildDataSchema(this::resolveResultColumnContext);
       }
       assert _dataSchema != null;
       return new SelectionResultsBlock(_dataSchema, List.of(), _comparator, _queryContext);
@@ -240,34 +241,20 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
     if (remaining <= 0) {
       return null;
     }
-    ValueBlock valueBlock = nextNonEmptyBlock();
-    if (valueBlock == null) {
+    if (!loadNextBlock()) {
       return null;
     }
-    int numDocsFetched = valueBlock.getNumDocs();
-    BlockValSet[] blockValSets = new BlockValSet[_numPhase1Columns];
-    for (int i = 0; i < _numPhase1Columns; i++) {
-      blockValSets[i] = valueBlock.getBlockValueSet(_phase1Expressions.get(i));
-    }
-    RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
-    int[] docIds = _twoPhase ? valueBlock.getDocIds() : null;
-    RoaringBitmap[] nullBitmaps = null;
-    if (_nullHandlingEnabled) {
-      nullBitmaps = new RoaringBitmap[_numPhase1Columns];
-      for (int i = 0; i < _numPhase1Columns; i++) {
-        nullBitmaps[i] = blockValSets[i].getNullBitmap();
-      }
-    }
-    _numDocsScanned += numDocsFetched;
-    _numEntriesScannedPostFilter += (long) numDocsFetched * _projectOperator.getNumColumnsProjected();
-    reportScanCost(numDocsFetched, (long) numDocsFetched * _projectOperator.getNumColumnsProjected());
 
     // Rows arrive sorted; we only need the first 'remaining' of them globally.
-    int numRows = Math.min(numDocsFetched, remaining);
+    int numRows = Math.min(_currentNumDocs, remaining);
     List<Object[]> rows = new ArrayList<>(numRows);
     for (int i = 0; i < numRows; i++) {
-      rows.add(materializeRow(blockValueFetcher, docIds, nullBitmaps, i));
+      rows.add(materializeRow(_currentFetcher, _currentDocIds, _currentNullBitmaps, i));
     }
+    _currentBlock = null;
+    _currentFetcher = null;
+    _currentDocIds = null;
+    _currentNullBitmaps = null;
     _numRowsEmitted += rows.size();
     return rows;
   }
@@ -319,35 +306,40 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
   /// is exhausted.
   @Nullable
   private Object[] nextRow() {
-    if (_currentBlock == null || _currentPos >= _currentNumDocs) {
-      if (_projectExhausted) {
-        return null;
-      }
-      _currentBlock = nextNonEmptyBlock();
-      if (_currentBlock == null) {
-        _projectExhausted = true;
-        return null;
-      }
-      BlockValSet[] blockValSets = new BlockValSet[_numPhase1Columns];
-      for (int i = 0; i < _numPhase1Columns; i++) {
-        blockValSets[i] = _currentBlock.getBlockValueSet(_phase1Expressions.get(i));
-      }
-      _currentFetcher = new RowBasedBlockValueFetcher(blockValSets);
-      _currentNumDocs = _currentBlock.getNumDocs();
-      _currentDocIds = _twoPhase ? _currentBlock.getDocIds() : null;
-      if (_nullHandlingEnabled) {
-        _currentNullBitmaps = new RoaringBitmap[_numPhase1Columns];
-        for (int i = 0; i < _numPhase1Columns; i++) {
-          _currentNullBitmaps[i] = blockValSets[i].getNullBitmap();
-        }
-      }
-      _currentPos = 0;
-      _numDocsScanned += _currentNumDocs;
-      _numEntriesScannedPostFilter += (long) _currentNumDocs * _projectOperator.getNumColumnsProjected();
-      reportScanCost(_currentNumDocs, (long) _currentNumDocs * _projectOperator.getNumColumnsProjected());
+    if ((_currentBlock == null || _currentPos >= _currentNumDocs) && !loadNextBlock()) {
+      return null;
     }
     int rowId = _currentPos++;
     return materializeRow(_currentFetcher, _currentDocIds, _currentNullBitmaps, rowId);
+  }
+
+  private boolean loadNextBlock() {
+    if (_projectExhausted) {
+      return false;
+    }
+    _currentBlock = nextNonEmptyBlock();
+    if (_currentBlock == null) {
+      _projectExhausted = true;
+      return false;
+    }
+    BlockValSet[] blockValSets = new BlockValSet[_numPhase1Columns];
+    for (int i = 0; i < _numPhase1Columns; i++) {
+      blockValSets[i] = _currentBlock.getBlockValueSet(_phase1Expressions.get(i));
+    }
+    _currentFetcher = new RowBasedBlockValueFetcher(blockValSets);
+    _currentNumDocs = _currentBlock.getNumDocs();
+    _currentDocIds = _twoPhase ? _currentBlock.getDocIds() : null;
+    if (_nullHandlingEnabled) {
+      _currentNullBitmaps = new RoaringBitmap[_numPhase1Columns];
+      for (int i = 0; i < _numPhase1Columns; i++) {
+        _currentNullBitmaps[i] = blockValSets[i].getNullBitmap();
+      }
+    }
+    _currentPos = 0;
+    _numDocsScanned += _currentNumDocs;
+    _numEntriesScannedPostFilter += (long) _currentNumDocs * _projectOperator.getNumColumnsProjected();
+    reportScanCost(_currentNumDocs, (long) _currentNumDocs * _projectOperator.getNumColumnsProjected());
+    return true;
   }
 
   /// Pulls the next project block carrying documents, skipping any that carry none. Returns `null` only when
@@ -461,20 +453,9 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
       }
 
       if (_dataSchema == null) {
-        _dataSchema = buildTwoPhaseDataSchema(transformOperator::getResultColumnContext);
+        _dataSchema = buildDataSchema(transformOperator::getResultColumnContext);
       }
     }
-  }
-
-  private DataSchema buildSinglePhaseDataSchema() {
-    String[] columnNames = new String[_numExpressions];
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[_numExpressions];
-    for (int i = 0; i < _numExpressions; i++) {
-      columnNames[i] = _expressions.get(i).toString();
-      columnDataTypes[i] = DataSchema.ColumnDataType.fromDataType(_orderByColumnContexts[i].getDataType(),
-          _orderByColumnContexts[i].isSingleValue());
-    }
-    return new DataSchema(columnNames, columnDataTypes);
   }
 
   /// Resolves a non-order-by expression's result type without building the phase-2 pipeline, for the zero-match case
@@ -494,21 +475,15 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
         TransformFunctionFactory.get(expression, _phase2ColumnContextMap, _queryContext));
   }
 
-  private DataSchema buildTwoPhaseDataSchema(Function<ExpressionContext, ColumnContext> resultColumnContexts) {
-    int numNonOrderByExpressions = _nonOrderByExpressions.size();
+  private DataSchema buildDataSchema(Function<ExpressionContext, ColumnContext> resultColumnContexts) {
     String[] columnNames = new String[_numExpressions];
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[_numExpressions];
+    ColumnDataType[] columnDataTypes = new ColumnDataType[_numExpressions];
     for (int i = 0; i < _numExpressions; i++) {
       columnNames[i] = _expressions.get(i).toString();
-    }
-    for (int i = 0; i < _numOrderByExpressions; i++) {
-      columnDataTypes[i] = DataSchema.ColumnDataType.fromDataType(_orderByColumnContexts[i].getDataType(),
-          _orderByColumnContexts[i].isSingleValue());
-    }
-    for (int i = 0; i < numNonOrderByExpressions; i++) {
-      ColumnContext columnContext = resultColumnContexts.apply(_nonOrderByExpressions.get(i));
-      columnDataTypes[_numOrderByExpressions + i] =
-          DataSchema.ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
+      ColumnContext columnContext = i < _numOrderByExpressions ? _orderByColumnContexts[i]
+          : resultColumnContexts.apply(_expressions.get(i));
+      columnDataTypes[i] = ColumnDataType.fromDataType(columnContext.getDataType(),
+          columnContext.isSingleValue());
     }
     return new DataSchema(columnNames, columnDataTypes);
   }
