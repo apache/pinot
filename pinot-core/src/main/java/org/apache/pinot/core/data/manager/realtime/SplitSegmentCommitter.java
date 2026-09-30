@@ -25,6 +25,8 @@ import java.util.Map;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -32,6 +34,7 @@ import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 
 
@@ -129,6 +132,8 @@ public class SplitSegmentCommitter implements SegmentCommitter {
     if (metadataFiles == null || metadataFiles.isEmpty()) {
       return;
     }
+    LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+    String rawTableName = TableNameBuilder.extractRawTableName(llcSegmentName.getTableName());
     File stagingDir = null;
     File metadataTarFile = null;
     try {
@@ -142,10 +147,10 @@ public class SplitSegmentCommitter implements SegmentCommitter {
           segmentName + "_" + UUID.randomUUID() + Constants.METADATA_TAR_GZ_FILE_EXT);
       // Tar the DIRECTORY so that the first archive entry is a directory, as DefaultMetadataExtractor expects.
       TarCompressionUtils.createCompressedTarFile(stagingDir, metadataTarFile);
-      _segmentUploader.uploadMetadataTar(metadataTarFile, new LLCSegmentName(segmentName),
-          METADATA_TAR_UPLOAD_TIMEOUT_MS);
+      _segmentUploader.uploadMetadataTar(metadataTarFile, llcSegmentName, METADATA_TAR_UPLOAD_TIMEOUT_MS);
     } catch (Exception e) {
       _segmentLogger.warn("Failed to upload metadata tar for segment: {}; continuing with commit", segmentName, e);
+      ServerMetrics.get().addMeteredTableValue(rawTableName, ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
     } finally {
       FileUtils.deleteQuietly(stagingDir);
       FileUtils.deleteQuietly(metadataTarFile);

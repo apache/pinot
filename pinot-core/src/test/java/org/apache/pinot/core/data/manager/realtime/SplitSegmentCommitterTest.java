@@ -25,6 +25,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -167,6 +169,39 @@ public class SplitSegmentCommitterTest {
     SegmentCompletionProtocol.Response response = newCommitter(handler, uploader, null).commit(mockBuildDescriptor());
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
     Mockito.verify(handler).segmentCommitEndWithMetadata(any(), any());
+    assertNoTempLeak();
+  }
+
+  @Test
+  public void testStagingFailureEmitsFailureMeterAndCommitSucceeds()
+      throws Exception {
+    ServerMetrics serverMetrics = Mockito.mock(ServerMetrics.class);
+    ServerMetrics.deregister();
+    Assert.assertTrue(ServerMetrics.register(serverMetrics));
+    try {
+      Map<String, File> brokenFiles = new HashMap<>(_metadataFiles);
+      brokenFiles.put(V1Constants.SEGMENT_CREATION_META, new File(TEMP_DIR, "does-not-exist"));
+      RealtimeSegmentDataManager.SegmentBuildDescriptor descriptor = mockBuildDescriptor();
+      Mockito.when(descriptor.getMetadataFiles()).thenReturn(brokenFiles);
+      SegmentUploader uploader = mockUploader("hdfs://root/" + RAW_TABLE_NAME + "/" + _segmentName);
+      ServerSegmentCompletionProtocolHandler handler = mockProtocolHandler();
+
+      SegmentCompletionProtocol.Response response = newCommitter(handler, uploader, null).commit(descriptor);
+
+      Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
+      Mockito.verify(handler).segmentCommitEndWithMetadata(any(), any());
+      Mockito.verify(uploader, Mockito.never()).uploadMetadataTar(any(), any(), anyInt());
+      Mockito.verify(serverMetrics)
+          .addMeteredTableValue(RAW_TABLE_NAME, ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1L);
+      assertNoTempLeak();
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  private void assertNoTempLeak() {
+    File[] leaked = FileUtils.getTempDirectory().listFiles((dir, name) -> name.startsWith(_segmentName));
+    Assert.assertEquals(leaked == null ? 0 : leaked.length, 0);
   }
 
   @Test
@@ -200,7 +235,6 @@ public class SplitSegmentCommitterTest {
     Assert.assertEquals(extracted.getTotalDocs(), source.getTotalDocs());
 
     // No staging dir or local tar may leak in the system temp dir.
-    File[] leaked = FileUtils.getTempDirectory().listFiles((dir, name) -> name.startsWith(_segmentName));
-    Assert.assertEquals(leaked == null ? 0 : leaked.length, 0);
+    assertNoTempLeak();
   }
 }
