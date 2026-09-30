@@ -1877,32 +1877,19 @@ public class TableConfigUtilsTest {
     assertEquals(Throwables.getRootCause(exception).getMessage(), "codecSpec requires RAW forward-index encoding");
 
     ObjectNode disabledForward = JsonUtils.newObjectNode();
+    disabledForward.put("encodingType", FieldConfig.EncodingType.RAW.name());
     disabledForward.put("disabled", true);
     disabledForward.put("codecSpec", "LZ4");
     ObjectNode disabledIndexes = JsonUtils.newObjectNode();
     disabledIndexes.set("forward", disabledForward);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     tableConfig.setFieldConfigList(List.of(new FieldConfig.Builder("intCol")
-        .withEncodingType(FieldConfig.EncodingType.RAW)
         .withIndexes(disabledIndexes)
         .build()));
     TableConfig disabledTableConfig = tableConfig;
     exception = expectThrows(IllegalStateException.class,
         () -> TableConfigUtils.validate(disabledTableConfig, schema));
     assertTrue(exception.getMessage().contains("codecSpec cannot be configured when the forward index is disabled"),
-        exception.getMessage());
-
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.setFieldConfigList(List.of(new FieldConfig.Builder("intCol")
-        .withEncodingType(FieldConfig.EncodingType.RAW)
-        .withIndexes(disabledIndexes)
-        .withProperties(Map.of(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString()))
-        .build()));
-    TableConfig legacyDisabledTableConfig = tableConfig;
-    exception = expectThrows(IllegalStateException.class,
-        () -> TableConfigUtils.validate(legacyDisabledTableConfig, schema));
-    assertTrue(Throwables.getRootCause(exception).getMessage()
-            .contains("codecSpec cannot be configured when the forward index is disabled"),
         exception.getMessage());
   }
 
@@ -1937,6 +1924,7 @@ public class TableConfigUtilsTest {
   private static FieldConfig fieldConfigWithCodecSpec(String column, FieldConfig.EncodingType encodingType,
       String codecSpec, @Nullable Integer targetDocsPerChunk) {
     ObjectNode forward = JsonUtils.newObjectNode();
+    forward.put("encodingType", encodingType.name());
     forward.put("codecSpec", codecSpec);
     if (targetDocsPerChunk != null) {
       forward.put("targetDocsPerChunk", targetDocsPerChunk);
@@ -1944,7 +1932,6 @@ public class TableConfigUtilsTest {
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("forward", forward);
     return new FieldConfig.Builder(column)
-        .withEncodingType(encodingType)
         .withIndexes(indexes)
         .build();
   }

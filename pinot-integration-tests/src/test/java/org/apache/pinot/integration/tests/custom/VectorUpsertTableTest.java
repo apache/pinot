@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
@@ -295,16 +296,14 @@ public class VectorUpsertTableTest extends CustomDataQueryClusterIntegrationTest
     streamConfigs.put(StreamConfigProperties.constructStreamProperty("kafka",
         StreamConfigProperties.STREAM_TOPIC_NAME), topicName);
 
-    FieldConfig vectorFieldConfig = new FieldConfig.Builder(VECTOR_COLUMN)
-        .withEncodingType(FieldConfig.EncodingType.RAW)
-        .withIndexTypes(List.of(FieldConfig.IndexType.VECTOR))
-        .withProperties(Map.of(
-            "vectorIndexType", "HNSW",
-            "vectorDimension", "2",
-            "vectorDistanceFunction", "COSINE",
-            "version", "1",
-            "commitDocs", "1"))
-        .build();
+    ObjectNode indexes = indexesWithForwardEncoding(FieldConfig.EncodingType.RAW);
+    ObjectNode vector = indexes.putObject("vector");
+    vector.put("vectorIndexType", "HNSW");
+    vector.put("vectorDimension", 2);
+    vector.put("vectorDistanceFunction", "COSINE");
+    vector.put("version", 1);
+    vector.putObject("properties").put("commitDocs", "1");
+    FieldConfig vectorFieldConfig = new FieldConfig.Builder(VECTOR_COLUMN).withIndexes(indexes).build();
 
     return new TableConfigBuilder(TableType.REALTIME)
         .setTableName(tableName)
