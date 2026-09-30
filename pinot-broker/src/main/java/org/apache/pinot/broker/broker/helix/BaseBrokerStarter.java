@@ -448,6 +448,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _serverRoutingStatsManager = new ServerRoutingStatsManager(_brokerConf, _brokerMetrics);
     _serverRoutingStatsManager.init();
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_failOpenPolicy);
+    _failureDetector = FailureDetectorFactory.getFailureDetector(_brokerConf, _brokerMetrics);
     initRoutingManager();
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_routingManager);
 
@@ -473,11 +474,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     BrokerQueryEventListenerFactory.init(_brokerConf.subset(Broker.EVENT_LISTENER_CONFIG_PREFIX));
 
     // Initialize the failure detector that removes servers from the broker routing table if they are not healthy
-    _failureDetector = FailureDetectorFactory.getFailureDetector(_brokerConf, _brokerMetrics);
-    _failureDetector.registerHealthyServerNotifier(
-        instanceId -> _routingManager.includeServerToRouting(instanceId));
-    _failureDetector.registerUnhealthyServerNotifier(
-        instanceId -> _routingManager.excludeServerFromRouting(instanceId));
+    _failureDetector.registerHealthyServerNotifier(this::includeServerToRouting);
+    _failureDetector.registerUnhealthyServerNotifier(this::excludeServerFromRouting);
     _failureDetector.start();
 
     // Enable/disable thread CPU time measurement through instance config.
@@ -814,8 +812,17 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   }
 
   protected void initRoutingManager() throws Exception {
-    _routingManager = new BrokerRoutingManager(_brokerMetrics, _serverRoutingStatsManager, _brokerConf);
+    _routingManager = new BrokerRoutingManager(_brokerMetrics, _serverRoutingStatsManager, _brokerConf,
+        _failOpenPolicy, _failureDetector);
     _routingManager.init(_spectatorHelixManager);
+  }
+
+  protected void includeServerToRouting(String instanceId) {
+    _routingManager.includeServerToRouting(instanceId);
+  }
+
+  protected void excludeServerFromRouting(String instanceId) {
+    _routingManager.excludeServerFromRouting(instanceId);
   }
 
   protected void initSpectatorHelixManager() throws Exception {

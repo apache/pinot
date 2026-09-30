@@ -27,6 +27,7 @@ import java.util.Map;
 import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.utils.HashUtil;
 
 /// Instance selector to balance the number of segments served by each selected server instance.
 ///
@@ -43,6 +44,25 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 /// replicas of each segment, and will try to select different replica id for each segment. The algorithm is very
 /// light-weight and will do best effort to balance the number of segments served by each selected server instance.
 public class BalancedInstanceSelector extends BaseInstanceSelector {
+
+  @Override
+  protected InstanceMapping selectForFailOpen(List<String> unavailableSegments, int requestId,
+      SegmentStates failOpenSegmentStates, Map<String, String> queryOptions) {
+    Map<String, String> selected = new HashMap<>(HashUtil.getHashMapCapacity(unavailableSegments.size()));
+    Map<String, String> optional = new HashMap<>();
+    for (String segment : unavailableSegments) {
+      List<SegmentInstanceCandidate> candidates = failOpenSegmentStates.getCandidates(segment);
+      if (candidates != null && !candidates.isEmpty()) {
+        SegmentInstanceCandidate candidate = candidates.get(requestId++ % candidates.size());
+        if (candidate.isOnline()) {
+          selected.put(segment, candidate.getInstance());
+        } else {
+          optional.put(segment, candidate.getInstance());
+        }
+      }
+    }
+    return new InstanceMapping(selected, optional);
+  }
 
   @Override
   public InstanceMapping select(List<String> segments, int requestId,

@@ -1269,7 +1269,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   /// Check if a server that was previously detected as unhealthy is now healthy.
   public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Checking gRPC connection to unhealthy server: {}", instanceId);
-    ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
+    ServerInstance serverInstance = getServerInstanceForRetry(instanceId);
     if (serverInstance == null) {
       LOGGER.info("Failed to find enabled server: {} in routing manager, skipping the retry", instanceId);
       return FailureDetector.ServerState.UNHEALTHY;

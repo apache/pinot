@@ -36,6 +36,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +75,15 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReplicaGroupInstanceSelector.class);
 
   @Override
+  protected InstanceMapping selectForFailOpen(List<String> unavailableSegments, int requestId,
+      SegmentStates failOpenSegmentStates, Map<String, String> queryOptions) {
+    Map<String, String> failOpenOptions = new HashMap<>(queryOptions);
+    failOpenOptions.put(QueryOptionKey.USE_FIXED_REPLICA, Boolean.FALSE.toString());
+    ServerSelectionContext ctx = new ServerSelectionContext(failOpenOptions, _config);
+    return selectServers(unavailableSegments, requestId, failOpenSegmentStates, null, ctx, false);
+  }
+
+  @Override
   public InstanceMapping select(List<String> segments, int requestId,
       SegmentStates segmentStates, Map<String, String> queryOptions) {
     return selectWithContext(segments, requestId, segmentStates, new ServerSelectionContext(queryOptions, _config));
@@ -101,11 +111,17 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
   protected InstanceMapping selectServers(List<String> segments, int requestId,
       SegmentStates segmentStates, @Nullable Map<String, Integer> serverRankMap, ServerSelectionContext ctx) {
+    return selectServers(segments, requestId, segmentStates, serverRankMap, ctx, true);
+  }
+
+  private InstanceMapping selectServers(List<String> segments, int requestId,
+      SegmentStates segmentStates, @Nullable Map<String, Integer> serverRankMap, ServerSelectionContext ctx,
+      boolean recordPoolMetrics) {
 
     Map<String, String> segmentToSelectedInstanceMap = new Object2ObjectOpenHashMap<>(segments.size());
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
-    Int2IntOpenHashMap poolToSegmentCount = new Int2IntOpenHashMap(2);
+    Int2IntOpenHashMap poolToSegmentCount = recordPoolMetrics ? new Int2IntOpenHashMap(2) : null;
     boolean useFixedReplica = ctx.isUseFixedReplica();
     Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(ctx.getQueryOptions());
     int numReplicaGroups = numReplicaGroupsToQuery != null ? numReplicaGroupsToQuery : 1;
@@ -144,7 +160,9 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
         }
       }
 
-      poolToSegmentCount.addTo(selectedInstance.getPool(), 1);
+      if (recordPoolMetrics) {
+        poolToSegmentCount.addTo(selectedInstance.getPool(), 1);
+      }
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.
       if (selectedInstance.isOnline()) {
@@ -157,9 +175,11 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       }
       replicaOffset = (replicaOffset + 1) % numReplicaGroups;
     }
-    for (Int2IntMap.Entry entry : poolToSegmentCount.int2IntEntrySet()) {
-      _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getIntValue(),
-          BrokerMetrics.getTagForPreferredPool(ctx.getQueryOptions()), String.valueOf(entry.getIntKey()));
+    if (recordPoolMetrics) {
+      for (Int2IntMap.Entry entry : poolToSegmentCount.int2IntEntrySet()) {
+        _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getIntValue(),
+            BrokerMetrics.getTagForPreferredPool(ctx.getQueryOptions()), String.valueOf(entry.getIntKey()));
+      }
     }
     return new InstanceMapping(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
