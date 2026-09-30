@@ -165,13 +165,18 @@ public class OpenStructSparseDenseParityTest {
       assertForwardValuesParity(denseDs, sparseDs, "latencyMs", FieldSpec.DataType.LONG);
       assertNullBitmapParity(denseDs, sparseDs, "latencyMs");
 
-      // Undeclared key: dense infers INT, sparse defaults to STRING.
+      // An undeclared key takes its type from the data, and the tier it lands on must not change that: the
+      // segment records what the build inferred, so the key reads as INT on both sides. Without the recorded
+      // type the sparse side fell back to STRING and the same key reported two types across segments.
+      assertForwardValuesParity(denseDs, sparseDs, "freeform", FieldSpec.DataType.INT);
+      assertNullBitmapParity(denseDs, sparseDs, "freeform");
+
       DataSource denseFreeform = denseDs.getDataSource("freeform");
       DataSource sparseFreeform = sparseDs.getDataSource("freeform");
       assertNotNull(denseFreeform);
       assertNotNull(sparseFreeform);
       assertEquals(denseFreeform.getDataSourceMetadata().getDataType().getStoredType(), FieldSpec.DataType.INT);
-      assertEquals(sparseFreeform.getDataSourceMetadata().getDataType().getStoredType(), FieldSpec.DataType.STRING);
+      assertEquals(sparseFreeform.getDataSourceMetadata().getDataType().getStoredType(), FieldSpec.DataType.INT);
 
       @SuppressWarnings("rawtypes")
       ForwardIndexReader denseFwd = denseFreeform.getForwardIndex();
@@ -184,7 +189,7 @@ public class OpenStructSparseDenseParityTest {
       } else {
         assertEquals(denseFwd.getInt(10, denseCtx), 42);
       }
-      assertEquals(sparseFwd.getString(10, sparseCtx), "42");
+      assertEquals(sparseFwd.getInt(10, sparseCtx), 42);
     } finally {
       dense.destroy();
       sparse.destroy();
