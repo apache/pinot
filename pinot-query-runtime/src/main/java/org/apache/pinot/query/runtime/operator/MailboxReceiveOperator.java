@@ -46,7 +46,7 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
 
   @Nullable
   private final SortUtils.SortComparator _autoComparator;
-  private final Map<AsyncStream<ReceivingMailbox.MseBlockWithStats>, StreamSample> _autoSamples;
+  private Map<AsyncStream<ReceivingMailbox.MseBlockWithStats>, StreamSample> _autoSamples;
   private boolean _autoProfilingDisabled;
 
   public MailboxReceiveOperator(OpChainExecutionContext context, MailboxReceiveNode node) {
@@ -67,6 +67,15 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
 
   @Override
   protected MseBlock getNextBlock() {
+    try {
+      return readNextBlock();
+    } catch (RuntimeException e) {
+      releaseBuffers();
+      throw e;
+    }
+  }
+
+  private MseBlock readNextBlock() {
     MseBlock block = _multiConsumer.readMseBlockBlocking();
     // When early termination flag is set, caller is expecting an EOS block to be returned, however since the 2 stages
     // between sending/receiving mailbox are setting early termination flag asynchronously, there's chances that the
@@ -81,13 +90,13 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
           sampleSenderOrder((MseBlock.Data) block);
         } catch (RuntimeException e) {
           // AUTO evidence must never turn a successful receiver-sort query into a failed one.
-          _autoProfilingDisabled = true;
-          _autoSamples.clear();
+          releaseBuffers();
           LOGGER.debug("Disabling window AUTO order profiling for this receiver", e);
         }
       }
       checkTerminationAndSampleUsage();
     } else {
+      releaseBuffers();
       onEos();
     }
     return block;
@@ -137,6 +146,17 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
       }
       sample._previousRow = null;
     }
+  }
+
+  @Override
+  protected void releaseBuffers() {
+    _autoProfilingDisabled = true;
+    _autoSamples = Map.of();
+  }
+
+  @Override
+  protected boolean hasBufferedState() {
+    return !_autoSamples.isEmpty();
   }
 
   private static final class StreamSample {
