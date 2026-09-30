@@ -98,7 +98,7 @@ public class FieldIndexConfigsUtil {
     }
     JsonNode indexes = fieldConfig.getIndexes();
     JsonNode forward = indexes != null ? indexes.get("forward") : null;
-    if (forward != null && forward.isObject()) {
+    if (forward != null && forward.isObject() && forward.hasNonNull("encodingType")) {
       try {
         return JsonUtils.jsonNodeToObject(forward, ForwardIndexConfig.class).getEncodingType()
             == FieldConfig.EncodingType.RAW;
