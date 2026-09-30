@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 import org.apache.pinot.broker.routing.segmentpruner.interval.Interval;
 import org.apache.pinot.broker.routing.segmentpruner.interval.IntervalTree;
 import org.testng.Assert;
@@ -85,5 +87,63 @@ public class IntervalTreeTest {
         new HashSet<>(Arrays.asList(name1, name4, name6, name7, name8, name9, name10, name11)));
     Assert.assertEquals(new HashSet<>(intervalTree.searchAll(new Interval(20, 30))),
         new HashSet<>(Arrays.asList(name8, name9, name10, name11, name12)));
+  }
+
+  @Test
+  public void testEmptyTree() {
+    IntervalTree<String> intervalTree = new IntervalTree<>(Map.of());
+    Assert.assertEquals(intervalTree.searchAll(new Interval(0, Long.MAX_VALUE)), List.of());
+    Assert.assertEquals(intervalTree.searchAll(null), List.of());
+  }
+
+  @Test
+  public void testNullSearchInterval() {
+    IntervalTree<String> intervalTree = new IntervalTree<>(Map.of("value", new Interval(5, 10)));
+    Assert.assertEquals(intervalTree.searchAll(null), List.of());
+  }
+
+  @Test
+  public void testAllValuesOnOneInterval() {
+    Map<String, Interval> valueToIntervalMap = new HashMap<>();
+    for (int i = 0; i < 100; i++) {
+      valueToIntervalMap.put("value" + i, new Interval(5, 10));
+    }
+    IntervalTree<String> intervalTree = new IntervalTree<>(valueToIntervalMap);
+    Assert.assertEquals(new HashSet<>(intervalTree.searchAll(new Interval(10, 20))), valueToIntervalMap.keySet());
+    Assert.assertEquals(intervalTree.searchAll(new Interval(11, 20)), List.of());
+  }
+
+  /// Cross-checks the tree against a brute force scan over randomly generated intervals. The tight value ranges make
+  /// many values share an interval, and the `[0, Long.MAX_VALUE]` entry mirrors the interval
+  /// [org.apache.pinot.broker.routing.segmentpruner.TimeSegmentPruner] gives a segment with no time range.
+  @Test
+  public void testAgainstBruteForceSearch() {
+    Random random = new Random(0);
+    for (int numValues : new int[]{1, 2, 3, 5, 13, 64, 500}) {
+      for (int valueRange : new int[]{1, 2, 5, 40, 1000}) {
+        Map<String, Interval> valueToIntervalMap = new HashMap<>();
+        for (int i = 0; i < numValues; i++) {
+          long min = random.nextInt(valueRange);
+          valueToIntervalMap.put("value" + i, new Interval(min, min + random.nextInt(valueRange)));
+        }
+        valueToIntervalMap.put("noTimeRange", new Interval(0, Long.MAX_VALUE));
+
+        IntervalTree<String> intervalTree = new IntervalTree<>(valueToIntervalMap);
+        for (int i = 0; i < 100; i++) {
+          long min = random.nextInt(valueRange + 2);
+          Interval searchInterval = new Interval(min, min + random.nextInt(valueRange + 2));
+          Set<String> expected = new HashSet<>();
+          for (Map.Entry<String, Interval> entry : valueToIntervalMap.entrySet()) {
+            if (entry.getValue().intersects(searchInterval)) {
+              expected.add(entry.getKey());
+            }
+          }
+          List<String> actual = intervalTree.searchAll(searchInterval);
+          Assert.assertEquals(new HashSet<>(actual), expected, "Mismatch for search interval: " + searchInterval);
+          Assert.assertEquals(actual.size(), expected.size(), "Duplicate values for search interval: "
+              + searchInterval);
+        }
+      }
+    }
   }
 }
