@@ -132,6 +132,7 @@ public class SplitSegmentCommitterTest {
   private SegmentUploader mockUploader(String segmentLocation)
       throws Exception {
     SegmentUploader uploader = Mockito.mock(SegmentUploader.class);
+    Mockito.when(uploader.isMetadataTarUploadSupported()).thenReturn(true);
     Mockito.when(uploader.uploadSegment(any(), any(LLCSegmentName.class)))
         .thenReturn(segmentLocation == null ? null : new URI(segmentLocation));
     return uploader;
@@ -193,6 +194,33 @@ public class SplitSegmentCommitterTest {
       Mockito.verify(uploader, Mockito.never()).uploadMetadataTar(any(), any(), anyInt());
       Mockito.verify(serverMetrics)
           .addMeteredTableValue(RAW_TABLE_NAME, ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1L);
+      assertNoTempLeak();
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  @Test
+  public void testMetadataTarSkippedWhenUploaderDoesNotSupportIt()
+      throws Exception {
+    ServerMetrics serverMetrics = Mockito.mock(ServerMetrics.class);
+    ServerMetrics.deregister();
+    Assert.assertTrue(ServerMetrics.register(serverMetrics));
+    try {
+      Map<String, File> brokenFiles = new HashMap<>(_metadataFiles);
+      brokenFiles.put(V1Constants.SEGMENT_CREATION_META, new File(TEMP_DIR, "does-not-exist"));
+      RealtimeSegmentDataManager.SegmentBuildDescriptor descriptor = mockBuildDescriptor();
+      Mockito.when(descriptor.getMetadataFiles()).thenReturn(brokenFiles);
+      SegmentUploader uploader = Mockito.mock(SegmentUploader.class);
+      Mockito.when(uploader.uploadSegment(any(), any(LLCSegmentName.class)))
+          .thenReturn(new URI("http://controller/" + _segmentName));
+      ServerSegmentCompletionProtocolHandler handler = mockProtocolHandler();
+
+      SegmentCompletionProtocol.Response response = newCommitter(handler, uploader, null).commit(descriptor);
+
+      Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
+      Mockito.verify(uploader, Mockito.never()).uploadMetadataTar(any(), any(), anyInt());
+      Mockito.verifyNoInteractions(serverMetrics);
       assertNoTempLeak();
     } finally {
       ServerMetrics.deregister();

@@ -70,6 +70,12 @@ public class PinotFSSegmentUploaderTest {
   }
 
   @Test
+  public void testMetadataTarUploadSupported() {
+    Assert.assertTrue(new PinotFSSegmentUploader("hdfs://root", TIMEOUT_IN_MS, _serverMetrics)
+        .isMetadataTarUploadSupported());
+  }
+
+  @Test
   public void testSuccessfulUpload() {
     SegmentUploader segmentUploader = new PinotFSSegmentUploader("hdfs://root", TIMEOUT_IN_MS, _serverMetrics);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);

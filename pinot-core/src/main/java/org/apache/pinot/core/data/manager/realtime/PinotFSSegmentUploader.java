@@ -41,7 +41,8 @@ import org.slf4j.LoggerFactory;
 
 /// A segment uploader which does segment upload to a segment store (with store root dir configured as
 /// \_segmentStoreUriStr) using PinotFS within a configurable timeout period. The final segment location would be in the
-/// URI \_segmentStoreUriStr/\_tableNameWithType/segmentName+random_uuid if successful.
+/// URI \_segmentStoreUriStr/\_tableNameWithType/segmentName+random_uuid if successful. It can also upload the segment
+/// metadata tar to \_segmentStoreUriStr/\_tableNameWithType/segmentName.metadata.tar.gz.
 public class PinotFSSegmentUploader implements SegmentUploader {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSSegmentUploader.class);
   public static final int DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS = 10 * 1000;
@@ -112,6 +113,11 @@ public class PinotFSSegmentUploader implements SegmentUploader {
     _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_FAILURE, 1);
 
     return null;
+  }
+
+  @Override
+  public boolean isMetadataTarUploadSupported() {
+    return true;
   }
 
   @Override

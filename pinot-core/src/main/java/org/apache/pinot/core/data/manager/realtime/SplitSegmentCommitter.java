@@ -89,7 +89,7 @@ public class SplitSegmentCommitter implements SegmentCommitter {
     _params.withSegmentLocation(segmentLocation);
 
     // TODO: put the metadata tar upload behind a server config flag. It is always on for now.
-    if (!isPeerSegmentLocation(segmentLocation)) {
+    if (_segmentUploader.isMetadataTarUploadSupported() && !isPeerSegmentLocation(segmentLocation)) {
       uploadMetadataTarQuietly(segmentBuildDescriptor.getMetadataFiles(), _params.getSegmentName());
     }
 
