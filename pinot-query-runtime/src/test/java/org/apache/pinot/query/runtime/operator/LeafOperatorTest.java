@@ -55,10 +55,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
-import org.apache.pinot.query.routing.StageMetadata;
-import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -126,24 +123,21 @@ public class LeafOperatorTest {
   @Test
   public void shouldConfirmOnlyOnePhysicalOrderedLeafRequest() {
     OpChainExecutionContext context = OperatorTestUtil.getTracingContext();
-    DataSchema schema = new DataSchema(new String[]{"key"},
-        new ColumnDataType[]{ColumnDataType.INT});
+    DataSchema schema = new DataSchema(new String[]{"key"}, new ColumnDataType[]{ColumnDataType.INT});
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0));
     TableScanNode scan = new TableScanNode(0, schema, PlanNode.NodeHint.EMPTY, List.of(), "table", List.of("key"));
     SortNode sort = new SortNode(0, schema, PlanNode.NodeHint.EMPTY, List.of(scan), collations, 10, -1);
-    WorkerMetadata worker = new WorkerMetadata(0, Map.of());
-    worker.setTableSegmentsMap(Map.of("OFFLINE", List.of("segment")));
-    ServerPlanRequestContext leafContext = new ServerPlanRequestContext(
-        new StagePlan(sort, new StageMetadata(0, List.of(worker), Map.of())), null, null, null, worker);
-    leafContext.setLeafStageBoundaryNode(sort);
+    ServerPlanRequestContext leafContext = mock(ServerPlanRequestContext.class);
+    when(leafContext.isSinglePhysicalTable()).thenReturn(true);
+    when(leafContext.getLeafStageBoundaryNode()).thenReturn(sort);
     context.setLeafStageContext(leafContext);
     try (LeafOperator leaf = new LeafOperator(context, mockQueryRequests(1), schema, null, _executorService)) {
       assertTrue(leaf.isSortedOn(collations));
       assertFalse(leaf.isSortedOn(List.of()));
       assertFalse(leaf.isSortedOn(List.of(new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING))));
-      leafContext.setLeafStageBoundaryNode(scan);
+      when(leafContext.getLeafStageBoundaryNode()).thenReturn(scan);
       assertFalse(leaf.isSortedOn(collations));
-      leafContext.setLeafStageBoundaryNode(sort);
+      when(leafContext.getLeafStageBoundaryNode()).thenReturn(sort);
     }
     try (LeafOperator hybrid = new LeafOperator(context, mockQueryRequests(2), schema, null, _executorService)) {
       assertFalse(hybrid.isSortedOn(collations));
