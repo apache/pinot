@@ -43,6 +43,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+
 
 /// Tests deserialization of a ResultSet given hardcoded Pinot results.
 public class PinotResultSetTest {
@@ -67,6 +70,18 @@ public class PinotResultSetTest {
       Assert.assertEquals(pinotResultSet.getString(5), resultSet.getString(currentRow, 4));
       currentRow++;
     }
+  }
+
+  @Test
+  public void testFetchValuesWithoutColumnTypes()
+      throws Exception {
+    PinotResultSet resultSet = new PinotResultSet(new AggregationResultSet(
+        JsonUtils.stringToJsonNode("{\"function\":\"sum(value)\",\"value\":\"42\"}")));
+
+    assertTrue(resultSet.next());
+    assertEquals(resultSet.getInt(1), 42);
+    assertEquals(resultSet.getString(1), "42");
+    assertEquals(resultSet.getMetaData().getColumnType(1), Types.VARCHAR);
   }
 
   @Test

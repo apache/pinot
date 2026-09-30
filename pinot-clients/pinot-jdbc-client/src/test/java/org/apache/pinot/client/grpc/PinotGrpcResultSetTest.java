@@ -26,17 +26,25 @@ import java.sql.SQLDataException;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.apache.pinot.client.PinotResultSet;
 import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.encoder.JsonResponseEncoder;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.testng.Assert;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Tests collection-valued results returned by the gRPC JDBC result set.
@@ -72,30 +80,30 @@ public class PinotGrpcResultSetTest {
 
     PinotGrpcResultSet resultSet = createResultSet(columnNames, columnTypes, row);
 
-    Assert.assertTrue(resultSet.next());
-    Assert.assertEquals(resultSet.getObject("map"), Map.of("name", "pinot", "count", 2));
-    Assert.assertEquals(resultSet.getObject(2), List.of(true, false));
-    Assert.assertEquals(resultSet.getObject(3), List.of(1, 2));
-    Assert.assertEquals(resultSet.getObject(4), List.of(2147483648L, 3L));
-    Assert.assertEquals(resultSet.getObject(5), List.of(1.25f, 2.5f));
-    Assert.assertEquals(resultSet.getObject(6), List.of(1.5, 2.75));
-    Assert.assertEquals(resultSet.getObject(7), List.of(new BigDecimal("1.20"), new BigDecimal("3.4")));
-    Assert.assertEquals(resultSet.getObject(8),
+    assertTrue(resultSet.next());
+    assertEquals(resultSet.getObject("map"), Map.of("name", "pinot", "count", 2));
+    assertEquals(resultSet.getObject(2), List.of(true, false));
+    assertEquals(resultSet.getObject(3), List.of(1, 2));
+    assertEquals(resultSet.getObject(4), List.of(2147483648L, 3L));
+    assertEquals(resultSet.getObject(5), List.of(1.25f, 2.5f));
+    assertEquals(resultSet.getObject(6), List.of(1.5, 2.75));
+    assertEquals(resultSet.getObject(7), List.of(new BigDecimal("1.20"), new BigDecimal("3.4")));
+    assertEquals(resultSet.getObject(8),
         List.of(Timestamp.valueOf("2020-01-01 12:00:00"), Timestamp.valueOf("2021-02-03 04:05:06")));
-    Assert.assertEquals(resultSet.getObject(9), List.of("first", "second"));
+    assertEquals(resultSet.getObject(9), List.of("first", "second"));
     List<?> bytes = (List<?>) resultSet.getObject(10);
-    Assert.assertEquals(bytes.get(0), new byte[]{0, (byte) 0xff});
-    Assert.assertEquals(bytes.get(1), new byte[]{0x10, 0x20});
-    Assert.assertEquals(resultSet.getObject(11), List.of(
+    assertEquals(bytes.get(0), new byte[]{0, (byte) 0xff});
+    assertEquals(bytes.get(1), new byte[]{0x10, 0x20});
+    assertEquals(resultSet.getObject(11), List.of(
         UUID.fromString("00000000-0000-0000-0000-000000000001"),
         UUID.fromString("00000000-0000-0000-0000-000000000002")));
 
     ResultSetMetaData metadata = resultSet.getMetaData();
-    Assert.assertEquals(metadata.getColumnType(1), Types.JAVA_OBJECT);
-    Assert.assertEquals(metadata.getColumnClassName(1), Map.class.getTypeName());
+    assertEquals(metadata.getColumnType(1), Types.JAVA_OBJECT);
+    assertEquals(metadata.getColumnClassName(1), Map.class.getTypeName());
     for (int columnIndex = 2; columnIndex <= metadata.getColumnCount(); columnIndex++) {
-      Assert.assertEquals(metadata.getColumnType(columnIndex), Types.JAVA_OBJECT);
-      Assert.assertEquals(metadata.getColumnClassName(columnIndex), List.class.getTypeName());
+      assertEquals(metadata.getColumnType(columnIndex), Types.JAVA_OBJECT);
+      assertEquals(metadata.getColumnClassName(columnIndex), List.class.getTypeName());
     }
   }
 
@@ -103,33 +111,35 @@ public class PinotGrpcResultSetTest {
   public void testNullAndEmptyValues()
       throws Exception {
     PinotGrpcResultSet resultSet = createResultSet(
-        new String[]{"map", "ints", "strings"},
-        new ColumnDataType[]{ColumnDataType.MAP, ColumnDataType.INT_ARRAY, ColumnDataType.STRING_ARRAY},
-        new Object[]{Map.of(), new int[0], new String[0]});
+        new String[]{"nullMap", "nullInts", "nullStrings", "emptyMap", "emptyInts", "emptyStrings"},
+        new ColumnDataType[]{ColumnDataType.MAP, ColumnDataType.INT_ARRAY, ColumnDataType.STRING_ARRAY,
+            ColumnDataType.MAP, ColumnDataType.INT_ARRAY, ColumnDataType.STRING_ARRAY},
+        new Object[]{null, null, null, Map.of(), new int[0], new String[0]});
 
-    Assert.assertTrue(resultSet.next());
-    setCurrentRowValue(resultSet, 0, null);
-    setCurrentRowValue(resultSet, 1, null);
-    Assert.assertNull(resultSet.getObject(1, List.class));
-    Assert.assertTrue(resultSet.wasNull());
-    Assert.assertNull(resultSet.getObject(1));
-    Assert.assertTrue(resultSet.wasNull());
-    Assert.assertNull(resultSet.getObject(2));
-    Assert.assertTrue(resultSet.wasNull());
-    Assert.assertEquals(resultSet.getObject(3), List.of());
-    Assert.assertFalse(resultSet.wasNull());
+    assertTrue(resultSet.next());
+    assertNull(resultSet.getObject(1, List.class));
+    assertTrue(resultSet.wasNull());
+    for (int columnIndex = 1; columnIndex <= 3; columnIndex++) {
+      assertNull(resultSet.getObject(columnIndex));
+      assertTrue(resultSet.wasNull());
+    }
+    assertEquals(resultSet.getObject(4), Map.of());
+    assertFalse(resultSet.wasNull());
+    for (int columnIndex = 5; columnIndex <= 6; columnIndex++) {
+      assertEquals(resultSet.getObject(columnIndex), List.of());
+      assertFalse(resultSet.wasNull());
+    }
   }
 
   @Test
   public void testGetStringForNullScalar()
       throws Exception {
     PinotGrpcResultSet resultSet = createResultSet(
-        new String[]{"value"}, new ColumnDataType[]{ColumnDataType.STRING}, new Object[]{"placeholder"});
+        new String[]{"value"}, new ColumnDataType[]{ColumnDataType.STRING}, new Object[]{null});
 
-    Assert.assertTrue(resultSet.next());
-    setCurrentRowValue(resultSet, 0, null);
-    Assert.assertNull(resultSet.getString(1));
-    Assert.assertTrue(resultSet.wasNull());
+    assertTrue(resultSet.next());
+    assertNull(resultSet.getString(1));
+    assertTrue(resultSet.wasNull());
   }
 
   @Test
@@ -139,33 +149,38 @@ public class PinotGrpcResultSetTest {
     PinotGrpcResultSet resultSet = createResultSet(
         new String[]{"uuid"}, new ColumnDataType[]{ColumnDataType.UUID}, new Object[]{uuid});
 
-    Assert.assertTrue(resultSet.next());
-    Assert.assertEquals(resultSet.getObject(1), uuid);
-    Assert.assertEquals(resultSet.getObject("uuid", UUID.class), uuid);
+    assertTrue(resultSet.next());
+    assertEquals(resultSet.getObject(1), uuid);
+    assertEquals(resultSet.getObject("uuid", UUID.class), uuid);
 
     ResultSetMetaData metadata = resultSet.getMetaData();
-    Assert.assertEquals(metadata.getColumnType(1), Types.OTHER);
-    Assert.assertEquals(metadata.getColumnClassName(1), UUID.class.getTypeName());
+    assertEquals(metadata.getColumnType(1), Types.OTHER);
+    assertEquals(metadata.getColumnClassName(1), UUID.class.getTypeName());
   }
 
   @Test
   public void testGetMapWithMixedNumericTypes()
       throws Exception {
-    PinotGrpcResultSet resultSet = createResultSet(
-        new String[]{"map"},
-        new ColumnDataType[]{ColumnDataType.MAP},
-        new Object[]{Map.of(
-            "small", 1,
-            "large", 2147483648L,
-            "float", 1.25d,
-            "nested", Map.of("value", 2))});
-
-    Assert.assertTrue(resultSet.next());
-    Assert.assertEquals(resultSet.getObject(1), Map.of(
+    Map<String, Object> map = new HashMap<>(Map.of(
         "small", 1,
         "large", 2147483648L,
         "float", 1.25d,
-        "nested", Map.of("value", 2)));
+        "nested", Map.of("value", 2),
+        "lists", List.of(List.of(1, true), List.of("pinot")),
+        "maps", List.of(Map.of("name", "pinot"), Map.of("count", 2)),
+        "arrays", new Object[]{new int[]{1, 2}, new Object[]{true, null, Map.of("value", 3)}}));
+    map.put("null", null);
+    DataSchema schema = new DataSchema(new String[]{"map"}, new ColumnDataType[]{ColumnDataType.MAP});
+    Object[] row = {map};
+    PinotGrpcResultSet resultSet = createResultSetFromFormattedRow(schema, row);
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(row);
+    PinotResultSet httpResultSet = PinotResultSet.fromJson(
+        JsonUtils.objectToString(Map.of("resultTable", new ResultTable(schema, rows))));
+
+    assertTrue(resultSet.next());
+    assertTrue(httpResultSet.next());
+    assertEquals(resultSet.getObject(1), httpResultSet.getObject(1));
   }
 
   @Test
@@ -176,10 +191,10 @@ public class PinotGrpcResultSetTest {
         new ColumnDataType[]{ColumnDataType.JSON, ColumnDataType.BIG_DECIMAL, ColumnDataType.TIMESTAMP},
         new Object[]{"{\"key\":1}", new BigDecimal("123.450"), Timestamp.valueOf("2020-01-01 12:00:00")});
 
-    Assert.assertTrue(resultSet.next());
-    Assert.assertEquals(resultSet.getObject(1), "{\"key\":1}");
-    Assert.assertEquals(resultSet.getObject(2), new BigDecimal("123.450"));
-    Assert.assertEquals(resultSet.getObject(3), Timestamp.valueOf("2020-01-01 12:00:00"));
+    assertTrue(resultSet.next());
+    assertEquals(resultSet.getObject(1), "{\"key\":1}");
+    assertEquals(resultSet.getObject(2), new BigDecimal("123.450"));
+    assertEquals(resultSet.getObject(3), Timestamp.valueOf("2020-01-01 12:00:00"));
   }
 
   @Test
@@ -192,14 +207,14 @@ public class PinotGrpcResultSetTest {
     PinotGrpcResultSet resultSet = createResultSetFromFormattedRow(
         schema, new Object[]{Map.of(), new int[0], "zz", "not-a-timestamp", "not-a-decimal"});
 
-    Assert.assertTrue(resultSet.next());
+    assertTrue(resultSet.next());
     setCurrentRowValue(resultSet, 0, "not-a-map");
     setCurrentRowValue(resultSet, 1, "not-an-array");
-    Assert.expectThrows(SQLDataException.class, () -> resultSet.getObject(1));
-    Assert.expectThrows(SQLDataException.class, () -> resultSet.getObject(2));
-    Assert.expectThrows(SQLDataException.class, () -> resultSet.getObject(3));
-    Assert.expectThrows(SQLDataException.class, () -> resultSet.getObject(4));
-    Assert.expectThrows(SQLDataException.class, () -> resultSet.getObject(5));
+    expectThrows(SQLDataException.class, () -> resultSet.getObject(1));
+    expectThrows(SQLDataException.class, () -> resultSet.getObject(2));
+    expectThrows(SQLDataException.class, () -> resultSet.getObject(3));
+    expectThrows(SQLDataException.class, () -> resultSet.getObject(4));
+    expectThrows(SQLDataException.class, () -> resultSet.getObject(5));
   }
 
   private static void setCurrentRowValue(PinotGrpcResultSet resultSet, int columnIndex, Object value)
