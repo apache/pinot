@@ -23,6 +23,7 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -540,6 +541,26 @@ public class SortOperatorTest {
 
   /// A sorted input must not be buffered at all: the consumer sees rows from the first input block before the input
   /// has reached EOS. This is what makes SORT_LIMIT the only implementation that does not break the pipeline.
+  @Test
+  public void shouldStreamOnlyWhenProducerMatchesRequestedCollation() {
+    DataSchema schema = new DataSchema(new String[]{"sort"}, new ColumnDataType[]{INT});
+    List<RelFieldCollation> asc = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    when(_input.isSortedOn(asc)).thenReturn(true);
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}))
+        .thenReturn(block(schema, new Object[]{3}, new Object[]{4})).thenReturn(SuccessMseBlock.INSTANCE);
+    SortOperator operator = getOperator(schema, asc, 2, 1);
+    assertTrue(operator instanceof LimitSortOperator);
+    assertTrue(operator.isSortedOn(asc));
+    assertBlockRows(operator.nextBlock(), new Object[]{2});
+    assertBlockRows(operator.nextBlock(), new Object[]{3});
+    assertTrue(operator.nextBlock().isSuccess());
+    assertFalse(operator.isSortedOn(List.of()));
+    assertTrue(getOperator(schema, List.of(new RelFieldCollation(0, Direction.DESCENDING, NullDirection.LAST)), 2, 1)
+        instanceof TopNSortOperator);
+    assertTrue(getOperator(schema, List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.FIRST)), 2, 1)
+        instanceof TopNSortOperator);
+  }
+
   @Test
   public void shouldStreamWithoutWaitingForEos() {
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});

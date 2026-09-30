@@ -102,7 +102,7 @@ public class ServerPlanRequestUtils {
     long queryArrivalTimeMs = System.currentTimeMillis();
 
     ServerPlanRequestContext serverContext = new ServerPlanRequestContext(stagePlan, leafQueryExecutor, executorService,
-        executionContext.getPipelineBreakerResult());
+        executionContext.getPipelineBreakerResult(), executionContext.getWorkerMetadata());
     // 1. Compile the PinotQuery
     constructPinotQueryPlan(serverContext, executionContext.getOpChainMetadata());
     // 2. Convert PinotQuery into InstanceRequest list (one for each physical table)
