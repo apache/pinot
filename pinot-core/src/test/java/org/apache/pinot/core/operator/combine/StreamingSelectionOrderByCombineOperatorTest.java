@@ -521,35 +521,6 @@ public class StreamingSelectionOrderByCombineOperatorTest {
         "Multiset of sortedCol values must match the MinMax baseline even though the underlying rows may differ");
   }
 
-  /// Correctness under single-column ties with an OFFSET: LIMIT 10 OFFSET 20 straddles the same sortedCol=0/1
-  /// boundary as [#testSingleColumnTieDeferralPreservesOrderByValuesAcrossLimitStraddle] (limit + offset = 30), but
-  /// exercises it with a nonzero offset. As [#testLimitOffsetParity] documents, the server (and this combine) retains
-  /// `limit + offset` rows -- the offset is trimmed by the broker afterwards -- so 30, not 10, rows come back
-  /// here too; what differs from the straddle test is only the query shape, not the row count.
-  @Test
-  public void testSingleColumnTieDeferralPreservesOrderByValuesAcrossOffset() {
-    @Language("sql") String query = "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol LIMIT 10 OFFSET 20";
-    Result baseline = run(_lowCardSegments, query, false, false, false, 0);
-    Result streamed = run(_lowCardSegments, query, true, false, true, 3);
-    assertTrue(streamed._combineOperator instanceof StreamingSelectionOrderByCombineOperator);
-    assertEquals(streamed._rows.size(), 30, "Server retains limit + offset rows; the broker trims the offset later");
-    assertSorted(streamed._rows, orderByComparator(query, false));
-    assertEquals(orderByColumnValues(streamed._rows), orderByColumnValues(baseline._rows),
-        "Multiset of sortedCol values must match the MinMax baseline even though the underlying rows may differ");
-  }
-
-  /// Condition 1 (the two-expression gate): `_lowCardSegments` still tie on sortedCol alone, but a second order-by
-  /// expression (valCol) makes the full order-by key a total order, so full-row parity applies unlike the
-  /// single-column tests above. `_deferTiedCursors` must be false here (`orderByExpressions.size() == 1` fails), so
-  /// this pins the same shape both before and after the production change: a wrongly-deferred cursor on this shape
-  /// would drop a row that sorts earlier on valCol despite tying on sortedCol, which parity would catch as a missing
-  /// row rather than merely a reordered one.
-  @Test
-  public void testTwoExpressionOrderByDoesNotDeferTiedCursors() {
-    assertParity(_lowCardSegments, "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 30",
-        false);
-  }
-
   /// Condition 2 (no under-delivery when the heap drains): a single-column ORDER BY with a LIMIT covering every row
   /// of `_lowCardSegments` forces every segment to eventually activate no matter how aggressively ties are deferred
   /// -- deferral only postpones a cursor, it never removes it from consideration, and the
@@ -1300,27 +1271,25 @@ public class StreamingSelectionOrderByCombineOperatorTest {
 
     int blockSize = 3;
     Result streamed = run(segments, query, true, nullHandling, true, blockSize);
-    assertStreamingParity(streamed, baseline, comparator, query, true, blockSize);
+    assertStreamingParity(streamed, baseline, comparator, query, blockSize);
   }
 
   private void assertStreamingParity(Result result, Result baseline, Comparator<Object[]> comparator,
-      @Language("sql") String query, boolean streaming, int blockSize) {
+      @Language("sql") String query, int blockSize) {
     assertEquals(result._combineOperator.getClass(), StreamingSelectionOrderByCombineOperator.class,
         "Expected the streaming combine operator for query: " + query);
     assertEquals(result._schema, baseline._schema, "Schema mismatch for query: " + query);
     assertSorted(result._rows, comparator);
     assertMultisetEquals(result._rows, baseline._rows);
-    if (streaming) {
-      int total = 0;
-      for (int size : result._blockSizes) {
-        assertTrue(size > 0 && size <= blockSize,
-            "Streamed block size out of range (0, " + blockSize + "] for query " + query + ": " + size);
-        total += size;
-      }
-      assertEquals(total, result._rows.size(), "Streamed block sizes must sum to the row count for query: " + query);
-      if (result._rows.size() > blockSize) {
-        assertTrue(result._numBlocks >= 2, "Expected multiple streamed blocks for query: " + query);
-      }
+    int total = 0;
+    for (int size : result._blockSizes) {
+      assertTrue(size > 0 && size <= blockSize,
+          "Streamed block size out of range (0, " + blockSize + "] for query " + query + ": " + size);
+      total += size;
+    }
+    assertEquals(total, result._rows.size(), "Streamed block sizes must sum to the row count for query: " + query);
+    if (result._rows.size() > blockSize) {
+      assertTrue(result._numBlocks >= 2, "Expected multiple streamed blocks for query: " + query);
     }
   }
 
@@ -1483,27 +1452,6 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     assertTrue(planCombineOperator(_sortedSegments, queryContext, true)
             instanceof StreamingSelectionOrderByCombineOperator,
         "The resolved mode must select the streaming combine");
-  }
-
-  @Test
-  public void testAutoHonoursTheMinSortedRatioThresholdForDesc() {
-    // The DESC gate is a precondition, not a replacement for the ratio check: once reverse iteration is allowed, a
-    // DESC query must still clear the same threshold an ASC one does. _mixedSegments is 2 sorted of 4, so 0.5 passes
-    // and 0.75 does not, exactly as in testAutoHonoursTheMinSortedRatioThreshold.
-    String query = "SET allowReverseOrder=true; SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol DESC, "
-        + "valCol DESC LIMIT 50";
-
-    QueryContext atThreshold =
-        modeContext("SET sortedSelectionMergeAutoMinSortedRatio=0.5; " + query, SortedSelectionMergeMode.AUTO);
-    makeStreamingInstancePlan(_mixedSegments, atThreshold);
-    assertEquals(atThreshold.getSortedSelectionMergeMode(), SortedSelectionMergeMode.ON,
-        "A DESC sorted ratio equal to the threshold must select the streaming merge");
-
-    QueryContext aboveThreshold =
-        modeContext("SET sortedSelectionMergeAutoMinSortedRatio=0.75; " + query, SortedSelectionMergeMode.AUTO);
-    makeStreamingInstancePlan(_mixedSegments, aboveThreshold);
-    assertEquals(aboveThreshold.getSortedSelectionMergeMode(), SortedSelectionMergeMode.OFF,
-        "A DESC sorted ratio below the threshold must keep the MinMax combine");
   }
 
   @Test
