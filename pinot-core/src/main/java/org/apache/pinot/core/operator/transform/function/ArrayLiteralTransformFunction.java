@@ -144,6 +144,17 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
     }
     _dataType = literalContexts.get(0).getLiteral().getType();
     switch (_dataType) {
+      case BOOLEAN:
+        _intArrayLiteral = new int[literalContexts.size()];
+        for (int i = 0; i < _intArrayLiteral.length; i++) {
+          _intArrayLiteral[i] = literalContexts.get(i).getLiteral().getBooleanValue() ? 1 : 0;
+        }
+        _longArrayLiteral = null;
+        _floatArrayLiteral = null;
+        _doubleArrayLiteral = null;
+        _stringArrayLiteral = null;
+        _bytesArrayLiteral = null;
+        break;
       case INT:
         _intArrayLiteral = new int[literalContexts.size()];
         for (int i = 0; i < _intArrayLiteral.length; i++) {

@@ -57,6 +57,10 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+
 
 /// all special tests that doesn't fit into [org.apache.pinot.query.runtime.queries.ResourceBasedQueriesTest]
 /// pattern goes here.
@@ -340,6 +344,154 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     Assert.assertEquals(resultTable.getRows().size(), expectedRows);
   }
 
+  @Test
+  public void testJsonExtractScalarLiteralDefaultParity() {
+    String timestamp = "TIMESTAMP '2018-01-01 11:12:53'";
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar('{}', '$.missing', 'STRING', " + timestamp + ") FROM a LIMIT 1",
+        "2018-01-01 11:12:53", 1);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar('{}', '$.missing', 'STRING', DATE '2024-02-29') FROM a LIMIT 1",
+        "2024-02-29", 1);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar('{}', '$.missing', 'STRING', TIME '11:12:53') FROM a LIMIT 1",
+        "11:12:53", 1);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar('{}', '$.missing', 'STRING', "
+            + "UUID '123e4567-e89b-12d3-a456-426614174000') FROM a LIMIT 1",
+        "123e4567-e89b-12d3-a456-426614174000", 1);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar('{}', '$.missing', 'LONG', 9007199254740993.0) FROM a LIMIT 1",
+        9007199254740992L, 1);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar('{}', '$.missing', 'STRING', 92233720368547758071) FROM a LIMIT 1",
+        "-9", 1);
+
+    // A dynamic path keeps the scalar call above the join. Its default must retain the same SQL-literal spelling used
+    // by the single-stage transform rather than becoming epoch-millis text during Rex conversion.
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar(a.col1, b.col2, 'STRING', " + timestamp
+            + ") FROM a JOIN b ON a.col1 = b.col1",
+        "2018-01-01 11:12:53", 15);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar(a.col1, b.col2, 'STRING', DATE '2024-02-29') "
+            + "FROM a JOIN b ON a.col1 = b.col1",
+        "2024-02-29", 15);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar(a.col1, b.col2, 'STRING', TIME '11:12:53') "
+            + "FROM a JOIN b ON a.col1 = b.col1",
+        "11:12:53", 15);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar(a.col1, b.col2, 'STRING', "
+            + "UUID '123e4567-e89b-12d3-a456-426614174000') FROM a JOIN b ON a.col1 = b.col1",
+        "123e4567-e89b-12d3-a456-426614174000", 15);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar(a.col1, b.col2, 'BOOLEAN', " + timestamp
+            + ") FROM a JOIN b ON a.col1 = b.col1",
+        false, 15);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar(a.col1, b.col2, 'LONG', 9007199254740993.0) "
+            + "FROM a JOIN b ON a.col1 = b.col1",
+        9007199254740992L, 15);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar(a.col1, b.col2, 'STRING', 92233720368547758071) "
+            + "FROM a JOIN b ON a.col1 = b.col1",
+        "-9", 15);
+
+    for (String function : new String[]{
+        "jsonExtractScalar", "jsonExtractScalarFast", "jsonExtractScalarFirstMatch", "jsonExtractScalarFory"
+    }) {
+      assertSingleColumnValue(
+          "SELECT " + function + "(col1, '$.missing', 'STRING', " + timestamp + ") FROM a",
+          "2018-01-01 11:12:53", 15);
+      assertSingleColumnValue(
+          "SELECT " + function + "(col1, '$.missing', 'TIMESTAMP', " + timestamp + ") FROM a",
+          "2018-01-01 11:12:53.0", 15);
+      assertSingleColumnValue(
+          "SELECT " + function + "(col1, '$.missing', 'LONG', 9007199254740993.0) FROM a",
+          9007199254740992L, 15);
+    }
+  }
+
+  @Test
+  public void testJsonExtractScalarNullInputWithNonNullDefault() {
+    String literalInputQuery =
+        "SELECT jsonExtractScalar(CAST(NULL AS VARCHAR), '$.missing', 'INT', 7) FROM a";
+    assertSingleColumnValue("SET enableNullHandling=true; " + literalInputQuery, null, 15);
+    assertSingleColumnValue("SET enableNullHandling=false; " + literalInputQuery, 7, 15);
+
+    // The path depends on both join inputs, which keeps jsonExtractScalar above the join and exercises FunctionOperand.
+    String joinedInputQuery = "SELECT jsonExtractScalar(CAST(NULL AS VARCHAR), "
+        + "REPLACE(CONCAT(a.col1, b.col1), CONCAT(a.col1, b.col1), '$.missing'), 'INT', 7) "
+        + "FROM a JOIN b ON a.col1 = b.col1";
+    assertSingleColumnValue("SET enableNullHandling=true; " + joinedInputQuery, null, 15);
+    assertSingleColumnValue("SET enableNullHandling=false; " + joinedInputQuery, 7, 15);
+
+    String joinedInputWithoutDefault = "SELECT jsonExtractScalar(CAST(NULL AS VARCHAR), "
+        + "REPLACE(CONCAT(a.col1, b.col1), CONCAT(a.col1, b.col1), '$.missing'), 'INT') "
+        + "FROM a JOIN b ON a.col1 = b.col1";
+    assertSingleColumnValue("SET enableNullHandling=true; " + joinedInputWithoutDefault, null, 15);
+    assertQueryFails("SET enableNullHandling=false; " + joinedInputWithoutDefault, "Cannot resolve JSON path");
+  }
+
+  @Test
+  public void testJsonExtractScalarUnresolvedArrayWithNullDefault() {
+    // Taking the path from the joined table forces intermediate-stage scalar evaluation. Match the leaf transform's
+    // explicit SQL NULL behavior under both null-handling modes.
+    assertSingleColumnValue(
+        "SET enableNullHandling=true; SELECT jsonExtractScalar(a.col1, b.col2, 'INT_ARRAY', NULL) "
+            + "FROM a JOIN b ON a.col1 = b.col1",
+        null, 15);
+    assertSingleColumnValue(
+        "SET enableNullHandling=false; SELECT jsonExtractScalar(a.col1, b.col2, 'INT_ARRAY', NULL) "
+            + "FROM a JOIN b ON a.col1 = b.col1",
+        new int[0], 15);
+    assertSingleColumnValue(
+        "SET enableNullHandling=true; SELECT jsonExtractScalar(col1, '$.missing', 'INT_ARRAY', NULL) FROM a",
+        null, 15);
+    assertSingleColumnValue(
+        "SET enableNullHandling=false; SELECT jsonExtractScalar(col1, '$.missing', 'INT_ARRAY', NULL) FROM a",
+        new int[0], 15);
+
+    assertSingleColumnValue(
+        "SET enableNullHandling=true; SELECT jsonExtractScalar(a.col1, b.col2, 'INT', NULL) "
+            + "FROM a JOIN b ON a.col1 = b.col1",
+        null, 15);
+    assertSingleColumnValue(
+        "SET enableNullHandling=false; SELECT jsonExtractScalar(a.col1, b.col2, 'INT', NULL) "
+            + "FROM a JOIN b ON a.col1 = b.col1",
+        0, 15);
+  }
+
+  @Test
+  public void testJsonExtractScalarResolvedNonArrayWithNullDefault() {
+    // The JSON expression uses both join inputs, so these calls cannot be evaluated on either leaf.
+    assertSingleColumnValue(
+        "SET enableNullHandling=true; SELECT jsonExtractScalar("
+            + "CONCAT(CONCAT(CONCAT('{\"v\":42,\"a\":\"', a.col1), "
+            + "CONCAT('\",\"b\":\"', b.col1)), '\"}'), "
+            + "'$.v', 'INT_ARRAY', NULL) FROM a JOIN b ON a.col1 = b.col1",
+        new int[0], 15);
+    assertSingleColumnValue(
+        "SET enableNullHandling=true; SELECT jsonExtractScalar("
+            + "CONCAT(CONCAT(CONCAT('{\"v\":{\"x\":1},\"a\":\"', a.col1), "
+            + "CONCAT('\",\"b\":\"', b.col1)), '\"}'), "
+            + "'$.v', 'INT_ARRAY', NULL) FROM a JOIN b ON a.col1 = b.col1",
+        new int[0], 15);
+  }
+
+  private void assertSingleColumnValue(String sql, Object expectedValue, int expectedRows) {
+    QueryDispatcher.QueryResult queryResult = queryRunner(sql, false);
+    assertNull(queryResult.getProcessingException(), "Query failed: " + queryResult.getProcessingException());
+    ResultTable resultTable = queryResult.getResultTable();
+    assertNotNull(resultTable, "Query returned no result table: " + sql);
+    assertEquals(resultTable.getRows().size(), expectedRows);
+    for (Object[] row : resultTable.getRows()) {
+      assertEquals(row.length, 1);
+      assertEquals(row[0], expectedValue, sql);
+    }
+  }
+
   /// Test automatically compares against H2.
   ///
   /// @deprecated do not add to this test set. this class will be broken down and clean up.
@@ -356,6 +508,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   /// Test compares against its desired exceptions.
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
   public void testSqlWithExceptionMsgChecker(String sql, @Language("regexp") String expectedError) {
+    assertQueryFails(sql, expectedError);
+  }
+
+  private void assertQueryFails(String sql, String expectedError) {
     try {
       // query pinot
       QueryDispatcher.QueryResult queryResult = queryRunner(sql, false);
@@ -433,6 +589,28 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT round_decimal(col3) FROM a", 15},
         new Object[]{"SELECT col1, roundDecimal(COUNT(*)) FROM a GROUP BY col1", 5},
         new Object[]{"SELECT col1, round_decimal(COUNT(*)) FROM a GROUP BY col1", 5},
+
+        // test json_extract_scalar resolves on the intermediate stage. Taking the jsonPath from the joined table
+        // keeps the call above the join, so it can only be answered by the scalar function. col1 is not JSON, so
+        // every row falls back to the default value and the query is a pure row-count check.
+        new Object[]{"SELECT json_extract_scalar(a.col1, b.col2, 'INT', 0) FROM a JOIN b ON a.col1 = b.col1", 15},
+        new Object[]{"SELECT jsonExtractScalar(a.col1, '$.x', 'INT', 0) FROM a JOIN b ON a.col1 = b.col1", 15},
+        // Empty all-literal arrays stay as runtime calls because Calcite cannot represent a typed empty array literal.
+        // Execute every supported array storage family to guard result serialization.
+        new Object[]{"SELECT jsonExtractScalar('{}', '$.missing', 'INT_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{}', '$.missing', 'LONG_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{}', '$.missing', 'FLOAT_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{}', '$.missing', 'DOUBLE_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{}', '$.missing', 'BOOLEAN_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{}', '$.missing', 'TIMESTAMP_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{}', '$.missing', 'STRING_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{}', '$.missing', 'BIG_DECIMAL_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{\"v\":[true,false]}', '$.v', 'BOOLEAN_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{\"v\":[1.25,2.5]}', '$.v', 'BIG_DECIMAL_ARRAY') FROM a", 15},
+        // nullableParameters on the four-argument scalar must preserve the three-argument overload's null-path
+        // short-circuit instead of attempting to compile a null JSONPath.
+        new Object[]{"SELECT jsonExtractScalar('{}', CAST(NULL AS VARCHAR), 'INT') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{}', CAST(NULL AS VARCHAR), 'INT', 7) FROM a", 15},
 
         // test queries with special query options attached
         //   - when leaf limit is set, each server returns multiStageLeafLimit number of rows only.
@@ -525,11 +703,6 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
               + "(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue']) to be single-quoted literal values"
       });
     }
-    //    - checked function cannot be found b/c there's no intermediate stage impl for json_extract_scalar
-    testCases.add(new Object[]{
-        "SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT) FROM a JOIN b ON a.col1 = b.col1",
-        "Unsupported function: JSONEXTRACTSCALAR"
-    });
 
     // Positive int keys (only included ones that will be parsed for this query)
     for (String key : new String[]{
