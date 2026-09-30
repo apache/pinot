@@ -576,7 +576,8 @@ public class QueryEnvironment {
     }
     Map<String, String> options = plannerContext.getOptions();
     SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, getSpoolMode(options),
-        isSpoolsFeedback(options), _envConfig.defaultHashFunction(), pruneUnnestColumns(options));
+        isSpoolsFeedback(options), _envConfig.defaultHashFunction(), pruneUnnestColumns(options),
+        QueryOptionsUtils.isStreamingSortedMailboxReceiveEnabled(options), _envConfig.getTableCache());
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
             _envConfig.getTableCache());

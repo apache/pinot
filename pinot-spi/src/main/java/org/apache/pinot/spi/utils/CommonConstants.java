@@ -1298,6 +1298,10 @@ public class CommonConstants {
         /// Option to customize the value of [Broker#CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY]
         public static final String PREFER_SELECT_ALIAS_IN_GROUP_BY = "preferSelectAliasInGroupBy";
 
+        /// Enables merge receive for leaf selection ORDER BY on one physical table. Default false; independent of
+        /// whether the leaf sorts its rows in memory or streams physically sorted segments. No-op for the V2 planner.
+        public static final String STREAMING_SORTED_MAILBOX_RECEIVE = "streamingSortedMailboxReceive";
+
         /// Per-query override of [Broker#CONFIG_OF_WINDOW_K_WAY_MERGE].
         public static final String WINDOW_K_WAY_MERGE = "windowKWayMerge";
 
