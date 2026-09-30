@@ -54,6 +54,9 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.slf4j.Logger;
@@ -205,6 +208,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public Plan makeInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService) {
     applyQueryOptions(queryContext);
+    boundGroupingSetsBaseAggregation(segmentContexts, queryContext);
 
     int numSegments = segmentContexts.size();
     List<PlanNode> planNodes = new ArrayList<>(numSegments);
@@ -375,6 +379,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public Plan makeStreamingInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService, ResultsBlockStreamer streamer) {
     applyQueryOptions(queryContext);
+    boundGroupingSetsBaseAggregation(segmentContexts, queryContext);
 
     int numSegments = segmentContexts.size();
     List<PlanNode> planNodes = new ArrayList<>(numSegments);
@@ -420,6 +425,89 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   protected CombinePlanNode createCombinePlanNode(List<PlanNode> planNodes, QueryContext queryContext,
       ExecutorService executorService, @Nullable ResultsBlockStreamer streamer) {
     return new CombinePlanNode(planNodes, queryContext, executorService, streamer);
+  }
+
+  /// Only emit BASE records when every local BASE key and every derived grouping-set key can fit the combine
+  /// table. Summing each segment's dictionary product is conservative even when keys overlap across segments.
+  /// Unknown, raw, transformed and multi-value columns use the per-row expansion path. This also makes a larger
+  /// `groupingSetsBaseAggregationMaxGroups` option unable to bypass the actual `numGroupsLimit` memory guard.
+  @VisibleForTesting
+  static void boundGroupingSetsBaseAggregation(List<SegmentContext> segmentContexts, QueryContext queryContext) {
+    if (queryContext.isGroupingSetsBaseAggregation()) {
+      queryContext.setGroupingSetsBaseAggregationAllowed(
+          fitsGroupingSetsBaseAggregationLimit(segmentContexts, queryContext));
+    }
+  }
+
+  @VisibleForTesting
+  static boolean fitsGroupingSetsBaseAggregationLimit(List<SegmentContext> segmentContexts, QueryContext queryContext) {
+    List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+    List<int[]> groupingSets = queryContext.getGroupingSets();
+    int limit = queryContext.getNumGroupsLimit();
+    if (groupByExpressions == null || groupingSets == null || limit <= 0) {
+      return false;
+    }
+
+    long remainingBase = limit;
+    long remainingDerived = limit;
+    for (SegmentContext segmentContext : segmentContexts) {
+      IndexSegment segment = segmentContext.getIndexSegment();
+      if (segment.getSegmentMetadata().getTotalDocs() == 0) {
+        continue;
+      }
+      long[] cardinalities = new long[groupByExpressions.size()];
+      for (int i = 0; i < cardinalities.length; i++) {
+        ExpressionContext expression = groupByExpressions.get(i);
+        if (expression.getType() != ExpressionContext.Type.IDENTIFIER) {
+          return false;
+        }
+        DataSource dataSource = segment.getDataSourceNullable(expression.getIdentifier());
+        if (dataSource == null || !dataSource.getDataSourceMetadata().isSingleValue()) {
+          return false;
+        }
+        Dictionary dictionary = dataSource.getDictionary();
+        ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
+        if (dictionary == null || forwardIndex == null || !forwardIndex.isDictionaryEncoded()) {
+          return false;
+        }
+        long cardinality = dictionary.length();
+        if (queryContext.isNullHandlingEnabled() && dataSource.getNullValueVector() != null) {
+          cardinality++;
+        }
+        if (cardinality == 0) {
+          return false;
+        }
+        cardinalities[i] = cardinality;
+      }
+
+      long baseGroups = 1;
+      for (long cardinality : cardinalities) {
+        if (baseGroups > remainingBase / cardinality) {
+          return false;
+        }
+        baseGroups *= cardinality;
+      }
+      if (baseGroups > remainingBase) {
+        return false;
+      }
+      remainingBase -= baseGroups;
+
+      for (int[] groupingSet : groupingSets) {
+        long derivedGroups = 1;
+        for (int columnIndex : groupingSet) {
+          if (columnIndex < 0 || columnIndex >= cardinalities.length
+              || derivedGroups > remainingDerived / cardinalities[columnIndex]) {
+            return false;
+          }
+          derivedGroups *= cardinalities[columnIndex];
+        }
+        if (derivedGroups > remainingDerived) {
+          return false;
+        }
+        remainingDerived -= derivedGroups;
+      }
+    }
+    return true;
   }
 
   /// In-place rewrite QueryContext based on the information from local IndexSegment.

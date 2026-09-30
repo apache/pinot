@@ -130,14 +130,6 @@ public abstract class IndexedTable extends BaseTable {
     return _lookupMap.computeIfPresent(key, (k, v) -> updateRecord(v, newRecord)) != null;
   }
 
-  /// Merges `newRecord` into the record with the same key if one exists; a record with a new key is ignored.
-  /// Used by the grouping-sets base-aggregation combine to fold OVERFLOW base records (whose base key was
-  /// dropped when the base table hit its group limit) into the already-derived groups, keeping the grand total
-  /// and coarse subtotals exact like the expansion path.
-  public void upsertExisting(Key key, Record newRecord) {
-    updateExistingRecord(key, newRecord);
-  }
-
   /// Merges a record only when its key is already present, reporting whether it was retained. Used when a
   /// grouping-set derived table has reached its group limit and cannot admit a new full-layout group.
   public boolean upsertExistingIfPresent(Key key, Record newRecord) {

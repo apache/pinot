@@ -121,12 +121,9 @@ public class MixedLayoutGroupByCombineOperatorTest {
   }
 
   @Test
-  public void testOverflowBaseGroupsKeepTotalsExact() throws Exception {
-    // When the combined BASE groups exceed numGroupsLimit (e.g. many segments with disjoint key spaces, each
-    // passing the per-segment cardinality gate), the overflowing base records must still contribute to the
-    // grand total and the coarse subtotals -- the expansion path keeps those exact under the limit, and the
-    // base path must not regress that. Two base-layout blocks with disjoint keys and numGroupsLimit=3: only 3
-    // of the 4 base keys are admitted as fine groups, but the grand total must equal the sum over ALL records.
+  public void testUnexpectedBaseGroupOverflowFailsClosed() throws Exception {
+    // The instance planner should reject this path before execution. If it does not, the combine must fail
+    // rather than return an incomplete grand total or buffer unbounded aggregation intermediates.
     QueryContext queryContext = queryContext();
     queryContext.setNumGroupsLimit(3);
     DataSchema baseSchema = new DataSchema(new String[]{"d1", "sum(m1)"},
@@ -143,25 +140,8 @@ public class MixedLayoutGroupByCombineOperatorTest {
     GroupByCombineOperator combineOperator =
         new GroupByCombineOperator(operators, queryContext, _executorService);
 
-    Object block = combineOperator.nextBlock();
-    if (!(block instanceof GroupByResultsBlock)) {
-      throw new AssertionError("Combine returned " + block.getClass().getSimpleName() + ": "
-          + ((org.apache.pinot.core.operator.blocks.results.BaseResultsBlock) block).getErrorMessages());
-    }
-    GroupByResultsBlock mergedBlock = (GroupByResultsBlock) block;
-    IndexedTable table = (IndexedTable) mergedBlock.getTable();
-
-    Double grandTotal = null;
-    Iterator<Record> iterator = table.iterator();
-    while (iterator.hasNext()) {
-      Object[] values = iterator.next().getValues();
-      if (((Number) values[1]).intValue() == 1) {
-        grandTotal = ((Number) values[2]).doubleValue();
-      }
-    }
-    assertEquals(grandTotal, 15.0,
-        "the grand total must include overflowed base groups (exact totals like the expansion path)");
-    assertEquals(mergedBlock.isNumGroupsLimitReached(), true);
+    assertTrue(combineOperator.nextBlock() instanceof ExceptionResultsBlock,
+        "unexpected BASE overflow must fail instead of returning an incorrect total");
   }
 
   @Test
