@@ -28,6 +28,7 @@ import java.util.Deque;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
@@ -72,7 +73,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
   private static final String MERGE_SCOPE = "SortedMailboxMergeReceiveOperator";
   private final DataSchema _dataSchema;
   private final Comparator<Object[]> _comparator;
-  private final SenderCursorHeap _readyCursors;
+  private final PriorityQueue<SenderCursor> _readyCursors;
   private final boolean _singleSortedSender;
   /// Senders that have not finished but do not currently have a row ready. Nothing can be emitted while this is
   /// non-empty because any one of these senders may hold the next row.
@@ -81,7 +82,6 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
       new IdentityHashMap<>();
   private boolean _mergeOutputStarted;
   private boolean _fallbackToSort;
-  private boolean _tryEqualHeadMerge;
   private int _fallbackOutputIndex = -1;
 
   /// Rows buffered only for the mixed-version fallback. The sorted list is handed downstream as-is, so cleanup must
@@ -100,7 +100,8 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
     _dataSchema = node.getDataSchema();
     _comparator = new SortUtils.SortComparator(List.copyOf(node.getCollations()), false);
     List<AsyncStream<ReceivingMailbox.MseBlockWithStats>> streams = _multiConsumer.getLiveStreamsSnapshot();
-    _readyCursors = new SenderCursorHeap(streams.size(), _comparator);
+    _readyCursors = new PriorityQueue<>(Math.max(streams.size(), 1),
+        (left, right) -> _comparator.compare(left.peek(), right.peek()));
     _singleSortedSender = streams.size() == 1;
     if (!_singleSortedSender) {
       for (AsyncStream<ReceivingMailbox.MseBlockWithStats> stream : streams) {
@@ -157,11 +158,10 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
 
   /// Merges the sorted senders, emitting at most [SortOperator#DEFAULT_MAX_ROWS_PER_BLOCK] rows per call.
   private MseBlock mergeNextBlock() {
-    ArrayList<Object[]> rows = new ArrayList<>(0);
+    List<Object[]> rows = new ArrayList<>();
     while (rows.size() < SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK) {
       if (!_starvedCursors.isEmpty()) {
         MseBlock.Eos error;
-        boolean receivedMoreRows = false;
         if (rows.isEmpty()) {
           error = readOneBlock();
         } else {
@@ -173,7 +173,6 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
             break;
           }
           error = processReadBlock(block);
-          receivedMoreRows = block != null && block.isData() && ((MseBlock.Data) block).getNumRows() > 0;
         }
         if (error != null) {
           return terminate(error);
@@ -183,70 +182,17 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
           _rows.addAll(rows);
           return sortAllRows();
         }
-        if (receivedMoreRows) {
-          // A refill proves this is not a one-block result. Restore the established full-block capacity once so
-          // fragmented input cannot trigger repeated growth while this output block is assembled.
-          rows.ensureCapacity(SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK);
-        }
         continue;
       }
       if (_readyCursors.isEmpty()) {
         break;
       }
-      if (rows.isEmpty()) {
-        // Keep empty and tiny results cheap without sacrificing the one-allocation path for full output blocks.
-        // Sum all currently buffered rows once; later output blocks retain the established full-block capacity.
-        int initialCapacity = _mergeOutputStarted ? SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK
-            : _readyCursors.getCappedAvailableRowCount(SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK);
-        // ArrayList grows by 1.5x. Round near-full first blocks up now so a small refill cannot allocate an oversized
-        // replacement in addition to the nearly full initial array.
-        if (initialCapacity + (initialCapacity >> 1) >= SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK) {
-          initialCapacity = SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK;
-        }
-        rows.ensureCapacity(initialCapacity);
-      }
-      if (_tryEqualHeadMerge && _readyCursors.size() > 1) {
-        int remaining = SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK - rows.size();
-        if (remaining >= _readyCursors.size()) {
-          if (_readyCursors.allHeadsEqual()) {
-            int previousRowCount = rows.size();
-            List<SenderCursor> exhausted = _readyCursors.advanceEqualHeads(rows);
-            if (exhausted != null) {
-              for (SenderCursor cursor : exhausted) {
-                if (!cursor._finished) {
-                  _starvedCursors.add(cursor);
-                }
-              }
-            }
-            if (!_starvedCursors.isEmpty()) {
-              _tryEqualHeadMerge = false;
-            }
-            checkActiveTerminationAndSampleUsageAfterBatch(previousRowCount, rows.size());
-            continue;
-          } else {
-            _tryEqualHeadMerge = false;
-          }
-        } else {
-          _readyCursors.ensureOrdered();
-        }
-      }
-      if (_readyCursors.size() == 4) {
-        advanceFourCursors(rows);
-        continue;
-      }
-      SenderCursor cursor = _readyCursors.peek();
+      SenderCursor cursor = _readyCursors.remove();
       rows.add(cursor.next());
       if (cursor.hasRow()) {
-        // The cursor's key can only move forward, so restoring the heap from the root takes one sift-down. A generic
-        // PriorityQueue poll followed by add performs two independent heap repairs for every emitted row.
-        _readyCursors.updateTop();
+        _readyCursors.add(cursor);
       } else if (!cursor._finished) {
-        _readyCursors.removeTop();
         _starvedCursors.add(cursor);
-        _tryEqualHeadMerge = false;
-      } else {
-        _readyCursors.removeTop();
-        _tryEqualHeadMerge = true;
       }
       QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rows.size(), MERGE_SCOPE,
           _context.getActiveDeadlineMs());
@@ -270,9 +216,6 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
   private MseBlock.Eos processReadBlock(@Nullable MseBlock block) {
     if (block == null) {
       updateFinishedCursors();
-      if (_starvedCursors.isEmpty()) {
-        _tryEqualHeadMerge = true;
-      }
       return null;
     }
     if (block.isEos()) {
@@ -283,7 +226,6 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
       }
       // Aggregate success is returned only after every sender has emitted EOS.
       _starvedCursors.clear();
-      _tryEqualHeadMerge = true;
       return null;
     }
     AsyncStream<ReceivingMailbox.MseBlockWithStats> stream = _multiConsumer.getLastReadStream();
@@ -300,9 +242,6 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
     updateFinishedCursors();
     if (cursor.hasRow() && _starvedCursors.remove(cursor)) {
       _readyCursors.add(cursor);
-    }
-    if (_starvedCursors.isEmpty()) {
-      _tryEqualHeadMerge = true;
     }
     return null;
   }
@@ -375,109 +314,6 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
 
   private void checkActiveTerminationAndSampleUsage() {
     QueryThreadContext.checkTerminationAndSampleUsage(MERGE_SCOPE, _context.getActiveDeadlineMs());
-  }
-
-  private void checkActiveTerminationAndSampleUsageAfterBatch(int previousRowCount, int currentRowCount) {
-    int mask = QueryThreadContext.CHECK_TERMINATION_AND_SAMPLE_USAGE_RECORD_MASK;
-    if ((previousRowCount & ~mask) != (currentRowCount & ~mask)) {
-      checkActiveTerminationAndSampleUsage();
-    }
-  }
-
-  /// Merges the common four-sender case with two comparisons per row instead of a heap sift-down. Stop when one
-  /// cursor runs dry because its next block may contain the global minimum.
-  private void advanceFourCursors(List<Object[]> output) {
-    SenderCursor cursor0 = _readyCursors.get(0);
-    SenderCursor cursor1 = _readyCursors.get(1);
-    SenderCursor cursor2 = _readyCursors.get(2);
-    SenderCursor cursor3 = _readyCursors.get(3);
-    _readyCursors.clear();
-
-    Object[] head0 = cursor0.peek();
-    Object[] head1 = cursor1.peek();
-    Object[] head2 = cursor2.peek();
-    Object[] head3 = cursor3.peek();
-    int leftWinner = betterHead(head0, 0, head1, 1);
-    int rightWinner = betterHead(head2, 2, head3, 3);
-    int winner = betterWinner(leftWinner, head0, head1, rightWinner, head2, head3);
-    boolean exhausted = false;
-    while (output.size() < SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK && !exhausted) {
-      switch (winner) {
-        case 0:
-          output.add(head0);
-          cursor0.advance();
-          head0 = cursor0.hasRow() ? cursor0.peek() : null;
-          exhausted = head0 == null;
-          leftWinner = betterHead(head0, 0, head1, 1);
-          break;
-        case 1:
-          output.add(head1);
-          cursor1.advance();
-          head1 = cursor1.hasRow() ? cursor1.peek() : null;
-          exhausted = head1 == null;
-          leftWinner = betterHead(head0, 0, head1, 1);
-          break;
-        case 2:
-          output.add(head2);
-          cursor2.advance();
-          head2 = cursor2.hasRow() ? cursor2.peek() : null;
-          exhausted = head2 == null;
-          rightWinner = betterHead(head2, 2, head3, 3);
-          break;
-        case 3:
-          output.add(head3);
-          cursor3.advance();
-          head3 = cursor3.hasRow() ? cursor3.peek() : null;
-          exhausted = head3 == null;
-          rightWinner = betterHead(head2, 2, head3, 3);
-          break;
-        default:
-          throw new IllegalStateException("Four-cursor tournament has no winner");
-      }
-      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(output.size(), MERGE_SCOPE,
-          _context.getActiveDeadlineMs());
-      if (!exhausted) {
-        winner = betterWinner(leftWinner, head0, head1, rightWinner, head2, head3);
-      }
-    }
-
-    int cursorState = restoreFourCursor(cursor0, head0) | restoreFourCursor(cursor1, head1)
-        | restoreFourCursor(cursor2, head2) | restoreFourCursor(cursor3, head3);
-    if ((cursorState & 1) != 0) {
-      _tryEqualHeadMerge = false;
-    } else if ((cursorState & 2) != 0) {
-      _tryEqualHeadMerge = true;
-    }
-  }
-
-  /// Returns bit 0 for a starved cursor and bit 1 for a finished cursor.
-  private int restoreFourCursor(SenderCursor cursor, @Nullable Object[] head) {
-    if (head != null) {
-      _readyCursors.add(cursor);
-      return 0;
-    }
-    if (!cursor._finished) {
-      _starvedCursors.add(cursor);
-      return 1;
-    }
-    return 2;
-  }
-
-  private int betterWinner(int leftWinner, Object[] head0, Object[] head1, int rightWinner, Object[] head2,
-      Object[] head3) {
-    Object[] leftHead = leftWinner == 0 ? head0 : head1;
-    Object[] rightHead = rightWinner == 2 ? head2 : head3;
-    return betterHead(leftHead, leftWinner, rightHead, rightWinner);
-  }
-
-  private int betterHead(@Nullable Object[] left, int leftCursor, @Nullable Object[] right, int rightCursor) {
-    if (left == null) {
-      return right == null ? -1 : rightCursor;
-    }
-    if (right == null) {
-      return leftCursor;
-    }
-    return _comparator.compare(left, right) <= 0 ? leftCursor : rightCursor;
   }
 
   /// Drops data that raced with early termination until aggregate EOS or a sender error arrives.
@@ -562,25 +398,6 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
       return _rows.get(_index++);
     }
 
-    void advance() {
-      _index++;
-    }
-
-    int getCappedAvailableRowCount(int limit) {
-      int rowCount = _rows.size() - _index;
-      if (rowCount >= limit) {
-        return limit;
-      }
-      for (List<Object[]> pendingRows : _pending) {
-        int remaining = limit - rowCount;
-        if (pendingRows.size() >= remaining) {
-          return limit;
-        }
-        rowCount += pendingRows.size();
-      }
-      return rowCount;
-    }
-
     void drainTo(List<Object[]> rows) {
       if (_index < _rows.size()) {
         rows.addAll(_rows.subList(_index, _rows.size()));
@@ -596,173 +413,6 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
         retainedRowCount += pendingRows.size();
       }
       return retainedRowCount;
-    }
-  }
-
-  /// Fixed-capacity min-heap for the current row from each sender.
-  ///
-  /// A merge advances only the minimum cursor, and a sorted cursor's next key cannot move backwards. Updating the
-  /// root in place therefore needs one sift-down instead of a generic heap's poll-plus-add pair.
-  private static class SenderCursorHeap {
-    private final SenderCursor[] _heap;
-    private final Comparator<Object[]> _comparator;
-    private int _size;
-    private boolean _dirty;
-
-    SenderCursorHeap(int capacity, Comparator<Object[]> comparator) {
-      _heap = new SenderCursor[Math.max(capacity, 1)];
-      _comparator = comparator;
-    }
-
-    void add(SenderCursor cursor) {
-      Preconditions.checkState(_size < _heap.length, "Cannot add more cursors than senders");
-      int index = _size++;
-      while (index > 0) {
-        int parentIndex = (index - 1) >>> 1;
-        SenderCursor parent = _heap[parentIndex];
-        if (_comparator.compare(cursor.peek(), parent.peek()) >= 0) {
-          break;
-        }
-        _heap[index] = parent;
-        index = parentIndex;
-      }
-      _heap[index] = cursor;
-    }
-
-    SenderCursor peek() {
-      return _heap[0];
-    }
-
-    SenderCursor get(int index) {
-      return _heap[index];
-    }
-
-    void updateTop() {
-      siftDown(_heap[0], _size);
-    }
-
-    void removeTop() {
-      int newSize = --_size;
-      SenderCursor replacement = _heap[newSize];
-      _heap[newSize] = null;
-      if (newSize > 0) {
-        siftDown(replacement, newSize);
-      }
-    }
-
-    int size() {
-      return _size;
-    }
-
-    int getCappedAvailableRowCount(int limit) {
-      int rowCount = 0;
-      for (int i = 0; i < _size; i++) {
-        int remaining = limit - rowCount;
-        int availableRowCount = _heap[i].getCappedAvailableRowCount(remaining);
-        if (availableRowCount >= remaining) {
-          return limit;
-        }
-        rowCount += availableRowCount;
-      }
-      return rowCount;
-    }
-
-    void ensureOrdered() {
-      if (_dirty) {
-        heapify();
-      }
-    }
-
-    /// Returns whether every sender currently has the same complete collation key.
-    ///
-    /// Equal heads can be advanced together because tie order across senders is unspecified. If an earlier equal-head
-    /// advance left the array unordered and the new heads diverged, this method restores the heap before returning.
-    boolean allHeadsEqual() {
-      Object[] first = _heap[0].peek();
-      for (int i = 1; i < _size; i++) {
-        if (_comparator.compare(first, _heap[i].peek()) != 0) {
-          if (_dirty) {
-            heapify();
-          }
-          return false;
-        }
-      }
-      // Equal keys satisfy the heap invariant regardless of their array order.
-      _dirty = false;
-      return true;
-    }
-
-    /// Emits one comparator-equal row from every cursor without per-cursor heap repairs.
-    @Nullable
-    List<SenderCursor> advanceEqualHeads(List<Object[]> output) {
-      List<SenderCursor> exhausted = null;
-      int active = 0;
-      int oldSize = _size;
-      for (int i = 0; i < oldSize; i++) {
-        SenderCursor cursor = _heap[i];
-        output.add(cursor.next());
-        if (cursor.hasRow()) {
-          _heap[active++] = cursor;
-        } else {
-          if (exhausted == null) {
-            exhausted = new ArrayList<>();
-          }
-          exhausted.add(cursor);
-        }
-      }
-      for (int i = active; i < oldSize; i++) {
-        _heap[i] = null;
-      }
-      _size = active;
-      if (active < oldSize) {
-        heapify();
-      } else if (active > 1) {
-        _dirty = true;
-      }
-      return exhausted;
-    }
-
-    private void heapify() {
-      for (int i = (_size >>> 1) - 1; i >= 0; i--) {
-        siftDown(i, _heap[i], _size);
-      }
-      _dirty = false;
-    }
-
-    private void siftDown(SenderCursor cursor, int size) {
-      siftDown(0, cursor, size);
-    }
-
-    private void siftDown(int index, SenderCursor cursor, int size) {
-      int half = size >>> 1;
-      while (index < half) {
-        int childIndex = (index << 1) + 1;
-        SenderCursor child = _heap[childIndex];
-        int rightIndex = childIndex + 1;
-        if (rightIndex < size
-            && _comparator.compare(_heap[rightIndex].peek(), child.peek()) < 0) {
-          childIndex = rightIndex;
-          child = _heap[rightIndex];
-        }
-        if (_comparator.compare(cursor.peek(), child.peek()) <= 0) {
-          break;
-        }
-        _heap[index] = child;
-        index = childIndex;
-      }
-      _heap[index] = cursor;
-    }
-
-    boolean isEmpty() {
-      return _size == 0;
-    }
-
-    void clear() {
-      for (int i = 0; i < _size; i++) {
-        _heap[i] = null;
-      }
-      _size = 0;
-      _dirty = false;
     }
   }
 }
