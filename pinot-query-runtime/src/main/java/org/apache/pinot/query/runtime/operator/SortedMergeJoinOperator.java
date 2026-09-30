@@ -176,6 +176,7 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
   }
 
   /// INNER and LEFT merge joins preserve the left key order, including after residual filtering and null padding.
+  @Override
   public boolean isSortedOn(List<RelFieldCollation> collations) {
     if (collations.isEmpty() || collations.size() > _leftKeyIds.length) {
       return false;

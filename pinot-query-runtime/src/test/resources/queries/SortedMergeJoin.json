@@ -52,6 +52,13 @@
         "sql": "SELECT /*+ joinOptions(join_strategy='sorted') */ a.correlation_id, COUNT(*) FROM {user_events} a JOIN {user_events} b ON a.correlation_id = b.correlation_id GROUP BY a.correlation_id",
         "h2Sql": "SELECT a.correlation_id, COUNT(*) FROM {user_events} a JOIN {user_events} b ON a.correlation_id = b.correlation_id GROUP BY a.correlation_id",
         "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Ordered leaf blocks feed a sorted left join with cross-input residuals and a streaming ORDER BY limit",
+        "sql": "SET sortedSelectionMergeMode='on'; SET sortedSelectionMergeBlockSize=2; SET streamingSortedMailboxReceive=true; SELECT /*+ joinOptions(join_strategy='sorted') */ a.correlation_id, b.correlation_id FROM {user_events} a LEFT JOIN {user_events} b ON a.correlation_id = b.correlation_id AND a.event <> b.event ORDER BY a.correlation_id ASC NULLS LAST LIMIT 10",
+        "h2Sql": "SELECT a.correlation_id, b.correlation_id FROM {user_events} a LEFT JOIN {user_events} b ON a.correlation_id = b.correlation_id AND a.event <> b.event ORDER BY a.correlation_id ASC NULLS LAST LIMIT 10",
+        "keepOutputRowOrder": true,
+        "ignoreV2Optimizer": true
       }
     ]
   }
