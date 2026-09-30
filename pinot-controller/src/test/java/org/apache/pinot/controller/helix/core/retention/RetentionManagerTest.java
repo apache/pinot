@@ -464,7 +464,8 @@ public class RetentionManagerTest {
     String realtimeTableSchemaJson = schema.toSingleLineJsonString();
     ZNRecord tableZNRecord = new ZNRecord(tableName);
     tableZNRecord.setSimpleField("schemaJSON", realtimeTableSchemaJson);
-    when(mockPropertyStore.get("/SCHEMAS/" + tableName, null, AccessOption.PERSISTENT)).thenReturn(tableZNRecord);
+    when(mockPropertyStore.get(eq("/SCHEMAS/" + tableName), any(Stat.class), eq(AccessOption.PERSISTENT)))
+        .thenReturn(tableZNRecord);
 
     InstanceConfig instanceConfig = new InstanceConfig("Broker_localhost_1234");
     instanceConfig.setHostName("localhost");
