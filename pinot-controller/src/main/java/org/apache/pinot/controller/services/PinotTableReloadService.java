@@ -323,7 +323,7 @@ public class PinotTableReloadService {
       }
       return JsonUtils.objectToPrettyString(tableNeedReloadResponse);
     } catch (InvalidConfigException e) {
-      throw new ControllerApplicationException(LOG, e.getMessage(), Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOG, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (IOException ioe) {
       throw new ControllerApplicationException(LOG, "Error parsing Pinot server response: " + ioe.getMessage(),
           Response.Status.INTERNAL_SERVER_ERROR, ioe);

@@ -27,6 +27,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 
 
 /// Tests exception logging modes used by Controller API responses.
@@ -60,5 +62,86 @@ public class ControllerApplicationExceptionTest {
     assertEquals(exception.getMessage(), PUBLIC_MESSAGE);
     verify(logger).error("{} exception type: {}", PUBLIC_MESSAGE, IllegalStateException.class.getName());
     verifyNoMoreInteractions(logger);
+  }
+
+  @Test
+  public void testFullModeKeepsTheCauseAndLogsIt() {
+    Logger logger = mock(Logger.class);
+    IllegalStateException cause = new IllegalStateException("Cannot read single-value for column: name");
+
+    ControllerApplicationException exception = new ControllerApplicationException(logger, PUBLIC_MESSAGE,
+        Response.Status.INTERNAL_SERVER_ERROR, cause);
+
+    assertSame(exception.getCause(), cause);
+    assertEquals(exception.getMessage(), PUBLIC_MESSAGE);
+    verify(logger).error(PUBLIC_MESSAGE, cause);
+    verifyNoMoreInteractions(logger);
+  }
+
+  @Test
+  public void testFullModeKeepsTheCauseOfAClientError() {
+    Logger logger = mock(Logger.class);
+    IllegalArgumentException cause = new IllegalArgumentException("Invalid column: name");
+
+    ControllerApplicationException exception =
+        new ControllerApplicationException(logger, PUBLIC_MESSAGE, Response.Status.BAD_REQUEST.getStatusCode(), cause);
+
+    assertSame(exception.getCause(), cause);
+    assertEquals(exception.getMessage(), PUBLIC_MESSAGE);
+    verify(logger).info("{} exception: {}", PUBLIC_MESSAGE, cause.getMessage());
+    verifyNoMoreInteractions(logger);
+  }
+
+  @Test
+  public void testLogOnlyModeLogsInFullWithoutKeepingTheCause() {
+    Logger logger = mock(Logger.class);
+    IllegalStateException cause = new IllegalStateException(SENSITIVE_MESSAGE);
+
+    ControllerApplicationException exception = new ControllerApplicationException(logger, PUBLIC_MESSAGE,
+        Response.Status.INTERNAL_SERVER_ERROR, cause, ExceptionLogMode.LOG_ONLY);
+
+    assertNull(exception.getCause());
+    assertEquals(exception.getMessage(), PUBLIC_MESSAGE);
+    verify(logger).error(PUBLIC_MESSAGE, cause);
+    verifyNoMoreInteractions(logger);
+  }
+
+  @Test
+  public void testLogOnlyModeLogsTheMessageOfAClientErrorWithoutKeepingTheCause() {
+    Logger logger = mock(Logger.class);
+    IllegalArgumentException cause = new IllegalArgumentException(SENSITIVE_MESSAGE);
+
+    ControllerApplicationException exception = new ControllerApplicationException(logger, PUBLIC_MESSAGE,
+        Response.Status.BAD_REQUEST, cause, ExceptionLogMode.LOG_ONLY);
+
+    assertNull(exception.getCause());
+    verify(logger).info("{} exception: {}", PUBLIC_MESSAGE, SENSITIVE_MESSAGE);
+    verifyNoMoreInteractions(logger);
+  }
+
+  @Test
+  public void testClientErrorLogsTheMessageOnceWhenItAlreadyContainsTheCause() {
+    Logger logger = mock(Logger.class);
+    IllegalArgumentException cause = new IllegalArgumentException("Table foo_OFFLINE does not exist");
+    String message = "Invalid request: " + cause.getMessage();
+
+    new ControllerApplicationException(logger, message, Response.Status.NOT_FOUND, cause);
+
+    verify(logger).info(message);
+    verifyNoMoreInteractions(logger);
+  }
+
+  @Test
+  public void testTypeOnlyModeDoesNotKeepTheCause() {
+    ControllerApplicationException exception = new ControllerApplicationException(mock(Logger.class), PUBLIC_MESSAGE,
+        Response.Status.BAD_REQUEST, new IllegalArgumentException(SENSITIVE_MESSAGE), ExceptionLogMode.TYPE_ONLY);
+
+    assertNull(exception.getCause());
+  }
+
+  @Test
+  public void testNoCauseWhenNoneIsGiven() {
+    assertNull(new ControllerApplicationException(mock(Logger.class), PUBLIC_MESSAGE, Response.Status.NOT_FOUND)
+        .getCause());
   }
 }

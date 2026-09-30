@@ -90,6 +90,7 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException.ExceptionLogMode;
 import org.apache.pinot.controller.api.upload.SegmentMetadataInfo;
 import org.apache.pinot.controller.api.upload.SegmentUploadMetadata;
 import org.apache.pinot.controller.api.upload.SegmentValidationUtils;
@@ -185,7 +186,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       hasDataAccess = accessControl.hasAccess(tableName, AccessType.READ, httpHeaders, Actions.Table.DOWNLOAD_SEGMENT);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
-          "Caught exception while validating access to table: " + tableName, Response.Status.INTERNAL_SERVER_ERROR, e);
+          "Caught exception while validating access to table: " + tableName, Response.Status.INTERNAL_SERVER_ERROR, e,
+          ExceptionLogMode.LOG_ONLY);
     }
     if (!hasDataAccess) {
       throw new ControllerApplicationException(LOGGER, "No data access to table: " + tableName,
@@ -458,7 +460,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
       _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER, "Exception while uploading segment: " + e.getMessage(),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+          Response.Status.INTERNAL_SERVER_ERROR, e, ExceptionLogMode.LOG_ONLY);
     } finally {
       FileUtils.deleteQuietly(tempEncryptedFile);
       FileUtils.deleteQuietly(tempDecryptedFile);
@@ -552,7 +554,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
       _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
-          "Exception while uploading reingested segment: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+          "Exception while uploading reingested segment: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e,
+          ExceptionLogMode.LOG_ONLY);
     } finally {
       FileUtils.deleteQuietly(tempTarFile);
       FileUtils.deleteQuietly(tempSegmentDir);
@@ -722,7 +725,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       } else {
         throw new ControllerApplicationException(LOGGER,
             "Exception while processing segments to upload: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR,
-            e);
+            e, ExceptionLogMode.LOG_ONLY);
       }
     } finally {
       cleanupTempFiles(tempFiles);

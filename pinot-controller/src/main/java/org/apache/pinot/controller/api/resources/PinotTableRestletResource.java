@@ -1047,9 +1047,9 @@ public class PinotTableRestletResource {
         }
       }
     } catch (TableNotFoundException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND, e);
     } catch (RebalanceInProgressException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
     }
   }
 
@@ -1279,7 +1279,7 @@ public class PinotTableRestletResource {
               includeColumnCompressionStats);
       segmentsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (IOException ioe) {
       throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
           Response.Status.INTERNAL_SERVER_ERROR, ioe);
@@ -1337,7 +1337,7 @@ public class PinotTableRestletResource {
               compressionStatsEnabled, includeColumnCompressionStats);
       return JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (IOException ioe) {
       throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
           Response.Status.INTERNAL_SERVER_ERROR, ioe);
@@ -1381,7 +1381,7 @@ public class PinotTableRestletResource {
               serverRequestBatchSize);
       validDocIdsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (IOException ioe) {
       throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
           Response.Status.INTERNAL_SERVER_ERROR, ioe);
@@ -1409,7 +1409,7 @@ public class PinotTableRestletResource {
       JsonNode segmentsMetadataJson = getAggregateIndexMetadataFromServer(tableNameWithType);
       tableIndexMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (IOException ioe) {
       throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
           Response.Status.INTERNAL_SERVER_ERROR, ioe);

@@ -18,12 +18,21 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 
 public class ExceptionUtils {
+  private static final String CAUSE_SEPARATOR = " -> ";
+  private static final String ELLIPSIS = "...";
+  private static final int MIN_CAUSE_LENGTH = ELLIPSIS.length() + 2;
 
   private ExceptionUtils() {
   }
@@ -59,6 +68,128 @@ public class ExceptionUtils {
     return sb.toString();
   }
 
+  /// Appends the messages of `cause` and its causes to `message`, each after `" -> "`. Messages already in the text are
+  /// skipped, at most `maxCauses` are kept (the outermost and the innermost, never dropping the root cause), and each
+  /// is abbreviated in the middle to `maxCauseLength` characters.
+  @Nullable
+  public static String appendCauses(@Nullable String message, @Nullable Throwable cause, int maxCauses,
+      int maxCauseLength) {
+    Preconditions.checkArgument(maxCauses >= 1, "maxCauses must be at least 1, got: %s", maxCauses);
+    Preconditions.checkArgument(maxCauseLength >= MIN_CAUSE_LENGTH, "maxCauseLength must be at least %s, got: %s",
+        MIN_CAUSE_LENGTH, maxCauseLength);
+    if (cause == null) {
+      return message;
+    }
+    String base = message != null ? message : "";
+    List<String> causeMessages = new ArrayList<>();
+    Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+    for (Throwable t = cause; t != null && visited.add(t); t = t.getCause()) {
+      String causeMessage = getOwnMessage(t);
+      if (causeMessage != null && !containsMessage(base, causeMessage)) {
+        causeMessages.add(causeMessage);
+      }
+    }
+    List<String> distinctMessages = new ArrayList<>(causeMessages.size());
+    int numCauseMessages = causeMessages.size();
+    for (int i = 0; i < numCauseMessages; i++) {
+      String causeMessage = causeMessages.get(i);
+      if (!distinctMessages.isEmpty()) {
+        String previous = distinctMessages.get(distinctMessages.size() - 1);
+        if (causeMessage.equals(previous)) {
+          continue;
+        }
+        // Keep the root cause: the previous message may be elided by the bound
+        boolean isRootCause = i == numCauseMessages - 1;
+        if (!isRootCause && previous.length() <= maxCauseLength && containsMessage(previous, causeMessage)) {
+          continue;
+        }
+      }
+      distinctMessages.add(causeMessage);
+    }
+    int numCauses = distinctMessages.size();
+    if (numCauses == 0) {
+      return message;
+    }
+    StringBuilder sb = new StringBuilder(base);
+    int numOutermost = maxCauses > 1 ? 1 : 0;
+    int firstInnermost = Math.max(numOutermost, numCauses - (maxCauses - numOutermost));
+    for (int i = 0; i < numOutermost; i++) {
+      appendCause(sb, distinctMessages.get(i), maxCauseLength);
+    }
+    if (firstInnermost > numOutermost) {
+      if (sb.length() > 0) {
+        sb.append(CAUSE_SEPARATOR);
+      }
+      sb.append(ELLIPSIS);
+    }
+    for (int i = firstInnermost; i < numCauses; i++) {
+      appendCause(sb, distinctMessages.get(i), maxCauseLength);
+    }
+    return sb.toString();
+  }
+
+  @Nullable
+  private static String getOwnMessage(Throwable t) {
+    Throwable cause = t.getCause();
+    boolean hasCause = cause != null && cause != t;
+    String message = t.getMessage();
+    if (StringUtils.isBlank(message)) {
+      if (hasCause) {
+        return null;
+      }
+      String simpleName = t.getClass().getSimpleName();
+      return simpleName.isEmpty() ? t.getClass().getName() : simpleName;
+    }
+    return hasCause && message.equals(cause.toString()) ? null : message;
+  }
+
+  private static void appendCause(StringBuilder sb, String causeMessage, int maxCauseLength) {
+    if (containsMessage(sb, causeMessage)) {
+      return;
+    }
+    if (sb.length() > 0) {
+      sb.append(CAUSE_SEPARATOR);
+    }
+    sb.append(abbreviateMiddle(causeMessage, maxCauseLength));
+  }
+
+  /// Whether `text` contains `message` as a whole word, e.g. `"5"` is not contained in `"table_5"`.
+  private static boolean containsMessage(CharSequence text, String message) {
+    String string = text.toString();
+    int messageLength = message.length();
+    boolean startsWithWordChar = isWordChar(message.charAt(0));
+    boolean endsWithWordChar = isWordChar(message.charAt(messageLength - 1));
+    for (int start = string.indexOf(message); start >= 0; start = string.indexOf(message, start + 1)) {
+      int end = start + messageLength;
+      boolean boundedBefore = !startsWithWordChar || start == 0 || !isWordChar(string.charAt(start - 1));
+      boolean boundedAfter = !endsWithWordChar || end == string.length() || !isWordChar(string.charAt(end));
+      if (boundedBefore && boundedAfter) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean isWordChar(char c) {
+    return Character.isLetterOrDigit(c) || c == '_';
+  }
+
+  private static String abbreviateMiddle(String message, int maxLength) {
+    int length = message.length();
+    if (length <= maxLength) {
+      return message;
+    }
+    int numCharsToKeep = maxLength - ELLIPSIS.length();
+    int headEnd = (numCharsToKeep + 1) / 2;
+    int tailStart = length - numCharsToKeep / 2;
+    if (Character.isHighSurrogate(message.charAt(headEnd - 1))) {
+      headEnd--;
+    }
+    if (Character.isLowSurrogate(message.charAt(tailStart))) {
+      tailStart++;
+    }
+    return message.substring(0, headEnd) + ELLIPSIS + message.substring(tailStart);
+  }
 
   public static String getStackTrace(Throwable e) {
     return getStackTrace(e, Integer.MAX_VALUE);

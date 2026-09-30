@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -43,6 +44,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -56,6 +58,7 @@ import org.apache.pinot.controller.util.FileIngestionHelper.DataPayload;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.segment.spi.creator.RecordProcessingException;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -149,13 +152,13 @@ public class PinotIngestionRestletResource {
     try {
       asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, new DataPayload(fileUpload)));
     } catch (IllegalArgumentException e) {
-      asyncResponse.resume(new ControllerApplicationException(LOGGER, String
-          .format("Got illegal argument when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
-          Response.Status.BAD_REQUEST, e));
+      asyncResponse.resume(newIngestFromFileException(
+          String.format("Got illegal argument when ingesting file into table: %s. %s", tableNameWithType,
+              e.getMessage()), Response.Status.BAD_REQUEST, e));
     } catch (Exception e) {
-      asyncResponse.resume(new ControllerApplicationException(LOGGER,
-          String.format("Caught exception when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
-          Response.Status.INTERNAL_SERVER_ERROR, e));
+      asyncResponse.resume(newIngestFromFileException(
+          String.format("Caught exception when ingesting file into table: %s. %s", tableNameWithType,
+              e.getMessage()), Response.Status.INTERNAL_SERVER_ERROR, e));
     }
   }
 
@@ -232,6 +235,16 @@ public class PinotIngestionRestletResource {
             new File(_controllerConf.getLocalTempDir(), INGESTION_DIR), authProvider,
             _controllerConf.isIngestFromUriLocalFileSystemAllowed());
     return fileIngestionHelper.buildSegmentAndPush(payload);
+  }
+
+  /// Only record failures expose their causes: other failures can involve files on the controller that the batch
+  /// config names.
+  @VisibleForTesting
+  static ControllerApplicationException newIngestFromFileException(String message, Response.Status status,
+      Exception e) {
+    boolean isRecordProcessingFailure = ExceptionUtils.indexOfType(e, RecordProcessingException.class) >= 0;
+    return new ControllerApplicationException(LOGGER, message, status, e,
+        isRecordProcessingFailure ? ExceptionLogMode.FULL : ExceptionLogMode.LOG_ONLY);
   }
 
   private URI getControllerUri() {
