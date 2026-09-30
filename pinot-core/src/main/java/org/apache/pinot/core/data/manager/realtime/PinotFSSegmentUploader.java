@@ -32,6 +32,7 @@ import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -110,6 +111,59 @@ public class PinotFSSegmentUploader implements SegmentUploader {
     }
     _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_FAILURE, 1);
 
+    return null;
+  }
+
+  @Override
+  public URI uploadMetadataTar(File metadataTarFile, LLCSegmentName segmentName, int timeoutInMillis) {
+    if (_segmentStoreUriStr == null || _segmentStoreUriStr.isEmpty()) {
+      LOGGER.error("Missing segment store uri. Failed to upload metadata tar {} for {}.", metadataTarFile.getName(),
+          segmentName.getSegmentName());
+      return null;
+    }
+    final String rawTableName = TableNameBuilder.extractRawTableName(segmentName.getTableName());
+    Callable<URI> uploadTask = () -> {
+      // Final object name (not a tmp name): the controller does not rename the sidecar.
+      URI destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, segmentName.getTableName(),
+          segmentName.getSegmentName() + Constants.METADATA_TAR_GZ_FILE_EXT));
+      long startTime = System.currentTimeMillis();
+      try {
+        PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
+        // Delete any existing object so that retries are idempotent.
+        if (pinotFS.exists(destUri)) {
+          pinotFS.delete(destUri, true);
+        }
+        pinotFS.copyFromLocalFile(metadataTarFile, destUri);
+        return destUri;
+      } catch (Exception e) {
+        LOGGER.warn("Failed copy metadata tar file {} to segment store {}: {}", metadataTarFile.getName(), destUri, e);
+      } finally {
+        long duration = System.currentTimeMillis() - startTime;
+        _serverMetrics.addTimedTableValue(rawTableName, ServerTimer.METADATA_TAR_UPLOAD_TIME_MS, duration,
+            TimeUnit.MILLISECONDS);
+      }
+      return null;
+    };
+    Future<URI> future = _executorService.submit(uploadTask);
+    try {
+      URI metadataTarLocation = future.get(timeoutInMillis, TimeUnit.MILLISECONDS);
+      if (metadataTarLocation != null) {
+        LOGGER.info("Successfully uploaded metadata tar of segment {} to {}.", segmentName, metadataTarLocation);
+        _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.METADATA_TAR_UPLOAD_SUCCESS, 1);
+        return metadataTarLocation;
+      }
+    } catch (InterruptedException e) {
+      LOGGER.info("Interrupted while waiting for metadata tar upload of {} to {}.", segmentName, _segmentStoreUriStr);
+      Thread.currentThread().interrupt();
+    } catch (TimeoutException e) {
+      _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.METADATA_TAR_UPLOAD_TIMEOUT, 1);
+      LOGGER.warn("Timed out waiting to upload metadata tar of segment: {} for table: {}",
+          segmentName.getSegmentName(), rawTableName);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to upload metadata tar {} of segment {} for table {}", metadataTarFile.getAbsolutePath(),
+          segmentName, rawTableName, e);
+    }
+    _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
     return null;
   }
 }
