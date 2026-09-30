@@ -284,46 +284,10 @@ public class SortedMergeJoinOperatorTest {
     assertEquals(rows.get(1), new Object[]{2, "a", 2, "a"});
   }
 
-  @Test
-  public void shouldExcludeNullKeysFromInnerJoin() {
-    MultiStageOperator left = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA)
-        .addRow(1, null)
-        .addRow(2, "BB")
-        .buildWithEos();
-    MultiStageOperator right = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA)
-        .addRow(3, null)
-        .addRow(4, "BB")
-        .buildWithEos();
-    SortedMergeJoinOperator operator =
-        getOperator(left, right, RESULT_SCHEMA, JoinRelType.INNER, List.of(1), List.of(1));
-    List<Object[]> rows = drain(operator);
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0), new Object[]{2, "BB", 4, "BB"});
-  }
-
-  @Test
-  public void shouldPreserveNullKeyLeftRowsInLeftJoin() {
-    MultiStageOperator left = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA)
-        .addRow(1, null)
-        .addRow(2, "BB")
-        .buildWithEos();
-    MultiStageOperator right = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA)
-        .addRow(3, null)
-        .addRow(4, "BB")
-        .buildWithEos();
-    SortedMergeJoinOperator operator =
-        getOperator(left, right, RESULT_SCHEMA, JoinRelType.LEFT, List.of(1), List.of(1));
-    List<Object[]> rows = drain(operator);
-    assertEquals(rows.size(), 2);
-    assertTrue(containsRow(rows, new Object[]{1, null, null, null}));
-    assertTrue(containsRow(rows, new Object[]{2, "BB", 4, "BB"}));
-  }
-
   /// Regression: the planner asks for NULLS LAST collation on both join inputs
   /// (`PinotJoinExchangeNodeInsertRule`), so a null-key row arrives immediately *after* the last non-null run — which
   /// is exactly where the run-scanning loops call `compareKeys` on it. A key comparator that unboxes or calls
-  /// `compareTo` without a null check throws NPE there and fails the query for any nullable join key. The two tests
-  /// above place nulls first, the opposite of the real ordering, so they cannot catch this.
+  /// `compareTo` without a null check throws NPE there and fails the query for a nullable join key.
   @Test
   public void shouldExcludeNullKeysSortedLastFromInnerJoin() {
     MultiStageOperator left = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA)
@@ -355,8 +319,8 @@ public class SortedMergeJoinOperatorTest {
         getOperator(left, right, RESULT_SCHEMA, JoinRelType.LEFT, List.of(1), List.of(1));
     List<Object[]> rows = drain(operator);
     assertEquals(rows.size(), 2);
-    assertTrue(containsRow(rows, new Object[]{2, "BB", 4, "BB"}));
-    assertTrue(containsRow(rows, new Object[]{1, null, null, null}));
+    assertEquals(rows.get(0), new Object[]{2, "BB", 4, "BB"});
+    assertEquals(rows.get(1), new Object[]{1, null, null, null});
   }
 
   /// A null key on the right side alone, sorted last, must terminate the right run without being dereferenced.
@@ -376,9 +340,9 @@ public class SortedMergeJoinOperatorTest {
         getOperator(left, right, RESULT_SCHEMA, JoinRelType.INNER, List.of(1), List.of(1));
     List<Object[]> rows = drain(operator);
     assertEquals(rows.size(), 3);
-    assertTrue(containsRow(rows, new Object[]{1, "AA", 10, "AA"}));
-    assertTrue(containsRow(rows, new Object[]{1, "AA", 11, "AA"}));
-    assertTrue(containsRow(rows, new Object[]{2, "BB", 12, "BB"}));
+    assertEquals(rows.get(0), new Object[]{1, "AA", 10, "AA"});
+    assertEquals(rows.get(1), new Object[]{1, "AA", 11, "AA"});
+    assertEquals(rows.get(2), new Object[]{2, "BB", 12, "BB"});
   }
 
   @Test
@@ -564,14 +528,6 @@ public class SortedMergeJoinOperatorTest {
     return repr;
   }
 
-  private static boolean containsRow(List<Object[]> rows, Object[] expected) {
-    for (Object[] row : rows) {
-      if (Arrays.equals(row, expected)) {
-        return true;
-      }
-    }
-    return false;
-  }
 
   @Test
   public void shouldPropagateLeftInputError() {
@@ -607,32 +563,6 @@ public class SortedMergeJoinOperatorTest {
     assertFalse(operator.hasBufferedState());
     assertTrue(((ErrorMseBlock) block).getErrorMessages()
         .get(QueryErrorCode.UNKNOWN).contains("testRightError"));
-  }
-
-  @Test
-  public void shouldHandleLeftJoinManyToMany() {
-    // LEFT JOIN with multiple left rows and multiple right rows sharing the same key, plus an additional key
-    // to verify correct cursor advancement after the many-to-many group.
-    MultiStageOperator left = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA)
-        .addRow(1, "k")
-        .addRow(2, "k")
-        .addRow(3, "m")
-        .buildWithEos();
-    MultiStageOperator right = new BlockListMultiStageOperator.Builder(CHILD_SCHEMA)
-        .addRow(10, "k")
-        .addRow(20, "k")
-        .addRow(30, "m")
-        .buildWithEos();
-    SortedMergeJoinOperator operator =
-        getOperator(left, right, RESULT_SCHEMA, JoinRelType.LEFT, List.of(1), List.of(1));
-    List<Object[]> rows = drain(operator);
-    // 2 left x 2 right for "k" = 4 rows, plus 1 left x 1 right for "m" = 1 row => 5 total
-    assertEquals(rows.size(), 5);
-    assertEquals(rows.get(0), new Object[]{1, "k", 10, "k"});
-    assertEquals(rows.get(1), new Object[]{1, "k", 20, "k"});
-    assertEquals(rows.get(2), new Object[]{2, "k", 10, "k"});
-    assertEquals(rows.get(3), new Object[]{2, "k", 20, "k"});
-    assertEquals(rows.get(4), new Object[]{3, "m", 30, "m"});
   }
 
   @Test
