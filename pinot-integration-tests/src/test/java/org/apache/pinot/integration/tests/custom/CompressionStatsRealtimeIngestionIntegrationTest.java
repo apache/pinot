@@ -98,9 +98,8 @@ public class CompressionStatsRealtimeIngestionIntegrationTest extends CustomData
   protected List<FieldConfig> getFieldConfigs() {
     List<FieldConfig> fieldConfigs = new ArrayList<>();
     for (String column : RAW_COLUMNS) {
-      fieldConfigs.add(
-          new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(),
-              FieldConfig.CompressionCodec.LZ4, null));
+      fieldConfigs.add(fieldConfigWithForwardEncoding(column, FieldConfig.EncodingType.RAW, List.of(),
+          FieldConfig.CompressionCodec.LZ4, null));
     }
     return fieldConfigs;
   }
