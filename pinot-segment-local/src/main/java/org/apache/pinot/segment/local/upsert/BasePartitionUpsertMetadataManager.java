@@ -25,12 +25,12 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -969,24 +969,27 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   private void recordSnapshotPass(boolean consistent) {
-    List<String> segmentNames = new ArrayList<>();
+    // Name alone is not enough, because minion tasks such as upsert compaction upload a new copy of a segment under the
+    // same name. It uses the data CRC rather than the full CRC, so a local build kept on a data CRC match, e.g. with a
+    // Lucene text index, still matches the committed copy.
+    TreeMap<String, Long> segmentVersions = new TreeMap<>();
     for (IndexSegment segment : _trackedSegments) {
       if (segment instanceof ImmutableSegmentImpl) {
-        segmentNames.add(segment.getSegmentName());
+        SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+        long dataCrc = segmentMetadata.getDataCrc();
+        segmentVersions.put(segment.getSegmentName(), dataCrc >= 0 ? dataCrc : segmentMetadata.getCrc());
       } else {
         // The pass runs before the new consuming segment takes its first record, so a tracked mutable segment is an
         // earlier one still waiting to be sealed. Its rows may not match the committed copy yet.
         consistent = false;
       }
     }
-    Collections.sort(segmentNames);
     CRC32 crc = new CRC32();
-    for (String segmentName : segmentNames) {
-      crc.update(segmentName.getBytes(StandardCharsets.UTF_8));
-      crc.update('\n');
+    for (Map.Entry<String, Long> entry : segmentVersions.entrySet()) {
+      crc.update((entry.getKey() + ':' + entry.getValue() + '\n').getBytes(StandardCharsets.UTF_8));
     }
     // A changed segment the pass skipped, e.g. on segmentLock contention, keeps a stale snapshot file
-    _lastSnapshotPass = new SnapshotPass(crc.getValue(), segmentNames.size(),
+    _lastSnapshotPass = new SnapshotPass(crc.getValue(), segmentVersions.size(),
         consistent && _updatedSegmentsSinceLastSnapshot.isEmpty(), System.currentTimeMillis());
   }
 

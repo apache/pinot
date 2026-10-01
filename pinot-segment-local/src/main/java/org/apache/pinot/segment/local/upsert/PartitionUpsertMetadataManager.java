@@ -90,12 +90,12 @@ public interface PartitionUpsertMetadataManager extends Closeable {
     return null;
   }
 
-  // Two replicas whose last passes are consistent and cover the same sealed segment names took their snapshots from
-  // the same inputs, so those snapshots can be compared. Consistent means no segment was added, replaced or removed
-  // while the pass ran, every changed segment got its snapshot file written, and no earlier consuming segment was still
-  // waiting to be sealed. A later segment change either drops a segment's snapshot file or leaves it alone, so the
-  // files left on disk stay as of the pass.
-  record SnapshotPass(long segmentNamesCrc, int numSegments, boolean consistent, long finishedAtMs) {
+  // Two replicas whose last passes are consistent and cover the same sealed segments, by name and data CRC, took their
+  // snapshots from the same inputs, so those snapshots can be compared. Consistent means no segment was added,
+  // replaced or removed while the pass ran, every changed segment got its snapshot file written, and no earlier
+  // consuming segment was still waiting to be sealed. A later segment change either drops a segment's snapshot file or
+  // leaves it alone, so the files left on disk stay as of the pass.
+  record SnapshotPass(long segmentsCrc, int numSegments, boolean consistent, long finishedAtMs) {
   }
 
   /// Remove the expired primary keys from the metadata when TTL is enabled.

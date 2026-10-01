@@ -793,7 +793,7 @@ public class TablesResource {
           SnapshotPass snapshotPass =
               partitionUpsertMetadataManager != null ? partitionUpsertMetadataManager.getLastSnapshotPass() : null;
           if (snapshotPass != null) {
-            validDocIdsMetadata.put("snapshotPass", Map.of("segmentNamesCrc", snapshotPass.segmentNamesCrc(),
+            validDocIdsMetadata.put("snapshotPass", Map.of("segmentsCrc", snapshotPass.segmentsCrc(),
                 "numSegments", snapshotPass.numSegments(), "consistent", snapshotPass.consistent(), "finishedAtMs",
                 snapshotPass.finishedAtMs()));
           }

@@ -419,7 +419,7 @@ public class TablesResourceTest extends BaseResourceTest {
     assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
     assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
     JsonNode snapshotPass = validDocIdsMetadata.get("snapshotPass");
-    assertEquals(snapshotPass.get("segmentNamesCrc").asLong(), 1234L);
+    assertEquals(snapshotPass.get("segmentsCrc").asLong(), 1234L);
     assertEquals(snapshotPass.get("numSegments").asInt(), 2);
     assertTrue(snapshotPass.get("consistent").asBoolean());
     assertEquals(snapshotPass.get("finishedAtMs").asLong(), 5678L);

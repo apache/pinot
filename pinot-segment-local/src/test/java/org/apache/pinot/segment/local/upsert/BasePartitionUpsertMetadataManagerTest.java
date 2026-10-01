@@ -1061,7 +1061,7 @@ public class BasePartitionUpsertMetadataManagerTest {
     assertTrue(pass1.consistent());
     assertTrue(pass2.consistent());
     assertEquals(pass1.numSegments(), 2);
-    assertEquals(pass2.segmentNamesCrc(), pass1.segmentNamesCrc());
+    assertEquals(pass2.segmentsCrc(), pass1.segmentsCrc());
 
     // An upload that reached only one replica so far, e.g. from SRT or FIT, makes the two passes not comparable
     addSnapshotSegment(replica1, replica1Dir, "seg03");
@@ -1069,7 +1069,19 @@ public class BasePartitionUpsertMetadataManagerTest {
     SnapshotPass passWithUpload = replica1.getLastSnapshotPass();
     assertTrue(passWithUpload.consistent());
     assertEquals(passWithUpload.numSegments(), 3);
-    assertNotEquals(passWithUpload.segmentNamesCrc(), pass2.segmentNamesCrc());
+    assertNotEquals(passWithUpload.segmentsCrc(), pass2.segmentsCrc());
+
+    // A compacted copy uploaded under the same name, applied on one replica only, also makes them not comparable
+    DummyPartitionUpsertMetadataManager replica3 = new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+    File replica3Dir = new File(TEMP_DIR, "replica3");
+    addSnapshotSegment(replica3, replica3Dir, "seg01");
+    ImmutableSegmentImpl compactedSeg02 = addSnapshotSegment(replica3, replica3Dir, "seg02");
+    when(compactedSeg02.getSegmentMetadata().getDataCrc()).thenReturn(99L);
+    replica3.takeSnapshot();
+    SnapshotPass passWithCompaction = replica3.getLastSnapshotPass();
+    assertTrue(passWithCompaction.consistent());
+    assertEquals(passWithCompaction.numSegments(), 2);
+    assertNotEquals(passWithCompaction.segmentsCrc(), pass2.segmentsCrc());
   }
 
   @Test
@@ -1152,13 +1164,14 @@ public class BasePartitionUpsertMetadataManagerTest {
     return upsertContext;
   }
 
-  private static void addSnapshotSegment(DummyPartitionUpsertMetadataManager upsertMetadataManager, File dir,
-      String segmentName)
+  private static ImmutableSegmentImpl addSnapshotSegment(DummyPartitionUpsertMetadataManager upsertMetadataManager,
+      File dir, String segmentName)
       throws IOException {
     ImmutableSegmentImpl segment =
         createImmutableSegment(segmentName, new File(dir, segmentName), new ArrayList<>(), null);
     segment.enableUpsert(upsertMetadataManager, createDocIds(0, 1), null);
     upsertMetadataManager.addSegment(segment);
+    return segment;
   }
 
   private static ImmutableSegmentImpl createImmutableSegment(String segName, File segDir,
