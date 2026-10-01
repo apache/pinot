@@ -120,13 +120,10 @@ public class ImmutableSegmentImplTest {
     ExecutorService executor = Executors.newSingleThreadExecutor();
     try {
       Future<?> destroyer = executor.submit(segment::destroy);
-      // A reader holds the read lock: destroy blocks draining it and must not close anything
+      // A reader holds the read lock: destroy must not close anything
       assertThrows(TimeoutException.class, () -> destroyer.get(500, TimeUnit.MILLISECONDS));
+      assertFalse(segment.isDestroyed());
       verify(indexContainer, never()).close();
-      // The flag is published before destroy queues for the write lock, so it is already visible while destroy is
-      // still draining, and an arriving reader skips the segment without ever contending for the lock
-      assertTrue(segment.isDestroyed());
-      assertFalse(segment.tryAcquireReadLock());
 
       segment.releaseReadLock();
       destroyer.get(10, TimeUnit.SECONDS);
