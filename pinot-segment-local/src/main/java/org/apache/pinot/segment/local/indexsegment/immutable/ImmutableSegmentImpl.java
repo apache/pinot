@@ -98,11 +98,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private ThreadSafeMutableRoaringBitmap _validDocIds;
   private ThreadSafeMutableRoaringBitmap _queryableDocIds;
   private volatile boolean _hasDeletedDocIds;
-  // Guards column reads through cached references against destroy(): readers hold the read lock, destroy() publishes
-  // _destroyed and then drains them on the write lock before closing the indexes.
+  // Guards column reads through cached references against destroy(): readers hold the read lock, destroy() takes the
+  // write lock just long enough to set _destroyed before closing the indexes
   private final ReentrantReadWriteLock _destroyLock = new ReentrantReadWriteLock();
-  // Monotonic: destroy() is the only writer and never clears it. Published before destroy() queues for the write
-  // lock, so arriving readers can skip the segment instead of parking behind the queued writer.
+  // Monotonic: destroy() is the only writer and never clears it, so an unlocked true reading is definitive
   private volatile boolean _destroyed;
 
   public ImmutableSegmentImpl(
