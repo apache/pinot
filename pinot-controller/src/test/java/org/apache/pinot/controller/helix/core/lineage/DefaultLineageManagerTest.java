@@ -21,7 +21,10 @@ package org.apache.pinot.controller.helix.core.lineage;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.LineageEntryState;
@@ -311,6 +314,143 @@ public class DefaultLineageManagerTest {
 
     assertTrue(segmentsToDelete.contains("dst1"),
         "Destination segment must be deleted immediately when lineageEntryCleanupRetentionPeriod is 0d");
+  }
+
+  @Test
+  public void testDefaultRetentionDoesNotCleanupRecentRevertedLineage() {
+    TableConfig tableConfig = refreshTableBuilder().build();
+
+    String entryId = UUID.randomUUID().toString();
+    SegmentLineage lineage = new SegmentLineage("testTable_OFFLINE");
+    lineage.addLineageEntry(entryId,
+        new LineageEntry(List.of("src1"), List.of("dst1"), LineageEntryState.REVERTED,
+            System.currentTimeMillis()));
+
+    List<String> segmentsToDelete = new ArrayList<>();
+    _lineageManager.updateLineageForRetention(tableConfig, lineage, List.of("src1", "dst1"), segmentsToDelete,
+        new HashSet<>());
+
+    assertFalse(segmentsToDelete.contains("dst1"),
+        "Destination segment must not be deleted for a recent REVERTED lineage entry with default retention");
+    assertTrue(lineage.getLineageEntries().containsKey(entryId),
+        "Recent REVERTED lineage entry must remain until the cleanup retention period elapses");
+  }
+
+  @Test
+  public void testDefaultRetentionCleansUpOldRevertedLineage() {
+    TableConfig tableConfig = refreshTableBuilder().build();
+
+    String entryId = UUID.randomUUID().toString();
+    SegmentLineage lineage = new SegmentLineage("testTable_OFFLINE");
+    lineage.addLineageEntry(entryId,
+        new LineageEntry(List.of("src1"), List.of("dst1"), LineageEntryState.REVERTED,
+            System.currentTimeMillis() - 2 * 24 * 60 * 60 * 1000L));
+
+    List<String> segmentsToDelete = new ArrayList<>();
+    _lineageManager.updateLineageForRetention(tableConfig, lineage, List.of("src1", "dst1"), segmentsToDelete,
+        new HashSet<>());
+
+    assertTrue(segmentsToDelete.contains("dst1"),
+        "Destination segment must be deleted for a REVERTED lineage entry after default retention elapses");
+    assertTrue(lineage.getLineageEntries().containsKey(entryId),
+        "REVERTED lineage entry must remain until its live destination segment has been deleted");
+  }
+
+  @Test
+  public void testZeroLineageCleanupRetentionCleansUpRevertedImmediately() {
+    TableConfig tableConfig = refreshTableBuilder().setLineageEntryCleanupRetentionPeriod("0s").build();
+
+    String entryId = UUID.randomUUID().toString();
+    SegmentLineage lineage = new SegmentLineage("testTable_OFFLINE");
+    lineage.addLineageEntry(entryId,
+        new LineageEntry(List.of("src1"), List.of("dst1"), LineageEntryState.REVERTED,
+            System.currentTimeMillis() - 1));
+
+    List<String> segmentsToDelete = new ArrayList<>();
+    _lineageManager.updateLineageForRetention(tableConfig, lineage, List.of("src1", "dst1"), segmentsToDelete,
+        new HashSet<>());
+
+    assertTrue(segmentsToDelete.contains("dst1"),
+        "Destination segment must be deleted immediately for REVERTED lineage when cleanup retention is 0s");
+  }
+
+  @Test
+  public void testRevertedCleanupDoesNotDeleteCompletedDestinationRegardlessOfEntryOrder() {
+    TableConfig tableConfig = refreshTableBuilder().setLineageEntryCleanupRetentionPeriod("0s").build();
+    LineageEntry revertedEntry = new LineageEntry(List.of("src1"), List.of("dst1"), LineageEntryState.REVERTED,
+        System.currentTimeMillis() - 1);
+    LineageEntry completedEntry = new LineageEntry(List.of("src1"), List.of("dst1"), LineageEntryState.COMPLETED,
+        System.currentTimeMillis());
+
+    for (boolean completedFirst : List.of(false, true)) {
+      Map<String, LineageEntry> entries = new LinkedHashMap<>();
+      if (completedFirst) {
+        entries.put("completed", completedEntry);
+        entries.put("reverted", revertedEntry);
+      } else {
+        entries.put("reverted", revertedEntry);
+        entries.put("completed", completedEntry);
+      }
+      SegmentLineage lineage = new SegmentLineage("testTable_OFFLINE", entries, null);
+      List<String> segmentsToDelete = new ArrayList<>();
+
+      _lineageManager.updateLineageForRetention(tableConfig, lineage, List.of("src1", "dst1"), segmentsToDelete,
+          new HashSet<>());
+
+      assertFalse(segmentsToDelete.contains("dst1"),
+          "A live destination referenced by a COMPLETED lineage entry must not be deleted by REVERTED cleanup");
+      assertFalse(lineage.getLineageEntries().containsKey("reverted"),
+          "Expired REVERTED entry must be removed after its shared destination is protected");
+      assertTrue(lineage.getLineageEntries().containsKey("completed"));
+    }
+  }
+
+  @Test
+  public void testRevertedCleanupProtectsSegmentsReferencedByRecentInProgressEntry() {
+    TableConfig tableConfig = refreshTableBuilder().build();
+    SegmentLineage lineage = new SegmentLineage("testTable_OFFLINE");
+    lineage.addLineageEntry("reverted",
+        new LineageEntry(List.of("oldSrc"),
+            List.of("activeSrc", "activeDst", "unprotectedLive", "unprotectedOrphan"),
+            LineageEntryState.REVERTED, System.currentTimeMillis() - 2 * 24 * 60 * 60 * 1000L));
+    lineage.addLineageEntry("inProgress",
+        new LineageEntry(List.of("activeSrc"), List.of("activeDst"), LineageEntryState.IN_PROGRESS,
+            System.currentTimeMillis()));
+
+    List<String> firstSegmentsToDelete = new ArrayList<>();
+    _lineageManager.updateLineageForRetention(tableConfig, lineage,
+        List.of("oldSrc", "activeSrc", "activeDst", "unprotectedLive"), firstSegmentsToDelete, new HashSet<>());
+
+    assertEquals(firstSegmentsToDelete, List.of("unprotectedLive"));
+    assertTrue(lineage.getLineageEntries().containsKey("reverted"));
+
+    List<String> secondSegmentsToDelete = new ArrayList<>();
+    _lineageManager.updateLineageForRetention(tableConfig, lineage, List.of("oldSrc", "activeSrc", "activeDst"),
+        secondSegmentsToDelete, new HashSet<>());
+
+    assertEquals(new HashSet<>(secondSegmentsToDelete), Set.of("unprotectedLive", "unprotectedOrphan"));
+    assertFalse(lineage.getLineageEntries().containsKey("reverted"));
+    assertTrue(lineage.getLineageEntries().containsKey("inProgress"));
+  }
+
+  @Test
+  public void testRevertedCleanupProtectsSourceOfAnotherExpiredEntry() {
+    TableConfig tableConfig = refreshTableBuilder().build();
+    long expiredTimestamp = System.currentTimeMillis() - 2 * 24 * 60 * 60 * 1000L;
+    SegmentLineage lineage = new SegmentLineage("testTable_OFFLINE");
+    lineage.addLineageEntry("reverted",
+        new LineageEntry(List.of("oldSrc"), List.of("reusedSource"), LineageEntryState.REVERTED, expiredTimestamp));
+    lineage.addLineageEntry("inProgress",
+        new LineageEntry(List.of("reusedSource"), List.of("abandonedDestination"), LineageEntryState.IN_PROGRESS,
+            expiredTimestamp));
+
+    List<String> segmentsToDelete = new ArrayList<>();
+    _lineageManager.updateLineageForRetention(tableConfig, lineage,
+        List.of("oldSrc", "reusedSource", "abandonedDestination"), segmentsToDelete, new HashSet<>());
+
+    assertFalse(segmentsToDelete.contains("reusedSource"),
+        "Zombie cleanup must not delete a segment used as the source of another replacement");
+    assertTrue(segmentsToDelete.contains("abandonedDestination"));
   }
 
   // ---------------------------------------------------------------------------

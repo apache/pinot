@@ -37,6 +37,8 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -45,6 +47,7 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
+import org.apache.pinot.controller.helix.core.lineage.LineageManager;
 import org.apache.pinot.controller.util.BrokerServiceHelper;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
@@ -61,6 +64,7 @@ import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.mockito.MockedStatic;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -914,5 +918,54 @@ public class RetentionManagerTest {
     // Verify deleteSegments is called — setupPinotHelixResourceManager's doAnswer
     // already asserts the correct segments via TestNG assertions
     verify(pinotHelixResourceManager, times(1)).deleteSegments(eq(OFFLINE_TABLE_NAME), anyList());
+  }
+
+  @Test
+  public void testLineageCleanupDiscardsDeleteCandidatesFromFailedWriteAttempt() {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "REFRESH", "DAILY"));
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME).setNumReplicas(1)
+            .setIngestionConfig(ingestionConfig).build();
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    LineageManager lineageManager = mock(LineageManager.class);
+    @SuppressWarnings("unchecked")
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
+    when(resourceManager.getLineageUpdaterLock(OFFLINE_TABLE_NAME)).thenReturn(new Object());
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    when(resourceManager.getLineageManager()).thenReturn(lineageManager);
+    when(resourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false)).thenReturn(List.of("reusedSegment"));
+    when(resourceManager.getConsumingSegments(OFFLINE_TABLE_NAME)).thenReturn(Set.of());
+
+    doAnswer(invocation -> {
+      List<String> deleteCandidates = invocation.getArgument(3);
+      deleteCandidates.add("reusedSegment");
+      return null;
+    }).doNothing().when(lineageManager)
+        .updateLineageForRetention(eq(tableConfig), any(SegmentLineage.class), anyList(), anyList(), anySet());
+
+    ZNRecord firstRecord = new SegmentLineage(OFFLINE_TABLE_NAME).toZNRecord();
+    firstRecord.setVersion(1);
+    ZNRecord secondRecord = new SegmentLineage(OFFLINE_TABLE_NAME).toZNRecord();
+    secondRecord.setVersion(2);
+
+    ControllerConf controllerConf = new ControllerConf();
+    RetentionManager retentionManager = createRetentionManager(resourceManager, mock(LeadControllerManager.class),
+        controllerConf, mock(ControllerMetrics.class), mock(BrokerServiceHelper.class));
+
+    try (MockedStatic<SegmentLineageAccessHelper> lineageAccessHelper = mockStatic(SegmentLineageAccessHelper.class)) {
+      lineageAccessHelper.when(() -> SegmentLineageAccessHelper.getSegmentLineageZNRecord(propertyStore,
+          OFFLINE_TABLE_NAME)).thenReturn(firstRecord, secondRecord);
+      lineageAccessHelper.when(() -> SegmentLineageAccessHelper.writeSegmentLineage(eq(propertyStore),
+          any(SegmentLineage.class), anyInt())).thenReturn(false, true);
+
+      retentionManager.processTable(OFFLINE_TABLE_NAME);
+
+      verify(lineageManager, times(2))
+          .updateLineageForRetention(eq(tableConfig), any(SegmentLineage.class), anyList(), anyList(), anySet());
+      verify(resourceManager, never()).deleteSegmentsForLineageCleanup(anyString(), anyList(), anyInt());
+    }
   }
 }
