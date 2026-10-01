@@ -1213,7 +1213,7 @@ public final class TableConfigUtils {
 
       validateTTLForUpsertConfig(tableConfig, schema);
       validatePartialUpsertStrategies(tableConfig, schema);
-      validateConsumptionDuringDownloadWithUpsertRevert(tableConfig);
+      validateConsumptionDuringUpsertRevert(tableConfig);
       Preconditions.checkState(
           !(PinotMd5Mode.isPinotMd5Disabled() && upsertConfig.getHashFunction() == HashFunction.MD5),
           "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
@@ -1231,7 +1231,7 @@ public final class TableConfigUtils {
   /// Rejects consuming the next segment during a download on tables that revert upsert metadata in PROTECTED mode,
   /// because the next segment's snapshot would run before the revert and miss the rows it restores.
   @VisibleForTesting
-  static void validateConsumptionDuringDownloadWithUpsertRevert(TableConfig tableConfig) {
+  static void validateConsumptionDuringUpsertRevert(TableConfig tableConfig) {
     if (tableConfig.getTableType() != TableType.REALTIME || !isTableTypeInconsistentDuringConsumption(tableConfig)
         || ConsumingSegmentConsistencyModeListener.getInstance().getConsistencyMode()
         != ConsumingSegmentConsistencyModeListener.Mode.PROTECTED) {
@@ -1242,12 +1242,14 @@ public final class TableConfigUtils {
         ingestionConfig != null ? ingestionConfig.getStreamIngestionConfig() : null;
     ParallelSegmentConsumptionPolicy policy =
         streamIngestionConfig != null ? streamIngestionConfig.getParallelSegmentConsumptionPolicy() : null;
+    // ALLOW_ALWAYS and ALLOW_DURING_DOWNLOAD_ONLY both allow it, and so does the deprecated flag when no policy is set
     boolean consumesDuringDownload = policy != null ? policy.isAllowedDuringDownload()
         : tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit();
     Preconditions.checkState(!consumesDuringDownload,
-        "Tables with partial upsert, dropOutOfOrderRecord or outOfOrderRecordColumn revert upsert metadata in "
-            + "PROTECTED consistency mode, so they cannot consume the next segment during a segment download. "
-            + "Set parallelSegmentConsumptionPolicy to DISALLOW_ALWAYS or ALLOW_DURING_BUILD_ONLY");
+        "%s lets the next segment consume during a segment download, but tables with partial upsert, "
+            + "dropOutOfOrderRecord or outOfOrderRecordColumn revert upsert metadata in PROTECTED consistency mode. "
+            + "Set parallelSegmentConsumptionPolicy to DISALLOW_ALWAYS or ALLOW_DURING_BUILD_ONLY",
+        policy != null ? "parallelSegmentConsumptionPolicy " + policy : "allowPartialUpsertConsumptionDuringCommit");
   }
 
   /// Checks if a data type is valid for time-based comparison operations (upsert/dedup).

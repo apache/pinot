@@ -2697,21 +2697,22 @@ public class TableConfigUtilsTest {
         ConsumingSegmentConsistencyModeListener.getInstance();
     try {
       // Without PROTECTED mode nothing is reverted, so every policy is allowed
-      checkConsumptionDuringDownload(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, false);
+      checkConsumptionDuringUpsertRevert(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, false);
 
       consistencyModeListener.setMode(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED);
-      checkConsumptionDuringDownload(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, true);
-      checkConsumptionDuringDownload(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_DURING_DOWNLOAD_ONLY,
-          true);
-      checkConsumptionDuringDownload(dropOutOfOrderConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, true);
-      checkConsumptionDuringDownload(allowDuringCommitConfig, null, true);
-      checkConsumptionDuringDownload(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY,
+      checkConsumptionDuringUpsertRevert(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, true);
+      checkConsumptionDuringUpsertRevert(partialUpsertConfig,
+          ParallelSegmentConsumptionPolicy.ALLOW_DURING_DOWNLOAD_ONLY, true);
+      checkConsumptionDuringUpsertRevert(dropOutOfOrderConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, true);
+      checkConsumptionDuringUpsertRevert(allowDuringCommitConfig, null, true);
+      checkConsumptionDuringUpsertRevert(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY,
           false);
-      checkConsumptionDuringDownload(partialUpsertConfig, ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS, false);
-      checkConsumptionDuringDownload(partialUpsertConfig, null, false);
+      checkConsumptionDuringUpsertRevert(partialUpsertConfig, ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS, false);
+      checkConsumptionDuringUpsertRevert(partialUpsertConfig, null, false);
       // An explicit policy wins over the deprecated flag, and full upsert without out-of-order handling never reverts
-      checkConsumptionDuringDownload(allowDuringCommitConfig, ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS, false);
-      checkConsumptionDuringDownload(fullUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, false);
+      checkConsumptionDuringUpsertRevert(allowDuringCommitConfig, ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS,
+          false);
+      checkConsumptionDuringUpsertRevert(fullUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, false);
 
       // The check is part of the upsert validation
       Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
@@ -2728,15 +2729,18 @@ public class TableConfigUtilsTest {
     }
   }
 
-  private void checkConsumptionDuringDownload(UpsertConfig upsertConfig, ParallelSegmentConsumptionPolicy policy,
+  private void checkConsumptionDuringUpsertRevert(UpsertConfig upsertConfig, ParallelSegmentConsumptionPolicy policy,
       boolean expectRejected) {
     TableConfig tableConfig = createTableConfigWithConsumptionPolicy(upsertConfig, policy);
     if (expectRejected) {
       IllegalStateException e = expectThrows(IllegalStateException.class,
-          () -> TableConfigUtils.validateConsumptionDuringDownloadWithUpsertRevert(tableConfig));
+          () -> TableConfigUtils.validateConsumptionDuringUpsertRevert(tableConfig));
       assertTrue(e.getMessage().contains("DISALLOW_ALWAYS or ALLOW_DURING_BUILD_ONLY"), e.getMessage());
+      assertTrue(e.getMessage().startsWith(
+          policy != null ? "parallelSegmentConsumptionPolicy " + policy : "allowPartialUpsertConsumptionDuringCommit"),
+          e.getMessage());
     } else {
-      TableConfigUtils.validateConsumptionDuringDownloadWithUpsertRevert(tableConfig);
+      TableConfigUtils.validateConsumptionDuringUpsertRevert(tableConfig);
     }
   }
 
