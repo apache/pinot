@@ -99,9 +99,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private ThreadSafeMutableRoaringBitmap _validDocIds;
   private ThreadSafeMutableRoaringBitmap _queryableDocIds;
   private volatile boolean _hasDeletedDocIds;
-  // Guards column reads through cached references against destroy(): readers hold the read lock, destroy() takes the
-  // write lock just long enough to set _destroyed before closing the indexes
+  // Guards column reads through cached references against destroy(): readers hold the read lock, destroy() publishes
+  // _destroyed and then drains them on the write lock before closing the indexes.
   private final ReentrantReadWriteLock _destroyLock = new ReentrantReadWriteLock();
+  // Monotonic: destroy() is the only writer and never clears it. Published before destroy() queues for the write
+  // lock, so arriving readers can skip the segment instead of parking behind the queued writer.
   private volatile boolean _destroyed;
 
   public ImmutableSegmentImpl(
@@ -379,13 +381,13 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     if (_partitionUpsertMetadataManager != null) {
       _partitionUpsertMetadataManager.untrackSegmentForUpsertView(this);
     }
-    // Publish the flag before queueing for the write lock so that readers arriving from here on skip this segment
-    // without touching the lock at all, instead of parking behind the queued writer for as long as the drain takes.
-    _destroyed = true;
-    // Then drain the readers that entered before the flag was published: they hold the read lock and must finish
-    // before any index is closed below.
+    // Wait for in-flight column reads (see tryAcquireReadLock) and make later ones skip this segment
     _destroyLock.writeLock().lock();
-    _destroyLock.writeLock().unlock();
+    try {
+      _destroyed = true;
+    } finally {
+      _destroyLock.writeLock().unlock();
+    }
     // StarTreeIndexContainer refers to other column index containers, so close it firstly.
     if (_starTreeIndexContainer != null) {
       try {
@@ -424,8 +426,8 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   /// Blocks [#destroy()] while the caller reads this segment's columns through a cached reference. Returns false,
   /// without holding the lock, once the segment is destroyed. A true return must be paired with [#releaseReadLock()].
   public boolean tryAcquireReadLock() {
-    // Unlocked early-out. Safe because the flag is monotonic: destroy() is its only writer and never clears it, so a
-    // true reading is definitive. A false reading proves nothing and still has to be re-established under the lock.
+    // Fast path only: skips a lock round-trip on a segment destroy() has already finished with. Safe because the
+    // flag is monotonic, so a true reading is definitive; a false reading is re-established under the lock below.
     if (_destroyed) {
       return false;
     }
