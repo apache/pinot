@@ -153,6 +153,12 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Maximum duration of a missing consuming segment in ideal state (in minutes)
   MISSING_CONSUMING_SEGMENT_MAX_DURATION_MINUTES("missingSegmentsMaxDurationInMinutes", false),
 
+  // Per partition, from the lead controller of the table: 1 when the stream partition has reached end of life and no
+  // new consuming segment will be created for it (e.g. a fully consumed Kinesis shard after a split or merge), 0 once
+  // the validation task creates a consuming segment for such a partition again. Not emitted for other partitions, and
+  // removed once the partition has no segments left or the controller stops leading the table.
+  PARTITION_END_OF_LIFE("partitionEndOfLife", false),
+
   // Number of in progress segment downloads
   SEGMENT_DOWNLOADS_IN_PROGRESS("segmentDownloadsInProgress", true),
 

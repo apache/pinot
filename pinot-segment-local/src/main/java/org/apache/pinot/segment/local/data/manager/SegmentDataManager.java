@@ -103,6 +103,11 @@ public abstract class SegmentDataManager {
 
   public abstract void doOffload();
 
+  /// Returns whether the segment has been offloaded, e.g. because it was replaced by another one.
+  public boolean isOffloaded() {
+    return _offloaded.get();
+  }
+
   /// Destroys the data manager and releases all the resources allocated.
   /// The data manager can only be destroyed once.
   public void destroy() {

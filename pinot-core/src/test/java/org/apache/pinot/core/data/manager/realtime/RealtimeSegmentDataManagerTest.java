@@ -40,6 +40,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.MetricValueUtils;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -676,6 +678,47 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   // Tests to go online from consuming state
+
+  @Test
+  public void testOnlineTransitionDoesNotAddBackConsumingGaugeAfterReplace()
+      throws Exception {
+    SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+    metadata.setEndOffset(new LongMsgOffset(START_OFFSET_VALUE + 600).toString());
+    for (RealtimeSegmentDataManager.State state : new RealtimeSegmentDataManager.State[]{
+        RealtimeSegmentDataManager.State.DISCARDED, RealtimeSegmentDataManager.State.CATCHING_UP
+    }) {
+      ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+      try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
+          null, null, null, serverMetrics)) {
+        segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+        segmentDataManager._stopWaitTimeMs = 0;
+        segmentDataManager._state.set(segmentDataManager, state);
+        segmentDataManager.setCurrentOffset(START_OFFSET_VALUE + 600);
+        // The table data manager offloads the replaced segment, which removes the gauge
+        segmentDataManager._offloadOnReplace = true;
+        segmentDataManager.goOnlineFromConsuming(metadata);
+        Assert.assertTrue(segmentDataManager.isOffloaded());
+        // Without a next consuming segment on this server (e.g. an ended Kinesis shard), a gauge at 0 would stay
+        Assert.assertFalse(MetricValueUtils.tableGaugeExists(serverMetrics, segmentDataManager._clientId,
+            ServerGauge.LLC_PARTITION_CONSUMING), "Gauge added back after replace in state: " + state);
+      }
+    }
+
+    // When the replace fails, the segment is not offloaded and the gauge stays at 0 to show the partition is stuck
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
+        null, null, serverMetrics)) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.DISCARDED);
+      segmentDataManager._offloadOnReplace = true;
+      segmentDataManager._failDownloadAndReplace = true;
+      Assert.assertThrows(RuntimeException.class, () -> segmentDataManager.goOnlineFromConsuming(metadata));
+      Assert.assertFalse(segmentDataManager.isOffloaded());
+      assertEquals(MetricValueUtils.getTableGaugeValue(serverMetrics, segmentDataManager._clientId,
+          ServerGauge.LLC_PARTITION_CONSUMING), 0L);
+    }
+  }
 
   // If the state is COMMITTED or RETAINED, nothing to do
   // If discarded or error state, then downloadAndReplace the segment
@@ -1689,6 +1732,9 @@ public class RealtimeSegmentDataManagerTest {
     public boolean _buildSegmentCalled = false;
     public boolean _failSegmentBuild = false;
     public boolean _buildAndReplaceCalled = false;
+    // When set, a successful build or download and replace offloads this segment like the table data manager does
+    public boolean _offloadOnReplace = false;
+    public boolean _failDownloadAndReplace = false;
     public int _stopWaitTimeMs = 100;
     private boolean _downloadAndReplaceCalled = false;
     private boolean _notifySegmentBuildFailedWithDeterministicErrorCalled = false;
@@ -1893,7 +1939,13 @@ public class RealtimeSegmentDataManagerTest {
       if (_useRealBuildAndReplace) {
         return super.buildSegmentAndReplace(committedSegmentZKMetadata);
       }
-      return !_failSegmentBuildAndReplace;
+      if (_failSegmentBuildAndReplace) {
+        return false;
+      }
+      if (_offloadOnReplace) {
+        offload();
+      }
+      return true;
     }
 
     @Override
@@ -1946,6 +1998,12 @@ public class RealtimeSegmentDataManagerTest {
       _downloadAndReplaceCalled = true;
       if (_useRealDownloadAndReplace) {
         super.downloadSegmentAndReplace(metadata);
+      }
+      if (_failDownloadAndReplace) {
+        throw new RuntimeException("Failed to download segment");
+      }
+      if (_offloadOnReplace) {
+        offload();
       }
     }
 
