@@ -1851,6 +1851,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
+  /// Builds the stream consumer client id, which is also the key of the LLC_PARTITION_CONSUMING gauge.
+  static String getClientId(String tableNameWithType, String streamTopic, int streamPartitionId,
+      @Nullable InstanceDataManagerConfig instanceDataManagerConfig) {
+    String clientId = tableNameWithType + "-" + streamTopic + "-" + streamPartitionId;
+    String clientIdSuffix =
+        instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
+    return StringUtils.isNotBlank(clientIdSuffix) ? clientId + "-" + clientIdSuffix : clientId;
+  }
+
   // Assume that this is called only on OFFLINE to CONSUMING transition.
   // If the transition is OFFLINE to ONLINE, the caller should have downloaded the segment and we don't reach here.
   public RealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
@@ -1917,13 +1926,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),
             _segmentZKMetadata.getStatus().toString());
     InstanceDataManagerConfig instanceDataManagerConfig = indexLoadingConfig.getInstanceDataManagerConfig();
-    String clientIdSuffix =
-        instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
-    if (StringUtils.isNotBlank(clientIdSuffix)) {
-      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _streamPartitionId + "-" + clientIdSuffix;
-    } else {
-      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _streamPartitionId;
-    }
+    _clientId = getClientId(_tableNameWithType, streamTopic, _streamPartitionId, instanceDataManagerConfig);
     _segmentLogger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + streamTopic;
     if (indexLoadingConfig.isRealtimeOffHeapAllocation() && !indexLoadingConfig.isDirectRealtimeOffHeapAllocation()) {
