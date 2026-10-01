@@ -98,10 +98,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private ThreadSafeMutableRoaringBitmap _validDocIds;
   private ThreadSafeMutableRoaringBitmap _queryableDocIds;
   private volatile boolean _hasDeletedDocIds;
-  // Guards column reads through cached references against destroy(): readers hold the read lock, destroy() takes the
-  // write lock just long enough to set _destroyed before closing the indexes
+  // Readers hold the read lock while reading columns through a cached reference; destroy() takes the write lock to
+  // set _destroyed before closing the indexes
   private final ReentrantReadWriteLock _destroyLock = new ReentrantReadWriteLock();
-  // Monotonic: destroy() is the only writer and never clears it, so an unlocked true reading is definitive
+  // Monotonic: destroy() is the only writer and never clears it
   private volatile boolean _destroyed;
 
   public ImmutableSegmentImpl(
@@ -398,7 +398,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     }
   }
 
-  /// True once [#destroy()] has started: the index buffers may be closed and must not be read.
+  /// True once [#destroy()] has set the flag: the index buffers may be closed and must not be read.
   public boolean isDestroyed() {
     return _destroyed;
   }
@@ -406,8 +406,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   /// Blocks [#destroy()] while the caller reads this segment's columns through a cached reference. Returns false,
   /// without holding the lock, once the segment is destroyed. A true return must be paired with [#releaseReadLock()].
   public boolean tryAcquireReadLock() {
-    // Fast path only: skips a lock round-trip on a segment destroy() has already finished with. Safe because the
-    // flag is monotonic, so a true reading is definitive; a false reading is re-established under the lock below.
+    // Fast path: the flag is monotonic, so a true reading is definitive. A false one is re-checked under the lock.
     if (_destroyed) {
       return false;
     }
