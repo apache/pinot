@@ -30,6 +30,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -47,7 +48,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
 import org.apache.pinot.controller.api.resources.PinotQueryResource.MultiStageQueryValidationRequest;
+import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -290,6 +293,56 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertAllLeafStagesEmptyRows(prefix,
         "SELECT AirlineID, COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0 GROUP BY AirlineID",
         List.of(), "LONG", "LONG");
+  }
+
+  /// The proto segment list encoding ships disabled, so a query uses the legacy JSON encoding until an operator turns
+  /// it on in cluster config, which has to take effect without restarting the broker. Both encodings must return
+  /// identical results, for queries with one and with several leaf stages.
+  @Test
+  public void testProtoSegmentListEncodingIsTransparent()
+      throws Exception {
+    QueryDispatcher dispatcher = ((BrokerRequestHandlerDelegate) _brokerStarters.get(0).getBrokerRequestHandler())
+        .getMultiStageBrokerRequestHandler().getQueryDispatcher();
+    assertFalse(dispatcher.isEnableProtoSegmentList(), "The proto segment list encoding must ship disabled");
+
+    String table = getTableName();
+    List<String> queries = List.of(
+        "SELECT COUNT(*) FROM " + table,
+        "SELECT Carrier, COUNT(*), MAX(ArrDelay) FROM " + table + " WHERE DaysSinceEpoch > 16312 "
+            + "GROUP BY Carrier ORDER BY Carrier",
+        "SELECT COUNT(*) FROM " + table + " a JOIN (SELECT DISTINCT Carrier FROM " + table + ") b "
+            + "ON a.Carrier = b.Carrier");
+
+    Map<String, JsonNode> legacyRows = new HashMap<>();
+    for (String query : queries) {
+      JsonNode response = postQuery(query);
+      assertTrue(response.get("exceptions").isEmpty(), "Unexpected exceptions with the legacy encoding: " + response);
+      legacyRows.put(query, response.get("resultTable").get("rows"));
+    }
+
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    try {
+      // What an operator does once every server has been upgraded.
+      _helixManager.getConfigAccessor()
+          .set(scope, CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST, "true");
+      TestUtils.waitForCondition(aVoid -> dispatcher.isEnableProtoSegmentList(), 10_000L,
+          "Enabling the proto segment list encoding in cluster config did not reach the broker");
+
+      for (String query : queries) {
+        JsonNode response = postQuery(query);
+        assertTrue(response.get("exceptions").isEmpty(),
+            "Unexpected exceptions with the proto encoding: " + response);
+        assertEquals(response.get("resultTable").get("rows"), legacyRows.get(query),
+            "The segment list encoding changed the result of: " + query);
+      }
+    } finally {
+      _helixManager.getConfigAccessor()
+          .set(scope, CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST, "false");
+      TestUtils.waitForCondition(aVoid -> !dispatcher.isEnableProtoSegmentList(), 10_000L,
+          "Disabling the proto segment list encoding in cluster config did not reach the broker");
+    }
   }
 
   @Test
@@ -2334,6 +2387,89 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       assertEquals(streamingRows.get(i).get(2).asLong(), baselineRows.get(i).get(2).asLong(),
           "COUNT(*) mismatch at row " + i);
     }
+  }
+
+  private static final String STREAMING_DISTINCT_OPTION = "SET streamingDistinctFlushThreshold = 2; ";
+
+  /// Verifies that the streaming distinct feature produces correct results when the query option
+  /// streamingDistinctFlushThreshold is set. Compares streaming results against a baseline query without the option.
+  ///
+  /// The threshold is set well below the real cardinality so the leaf flushes several times and the same value is
+  /// emitted in more than one flush window - the case the intermediate stage has to de-duplicate.
+  ///
+  /// NOTE: None of these queries may carry an ORDER BY. The planner pushes collations into the leaf aggregate for
+  /// aggregates with no aggregate calls (PinotAggregateExchangeNodeInsertRule#isGroupTrimmingEnabled), which makes
+  /// the leaf QueryContext order-by non-null and disqualifies the streaming operator - the assertions would then
+  /// compare the blocking path against itself and pass no matter what the new operator does.
+  @Test
+  public void testStreamingDistinct()
+      throws Exception {
+    // Single column
+    assertStreamingDistinctMatchesBaseline("SELECT DISTINCT Carrier FROM mytable LIMIT 1000");
+
+    // Multiple columns
+    assertStreamingDistinctMatchesBaseline("SELECT DISTINCT Carrier, OriginState FROM mytable LIMIT 1000");
+
+    // The GROUP BY spelling of the same thing: an aggregate with no aggregate calls, which the leaf stage rewrites
+    // into a single-stage DISTINCT query (NonAggregationGroupByToDistinctQueryRewriter).
+    assertStreamingDistinctMatchesBaseline("SELECT Carrier FROM mytable GROUP BY Carrier LIMIT 1000");
+  }
+
+  /// The streaming operator must be skipped when the leaf-stage LIMIT is at or below the flush threshold (the limit
+  /// already bounds the table and keeps the early-termination short-circuit) and when the query has an ORDER BY.
+  @Test
+  public void testStreamingDistinctNotUsedWhenGuardsFail()
+      throws Exception {
+    // LIMIT equal to and below the threshold of 2
+    assertStreamingDistinctOperatorUsed("SELECT DISTINCT Carrier FROM mytable LIMIT 2", false);
+    assertStreamingDistinctOperatorUsed("SELECT DISTINCT Carrier FROM mytable LIMIT 1", false);
+    // ORDER BY is pushed into the leaf aggregate, so the leaf sees a bounded top-LIMIT heap
+    assertStreamingDistinctOperatorUsed("SELECT DISTINCT Carrier FROM mytable ORDER BY Carrier LIMIT 1000", false);
+    // Control: same shape, no ORDER BY, LIMIT above the threshold
+    assertStreamingDistinctOperatorUsed("SELECT DISTINCT Carrier FROM mytable LIMIT 1000", true);
+  }
+
+  private void assertStreamingDistinctMatchesBaseline(String query)
+      throws Exception {
+    // Guard against a vacuous comparison: without this, a query that silently takes the blocking path in both runs
+    // would pass whatever the streaming operator did.
+    assertStreamingDistinctOperatorUsed(query, true);
+
+    JsonNode baselineRows = postQuery(query).get("resultTable").get("rows");
+    assertTrue(baselineRows.size() > 0, "Baseline query should return results: " + query);
+
+    JsonNode streamingRows =
+        postQuery(STREAMING_DISTINCT_OPTION + query).get("resultTable").get("rows");
+
+    // Results are unordered, so compare as sorted multisets. This still catches both duplicates and dropped rows.
+    assertEquals(sortedRows(streamingRows), sortedRows(baselineRows),
+        "Streaming distinct returned a different row multiset for: " + query);
+  }
+
+  /// Asserts which leaf-stage combine operator the server actually picks. `explainAskingServers` pulls the
+  /// single-stage leaf plan in under `LeafStageCombineOperator`, where operator names appear in the UpperCamel form
+  /// produced by `BaseOperator#getExplainName()` - so `STREAMING_COMBINE_DISTINCT` renders as
+  /// `StreamingCombineDistinct`. Note `CombineDistinct` is a substring of it, so only the streaming name can be
+  /// tested for presence/absence unambiguously.
+  private void assertStreamingDistinctOperatorUsed(String query, boolean expected)
+      throws Exception {
+    String plan = postQuery("SET explainAskingServers=true; " + STREAMING_DISTINCT_OPTION + "EXPLAIN PLAN FOR " + query)
+        .toString();
+    assertEquals(plan.contains("StreamingCombineDistinct"), expected,
+        "Unexpected combine operator selection for: " + query + "\nPlan: " + plan);
+  }
+
+  private static List<List<String>> sortedRows(JsonNode rows) {
+    List<List<String>> result = new ArrayList<>(rows.size());
+    for (JsonNode row : rows) {
+      List<String> values = new ArrayList<>(row.size());
+      for (JsonNode value : row) {
+        values.add(value.asText());
+      }
+      result.add(values);
+    }
+    result.sort(Comparator.comparing(Object::toString));
+    return result;
   }
 
   private JsonNode getQueryResultForDBTest(String column, String tableName, @Nullable String database,

@@ -52,13 +52,18 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
   // Use empty IntOpenHashSet as a placeholder for empty result
   protected static final IntSet EMPTY_PLACEHOLDER = new IntOpenHashSet();
 
-  protected BaseDistinctCountSmartSketchAggregationFunction(ExpressionContext expression) {
-    super(expression);
+  protected BaseDistinctCountSmartSketchAggregationFunction(ExpressionContext expression,
+      boolean nullHandlingEnabled) {
+    super(expression, nullHandlingEnabled);
   }
 
   protected abstract int getThreshold();
 
   protected abstract Object convertSetToSketch(Set valueSet, DataType storedType);
+
+  /// Adds every value of the set into a sketch that [#convertSetToSketch] already created. Used to fold the values
+  /// that arrive after a group has been converted, without building a second sketch.
+  protected abstract void addSetToSketch(Object sketch, Set valueSet, DataType storedType);
 
   protected abstract Object convertToSketch(DictIdsWrapper dictIdsWrapper);
 
@@ -93,47 +98,58 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
         case INT: {
           IntOpenHashSet intSet = (IntOpenHashSet) valueSet;
           int[] intValues = blockValSet.getIntValuesSV();
-          for (int i = 0; i < length; i++) {
-            intSet.add(intValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              intSet.add(intValues[i]);
+            }
+          });
           break;
         }
         case LONG: {
           LongOpenHashSet longSet = (LongOpenHashSet) valueSet;
           long[] longValues = blockValSet.getLongValuesSV();
-          for (int i = 0; i < length; i++) {
-            longSet.add(longValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              longSet.add(longValues[i]);
+            }
+          });
           break;
         }
         case FLOAT: {
           FloatOpenHashSet floatSet = (FloatOpenHashSet) valueSet;
           float[] floatValues = blockValSet.getFloatValuesSV();
-          for (int i = 0; i < length; i++) {
-            floatSet.add(floatValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              floatSet.add(floatValues[i]);
+            }
+          });
           break;
         }
         case DOUBLE: {
           DoubleOpenHashSet doubleSet = (DoubleOpenHashSet) valueSet;
           double[] doubleValues = blockValSet.getDoubleValuesSV();
-          for (int i = 0; i < length; i++) {
-            doubleSet.add(doubleValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              doubleSet.add(doubleValues[i]);
+            }
+          });
           break;
         }
         case STRING: {
           ObjectOpenHashSet<String> stringSet = (ObjectOpenHashSet<String>) valueSet;
           String[] stringValues = blockValSet.getStringValuesSV();
-          stringSet.addAll(Arrays.asList(stringValues).subList(0, length));
+          forEachNotNull(length, blockValSet,
+              (from, to) -> stringSet.addAll(Arrays.asList(stringValues).subList(from, to)));
           break;
         }
         case BYTES: {
           ObjectOpenHashSet<ByteArray> bytesSet = (ObjectOpenHashSet<ByteArray>) valueSet;
           byte[][] bytesValues = blockValSet.getBytesValuesSV();
-          for (int i = 0; i < length; i++) {
-            bytesSet.add(new ByteArray(bytesValues[i]));
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              bytesSet.add(new ByteArray(bytesValues[i]));
+            }
+          });
           break;
         }
         default:
@@ -144,49 +160,59 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
         case INT: {
           IntOpenHashSet intSet = (IntOpenHashSet) valueSet;
           int[][] intValues = blockValSet.getIntValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (int value : intValues[i]) {
-              intSet.add(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (int value : intValues[i]) {
+                intSet.add(value);
+              }
             }
-          }
+          });
           break;
         }
         case LONG: {
           LongOpenHashSet longSet = (LongOpenHashSet) valueSet;
           long[][] longValues = blockValSet.getLongValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (long value : longValues[i]) {
-              longSet.add(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (long value : longValues[i]) {
+                longSet.add(value);
+              }
             }
-          }
+          });
           break;
         }
         case FLOAT: {
           FloatOpenHashSet floatSet = (FloatOpenHashSet) valueSet;
           float[][] floatValues = blockValSet.getFloatValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (float value : floatValues[i]) {
-              floatSet.add(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (float value : floatValues[i]) {
+                floatSet.add(value);
+              }
             }
-          }
+          });
           break;
         }
         case DOUBLE: {
           DoubleOpenHashSet doubleSet = (DoubleOpenHashSet) valueSet;
           double[][] doubleValues = blockValSet.getDoubleValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (double value : doubleValues[i]) {
-              doubleSet.add(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (double value : doubleValues[i]) {
+                doubleSet.add(value);
+              }
             }
-          }
+          });
           break;
         }
         case STRING: {
           ObjectOpenHashSet<String> stringSet = (ObjectOpenHashSet<String>) valueSet;
           String[][] stringValues = blockValSet.getStringValuesMV();
-          for (int i = 0; i < length; i++) {
-            Collections.addAll(stringSet, stringValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              Collections.addAll(stringSet, stringValues[i]);
+            }
+          });
           break;
         }
         default:
@@ -210,14 +236,18 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
       IntSet modifiedGroups = new IntOpenHashSet();
       if (blockValSet.isSingleValue()) {
         int[] dictIds = blockValSet.getDictionaryIdsSV();
-        for (int i = 0; i < length; i++) {
-          aggregateDictIdForGroup(groupByResultHolder, groupKeyArray[i], dictionary, dictIds[i], modifiedGroups);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            aggregateDictIdForGroup(groupByResultHolder, groupKeyArray[i], dictionary, dictIds[i], modifiedGroups);
+          }
+        });
       } else {
         int[][] dictIds = blockValSet.getDictionaryIdsMV();
-        for (int i = 0; i < length; i++) {
-          aggregateDictIdsForGroup(groupByResultHolder, groupKeyArray[i], dictionary, dictIds[i], modifiedGroups);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            aggregateDictIdsForGroup(groupByResultHolder, groupKeyArray[i], dictionary, dictIds[i], modifiedGroups);
+          }
+        });
       }
       // Check cardinality only once per modified group after all additions
       checkAndConvertToSketchForGroups(groupByResultHolder, modifiedGroups);
@@ -230,47 +260,60 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
       switch (storedType) {
         case INT: {
           int[] intValues = blockValSet.getIntValuesSV();
-          for (int i = 0; i < length; i++) {
-            ((IntOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.INT)).add(intValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              ((IntOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.INT)).add(intValues[i]);
+            }
+          });
           break;
         }
         case LONG: {
           long[] longValues = blockValSet.getLongValuesSV();
-          for (int i = 0; i < length; i++) {
-            ((LongOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.LONG)).add(longValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              ((LongOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.LONG)).add(longValues[i]);
+            }
+          });
           break;
         }
         case FLOAT: {
           float[] floatValues = blockValSet.getFloatValuesSV();
-          for (int i = 0; i < length; i++) {
-            ((FloatOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.FLOAT)).add(floatValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              ((FloatOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.FLOAT))
+                  .add(floatValues[i]);
+            }
+          });
           break;
         }
         case DOUBLE: {
           double[] doubleValues = blockValSet.getDoubleValuesSV();
-          for (int i = 0; i < length; i++) {
-            ((DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.DOUBLE)).add(
-                doubleValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              ((DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.DOUBLE)).add(
+                  doubleValues[i]);
+            }
+          });
           break;
         }
         case STRING: {
           String[] stringValues = blockValSet.getStringValuesSV();
-          for (int i = 0; i < length; i++) {
-            ((ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.STRING)).add(
-                stringValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              ((ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.STRING)).add(
+                  stringValues[i]);
+            }
+          });
           break;
         }
         case BYTES: {
           byte[][] bytesValues = blockValSet.getBytesValuesSV();
-          for (int i = 0; i < length; i++) {
-            ((ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.BYTES)).add(
-                new ByteArray(bytesValues[i]));
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              ((ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.BYTES)).add(
+                  new ByteArray(bytesValues[i]));
+            }
+          });
           break;
         }
         default:
@@ -280,54 +323,64 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
       switch (storedType) {
         case INT: {
           int[][] intValues = blockValSet.getIntValuesMV();
-          for (int i = 0; i < length; i++) {
-            IntOpenHashSet intSet = (IntOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.INT);
-            for (int value : intValues[i]) {
-              intSet.add(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              IntOpenHashSet intSet = (IntOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.INT);
+              for (int value : intValues[i]) {
+                intSet.add(value);
+              }
             }
-          }
+          });
           break;
         }
         case LONG: {
           long[][] longValues = blockValSet.getLongValuesMV();
-          for (int i = 0; i < length; i++) {
-            LongOpenHashSet longSet =
-                (LongOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.LONG);
-            for (long value : longValues[i]) {
-              longSet.add(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              LongOpenHashSet longSet =
+                  (LongOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.LONG);
+              for (long value : longValues[i]) {
+                longSet.add(value);
+              }
             }
-          }
+          });
           break;
         }
         case FLOAT: {
           float[][] floatValues = blockValSet.getFloatValuesMV();
-          for (int i = 0; i < length; i++) {
-            FloatOpenHashSet floatSet =
-                (FloatOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.FLOAT);
-            for (float value : floatValues[i]) {
-              floatSet.add(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              FloatOpenHashSet floatSet =
+                  (FloatOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.FLOAT);
+              for (float value : floatValues[i]) {
+                floatSet.add(value);
+              }
             }
-          }
+          });
           break;
         }
         case DOUBLE: {
           double[][] doubleValues = blockValSet.getDoubleValuesMV();
-          for (int i = 0; i < length; i++) {
-            DoubleOpenHashSet doubleSet =
-                (DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.DOUBLE);
-            for (double value : doubleValues[i]) {
-              doubleSet.add(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              DoubleOpenHashSet doubleSet =
+                  (DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.DOUBLE);
+              for (double value : doubleValues[i]) {
+                doubleSet.add(value);
+              }
             }
-          }
+          });
           break;
         }
         case STRING: {
           String[][] stringValues = blockValSet.getStringValuesMV();
-          for (int i = 0; i < length; i++) {
-            ObjectOpenHashSet<String> stringSet =
-                (ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.STRING);
-            Collections.addAll(stringSet, stringValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              ObjectOpenHashSet<String> stringSet =
+                  (ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.STRING);
+              Collections.addAll(stringSet, stringValues[i]);
+            }
+          });
           break;
         }
         default:
@@ -347,18 +400,22 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
       IntSet modifiedGroups = new IntOpenHashSet();
       if (blockValSet.isSingleValue()) {
         int[] dictIds = blockValSet.getDictionaryIdsSV();
-        for (int i = 0; i < length; i++) {
-          for (int groupKey : groupKeysArray[i]) {
-            aggregateDictIdForGroup(groupByResultHolder, groupKey, dictionary, dictIds[i], modifiedGroups);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (int groupKey : groupKeysArray[i]) {
+              aggregateDictIdForGroup(groupByResultHolder, groupKey, dictionary, dictIds[i], modifiedGroups);
+            }
           }
-        }
+        });
       } else {
         int[][] dictIds = blockValSet.getDictionaryIdsMV();
-        for (int i = 0; i < length; i++) {
-          for (int groupKey : groupKeysArray[i]) {
-            aggregateDictIdsForGroup(groupByResultHolder, groupKey, dictionary, dictIds[i], modifiedGroups);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (int groupKey : groupKeysArray[i]) {
+              aggregateDictIdsForGroup(groupByResultHolder, groupKey, dictionary, dictIds[i], modifiedGroups);
+            }
           }
-        }
+        });
       }
       // Check cardinality only once per modified group after all additions
       checkAndConvertToSketchForGroups(groupByResultHolder, modifiedGroups);
@@ -371,44 +428,56 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
       switch (storedType) {
         case INT: {
           int[] intValues = blockValSet.getIntValuesSV();
-          for (int i = 0; i < length; i++) {
-            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], intValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], intValues[i]);
+            }
+          });
           break;
         }
         case LONG: {
           long[] longValues = blockValSet.getLongValuesSV();
-          for (int i = 0; i < length; i++) {
-            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], longValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], longValues[i]);
+            }
+          });
           break;
         }
         case FLOAT: {
           float[] floatValues = blockValSet.getFloatValuesSV();
-          for (int i = 0; i < length; i++) {
-            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], floatValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], floatValues[i]);
+            }
+          });
           break;
         }
         case DOUBLE: {
           double[] doubleValues = blockValSet.getDoubleValuesSV();
-          for (int i = 0; i < length; i++) {
-            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], doubleValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], doubleValues[i]);
+            }
+          });
           break;
         }
         case STRING: {
           String[] stringValues = blockValSet.getStringValuesSV();
-          for (int i = 0; i < length; i++) {
-            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i]);
+            }
+          });
           break;
         }
         case BYTES: {
           byte[][] bytesValues = blockValSet.getBytesValuesSV();
-          for (int i = 0; i < length; i++) {
-            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], new ByteArray(bytesValues[i]));
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], new ByteArray(bytesValues[i]));
+            }
+          });
           break;
         }
         default:
@@ -418,62 +487,73 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
       switch (storedType) {
         case INT: {
           int[][] intValues = blockValSet.getIntValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (int groupKey : groupKeysArray[i]) {
-              IntOpenHashSet intSet = (IntOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.INT);
-              for (int value : intValues[i]) {
-                intSet.add(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (int groupKey : groupKeysArray[i]) {
+                IntOpenHashSet intSet = (IntOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.INT);
+                for (int value : intValues[i]) {
+                  intSet.add(value);
+                }
               }
             }
-          }
+          });
           break;
         }
         case LONG: {
           long[][] longValues = blockValSet.getLongValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (int groupKey : groupKeysArray[i]) {
-              LongOpenHashSet longSet = (LongOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.LONG);
-              for (long value : longValues[i]) {
-                longSet.add(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (int groupKey : groupKeysArray[i]) {
+                LongOpenHashSet longSet = (LongOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.LONG);
+                for (long value : longValues[i]) {
+                  longSet.add(value);
+                }
               }
             }
-          }
+          });
           break;
         }
         case FLOAT: {
           float[][] floatValues = blockValSet.getFloatValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (int groupKey : groupKeysArray[i]) {
-              FloatOpenHashSet floatSet = (FloatOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.FLOAT);
-              for (float value : floatValues[i]) {
-                floatSet.add(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (int groupKey : groupKeysArray[i]) {
+                FloatOpenHashSet floatSet =
+                    (FloatOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.FLOAT);
+                for (float value : floatValues[i]) {
+                  floatSet.add(value);
+                }
               }
             }
-          }
+          });
           break;
         }
         case DOUBLE: {
           double[][] doubleValues = blockValSet.getDoubleValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (int groupKey : groupKeysArray[i]) {
-              DoubleOpenHashSet doubleSet =
-                  (DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.DOUBLE);
-              for (double value : doubleValues[i]) {
-                doubleSet.add(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (int groupKey : groupKeysArray[i]) {
+                DoubleOpenHashSet doubleSet =
+                    (DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.DOUBLE);
+                for (double value : doubleValues[i]) {
+                  doubleSet.add(value);
+                }
               }
             }
-          }
+          });
           break;
         }
         case STRING: {
           String[][] stringValues = blockValSet.getStringValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (int groupKey : groupKeysArray[i]) {
-              ObjectOpenHashSet<String> stringSet =
-                  (ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKey, DataType.STRING);
-              Collections.addAll(stringSet, stringValues[i]);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (int groupKey : groupKeysArray[i]) {
+                ObjectOpenHashSet<String> stringSet =
+                    (ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKey, DataType.STRING);
+                Collections.addAll(stringSet, stringValues[i]);
+              }
             }
-          }
+          });
           break;
         }
         default:
@@ -510,9 +590,16 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
 
     if (result instanceof DictIdsWrapper) {
       return convertToValueSet((DictIdsWrapper) result);
-    } else {
-      return result;
     }
+    if (result instanceof SketchWithPendingValues) {
+      SketchWithPendingValues converted = (SketchWithPendingValues) result;
+      if (!converted._pendingValues.isEmpty()) {
+        addSetToSketch(converted._sketch, converted._pendingValues, converted._storedType);
+        converted._pendingValues.clear();
+      }
+      return converted._sketch;
+    }
+    return result;
   }
 
   /// Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
@@ -567,14 +654,38 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     return dictIdsWrapper._dictIdBitmap;
   }
 
-  /// Returns the value set for the given group key or creates a new one if it does not exist.
-  protected static Set getValueSet(GroupByResultHolder groupByResultHolder, int groupKey, DataType valueType) {
-    Set valueSet = groupByResultHolder.getResult(groupKey);
-    if (valueSet == null) {
-      valueSet = getValueSet(valueType);
+  /// Returns the value set for the given group key, creating one if it does not exist, and converting the group to a
+  /// sketch once its set has grown past the threshold. A group that already converted returns its pending set, which
+  /// this folds into the sketch. Without any of this the per-group sets of a non-dictionary column grow for the whole
+  /// segment, because the only other check runs at merge time.
+  ///
+  /// The check runs here, on a set that has just been fetched anyway, rather than as a second pass over the batch. It
+  /// therefore converts on the first touch after the threshold is crossed, which bounds a group at the threshold plus
+  /// one batch of values.
+  protected final Set getValueSet(GroupByResultHolder groupByResultHolder, int groupKey, DataType valueType) {
+    Object result = groupByResultHolder.getResult(groupKey);
+    if (result == null) {
+      Set valueSet = getValueSet(valueType);
       groupByResultHolder.setValueForKey(groupKey, valueSet);
+      return valueSet;
     }
-    return valueSet;
+    int threshold = getThreshold();
+    if (result instanceof SketchWithPendingValues) {
+      SketchWithPendingValues converted = (SketchWithPendingValues) result;
+      if (converted._pendingValues.size() > threshold) {
+        addSetToSketch(converted._sketch, converted._pendingValues, valueType);
+        converted._pendingValues.clear();
+      }
+      return converted._pendingValues;
+    }
+    Set valueSet = (Set) result;
+    if (valueSet.size() <= threshold) {
+      return valueSet;
+    }
+    SketchWithPendingValues converted =
+        new SketchWithPendingValues(convertSetToSketch(valueSet, valueType), getValueSet(valueType), valueType);
+    groupByResultHolder.setValueForKey(groupKey, converted);
+    return converted._pendingValues;
   }
 
   /// Helper method to set dictionary id for the given group keys into the result holder.
@@ -586,42 +697,42 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
   }
 
   /// Helper method to set INT value for the given group keys into the result holder.
-  protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, int value) {
+  protected final void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, int value) {
     for (int groupKey : groupKeys) {
       ((IntOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.INT)).add(value);
     }
   }
 
   /// Helper method to set LONG value for the given group keys into the result holder.
-  protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, long value) {
+  protected final void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, long value) {
     for (int groupKey : groupKeys) {
       ((LongOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.LONG)).add(value);
     }
   }
 
   /// Helper method to set FLOAT value for the given group keys into the result holder.
-  protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, float value) {
+  protected final void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, float value) {
     for (int groupKey : groupKeys) {
       ((FloatOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.FLOAT)).add(value);
     }
   }
 
   /// Helper method to set DOUBLE value for the given group keys into the result holder.
-  protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, double value) {
+  protected final void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, double value) {
     for (int groupKey : groupKeys) {
       ((DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.DOUBLE)).add(value);
     }
   }
 
   /// Helper method to set STRING value for the given group keys into the result holder.
-  protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, String value) {
+  protected final void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, String value) {
     for (int groupKey : groupKeys) {
       ((ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKey, DataType.STRING)).add(value);
     }
   }
 
   /// Helper method to set BYTES value for the given group keys into the result holder.
-  protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
+  protected final void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
       ByteArray value) {
     for (int groupKey : groupKeys) {
       ((ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKey, DataType.BYTES)).add(value);
@@ -731,6 +842,20 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
           groupByResultHolder.setValueForKey(groupKey, convertToSketch(dictIdsWrapper));
         }
       }
+    }
+  }
+
+  /// Per-group state after a group converted to a sketch. New values keep landing in a plain set, which the next
+  /// threshold check folds into the sketch, so the typed aggregation loops never see a sketch.
+  private static final class SketchWithPendingValues {
+    final Object _sketch;
+    final DataType _storedType;
+    final Set _pendingValues;
+
+    SketchWithPendingValues(Object sketch, Set pendingValues, DataType storedType) {
+      _sketch = sketch;
+      _pendingValues = pendingValues;
+      _storedType = storedType;
     }
   }
 

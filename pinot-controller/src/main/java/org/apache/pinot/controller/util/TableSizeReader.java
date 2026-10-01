@@ -398,7 +398,8 @@ public class TableSizeReader {
     long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
     Map<String, List<String>> serverToSegmentsMap = _helixResourceManager.getServerToSegmentsMap(tableNameWithType,
         null, includeReplacedSegments);
-    ServerTableSizeReader serverTableSizeReader = new ServerTableSizeReader(_executor, _connectionManager);
+    ServerTableSizeReader serverTableSizeReader = new ServerTableSizeReader(_executor, _connectionManager,
+        _helixResourceManager.getServerAdminAuthProvider());
     BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
     Map<String, TableSizeInfo> serverToTableSizeInfoMap =
         serverTableSizeReader.getTableSizeInfoFromServers(endpoints, tableNameWithType, timeoutMs);
@@ -480,7 +481,8 @@ public class TableSizeReader {
 
     if (compressionStatsEnabled) {
       ServerCompressionStatsReader compressionStatsReader =
-          new ServerCompressionStatsReader(_executor, _connectionManager);
+          new ServerCompressionStatsReader(_executor, _connectionManager,
+              _helixResourceManager.getServerAdminAuthProvider());
       ServerCompressionStatsReader.CompressionStatsResult compressionStats = includeSelectedCompressionStats
           ? compressionStatsReader.readWithSelectedSegments(tableNameWithType, serverToSegmentsMap, endpoints, null,
               includeColumnCompressionStats, deadlineNanos)

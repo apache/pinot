@@ -197,6 +197,9 @@ public abstract class ClusterTest extends ControllerTest {
       _brokerGrpcEndpoint = "localhost:" + brokerGrpcPort;
     }
     _nextBrokerGrpcPort = brokerGrpcPort + 1;
+    int brokerQueryRunnerPort = NetUtils.findOpenPort(_nextBrokerQueryRunnerPort);
+    brokerConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, brokerQueryRunnerPort);
+    _nextBrokerQueryRunnerPort = brokerQueryRunnerPort + 1;
     overrideBrokerConf(brokerConf);
     return brokerConf;
   }

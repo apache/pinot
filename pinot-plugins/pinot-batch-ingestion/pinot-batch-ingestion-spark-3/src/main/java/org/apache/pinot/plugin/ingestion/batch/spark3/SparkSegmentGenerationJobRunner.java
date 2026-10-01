@@ -225,7 +225,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
             throws Exception {
           PluginManager.get().init();
           for (PinotFSSpec pinotFSSpec : _spec.getPinotFSSpecs()) {
-            PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
+            PinotFSFactory.registerIfNeeded(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
                 new PinotConfiguration(pinotFSSpec));
           }
           PinotFS finalOutputDirFS = PinotFSFactory.create(finalOutputDirURI.getScheme());

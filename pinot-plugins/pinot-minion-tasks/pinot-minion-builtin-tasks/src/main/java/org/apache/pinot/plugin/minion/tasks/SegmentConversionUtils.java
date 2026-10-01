@@ -108,6 +108,31 @@ public class SegmentConversionUtils {
   public static void uploadSegment(Map<String, String> configs, List<Header> httpHeaders,
       List<NameValuePair> parameters, String tableNameWithType, String segmentName, String uploadURL, File fileToUpload)
       throws Exception {
+    uploadWithRetry(configs, httpHeaders, tableNameWithType, segmentName, uploadURL,
+        (client, uri, socketTimeoutMs) -> client.uploadSegment(uri, segmentName, fileToUpload, httpHeaders, parameters,
+            socketTimeoutMs));
+  }
+
+  /// METADATA-mode registration with the same retry loop as [#uploadSegment]. Only the metadata tar is sent,
+  /// and `httpHeaders` must carry the segment tar location as DOWNLOAD_URI.
+  public static void uploadSegmentMetadata(Map<String, String> configs, List<Header> httpHeaders,
+      List<NameValuePair> parameters, String tableNameWithType, String segmentName, String uploadURL,
+      File segmentMetadataFile)
+      throws Exception {
+    uploadWithRetry(configs, httpHeaders, tableNameWithType, segmentName, uploadURL,
+        (client, uri, socketTimeoutMs) -> client.uploadSegmentMetadata(uri, segmentName, segmentMetadataFile,
+            httpHeaders, parameters, socketTimeoutMs));
+  }
+
+  @FunctionalInterface
+  private interface UploadRequest {
+    SimpleHttpResponse send(FileUploadDownloadClient client, URI uri, int socketTimeoutMs)
+        throws Exception;
+  }
+
+  private static void uploadWithRetry(Map<String, String> configs, List<Header> httpHeaders, String tableNameWithType,
+      String segmentName, String uploadURL, UploadRequest uploadRequest)
+      throws Exception {
     // Create a RoundRobinURIProvider to round-robin IP addresses when retry uploading. Otherwise, it may always try to
     // upload to a same broken host as: 1) DNS may not RR the IP addresses 2) OS cache the DNS resolution result.
     RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(List.of(new URI(uploadURL)), true);
@@ -126,6 +151,10 @@ public class SegmentConversionUtils {
         retryScaleFactorConfig != null ? Double.parseDouble(retryScaleFactorConfig) : DEFAULT_RETRY_SCALE_FACTOR;
     RetryPolicy retryPolicy =
         RetryPolicies.exponentialBackoffRetryPolicy(maxNumAttempts, initialRetryDelayMs, retryScaleFactor);
+    String socketTimeoutMsConfig = configs.get(MinionConstants.SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS_KEY);
+    int socketTimeoutMs =
+        socketTimeoutMsConfig != null ? Integer.parseInt(socketTimeoutMsConfig)
+            : HttpClient.DEFAULT_SOCKET_TIMEOUT_MS;
 
     // Upload the segment with retry policy
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
@@ -141,9 +170,7 @@ public class SegmentConversionUtils {
           httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + hostPort));
         }
         try {
-          SimpleHttpResponse response =
-              fileUploadDownloadClient.uploadSegment(uri, segmentName, fileToUpload, httpHeaders, parameters,
-                  HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+          SimpleHttpResponse response = uploadRequest.send(fileUploadDownloadClient, uri, socketTimeoutMs);
           LOGGER.info("Got response {}: {} while uploading table: {}, segment: {} with uploadURL: {}",
               response.getStatusCode(), response.getResponse(), tableNameWithType, segmentName, uploadURL);
           return true;
@@ -178,6 +205,14 @@ public class SegmentConversionUtils {
       StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Nullable AuthProvider authProvider,
       boolean forceCleanup)
       throws Exception {
+    return startSegmentReplace(tableNameWithType, uploadURL, startReplaceSegmentsRequest, authProvider, forceCleanup,
+        HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  public static String startSegmentReplace(String tableNameWithType, String uploadURL,
+      StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Nullable AuthProvider authProvider,
+      boolean forceCleanup, int socketTimeoutMs)
+      throws Exception {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
@@ -185,7 +220,8 @@ public class SegmentConversionUtils {
       URI uri = FileUploadDownloadClient.getStartReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(),
           forceCleanup);
       SimpleHttpResponse response =
-          fileUploadDownloadClient.startReplaceSegments(uri, startReplaceSegmentsRequest, authProvider);
+          fileUploadDownloadClient.startReplaceSegments(uri, startReplaceSegmentsRequest, authProvider,
+              socketTimeoutMs);
       String responseString = response.getResponse();
       LOGGER.info(
           "Got response {}: {} while sending start replace segment request for table: {}, uploadURL: {}, request: {}",

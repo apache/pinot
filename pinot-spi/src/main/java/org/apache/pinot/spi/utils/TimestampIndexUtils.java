@@ -190,6 +190,6 @@ public class TimestampIndexUtils {
   }
 
   private static String getTransformExpression(String timestampColumn, TimestampIndexGranularity granularity) {
-    return "dateTrunc('" + granularity + "',\"" + timestampColumn + "\")";
+    return "dateTrunc('" + granularity + "'," + SqlUtils.quoteIdentifier(timestampColumn) + ")";
   }
 }

@@ -184,6 +184,22 @@ public class ArrowResponseEncoderTest {
     assertNull(decodedTable.getRows().get(1)[1], "Null UUID array should round-trip as null");
   }
 
+  /// `OBJECT` values are not rendered by the broker (e.g. a `Long` returned by a post-aggregation function), so the
+  /// encoder writes their `toString()` form.
+  @Test
+  public void testEncodeDecodeObjectColumnWithNonStringValue()
+      throws IOException {
+    DataSchema schema = new DataSchema(new String[]{"objectCol"}, new ColumnDataType[]{ColumnDataType.OBJECT});
+    List<Object[]> rows = List.<Object[]>of(new Object[]{1L});
+
+    ResultTable resultTable = new ResultTable(schema, rows);
+    ArrowResponseEncoder encoder = new ArrowResponseEncoder();
+    byte[] encodedBytes = encoder.encodeResultTable(resultTable, 0, rows.size());
+    ResultTable decodedTable = encoder.decodeResultTable(encodedBytes, rows.size(), schema);
+
+    assertEquals(decodedTable.getRows().get(0)[0], "1");
+  }
+
   @Test
   public void testEncodeDecodeAllDataTypes()
       throws IOException {

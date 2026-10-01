@@ -43,6 +43,7 @@ import static org.testng.Assert.*;
 /// This class tests env variables when starting controller from configs
 public class ControllerStarterDynamicEnvTest extends ControllerTest {
   private final Map<String, Object> _configOverride = new HashMap<>();
+  private int _controllerPortOverride;
 
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
@@ -53,10 +54,11 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
   @Test
   public void testNoVariable()
       throws Exception {
+    int controllerPort = findControllerPortInForkRange();
     _configOverride.clear();
     _configOverride.put(CONTROLLER_HOST, "myHost");
     _configOverride.put(CONFIG_OF_INSTANCE_ID, "Controller_myInstance");
-    _configOverride.put(CONTROLLER_PORT, 1234);
+    _configOverride.put(CONTROLLER_PORT, controllerPort);
 
     startZk();
     this.startController();
@@ -66,7 +68,7 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, instanceId);
     assertEquals(instanceConfig.getInstanceName(), instanceId);
     assertEquals(instanceConfig.getHostName(), "myHost");
-    assertEquals(instanceConfig.getPort(), "1234");
+    assertEquals(instanceConfig.getPort(), Integer.toString(controllerPort));
     assertEquals(instanceConfig.getTags(), Set.of(CONTROLLER_INSTANCE));
 
     stopController();
@@ -76,11 +78,12 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
   @Test
   public void testOneVariable()
       throws Exception {
+    int controllerPort = findControllerPortInForkRange();
     _configOverride.clear();
     _configOverride.put("dynamic.env.config", "controller.host");
     _configOverride.put(CONTROLLER_HOST, "HOST");
     _configOverride.put(CONFIG_OF_INSTANCE_ID, "Controller_myInstance");
-    _configOverride.put(CONTROLLER_PORT, 1234);
+    _configOverride.put(CONTROLLER_PORT, controllerPort);
 
     startZk();
     this.startController();
@@ -90,7 +93,7 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, instanceId);
     assertEquals(instanceConfig.getInstanceName(), instanceId);
     assertEquals(instanceConfig.getHostName(), "myHost");
-    assertEquals(instanceConfig.getPort(), "1234");
+    assertEquals(instanceConfig.getPort(), Integer.toString(controllerPort));
     assertEquals(instanceConfig.getTags(), Set.of(CONTROLLER_INSTANCE));
 
     stopController();
@@ -100,6 +103,7 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
   @Test
   public void testMultipleVariables()
       throws Exception {
+    int controllerPort = findControllerPortInForkRange();
     _configOverride.clear();
     _configOverride.put("dynamic.env.config", "controller.host,controller.port");
     _configOverride.put(CONTROLLER_HOST, "HOST");
@@ -114,7 +118,7 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, instanceId);
     assertEquals(instanceConfig.getInstanceName(), instanceId);
     assertEquals(instanceConfig.getHostName(), "myHost");
-    assertEquals(instanceConfig.getPort(), "1234");
+    assertEquals(instanceConfig.getPort(), Integer.toString(controllerPort));
     assertEquals(instanceConfig.getTags(), Set.of(CONTROLLER_INSTANCE));
 
     stopController();
@@ -150,7 +154,7 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
       throws Exception {
     Map<String, String> envVariables = new HashMap<>();
     envVariables.put("HOST", "myHost");
-    envVariables.put("PORT", "1234");
+    envVariables.put("PORT", Integer.toString(_controllerPortOverride));
     _controllerStarter = createControllerStarter();
     _controllerStarter.init(new PinotConfiguration(properties, envVariables));
     _controllerStarter.start();
@@ -183,5 +187,10 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
         break;
     }
     assertEquals(System.getProperty("user.timezone"), "UTC");
+  }
+
+  private int findControllerPortInForkRange() {
+    _controllerPortOverride = NetUtils.findOpenPort(_nextControllerPort);
+    return _controllerPortOverride;
   }
 }

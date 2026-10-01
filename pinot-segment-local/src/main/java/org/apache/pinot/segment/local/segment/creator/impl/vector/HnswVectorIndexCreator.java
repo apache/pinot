@@ -28,6 +28,7 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.IOUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorIndexCombined;
 import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -44,8 +45,6 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(HnswVectorIndexCreator.class);
   public static final String VECTOR_INDEX_DOC_ID_COLUMN_NAME = "DocID";
 
-  private final Directory _indexDirectory;
-  private final IndexWriter _indexWriter;
   private final String _vectorColumn;
   private final VectorSimilarityFunction _vectorSimilarityFunction;
   private final int _vectorDimension;
@@ -53,6 +52,8 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
   private final boolean _storeInSegmentFile;
   private final File _segmentIndexDir;
   private final File _hnswIndexDir;
+  private final Directory _indexDirectory;
+  private final IndexWriter _indexWriter;
 
   private int _nextDocId = 0;
 
@@ -62,27 +63,24 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
     _vectorSimilarityFunction = VectorIndexUtils.toSimilarityFunction(vectorIndexConfig.getVectorDistanceFunction());
     _storeInSegmentFile = vectorIndexConfig.isStoreInSegmentFile();
     _segmentIndexDir = segmentIndexDir;
-    // Use local variables so that, if IndexWriter construction fails after FSDirectory is already
-    // open, we can close the directory before rethrowing — preventing a file-descriptor leak.
+    // Segment generation is always in V1 and later we convert (as part of post creation processing) to V3 if
+    // segmentVersion is set to V3 in SegmentGeneratorConfig.
+    _hnswIndexDir =
+        new File(segmentIndexDir, _vectorColumn + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+
     Directory indexDirectory = null;
-    IndexWriter indexWriter;
+    IndexWriter indexWriter = null;
     try {
-      // segment generation is always in V1 and later we convert (as part of post creation processing)
-      // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
-      File indexFile = new File(segmentIndexDir, _vectorColumn
-          + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
-      _hnswIndexDir = indexFile;
-      indexDirectory = FSDirectory.open(indexFile.toPath());
+      indexDirectory = FSDirectory.open(_hnswIndexDir.toPath());
       LOGGER.info("Creating HNSW index for column: {} at path: {} with {} for segment: {}", column,
-          indexFile.getAbsolutePath(), vectorIndexConfig.getProperties(), segmentIndexDir.getAbsolutePath());
+          _hnswIndexDir.getAbsolutePath(), vectorIndexConfig.getProperties(), segmentIndexDir.getAbsolutePath());
       indexWriter = new IndexWriter(indexDirectory, VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig));
     } catch (Exception e) {
-      if (indexDirectory != null) {
-        try {
-          indexDirectory.close();
-        } catch (IOException closeEx) {
-          e.addSuppressed(closeEx);
-        }
+      // IndexWriter does not close the Directory passed to it, so both need to be closed.
+      try {
+        IOUtils.close(indexWriter, indexDirectory);
+      } catch (Exception closeEx) {
+        e.addSuppressed(closeEx);
       }
       throw new RuntimeException(
           "Caught exception while instantiating the HnswVectorIndexCreator for column: " + column, e);
@@ -129,9 +127,9 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
   public void close()
       throws IOException {
     try {
-      // based on the commit flag set in IndexWriterConfig, this will decide to commit or not
-      _indexWriter.close();
-      _indexDirectory.close();
+      // Based on the commit flag set in IndexWriterConfig, closing the writer will decide to commit or not.
+      // IndexWriter does not close the Directory passed to it, so both need to be closed.
+      IOUtils.close(_indexWriter, _indexDirectory);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while closing the HNSW index for column: " + _vectorColumn, e);
     }

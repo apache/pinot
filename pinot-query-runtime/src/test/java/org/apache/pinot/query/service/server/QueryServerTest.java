@@ -235,13 +235,26 @@ public class QueryServerTest extends QueryTestSet {
   @Test(dataProvider = "testSql")
   public void testWorkerAcceptsWorkerRequestCorrect(String sql)
       throws Exception {
+    testWorkerAcceptsWorkerRequestCorrect(sql, false);
+  }
+
+  /// Same as [#testWorkerAcceptsWorkerRequestCorrect(String)] with the leaf-stage segment lists shipped as native
+  /// proto fields instead of the legacy JSON custom property.
+  @Test(dataProvider = "testSql")
+  public void testWorkerAcceptsProtoSegmentListRequestCorrect(String sql)
+      throws Exception {
+    testWorkerAcceptsWorkerRequestCorrect(sql, true);
+  }
+
+  private void testWorkerAcceptsWorkerRequestCorrect(String sql, boolean protoSegmentList)
+      throws Exception {
     DispatchableSubPlan queryPlan = _queryEnvironment.planQuery(sql);
     Set<DispatchablePlanFragment> stagePlans = queryPlan.getQueryStagesWithoutRoot();
     // Ignore reduce stage (stage 0)
     for (DispatchablePlanFragment stagePlan : stagePlans) {
       int stageId = stagePlan.getPlanFragment().getFragmentId();
       // only get one worker request out.
-      Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, stageId);
+      Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, stageId, protoSegmentList);
       Map<String, String> requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(queryRequest.getMetadata());
 
       // submit the request for testing.
@@ -321,10 +334,14 @@ public class QueryServerTest extends QueryTestSet {
   }
 
   private Worker.QueryRequest getQueryRequest(DispatchableSubPlan queryPlan, int stageId) {
+    return getQueryRequest(queryPlan, stageId, false);
+  }
+
+  private Worker.QueryRequest getQueryRequest(DispatchableSubPlan queryPlan, int stageId, boolean protoSegmentList) {
     DispatchablePlanFragment stagePlan = queryPlan.getQueryStageMap().get(stageId);
     Plan.PlanNode rootNode = PlanNodeSerializer.process(stagePlan.getPlanFragment().getFragmentRoot());
     List<Worker.WorkerMetadata> workerMetadataList =
-        QueryPlanSerDeUtils.toProtoWorkerMetadataList(stagePlan.getWorkerMetadataList());
+        QueryPlanSerDeUtils.toProtoWorkerMetadataList(stagePlan.getWorkerMetadataList(), protoSegmentList);
     ByteString customProperty = QueryPlanSerDeUtils.toProtoProperties(stagePlan.getCustomProperties());
 
     // this particular test set requires the request to have a single QueryServerInstance to dispatch to

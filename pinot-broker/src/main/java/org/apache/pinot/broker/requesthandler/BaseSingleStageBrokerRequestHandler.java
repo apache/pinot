@@ -55,6 +55,7 @@ import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
 import org.apache.pinot.common.http.MultiHttpRequest;
@@ -107,7 +108,9 @@ import org.apache.pinot.materializedview.handler.MaterializedViewSplitExecutionC
 import org.apache.pinot.materializedview.rewrite.MaterializedViewRewritePlan;
 import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -148,13 +151,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
+  /// Canonical name (see [RequestUtils#canonicalizeFunctionName]) of the `lookup()` transform function, which reads a
+  /// dimension table named by a string literal argument instead of by the FROM clause.
+  private static final String LOOKUP_FUNCTION = "lookup";
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
 
   protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();
   @Nullable
   protected final MaterializedViewHandler _materializedViewHandler;
   protected final boolean _disableGroovy;
-  protected final boolean _useApproximateFunction;
   protected final int _defaultHllLog2m;
   protected final boolean _enableQueryLimitOverride;
   protected final boolean _enableDistinctCountBitmapOverride;
@@ -166,6 +171,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final boolean _enableMultistageMigrationMetric;
   protected final boolean _useMSEToFillEmptyResponseSchema;
   protected final boolean _enableQueryFingerprinting;
+  protected final AuthProvider _serverAdminAuthProvider;
   protected ExecutorService _multistageCompileExecutor;
   protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
   protected ImplicitHybridTableRouteProvider _implicitHybridTableRouteProvider;
@@ -191,8 +197,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         threadAccountant, multiClusterRoutingContext);
     _materializedViewHandler = materializedViewHandler;
+    _serverAdminAuthProvider = AuthProviderUtils.extractAuthProvider(config, Broker.SERVER_ADMIN_AUTH_PREFIX);
     _disableGroovy = _config.getProperty(Broker.DISABLE_GROOVY, Broker.DEFAULT_DISABLE_GROOVY);
-    _useApproximateFunction = _config.getProperty(Broker.USE_APPROXIMATE_FUNCTION, false);
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
         CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
     _enableQueryLimitOverride = _config.getProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
@@ -309,7 +315,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     LOGGER.debug("Cancelling the query: {} via server urls: {}", _queryLogger.redactQuery(queryServers._query),
         serverUrls);
     CompletionService<MultiHttpRequestResponse> completionService =
-        new MultiHttpRequest(executor, connMgr).execute(serverUrls, null, timeoutMs, "DELETE", HttpDelete::new);
+        new MultiHttpRequest(executor, connMgr).execute(serverUrls, null, _serverAdminAuthProvider, timeoutMs,
+            "DELETE", HttpDelete::new);
     List<String> errMsgs = new ArrayList<>(serverUrls.size());
     for (int i = 0; i < serverUrls.size(); i++) {
       MultiHttpRequestResponse httpRequestResponse = null;
@@ -398,15 +405,18 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     final Schema _schema;
     final String _tableName;
     final String _rawTableName;
+    /// Dimension tables read by `lookup()` calls, which are not part of the data source
+    final Set<String> _lookupTableNames;
     final BrokerResponse _errorOrLiteralOnlyBrokerResponse;
 
     public CompileResult(PinotQuery pinotQuery, PinotQuery serverPinotQuery, Schema schema, String tableName,
-        String rawTableName) {
+        String rawTableName, Set<String> lookupTableNames) {
       _pinotQuery = pinotQuery;
       _serverPinotQuery = serverPinotQuery;
       _schema = schema;
       _tableName = tableName;
       _rawTableName = rawTableName;
+      _lookupTableNames = lookupTableNames;
       _errorOrLiteralOnlyBrokerResponse = null;
     }
 
@@ -416,6 +426,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _schema = null;
       _tableName = null;
       _rawTableName = null;
+      _lookupTableNames = Set.of();
       _errorOrLiteralOnlyBrokerResponse = errorOrLiteralOnlyBrokerResponse;
     }
   }
@@ -480,6 +491,30 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
     BrokerRequest serverBrokerRequest =
         serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
+
+    // A `lookup()` dimension table is not part of the data source, so neither the logical-table check nor the
+    // BrokerRequest based check below covers it. Authorize it here, for both branches.
+    Set<String> lookupTableNames = compileResult._lookupTableNames;
+    if (!lookupTableNames.isEmpty()) {
+      AuthorizationResult lookupAuthorizationResult =
+          hasTableAccess(requesterIdentity, lookupTableNames, requestContext, httpHeaders);
+      if (!lookupAuthorizationResult.hasAccess()) {
+        throwAccessDeniedError(requestId, query, requestContext, tableName, lookupAuthorizationResult);
+      }
+      if (_enableRowColumnLevelAuth) {
+        // `lookup()` resolves a row by primary key against the dimension table's in-memory data and never evaluates a
+        // filter against that table, so an RLS filter on it cannot be applied. Reject the query instead of returning
+        // rows the principal is not allowed to see.
+        for (String lookupTableName : lookupTableNames) {
+          List<String> rowFilters =
+              accessControl.getRowColFilters(requesterIdentity, lookupTableName).getRLSFilters().orElse(null);
+          if (rowFilters != null && !rowFilters.isEmpty()) {
+            throwAccessDeniedError(requestId, query, requestContext, tableName,
+                new TableAuthorizationResult(Set.of(lookupTableName)));
+          }
+        }
+      }
+    }
 
     TableRouteProvider routeProvider;
 
@@ -636,10 +671,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     QueryConfig realtimeTableQueryConfig = routeInfo.getRealtimeTableQueryConfig();
     TimeBoundaryInfo timeBoundaryInfo = routeInfo.getTimeBoundaryInfo();
 
-    HandlerContext handlerContext = getHandlerContext(offlineTableQueryConfig, realtimeTableQueryConfig);
+    HandlerContext handlerContext =
+        getHandlerContext(offlineTableQueryConfig, realtimeTableQueryConfig, pinotQuery.getQueryOptions());
     validateGroovyScript(serverPinotQuery, handlerContext._disableGroovy);
+    boolean approximateFunctionApplied = false;
     if (handlerContext._useApproximateFunction) {
-      handleApproximateFunctionOverride(serverPinotQuery);
+      approximateFunctionApplied = handleApproximateFunctionOverride(serverPinotQuery,
+          handlerContext._distinctCountParams, handlerContext._percentileParams);
+      if (approximateFunctionApplied) {
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.APPROXIMATE_FUNCTION_OVERRIDES, 1);
+      }
     }
 
     // Validate the request
@@ -1045,6 +1086,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     brokerResponse.setRLSFiltersApplied(rlsFiltersApplied.get());
+    brokerResponse.setApproximateFunctionApplied(approximateFunctionApplied);
 
     // Record per-server stats on the SSE BrokerResponse so downstream consumers can read it.
     brokerResponse.setServerStats(serverStats.getServerStats());
@@ -1141,9 +1183,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } catch (Exception e) {
       LOGGER.info("Caught exception while handling the subquery in request {}: {}, {}", requestId,
           _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()), e.getMessage());
-      requestContext.setErrorCode(QueryErrorCode.QUERY_EXECUTION);
-      return new CompileResult(
-          new BrokerResponseNative(QueryErrorCode.QUERY_EXECUTION, e.getMessage()));
+      QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.QUERY_EXECUTION);
+      requestContext.setErrorCode(errorCode);
+      return new CompileResult(new BrokerResponseNative(errorCode, e.getMessage()));
     }
 
     boolean ignoreCase = _tableCache.isIgnoreCase();
@@ -1169,6 +1211,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     if (!authorizationResult.hasAccess()) {
       throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
+    }
+
+    // A `lookup()` dimension table is named by a literal argument rather than by the FROM clause, so it is absent from
+    // the data source. Collect it here so that `doHandleRequest` can authorize it alongside the queried table.
+    Set<String> lookupTableNames = extractLookupTableNames(serverPinotQuery);
+    if (serverPinotQuery != pinotQuery) {
+      // For a gapfill query the two differ, and only the stripped one was walked above
+      lookupTableNames.addAll(extractLookupTableNames(pinotQuery));
     }
 
     try {
@@ -1205,7 +1255,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     Schema schema = _tableCache.getSchema(rawTableName);
     _queryOptimizer.optimize(serverPinotQuery, schema);
 
-    return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName);
+    return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName, lookupTableNames);
   }
 
   /// Mutable holder returned from [#applyMaterializedViewRewriteAtCompile] — Java has no out
@@ -1590,8 +1640,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         sqlNodeAndOptions = RequestUtils.parseQuery(subquery, jsonRequest);
       } catch (Exception e) {
         // Do not log or emit metric here because it is pure user error
-        requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
-        throw new RuntimeException("Failed to parse subquery: " + subquery, e);
+        QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.SQL_PARSING);
+        throw new QueryException(errorCode, "Failed to parse subquery: " + e.getMessage(), e);
       }
 
       // Add null handling option from broker config only if there is no override in the query
@@ -1615,7 +1665,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           doHandleRequest(requestId, subquery, sqlNodeAndOptions, jsonRequest, requesterIdentity, requestContext,
               httpHeaders, accessControl, false);
       if (response.getExceptionsSize() != 0) {
-        throw new RuntimeException("Caught exception while executing subquery: " + subquery);
+        QueryProcessingException exception = response.getExceptions().get(0);
+        throw new QueryException(QueryErrorCode.fromErrorCode(exception.getErrorCode()),
+            "Caught exception while executing subquery: " + subquery + ": " + exception.getMessage());
       }
       String serializedIdSet = (String) response.getResultTable().getRows().get(0)[0];
       function.setOperator(IN_ID_SET);
@@ -1817,7 +1869,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   private HandlerContext getHandlerContext(@Nullable QueryConfig offlineTableQueryConfig,
-      @Nullable QueryConfig realtimeTableQueryConfig) {
+      @Nullable QueryConfig realtimeTableQueryConfig, @Nullable Map<String, String> queryOptions) {
     Boolean disableGroovyOverride = null;
     Boolean useApproximateFunctionOverride = null;
     if (offlineTableQueryConfig != null) {
@@ -1852,18 +1904,31 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     boolean disableGroovy = disableGroovyOverride != null ? disableGroovyOverride : _disableGroovy;
+    // Precedence: query option > table config > cluster config > broker conf. One snapshot, so that the flag and the
+    // parameters this query uses come from the same version of the config.
+    Boolean queryOptionOverride =
+        queryOptions != null ? QueryOptionsUtils.isUseApproximateFunction(queryOptions) : null;
+    ApproximateFunctionOverrideProvider.Settings approximateFunctionSettings =
+        _approximateFunctionOverrideProvider.getSettings();
     boolean useApproximateFunction =
-        useApproximateFunctionOverride != null ? useApproximateFunctionOverride : _useApproximateFunction;
-    return new HandlerContext(disableGroovy, useApproximateFunction);
+        approximateFunctionSettings.isEnabled(queryOptionOverride, useApproximateFunctionOverride);
+    return new HandlerContext(disableGroovy, useApproximateFunction,
+        approximateFunctionSettings._distinctCountParams, approximateFunctionSettings._percentileParams);
   }
 
   private static class HandlerContext {
     final boolean _disableGroovy;
     final boolean _useApproximateFunction;
+    /// Parameters for the rewritten calls, empty when the aggregation function defaults apply.
+    final String _distinctCountParams;
+    final String _percentileParams;
 
-    HandlerContext(boolean disableGroovy, boolean useApproximateFunction) {
+    HandlerContext(boolean disableGroovy, boolean useApproximateFunction, String distinctCountParams,
+        String percentileParams) {
       _disableGroovy = disableGroovy;
       _useApproximateFunction = useApproximateFunction;
+      _distinctCountParams = distinctCountParams;
+      _percentileParams = percentileParams;
     }
   }
 
@@ -1927,57 +1992,79 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   /// Rewrites potential expensive functions to their approximation counterparts.
   /// - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
   /// - PERCENTILE -> PERCENTILE_SMART_TDIGEST
+  ///
+  /// The rewritten functions stay exact until an accumulator crosses their conversion threshold, which the
+  /// parameters carry. An empty parameter string appends nothing, so the aggregation function defaults apply.
+  ///
+  /// @return true if at least one function was rewritten, which makes the result of the query approximate
   @VisibleForTesting
-  static void handleApproximateFunctionOverride(PinotQuery pinotQuery) {
+  static boolean handleApproximateFunctionOverride(PinotQuery pinotQuery, String distinctCountParams,
+      String percentileParams) {
+    boolean applied = false;
     for (Expression expression : pinotQuery.getSelectList()) {
-      handleApproximateFunctionOverride(expression);
+      applied |= handleApproximateFunctionOverride(expression, distinctCountParams, percentileParams);
     }
     List<Expression> orderByExpressions = pinotQuery.getOrderByList();
     if (orderByExpressions != null) {
       for (Expression expression : orderByExpressions) {
         // NOTE: Order-by is always a Function with the ordering of the Expression
-        handleApproximateFunctionOverride(expression.getFunctionCall().getOperands().get(0));
+        applied |= handleApproximateFunctionOverride(expression.getFunctionCall().getOperands().get(0),
+            distinctCountParams, percentileParams);
       }
     }
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
-      handleApproximateFunctionOverride(havingExpression);
+      applied |= handleApproximateFunctionOverride(havingExpression, distinctCountParams, percentileParams);
     }
+    return applied;
   }
 
-  private static void handleApproximateFunctionOverride(Expression expression) {
+  private static boolean handleApproximateFunctionOverride(Expression expression, String distinctCountParams,
+      String percentileParams) {
     Function function = expression.getFunctionCall();
     if (function == null) {
-      return;
+      return false;
     }
     String functionName = function.getOperator();
     if (functionName.equals("distinctcount") || functionName.equals("distinctcountmv")) {
       function.setOperator("distinctcountsmarthll");
+      appendParams(function, distinctCountParams, 1);
+      return true;
     } else if (functionName.startsWith("percentile")) {
-      String remainingFunctionName = functionName.substring(10);
-      if (remainingFunctionName.isEmpty() || remainingFunctionName.equals("mv")) {
+      String suffix = functionName.substring(10);
+      if (suffix.isEmpty() || suffix.equals("mv")) {
         function.setOperator("percentilesmarttdigest");
-      } else if (remainingFunctionName.matches("\\d+")) {
+      } else if (suffix.matches("\\d+(mv)?")) {
+        // The percentile is in the function name, so it becomes an explicit argument.
+        String digits = suffix.endsWith("mv") ? suffix.substring(0, suffix.length() - 2) : suffix;
+        int percentile;
         try {
-          int percentile = Integer.parseInt(remainingFunctionName);
-          function.setOperator("percentilesmarttdigest");
-          function.addToOperands(RequestUtils.getLiteralExpression(percentile));
+          percentile = Integer.parseInt(digits);
         } catch (Exception e) {
           throw new BadQueryRequestException("Illegal function name: " + functionName);
         }
-      } else if (remainingFunctionName.matches("\\d+mv")) {
-        try {
-          int percentile = Integer.parseInt(remainingFunctionName.substring(0, remainingFunctionName.length() - 2));
-          function.setOperator("percentilesmarttdigest");
-          function.addToOperands(RequestUtils.getLiteralExpression(percentile));
-        } catch (Exception e) {
-          throw new BadQueryRequestException("Illegal function name: " + functionName);
-        }
+        function.setOperator("percentilesmarttdigest");
+        function.addToOperands(RequestUtils.getLiteralExpression(percentile));
+      } else {
+        // An already approximate variant, e.g. PERCENTILE_TDIGEST. Nothing to rewrite.
+        return false;
       }
+      appendParams(function, percentileParams, 2);
+      return true;
     } else {
+      boolean applied = false;
       for (Expression operand : function.getOperands()) {
-        handleApproximateFunctionOverride(operand);
+        applied |= handleApproximateFunctionOverride(operand, distinctCountParams, percentileParams);
       }
+      return applied;
+    }
+  }
+
+  /// Appends the parameters as the trailing argument of a rewritten call, unless the call has an unexpected arity,
+  /// in which case the function defaults apply rather than a call the server cannot construct.
+  private static void appendParams(Function function, String params, int expectedNumOperands) {
+    if (!params.isEmpty() && function.getOperandsSize() == expectedNumOperands) {
+      function.addToOperands(RequestUtils.getLiteralExpression(params));
     }
   }
 
@@ -2152,6 +2239,50 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     pinotQuery.setSelectList(newSelections);
   }
 
+  /// Returns the dimension tables read by the `lookup()` calls in the given query.
+  ///
+  /// `lookup()` names its dimension table with a string literal argument instead of the FROM clause, so the table is
+  /// absent from the query's data source and has to be collected explicitly for the table-level access checks to see
+  /// it. The names are returned exactly as written, which is how `LookupTransformFunction` resolves them on the
+  /// server, so the authorized table is always the one actually read.
+  @VisibleForTesting
+  static Set<String> extractLookupTableNames(PinotQuery pinotQuery) {
+    Set<String> lookupTableNames = new HashSet<>();
+    for (Expression expression : pinotQuery.getSelectList()) {
+      collectLookupTableNames(expression, lookupTableNames);
+    }
+    collectLookupTableNames(pinotQuery.getFilterExpression(), lookupTableNames);
+    collectLookupTableNames(pinotQuery.getHavingExpression(), lookupTableNames);
+    collectLookupTableNames(pinotQuery.getGroupByList(), lookupTableNames);
+    collectLookupTableNames(pinotQuery.getOrderByList(), lookupTableNames);
+    return lookupTableNames;
+  }
+
+  private static void collectLookupTableNames(@Nullable List<Expression> expressions, Set<String> lookupTableNames) {
+    if (expressions != null) {
+      for (Expression expression : expressions) {
+        collectLookupTableNames(expression, lookupTableNames);
+      }
+    }
+  }
+
+  private static void collectLookupTableNames(@Nullable Expression expression, Set<String> lookupTableNames) {
+    if (expression == null || expression.getType() != ExpressionType.FUNCTION) {
+      return;
+    }
+    Function functionCall = expression.getFunctionCall();
+    List<Expression> operands = functionCall.getOperands();
+    if (LOOKUP_FUNCTION.equals(functionCall.getOperator()) && !operands.isEmpty()) {
+      Literal tableName = operands.get(0).getLiteral();
+      // A non-literal table name is rejected by LookupTransformFunction on the server
+      if (tableName != null && tableName.isSetStringValue()) {
+        lookupTableNames.add(tableName.getStringValue());
+      }
+    }
+    // Recurse regardless, so that a lookup() nested inside another lookup()'s join value is collected too
+    collectLookupTableNames(operands, lookupTableNames);
+  }
+
   /// Fixes the column names to the actual column names in the given expression.
   private static void fixColumnName(String rawTableName, Expression expression, Map<String, String> columnNameMap,
       boolean ignoreCase) {
@@ -2165,7 +2296,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         case "as":
           fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, ignoreCase);
           break;
-        case "lookup":
+        case LOOKUP_FUNCTION:
           // LOOKUP function looks up another table's schema, skip the check for now.
           break;
         default:

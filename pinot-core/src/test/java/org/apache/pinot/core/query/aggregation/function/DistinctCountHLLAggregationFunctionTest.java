@@ -39,7 +39,7 @@ public class DistinctCountHLLAggregationFunctionTest {
   @Test
   public void testCanUseStarTreeDefaultLog2m() {
     DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col")));
+        List.of(ExpressionContext.forIdentifier("col")), false);
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, "8")));
@@ -47,7 +47,7 @@ public class DistinctCountHLLAggregationFunctionTest {
     Assert.assertFalse(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, 16)));
 
     function = new DistinctCountHLLAggregationFunction(List.of(ExpressionContext.forIdentifier("col"),
-        ExpressionContext.forLiteral(Literal.stringValue("8"))));
+        ExpressionContext.forLiteral(Literal.stringValue("8"))), false);
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, "8")));
@@ -58,7 +58,7 @@ public class DistinctCountHLLAggregationFunctionTest {
   @Test
   public void testCanUseStarTreeCustomLog2m() {
     DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col"), ExpressionContext.forLiteral(Literal.intValue(16))));
+        List.of(ExpressionContext.forIdentifier("col"), ExpressionContext.forLiteral(Literal.intValue(16))), false);
 
     Assert.assertFalse(function.canUseStarTree(Map.of()));
     Assert.assertFalse(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, "8")));
@@ -86,7 +86,7 @@ public class DistinctCountHLLAggregationFunctionTest {
     ObjectAggregationResultHolder holder = new ObjectAggregationResultHolder();
     DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(Literal.intValue(12))));
+            ExpressionContext.forLiteral(Literal.intValue(12))), false);
 
     BitSet bitSet = DistinctCountHLLAggregationFunction.getDictIdBitSet(holder, dictionary);
     for (int dictId : dictIds) {
@@ -119,7 +119,7 @@ public class DistinctCountHLLAggregationFunctionTest {
     ObjectAggregationResultHolder holder = new ObjectAggregationResultHolder();
     DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(Literal.intValue(14))));
+            ExpressionContext.forLiteral(Literal.intValue(14))), false);
 
     BitSet bitSet = DistinctCountHLLAggregationFunction.getDictIdBitSet(holder, dictionary);
     for (int dictId : dictIds) {
@@ -146,7 +146,7 @@ public class DistinctCountHLLAggregationFunctionTest {
     ObjectAggregationResultHolder holder = new ObjectAggregationResultHolder();
     DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(Literal.intValue(12))));
+            ExpressionContext.forLiteral(Literal.intValue(12))), false);
 
     // Batch 1: dict IDs 0–99
     int[] batch1 = new int[100];

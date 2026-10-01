@@ -3,11 +3,26 @@
 Engineering principles governing Apache Pinot development, organized by severity within each domain.
 
 Severity definitions:
-- **CRITICAL**: Must fix before merge. Data loss, corruption, silent wrong results, backward incompatibility, security issues, race conditions.
-- **MAJOR**: Should fix. Strong justification needed to skip. Performance regressions, design violations, missing tests, wrong abstractions.
+- **CRITICAL**: Must fix before merge. Confirmed risks of data loss, corruption, wrong results, broken supported compatibility, security violations, or concurrency failures affecting correctness or availability.
+- **MAJOR**: Should fix. Demonstrated material performance regressions, design defects, or coverage gaps that leave important changed behavior unverified.
 - **MINOR**: Improves quality. Acceptable to defer. Naming, style, idioms, process suggestions.
 
+These definitions are the single source for finding severity. Section labels, examples, and pattern matches guide
+investigation; they are not findings. Assign severity from concrete impact and reachable failure conditions. Missing
+documentation, tests, or benchmark evidence, process deviations, and size thresholds alone are not CRITICAL findings.
+
 Priority order: Production Safety > Backward Compatibility > Correctness > State Management > Performance > Architecture > Testing > Naming > Process
+
+## Review Delivery
+
+- Prefer actionable findings as inline comments anchored to the narrowest relevant changed lines. When inline comments
+  are unavailable, include exact file and line references.
+- Always include a concise review summary covering the scope, overall assessment, and finding counts by severity.
+- Keep the summary synthetic; do not repeat the full text of every inline finding.
+- For review-only tasks, complete when relevant risks are assessed and actionable findings and material validation gaps
+  are reported. Use targeted read-only verification to support findings. Do not run tests, modify the checkout, or publish
+  findings solely to satisfy a checklist; those actions require authorization from the task. Continue implementation or
+  fixes when the task authorizes that work.
 
 ---
 
@@ -90,7 +105,9 @@ if (effective == Enablement.ENABLE) { /* enable upsert */ }
 ### MAJOR
 
 **C1.6 — New features default to OFF**
-Behavior-changing features default to disabled. Boolean flags should default to `false`. Name as `disableXXX` so default=false means enabled.
+New behavior-changing features default to disabled: `enableXxx=false`, or `disableXxx=true` when using an established
+disable-style key. Judge the effective behavior, not the literal boolean value. Preserve existing flag names and defaults
+unless a default change is explicitly intended and validated.
 - Trigger: Any PR adding a new feature flag or boolean config
 
 **C1.7 — Config namespace consistency**
@@ -162,26 +179,30 @@ if (!helixAdmin.setResourceIdealState(clusterName, tableName, idealState, expect
 ```
 
 **C2.2 — Thread safety conservatism**
-When uncertain about framework threading guarantees (e.g., gRPC StreamObserver), default to explicit synchronization (`volatile`, `synchronized`). Read upstream library source code to verify actual contracts.
+Establish the threading contract and shared-state access before choosing synchronization. Check relevant framework
+documentation or source when the contract is unclear. Add synchronization for identified concurrent access, not merely
+because a callback or framework is involved.
 - Trigger: Any PR modifying shared mutable state or concurrent code
 
 ```java
-// BAD: Assumes gRPC StreamObserver is thread-safe (it's NOT for onNext)
+// BAD: Two application producers invoke this observer concurrently without protecting shared state
 class MyObserver implements StreamObserver<DataBlock> {
   private List<DataBlock> blocks = new ArrayList<>(); // unsynchronized
-  public void onNext(DataBlock block) { blocks.add(block); } // called from gRPC threads
+  public void onNext(DataBlock block) { blocks.add(block); }
 }
 ```
 ```java
-// GOOD: Explicit synchronization until threading contract is verified
+// GOOD: Protect concurrent additions after confirming the two-producer threading contract
 class MyObserver implements StreamObserver<DataBlock> {
   private final List<DataBlock> blocks = Collections.synchronizedList(new ArrayList<>());
   public void onNext(DataBlock block) { blocks.add(block); }
 }
 ```
 
-**C2.3 — Exhaustive race condition analysis for lock changes**
-When moving from coarse-grained to fine-grained locking, enumerate ALL possible interleavings. Missing IS updates = MAJOR correctness issue.
+**C2.3 — Verify affected invariants when changing locks**
+Identify the shared state and invariants affected by the lock change. Analyze key competing operations and failure
+interleavings, with focused tests where needed. Preserve coupled updates; exhaustive enumeration of every possible
+thread schedule is not required.
 - Trigger: Any PR changing lock granularity or locking strategy
 
 ```java
@@ -191,7 +212,7 @@ When moving from coarse-grained to fine-grained locking, enumerate ALL possible 
 + // IdealState update now outside lock — another thread can see stale routing
 ```
 ```java
-// GOOD: Enumerate interleavings; keep coupled operations under same lock
+// GOOD: Verify competing updates preserve the invariant; keep coupled operations under the same lock
 synchronized (_tableLocks.get(table)) {
   updateRoutingTable(table);
   updateIdealState(table); // must stay atomic with routing update
@@ -236,7 +257,7 @@ synchronized (this) {
 ```
 
 **C2.6 — Thread safety in shared observers must be proven correct**
-Mutable state in shared gRPC observers is a MAJOR concern.
+For observers whose callbacks can run concurrently, verify safe publication and protection of mutable state.
 - Trigger: Any PR modifying gRPC StreamObserver implementations or shared callback handlers
 
 ```java
@@ -249,7 +270,7 @@ class BlockObserver implements StreamObserver<DataBlock> {
 ```java
 // GOOD: Use atomic or synchronize; document the threading model
 class BlockObserver implements StreamObserver<DataBlock> {
-  // gRPC calls onNext from transport threads — must be thread-safe
+  // Application producers can call onNext concurrently; protect the shared counter
   private final AtomicInteger blockCount = new AtomicInteger(0);
   public void onNext(DataBlock b) { blockCount.incrementAndGet(); processBlock(b); }
 }
@@ -340,12 +361,14 @@ public BrokerResponse handleQuery(JsonNode query) {
 }
 ```
 
-**C3.3 — Centralize ZooKeeper writes in ZKOperator pattern**
-Other classes pass metadata objects without writing directly. Separate in-memory mutation from ZK persistence for batching and version-aware writes.
-- Trigger: Any PR writing to ZK outside the designated ZKOperator class
+**C3.3 — Preserve the owning subsystem's ZooKeeper persistence boundary**
+Within segment upload, preserve the established `ZKOperator` / `PinotHelixResourceManager` ownership boundary. Other
+subsystems use their own persistence owner; do not route unrelated writes through the upload helper. Separate in-memory
+mutation from persistence where needed for batching, version checks, and failure handling.
+- Trigger: Any PR bypassing its subsystem's persistence owner or required consistency checks
 
 ```java
-// BAD: ZK write scattered in a helper class — bypasses version control and batching
+// BAD: Segment-upload helper bypasses its owner's version checks and batching
 class SegmentStatusUpdater {
   void markComplete(String segment) {
     SegmentZKMetadata meta = ZKMetadataProvider.getSegmentMetadata(store, segment);
@@ -364,8 +387,10 @@ class SegmentStatusUpdater {
 }
 ```
 
-**C3.4 — New feature code paths must be completely separate from existing ones**
-Ensure backward compatibility by not modifying shared paths. Scope engine-specific changes to the relevant engine.
+**C3.4 — Isolate feature-specific semantics while preserving existing behavior**
+Scope feature- or engine-specific behavior to its intended callers. Reuse or modify shared implementations when existing
+contracts remain compatible, and verify affected existing callers. Separate implementations are not required solely
+because a feature is new.
 - Trigger: Any PR adding a new feature that touches existing query/ingestion paths
 
 ```java
@@ -413,7 +438,8 @@ All query option parsing in `QueryOptionsUtils`. Mechanism changes in central ut
 - Trigger: Any PR with utility logic duplicated across call sites
 
 **C3.8 — Module placement**
-Shared context classes go in lowest feasible module. `pinot-spi` is for interfaces only, concrete implementations in runtime modules.
+Shared context classes go in the lowest feasible module. `pinot-spi` contains public SPI contracts and their
+dependency-light data/config types; service implementations belong in runtime modules.
 - Trigger: Any PR adding new classes — check module placement
 
 **C3.9 — Caller-side validation over internal flags**
@@ -858,7 +884,10 @@ State this explicitly. When renaming types, update all corresponding variable na
 ### CRITICAL
 
 **C6.1 — CI must be green before merge**
-Backward compatibility tests are non-negotiable. Fix linter failures even when PR is approved.
+Inspect required checks for the exact reviewed SHA before claiming merge readiness. Classify failures as attributable to
+the change, pre-existing, flaky, infrastructure-related, or unresolved; required checks that are pending or failing remain
+merge gates. Read-only review reports those gates without rebasing, editing, or retrying CI. When remediation is authorized,
+fix attributable failures within scope, including compatibility and lint failures, and verify checks on the resulting SHA.
 - Trigger: Any PR with failing CI checks
 
 ```java
@@ -866,8 +895,9 @@ Backward compatibility tests are non-negotiable. Fix linter failures even when P
 // japicmp backward-compat test fails → merge → breaks downstream plugin builds
 ```
 ```java
-// GOOD: Fix the compat issue or update the baseline with justification
-// If genuinely unrelated: rebase on latest master, verify CI green, then merge
+// GOOD: Report the required compatibility failure on the reviewed SHA
+// If remediation is authorized, fix the regression and verify required checks on the new SHA
+// If unrelated, report the evidence and remaining merge gate without changing the review scope
 ```
 
 **C6.2 — Tests must not be more resilient than production code**
@@ -894,24 +924,25 @@ Don't add retries/sleeps that production doesn't have. Fix root causes of flakin
 ### MAJOR
 
 **C6.3 — Bug fixes require regression tests**
-Tests that fail without the fix and pass with it.
-- Trigger: Any bug fix PR without a corresponding test
+For behavioral fixes, retain or extend tests that distinguish the broken behavior from the correction. Reuse existing
+coverage when it proves the regression. When coverage is unclear, verify failure on the unfixed baseline and success
+with the fix; equivalent verified evidence need not be repeated. Use the actual pre-fix base or revert only the fix in
+an isolated comparison; `HEAD~1` is suitable only when it represents that pre-fix state. Report unavailable evidence.
+- Trigger: Any behavioral bug fix PR without evidence that the regression is covered
 
-**C6.4 — Integration tests exercise the full pipeline**
-Test user-facing queries through rewrite+optimization chain, not internal APIs.
-- Trigger: Any PR adding tests for query behavior
+**C6.4 — Test at the smallest layer that proves the behavior**
+Use focused tests for local behavior. When a change depends on parsing, rewriting, optimization, or cross-layer
+interaction, test through the relevant query pipeline. Reuse existing tests and shared integration clusters.
+- Trigger: Query behavior changes whose regression coverage may miss an affected pipeline stage or interaction
 
 **C6.5 — Tests must actually validate claimed behavior**
-If tests pass with invalid credentials, the test suite has a gap.
+Assertions must distinguish the claimed behavior from the relevant failure case. An authentication-success test that
+also passes with invalid credentials has a gap; an explicit credential-rejection test should pass for that input.
 - Trigger: Any PR where test assertions may be vacuously true
 
 **C6.6 — Guard serialization format with tests**
-Add round-trip tests for Jackson-annotated classes.
+Verify existing round-trip and compatibility coverage for changed serialization contracts; add cases for uncovered behavior.
 - Trigger: Any PR modifying JSON-serialized config or metadata classes
-
-**C6.7 — Performance-sensitive changes require benchmark comparisons**
-Share perf numbers comparing old vs new. Demand evidence before accepting degrading changes.
-- Trigger: Any PR claiming performance improvement without benchmarks
 
 **C6.8 — New tests must be verified as stable before merge**
 Investigate CI failures in newly added tests before approval.
@@ -944,6 +975,13 @@ public class JsonFunctionTest extends CustomDataQueryClusterIntegrationTest { ..
 
 ### MINOR
 
+**C6.7 — Prefer benchmark evidence for performance-sensitive changes**
+Prefer before-and-after results with enough methodology to reproduce the comparison. A one-off benchmark class does
+not need to be checked in unless it provides durable regression coverage or reusable benchmark value. Do not require
+a disposable harness in the repository when representative results and methodology are available.
+- Trigger: Any PR making a performance-sensitive change without representative before-and-after results and
+  reproducible methodology
+
 **C6.11 — Core concurrent data structures require dedicated concurrent tests**
 - Trigger: Any PR adding or modifying concurrent data structures
 
@@ -966,9 +1004,11 @@ Don't change @BeforeClass to @BeforeMethod without justification.
 Not latest master, to avoid false positives.
 - Trigger: Any PR modifying backward compatibility test configuration
 
-**C6.17 — Place tests in the correct test file**
-Tests for ClassB don't belong in ClassA's test file.
-- Trigger: Any PR adding tests to an unrelated test class
+**C6.17 — Keep related tests concise and together**
+Add cases to the existing test class for the production class or module when practical. Keep each test focused and
+concise. Avoid creating one test class per functionality; use a separate class only when setup, lifecycle, or scope is
+materially distinct. Tests for ClassB don't belong in ClassA's test file.
+- Trigger: Any PR adding a new test class or tests to an unrelated test class
 
 **C6.18 — Maintain test scale unless explicitly justified**
 Smaller tests may miss issues. Use assertions, not logging.
@@ -1009,8 +1049,10 @@ Annotate accurately on BOTH parameters and return values. Do not annotate params
 - Trigger: Any PR adding or modifying method signatures
 
 **C7.3 — Precise naming**
-Method names must match scope and use precise prepositions (`for` not `of`). Variables reflect contents (`tablesUpdated` not `tablesToUpdate`).
-- Trigger: Any PR introducing new methods or variables with ambiguous names
+Method names must match scope and use precise prepositions (`for` not `of`). Variables reflect contents
+(`tablesUpdated` not `tablesToUpdate`). Use consistent terminology and role suffixes across related classes, methods,
+and implementations.
+- Trigger: Any PR introducing or renaming related classes, methods, or variables
 
 **C7.4 — Method signatures reflect actual behavior**
 Void for in-place mutation. Primitive types over wrappers when null has no distinct meaning.
@@ -1097,6 +1139,27 @@ State transition logs should capture both previous and new values.
 "oldest/latest" for temporal ordering, not "smallest/largest". Plural names for collections.
 - Trigger: Any PR with temporal or collection variable names
 
+**C7.21 — Use static imports for Assert and Mockito in tests**
+Statically import the assertion and mocking methods used from `Assert` and `Mockito`. Call `assertEquals(...)`,
+`mock(...)`, and `when(...)` directly instead of qualifying them with `Assert.` or `Mockito.`.
+- Trigger: Any PR adding or modifying test code with qualified `Assert` or `Mockito` method calls
+
+**C7.22 — Import Pinot data-type enums directly**
+Import `FieldSpec.DataType` and `DataSchema.ColumnDataType` directly. Use `DataType` and `ColumnDataType` at call sites
+instead of the enclosing-class-qualified names.
+- Trigger: Any PR using `FieldSpec.DataType` or `DataSchema.ColumnDataType` outside import declarations
+
+**C7.23 — Put multiline ternary branches on separate lines**
+Keep a ternary expression on one line when it fits. Otherwise, put the true and false branches on separate lines:
+
+```java
+condition
+    ? trueExpression
+    : falseExpression;
+```
+
+- Trigger: Any PR adding or modifying a multiline ternary expression
+
 ---
 
 ## 8. Process & Scope
@@ -1104,20 +1167,22 @@ State transition logs should capture both previous and new values.
 ### CRITICAL
 
 **C8.1 — SPI changes must be flagged**
-Explicitly tag all teams maintaining plugins for review. SPI blast radius extends beyond core.
-- Trigger: Any PR modifying classes in `pinot-spi` module
+Assess plugin-visible contract changes and identify affected plugins and relevant reviewers. Severity follows the actual
+compatibility impact, not the module path. Tag or request review from others only when the user authorizes that external
+communication; otherwise identify the required reviewers in the review summary.
+- Trigger: Any PR changing a plugin-visible SPI signature, contract, or behavior
 
 ```java
-// BAD: Changed SPI interface method without notifying plugin teams
+// BAD: Adds a required SPI method without preserving existing plugin compatibility
 // pinot-spi/src/.../RecordReader.java — added required method
 + void seekToOffset(long offset); // all existing RecordReader plugins now fail to compile
 ```
 ```java
-// GOOD: Add default method for backward compat; flag plugin teams for review
+// GOOD: Keep existing readers usable; the new optional capability is unsupported by default
 + default void seekToOffset(long offset) {
 +   throw new UnsupportedOperationException("Not implemented");
 + }
-// PR description: "@kafka-plugin-team @kinesis-plugin-team — SPI change, please review"
+// Review summary: identify affected reader plugins and the relevant maintainers for compatibility review
 ```
 
 **C8.2 — Do not modify deprecated features with known security implications**
@@ -1142,7 +1207,9 @@ Reference how `segment.fetcher`, `ForwardIndexConfig`, etc. are handled. New var
 - Trigger: Any PR adding new implementations of existing patterns
 
 **C8.4 — Minimize PR scope**
-Do not include unrelated changes. No accidental whitespace/formatting changes.
+Keep the change lean. Include only the code, tests, and documentation needed for the stated purpose. Exclude unrelated
+refactors, drive-by cleanup, generated churn, and accidental whitespace or formatting changes; move worthwhile cleanup
+to a separate PR.
 - Trigger: Any PR with changes outside its stated scope
 
 **C8.5 — Separate reverts from improvements**
@@ -1162,7 +1229,9 @@ Dependency version overrides require explicit justification.
 - Trigger: Any PR adding new dependencies or overriding versions in pom.xml
 
 **C8.9 — Split large PRs into focused, independently reviewable units**
-Critical path changes must be isolated. PRs must be complete — no interfaces without implementations.
+PRs must remain practical for a human to review. Split huge changes and remove unnecessary mechanical churn before
+review. Isolate critical-path changes and keep each PR complete — no interfaces without implementations. Size may be
+justified, but unrelated change is not.
 - Trigger: Any PR exceeding ~500 lines or touching 3+ subsystems
 
 **C8.10 — Default behavior changes require release notes and documentation updates**
@@ -1182,9 +1251,11 @@ Require failing tests or concrete bugs before accepting performance-degrading ch
 Not just the solution. Include context for reviewers and future readers.
 - Trigger: Any PR with insufficient description
 
-**C8.14 — Explore alternative approaches in separate PRs**
-Compare designs before committing.
-- Trigger: Any PR where alternative designs were discussed but not prototyped
+**C8.14 — Document consequential alternatives and trade-offs**
+Explain relevant alternatives and why the chosen approach meets the requirements. Prototype only when a critical unknown
+cannot be resolved from existing evidence and the experiment is within the authorized scope. Discussing an option does
+not require implementing it or opening another PR.
+- Trigger: Any consequential design decision whose rationale or critical feasibility assumptions remain unclear
 
 **C8.15 — Model features aligned with domain standards**
 Text search follows Lucene/OpenSearch DSL. SQL functions follow SQL standard semantics.
@@ -1221,7 +1292,7 @@ Approve the immediate fix while deferring broader design to separate threads.
 | 3. Code Architecture & Module Design | 5 | 11 | 8 | 24 |
 | 4. Performance & Efficiency | 2 | 16 | 4 | 22 |
 | 5. Correctness & Safety | 9 | 16 | 3 | 28 |
-| 6. Testing Strategies | 2 | 8 | 8 | 18 |
-| 7. Naming & API Design | 1 | 9 | 10 | 20 |
+| 6. Testing Strategies | 2 | 7 | 9 | 18 |
+| 7. Naming & API Design | 1 | 9 | 13 | 23 |
 | 8. Process & Scope | 2 | 10 | 8 | 20 |
-| **Total** | **32** | **84** | **48** | **164** |
+| **Total** | **32** | **83** | **52** | **167** |

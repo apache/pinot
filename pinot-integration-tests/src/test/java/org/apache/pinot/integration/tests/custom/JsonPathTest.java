@@ -60,12 +60,14 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
   // path (which visits every doc) return the same result set but follow visibly different code paths.
   private static final int NUM_DISTINCT_K1 = 100;
   private static final String MY_MAP_STR_FIELD_NAME = "myMapStr";
+  private static final String MY_MAP_NUMBER_STR_FIELD_NAME = "myMapNumberStr";
   private static final String MY_MAP_BYTES_FIELD_NAME = "myMapBytes";
   private static final String MY_MAP_STR_K1_FIELD_NAME = "myMapStr_k1";
   private static final String MY_MAP_STR_K2_FIELD_NAME = "myMapStr_k2";
   /// Derived columns that exercise the opt-in fast scalar functions through the ingestion transform path.
   private static final String MY_MAP_STR_K1_FAST_FIELD_NAME = "myMapStr_k1_fast";
   private static final String MY_MAP_STR_K1_FIRST_FIELD_NAME = "myMapStr_k1_first";
+  private static final String MY_MAP_STR_K1_FORY_FIELD_NAME = "myMapStr_k1_fory";
   private static final String COMPLEX_MAP_STR_FIELD_NAME = "complexMapStr";
   private static final String COMPLEX_MAP_STR_K3_FIELD_NAME = "complexMapStr_k3";
 
@@ -92,11 +94,13 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
         .setSchemaName(getTableName())
         .addSingleValueDimension("myMap", DataType.STRING)
         .addSingleValueDimension(MY_MAP_STR_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(MY_MAP_NUMBER_STR_FIELD_NAME, DataType.STRING)
         .addSingleValueDimension(MY_MAP_BYTES_FIELD_NAME, DataType.BYTES)
         .addSingleValueDimension(MY_MAP_STR_K1_FIELD_NAME, DataType.STRING)
         .addSingleValueDimension(MY_MAP_STR_K2_FIELD_NAME, DataType.STRING)
         .addSingleValueDimension(MY_MAP_STR_K1_FAST_FIELD_NAME, DataType.STRING)
         .addSingleValueDimension(MY_MAP_STR_K1_FIRST_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(MY_MAP_STR_K1_FORY_FIELD_NAME, DataType.STRING)
         .addSingleValueDimension(COMPLEX_MAP_STR_FIELD_NAME, DataType.STRING)
         .addMultiValueDimension(COMPLEX_MAP_STR_K3_FIELD_NAME, DataType.STRING)
         .build();
@@ -111,6 +115,8 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
             "jsonPathStringFast(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'DEFAULT')"),
         new TransformConfig(MY_MAP_STR_K1_FIRST_FIELD_NAME,
             "jsonPathStringFirstMatch(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'DEFAULT')"),
+        new TransformConfig(MY_MAP_STR_K1_FORY_FIELD_NAME,
+            "jsonPathStringFory(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'DEFAULT')"),
         new TransformConfig(COMPLEX_MAP_STR_K3_FIELD_NAME, "jsonPathArray(" + COMPLEX_MAP_STR_FIELD_NAME + ", '$.k3')")
     );
     IngestionConfig ingestionConfig = new IngestionConfig();
@@ -129,6 +135,8 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     List<org.apache.avro.Schema.Field> fields = List.of(
         new org.apache.avro.Schema.Field(MY_MAP_STR_FIELD_NAME,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null),
+        new org.apache.avro.Schema.Field(MY_MAP_NUMBER_STR_FIELD_NAME,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null),
         new org.apache.avro.Schema.Field(MY_MAP_BYTES_FIELD_NAME,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BYTES), null, null),
         new org.apache.avro.Schema.Field(COMPLEX_MAP_STR_FIELD_NAME,
@@ -144,6 +152,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
         GenericData.Record record = new GenericData.Record(avroSchema);
         String myMapJson = JsonUtils.objectToString(map);
         record.put(MY_MAP_STR_FIELD_NAME, myMapJson);
+        record.put(MY_MAP_NUMBER_STR_FIELD_NAME, JsonUtils.objectToString(Map.of("n", i)));
         record.put(MY_MAP_BYTES_FIELD_NAME, ByteBuffer.wrap(myMapJson.getBytes(StandardCharsets.UTF_8)));
 
         Map<String, Object> complexMap = new HashMap<>();
@@ -398,52 +407,68 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(pinotResponse.get("totalDocs").asInt(), 0);
   }
 
-  /// End-to-end coverage for the opt-in fast functions. They take an `Object` argument, so - like the
-  /// existing `jsonPathString` - they are used through the ingestion transform path, not as query-time scalars.
-  /// `myMapStr_k1_fast` / `myMapStr_k1_first` are derived at ingestion via `jsonPathStringFast` /
-  /// `jsonPathStringFirstMatch`; this asserts, over real rows on both query engines, that they equal the
-  /// Jayway-derived `myMapStr_k1`. The rows have no duplicate keys and no malformed content, so `FirstMatch`
-  /// must also agree.
+  /// End-to-end coverage for the opt-in fast functions and the experimental Fory function. They take an `Object`
+  /// argument, so - like the existing `jsonPathString` - they are used through the ingestion transform path, not as
+  /// query-time scalars.
+  /// The additional columns are derived at ingestion via `jsonPathStringFast`, `jsonPathStringFirstMatch`, and
+  /// `jsonPathStringFory`; this asserts, over real rows on both query engines, that they equal the Jayway-derived
+  /// `myMapStr_k1`. The rows have no duplicate keys and no malformed content, so `FirstMatch` must also agree.
   @Test(dataProvider = "useBothQueryEngines")
   void testFastScalarFunctions(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = "SELECT myMapStr_k1, myMapStr_k1_fast, myMapStr_k1_first FROM " + getTableName() + " LIMIT 1000";
+    String query = "SELECT myMapStr_k1, myMapStr_k1_fast, myMapStr_k1_first, myMapStr_k1_fory FROM "
+        + getTableName() + " LIMIT 1000";
     JsonNode rows = postQuery(query).get("resultTable").get("rows");
     assertTrue(rows.size() > 0, "expected non-empty result set");
     for (JsonNode row : rows) {
       String jayway = row.get(0).asText();
       assertEquals(row.get(1).asText(), jayway, "jsonPathStringFast must equal Jayway jsonPathString");
       assertEquals(row.get(2).asText(), jayway, "jsonPathStringFirstMatch must equal Jayway on clean data");
+      assertEquals(row.get(3).asText(), jayway, "jsonPathStringFory must equal Jayway jsonPathString");
     }
   }
 
-  /// Query-time coverage for the typed transforms backed by the same fast extractor. Both modes must match the
-  /// existing `jsonExtractScalar` transform on this clean, duplicate-free data set.
+  /// Query-time coverage for the opt-in typed transforms. Each mode must match the existing `jsonExtractScalar`
+  /// transform on this clean, duplicate-free data set. The numeric query is eligible for Fory's streaming fast path;
+  /// STRING results and BYTES input deliberately exercise its Jayway compatibility fallback.
   @Test(dataProvider = "useBothQueryEngines")
   void testFastJsonExtractScalarTransforms(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = "SELECT jsonExtractScalar(myMapStr, '$.k1', 'STRING'), "
         + "jsonExtractScalarFast(myMapStr, '$.k1', 'STRING'), "
-        + "jsonExtractScalarFirstMatch(myMapStr, '$.k1', 'STRING') FROM " + getTableName() + " LIMIT 1000";
+        + "jsonExtractScalarFirstMatch(myMapStr, '$.k1', 'STRING'), "
+        + "jsonExtractScalarFory(myMapStr, '$.k1', 'STRING') FROM " + getTableName() + " LIMIT 1000";
     JsonNode rows = postQuery(query).get("resultTable").get("rows");
     assertTrue(rows.size() > 0, "expected non-empty result set");
     for (JsonNode row : rows) {
       String jayway = row.get(0).asText();
       assertEquals(row.get(1).asText(), jayway, "jsonExtractScalarFast must equal jsonExtractScalar");
       assertEquals(row.get(2).asText(), jayway, "jsonExtractScalarFirstMatch must equal Jayway on clean data");
+      assertEquals(row.get(3).asText(), jayway, "jsonExtractScalarFory must equal Jayway on clean data");
+    }
+
+    query = "SELECT jsonExtractScalar(myMapNumberStr, '$.n', 'LONG'), "
+        + "jsonExtractScalarFory(myMapNumberStr, '$.n', 'LONG') FROM " + getTableName() + " LIMIT 1000";
+    rows = postQuery(query).get("resultTable").get("rows");
+    assertTrue(rows.size() > 0, "expected non-empty numeric result set");
+    for (JsonNode row : rows) {
+      assertEquals(row.get(1).asLong(), row.get(0).asLong(),
+          "streaming Fory extraction must equal jsonExtractScalar");
     }
 
     query = "SELECT jsonExtractScalar(myMapBytes, '$.k1', 'STRING'), "
         + "jsonExtractScalarFast(myMapBytes, '$.k1', 'STRING'), "
-        + "jsonExtractScalarFirstMatch(myMapBytes, '$.k1', 'STRING') FROM " + getTableName() + " LIMIT 1000";
+        + "jsonExtractScalarFirstMatch(myMapBytes, '$.k1', 'STRING'), "
+        + "jsonExtractScalarFory(myMapBytes, '$.k1', 'STRING') FROM " + getTableName() + " LIMIT 1000";
     rows = postQuery(query).get("resultTable").get("rows");
     assertTrue(rows.size() > 0, "expected non-empty BYTES result set");
     for (JsonNode row : rows) {
       String jayway = row.get(0).asText();
       assertEquals(row.get(1).asText(), jayway, "BYTES fast extraction must equal jsonExtractScalar");
       assertEquals(row.get(2).asText(), jayway, "BYTES first-match extraction must equal Jayway on clean data");
+      assertEquals(row.get(3).asText(), jayway, "BYTES Fory fallback must equal Jayway on clean data");
     }
   }
 

@@ -22,7 +22,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
@@ -37,6 +40,10 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.local.segment.index.datasource.NullDataSource;
+import org.apache.pinot.segment.local.segment.index.openstruct.FakeStringForwardIndex;
+import org.apache.pinot.segment.local.segment.index.openstruct.OpenStructSparseBlobReader;
+import org.apache.pinot.segment.local.segment.index.openstruct.SparseKeyDataSource;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -44,17 +51,21 @@ import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class MapFilterOperatorOpenStructTest {
@@ -64,7 +75,7 @@ public class MapFilterOperatorOpenStructTest {
 
   private static ExpressionContext itemExpr(String column, String key) {
     ExpressionContext colArg = ExpressionContext.forIdentifier(column);
-    ExpressionContext keyArg = ExpressionContext.forLiteral(FieldSpec.DataType.STRING, key);
+    ExpressionContext keyArg = ExpressionContext.forLiteral(DataType.STRING, key);
     FunctionContext fn = new FunctionContext(FunctionContext.Type.TRANSFORM,
         ItemTransformFunction.FUNCTION_NAME, Arrays.asList(colArg, keyArg));
     return ExpressionContext.forFunction(fn);
@@ -103,27 +114,35 @@ public class MapFilterOperatorOpenStructTest {
     when(qc.isNullHandlingEnabled()).thenReturn(nullHandlingEnabled);
     when(qc.isIndexUseAllowed(any(DataSource.class), any())).thenReturn(true);
     when(qc.isIndexUseAllowed(anyString(), any())).thenReturn(true);
+    // The dictionary-based IN evaluator caches the sorted values on the query context
+    //noinspection unchecked
+    when(qc.getOrComputeSharedValue(any(), any(), any())).thenAnswer(
+        inv -> ((Function<Object, Object>) inv.getArgument(2)).apply(inv.getArgument(1)));
     return qc;
   }
 
-  /// OPEN_STRUCT source that is fully materialized but does not hold {@code key}. Stubs the field
-  /// spec and doc count that {@code OpenStructNullDataSource.forAbsentKey} reads.
+  /// OPEN_STRUCT source that is fully materialized but does not hold `key`, so the key resolves to an all-null source.
   private static OpenStructDataSource mockFullyMaterializedAbsentKey(String key) {
     return mockFullyMaterializedAbsentKey(key, Map.of());
   }
 
-  /// OPEN_STRUCT source that is fully materialized but does not hold {@code key}. Stubs the field
-  /// spec and doc count that {@code OpenStructNullDataSource.forAbsentKey} reads. {@code children}
-  /// carries the declared child specs — pass an empty map for an undeclared key.
+  /// OPEN_STRUCT source that is fully materialized but does not hold `key`, so the key resolves to an all-null source
+  /// typed by the real `getValueFieldSpec` rule over `children`, the declared child specs; pass an empty map for an
+  /// undeclared key.
   private static OpenStructDataSource mockFullyMaterializedAbsentKey(String key, Map<String, FieldSpec> children) {
-    OpenStructDataSource osDs = mock(OpenStructDataSource.class);
+    OpenStructDataSource osDs = mockOpenStructSource(children);
     when(osDs.isMaterialized(key)).thenReturn(false);
     when(osDs.isFullyMaterialized()).thenReturn(true);
-    when(osDs.getFieldSpec()).thenReturn(
-        new ComplexFieldSpec(COLUMN, FieldSpec.DataType.OPEN_STRUCT, true, children));
-    DataSourceMetadata osMeta = mock(DataSourceMetadata.class);
-    when(osMeta.getNumDocs()).thenReturn(NUM_DOCS);
-    when(osDs.getDataSourceMetadata()).thenReturn(osMeta);
+    NullDataSource absentKeyDs = new NullDataSource(osDs.getValueFieldSpec(key), NUM_DOCS);
+    when(osDs.getDataSource(key)).thenReturn(absentKeyDs);
+    return osDs;
+  }
+
+  /// OPEN_STRUCT source mock whose key field specs come from the real `getValueFieldSpec` rule over `children`.
+  private static OpenStructDataSource mockOpenStructSource(Map<String, FieldSpec> children) {
+    OpenStructDataSource osDs = mock(OpenStructDataSource.class);
+    when(osDs.getFieldSpec()).thenReturn(new ComplexFieldSpec(COLUMN, DataType.OPEN_STRUCT, true, children));
+    when(osDs.getValueFieldSpec(anyString())).thenCallRealMethod();
     return osDs;
   }
 
@@ -133,7 +152,42 @@ public class MapFilterOperatorOpenStructTest {
     return segment;
   }
 
-  /// Counts matching docs by iterating. Scan-based operators do not implement getNumMatchingDocs().
+  /// Even docIds have region ("us" when docId%4==0 else "eu"); odd docIds have empty blobs.
+  private static OpenStructDataSource mockSparseSegmentSource(@Nullable List<String> manifest,
+      Map<String, FieldSpec> children) {
+    String[] blobs = new String[NUM_DOCS];
+    for (int i = 0; i < NUM_DOCS; i++) {
+      blobs[i] = i % 2 == 0 ? "{\"region\":\"" + (i % 4 == 0 ? "us" : "eu") + "\"}" : null;
+    }
+    return mockSparseSegmentSource(manifest, children, blobs);
+  }
+
+  private static OpenStructDataSource mockSparseSegmentSource(@Nullable List<String> manifest,
+      Map<String, FieldSpec> children, String[] blobs) {
+    return mockSparseSegmentSource(manifest, children, blobs, 0);
+  }
+
+  private static OpenStructDataSource mockSparseSegmentSource(@Nullable List<String> manifest,
+      Map<String, FieldSpec> children, String[] blobs, int maxNumValuesPerMVEntry) {
+    OpenStructSparseBlobReader blob = new OpenStructSparseBlobReader(
+        new FakeStringForwardIndex(blobs), FakeStringForwardIndex.nullVector(blobs), NUM_DOCS);
+    OpenStructDataSource osDs = mockOpenStructSource(children);
+    when(osDs.isMaterialized(anyString())).thenReturn(false);
+    when(osDs.isFullyMaterialized()).thenReturn(false);
+    DataSourceMetadata osMeta = mock(DataSourceMetadata.class);
+    when(osMeta.getNumDocs()).thenReturn(NUM_DOCS);
+    when(osDs.getDataSourceMetadata()).thenReturn(osMeta);
+    when(osDs.getDataSource(anyString())).thenAnswer(inv -> {
+      String key = inv.getArgument(0);
+      FieldSpec childSpec = osDs.getValueFieldSpec(key);
+      if (manifest != null && !manifest.contains(key)) {
+        return new NullDataSource(childSpec, NUM_DOCS);
+      }
+      return new SparseKeyDataSource(childSpec, blob, maxNumValuesPerMVEntry);
+    });
+    return osDs;
+  }
+
   private static int countMatches(MapFilterOperator op) {
     BlockDocIdIterator iterator = op.getTrues().iterator();
     int count = 0;
@@ -153,7 +207,7 @@ public class MapFilterOperatorOpenStructTest {
     when(osDs.getDataSource(KEY)).thenReturn(keyDs);
 
     DataSourceMetadata meta = mock(DataSourceMetadata.class);
-    when(meta.getDataType()).thenReturn(FieldSpec.DataType.STRING);
+    when(meta.getDataType()).thenReturn(DataType.STRING);
     when(meta.isSorted()).thenReturn(false);
     when(meta.isSingleValue()).thenReturn(true);
     when(keyDs.getDataSourceMetadata()).thenReturn(meta);
@@ -221,19 +275,6 @@ public class MapFilterOperatorOpenStructTest {
     assertEquals(countMatches(op), NUM_DOCS);
   }
 
-  /// Same as above for NOT_IN.
-  @Test
-  public void testAbsentKeyNotInMatchesAllWhenNullHandlingOff() {
-    OpenStructDataSource osDs = mockFullyMaterializedAbsentKey("missing_key");
-    IndexSegment segment = mockSegment(osDs);
-
-    Predicate predicate = makeNotInPredicate(COLUMN, "missing_key", List.of("a", "b"));
-    MapFilterOperator op = new MapFilterOperator(segment, predicate, mockQueryContext(), NUM_DOCS);
-
-    assertTrue(op.toExplainString().contains("delegateTo:per_key_index"));
-    assertEquals(countMatches(op), NUM_DOCS);
-  }
-
   /// IN against an absent key never matches, regardless of null handling.
   @Test
   public void testAbsentKeyInMatchesNothingWhenNullHandlingOff() {
@@ -257,7 +298,7 @@ public class MapFilterOperatorOpenStructTest {
     IndexSegment segment = mockSegment(osDs);
 
     Predicate predicate = new RangePredicate(itemExpr(COLUMN, "missing_key"), false, "100", false,
-        RangePredicate.UNBOUNDED, FieldSpec.DataType.LONG);
+        RangePredicate.UNBOUNDED, DataType.LONG);
     MapFilterOperator op = new MapFilterOperator(segment, predicate, mockQueryContext(), NUM_DOCS);
 
     assertEquals(countMatches(op), NUM_DOCS);
@@ -269,11 +310,11 @@ public class MapFilterOperatorOpenStructTest {
   @Test
   public void testAbsentDeclaredKeyRangeMatchesNothing() {
     OpenStructDataSource osDs = mockFullyMaterializedAbsentKey("missing_key",
-        Map.of("missing_key", new DimensionFieldSpec("missing_key", FieldSpec.DataType.LONG, true)));
+        Map.of("missing_key", new DimensionFieldSpec("missing_key", DataType.LONG, true)));
     IndexSegment segment = mockSegment(osDs);
 
     Predicate predicate = new RangePredicate(itemExpr(COLUMN, "missing_key"), false, "100", false,
-        RangePredicate.UNBOUNDED, FieldSpec.DataType.LONG);
+        RangePredicate.UNBOUNDED, DataType.LONG);
     MapFilterOperator op = new MapFilterOperator(segment, predicate, mockQueryContext(), NUM_DOCS);
 
     assertTrue(op.canOptimizeCount());
@@ -329,8 +370,8 @@ public class MapFilterOperatorOpenStructTest {
 
   /// A predicate the per-key path cannot rewrite (REGEXP_LIKE) must decline rather than fold the
   /// absent key to a match-all/match-none it never evaluated. Structured like
-  /// {@link #testSparseKeyFallsToExpressionFilter} because ExpressionFilterOperator cannot be built
-  /// against a mock segment.
+  /// {@link #testSparseKeyUnsupportedPredicateStillFallsThrough} because ExpressionFilterOperator
+  /// cannot be built against a mock segment.
   @Test
   public void testAbsentKeyUnsupportedPredicateFallsThrough() {
     OpenStructDataSource osDs = mockFullyMaterializedAbsentKey("missing_key");
@@ -345,47 +386,129 @@ public class MapFilterOperatorOpenStructTest {
       assertFalse(op.toExplainString().contains("delegateTo:per_key_index"));
     } catch (Exception e) {
       // The per-key path still had to decline before the expression fallback was attempted.
-      verify(osDs).isFullyMaterialized();
+      verify(osDs).getDataSource("missing_key");
     }
   }
 
-  /// Non-materialized key on a segment that is NOT fully materialized → falls to EXPRESSION_FILTER.
   @Test
-  public void testSparseKeyFallsToExpressionFilter() {
-    OpenStructDataSource osDs = mock(OpenStructDataSource.class);
-    when(osDs.isMaterialized("sparse_key")).thenReturn(false);
-    when(osDs.isFullyMaterialized()).thenReturn(false);
-    // No JSON index
+  public void testSparseKeyScansVirtualReader() {
+    OpenStructDataSource osDs = mockSparseSegmentSource(List.of("region"), Map.of());
+    IndexSegment segment = mockSegment(osDs);
+
+    Predicate eqUs = makeEqPredicate(COLUMN, "region", "us");
+    MapFilterOperator eqOp = new MapFilterOperator(segment, eqUs, mockQueryContext(), NUM_DOCS);
+    assertTrue(eqOp.toExplainString().contains("delegateTo:per_key_index"));
+    assertEquals(countMatches(eqOp), 25);
+
+    Predicate neqUs = makeNotEqPredicate(COLUMN, "region", "us");
+    MapFilterOperator neqOp = new MapFilterOperator(segment, neqUs, mockQueryContext(), NUM_DOCS);
+    assertTrue(neqOp.toExplainString().contains("delegateTo:per_key_index"));
+    assertEquals(countMatches(neqOp), 75);
+  }
+
+  @Test
+  public void testSparseKeyNotEqWithNullHandlingOn() {
+    OpenStructDataSource osDs = mockSparseSegmentSource(List.of("region"), Map.of());
+    IndexSegment segment = mockSegment(osDs);
+
+    Predicate neqUs = makeNotEqPredicate(COLUMN, "region", "us");
+    MapFilterOperator op = new MapFilterOperator(segment, neqUs, mockQueryContext(true), NUM_DOCS);
+    assertTrue(op.toExplainString().contains("delegateTo:per_key_index"));
+    assertEquals(countMatches(op), 25);
+  }
+
+  @Test
+  public void testSparseKeyInPredicateScansVirtualReader() {
+    OpenStructDataSource osDs = mockSparseSegmentSource(List.of("region"), Map.of());
+    IndexSegment segment = mockSegment(osDs);
+
+    Predicate inPred = makeInPredicate(COLUMN, "region", List.of("us", "eu"));
+    MapFilterOperator inOp = new MapFilterOperator(segment, inPred, mockQueryContext(), NUM_DOCS);
+    assertTrue(inOp.toExplainString().contains("delegateTo:per_key_index"));
+    assertEquals(countMatches(inOp), 50);
+
+    Predicate notInPred = makeNotInPredicate(COLUMN, "region", List.of("us", "eu"));
+    MapFilterOperator notInOp = new MapFilterOperator(segment, notInPred, mockQueryContext(), NUM_DOCS);
+    assertTrue(notInOp.toExplainString().contains("delegateTo:per_key_index"));
+    assertEquals(countMatches(notInOp), 50);
+  }
+
+  @Test
+  public void testManifestMissingKeyShortCircuits() {
+    OpenStructDataSource osDs = mockSparseSegmentSource(List.of("region"), Map.of());
+    IndexSegment segment = mockSegment(osDs);
+
+    Predicate eqPred = makeEqPredicate(COLUMN, "not_there", "x");
+    MapFilterOperator eqOp = new MapFilterOperator(segment, eqPred, mockQueryContext(), NUM_DOCS);
+    assertTrue(eqOp.toExplainString().contains("delegateTo:per_key_index"));
+    assertEquals(countMatches(eqOp), 0);
+
+    Predicate isNull = makeIsNullPredicate(COLUMN, "not_there");
+    MapFilterOperator nullOp = new MapFilterOperator(segment, isNull, mockQueryContext(), NUM_DOCS);
+    assertTrue(nullOp.toExplainString().contains("delegateTo:per_key_index"));
+    assertEquals(nullOp.getNumMatchingDocs(), NUM_DOCS);
+  }
+
+  @Test
+  public void testNoManifestFallsBackToVirtualScan() {
+    OpenStructDataSource osDs = mockSparseSegmentSource(null, Map.of());
+    IndexSegment segment = mockSegment(osDs);
+
+    Predicate eqPred = makeEqPredicate(COLUMN, "ghost_key", "x");
+    MapFilterOperator op = new MapFilterOperator(segment, eqPred, mockQueryContext(), NUM_DOCS);
+    assertTrue(op.toExplainString().contains("delegateTo:per_key_index"));
+    assertEquals(countMatches(op), 0);
+  }
+
+  @Test
+  public void testSparseKeyIsNullUsesPresenceBitmap() {
+    OpenStructDataSource osDs = mockSparseSegmentSource(List.of("region"), Map.of());
+    IndexSegment segment = mockSegment(osDs);
+
+    Predicate isNull = makeIsNullPredicate(COLUMN, "region");
+    MapFilterOperator nullOp = new MapFilterOperator(segment, isNull, mockQueryContext(true), NUM_DOCS);
+    assertTrue(nullOp.toExplainString().contains("delegateTo:per_key_index"));
+    assertEquals(nullOp.getNumMatchingDocs(), 50);
+
+    Predicate isNotNull = makeIsNotNullPredicate(COLUMN, "region");
+    MapFilterOperator notNullOp = new MapFilterOperator(segment, isNotNull, mockQueryContext(true), NUM_DOCS);
+    assertTrue(notNullOp.toExplainString().contains("delegateTo:per_key_index"));
+    assertEquals(notNullOp.getNumMatchingDocs(), 50);
+  }
+
+  @Test
+  public void testSparseKeyRangeOnDeclaredLongScans() {
+    String[] blobs = new String[NUM_DOCS];
+    for (int i = 0; i < NUM_DOCS; i++) {
+      blobs[i] = i % 2 == 0 ? "{\"latencyMs\":" + i + "}" : null;
+    }
+    Map<String, FieldSpec> children =
+        Map.of("latencyMs", new DimensionFieldSpec("latencyMs", DataType.LONG, true));
+    OpenStructDataSource osDs = mockSparseSegmentSource(List.of("latencyMs"), children, blobs);
+    IndexSegment segment = mockSegment(osDs);
+
+    Predicate range = new RangePredicate(itemExpr(COLUMN, "latencyMs"), false, "50", false,
+        RangePredicate.UNBOUNDED, DataType.LONG);
+    MapFilterOperator op = new MapFilterOperator(segment, range, mockQueryContext(), NUM_DOCS);
+    assertTrue(op.toExplainString().contains("delegateTo:per_key_index"));
+    assertEquals(countMatches(op), 24);
+  }
+
+  @Test
+  public void testSparseKeyUnsupportedPredicateStillFallsThrough() {
+    OpenStructDataSource osDs = mockSparseSegmentSource(List.of("region"), Map.of());
     when(osDs.getJsonIndex()).thenReturn(null);
-
-    IndexSegment segment = mock(IndexSegment.class);
-    when(segment.getDataSourceNullable(COLUMN)).thenReturn(osDs);
-    // ExpressionFilterOperator constructor calls segment.getDataSource(column) for columns in the
-    // predicate expression. Return the osDs for the column itself.
+    IndexSegment segment = mockSegment(osDs);
     when(segment.getDataSource(COLUMN)).thenReturn(osDs);
-
-    // ExpressionFilterOperator needs column metadata from the DataSource
-    DataSourceMetadata meta = mock(DataSourceMetadata.class);
-    when(meta.getDataType()).thenReturn(FieldSpec.DataType.STRING);
-    when(meta.isSingleValue()).thenReturn(true);
-    when(osDs.getDataSourceMetadata()).thenReturn(meta);
     when(osDs.getColumnName()).thenReturn(COLUMN);
 
-    QueryContext qc = mockQueryContext();
-    Predicate predicate = makeEqPredicate(COLUMN, "sparse_key", "value");
-
-    // ExpressionFilterOperator's constructor creates a TransformFunction via the factory, which
-    // may fail on a mock segment. We verify the dispatch path via isMaterialized/isFullyMaterialized
-    // interaction: the per-key path should NOT be entered (getDataSource(key) never called).
+    Predicate predicate = new RegexpLikePredicate(itemExpr(COLUMN, "region"), "u.*");
     try {
-      MapFilterOperator op = new MapFilterOperator(segment, predicate, qc, NUM_DOCS);
-      assertTrue(op.toExplainString().contains("delegateTo:expression_filter"));
+      MapFilterOperator op = new MapFilterOperator(segment, predicate, mockQueryContext(), NUM_DOCS);
+      assertFalse(op.toExplainString().contains("delegateTo:per_key_index"));
     } catch (Exception e) {
-      // If ExpressionFilterOperator constructor fails on mock internals, that's OK —
-      // verify the per-key path was not taken.
-      verify(osDs, never()).getDataSource("sparse_key");
-      verify(osDs).isMaterialized("sparse_key");
-      verify(osDs).isFullyMaterialized();
+      // Per-key path declined; expression fallback attempted but may fail on mock internals.
+      verify(osDs).getDataSource("region");
     }
   }
 
@@ -433,7 +556,7 @@ public class MapFilterOperatorOpenStructTest {
     when(osDs.getDataSource(KEY)).thenReturn(keyDs);
 
     DataSourceMetadata meta = mock(DataSourceMetadata.class);
-    when(meta.getDataType()).thenReturn(FieldSpec.DataType.STRING);
+    when(meta.getDataType()).thenReturn(DataType.STRING);
     when(meta.isSorted()).thenReturn(false);
     when(meta.isSingleValue()).thenReturn(true);
     when(keyDs.getDataSourceMetadata()).thenReturn(meta);
@@ -476,5 +599,108 @@ public class MapFilterOperatorOpenStructTest {
       docIds.add(docId);
     }
     return docIds;
+  }
+
+  private static OpenStructDataSource withSparseJsonIndex(OpenStructDataSource osDs,
+      JsonIndexReader jsonIndex) {
+    when(osDs.getSparseJsonIndex()).thenReturn(jsonIndex);
+    return osDs;
+  }
+
+  @Test
+  public void testSparseJsonIndexEqUsesPostings() {
+    JsonIndexReader jsonIndex = mock(JsonIndexReader.class);
+    MutableRoaringBitmap postings = new MutableRoaringBitmap();
+    postings.add(0);
+    postings.add(4);
+    when(jsonIndex.getMatchingDocIds(any(FilterContext.class))).thenReturn(postings);
+
+    OpenStructDataSource osDs = withSparseJsonIndex(mockSparseSegmentSource(List.of("region"), Map.of()), jsonIndex);
+    MapFilterOperator op = new MapFilterOperator(mockSegment(osDs),
+        makeEqPredicate(COLUMN, "region", "us"), mockQueryContext(), NUM_DOCS);
+
+    assertTrue(op.toExplainString().contains("delegateTo:json_match"));
+    assertEquals(countMatches(op), 2);
+  }
+
+  @Test
+  public void testSparseJsonIndexNotEqComplementsPostings() {
+    JsonIndexReader jsonIndex = mock(JsonIndexReader.class);
+    MutableRoaringBitmap postings = new MutableRoaringBitmap();
+    postings.add(0);
+    when(jsonIndex.getMatchingDocIds(any(FilterContext.class))).thenReturn(postings);
+
+    OpenStructDataSource osDs = withSparseJsonIndex(mockSparseSegmentSource(List.of("region"), Map.of()), jsonIndex);
+    MapFilterOperator op = new MapFilterOperator(mockSegment(osDs),
+        makeNotEqPredicate(COLUMN, "region", "us"), mockQueryContext(), NUM_DOCS);
+
+    assertTrue(op.toExplainString().contains("delegateTo:json_match"));
+    assertEquals(countMatches(op), NUM_DOCS - 1);
+  }
+
+  @Test
+  public void testSparseJsonIndexRefusals() {
+    JsonIndexReader jsonIndex = mock(JsonIndexReader.class);
+
+    // (a) EQ against the STRING default "null"
+    OpenStructDataSource a = withSparseJsonIndex(mockSparseSegmentSource(List.of("region"), Map.of()), jsonIndex);
+    MapFilterOperator opA = new MapFilterOperator(mockSegment(a),
+        makeEqPredicate(COLUMN, "region", "null"), mockQueryContext(), NUM_DOCS);
+    assertTrue(opA.toExplainString().contains("delegateTo:per_key_index"));
+    assertEquals(countMatches(opA), NUM_DOCS / 2);
+
+    // (b) NOT_EQ with null handling on
+    OpenStructDataSource b = withSparseJsonIndex(mockSparseSegmentSource(List.of("region"), Map.of()), jsonIndex);
+    MapFilterOperator opB = new MapFilterOperator(mockSegment(b),
+        makeNotEqPredicate(COLUMN, "region", "us"), mockQueryContext(true), NUM_DOCS);
+    assertTrue(opB.toExplainString().contains("delegateTo:per_key_index"));
+
+    // (c) numeric declared type
+    String[] longBlobs = new String[NUM_DOCS];
+    for (int i = 0; i < NUM_DOCS; i++) {
+      longBlobs[i] = i % 2 == 0 ? "{\"latencyMs\":" + i + "}" : null;
+    }
+    Map<String, FieldSpec> children =
+        Map.of("latencyMs", new DimensionFieldSpec("latencyMs", DataType.LONG, true));
+    OpenStructDataSource c = withSparseJsonIndex(
+        mockSparseSegmentSource(List.of("latencyMs"), children, longBlobs), jsonIndex);
+    MapFilterOperator opC = new MapFilterOperator(mockSegment(c),
+        makeEqPredicate(COLUMN, "latencyMs", "42"), mockQueryContext(), NUM_DOCS);
+    assertTrue(opC.toExplainString().contains("delegateTo:per_key_index"));
+
+    // (d) EQ against the custom default null value declared on a key the manifest excludes: the key folds through its
+    //     dictionary, which holds that default, instead of consulting the JSON index
+    Map<String, FieldSpec> customDefault =
+        Map.of("missing", new DimensionFieldSpec("missing", DataType.STRING, true, "N/A"));
+    OpenStructDataSource d = withSparseJsonIndex(mockSparseSegmentSource(List.of("region"), customDefault), jsonIndex);
+    MapFilterOperator opD = new MapFilterOperator(mockSegment(d),
+        makeEqPredicate(COLUMN, "missing", "N/A"), mockQueryContext(), NUM_DOCS);
+    assertTrue(opD.toExplainString().contains("delegateTo:per_key_index"));
+    assertEquals(countMatches(opD), NUM_DOCS);
+
+    verify(jsonIndex, never()).getMatchingDocIds(any(FilterContext.class));
+  }
+
+  /// A multi-value key's values live in the blob as a JSON array, so `key = 'a'` has to compare against each
+  /// element. The scan does; the JSON index, which flattens an array element-wise, answers a different
+  /// question -- so the fast path is refused and the two cannot disagree.
+  @Test
+  public void testSparseMultiValueKeyScansInsteadOfUsingTheJsonIndex() {
+    JsonIndexReader jsonIndex = mock(JsonIndexReader.class);
+    String[] blobs = new String[NUM_DOCS];
+    for (int i = 0; i < NUM_DOCS; i++) {
+      // Every fourth doc holds "a" among its values, the rest of the even docs do not, odd docs lack the key.
+      blobs[i] = i % 2 != 0 ? null : i % 4 == 0 ? "{\"tags\":[\"a\",\"b\"]}" : "{\"tags\":[\"c\"]}";
+    }
+    Map<String, FieldSpec> children = Map.of("tags", new DimensionFieldSpec("tags", DataType.STRING, false));
+    OpenStructDataSource osDs = withSparseJsonIndex(
+        mockSparseSegmentSource(List.of("tags"), children, blobs, 2), jsonIndex);
+
+    MapFilterOperator op = new MapFilterOperator(mockSegment(osDs),
+        makeEqPredicate(COLUMN, "tags", "a"), mockQueryContext(), NUM_DOCS);
+
+    assertTrue(op.toExplainString().contains("delegateTo:per_key_index"));
+    assertEquals(countMatches(op), NUM_DOCS / 4);
+    verify(jsonIndex, never()).getMatchingDocIds(any(FilterContext.class));
   }
 }

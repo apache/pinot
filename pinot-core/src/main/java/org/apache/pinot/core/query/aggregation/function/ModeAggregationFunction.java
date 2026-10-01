@@ -36,6 +36,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -57,8 +58,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// - Expression: expression that contains the column to be calculated mode on, can be any Numeric column
 /// - MultiModeReducerType (optional): the reducer to use in case of multiple modes present in data
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class ModeAggregationFunction
-    extends NullableSingleInputAggregationFunction<Map<? extends Number, Long>, Double> {
+public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<Map<? extends Number, Long>, Double> {
 
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
@@ -504,8 +504,15 @@ public class ModeAggregationFunction
     return ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(Map<? extends Number, Long> intermediateResult) {
+  public Double extractFinalResult(@Nullable Map<? extends Number, Long> intermediateResult) {
+    // A null intermediate result means nothing was aggregated, and the mode of nothing is NULL. An empty map is a
+    // different thing: it is what an untouched single-stage result holder produces, and it keeps its historical
+    // sentinel below so that path is not silently changed.
+    if (intermediateResult == null) {
+      return null;
+    }
     if (intermediateResult.isEmpty()) {
       if (_nullHandlingEnabled) {
         return null;
@@ -725,6 +732,19 @@ public class ModeAggregationFunction
     private DictIdsWrapper(Dictionary dictionary) {
       _dictionary = dictionary;
       _dictIdCountMap = new Int2IntOpenHashMap();
+    }
+  }
+
+  /// Service registration for MODE.
+  public static final class Provider implements AggregationFunctionProvider {
+    @Override
+    public AggregationFunctionType getType() {
+      return AggregationFunctionType.MODE;
+    }
+
+    @Override
+    public AggregationFunction<?, ?> create(FunctionContext function, boolean nullHandlingEnabled) {
+      return new ModeAggregationFunction(function.getArguments(), nullHandlingEnabled);
     }
   }
 }

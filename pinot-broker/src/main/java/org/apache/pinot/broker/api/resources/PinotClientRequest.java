@@ -667,7 +667,8 @@ public class PinotClientRequest {
     try {
       sqlNodeAndOptions = RequestUtils.parseQuery(sqlRequestJson.get(Request.SQL).asText(), sqlRequestJson);
     } catch (Exception e) {
-      return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+      QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.SQL_PARSING);
+      return new BrokerResponseNative(errorCode, e.getMessage());
     }
     if (forceUseMultiStage) {
       sqlNodeAndOptions.setExtraOptions(Map.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));

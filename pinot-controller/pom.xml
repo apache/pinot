@@ -108,6 +108,12 @@
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- @Suite classes under suites/ that split the controller tests into the stateful and stateless runs -->
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-suite</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
   <build>
     <resources>
@@ -168,20 +174,51 @@
           </execution>
         </executions>
       </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
-          <suiteXmlFiles>
-            <suiteXmlFile>testng-statefull.xml</suiteXmlFile>
-            <suiteXmlFile>testng-stateless.xml</suiteXmlFile>
-          </suiteXmlFiles>
-        </configuration>
-      </plugin>
     </plugins>
   </build>
 
   <profiles>
+    <!-- Explicit -Dtest selections bypass the grouped suites, as they did with suiteXmlFiles. -->
+    <profile>
+      <id>controller-test-suites</id>
+      <activation>
+        <property>
+          <name>!test</name>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>default-test</id>
+                <configuration>
+                  <includes>
+                    <include>**/suites/ControllerStatefulSuite.java</include>
+                  </includes>
+                  <reportNameSuffix>stateful</reportNameSuffix>
+                </configuration>
+              </execution>
+              <execution>
+                <id>stateless-tests</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <includes>
+                    <include>**/suites/ControllerStatelessSuite.java</include>
+                  </includes>
+                  <reportNameSuffix>stateless</reportNameSuffix>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>bin-dist</id>
       <properties>

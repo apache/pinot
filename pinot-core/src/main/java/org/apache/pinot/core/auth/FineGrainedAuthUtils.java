@@ -20,6 +20,7 @@
 package org.apache.pinot.core.auth;
 
 import java.lang.reflect.Method;
+import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
@@ -54,6 +55,18 @@ public class FineGrainedAuthUtils {
     return name;
   }
 
+  /// Finds the raw target parameter identified by an [Authorize] annotation.
+  ///
+  /// @param auth annotation identifying the authorization target
+  /// @param pathParams request path parameters
+  /// @param queryParams request query parameters
+  /// @return the unnormalized table parameter value, or `null` for a cluster target or missing table parameter
+  @Nullable
+  public static String findRawTargetId(Authorize auth, MultivaluedMap<String, String> pathParams,
+      MultivaluedMap<String, String> queryParams) {
+    return auth.targetType() == TargetType.TABLE ? findParam(auth.paramName(), pathParams, queryParams) : null;
+  }
+
   /// Validate fine-grained authorization for APIs.
   /// There are 2 possible cases:
   /// 1. [Authorize] annotation is present on the method. In this case, do the finer grain authorization using the
@@ -85,16 +98,21 @@ public class FineGrainedAuthUtils {
         }
 
         // find the paramName in the path or query params
-        targetId = findParam(auth.paramName(), uriInfo.getPathParameters(), uriInfo.getQueryParameters());
+        targetId = findRawTargetId(auth, uriInfo.getPathParameters(), uriInfo.getQueryParameters());
 
-        if (StringUtils.isEmpty(targetId)) {
+        if (StringUtils.isBlank(targetId)) {
           throw new WebApplicationException(
-              "Could not find paramName " + auth.paramName() + " in path or query params of the API: "
-                  + uriInfo.getRequestUri(), Response.Status.INTERNAL_SERVER_ERROR);
+              "Missing required table parameter '" + auth.paramName() + "' for API: " + uriInfo.getRequestUri(),
+              Response.Status.BAD_REQUEST);
         }
 
         // Table name may contain type, hence get raw table name for checking access
-        targetId = DatabaseUtils.translateTableName(TableNameBuilder.extractRawTableName(targetId), httpHeaders);
+        try {
+          targetId = DatabaseUtils.translateTableName(TableNameBuilder.extractRawTableName(targetId), httpHeaders);
+        } catch (RuntimeException e) {
+          throw new WebApplicationException("Invalid table parameter '" + auth.paramName() + "': " + e.getMessage(),
+              e, Response.Status.BAD_REQUEST);
+        }
 
         accessDeniedMsg = "Access denied to " + auth.action() + " for table: " + targetId;
       } else if (auth.targetType() == TargetType.CLUSTER) {

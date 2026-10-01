@@ -18,11 +18,16 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -70,6 +75,51 @@ public class ScalingThreadPoolExecutorTest {
     executorService.submit(r2);
     TestUtils.waitForCondition(aVoid -> executorService.getPoolSize() == 2, 2000,
         "Timed out waiting for thread pool to scale up");
+  }
+
+  @Test
+  public void testInterruptedSubmissionIsQueued() throws Exception {
+    ThreadPoolExecutor executorService =
+        (ThreadPoolExecutor) ScalingThreadPoolExecutor.newScalingThreadPool(0, 1, 500);
+    CountDownLatch taskStarted = new CountDownLatch(1);
+    CountDownLatch releaseTask = new CountDownLatch(1);
+    try {
+      Future<?> activeTask = executorService.submit(() -> {
+        taskStarted.countDown();
+        try {
+          releaseTask.await();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      });
+      assertTrue(taskStarted.await(10, TimeUnit.SECONDS), "Timed out waiting for the active task to start");
+
+      Future<?> queuedTask;
+      try {
+        Thread.currentThread().interrupt();
+        queuedTask = executorService.submit(() -> { });
+        assertTrue(Thread.currentThread().isInterrupted(), "Submission should preserve the caller's interrupt status");
+      } finally {
+        Thread.interrupted();
+        releaseTask.countDown();
+      }
+
+      activeTask.get(10, TimeUnit.SECONDS);
+      queuedTask.get(10, TimeUnit.SECONDS);
+    } finally {
+      Thread.interrupted();
+      releaseTask.countDown();
+      executorService.shutdownNow();
+      assertTrue(executorService.awaitTermination(10, TimeUnit.SECONDS), "Executor did not terminate");
+    }
+  }
+
+  @Test
+  public void testSubmissionAfterShutdownIsRejected() {
+    ThreadPoolExecutor executorService =
+        (ThreadPoolExecutor) ScalingThreadPoolExecutor.newScalingThreadPool(0, 1, 500);
+    executorService.shutdown();
+    assertThrows(RejectedExecutionException.class, () -> executorService.submit(() -> { }));
   }
 
   private Runnable getSleepingRunnable() {

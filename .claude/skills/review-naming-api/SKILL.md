@@ -1,6 +1,6 @@
 ---
 name: review-naming-api
-description: Review Apache Pinot diffs for naming, API design, and public-surface hygiene — method and class names; REST JSON field names; SPI method names; enum constant names (permanent); consistency with existing patterns; fully-qualified class names inline (disallowed); Javadoc on new public classes. Trigger keywords — public API, SPI, REST, @JsonProperty, enum name, class rename, method rename, Javadoc.
+description: Review Apache Pinot naming and API conventions when public names, signatures, or documentation change.
 domain: kb/code-review-principles.md#7-naming--api-design
 triggers:
   - diff adds or renames public classes/methods/fields

@@ -87,6 +87,10 @@ import static org.testng.Assert.*;
 ///       ORDER BY + LIMIT + OFFSET; verify correct pagination and ordering.
 /// 3. [#testMultipleMaterializedViewCostSelection()] — two MVs match the same query at
 ///       different costs; verify the lower-cost MV is selected.
+/// 4. [#testScalarGroupingFunctionRewrite()] and
+///       [#testScalarGroupingFunctionResidualOnSourceColumnFallsBack()] — a finer-grained MV
+///       groups by a scalar expression; verify both re-aggregation and safe fallback when a
+///       residual references the unprojected source column.
 ///
 /// **Why this extends [BaseClusterIntegrationTest] directly instead of
 /// [org.apache.pinot.integration.tests.custom.CustomDataQueryClusterIntegrationTest] :**
@@ -105,12 +109,15 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
   private static final String MATERIALIZED_VIEW_COLD_TABLE_NAME = "materializedViewColdTable";
   private static final String MATERIALIZED_VIEW_SCAN_TABLE_NAME = "materializedViewScanTable";
   private static final String MATERIALIZED_VIEW_COST_TABLE_NAME = "materializedViewCostTable";
+  private static final String MATERIALIZED_VIEW_SCALAR_TABLE_NAME = "materializedViewScalarTable";
 
   private static final String MATERIALIZED_VIEW_FULL_TABLE_OFFLINE = MATERIALIZED_VIEW_FULL_TABLE_NAME + "_OFFLINE";
   private static final String MATERIALIZED_VIEW_SPLIT_TABLE_OFFLINE = MATERIALIZED_VIEW_SPLIT_TABLE_NAME + "_OFFLINE";
   private static final String MATERIALIZED_VIEW_COLD_TABLE_OFFLINE = MATERIALIZED_VIEW_COLD_TABLE_NAME + "_OFFLINE";
   private static final String MATERIALIZED_VIEW_SCAN_TABLE_OFFLINE = MATERIALIZED_VIEW_SCAN_TABLE_NAME + "_OFFLINE";
   private static final String MATERIALIZED_VIEW_COST_TABLE_OFFLINE = MATERIALIZED_VIEW_COST_TABLE_NAME + "_OFFLINE";
+  private static final String MATERIALIZED_VIEW_SCALAR_TABLE_OFFLINE =
+      MATERIALIZED_VIEW_SCALAR_TABLE_NAME + "_OFFLINE";
 
   private static final String TIME_COLUMN = "DaysSinceEpoch";
 
@@ -124,6 +131,12 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
   private static final long SPLIT_BOUNDARY_MS = 16086L * 86_400_000L;
 
   private static final String[] CARRIERS = {"AA", "DL", "UA", "WN", "US", "B6", "OO", "EV", "MQ", "NK"};
+
+  /// Row cap for the source aggregation that seeds an MV segment.  The MV must hold *every* group
+  /// or the row-for-row comparison against the rewrite-disabled baseline would validate a
+  /// truncated view; callers assert the returned row count stays strictly below this cap so a
+  /// dataset that outgrows it fails loudly instead of silently materializing a prefix.
+  private static final int MATERIALIZED_VIEW_SOURCE_ROW_LIMIT = 10000;
 
   private PinotHelixResourceManager _helixResourceManager;
   private HelixPropertyStore<ZNRecord> _propertyStore;
@@ -205,6 +218,7 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
     setupColdStartMv();
     setupScanMv();
     setupCostCompetitorMv();
+    setupScalarGroupingMv();
 
     /// Wait for the broker's MaterializedViewMetadataCache to register every newly-published MV
     /// by polling a sentinel query that should be served by the full-rewrite MV.  Polling on a
@@ -213,6 +227,9 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
     /// race the timeout.
     waitForMaterializedViewRegistered(MATERIALIZED_VIEW_FULL_TABLE_OFFLINE,
         "SELECT Carrier, SUM(ArrDelayMinutes) FROM " + SOURCE_TABLE_NAME + " GROUP BY Carrier");
+    waitForMaterializedViewRegistered(MATERIALIZED_VIEW_SCALAR_TABLE_OFFLINE,
+        "SELECT UPPER(UniqueCarrier), SUM(ArrDelayMinutes) FROM " + SOURCE_TABLE_NAME
+            + " GROUP BY UPPER(UniqueCarrier)");
   }
 
   /// Polls a query that is known to be rewritable to the given MV until the broker's metadata
@@ -243,6 +260,7 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
     cleanupMaterializedViewMetadata(MATERIALIZED_VIEW_COLD_TABLE_OFFLINE);
     cleanupMaterializedViewMetadata(MATERIALIZED_VIEW_SCAN_TABLE_OFFLINE);
     cleanupMaterializedViewMetadata(MATERIALIZED_VIEW_COST_TABLE_OFFLINE);
+    cleanupMaterializedViewMetadata(MATERIALIZED_VIEW_SCALAR_TABLE_OFFLINE);
 
     /// Drop MV tables before the base table so the controller's referential-integrity check
     /// (introduced in pinot-controller to prevent orphaned MVs) does not block the base drop.
@@ -251,6 +269,7 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
     dropOfflineTable(MATERIALIZED_VIEW_COLD_TABLE_NAME);
     dropOfflineTable(MATERIALIZED_VIEW_SCAN_TABLE_NAME);
     dropOfflineTable(MATERIALIZED_VIEW_COST_TABLE_NAME);
+    dropOfflineTable(MATERIALIZED_VIEW_SCALAR_TABLE_NAME);
     dropOfflineTable(SOURCE_TABLE_NAME);
 
     stopServer();
@@ -835,6 +854,79 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
   }
 
   /// -----------------------------------------------------------------------
+  ///  Phase 3, Test 10: Scalar grouping function with re-aggregation
+  /// -----------------------------------------------------------------------
+
+  /// Verifies that `AggregationSubsumptionStrategy` can match a scalar grouping
+  /// expression. The MV is finer grained (`UPPER(UniqueCarrier), Origin`) than the user
+  /// query (`UPPER(UniqueCarrier)`), so the MV aggregate must be re-aggregated.
+  @Test
+  public void testScalarGroupingFunctionRewrite()
+      throws Exception {
+    String query = ""
+        + "SELECT UPPER(UniqueCarrier) AS upper_UniqueCarrier, "
+        + "SUM(ArrDelayMinutes) AS sum_ArrDelayMinutes "
+        + "FROM " + SOURCE_TABLE_NAME + " "
+        + "GROUP BY UPPER(UniqueCarrier) "
+        + "ORDER BY UPPER(UniqueCarrier) "
+        + "LIMIT 10000";
+
+    JsonNode materializedViewResponse = postQuery(query);
+    assertNoExceptions(materializedViewResponse);
+    assertEquals(getMaterializedViewQueried(materializedViewResponse), MATERIALIZED_VIEW_SCALAR_TABLE_OFFLINE,
+        "Expected the finer-grained scalar grouping MV to be selected");
+
+    JsonNode directResponse = postQuery("SET enableMaterializedViewRewrite='false'; " + query);
+    assertNoExceptions(directResponse);
+    assertNull(getMaterializedViewQueried(directResponse),
+        "Rewrite-disabled baseline must query the base table");
+
+    JsonNode materializedViewResult = materializedViewResponse.get("resultTable");
+    JsonNode directResult = directResponse.get("resultTable");
+    assertNotNull(materializedViewResult);
+    assertNotNull(directResult);
+    assertTrue(materializedViewResult.get("rows").size() > 0, "Result should have rows");
+    assertEquals(materializedViewResult.get("dataSchema"), directResult.get("dataSchema"),
+        "MV rewrite should preserve the complete result schema");
+    assertEquals(materializedViewResult.get("rows"), directResult.get("rows"),
+        "MV rewrite should return the same complete, ordered result as the base table");
+  }
+
+  /// Verifies that a residual on the raw source column hidden inside a scalar grouping
+  /// expression rejects the MV and safely falls back to the base table. `UniqueCarrier` is not
+  /// projected by any other MV in this test, so an MV hit would expose the invalid rewrite.
+  @Test
+  public void testScalarGroupingFunctionResidualOnSourceColumnFallsBack()
+      throws Exception {
+    String query = ""
+        + "SELECT UPPER(UniqueCarrier) AS upper_UniqueCarrier, "
+        + "SUM(ArrDelayMinutes) AS sum_ArrDelayMinutes "
+        + "FROM " + SOURCE_TABLE_NAME + " "
+        + "WHERE UniqueCarrier = 'AA' "
+        + "GROUP BY UPPER(UniqueCarrier) "
+        + "ORDER BY UPPER(UniqueCarrier) "
+        + "LIMIT 10000";
+
+    JsonNode fallbackResponse = postQuery(query);
+    assertNoExceptions(fallbackResponse);
+    assertNull(getMaterializedViewQueried(fallbackResponse),
+        "A residual on the unprojected raw source column must reject the scalar-grouping MV");
+
+    JsonNode directResponse = postQuery("SET enableMaterializedViewRewrite='false'; " + query);
+    assertNoExceptions(directResponse);
+
+    JsonNode fallbackResult = fallbackResponse.get("resultTable");
+    JsonNode directResult = directResponse.get("resultTable");
+    assertNotNull(fallbackResult);
+    assertNotNull(directResult);
+    assertTrue(fallbackResult.get("rows").size() > 0, "Fallback result should have rows");
+    assertEquals(fallbackResult.get("dataSchema"), directResult.get("dataSchema"),
+        "Fallback should preserve the complete result schema");
+    assertEquals(fallbackResult.get("rows"), directResult.get("rows"),
+        "Fallback should return the same complete, ordered result as the rewrite-disabled query");
+  }
+
+  /// -----------------------------------------------------------------------
   ///  MV table setup
   /// -----------------------------------------------------------------------
 
@@ -1104,6 +1196,73 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
 
     MaterializedViewRuntimeMetadata runtime = new MaterializedViewRuntimeMetadata(
         MATERIALIZED_VIEW_COST_TABLE_OFFLINE, DATA_MAX_TIME_MS, new HashMap<>());
+    MaterializedViewRuntimeMetadataUtils.persist(_propertyStore, runtime, -1);
+  }
+
+  /// Scalar-grouping MV: groups by `UPPER(UniqueCarrier), Origin` with full coverage.
+  /// The extra `Origin` key makes it finer grained than the query exercised by
+  /// [#testScalarGroupingFunctionRewrite()], forcing aggregate re-aggregation.
+  private void setupScalarGroupingMv()
+      throws Exception {
+    Schema materializedViewSchema = new Schema.SchemaBuilder()
+        .setSchemaName(MATERIALIZED_VIEW_SCALAR_TABLE_NAME)
+        .addSingleValueDimension("upper_UniqueCarrier", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("Origin", FieldSpec.DataType.STRING)
+        .addMetric("sum_ArrDelayMinutes", FieldSpec.DataType.DOUBLE)
+        .build();
+    addSchema(materializedViewSchema);
+
+    TableConfig materializedViewTableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(MATERIALIZED_VIEW_SCALAR_TABLE_NAME)
+        .setNumReplicas(1)
+        .build();
+    addTableConfig(materializedViewTableConfig);
+
+    /// Materialize the exact source-table aggregates so the rewrite can be checked
+    /// row-for-row against a rewrite-disabled baseline rather than synthetic values.
+    String sourceAggregationQuery = ""
+        + "SET enableMaterializedViewRewrite='false'; "
+        + "SELECT UPPER(UniqueCarrier), Origin, SUM(ArrDelayMinutes) "
+        + "FROM " + SOURCE_TABLE_NAME + " "
+        + "GROUP BY UPPER(UniqueCarrier), Origin "
+        + "ORDER BY UPPER(UniqueCarrier), Origin "
+        + "LIMIT " + MATERIALIZED_VIEW_SOURCE_ROW_LIMIT;
+    JsonNode sourceAggregationResponse = postQuery(sourceAggregationQuery);
+    assertNoExceptions(sourceAggregationResponse);
+
+    JsonNode sourceRows = sourceAggregationResponse.get("resultTable").get("rows");
+    assertTrue(sourceRows.size() > 0, "Source aggregation should produce rows");
+    assertTrue(sourceRows.size() < MATERIALIZED_VIEW_SOURCE_ROW_LIMIT,
+        "Source aggregation hit the row limit, so the MV would hold only a prefix of the groups "
+            + "and the row-for-row comparison would validate a truncated view. Raise "
+            + "MATERIALIZED_VIEW_SOURCE_ROW_LIMIT.");
+    List<GenericRow> rows = new ArrayList<>(sourceRows.size());
+    for (JsonNode sourceRow : sourceRows) {
+      GenericRow row = new GenericRow();
+      row.putValue("upper_UniqueCarrier", sourceRow.get(0).asText());
+      row.putValue("Origin", sourceRow.get(1).asText());
+      row.putValue("sum_ArrDelayMinutes", sourceRow.get(2).asDouble());
+      rows.add(row);
+    }
+    buildAndUploadSegment(materializedViewTableConfig, materializedViewSchema, rows,
+        MATERIALIZED_VIEW_SCALAR_TABLE_NAME, "materializedViewScalarSeg");
+
+    waitForAnyDocLoaded(MATERIALIZED_VIEW_SCALAR_TABLE_NAME, 60_000L);
+
+    String definedSql = "SELECT UPPER(UniqueCarrier) AS upper_UniqueCarrier, Origin, "
+        + "SUM(ArrDelayMinutes) AS sum_ArrDelayMinutes "
+        + "FROM " + SOURCE_TABLE_NAME + " "
+        + "GROUP BY UPPER(UniqueCarrier), Origin";
+    MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
+        MATERIALIZED_VIEW_SCALAR_TABLE_OFFLINE,
+        List.of(SOURCE_TABLE_NAME),
+        definedSql,
+        Map.of(),
+        null);
+    MaterializedViewDefinitionMetadataUtils.persist(_propertyStore, definition, -1);
+
+    MaterializedViewRuntimeMetadata runtime = new MaterializedViewRuntimeMetadata(
+        MATERIALIZED_VIEW_SCALAR_TABLE_OFFLINE, DATA_MAX_TIME_MS, new HashMap<>());
     MaterializedViewRuntimeMetadataUtils.persist(_propertyStore, runtime, -1);
   }
 

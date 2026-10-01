@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -96,7 +97,8 @@ public class QueryExecutorTest {
   private static final String AVRO_DATA_PATH = "data/sampleEatsData30k.avro";
   private static final String EMPTY_JSON_DATA_PATH = "data/test_empty_data.json";
   private static final String QUERY_EXECUTOR_CONFIG_PATH = "conf/query-executor.properties";
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "QueryExecutorTest");
+  private static final File TEMP_DIR =
+      new File(FileUtils.getTempDirectory(), "QueryExecutorTest-" + UUID.randomUUID());
   private static final String RAW_TABLE_NAME = "sampleEatsData";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final int NUM_SEGMENTS_TO_GENERATE = 2;

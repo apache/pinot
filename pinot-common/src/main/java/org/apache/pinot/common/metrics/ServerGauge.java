@@ -168,7 +168,25 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   THROTTLE_EXECUTOR_QUEUE_SIZE("count", true,
       "Current number of tasks in the throttle executor queue"),
   // Workload config fetch status: 1 = success, 0 = failure
-  WORKLOAD_CONFIG_FETCH_STATUS("status", true);
+  WORKLOAD_CONFIG_FETCH_STATUS("status", true),
+  // OPEN_STRUCT segment build observability. Each seal on this server overwrites the previous value for the
+  // same (table, column), so these are not table-wide totals and must not be summed across segments or
+  // replicas; sampling them over time gives the trend.
+  OPEN_STRUCT_LAST_SEGMENT_DENSE_KEY_COUNT("keys", false,
+      "Number of OPEN_STRUCT keys classified as dense in the most recently sealed segment"),
+  OPEN_STRUCT_LAST_SEGMENT_SPARSE_KEY_COUNT("keys", false,
+      "Number of OPEN_STRUCT keys classified as sparse in the most recently sealed segment"),
+  OPEN_STRUCT_LAST_SEGMENT_KEY_COUNT("keys", false,
+      "Unique keys in the most recently sealed segment for this OPEN_STRUCT column (dense + sparse)"),
+  OPEN_STRUCT_LAST_SEGMENT_DOC_COUNT("documents", false,
+      "Total docs in the most recently sealed segment for this OPEN_STRUCT column; denominator for "
+          + "openStructLastSegmentKeyDocCount"),
+  /// When `perKeyMetricsEnabled` is false (default), emitted only for keys named in `denseKeys`. When
+  /// true, emitted for every key in the sealed segment — registry entries follow the ingested key space.
+  /// See `OpenStructColumnSplitter#emitMetrics`.
+  OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT("documents", false,
+      "Docs in which an OPEN_STRUCT key was present in the most recently sealed segment; "
+          + "divide by openStructLastSegmentDocCount for the fill rate");
 
   private final String _gaugeName;
   private final String _unit;

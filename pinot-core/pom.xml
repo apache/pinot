@@ -170,6 +170,11 @@
       <artifactId>assertj-core</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.fory</groupId>
+      <artifactId>fory-json</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <profiles>

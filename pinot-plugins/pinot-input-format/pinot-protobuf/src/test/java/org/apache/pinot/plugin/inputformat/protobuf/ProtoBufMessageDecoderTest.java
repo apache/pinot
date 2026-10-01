@@ -25,14 +25,39 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.ProtoBufDescriptorFallbackListener;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.plugin.inputformat.protobuf.ProtoBufTestDataGenerator.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class ProtoBufMessageDecoderTest {
+
+  @Test
+  public void testDescriptorFallbackEnabledPrecedence() {
+    ProtoBufDescriptorFallbackListener listener = ProtoBufDescriptorFallbackListener.getInstance();
+    try {
+      Map<String, String> props = new HashMap<>();
+      // Without a table-level prop, the (dynamically updatable) cluster-wide value applies
+      listener.setEnabled(true);
+      assertTrue(ProtoBufMessageDecoder.isDescriptorFallbackEnabled(props));
+      listener.setEnabled(false);
+      assertFalse(ProtoBufMessageDecoder.isDescriptorFallbackEnabled(props));
+
+      // An explicit table-level prop overrides the cluster-wide value in both directions
+      props.put(ProtoBufMessageDecoder.DESCRIPTOR_FILE_FALLBACK_ENABLED, "true");
+      assertTrue(ProtoBufMessageDecoder.isDescriptorFallbackEnabled(props));
+      listener.setEnabled(true);
+      props.put(ProtoBufMessageDecoder.DESCRIPTOR_FILE_FALLBACK_ENABLED, "false");
+      assertFalse(ProtoBufMessageDecoder.isDescriptorFallbackEnabled(props));
+    } finally {
+      listener.reset();
+    }
+  }
 
   @Test
   public void testHappyCase()

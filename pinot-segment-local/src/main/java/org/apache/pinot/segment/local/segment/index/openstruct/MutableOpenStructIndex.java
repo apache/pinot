@@ -40,7 +40,9 @@ import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.OpenStructKeyFlattener;
 import org.apache.pinot.spi.data.OpenStructTypeInference;
+import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,18 +59,37 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableOpenStructIndex.class);
 
   private final String _openStructColumn;
+  private final String _tableNameWithType;
   private final OpenStructIndexConfig _config;
+  private final int _maxNestedKeyDepth;
   private final Map<String, FieldSpec> _childFieldSpecs;
   private final PinotDataBufferMemoryManager _memoryManager;
   private final int _capacity;
 
-  // Volatile for lock-free reader access; writer always holds the consuming-thread lock.
+  // Volatile copy-on-write: the writer (consuming thread) creates a fresh HashMap copy and publishes
+  // atomically via volatile write (see allocateKeyColumn). Readers see a consistent snapshot of the
+  // entire map. ConcurrentHashMap is NOT appropriate here — it would allow readers to observe
+  // partially-updated state during a put. Single-writer is guaranteed by the Pinot consuming thread
+  // model (one thread per partition).
   private volatile Map<String, MutableKeyColumn> _keyColumns = new HashMap<>();
+  // Single-writer (see #index), but close() may run on a different thread, so volatile for
+  // visibility; flushed to ServerMetrics on close() to avoid a metered-value call on every
+  // ignored key of every consumed row.
+  private volatile long _ignoredKeyDropCount;
+  // Single-writer (see #index): the consuming thread caches and reuses the PinotMeter, which skips
+  // the per-value metric-name rebuild and registry lookup addMeteredTableValue would otherwise do,
+  // while still marking the meter live instead of batching the count to close().
+  @Nullable
+  private PinotMeter _typeCoercionFailureMeter;
+  @Nullable
+  private PinotMeter _typeInferenceFailureMeter;
 
-  public MutableOpenStructIndex(String openStructColumn, ComplexFieldSpec fieldSpec,
+  public MutableOpenStructIndex(String openStructColumn, String tableNameWithType, ComplexFieldSpec fieldSpec,
       OpenStructIndexConfig config, PinotDataBufferMemoryManager memoryManager, int capacity) {
     _openStructColumn = openStructColumn;
+    _tableNameWithType = tableNameWithType;
     _config = config;
+    _maxNestedKeyDepth = config.getMaxNestedKeyDepth();
     _memoryManager = memoryManager;
     _capacity = capacity;
 
@@ -94,92 +115,201 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
       return;
     }
     Map<String, Object> map = (Map<String, Object>) value;
-    for (Map.Entry<String, Object> entry : map.entrySet()) {
-      String key = entry.getKey();
-      Object rawValue = entry.getValue();
-      if (rawValue == null) {
-        continue;
-      }
+    // Flattened the same way as the sealed build path ([OpenStructColumnSplitter#addMap]) so a nested value resolves
+    // under the same key before and after seal. Consuming mode materializes every key, so the container flag the
+    // splitter uses for dense selection is not needed here.
+    OpenStructKeyFlattener.flatten(map, _maxNestedKeyDepth, (key, rawValue, container) ->
+        indexEntry(docId, key, rawValue));
+  }
 
-      MutableKeyColumn keyCol = _keyColumns.get(key);
-      if (keyCol == null) {
-        // Mutable mode holds every observed key (see MutableOpenStructDataSource#isFullyMaterialized);
-        // dense/sparse classification (maxDenseKeys / denseKeys) is applied at seal time by the segment
-        // build, so no key is dropped during consumption.
-        // Resolve stored type and coerce BEFORE allocating a column so a first-row coercion failure
-        // does not allocate a column that was never usable.
-        DataType resolvedType = resolveStoredType(key, rawValue);
-        if (resolvedType == null) {
-          continue;
-        }
-        Object coerced = tryCoerce(key, rawValue, resolvedType);
-        if (coerced == null) {
-          continue;
-        }
-        keyCol = allocateKeyColumn(key, resolvedType);
-        keyCol.setValue(docId, coerced);
-        continue;
-      }
+  private void indexEntry(int docId, String key, @Nullable Object rawValue) {
+    if (rawValue == null) {
+      return;
+    }
+    if (_config.isIgnoredKey(key)) {
+      _ignoredKeyDropCount++;
+      return;
+    }
 
-      DataType storedType = keyCol.getStoredType();
-      Object coerced = tryCoerce(key, rawValue, storedType);
+    MutableKeyColumn keyCol = _keyColumns.get(key);
+    Object[] elements = OpenStructTypeInference.asMultiValue(rawValue);
+    if (elements != null && elements.length == 0) {
+      // No elements, so no value: the key is not in this document, the same as a null value above. Matches
+      // OpenStructColumnSplitter, where a materialized multi-value column has no empty state to store.
+      return;
+    }
+    if (keyCol != null && elements != null && keyCol.isSingleValue()) {
+      // Shape is fixed by the first value, as on the sealed side: a collection arriving on a scalar key is
+      // handled as any other value the column cannot represent, not by reshaping the column underneath it.
+      elements = null;
+    }
+    if (keyCol == null) {
+      // Mutable mode holds every observed key (see MutableOpenStructDataSource#isFullyMaterialized);
+      // dense/sparse classification (maxDenseKeys / denseKeys) is applied at seal time by the segment
+      // build, so no key is dropped during consumption.
+      // Resolve stored type and coerce BEFORE allocating a column so a first-row coercion failure
+      // does not allocate a column that was never usable.
+      // A declaration decides the shape in both directions; only an undeclared key takes it from the data.
+      FieldSpec declaredSpec = _childFieldSpecs.get(key);
+      boolean multiValue = declaredSpec != null ? !declaredSpec.isSingleValueField() : elements != null;
+      if (!multiValue) {
+        elements = null;
+      }
+      DataType resolvedType = multiValue
+          ? resolveElementStoredType(key, elements)
+          : resolveStoredType(key, rawValue, null);
+      PinotDataType destType = ColumnDataType.fromDataTypeSV(resolvedType).toPinotDataType();
+      Object coerced = elements != null ? tryCoerceAll(key, elements, destType) : tryCoerce(key, rawValue, destType);
       if (coerced == null) {
-        continue;
+        return;
       }
+      keyCol = allocateKeyColumn(key, resolvedType, !multiValue);
+      setOn(keyCol, docId, coerced);
+      return;
+    }
+
+    if (keyCol.needsInferenceCheck()) {
+      meterIfUninferable(rawValue);
+    }
+    Object coerced = elements != null
+        ? tryCoerceAll(key, elements, keyCol.getDestType())
+        : tryCoerce(key, rawValue, keyCol.getDestType());
+    if (coerced == null) {
+      return;
+    }
+    setOn(keyCol, docId, coerced);
+  }
+
+  /// Writes a coerced value, wrapping a scalar into a one-element list on a multi-value key -- the shape the
+  /// column was built with wins, the same as on the sealed side. A list too long for the column is dropped and
+  /// metered like a coercion failure rather than failing the whole segment.
+  private void setOn(MutableKeyColumn keyCol, int docId, Object coerced) {
+    if (keyCol.isSingleValue()) {
       keyCol.setValue(docId, coerced);
+      return;
+    }
+    Object[] values = coerced instanceof Object[] ? (Object[]) coerced : new Object[]{coerced};
+    try {
+      keyCol.setValues(docId, values);
+    } catch (IllegalArgumentException e) {
+      _typeCoercionFailureMeter = meterFailure(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES,
+          _typeCoercionFailureMeter);
     }
   }
 
-  /// Resolves the stored type for a key without allocating any state. Returns null when the type
-  /// cannot be inferred (caller should skip the entry).
-  @Nullable
-  private DataType resolveStoredType(String key, Object rawValue) {
+  /// Stored type for a multi-value key: the declared child spec when there is one, otherwise the element type.
+  private DataType resolveElementStoredType(String key, @Nullable Object[] elements) {
     FieldSpec spec = _childFieldSpecs.get(key);
-    DataType valueType;
     if (spec != null) {
-      valueType = spec.getDataType();
-    } else {
-      valueType = OpenStructTypeInference.inferDataType(rawValue);
-      if (valueType == null) {
-        LOGGER.warn("OPEN_STRUCT '{}': could not infer DataType for key '{}' from value of class '{}'."
-                + " Dropping the entry.",
-            _openStructColumn, key, rawValue.getClass().getName());
+      return spec.getDataType().getStoredType();
+    }
+    DataType inferred = elements == null ? null : OpenStructTypeInference.inferElementDataType(elements);
+    if (inferred == null) {
+      // Empty, or all nulls: STRING holds whatever the key turns out to carry.
+      return DataType.STRING;
+    }
+    return inferred;
+  }
+
+  /// Coerces every element, or returns null when any of them fails -- an array's length is part of its value, so
+  /// dropping one element would shift every index after it.
+  @Nullable
+  private Object[] tryCoerceAll(String key, Object[] elements, PinotDataType destType) {
+    Object[] coerced = new Object[elements.length];
+    for (int i = 0; i < elements.length; i++) {
+      if (elements[i] == null) {
+        _typeCoercionFailureMeter = meterFailure(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES,
+            _typeCoercionFailureMeter);
+        return null;
+      }
+      coerced[i] = tryCoerce(key, elements[i], destType);
+      if (coerced[i] == null) {
         return null;
       }
     }
-    return valueType.getStoredType();
+    return coerced;
   }
 
-  /// Coerces rawValue to storedType. Returns null on failure (logged at WARN); the caller drops
-  /// the entry. Note: a successful coerce of a "null"-shaped raw value would also return null —
-  /// but callers gate on rawValue != null before reaching here.
+  /// Resolves the stored type for a key without allocating any state, and meters a value that took
+  /// the STRING fallback. `establishedType` is the key's already-resolved stored type, or `null` on
+  /// first sighting.
+  ///
+  /// The fallback rule (unmappable value → STRING) must match the sealed build path
+  /// ([OpenStructColumnSplitter#addMap]) so a value reads the same before and after seal.
+  private DataType resolveStoredType(String key, Object rawValue, @Nullable DataType establishedType) {
+    FieldSpec spec = _childFieldSpecs.get(key);
+    if (spec != null) {
+      return spec.getDataType().getStoredType();
+    }
+    if (establishedType != null && establishedType != DataType.STRING) {
+      return establishedType;
+    }
+    DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
+    if (inferred == null) {
+      if (establishedType == null) {
+        LOGGER.warn("OPEN_STRUCT '{}': could not infer DataType for key '{}' from value of class '{}'."
+                + " Falling back to STRING.",
+            _openStructColumn, key, rawValue.getClass().getName());
+      }
+      _typeInferenceFailureMeter = meterFailure(ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES,
+          _typeInferenceFailureMeter);
+      return DataType.STRING;
+    }
+    return establishedType != null ? establishedType : inferred;
+  }
+
+  /// Counts an inference failure for a value on a STRING-fallback key. This is the metering-only
+  /// half of [#resolveStoredType]: on the established path that method always returns the key's
+  /// own stored type, so the return value is unused and only the side effect matters.
+  private void meterIfUninferable(Object rawValue) {
+    if (OpenStructTypeInference.inferDataType(rawValue) == null) {
+      _typeInferenceFailureMeter = meterFailure(ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES,
+          _typeInferenceFailureMeter);
+    }
+  }
+
+  /// Coerces rawValue to storedType. Returns null on failure; the caller drops the entry. Failures
+  /// are reported through [ServerMeter#OPEN_STRUCT_TYPE_COERCION_FAILURES] rather than a log line,
+  /// because this runs per value on the consuming path. Note: a successful coerce of a
+  /// "null"-shaped raw value would also return null — but callers gate on rawValue != null before
+  /// reaching here.
   @Nullable
-  private Object tryCoerce(String key, Object rawValue, DataType storedType) {
+  private Object tryCoerce(String key, Object rawValue, PinotDataType destType) {
     try {
       PinotDataType sourceType = PinotDataType.getSingleValueType(rawValue);
-      PinotDataType destType = ColumnDataType.fromDataTypeSV(storedType).toPinotDataType();
       return destType.convert(rawValue, sourceType);
     } catch (Exception e) {
-      ServerMetrics serverMetrics = ServerMetrics.get();
-      if (serverMetrics != null) {
-        serverMetrics.addMeteredGlobalValue(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 1);
-      }
+      _typeCoercionFailureMeter = meterFailure(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES,
+          _typeCoercionFailureMeter);
       return null;
     }
   }
 
+  /// Marks one occurrence on `meter`, reusing `reusedMeter` when present to skip the metric-name
+  /// rebuild and registry lookup a fresh [ServerMetrics#addMeteredTableValue] call would do. Returns
+  /// the meter to reuse on the next call (unchanged when no [ServerMetrics] is registered).
+  private PinotMeter meterFailure(ServerMeter meter, @Nullable PinotMeter reusedMeter) {
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    if (serverMetrics == null) {
+      return reusedMeter;
+    }
+    return serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn, meter, 1, reusedMeter);
+  }
+
   /// Allocates a new MutableKeyColumn for `key` with the resolved `storedType` and
   /// publishes it via volatile copy-on-write.
-  private MutableKeyColumn allocateKeyColumn(String key, DataType storedType) {
+  private MutableKeyColumn allocateKeyColumn(String key, DataType storedType, boolean singleValue) {
     String allocationContext = _openStructColumn + "$" + key;
-    // Use the standard dimension default for the resolved stored type, regardless of any child
-    // spec's own default: OpenStructColumnSplitter#writeDenseKeyColumn (the sealed build path)
-    // always derives the absent-doc default from a throwaway DimensionFieldSpec(key, storedType,
-    // true) rather than the real child spec, so mirroring that exactly is what keeps a doc's
-    // resolved value identical before and after seal.
-    Object defaultNullValue = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, storedType, null);
-    MutableKeyColumn newCol =
-        new MutableKeyColumn(key, storedType, defaultNullValue, _memoryManager, _capacity, allocationContext);
+    // A declared key takes its declared default, computed from the declared data type rather than the type it is
+    // stored as -- the same rule OpenStructColumnSplitter#materializedFieldSpec applies on the sealed side, so a doc
+    // without the key resolves identically before and after seal.
+    FieldSpec declared = _childFieldSpecs.get(key);
+    Object defaultNullValue = declared != null
+        ? declared.getDefaultNullValue()
+        : FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, storedType, null);
+    boolean needsInferenceCheck = !_childFieldSpecs.containsKey(key) && storedType == DataType.STRING;
+    MutableKeyColumn newCol = new MutableKeyColumn(key, storedType, defaultNullValue, _memoryManager, _capacity,
+        allocationContext, needsInferenceCheck, singleValue);
     Map<String, MutableKeyColumn> updated = new HashMap<>(_keyColumns);
     updated.put(key, newCol);
     _keyColumns = updated;
@@ -243,9 +373,15 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     }
     FieldSpec spec = _childFieldSpecs.get(key);
     if (spec == null) {
-      spec = new DimensionFieldSpec(key, col.getStoredType(), true);
+      // Shape comes from the column, not a fixed single-value assumption: a key holding lists has a multi-value
+      // forward index, and metadata that disagreed with it would tell the query planner the wrong thing.
+      spec = new DimensionFieldSpec(key, col.getStoredType(), col.isSingleValue());
     }
-    return new SimpleColumnMetadata(spec, _capacity);
+    // A multi-value key must carry a real max length: the scan iterators allocate their matcher buffers from it,
+    // so UNAVAILABLE (-1) throws NegativeArraySizeException before a RANGE predicate is ever evaluated. A
+    // consuming key has no range index, so RANGE always reaches the scan.
+    return spec.isSingleValueField() ? new SimpleColumnMetadata(spec, _capacity)
+        : new SimpleColumnMetadata(spec, _capacity, MutableKeyColumn.MAX_NUM_MULTI_VALUES);
   }
 
   @Override
@@ -266,8 +402,26 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   @Override
   public void close()
       throws IOException {
-    for (MutableKeyColumn keyCol : _keyColumns.values()) {
-      keyCol.close();
+    try {
+      flushMeters();
+    } finally {
+      for (MutableKeyColumn keyCol : _keyColumns.values()) {
+        keyCol.close();
+      }
+    }
+  }
+
+  /// Emits the batched ignored-key-drop counter. It accumulates per row on the consuming path and
+  /// is flushed once here, mirroring what [OpenStructColumnSplitter] does at seal time. Zeroed after
+  /// emitting so a second close() (e.g. destroy() after commit()) does not double-count.
+  private void flushMeters() {
+    if (_ignoredKeyDropCount > 0) {
+      ServerMetrics serverMetrics = ServerMetrics.get();
+      if (serverMetrics != null) {
+        serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
+            ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, _ignoredKeyDropCount);
+      }
+      _ignoredKeyDropCount = 0;
     }
   }
 }

@@ -67,6 +67,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -149,12 +150,30 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       Schema schema = segmentMetadata.getSchema();
       for (String parent : openStructParents) {
         FieldSpec fieldSpec = schema != null ? schema.getFieldSpecFor(parent) : null;
-        if (!(fieldSpec instanceof ComplexFieldSpec)) {
+        if (schema == null) {
+          LOGGER.warn("Segment '{}': skipping OPEN_STRUCT parent column '{}': no schema available. "
+              + "Dense/sparse child data on disk will not be queryable.", segmentMetadata.getName(), parent);
           continue;
+        }
+        if (!(fieldSpec instanceof ComplexFieldSpec)) {
+          LOGGER.warn("Segment '{}': skipping OPEN_STRUCT parent column '{}': fieldSpec is {} "
+                  + "(expected ComplexFieldSpec). Dense/sparse child data on disk will not be queryable.",
+              segmentMetadata.getName(), parent, fieldSpec != null ? fieldSpec.getClass().getSimpleName() : "null");
+          continue;
+        }
+        ColumnMetadata parentMetadata = segmentMetadata.getColumnMetadataMap().get(parent);
+        List<String> sparseKeys = null;
+        Map<String, Integer> sparseMultiValueKeys = null;
+        Map<String, DataType> sparseKeyTypes = null;
+        if (parentMetadata instanceof ColumnMetadataImpl impl) {
+          sparseKeys = impl.getSparseKeys();
+          sparseMultiValueKeys = impl.getSparseMultiValueKeys();
+          sparseKeyTypes = impl.getSparseKeyTypes();
         }
         _dataSources.put(parent, new ImmutableOpenStructDataSource((ComplexFieldSpec) fieldSpec,
             openStructDenseChildren.getOrDefault(parent, Map.of()),
-            openStructSparseChildren.get(parent), segmentMetadata.getTotalDocs()));
+            openStructSparseChildren.get(parent), segmentMetadata.getTotalDocs(), sparseKeys,
+            sparseMultiValueKeys, sparseKeyTypes));
       }
     }
 

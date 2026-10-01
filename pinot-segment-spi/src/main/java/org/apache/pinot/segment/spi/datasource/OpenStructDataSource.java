@@ -18,10 +18,16 @@
  */
 package org.apache.pinot.segment.spi.datasource;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /// DataSource for an OPEN_STRUCT column. Provides per-key DataSources that can be used for
@@ -32,47 +38,53 @@ public interface OpenStructDataSource extends DataSource {
   /// Returns the OPEN_STRUCT ComplexFieldSpec.
   ComplexFieldSpec getFieldSpec();
 
-  /// Returns the DataSource for the given key's values. The DataSource's value type is the
-  /// per-key declared type (from `childFieldSpecs`) when present, otherwise auto-derived.
-  ///
-  /// Returns `null` when the key has no materialized per-key DataSource in this segment. A `null`
-  /// return does not mean the key is absent from the data — when [#isFullyMaterialized()] is
-  /// `false` the key may still live in the sparse blob. Callers that need a readable source for an
-  /// absent key should synthesize a typed all-null source rather than reading the sparse column.
-  @Nullable
+  /// Returns the DataSource for the given key's values, typed per [#getValueFieldSpec(String)]. Never `null`:
+  /// - **Materialized key** → the dense per-key DataSource (has dictionary / inverted index).
+  /// - **Sparse key** → a virtual blob-backed DataSource that parses the sparse JSON column per doc and coerces
+  ///   values to the resolved stored type. Returned when the key is inside the sparse manifest, or when there is no
+  ///   manifest (pre-manifest segments treat every unmaterialized key as potentially sparse).
+  /// - **Definitively absent** → an all-null DataSource built like a default column: every document is null, and
+  ///   reads as the key's default null value with null handling off. Returned when the segment is fully materialized
+  ///   (no sparse column), or when the sparse manifest exists and does not list this key.
   DataSource getDataSource(String key);
 
+  /// Returns the field spec describing the given key's values: the declared child field spec when present, otherwise a
+  /// single-value STRING dimension named after the key.
+  default FieldSpec getValueFieldSpec(String key) {
+    FieldSpec childFieldSpec = getFieldSpec().getChildFieldSpec(key);
+    return childFieldSpec != null ? childFieldSpec : new DimensionFieldSpec(key, DataType.STRING, true);
+  }
+
   /// Returns whether the given key has a materialized per-key index in this segment. Exact,
-  /// O(1) lookup into the materialized key set.
+  /// O(1) lookup into the materialized key set. Virtual sparse-backed sources do not count as
+  /// materialized.
   ///
   /// Query operators use this to choose between the fast path (per-key inverted/dictionary
   /// index) and the fallback (expression scan). Note the fallback does not read the sparse blob:
   /// a non-materialized key resolves to a typed all-null source, so the scan sees NULL at every
   /// document.
   ///
-  /// A `false` return is only a definitive "absent" when [#isFullyMaterialized()] is also
-  /// `true`; otherwise the key may still exist in the sparse blob.
+  /// A `false` return means the key is either in the sparse tier or definitively absent; [#getDataSource(String)]
+  /// returns the matching source either way.
   boolean isMaterialized(String key);
 
   /// Returns whether every key in this segment is materialized — i.e., there is no sparse
   /// blob and the materialized key set is exhaustive.
   ///
-  /// When `true`, a `false` return from [#isMaterialized(String)] is a definitive "absent"
-  /// and callers can treat the key as present-but-all-null — e.g. evaluate predicates against a
-  /// typed all-null DataSource, which yields the correct answer under both null-handling modes
-  /// (an absent key reads as its type default with null handling off, and as NULL with it on).
+  /// When `true`, a `false` return from [#isMaterialized(String)] is a definitive "absent", and
+  /// [#getDataSource(String)] returns an all-null DataSource for the key, which yields the correct answer under both
+  /// null-handling modes (an absent key reads as its type default with null handling off, and as NULL with it on).
   boolean isFullyMaterialized();
 
   /// Returns DataSources for all keys present in this segment.
   Map<String, DataSource> getDataSources();
 
-  /// Returns the DataSourceMetadata for the given key's values, or `null` when the key has no
-  /// materialized per-key DataSource in this segment. See [#getDataSource(String)].
-  @Nullable
+  /// Returns the DataSourceMetadata for the given key, i.e. that of [#getDataSource(String)].
   DataSourceMetadata getDataSourceMetadata(String key);
 
-  /// Returns the ColumnIndexContainer for the given key's values, or `null` when the key has no
-  /// materialized per-key DataSource in this segment. See [#getDataSource(String)].
+  /// Returns the ColumnIndexContainer for the given key, or `null` for a sparse key: virtual sparse-backed sources do
+  /// not expose a ColumnIndexContainer (they use BaseDataSource, not ImmutableDataSource). A key absent from the
+  /// segment resolves to an all-null DataSource and returns its container.
   @Nullable
   ColumnIndexContainer getIndexContainer(String key);
 
@@ -85,11 +97,41 @@ public interface OpenStructDataSource extends DataSource {
         "Per-doc OPEN_STRUCT map reconstruction is not supported by this implementation");
   }
 
+  /// Opens a [MapValueReader] scoped to one sequential scan of this data source, e.g. a full
+  /// segment read by the seal path or a minion task's record reader. Implementations backed by
+  /// per-key forward-index readers (immutable segments) can cache those readers for the life of
+  /// the returned instance instead of reconstructing one per key per doc; the default just
+  /// delegates each call to [#getMapValue(int)], which is already O(1) for in-memory mutable
+  /// segments.
+  ///
+  /// Not thread-safe: the returned reader is for one single-threaded sequential scan, not for
+  /// concurrent callers sharing this data source.
+  default MapValueReader openMapValueReader() {
+    return this::getMapValue;
+  }
+
+  /// A [#getMapValue(int)] reader scoped to one scan; see [#openMapValueReader()].
+  interface MapValueReader extends Closeable {
+    @Nullable
+    Map<String, Object> getMapValue(int docId);
+
+    @Override
+    default void close()
+        throws IOException {
+    }
+  }
+
   /// Whether the per-key dictionary's contents correspond exactly to the values readable from
   /// the key column (absent docs folded as the default included) — i.e. dictionary-based
   /// MIN/MAX/DISTINCTCOUNT over it matches a full scan. Sealed segments build dictionaries
   /// from the folded values, so they are always exact.
   default boolean isKeyDictionaryExact(String key) {
     return true;
+  }
+
+  /// JSON index over the sparse blob column, or null when absent.
+  @Nullable
+  default JsonIndexReader getSparseJsonIndex() {
+    return null;
   }
 }

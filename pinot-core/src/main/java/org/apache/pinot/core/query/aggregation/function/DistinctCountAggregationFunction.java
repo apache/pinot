@@ -34,8 +34,12 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class DistinctCountAggregationFunction extends BaseDistinctAggregateAggregationFunction<Integer> {
 
   public DistinctCountAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    super(verifySingleArgument(arguments, "DISTINCT_COUNT"), AggregationFunctionType.DISTINCTCOUNT,
-        nullHandlingEnabled);
+    this(verifySingleArgument(arguments, "DISTINCT_COUNT"), AggregationFunctionType.DISTINCTCOUNT, nullHandlingEnabled);
+  }
+
+  protected DistinctCountAggregationFunction(ExpressionContext expression,
+      AggregationFunctionType aggregationFunctionType, boolean nullHandlingEnabled) {
+    super(expression, aggregationFunctionType, nullHandlingEnabled);
   }
 
   @Override
@@ -79,7 +83,6 @@ public class DistinctCountAggregationFunction extends BaseDistinctAggregateAggre
     return ColumnDataType.INT;
   }
 
-  @Nullable
   @Override
   public Integer extractFinalResult(@Nullable Set intermediateResult) {
     return intermediateResult == null ? 0 : intermediateResult.size();

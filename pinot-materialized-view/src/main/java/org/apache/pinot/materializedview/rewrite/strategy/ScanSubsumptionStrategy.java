@@ -55,8 +55,11 @@ public class ScanSubsumptionStrategy extends AbstractSubsumptionStrategy {
         && MaterializedViewQueryShape.classify(viewQuery) == MaterializedViewQueryShape.SCAN;
   }
 
+  /// Scan queries have no GROUP BY on either side, so there is no key to remap and the projection
+  /// map is not consulted.
   @Override
-  protected boolean groupByMatches(PinotQuery userQuery, PinotQuery viewQuery) {
+  protected boolean groupByMatches(PinotQuery userQuery, PinotQuery viewQuery,
+      Map<Expression, String> viewProjectionMap) {
     return !userQuery.isSetGroupByList() && !viewQuery.isSetGroupByList();
   }
 

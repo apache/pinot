@@ -30,6 +30,7 @@ import io.swagger.annotations.SwaggerDefinition;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
@@ -80,7 +81,12 @@ public class PinotControllerAuthResource {
       @ApiParam(value = "API access type") @DefaultValue("READ") @QueryParam("accessType") AccessType accessType,
       @ApiParam(value = "Endpoint URL") @QueryParam("endpointUrl") String endpointUrl) {
     AccessControl accessControl = _accessControlFactory.create();
-    return accessControl.hasAccess(tableName, accessType, _httpHeaders, endpointUrl);
+    try {
+      return accessControl.hasAccess(tableName, accessType, _httpHeaders, endpointUrl);
+    } catch (NotAuthorizedException e) {
+      // Preserve the deprecated probe's boolean contract while protected endpoints return 401 for invalid credentials.
+      return false;
+    }
   }
 
   /// Verify a token is both authenticated and authorized to perform an operation.

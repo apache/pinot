@@ -35,7 +35,6 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
-import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -172,12 +171,8 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
     _processingException.compareAndSet(null, t);
     // Clear the blocking queue and add the exception results block to terminate the main thread
     _blockingQueue.clear();
-    QueryErrorMessage errorMsg;
-    if (t instanceof QueryException) {
-      errorMsg = QueryErrorMessage.safeMsg(((QueryException) t).getErrorCode(), t.getMessage());
-    } else {
-      errorMsg = QueryErrorMessage.safeMsg(QueryErrorCode.QUERY_EXECUTION, t.getMessage());
-    }
+    QueryErrorMessage errorMsg =
+        QueryErrorMessage.safeMsg(QueryErrorCode.fromThrowable(t, QueryErrorCode.QUERY_EXECUTION), t.getMessage());
     _blockingQueue.offer(new ExceptionResultsBlock(errorMsg));
   }
 

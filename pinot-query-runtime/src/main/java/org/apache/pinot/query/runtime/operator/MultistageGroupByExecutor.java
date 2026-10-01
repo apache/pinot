@@ -34,6 +34,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
@@ -371,7 +372,7 @@ public class MultistageGroupByExecutor {
     int[] groupByKeys = generateGroupByKeys(block);
     int numRows = groupByKeys.length;
     int numFunctions = _aggFunctions.length;
-    Object[][] intermediateResults = new Object[numFunctions][numRows];
+    Object[][] intermediateResults = new Object[numFunctions][];
     for (int i = 0; i < numFunctions; i++) {
       intermediateResults[i] = AggregateOperator.getIntermediateResults(_aggFunctions[i], block);
     }
@@ -389,18 +390,8 @@ public class MultistageGroupByExecutor {
           mergedResults = (Comparable[]) _mergeResultHolder.get(groupByKey);
         }
         for (int j = 0; j < numFunctions; j++) {
-          AggregationFunction aggFunction = _aggFunctions[j];
           Comparable finalResult = (Comparable) intermediateResults[j][i];
-          // Not all V1 aggregation functions have null-handling logic. Handle null values before calling merge.
-          // TODO: Fix it
-          if (finalResult == null) {
-            continue;
-          }
-          if (mergedResults[j] == null) {
-            mergedResults[j] = finalResult;
-          } else {
-            mergedResults[j] = aggFunction.mergeFinalResult(mergedResults[j], finalResult);
-          }
+          mergedResults[j] = AggregationFunctionUtils.mergeFinalResult(_aggFunctions[j], mergedResults[j], finalResult);
         }
       }
     } else {
@@ -417,18 +408,8 @@ public class MultistageGroupByExecutor {
           mergedResults = _mergeResultHolder.get(groupByKey);
         }
         for (int j = 0; j < numFunctions; j++) {
-          AggregationFunction aggFunction = _aggFunctions[j];
-          Object intermediateResult = intermediateResults[j][i];
-          // Not all V1 aggregation functions have null-handling logic. Handle null values before calling merge.
-          // TODO: Fix it
-          if (intermediateResult == null) {
-            continue;
-          }
-          if (mergedResults[j] == null) {
-            mergedResults[j] = intermediateResult;
-          } else {
-            mergedResults[j] = aggFunction.merge(mergedResults[j], intermediateResult);
-          }
+          mergedResults[j] =
+              AggregationFunctionUtils.merge(_aggFunctions[j], mergedResults[j], intermediateResults[j][i]);
         }
       }
     }
@@ -465,16 +446,26 @@ public class MultistageGroupByExecutor {
   }
 
   private int[] generateGroupByKeys(DataBlock dataBlock) {
-    Object[] keys;
-    if (_groupKeyIds.length == 1) {
-      keys = DataBlockExtractUtils.extractKey(dataBlock, _groupKeyIds[0]);
-    } else {
-      keys = DataBlockExtractUtils.extractKeys(dataBlock, _groupKeyIds);
-    }
-    int numRows = keys.length;
+    int numRows = dataBlock.getNumberOfRows();
     int[] intKeys = new int[numRows];
-    for (int i = 0; i < numRows; i++) {
-      intKeys[i] = _groupIdGenerator.getGroupId(keys[i]);
+    int numKeys = _groupKeyIds.length;
+    if (numKeys == 1) {
+      Object[] keys = DataBlockExtractUtils.extractKey(dataBlock, _groupKeyIds[0]);
+      for (int i = 0; i < numRows; i++) {
+        intKeys[i] = _groupIdGenerator.getGroupId(keys[i]);
+      }
+    } else {
+      Object[][] columns = new Object[numKeys][];
+      for (int i = 0; i < numKeys; i++) {
+        columns[i] = DataBlockExtractUtils.extractKey(dataBlock, _groupKeyIds[i]);
+      }
+      Object[] key = new Object[numKeys];
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        for (int i = 0; i < numKeys; i++) {
+          key[i] = columns[i][rowId];
+        }
+        intKeys[rowId] = _groupIdGenerator.getGroupId(key);
+      }
     }
     return intKeys;
   }
@@ -511,15 +502,25 @@ public class MultistageGroupByExecutor {
   }
 
   private int[] generateGroupByKeys(DataBlock dataBlock, int numMatchedRows, RoaringBitmap matchedBitmap) {
-    Object[] keys;
-    if (_groupKeyIds.length == 1) {
-      keys = DataBlockExtractUtils.extractKey(dataBlock, _groupKeyIds[0], numMatchedRows, matchedBitmap);
-    } else {
-      keys = DataBlockExtractUtils.extractKeys(dataBlock, _groupKeyIds, numMatchedRows, matchedBitmap);
-    }
     int[] intKeys = new int[numMatchedRows];
-    for (int i = 0; i < numMatchedRows; i++) {
-      intKeys[i] = _groupIdGenerator.getGroupId(keys[i]);
+    int numKeys = _groupKeyIds.length;
+    if (numKeys == 1) {
+      Object[] keys = DataBlockExtractUtils.extractKey(dataBlock, _groupKeyIds[0], numMatchedRows, matchedBitmap);
+      for (int i = 0; i < numMatchedRows; i++) {
+        intKeys[i] = _groupIdGenerator.getGroupId(keys[i]);
+      }
+    } else {
+      Object[][] columns = new Object[numKeys][];
+      for (int i = 0; i < numKeys; i++) {
+        columns[i] = DataBlockExtractUtils.extractKey(dataBlock, _groupKeyIds[i], numMatchedRows, matchedBitmap);
+      }
+      Object[] key = new Object[numKeys];
+      for (int rowId = 0; rowId < numMatchedRows; rowId++) {
+        for (int i = 0; i < numKeys; i++) {
+          key[i] = columns[i][rowId];
+        }
+        intKeys[rowId] = _groupIdGenerator.getGroupId(key);
+      }
     }
     return intKeys;
   }

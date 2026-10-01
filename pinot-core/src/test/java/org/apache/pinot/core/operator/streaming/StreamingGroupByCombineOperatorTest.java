@@ -33,6 +33,8 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
+import org.apache.pinot.core.operator.combine.BaseCombineOperator;
+import org.apache.pinot.core.plan.CombinePlanNode;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
@@ -71,6 +73,8 @@ public class StreamingGroupByCombineOperatorTest {
   // Each group key appears twice per segment with intColumn values that sum to a known total
   private static final int NUM_RECORDS_PER_SEGMENT = 100;
   private static final int NUM_DISTINCT_GROUPS = 50;
+
+  private static final String GROUP_BY_SUM = "SELECT groupColumn, SUM(intColumn) FROM testTable GROUP BY groupColumn";
 
   private static final String GROUP_COLUMN = "groupColumn";
   private static final String INT_COLUMN = "intColumn";
@@ -432,6 +436,45 @@ public class StreamingGroupByCombineOperatorTest {
     }
     // Per segment, the total over all rows is sum over g of 2 * (g + 1) = 2550
     assertEquals(groupSums.get(null), NUM_SEGMENTS * 2550.0, 0.001, "Incorrect rollup total");
+  }
+
+  /// A leaf asked to return FINAL results must not stream: a flushed block holds only a partial aggregate, and one
+  /// group key can span several flush windows. `serverReturnFinalResult` comes from an `AggType.DIRECT` leaf
+  /// (`is_partitioned_by_group_by_keys`), which has no aggregation above it to merge the pieces back together.
+  @Test
+  public void testServerReturnFinalResultDoesNotUseStreamingCombine() {
+    assertFallsBackToNonStreamingCombine("SET serverReturnFinalResult=true; " + GROUP_BY_SUM);
+  }
+
+  /// Same for `serverReturnFinalResultKeyUnpartitioned` (`is_leaf_return_final_result`): a FINAL stage does sit
+  /// above, but it merges FINAL results, which double-counts across flushes for functions whose mergeFinalResult
+  /// accumulates (e.g. DISTINCTCOUNT sums its inputs).
+  @Test
+  public void testServerReturnFinalResultKeyUnpartitionedDoesNotUseStreamingCombine() {
+    assertFallsBackToNonStreamingCombine("SET serverReturnFinalResultKeyUnpartitioned=true; " + GROUP_BY_SUM);
+  }
+
+  @Test
+  public void testPlainLeafUsesStreamingCombine() {
+    assertEquals(route(GROUP_BY_SUM, 10).getClass(), StreamingGroupByCombineOperator.class);
+  }
+
+  /// Asserts that a flush threshold picks exactly the operator the same query gets without one.
+  private void assertFallsBackToNonStreamingCombine(String query) {
+    assertEquals(route(query, 10).getClass(), route(query, 0).getClass(),
+        "A leaf asked to return FINAL results must be combined as if no flush threshold were set");
+  }
+
+  /// Runs [CombinePlanNode] with a streamer attached, as an MSE leaf stage does.
+  private BaseCombineOperator<?> route(String query, int flushThreshold) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    queryContext.setStreamingGroupByFlushThreshold(flushThreshold);
+    List<PlanNode> planNodes = new ArrayList<>(NUM_SEGMENTS);
+    for (IndexSegment indexSegment : _indexSegments) {
+      planNodes.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(indexSegment), queryContext));
+    }
+    return new CombinePlanNode(planNodes, queryContext, EXECUTOR, block -> { }).run();
   }
 
   private List<Operator> buildOperators(QueryContext queryContext) {

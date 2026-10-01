@@ -23,20 +23,6 @@ import java.util.List;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggBigDecimalFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggBytesFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctBigDecimalFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctBytesFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctDoubleFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctFloatFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctIntFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctLongFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctStringFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDoubleFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggFloatFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggIntFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggLongFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggStringFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ListAggDistinctFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ListAggFunction;
 import org.apache.pinot.core.query.aggregation.function.array.SumArrayDoubleAggregationFunction;
@@ -48,7 +34,6 @@ import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMatc
 import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMaxStepAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelStepDurationStatsAggregationFunction;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
@@ -77,13 +62,13 @@ public class AggregationFunctionFactory {
           return new PercentileKLLAggregationFunction(arguments, nullHandlingEnabled);
         }
         if (remainingFunctionName.equals("KLLMV")) {
-          return new PercentileKLLMVAggregationFunction(arguments);
+          return new PercentileKLLMVAggregationFunction(arguments, nullHandlingEnabled);
         }
         if (remainingFunctionName.equals("RAWKLL")) {
           return new PercentileRawKLLAggregationFunction(arguments, nullHandlingEnabled);
         }
         if (remainingFunctionName.equals("RAWKLLMV")) {
-          return new PercentileRawKLLMVAggregationFunction(arguments);
+          return new PercentileRawKLLMVAggregationFunction(arguments, nullHandlingEnabled);
         }
         if (numArguments == 1) {
           // Single argument percentile (e.g. Percentile99(foo), PercentileTDigest95(bar), etc.)
@@ -115,23 +100,28 @@ public class AggregationFunctionFactory {
           } else if (remainingFunctionName.matches("\\d+MV")) {
             // PercentileMV
             String percentileString = remainingFunctionName.substring(0, remainingFunctionName.length() - 2);
-            return new PercentileMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+            return new PercentileMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString),
+                nullHandlingEnabled);
           } else if (remainingFunctionName.matches("EST\\d+MV")) {
             // PercentileEstMV
             String percentileString = remainingFunctionName.substring(3, remainingFunctionName.length() - 2);
-            return new PercentileEstMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+            return new PercentileEstMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString),
+                nullHandlingEnabled);
           } else if (remainingFunctionName.matches("RAWEST\\d+MV")) {
             // PercentileRawEstMV
             String percentileString = remainingFunctionName.substring(6, remainingFunctionName.length() - 2);
-            return new PercentileRawEstMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+            return new PercentileRawEstMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString),
+                nullHandlingEnabled);
           } else if (remainingFunctionName.matches("TDIGEST\\d+MV")) {
             // PercentileTDigestMV
             String percentileString = remainingFunctionName.substring(7, remainingFunctionName.length() - 2);
-            return new PercentileTDigestMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+            return new PercentileTDigestMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString),
+                nullHandlingEnabled);
           } else if (remainingFunctionName.matches("RAWTDIGEST\\d+MV")) {
             // PercentileRawTDigestMV
             String percentileString = remainingFunctionName.substring(10, remainingFunctionName.length() - 2);
-            return new PercentileRawTDigestMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+            return new PercentileRawTDigestMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString),
+                nullHandlingEnabled);
           }
         } else if (numArguments == 2) {
           // Double arguments percentile (e.g. percentile(foo, 99), percentileTDigest(bar, 95), etc.) where the
@@ -160,23 +150,23 @@ public class AggregationFunctionFactory {
           }
           if (remainingFunctionName.equals("MV")) {
             // PercentileMV
-            return new PercentileMVAggregationFunction(firstArgument, percentile);
+            return new PercentileMVAggregationFunction(firstArgument, percentile, nullHandlingEnabled);
           }
           if (remainingFunctionName.equals("ESTMV")) {
             // PercentileEstMV
-            return new PercentileEstMVAggregationFunction(firstArgument, percentile);
+            return new PercentileEstMVAggregationFunction(firstArgument, percentile, nullHandlingEnabled);
           }
           if (remainingFunctionName.equals("RAWESTMV")) {
             // PercentileRawEstMV
-            return new PercentileRawEstMVAggregationFunction(firstArgument, percentile);
+            return new PercentileRawEstMVAggregationFunction(firstArgument, percentile, nullHandlingEnabled);
           }
           if (remainingFunctionName.equals("TDIGESTMV")) {
             // PercentileTDigestMV
-            return new PercentileTDigestMVAggregationFunction(firstArgument, percentile);
+            return new PercentileTDigestMVAggregationFunction(firstArgument, percentile, nullHandlingEnabled);
           }
           if (remainingFunctionName.equals("RAWTDIGESTMV")) {
             // PercentileRawTDigestMV
-            return new PercentileRawTDigestMVAggregationFunction(firstArgument, percentile);
+            return new PercentileRawTDigestMVAggregationFunction(firstArgument, percentile, nullHandlingEnabled);
           }
         } else if (numArguments == 3) {
           // Triple arguments percentile (e.g. percentileTDigest(bar, 95, 1000), etc.) where the
@@ -200,16 +190,22 @@ public class AggregationFunctionFactory {
           }
           if (remainingFunctionName.equals("TDIGESTMV")) {
             // PercentileTDigestMV
-            return new PercentileTDigestMVAggregationFunction(firstArgument, percentile, compressionFactor);
+            return new PercentileTDigestMVAggregationFunction(firstArgument, percentile, compressionFactor,
+                nullHandlingEnabled);
           }
           if (remainingFunctionName.equals("RAWTDIGESTMV")) {
             // PercentileRawTDigestMV
-            return new PercentileRawTDigestMVAggregationFunction(firstArgument, percentile, compressionFactor);
+            return new PercentileRawTDigestMVAggregationFunction(firstArgument, percentile, compressionFactor,
+                nullHandlingEnabled);
           }
         }
         throw new IllegalArgumentException("Invalid percentile function: " + function);
       } else {
         AggregationFunctionType functionType = AggregationFunctionType.valueOf(upperCaseFunctionName);
+        AggregationFunctionProvider provider = AggregationFunctionProviderRegistry.getProvider(functionType);
+        if (provider != null) {
+          return provider.create(function, nullHandlingEnabled);
+        }
         switch (functionType) {
           case COUNT:
             return new CountAggregationFunction(arguments, nullHandlingEnabled);
@@ -236,39 +232,6 @@ public class AggregationFunctionFactory {
             return new SumPrecisionAggregationFunction(arguments, nullHandlingEnabled);
           case AVG:
             return new AvgAggregationFunction(arguments, nullHandlingEnabled);
-          case MODE:
-            return new ModeAggregationFunction(arguments, nullHandlingEnabled);
-          case ANYVALUE:
-            return new AnyValueAggregationFunction(arguments, nullHandlingEnabled);
-          case FIRSTWITHTIME: {
-            Preconditions.checkArgument(numArguments == 3,
-                "FIRST_WITH_TIME expects 3 arguments, got: %s. The function can be used as "
-                    + "firstWithTime(dataColumn, timeColumn, 'dataType')", numArguments);
-            ExpressionContext timeCol = arguments.get(1);
-            ExpressionContext dataTypeExp = arguments.get(2);
-            Preconditions.checkArgument(dataTypeExp.getType() == ExpressionContext.Type.LITERAL,
-                "FIRST_WITH_TIME expects the 3rd argument to be literal, got: %s. The function can be used as "
-                    + "firstWithTime(dataColumn, timeColumn, 'dataType')", dataTypeExp.getType());
-            DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
-            switch (dataType) {
-              case BOOLEAN:
-                return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled,
-                    true);
-              case INT:
-                return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled,
-                    false);
-              case LONG:
-                return new FirstLongValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
-              case FLOAT:
-                return new FirstFloatValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
-              case DOUBLE:
-                return new FirstDoubleValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
-              case STRING:
-                return new FirstStringValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
-              default:
-                throw new IllegalArgumentException("Unsupported data type for FIRST_WITH_TIME: " + dataType);
-            }
-          }
           case LISTAGG: {
             Preconditions.checkArgument(numArguments == 2 || numArguments == 3,
                 "LISTAGG expects 2 or 3 arguments, got: %s. The function can be used as "
@@ -292,96 +255,9 @@ public class AggregationFunctionFactory {
             return new ListAggFunction(arguments.get(0), separator, nullHandlingEnabled);
           }
           case SUMARRAYLONG:
-            return new SumArrayLongAggregationFunction(arguments);
+            return new SumArrayLongAggregationFunction(arguments, nullHandlingEnabled);
           case SUMARRAYDOUBLE:
-            return new SumArrayDoubleAggregationFunction(arguments);
-          case ARRAYAGG: {
-            Preconditions.checkArgument(numArguments >= 2,
-                "ARRAY_AGG expects 2 or 3 arguments, got: %s. The function can be used as "
-                    + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", numArguments);
-            ExpressionContext dataTypeExp = arguments.get(1);
-            Preconditions.checkArgument(dataTypeExp.getType() == ExpressionContext.Type.LITERAL,
-                "ARRAY_AGG expects the 2nd argument to be literal, got: %s. The function can be used as "
-                    + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", dataTypeExp.getType());
-            DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
-            boolean isDistinct = false;
-            if (numArguments == 3) {
-              ExpressionContext isDistinctExp = arguments.get(2);
-              Preconditions.checkArgument(isDistinctExp.getType() == ExpressionContext.Type.LITERAL,
-                  "ARRAY_AGG expects the 3rd argument to be literal, got: %s. The function can be used as "
-                      + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", isDistinctExp.getType());
-              isDistinct = isDistinctExp.getLiteral().getBooleanValue();
-            }
-            if (isDistinct) {
-              switch (dataType) {
-                case BOOLEAN:
-                case INT:
-                  return new ArrayAggDistinctIntFunction(firstArgument, dataType, nullHandlingEnabled);
-                case LONG:
-                case TIMESTAMP:
-                  return new ArrayAggDistinctLongFunction(firstArgument, dataType, nullHandlingEnabled);
-                case FLOAT:
-                  return new ArrayAggDistinctFloatFunction(firstArgument, nullHandlingEnabled);
-                case DOUBLE:
-                  return new ArrayAggDistinctDoubleFunction(firstArgument, nullHandlingEnabled);
-                case BIG_DECIMAL:
-                  return new ArrayAggDistinctBigDecimalFunction(firstArgument, nullHandlingEnabled);
-                case STRING:
-                  return new ArrayAggDistinctStringFunction(firstArgument, nullHandlingEnabled);
-                case BYTES:
-                  return new ArrayAggDistinctBytesFunction(firstArgument, nullHandlingEnabled);
-                default:
-                  throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
-              }
-            }
-            switch (dataType) {
-              case BOOLEAN:
-              case INT:
-                return new ArrayAggIntFunction(firstArgument, dataType, nullHandlingEnabled);
-              case LONG:
-              case TIMESTAMP:
-                return new ArrayAggLongFunction(firstArgument, dataType, nullHandlingEnabled);
-              case FLOAT:
-                return new ArrayAggFloatFunction(firstArgument, nullHandlingEnabled);
-              case DOUBLE:
-                return new ArrayAggDoubleFunction(firstArgument, nullHandlingEnabled);
-              case BIG_DECIMAL:
-                return new ArrayAggBigDecimalFunction(firstArgument, nullHandlingEnabled);
-              case STRING:
-                return new ArrayAggStringFunction(firstArgument, nullHandlingEnabled);
-              case BYTES:
-                return new ArrayAggBytesFunction(firstArgument, nullHandlingEnabled);
-              default:
-                throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
-            }
-          }
-          case LASTWITHTIME: {
-            Preconditions.checkArgument(numArguments == 3,
-                "LAST_WITH_TIME expects 3 arguments, got: %s. The function can be used as "
-                    + "lastWithTime(dataColumn, timeColumn, 'dataType')", numArguments);
-            ExpressionContext timeCol = arguments.get(1);
-            ExpressionContext dataTypeExp = arguments.get(2);
-            Preconditions.checkArgument(dataTypeExp.getType() == ExpressionContext.Type.LITERAL,
-                "LAST_WITH_TIME expects the 3rd argument to be literal, got: %s. The function can be used as "
-                    + "lastWithTime(dataColumn, timeColumn, 'dataType')", dataTypeExp.getType());
-            DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
-            switch (dataType) {
-              case BOOLEAN:
-                return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled, true);
-              case INT:
-                return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled, false);
-              case LONG:
-                return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
-              case FLOAT:
-                return new LastFloatValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
-              case DOUBLE:
-                return new LastDoubleValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
-              case STRING:
-                return new LastStringValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
-              default:
-                throw new IllegalArgumentException("Unsupported data type for LAST_WITH_TIME: " + dataType);
-            }
-          }
+            return new SumArrayDoubleAggregationFunction(arguments, nullHandlingEnabled);
           case MINMAXRANGE:
             return new MinMaxRangeAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNT:
@@ -389,31 +265,31 @@ public class AggregationFunctionFactory {
           case DISTINCTCOUNTOFFHEAP:
             return new DistinctCountOffHeapAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTBITMAP:
-            return new DistinctCountBitmapAggregationFunction(arguments);
+            return new DistinctCountBitmapAggregationFunction(arguments, nullHandlingEnabled);
           case SEGMENTPARTITIONEDDISTINCTCOUNT:
-            return new SegmentPartitionedDistinctCountAggregationFunction(arguments);
+            return new SegmentPartitionedDistinctCountAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTHLL:
-            return new DistinctCountHLLAggregationFunction(arguments);
+            return new DistinctCountHLLAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWHLL:
-            return new DistinctCountRawHLLAggregationFunction(arguments);
+            return new DistinctCountRawHLLAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTSMARTHLL:
-            return new DistinctCountSmartHLLAggregationFunction(arguments);
+            return new DistinctCountSmartHLLAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTSMARTHLLPLUS:
-            return new DistinctCountSmartHLLPlusAggregationFunction(arguments);
+            return new DistinctCountSmartHLLPlusAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTSMARTULL:
-            return new DistinctCountSmartULLAggregationFunction(arguments);
+            return new DistinctCountSmartULLAggregationFunction(arguments, nullHandlingEnabled);
           case FASTHLL:
-            return new FastHLLAggregationFunction(arguments);
+            return new FastHLLAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTTHETASKETCH:
-            return new DistinctCountThetaSketchAggregationFunction(arguments);
+            return new DistinctCountThetaSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWTHETASKETCH:
-            return new DistinctCountRawThetaSketchAggregationFunction(arguments);
+            return new DistinctCountRawThetaSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTSUM:
             return new DistinctSumAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTAVG:
             return new DistinctAvgAggregationFunction(arguments, nullHandlingEnabled);
           case IDSET:
-            return new IdSetAggregationFunction(arguments);
+            return new IdSetAggregationFunction(arguments, nullHandlingEnabled);
           case COUNTMV:
             return new CountMVAggregationFunction(arguments, nullHandlingEnabled);
           case MINMV:
@@ -427,33 +303,33 @@ public class AggregationFunctionFactory {
           case MINMAXRANGEMV:
             return new MinMaxRangeMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTMV:
-            return new DistinctCountMVAggregationFunction(arguments);
+            return new DistinctCountMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTBITMAPMV:
-            return new DistinctCountBitmapMVAggregationFunction(arguments);
+            return new DistinctCountBitmapMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTHLLMV:
-            return new DistinctCountHLLMVAggregationFunction(arguments);
+            return new DistinctCountHLLMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWHLLMV:
-            return new DistinctCountRawHLLMVAggregationFunction(arguments);
+            return new DistinctCountRawHLLMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTHLLPLUS:
-            return new DistinctCountHLLPlusAggregationFunction(arguments);
+            return new DistinctCountHLLPlusAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWHLLPLUS:
-            return new DistinctCountRawHLLPlusAggregationFunction(arguments);
+            return new DistinctCountRawHLLPlusAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTHLLPLUSMV:
-            return new DistinctCountHLLPlusMVAggregationFunction(arguments);
+            return new DistinctCountHLLPlusMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWHLLPLUSMV:
-            return new DistinctCountRawHLLPlusMVAggregationFunction(arguments);
+            return new DistinctCountRawHLLPlusMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTSUMMV:
-            return new DistinctSumMVAggregationFunction(arguments);
+            return new DistinctSumMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTAVGMV:
-            return new DistinctAvgMVAggregationFunction(arguments);
+            return new DistinctAvgMVAggregationFunction(arguments, nullHandlingEnabled);
           case STUNION:
-            return new StUnionAggregationFunction(arguments);
+            return new StUnionAggregationFunction(arguments, nullHandlingEnabled);
           case HISTOGRAM:
-            return new HistogramAggregationFunction(arguments);
+            return new HistogramAggregationFunction(arguments, nullHandlingEnabled);
           case COVARPOP:
-            return new CovarianceAggregationFunction(arguments, false);
+            return new CovarianceAggregationFunction(arguments, false, nullHandlingEnabled);
           case COVARSAMP:
-            return new CovarianceAggregationFunction(arguments, true);
+            return new CovarianceAggregationFunction(arguments, true, nullHandlingEnabled);
           case BOOLAND:
             return new BooleanAndAggregationFunction(arguments, nullHandlingEnabled);
           case BOOLOR:
@@ -467,58 +343,56 @@ public class AggregationFunctionFactory {
           case STDDEVSAMP:
             return new VarianceAggregationFunction(arguments, true, true, nullHandlingEnabled);
           case SKEWNESS:
-            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.SKEWNESS);
+            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.SKEWNESS,
+                nullHandlingEnabled);
           case KURTOSIS:
-            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.KURTOSIS);
+            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.KURTOSIS,
+                nullHandlingEnabled);
           case FOURTHMOMENT:
-            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.MOMENT);
+            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.MOMENT,
+                nullHandlingEnabled);
           case DISTINCTCOUNTTUPLESKETCH:
             // mode actually doesn't matter here because we only care about keys, not values
-            return new DistinctCountIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+            return new DistinctCountIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum,
+                nullHandlingEnabled);
           case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
-            return new IntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+            return new IntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum, nullHandlingEnabled);
           case SUMVALUESINTEGERSUMTUPLESKETCH:
-            return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+            return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum,
+                nullHandlingEnabled);
           case AVGVALUEINTEGERSUMTUPLESKETCH:
-            return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
-          case PINOTPARENTAGGEXPRMAX:
-            return new ParentExprMinMaxAggregationFunction(arguments, true);
-          case PINOTPARENTAGGEXPRMIN:
-            return new ParentExprMinMaxAggregationFunction(arguments, false);
-          case PINOTCHILDAGGEXPRMAX:
-            return new ChildExprMinMaxAggregationFunction(arguments, true);
-          case PINOTCHILDAGGEXPRMIN:
-            return new ChildExprMinMaxAggregationFunction(arguments, false);
+            return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum,
+                nullHandlingEnabled);
           case EXPRMAX:
           case EXPRMIN:
             throw new IllegalArgumentException(
                 "Aggregation function: " + functionType + " is only supported in selection without alias.");
           case FUNNELCOUNT:
-            return new FunnelCountAggregationFunctionFactory(arguments).get();
+            return new FunnelCountAggregationFunctionFactory(arguments, nullHandlingEnabled).get();
           case FUNNELMAXSTEP:
-            return new FunnelMaxStepAggregationFunction(arguments);
+            return new FunnelMaxStepAggregationFunction(arguments, nullHandlingEnabled);
           case FUNNELMATCHSTEP:
-            return new FunnelMatchStepAggregationFunction(arguments);
+            return new FunnelMatchStepAggregationFunction(arguments, nullHandlingEnabled);
           case FUNNELCOMPLETECOUNT:
-            return new FunnelCompleteCountAggregationFunction(arguments);
+            return new FunnelCompleteCountAggregationFunction(arguments, nullHandlingEnabled);
           case FUNNELSTEPDURATIONSTATS:
-            return new FunnelStepDurationStatsAggregationFunction(arguments);
+            return new FunnelStepDurationStatsAggregationFunction(arguments, nullHandlingEnabled);
           case FUNNELEVENTSFUNCTIONEVAL:
-            return new FunnelEventsFunctionEvalAggregationFunction(arguments);
+            return new FunnelEventsFunctionEvalAggregationFunction(arguments, nullHandlingEnabled);
           case FREQUENTSTRINGSSKETCH:
-            return new FrequentStringsSketchAggregationFunction(arguments);
+            return new FrequentStringsSketchAggregationFunction(arguments, nullHandlingEnabled);
           case FREQUENTLONGSSKETCH:
-            return new FrequentLongsSketchAggregationFunction(arguments);
+            return new FrequentLongsSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTCPCSKETCH:
-            return new DistinctCountCPCSketchAggregationFunction(arguments);
+            return new DistinctCountCPCSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWCPCSKETCH:
-            return new DistinctCountRawCPCSketchAggregationFunction(arguments);
+            return new DistinctCountRawCPCSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTULL:
-            return new DistinctCountULLAggregationFunction(arguments);
+            return new DistinctCountULLAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWULL:
-            return new DistinctCountRawULLAggregationFunction(arguments);
+            return new DistinctCountRawULLAggregationFunction(arguments, nullHandlingEnabled);
           case TIMESERIESAGGREGATE:
-            return new TimeSeriesAggregationFunction(arguments);
+            return new TimeSeriesAggregationFunction(arguments, nullHandlingEnabled);
           default:
             throw new IllegalArgumentException("Unsupported aggregation function type: " + functionType);
         }

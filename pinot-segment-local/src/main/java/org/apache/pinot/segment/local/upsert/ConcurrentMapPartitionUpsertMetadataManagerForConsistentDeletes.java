@@ -388,14 +388,18 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                         prevLocation.getComparisonValue(),
                         RecordLocation.decrementSegmentCount(prevLocation.getDistinctSegmentCount()));
                   } catch (Exception e) {
-                    _logger.error("Failed to revert to previous segment: {} while reconciling metadata for "
-                        + "segment: {}, removing key", prevSegment.getSegmentName(), segment.getSegmentName(), e);
+                    _logger.error("UPSERT_METADATA_REVERT_FAILED: segment={}. Failed to revert to previous segment: "
+                        + "{}, removing key", segment.getSegmentName(), prevSegment.getSegmentName(), e);
+                    _serverMetrics.addMeteredTableValue(_tableNameWithType,
+                        ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
                     return null;
                   }
                 } else {
                   // Should not happen
-                  _logger.error("Failed to find valid doc ids in previous segment: {} while reconciling metadata "
-                      + "for segment: {}, removing key", prevSegment.getSegmentName(), segment.getSegmentName());
+                  _logger.error("UPSERT_METADATA_REVERT_FAILED: segment={}. Failed to find valid doc ids in previous "
+                      + "segment: {}, removing key", segment.getSegmentName(), prevSegment.getSegmentName());
+                  _serverMetrics.addMeteredTableValue(_tableNameWithType,
+                      ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
                   return null;
                 }
               } finally {
@@ -405,12 +409,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               // The consuming segment's key is in a different immutable segment
               _previousKeyToRecordLocationMap.remove(pk);
             } else {
-              _logger.warn(
-                  "Consuming segment: {} has added the primary key for docId: {} from the segment: {}, suggesting"
-                      + " that consumption is occurring concurrently with segment replacement, which is undesirable "
-                      + "for consistency between replicas for the table: {}.",
-                  recordLocation.getSegment().getSegmentName(), primaryKeyEntry.getKey(), segment.getSegmentName(),
+              _logger.warn("UPSERT_METADATA_REVERT_FAILED: segment={}. Consuming segment: {} has added the primary "
+                      + "key for docId: {}, suggesting that consumption is occurring concurrently with segment "
+                      + "replacement, which is undesirable for consistency between replicas for the table: {}.",
+                  segment.getSegmentName(), recordLocation.getSegment().getSegmentName(), primaryKeyEntry.getKey(),
                   _tableNameWithType);
+              _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
             }
             if (!uniquePrimaryKeys.add(pk)) {
               return recordLocation;
@@ -501,12 +505,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     int newDocId = recordInfo.getDocId();
     Comparable newComparisonValue = recordInfo.getComparisonValue();
 
-    // When TTL is enabled, update largestSeenComparisonValue when adding new record
-    if (_deletedKeysTTL > 0) {
-      double comparisonValue = ((Number) newComparisonValue).doubleValue();
-      _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, comparisonValue));
-    }
-
     _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
         (primaryKey, currentRecordLocation) -> {
           if (currentRecordLocation != null) {
@@ -551,6 +549,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
             return new RecordLocation(segment, newDocId, newComparisonValue, 1);
           }
         });
+    // Bump after the record is installed; see ConcurrentMapPartitionUpsertMetadataManager#doAddRecord.
+    if (_deletedKeysTTL > 0) {
+      updateLargestSeenComparisonValue(((Number) newComparisonValue).doubleValue());
+    }
 
     updatePrimaryKeyGauge();
     return !isOutOfOrderRecord.get();

@@ -36,6 +36,10 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 ///
 /// Should call [#nextBlock()] multiple times until it returns `null` (already exhausts all the
 /// matched documents) or already gathered enough documents (for selection queries).
+///
+/// The returned [org.apache.pinot.core.operator.blocks.DocIdSetBlock] wraps a thread-local scratch buffer shared by
+/// all `DocIdSetOperator` instances on the same thread: its contents are invalidated by the next [#nextBlock()] call
+/// on any instance on this thread. Consumers that hold on to a block across pulls must copy the array.
 public class DocIdSetOperator extends BaseDocIdSetOperator {
   private static final String EXPLAIN_NAME = "DOC_ID_SET";
 

@@ -29,11 +29,13 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.function.UnaryOperator;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.PinotStaticHttpHandler;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
+import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 
 
@@ -43,19 +45,27 @@ public class SwaggerSetupUtils {
 
   public static void setupSwagger(String componentType, String resourcePackage, boolean useHttps, String basePath,
       HttpServer httpServer) {
+    setupSwagger(componentType, resourcePackage, useHttps, basePath, httpServer, UnaryOperator.identity());
+  }
+
+  /// Sets up the Swagger resources, applying the given wrapper to each directly registered Grizzly handler.
+  ///
+  /// @param httpHandlerWrapper wrapper for component-specific request handling such as access control
+  public static void setupSwagger(String componentType, String resourcePackage, boolean useHttps, String basePath,
+      HttpServer httpServer, UnaryOperator<HttpHandler> httpHandlerWrapper) {
     BeanConfig beanConfig = buildSwaggerConfig(componentType, resourcePackage, useHttps, basePath);
     beanConfig.setScan(true);
 
     ClassLoader classLoader = SwaggerSetupUtils.class.getClassLoader();
     CLStaticHttpHandler staticHttpHandler = new CLStaticHttpHandler(classLoader, "/api/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
-    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/api/", "/help/");
+    httpServer.getServerConfiguration().addHttpHandler(httpHandlerWrapper.apply(staticHttpHandler), "/api/", "/help/");
 
     String swaggerVersion = findSwaggerVersion(classLoader);
     URL swaggerDistLocation = classLoader.getResource(
             CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH + swaggerVersion + "/");
     CLStaticHttpHandler swaggerDist = new PinotStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
-    httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
+    httpServer.getServerConfiguration().addHttpHandler(httpHandlerWrapper.apply(swaggerDist), "/swaggerui-dist/");
   }
 
   @VisibleForTesting

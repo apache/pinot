@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
@@ -113,7 +114,7 @@ public abstract class ChildAggregationFunction implements AggregationFunction<Lo
   }
 
   @Override
-  public final Long extractFinalResult(Long longValue) {
+  public final Long extractFinalResult(@Nullable Long longValue) {
     return 0L;
   }
 

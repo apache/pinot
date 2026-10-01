@@ -199,6 +199,27 @@ public class V1Constants {
       // Whether this OPEN_STRUCT column has a sparse column for keys not materialized as dense.
       public static final String HAS_SPARSE_COLUMN = "hasSparseColumn";
 
+      // Names of the keys in this OPEN_STRUCT column's sparse column, stored as a JSON array
+      // string. Commas and quotes inside a key round-trip. A backslash does not, once there are
+      // two or more keys: the commas make the list delimiter handler treat the value as a list and
+      // strip the escape, leaving invalid JSON on reload. Absent on segments built before the
+      // sparse read path — readers must treat every unmaterialized key as potentially sparse.
+      public static final String SPARSE_KEYS = "sparseKeys";
+
+      // Shape of the multi-value keys in this OPEN_STRUCT column's sparse column, stored as a JSON
+      // object string mapping key name to the longest value it holds. Dense keys carry their own
+      // shape in their column metadata; a sparse key's lives here, because the blob it is stored in
+      // is JSON and holds both shapes. Absent when no sparse key is multi-value, and on segments
+      // built before multi-value keys — readers must treat an unlisted sparse key as single-value.
+      public static final String SPARSE_MULTI_VALUE_KEYS = "sparseMultiValueKeys";
+
+      // Value type of each key in this OPEN_STRUCT column's sparse column, stored as a JSON object
+      // string mapping key name to DataType name. A dense key carries its type in its own column
+      // metadata; a sparse key's lives here, because the blob it is stored in is JSON and carries no
+      // type of its own. Absent on segments built before this was recorded -- readers must fall back
+      // to STRING for an unlisted sparse key, which is what every sparse key used to read as.
+      public static final String SPARSE_KEY_TYPES = "sparseKeyTypes";
+
       /// Partition function, all optional
       public static final String PARTITION_FUNCTION = "partitionFunction";
       public static final String NUM_PARTITIONS = "numPartitions";

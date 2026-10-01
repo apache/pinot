@@ -167,6 +167,11 @@ public class TableNameExtractor {
     if (select.getHaving() != null) {
       extractTableNames(select.getHaving());
     }
+    // QUALIFY is rejected by the single-stage engine but legal for the multi-stage one, which is what this extractor
+    // runs on, so a subquery hiding in it still has to be walked.
+    if (select.getQualify() != null) {
+      extractTableNames(select.getQualify());
+    }
     if (select.getOrderList() != null) {
       visitNodeList(select.getOrderList());
     }

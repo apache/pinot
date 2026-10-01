@@ -37,22 +37,23 @@ import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.local.segment.index.openstruct.OpenStructNullDataSource;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /// Filter operator for Map/OPEN_STRUCT matching. Dispatches in priority order:
 /// 1. Per-key materialized index (OPEN_STRUCT columns with per-key inverted/range/bloom indexes)
-/// 2. JSON index (JsonMatchFilterOperator)
-/// 3. Expression scan fallback (ExpressionFilterOperator)
+/// 2. Sparse virtual scan (unmaterialized keys with a sparse blob tier); a key absent from the segment resolves to an
+///    all-null source and takes the per-key path
+/// 3. JSON index (JsonMatchFilterOperator)
+/// 4. Expression scan fallback (ExpressionFilterOperator)
 public class MapFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_MAP";
 
@@ -61,7 +62,7 @@ public class MapFilterOperator extends BaseFilterOperator {
   }
 
   private final BaseFilterOperator _delegate;
-  private final DelegateType _delegateType;
+  private DelegateType _delegateType = DelegateType.PER_KEY_INDEX;
   private final String _columnName;
   private final String _keyName;
   private final Predicate _predicate;
@@ -85,7 +86,6 @@ public class MapFilterOperator extends BaseFilterOperator {
     BaseFilterOperator perKey = tryPerKeyIndex(columnDs, queryContext, numDocs);
     if (perKey != null) {
       _delegate = perKey;
-      _delegateType = DelegateType.PER_KEY_INDEX;
       return;
     }
 
@@ -106,85 +106,24 @@ public class MapFilterOperator extends BaseFilterOperator {
       return null;
     }
     OpenStructDataSource osDs = (OpenStructDataSource) columnDs;
-
-    if (osDs.isMaterialized(_keyName)) {
-      DataSource keyDs = osDs.getDataSource(_keyName);
-      return buildPerKeyFilterOperator(keyDs, queryContext, numDocs);
+    DataSource keyDs = osDs.getDataSource(_keyName);
+    // Among unmaterialized keys only a sparse virtual source lacks a dictionary; an absent key folds through its
+    // single-entry dictionary, which is cheaper on the per-key path than consulting the blob's JSON index
+    if (!osDs.isMaterialized(_keyName) && keyDs.getDictionary() == null) {
+      BaseFilterOperator jsonFastPath = trySparseJsonIndex(osDs, keyDs, queryContext, numDocs);
+      if (jsonFastPath != null) {
+        return jsonFastPath;
+      }
     }
-
-    // Key not materialized but the segment is fully materialized — definitive absence.
-    if (osDs.isFullyMaterialized()) {
-      return buildAbsentKeyFilterOperator(osDs, queryContext, numDocs);
-    }
-
-    // Sparse — the key may be in the sparse blob, which neither the JSON nor the expression path can
-    // read yet, so it evaluates as NULL. See ImmutableOpenStructDataSource#getDataSource.
-    return null;
+    return buildPerKeyFilterOperator(keyDs, queryContext, numDocs);
   }
 
-  /// Builds the filter for a key that is definitively absent from a fully materialized segment.
-  /// Every document answers the predicate identically, so it is folded to a match-all / match-none
-  /// once instead of scanning an all-null column.
-  ///
-  /// With null handling on, three-valued logic makes every value predicate UNKNOWN and nothing
-  /// matches. With it off the key reads as its type's default null value, so the predicate is
-  /// evaluated against that single value — notably NOT_EQ / NOT_IN then match every document.
-  ///
-  /// The value comes from {@link OpenStructNullDataSource#forAbsentKey}, the same source the
-  /// projection path feeds to `item()`, so filter and projection cannot disagree. For a key with no
-  /// declared child spec that factory falls back to STRING, which means a numeric range over an
-  /// undeclared key compares lexicographically — the same answer `item()` yields for it.
-  @Nullable
-  private BaseFilterOperator buildAbsentKeyFilterOperator(OpenStructDataSource osDs, QueryContext queryContext,
-      int numDocs) {
-    Predicate.Type type = _predicate.getType();
-    if (type == Predicate.Type.IS_NULL) {
-      return new MatchAllFilterOperator(numDocs);
-    }
-    if (type == Predicate.Type.IS_NOT_NULL) {
-      return EmptyFilterOperator.getInstance();
-    }
-    Predicate rewritten = rewritePredicateForKey(_predicate);
-    if (rewritten == null) {
-      return null;
-    }
-    if (queryContext.isNullHandlingEnabled()) {
-      return EmptyFilterOperator.getInstance();
-    }
-    DataSource keyDs = OpenStructNullDataSource.forAbsentKey(osDs, _keyName);
-    PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateEvaluator(rewritten, keyDs, queryContext);
-    Boolean matches = matchesDefaultNullValue(evaluator, keyDs.getForwardIndex());
-    if (matches == null) {
-      return null;
-    }
-    return matches ? new MatchAllFilterOperator(numDocs) : EmptyFilterOperator.getInstance();
-  }
-
-  /// Applies the evaluator to the default null value every document of an absent key reads as.
-  /// Returns `null` for a stored type the all-null forward index cannot serve, so the caller falls
-  /// through to the expression path rather than failing the query.
-  @Nullable
-  private static Boolean matchesDefaultNullValue(PredicateEvaluator evaluator, ForwardIndexReader<?> forwardIndex) {
-    switch (forwardIndex.getStoredType()) {
-      case INT:
-        return evaluator.applySV(forwardIndex.getInt(0, null));
-      case LONG:
-        return evaluator.applySV(forwardIndex.getLong(0, null));
-      case FLOAT:
-        return evaluator.applySV(forwardIndex.getFloat(0, null));
-      case DOUBLE:
-        return evaluator.applySV(forwardIndex.getDouble(0, null));
-      case BIG_DECIMAL:
-        return evaluator.applySV(forwardIndex.getBigDecimal(0, null));
-      case STRING:
-        return evaluator.applySV(forwardIndex.getString(0, null));
-      case BYTES:
-        return evaluator.applySV(forwardIndex.getBytes(0, null));
-      default:
-        return null;
-    }
-  }
-
+  /// Builds the filter over the key's data source. A key absent from the segment resolves to an all-null source whose
+  /// single-entry dictionary folds every value predicate to always-true or always-false, so no document is scanned:
+  /// with null handling on every document is null, so IS_NULL matches everything and nothing matches a value
+  /// predicate; with it off the key reads as its default null value, so notably NOT_EQ / NOT_IN match every document.
+  /// An undeclared key is typed STRING, so a numeric range over it compares lexicographically, the same answer `item()`
+  /// yields for it.
   @Nullable
   private BaseFilterOperator buildPerKeyFilterOperator(DataSource keyDs, QueryContext queryContext, int numDocs) {
     switch (_predicate.getType()) {
@@ -216,6 +155,61 @@ public class MapFilterOperator extends BaseFilterOperator {
       default:
         return null;
     }
+  }
+
+  @Nullable
+  private BaseFilterOperator trySparseJsonIndex(OpenStructDataSource osDs, DataSource sparseKeyDs,
+      QueryContext queryContext, int numDocs) {
+    JsonIndexReader jsonIndex = osDs.getSparseJsonIndex();
+    if (jsonIndex == null) {
+      return null;
+    }
+    if (sparseKeyDs.getDataSourceMetadata().getDataType().getStoredType() != FieldSpec.DataType.STRING) {
+      return null;
+    }
+    if (!sparseKeyDs.getDataSourceMetadata().isSingleValue()) {
+      // The blob holds a multi-value key as a JSON array, and the index flattens an array element-wise, while
+      // the predicate here names the key itself -- so the postings answer a different question than the scan
+      // over the key's values does. A multi-value key never takes the fast path.
+      return null;
+    }
+    List<String> values;
+    boolean negated;
+    switch (_predicate.getType()) {
+      case EQ:
+        values = List.of(((EqPredicate) _predicate).getValue());
+        negated = false;
+        break;
+      case IN:
+        values = ((InPredicate) _predicate).getValues();
+        negated = false;
+        break;
+      case NOT_EQ:
+        values = List.of(((NotEqPredicate) _predicate).getValue());
+        negated = true;
+        break;
+      case NOT_IN:
+        values = ((NotInPredicate) _predicate).getValues();
+        negated = true;
+        break;
+      default:
+        return null;
+    }
+    // Docs without the key read as the key's default null value, which the JSON index cannot see
+    if (values.contains((String) sparseKeyDs.getDataSourceMetadata().getFieldSpec().getDefaultNullValue())) {
+      return null;
+    }
+    if (negated && queryContext.isNullHandlingEnabled()) {
+      return null;
+    }
+    ExpressionContext keyLhs = ExpressionContext.forIdentifier(_keyName);
+    Predicate positive = values.size() == 1
+        ? new EqPredicate(keyLhs, values.get(0))
+        : new InPredicate(keyLhs, values);
+    JsonMatchFilterOperator jsonOp =
+        new JsonMatchFilterOperator(jsonIndex, FilterContext.forPredicate(positive), numDocs);
+    _delegateType = DelegateType.JSON_MATCH;
+    return negated ? new NotFilterOperator(jsonOp, numDocs, false) : jsonOp;
   }
 
   @Nullable
@@ -291,6 +285,11 @@ public class MapFilterOperator extends BaseFilterOperator {
   }
 
   @Override
+  protected BlockDocIdSet getNotFalses() {
+    return _delegate.getNotFalses();
+  }
+
+  @Override
   public boolean canOptimizeCount() {
     return _delegate.canOptimizeCount();
   }
@@ -308,6 +307,11 @@ public class MapFilterOperator extends BaseFilterOperator {
   @Override
   public BitmapCollection getBitmaps() {
     return _delegate.getBitmaps();
+  }
+
+  @Override
+  public boolean mayHaveNulls() {
+    return _delegate.mayHaveNulls();
   }
 
   @Override

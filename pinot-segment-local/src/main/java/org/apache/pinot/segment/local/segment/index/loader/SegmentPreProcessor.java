@@ -22,7 +22,11 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.ServiceLoader;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
@@ -39,11 +43,14 @@ import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
@@ -53,7 +60,9 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,6 +76,41 @@ import org.slf4j.LoggerFactory;
 /// - Use [ColumnMinMaxValueGenerator] to add min/max value to column metadata
 public class SegmentPreProcessor implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreProcessor.class);
+
+  // The highest-priority ServiceLoader-registered provider, or null to use this class directly. Resolved once, at
+  // first use (segment loading), by which point PluginManager has loaded the plugin classloaders.
+  @Nullable
+  private static final SegmentPreProcessorProvider PROVIDER = loadProvider();
+
+  @Nullable
+  private static SegmentPreProcessorProvider loadProvider() {
+    // Enumerate this class's own classloader plus every plugin classloader: new-style plugins live in isolated
+    // realms whose services a plain ServiceLoader.load() cannot see (see PluginManager#getPluginClassLoaders).
+    Set<ClassLoader> classLoaders = new LinkedHashSet<>();
+    classLoaders.add(SegmentPreProcessorProvider.class.getClassLoader());
+    classLoaders.addAll(PluginManager.get().getPluginClassLoaders());
+    SegmentPreProcessorProvider best = null;
+    for (ClassLoader classLoader : classLoaders) {
+      for (SegmentPreProcessorProvider provider : ServiceLoader.load(SegmentPreProcessorProvider.class,
+          classLoader)) {
+        if (best == null || provider.getPriority() > best.getPriority()) {
+          best = provider;
+        }
+      }
+    }
+    if (best != null) {
+      LOGGER.info("Using segment pre-processor provider: {}", best.getClass().getName());
+    }
+    return best;
+  }
+
+  /// Creates the segment pre-processor: the highest-priority [SegmentPreProcessorProvider]'s instance, or a plain
+  /// [SegmentPreProcessor] when no provider is registered.
+  public static SegmentPreProcessor create(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
+    return PROVIDER != null
+        ? PROVIDER.create(segmentDirectory, indexLoadingConfig)
+        : new SegmentPreProcessor(segmentDirectory, indexLoadingConfig);
+  }
 
   private final SegmentDirectory _segmentDirectory;
   private final IndexLoadingConfig _indexLoadingConfig;
@@ -140,7 +184,8 @@ public class SegmentPreProcessor implements AutoCloseable {
       // build dict-id-based indexes on top of the new shared dictionary. If this order is violated, downstream
       // handlers fail with an IllegalStateException because the dictionary they require does not yet exist.
       // Any future change to handler scheduling MUST preserve: ForwardIndexHandler → reloadMetadata → other handlers.
-      IndexHandler forwardHandler = createHandler(StandardIndexes.forward());
+      Map<String, FieldIndexConfigs> configsByCol = _indexLoadingConfig.getFieldIndexConfigByColName();
+      IndexHandler forwardHandler = createHandler(StandardIndexes.forward(), configsByCol);
       indexHandlers.add(forwardHandler);
       forwardHandler.updateIndices(segmentWriter);
       _segmentDirectory.reloadMetadata();
@@ -148,7 +193,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       // Now that ForwardIndexHandler.updateIndices has been updated, we can run all other indexes in any order
       for (IndexType<?, ?, ?> type : IndexService.getInstance().getAllIndexes()) {
         if (type != StandardIndexes.forward()) {
-          IndexHandler handler = createHandler(type);
+          IndexHandler handler = createHandler(type, configsByCol);
           indexHandlers.add(handler);
           handler.updateIndices(segmentWriter);
         }
@@ -191,9 +236,39 @@ public class SegmentPreProcessor implements AutoCloseable {
     }
   }
 
-  private IndexHandler createHandler(IndexType<?, ?, ?> type) {
-    return type.createIndexHandler(_segmentDirectory, _indexLoadingConfig.getFieldIndexConfigByColName(), _schema,
+  private IndexHandler createHandler(IndexType<?, ?, ?> type, Map<String, FieldIndexConfigs> configsByCol) {
+    return type.createIndexHandler(_segmentDirectory, configsByCol, schemaWithMaterializedChildColumns(configsByCol),
         _tableConfig);
+  }
+
+  /// The table schema plus one entry per OPEN_STRUCT materialized child that has index configs.
+  ///
+  /// A materialized child (`col$key`) is a real column of the segment but not of the table schema, and
+  /// [ForwardIndexHandler] skips a column it cannot find in the schema. That is why a key never got the
+  /// raw-to-dictionary conversion an inverted or range index depends on: its configs were in the config map
+  /// (see [IndexLoadingConfig#withOpenStructChildConfigs]) but the column was invisible to the one handler that
+  /// had to act first. The child's spec comes from segment metadata; the table's own schema is left untouched.
+  private Schema schemaWithMaterializedChildColumns(Map<String, FieldIndexConfigs> configsByCol) {
+    Map<String, ColumnMetadata> columnMetadataMap = _segmentDirectory.getSegmentMetadata().getColumnMetadataMap();
+    Schema augmented = null;
+    for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
+      String column = entry.getKey();
+      if (_schema.hasColumn(column) || !configsByCol.containsKey(column)) {
+        continue;
+      }
+      if (!(entry.getValue() instanceof ColumnMetadataImpl columnMetadata) || !columnMetadata.isMaterializedChild()) {
+        continue;
+      }
+      if (augmented == null) {
+        augmented = new Schema();
+        augmented.setSchemaName(_schema.getSchemaName());
+        for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+          augmented.addField(fieldSpec);
+        }
+      }
+      augmented.addField(columnMetadata.getFieldSpec());
+    }
+    return augmented == null ? _schema : augmented;
   }
 
   /// This method checks if there is any discrepancy between the segment and current table config and schema.
@@ -214,9 +289,14 @@ public class SegmentPreProcessor implements AutoCloseable {
         LOGGER.info("Found default columns need updates in segment: {}", segmentName);
         return true;
       }
-      // Check if there is need to update single-column indices, like inverted index, json index etc.
+      // Check if there is need to update single-column indices, like inverted index, json index etc. The
+      // OPEN_STRUCT child configs are resolved here for the same reason process() resolves them: without them a
+      // key's index settings are invisible, and a reload that would apply them is never triggered in the first
+      // place. A derived copy is used so a config shared across segments does not pick up this segment's children.
+      Map<String, FieldIndexConfigs> configsByCol =
+          _indexLoadingConfig.withOpenStructChildConfigs(segmentMetadata).getFieldIndexConfigByColName();
       for (IndexType<?, ?, ?> type : IndexService.getInstance().getAllIndexes()) {
-        if (createHandler(type).needUpdateIndices(segmentReader)) {
+        if (createHandler(type, configsByCol).needUpdateIndices(segmentReader)) {
           LOGGER.info("Found index type: {} needs updates in segment: {}", type, segmentName);
           return true;
         }
@@ -256,16 +336,18 @@ public class SegmentPreProcessor implements AutoCloseable {
   }
 
   private boolean needProcessStarTrees() {
+    SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
+    List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
     // Check if there is need to create/modify/remove star-trees.
     if (!_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
-      return false;
+      // Star-trees left unreadable by a column encoding change are still removed, see processStarTrees().
+      return starTreeMetadataList != null && !StarTreeBuilderUtils.findUnloadableDimensions(starTreeMetadataList,
+          segmentMetadata).isEmpty();
     }
 
-    SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
     List<StarTreeV2BuilderConfig> starTreeBuilderConfigs =
         StarTreeBuilderUtils.generateBuilderConfigs(_indexLoadingConfig.getStarTreeIndexConfigs(),
             _indexLoadingConfig.isEnableDefaultStarTree(), segmentMetadata);
-    List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
     // There are existing star-trees, but if they match the builder configs exactly,
     // then there is no need to generate the star-trees
 
@@ -358,19 +440,35 @@ public class SegmentPreProcessor implements AutoCloseable {
   private boolean processStarTrees(File indexDir,
       @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet)
       throws Exception {
-    if (!_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
-      return false;
-    }
-
     SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
     String segmentName = segmentMetadata.getName();
+    List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+
+    if (!_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
+      // A star-tree whose dimension column is no longer dictionary-encoded (e.g. because the column was added to
+      // 'noDictionaryColumns' and re-encoded by the forward index handler above) cannot be read, and fails the whole
+      // segment load. Drop it even here: removing star-trees only deletes files, so unlike rebuilding them it is
+      // cheap enough to do with dynamic star-tree creation disabled. When it is enabled the star-trees are rebuilt by
+      // the regular flow below, because their split order no longer matches the builder configs.
+      Set<String> unloadableDimensions = starTreeMetadataList != null
+          ? StarTreeBuilderUtils.findUnloadableDimensions(starTreeMetadataList, segmentMetadata)
+          : Set.of();
+      if (unloadableDimensions.isEmpty()) {
+        return false;
+      }
+      LOGGER.warn("Removing star-trees from segment: {} because dimension columns: {} are no longer "
+              + "dictionary-encoded. Enable dynamic star-tree creation to have them rebuilt", segmentName,
+          unloadableDimensions);
+      StarTreeBuilderUtils.removeStarTrees(indexDir);
+      return true;
+    }
+
     List<StarTreeV2BuilderConfig> starTreeBuilderConfigs =
         StarTreeBuilderUtils.generateBuilderConfigs(_indexLoadingConfig.getStarTreeIndexConfigs(),
             _indexLoadingConfig.isEnableDefaultStarTree(), segmentMetadata);
 
     boolean shouldGenerateStarTree = !starTreeBuilderConfigs.isEmpty();
     boolean shouldRemoveStarTree = false;
-    List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
     if (starTreeMetadataList != null) {
       // There are existing star-trees
       if (!shouldGenerateStarTree) {

@@ -26,7 +26,7 @@ import org.apache.pinot.core.query.aggregation.function.array.ListAggDistinctFun
 import org.apache.pinot.core.query.aggregation.function.array.ListAggFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -52,8 +52,8 @@ public class ListAggFunctionTest extends AbstractAggregationFunctionTest {
     }
 
     @Override
-    public FieldSpec.DataType getValueType() {
-      return FieldSpec.DataType.STRING;
+    public DataType getValueType() {
+      return DataType.STRING;
     }
   }
 
@@ -75,8 +75,8 @@ public class ListAggFunctionTest extends AbstractAggregationFunctionTest {
     }
 
     @Override
-    public FieldSpec.DataType getValueType() {
-      return FieldSpec.DataType.STRING;
+    public DataType getValueType() {
+      return DataType.STRING;
     }
   }
 
@@ -106,8 +106,7 @@ public class ListAggFunctionTest extends AbstractAggregationFunctionTest {
 
   @Test
   public void testListAggDistinctAggregate() {
-    ListAggDistinctFunction fn =
-        new ListAggDistinctFunction(ExpressionContext.forIdentifier("myField"), ",", false);
+    ListAggDistinctFunction fn = new ListAggDistinctFunction(ExpressionContext.forIdentifier("myField"), ",", false);
     AggregationResultHolder holder = fn.createAggregationResultHolder();
     fn.aggregate(2, holder,
         Map.of(ExpressionContext.forIdentifier("myField"), new TestStringMVBlock(new String[][]{{"A", "B"}, {"C"}})));
@@ -119,8 +118,7 @@ public class ListAggFunctionTest extends AbstractAggregationFunctionTest {
 
   @Test
   public void testListAggDistinctAggregateSV() {
-    ListAggDistinctFunction fn =
-        new ListAggDistinctFunction(ExpressionContext.forIdentifier("svField"), ",", false);
+    ListAggDistinctFunction fn = new ListAggDistinctFunction(ExpressionContext.forIdentifier("svField"), ",", false);
     AggregationResultHolder holder = fn.createAggregationResultHolder();
     fn.aggregate(3, holder,
         Map.of(ExpressionContext.forIdentifier("svField"), new TestStringSVBlock(new String[]{"A", "B", "C"})));

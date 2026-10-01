@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
@@ -43,6 +46,13 @@ import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.OpenStructNaming;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -169,6 +179,9 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     public HelixTaskResult handleMessage() {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       _logger.info("Handling table deletion message: {}", _message);
+      // Resolved before the table goes away: these gauge keys come from the table config, and the only
+      // in-memory copy of it lives on the table data manager that deleteTable is about to discard.
+      List<String> openStructMetricKeys = resolveOpenStructMetricKeys();
       try {
         long deletionTimeMs = _message.getCreateTimeStamp();
         if (deletionTimeMs <= 0) {
@@ -188,6 +201,12 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         Arrays.stream(ServerGauge.values())
             .filter(g -> !g.isGlobal())
             .forEach(g -> _metrics.removeTableGauge(_tableNameWithType, g));
+        // OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT registers as <gauge>.<table>.<column>$<key>, so the sweep above --
+        // which composes only the unkeyed <gauge>.<table> -- cannot reach it. Only the configured keys are
+        // recoverable here; see openStructMetricKeys for the keys this misses.
+        openStructMetricKeys.forEach(
+            metricKey -> _metrics.removeTableGauge(_tableNameWithType, metricKey,
+                ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT));
         Arrays.stream(ServerTimer.values())
             .filter(t -> !t.isGlobal())
             .forEach(t -> _metrics.removeTableTimer(_tableNameWithType, t));
@@ -199,6 +218,41 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       }
       return helixTaskResult;
     }
+
+    private List<String> resolveOpenStructMetricKeys() {
+      try {
+        TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(_tableNameWithType);
+        if (tableDataManager == null) {
+          return List.of();
+        }
+        Pair<TableConfig, Schema> configAndSchema = tableDataManager.getCachedTableConfigAndSchema();
+        return configAndSchema == null ? List.of()
+            : openStructMetricKeys(configAndSchema.getLeft(), configAndSchema.getRight());
+      } catch (Exception e) {
+        // Metric bookkeeping must never block table deletion.
+        _logger.warn("Could not resolve OPEN_STRUCT gauge keys for table: {}; its per-key gauges may survive until "
+            + "the next restart", _tableNameWithType, e);
+        return List.of();
+      }
+    }
+  }
+
+  /// The `<column>$<key>` metric keys of the per-key OPEN_STRUCT gauges recoverable from the given
+  /// table's config — one per configured `denseKeys` entry. Complete when `perKeyMetricsEnabled` is
+  /// off; a subset when on, since discovered keys exist only in ingested data and cannot be named at
+  /// deletion time. Gauges for discovered keys survive until the server restarts.
+  @VisibleForTesting
+  static List<String> openStructMetricKeys(TableConfig tableConfig, Schema schema) {
+    List<String> metricKeys = new ArrayList<>();
+    FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema).forEach((column, indexConfigs) -> {
+      IndexConfig openStructConfig = indexConfigs.getConfig(StandardIndexes.openStruct());
+      if (openStructConfig instanceof OpenStructIndexConfig) {
+        for (String key : ((OpenStructIndexConfig) openStructConfig).getDenseKeys()) {
+          metricKeys.add(OpenStructNaming.metricKey(column, key));
+        }
+      }
+    });
+    return metricKeys;
   }
 
   private class ForceCommitMessageHandler extends DefaultMessageHandler {

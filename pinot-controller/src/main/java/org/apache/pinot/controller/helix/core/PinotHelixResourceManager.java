@@ -92,6 +92,7 @@ import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.config.provider.ZkTableCache;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -160,6 +161,7 @@ import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
+import org.apache.pinot.controller.util.PageCacheWarmupControllerExecutor;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.core.util.NumberUtils;
 import org.apache.pinot.core.util.NumericException;
@@ -171,6 +173,7 @@ import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMeta
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadataUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceConfigValidatorRegistry;
@@ -224,7 +227,9 @@ public class PinotHelixResourceManager {
     START, END, REVERT
   }
 
-  // TODO: make this configurable
+  // Default values for the endReplaceSegments IdealState -> ExternalView convergence wait,
+  // overridable via controller config (see ControllerConf#getSegmentReplaceExternalView*). The
+  // resolved values live in the _segmentReplace* / _endReplaceSegmentsRetryPolicy fields.
   public static final long EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS = 10 * 60_000L; // 10 minutes
   public static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
 
@@ -244,6 +249,12 @@ public class PinotHelixResourceManager {
   private final boolean _enableTieredSegmentAssignment;
   @Nullable
   private final ControllerConf _controllerConf;
+  private final AuthProvider _serverAdminAuthProvider;
+  // endReplaceSegments IdealState -> ExternalView convergence knobs, resolved once from controller
+  // config (or the static defaults when no config is supplied).
+  private final long _segmentReplaceExternalViewMaxWaitMs;
+  private final long _segmentReplaceExternalViewCheckIntervalMs;
+  private final RetryPolicy _endReplaceSegmentsRetryPolicy;
 
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
@@ -256,6 +267,7 @@ public class PinotHelixResourceManager {
   private TableCache _tableCache;
   private final LineageManager _lineageManager;
   private QueryWorkloadManager _queryWorkloadManager;
+  private final PageCacheWarmupControllerExecutor _pageCacheWarmupControllerExecutor;
   // Dedicated ZkClient for transactional multi-path writes (atomic ZK multi()). Lazily built on
   // first multiWriteZK call. A dedicated session is used because Helix 1.3.2 does not expose
   // multi() on BaseDataAccessor, and the underlying ZkClient inside ZKHelixManager is not publicly
@@ -274,6 +286,18 @@ public class PinotHelixResourceManager {
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
     _enableTieredSegmentAssignment = enableTieredSegmentAssignment;
     _controllerConf = controllerConf;
+    _serverAdminAuthProvider =
+        AuthProviderUtils.extractAuthProvider(controllerConf, ControllerConf.CONTROLLER_SERVER_ADMIN_AUTH_PREFIX);
+    if (controllerConf != null) {
+      _segmentReplaceExternalViewMaxWaitMs = controllerConf.getSegmentReplaceExternalViewMaxWaitMs();
+      _segmentReplaceExternalViewCheckIntervalMs = controllerConf.getSegmentReplaceExternalViewCheckIntervalMs();
+      _endReplaceSegmentsRetryPolicy =
+          RetryPolicies.exponentialBackoffRetryPolicy(controllerConf.getSegmentReplaceMaxRetryAttempts(), 1000L, 2.0f);
+    } else {
+      _segmentReplaceExternalViewMaxWaitMs = EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
+      _segmentReplaceExternalViewCheckIntervalMs = EXTERNAL_VIEW_CHECK_INTERVAL_MS;
+      _endReplaceSegmentsRetryPolicy = DEFAULT_RETRY_POLICY;
+    }
     _instanceAdminEndpointCache =
         CacheBuilder.newBuilder().expireAfterWrite(CACHE_ENTRY_EXPIRE_TIME_HOURS, TimeUnit.HOURS)
             .build(new CacheLoader<>() {
@@ -289,6 +313,7 @@ public class PinotHelixResourceManager {
       _lineageUpdaterLocks[i] = new Object();
     }
     _lineageManager = lineageManager;
+    _pageCacheWarmupControllerExecutor = new PageCacheWarmupControllerExecutor(this, controllerConf);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -352,6 +377,7 @@ public class PinotHelixResourceManager {
   /// Stop the Pinot controller instance.
   public synchronized void stop() {
     _segmentDeletionManager.stop();
+    _pageCacheWarmupControllerExecutor.shutdown();
     ZkClient zkClient = _zkClient;
     if (zkClient != null) {
       _zkClient = null;
@@ -1051,6 +1077,15 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, tableNameWithType);
   }
 
+  /// Reads the ZK metadata of the named segments in a single batched request, index-aligned with `segmentNames` and
+  /// holding `null` for segments whose znode could not be read. See
+  /// [ZKMetadataProvider#getSegmentsZKMetadata(ZkHelixPropertyStore, String, List, List)] for the full contract,
+  /// including the `stats` out-parameter that carries the znodes' modification times.
+  public List<SegmentZKMetadata> getSegmentsZKMetadata(String tableNameWithType,
+      List<String> segmentNames, @Nullable List<Stat> stats) {
+    return ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, tableNameWithType, segmentNames, stats);
+  }
+
   public Collection<String> getLastLLCCompletedSegments(String tableNameWithType) {
     return getLastLLCCompletedSegments(getSegmentsZKMetadata(tableNameWithType));
   }
@@ -1643,6 +1678,7 @@ public class PinotHelixResourceManager {
       // Update existing schema
       if (override) {
         updateSchema(schema, oldSchema, force);
+        refreshTablesUsingSchema(schemaName);
       } else {
         throw new SchemaAlreadyExistsException("Schema: " + schemaName + " already exists");
       }
@@ -1675,30 +1711,43 @@ public class PinotHelixResourceManager {
     }
 
     updateSchema(schema, oldSchema, forceTableSchemaUpdate);
+    if (reload) {
+      reloadTablesUsingSchema(schemaName);
+    } else {
+      refreshTablesUsingSchema(schemaName);
+    }
+  }
+
+  /// Reloads all segments of the tables using the given schema. Logical table schemas are skipped because no
+  /// segments are backed by them.
+  private void reloadTablesUsingSchema(String schemaName)
+      throws TableNotFoundException {
     if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, schemaName)) {
-      // For logical table schemas, we do not need to reload segments or send schema refresh messages
-      LOGGER.info("Logical table schema: {} updated, no need to reload segments or send schema refresh messages",
-          schemaName);
+      LOGGER.info("Logical table schema: {} updated, no need to reload segments", schemaName);
       return;
     }
+    LOGGER.info("Reloading tables with name: {}", schemaName);
+    for (String tableNameWithType : getExistingTableNamesWithType(schemaName, null)) {
+      reloadAllSegments(tableNameWithType, false, null);
+    }
+  }
+
+  /// Sends the table config and schema refresh message to the servers hosting the tables using the given schema.
+  /// Servers reuse their cached schema for ordinary segment loads and only refresh it on this message, an explicit
+  /// reload or a table config update, so every schema update has to send it or newly loaded segments keep being
+  /// processed against the previous schema. Logical table schemas are skipped because no segments are backed by them.
+  private void refreshTablesUsingSchema(String schemaName) {
+    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, schemaName)) {
+      LOGGER.info("Logical table schema: {} updated, no need to send schema refresh messages", schemaName);
+      return;
+    }
+    LOGGER.info("Refreshing schema for tables with name: {}", schemaName);
     try {
-      List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
-      if (reload) {
-        LOGGER.info("Reloading tables with name: {}", schemaName);
-        for (String tableNameWithType : tableNamesWithType) {
-          reloadAllSegments(tableNameWithType, false, null);
-        }
-      } else {
-        LOGGER.info("Refreshing schema for tables with name: {}", schemaName);
-        for (String tableNameWithType : tableNamesWithType) {
-          sendTableConfigSchemaRefreshMessage(tableNameWithType);
-        }
+      for (String tableNameWithType : getExistingTableNamesWithType(schemaName, null)) {
+        sendTableConfigSchemaRefreshMessage(tableNameWithType);
       }
     } catch (TableNotFoundException e) {
-      if (reload) {
-        throw e;
-      }
-      // We don't throw exception if no tables found for schema when reload is false. Since this could be valid case
+      // A schema can exist before any table uses it
       LOGGER.warn("No tables found for schema (refresh only): {}", schemaName, e);
     }
   }
@@ -4264,6 +4313,13 @@ public class PinotHelixResourceManager {
     return endpointToInstance;
   }
 
+  /// Returns the service identity provider used for outbound Server admin API requests.
+  ///
+  /// Callers must resolve the headers for each request so providers that rotate credentials are honored.
+  public AuthProvider getServerAdminAuthProvider() {
+    return _serverAdminAuthProvider;
+  }
+
   /// Helper method to return a list of tables that exists and matches the given table name and type, or throws
   /// [ControllerApplicationException] if no table found.
   ///
@@ -4536,7 +4592,7 @@ public class PinotHelixResourceManager {
     long endReplaceSegmentsTs = System.currentTimeMillis();
     int attemptCount;
     try {
-      attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> {
+      attemptCount = _endReplaceSegmentsRetryPolicy.attempt(() -> {
         long endReplaceSegmentsTsForAttempt = System.currentTimeMillis();
         // Fetch the segment lineage and look up the lineage entry based on the entry id.
         SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
@@ -4660,7 +4716,7 @@ public class PinotHelixResourceManager {
   ///                     on it.
   protected void preSegmentReplaceUpdateRouting(String tableNameWithType, List<String> segmentsTo,
       List<String> segmentsFrom) {
-    // No-op by default
+    _pageCacheWarmupControllerExecutor.triggerPageCacheWarmup(tableNameWithType, segmentsTo);
   }
 
   /// List the segment lineage
@@ -4835,7 +4891,7 @@ public class PinotHelixResourceManager {
 
   private boolean waitForSegmentsBecomeOnline(String tableNameWithType, List<String> segmentsToCheck)
       throws InterruptedException {
-    long endTimeMs = System.currentTimeMillis() + EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
+    long endTimeMs = System.currentTimeMillis() + _segmentReplaceExternalViewMaxWaitMs;
     String segmentNotOnline;
     do {
       segmentNotOnline = null;
@@ -4849,7 +4905,7 @@ public class PinotHelixResourceManager {
       if (segmentNotOnline == null) {
         return true;
       }
-      Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+      Thread.sleep(_segmentReplaceExternalViewCheckIntervalMs);
     } while (System.currentTimeMillis() < endTimeMs);
     LOGGER.warn("Timed out while waiting for segment: {} to become ONLINE for table: {}", segmentNotOnline,
         tableNameWithType);
@@ -5560,8 +5616,8 @@ public class PinotHelixResourceManager {
     // the per-consuming-segment commit rate.  Without this early bail, even a no-op notify
     // chain (extract name + WARN log + onBaseTableFullInvalidation → fast-path inside) would
     // multiply controller CPU + log volume on every realtime commit.  Verified by
-    // PauselessRealtimeIngestionNewSegmentMetadataCreationFailureTest, which timed out at 100s
-    // when the per-commit WARN log was unconditionally emitted.
+    // PauselessRealtimeIngestionIntegrationTest#testNewSegmentMetadataCreationFailure, which timed out at 100s when
+    // the per-commit WARN log was unconditionally emitted.
     if (mgr.getDependentMaterializedViews(rawTableName).isEmpty()) {
       return;
     }

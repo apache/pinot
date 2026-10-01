@@ -74,6 +74,11 @@ public class BasicAuthPrincipal {
     return _permissions.isEmpty() || _permissions.contains(permission.toLowerCase());
   }
 
+  /// Returns whether this principal was explicitly granted the given permission.
+  public boolean hasExplicitPermission(String permission) {
+    return _permissions.contains(permission.toLowerCase());
+  }
+
   /// Gets the Row-Level Security (RLS) filter configured for the given table.
   /// The RLS filter is applied only if the user has access to the table
   /// (as determined by [#hasTable(String)]).
