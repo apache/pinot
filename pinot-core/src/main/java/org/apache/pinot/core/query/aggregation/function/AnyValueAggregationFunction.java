@@ -82,9 +82,8 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
 
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
-    // Default to STRING if result type is not yet determined
-    // TODO: See if UNKNOWN can be used instead
-    return _resultType != null ? _resultType : ColumnDataType.STRING;
+    // A merge-only executor cannot infer the input type from a BlockValSet. Preserve the intermediate value's type.
+    return ColumnDataType.OBJECT;
   }
 
   @Override
