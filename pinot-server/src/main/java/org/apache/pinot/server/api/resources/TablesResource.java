@@ -104,6 +104,8 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager.SnapshotPass;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -782,6 +784,20 @@ public class TablesResource {
               ((ImmutableSegment) segmentDataManager.getSegment()).getSegmentSizeBytes());
         }
         validDocIdsMetadata.put("segmentCreationTimeMillis", indexSegment.getSegmentMetadata().getIndexCreationTime());
+        ValidDocIdsType resolvedValidDocIdsType = validDocIdSnapshotPair.getLeft();
+        if (resolvedValidDocIdsType == ValidDocIdsType.SNAPSHOT
+            || resolvedValidDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
+          // Lets a caller tell whether two replicas' snapshot files of this partition can be compared
+          PartitionUpsertMetadataManager partitionUpsertMetadataManager =
+              ((ImmutableSegmentImpl) indexSegment).getPartitionUpsertMetadataManager();
+          SnapshotPass snapshotPass =
+              partitionUpsertMetadataManager != null ? partitionUpsertMetadataManager.getLastSnapshotPass() : null;
+          if (snapshotPass != null) {
+            validDocIdsMetadata.put("snapshotPass", Map.of("segmentNamesCrc", snapshotPass.segmentNamesCrc(),
+                "numSegments", snapshotPass.numSegments(), "consistent", snapshotPass.consistent(), "finishedAtMs",
+                snapshotPass.finishedAtMs()));
+          }
+        }
         allValidDocIdsMetadata.add(validDocIdsMetadata);
       }
       if (nonImmutableSegmentCount > 0) {
