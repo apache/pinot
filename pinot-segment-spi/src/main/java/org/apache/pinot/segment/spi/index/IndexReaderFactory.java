@@ -43,6 +43,31 @@ public interface IndexReaderFactory<R extends IndexReader> {
       ColumnMetadata metadata)
       throws IOException, IndexReaderConstraintException;
 
+  /// Creates a reader for a column whose segment stores no buffer for this index type, that is, when
+  /// [SegmentDirectory.Reader#hasIndexFor] is `false` and [#createIndexReader] is not called. This lets an index type
+  /// serve a reader whose content is derived from other data of the column, for example its forward index, instead of
+  /// read from a stored buffer.
+  ///
+  /// It is called after the readers of the column's stored indexes are created, which `storedReaders` exposes. The
+  /// default returns `null`: without a stored buffer the index is absent.
+  ///
+  /// @throws IndexReaderConstraintException if the constraints of the index reader are not matched
+  /// @return the index reader, or null if the index is absent for that column
+  @Nullable
+  default R createIndexReaderWithoutStoredIndex(SegmentDirectory.Reader segmentReader,
+      FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata, StoredIndexReaders storedReaders)
+      throws IOException, IndexReaderConstraintException {
+    return null;
+  }
+
+  /// The readers created for a column from its stored indexes, as passed to [#createIndexReaderWithoutStoredIndex].
+  interface StoredIndexReaders {
+
+    /// Returns the column's reader of the given index type, or null when the column stores no such index.
+    @Nullable
+    <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType);
+  }
+
   abstract class Default<C extends IndexConfig, R extends IndexReader> implements IndexReaderFactory<R> {
 
     protected abstract IndexType<C, R, ?> getIndexType();

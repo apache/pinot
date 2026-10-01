@@ -283,6 +283,89 @@ public class PhysicalColumnIndexContainerTest {
   }
 
   @Test
+  public void testReaderWithoutStoredIndex()
+      throws IOException {
+    installStandardStubs();
+    IndexReader derivedReader = mock(IndexReader.class, "derived");
+    List<IndexReader> forwardSeenByFactory = new ArrayList<>();
+    // bloom_filter (numeric id 0) also derives a reader, before null value vector (id 8) is derived: derived readers
+    // must only see stored-index readers.
+    _stubTypes.get(StandardIndexes.BLOOM_FILTER_ID).setReaderFactory(
+        derivingFactory(mock(IndexReader.class, "derivedBloom"), new ArrayList<>()));
+    _stubTypes.get(StandardIndexes.NULL_VALUE_VECTOR_ID).setReaderFactory(
+        derivingFactory(derivedReader, forwardSeenByFactory));
+
+    // No stored null vector: the factory derives a reader from the stored forward reader; the other absent types stay
+    // absent.
+    PhysicalColumnIndexContainer container = newContainer(Set.of(StandardIndexes.FORWARD_ID), false);
+    assertSame(container.getIndex(_stubTypes.get(StandardIndexes.NULL_VALUE_VECTOR_ID)), derivedReader);
+    assertEquals(forwardSeenByFactory, List.of(_stubReaders.get(StandardIndexes.FORWARD_ID)));
+    assertSame(container.getIndex(_stubTypes.get(StandardIndexes.FORWARD_ID)),
+        _stubReaders.get(StandardIndexes.FORWARD_ID));
+    for (String id : STANDARD_IDS) {
+      if (!Set.of(StandardIndexes.FORWARD_ID, StandardIndexes.NULL_VALUE_VECTOR_ID, StandardIndexes.BLOOM_FILTER_ID)
+          .contains(id)) {
+        assertNull(container.getIndex(_stubTypes.get(id)), id);
+      }
+    }
+    container.close();
+    verify(derivedReader).close();
+  }
+
+  @Test
+  public void testStoredIndexDoesNotUseTheReaderWithoutStoredIndex()
+      throws IOException {
+    installStandardStubs();
+    IndexReader storedReader = mock(IndexReader.class, "stored");
+    IndexReader derivedReader = mock(IndexReader.class, "derived");
+    StubIndexType nullValueType = _stubTypes.get(StandardIndexes.NULL_VALUE_VECTOR_ID);
+    nullValueType.setReaderFactory(new IndexReaderFactory<>() {
+      @Override
+      public IndexReader createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs configs,
+          ColumnMetadata metadata) {
+        return storedReader;
+      }
+
+      @Override
+      public IndexReader createIndexReaderWithoutStoredIndex(SegmentDirectory.Reader segmentReader,
+          FieldIndexConfigs configs, ColumnMetadata metadata, StoredIndexReaders storedReaders) {
+        return derivedReader;
+      }
+    });
+
+    PhysicalColumnIndexContainer container =
+        newContainer(Set.of(StandardIndexes.FORWARD_ID, StandardIndexes.NULL_VALUE_VECTOR_ID), false);
+
+    assertSame(container.getIndex(nullValueType), storedReader);
+  }
+
+  /// A factory that only serves readers for columns without a stored index, recording the stored forward reader it
+  /// was given.
+  private IndexReaderFactory<IndexReader> derivingFactory(IndexReader derivedReader,
+      List<IndexReader> forwardSeenByFactory) {
+    StubIndexType forwardType = _stubTypes.get(StandardIndexes.FORWARD_ID);
+    StubIndexType nullValueType = _stubTypes.get(StandardIndexes.NULL_VALUE_VECTOR_ID);
+    StubIndexType bloomType = _stubTypes.get(StandardIndexes.BLOOM_FILTER_ID);
+    return new IndexReaderFactory<>() {
+      @Override
+      public IndexReader createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs configs,
+          ColumnMetadata metadata) {
+        throw new AssertionError("No stored index: the stored-index path must not be used");
+      }
+
+      @Override
+      public IndexReader createIndexReaderWithoutStoredIndex(SegmentDirectory.Reader segmentReader,
+          FieldIndexConfigs configs, ColumnMetadata metadata, StoredIndexReaders storedReaders) {
+        forwardSeenByFactory.add(storedReaders.getIndex(forwardType));
+        // Only stored-index readers are visible, never other derived ones.
+        assertNull(storedReaders.getIndex(nullValueType));
+        assertNull(storedReaders.getIndex(bloomType));
+        return derivedReader;
+      }
+    };
+  }
+
+  @Test
   public void testCloseClosesEveryReaderOnce()
       throws IOException {
     installStandardStubs();

@@ -91,16 +91,18 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     // [0, allIndexes.size()), and IndexService caps that size at IndexService.MAX_INDEX_TYPES, the width of the mask.
     IndexReader[] readersById = new IndexReader[allIndexes.size()];
     long presentMask = 0L;
+    // Bit i is set when the index type with numeric id i has no stored buffer in this column.
+    long missingMask = 0L;
     boolean forwardIndexOnly = indexLoadingConfig.isForwardIndexOnly();
     try {
       for (IndexType<?, ?, ?> indexType : allIndexes) {
         if (forwardIndexOnly && !FORWARD_INDEX_ONLY_TYPES.contains(indexType.getId())) {
           continue;
         }
+        // Resolve the id the same way getIndex() does, and before creating the reader, so that nothing can throw
+        // between creating a reader and recording it for cleanup.
+        short indexId = indexService.getNumericId(indexType);
         if (segmentReader.hasIndexFor(columnName, indexType)) {
-          // Resolve the id the same way getIndex() does, and before creating the reader, so that nothing can throw
-          // between creating a reader and recording it for cleanup.
-          short indexId = indexService.getNumericId(indexType);
           IndexReaderFactory<?> readerProvider = indexType.getReaderFactory();
           try {
             IndexReader reader = readerProvider.createIndexReader(segmentReader, fieldIndexConfigs, metadata);
@@ -110,6 +112,38 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
             }
           } catch (IndexReaderConstraintException ex) {
             LOGGER.warn("Constraint violation when indexing {} with {} index", columnName, indexType, ex);
+          }
+        } else {
+          missingMask |= 1L << indexId;
+        }
+      }
+
+      // Without a stored buffer most index types are absent, but a type may still derive a reader from other data of
+      // the column. These are created once every stored-index reader exists, so they can build on any of them.
+      if (missingMask != 0) {
+        long storedMask = presentMask;
+        IndexReaderFactory.StoredIndexReaders storedReaders = new IndexReaderFactory.StoredIndexReaders() {
+          @Nullable
+          @Override
+          public <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType) {
+            short indexId = indexService.getNumericId(indexType);
+            return ((storedMask >>> indexId) & 1L) == 0 ? null : (I) readersById[indexId];
+          }
+        };
+        for (IndexType<?, ?, ?> indexType : allIndexes) {
+          short indexId = indexService.getNumericId(indexType);
+          if (((missingMask >>> indexId) & 1L) == 0) {
+            continue;
+          }
+          try {
+            IndexReader reader = indexType.getReaderFactory()
+                .createIndexReaderWithoutStoredIndex(segmentReader, fieldIndexConfigs, metadata, storedReaders);
+            if (reader != null) {
+              readersById[indexId] = reader;
+              presentMask |= 1L << indexId;
+            }
+          } catch (IndexReaderConstraintException ex) {
+            LOGGER.warn("Constraint violation when deriving {} index for {}", indexType, columnName, ex);
           }
         }
       }
