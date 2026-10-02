@@ -129,7 +129,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // The following variables are always accessed within synchronized block
   private boolean _stopped;
   // Initialize with 1 pending operation to indicate the metadata manager can take more operations
-  private int _numPendingOperations = 1;
+  protected int _numPendingOperations = 1;
   private boolean _closed;
   // The lock and boolean flag ensure only one thread can start preloading and preloading happens only once.
   private final Lock _preloadLock = new ReentrantLock();
