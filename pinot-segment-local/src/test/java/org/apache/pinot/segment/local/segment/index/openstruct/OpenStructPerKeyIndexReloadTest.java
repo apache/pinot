@@ -166,6 +166,19 @@ public class OpenStructPerKeyIndexReloadTest {
     assertFalse(hasIndex(segmentDir, host, StandardIndexes.dictionary()), "the raw key must stay raw");
   }
 
+  private static List<FieldConfig> mixedMatrixKeys() {
+    FieldConfig views = new FieldConfig.Builder("views")
+        .withIndexes(JsonUtils.objectToJsonNode(Map.of("inverted", Map.of())))
+        .build();
+    FieldConfig cpu = new FieldConfig.Builder("cpu")
+        .withEncodingType(FieldConfig.EncodingType.DICTIONARY)
+        .build();
+    FieldConfig host = new FieldConfig.Builder("host")
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .build();
+    return List.of(views, cpu, host);
+  }
+
   private static OpenStructIndexConfig withMixedMatrix() {
     FieldConfig views = new FieldConfig.Builder("views")
         .withIndexes(JsonUtils.objectToJsonNode(Map.of("inverted", Map.of())))
@@ -232,6 +245,55 @@ public class OpenStructPerKeyIndexReloadTest {
         .withIndexes(indexes)
         .build();
     return new OpenStructIndexConfig(false, null, -1, Set.of("views"), 0.0, List.of(keyConfig));
+  }
+
+  /// The shared blob is an ordinary single-value STRING column holding each row's document, so an index that
+  /// reads JSON out of a STRING column applies to it. Without one, every predicate on an unshredded key scans.
+  @Test
+  public void testAJsonIndexCanBeBuiltOnTheSparseBlob()
+      throws Exception {
+    // The blob only exists when some key is left out of the dense set, so the segment is built with a budget.
+    File segmentDir = buildSegment("blobJsonIndex", withMixedMatrix());
+    String sparse = OpenStructNaming.sparseColumnName(COLUMN);
+    assertTrue(new SegmentMetadataImpl(segmentDir).getColumnMetadataMap().containsKey(sparse),
+        "precondition: a key was left unmaterialized, so the blob column exists");
+    assertFalse(hasIndex(segmentDir, sparse, StandardIndexes.json()),
+        "precondition: the blob starts with no index");
+
+    reload(segmentDir, withSparseJsonIndex());
+
+    assertTrue(hasIndex(segmentDir, sparse, StandardIndexes.json()),
+        "sparseJsonIndex must build a JSON index over the blob");
+    assertFalse(hasIndex(segmentDir, sparse, StandardIndexes.dictionary()),
+        "and the blob must never get a dictionary -- its values are whole documents");
+  }
+
+  /// `sparseFieldConfig` names the index directly, so any registered index type that accepts a STRING column can
+  /// be asked for on the blob rather than only the one `sparseJsonIndex` hard-codes.
+  @Test
+  public void testTheBlobIndexCanBeNamedDirectly()
+      throws Exception {
+    File segmentDir = buildSegment("blobNamedIndex", withMixedMatrix());
+    reload(segmentDir, withSparseFieldConfig("json"));
+
+    assertTrue(hasIndex(segmentDir, OpenStructNaming.sparseColumnName(COLUMN), StandardIndexes.json()),
+        "an index named under sparseFieldConfig.indexes must be built on the blob");
+  }
+
+  private static OpenStructIndexConfig withSparseJsonIndex() {
+    return new OpenStructIndexConfig(false, null, 3, Set.of("views", "cpu", "host"), 0.5,
+        mixedMatrixKeys(), true);
+  }
+
+  private static OpenStructIndexConfig withSparseFieldConfig(String indexName) {
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set(indexName, JsonUtils.newObjectNode());
+    FieldConfig blob = new FieldConfig.Builder(OpenStructNaming.sparseColumnName(COLUMN))
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
+    return new OpenStructIndexConfig(false, null, 3, Set.of("views", "cpu", "host"), 0.5,
+        mixedMatrixKeys(), null, null, null, null, blob);
   }
 
   // ---------------------------------------------------------------- fixtures

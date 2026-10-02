@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
 import java.util.HashMap;
@@ -51,6 +52,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
@@ -495,9 +497,6 @@ public class IndexLoadingConfig {
       if (!childColumn.contains(OpenStructNaming.SEPARATOR) || indexConfigsByColName.containsKey(childColumn)) {
         continue;
       }
-      if (OpenStructNaming.isSparseColumn(childColumn)) {
-        continue;
-      }
       String parentColumn = OpenStructNaming.parseParentColumn(childColumn);
       FieldIndexConfigs parentConfigs = indexConfigsByColName.get(parentColumn);
       if (parentConfigs == null) {
@@ -508,6 +507,16 @@ public class IndexLoadingConfig {
         continue;
       }
       OpenStructIndexConfig openStructConfig = (OpenStructIndexConfig) osConfig;
+      if (OpenStructNaming.isSparseColumn(childColumn)) {
+        FieldIndexConfigs blobConfigs = sparseChildConfigs(openStructConfig, entry.getValue().getFieldSpec());
+        if (blobConfigs != null) {
+          if (updatedConfigs == null) {
+            updatedConfigs = new HashMap<>(indexConfigsByColName);
+          }
+          updatedConfigs.put(childColumn, blobConfigs);
+        }
+        continue;
+      }
       String key = OpenStructNaming.parseKey(childColumn);
       FieldConfig keyFieldConfig = openStructConfig.getValueFieldConfig(key);
       if (keyFieldConfig == null) {
@@ -534,6 +543,36 @@ public class IndexLoadingConfig {
 
   public void addOpenStructChildConfigs(SegmentMetadataImpl segmentMetadata) {
     _resolvedIndexState = withOpenStructChildConfigs(segmentMetadata)._resolvedIndexState;
+  }
+
+  /// Index configs for the shared blob column, or null when the table asked for nothing on it.
+  ///
+  /// The blob is an ordinary single-value STRING column holding each row's document as JSON, so an index that
+  /// reads JSON out of a STRING column applies to it unchanged -- a JSON index, or any other registered index
+  /// type named under `sparseFieldConfig.indexes`. What it must never get is a dictionary: the values are whole
+  /// documents, nearly all distinct, and a forward index of dict ids over them costs more than it saves. So the
+  /// encoding is forced RAW here rather than taken from the config.
+  @Nullable
+  private static FieldIndexConfigs sparseChildConfigs(OpenStructIndexConfig openStructConfig,
+      FieldSpec blobFieldSpec) {
+    FieldConfig sparseFieldConfig = openStructConfig.getSparseFieldConfig();
+    boolean legacyJsonIndex = openStructConfig.isSparseJsonIndex();
+    if (sparseFieldConfig == null && !legacyJsonIndex) {
+      return null;
+    }
+    FieldConfig.Builder builder = sparseFieldConfig != null
+        ? new FieldConfig.Builder(sparseFieldConfig) : new FieldConfig.Builder(blobFieldSpec.getName());
+    builder.withEncodingType(FieldConfig.EncodingType.RAW);
+    if (legacyJsonIndex) {
+      // `sparseJsonIndex: true` predates sparseFieldConfig and means exactly one thing: a JSON index on the blob.
+      ObjectNode indexes = sparseFieldConfig != null && sparseFieldConfig.getIndexes() instanceof ObjectNode existing
+          ? existing.deepCopy() : JsonUtils.newObjectNode();
+      if (!indexes.has(StandardIndexes.json().getPrettyName())) {
+        indexes.set(StandardIndexes.json().getPrettyName(), JsonUtils.newObjectNode());
+      }
+      builder.withIndexes(indexes);
+    }
+    return FieldIndexConfigsUtil.fromFieldConfig(builder.build(), blobFieldSpec);
   }
 
   public IndexLoadingConfig withKnownColumns(Set<String> columns) {
