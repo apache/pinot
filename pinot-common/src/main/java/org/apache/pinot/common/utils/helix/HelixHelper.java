@@ -21,10 +21,12 @@ package org.apache.pinot.common.utils.helix;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -73,7 +75,6 @@ public class HelixHelper {
       RetryPolicies.randomDelayRetryPolicy(20, 100L, 200L);
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixHelper.class);
-  private static final ZNRecordSerializer ZN_RECORD_SERIALIZER = new ZNRecordSerializer();
   private static final IdealStateGroupCommit IDEAL_STATE_GROUP_COMMIT = new IdealStateGroupCommit();
 
   private static final String ONLINE = "ONLINE";
@@ -90,9 +91,31 @@ public class HelixHelper {
     return HelixManagerFactory.getZKHelixManager(clusterName, instanceName, instanceType, zkAddress);
   }
 
+  /// Returns a deep copy of the IdealState with the same content as cloning it through a serialization round trip of
+  /// its ZNRecord: id, simple fields, map fields, list fields and raw payload, with the same container types and
+  /// iteration order. Like the round trip, the ZK stat fields (e.g. version) are not copied. Unlike the round trip, the
+  /// serializer's write policies (list field bound, size limit) are not applied; they still apply when the IdealState
+  /// is written.
+  ///
+  /// Copying the fields directly avoids serializing (and compressing) the whole ZNRecord and parsing it back, which
+  /// takes seconds for an IdealState with hundreds of thousands of segments and widens the window for version
+  /// conflicts when updating it.
   public static IdealState cloneIdealState(IdealState idealState) {
-    return new IdealState(
-        (ZNRecord) ZN_RECORD_SERIALIZER.deserialize(ZN_RECORD_SERIALIZER.serialize(idealState.getRecord())));
+    ZNRecord record = idealState.getRecord();
+    IdealState copy = new IdealState(record.getId());
+    ZNRecord copyRecord = copy.getRecord();
+    copyRecord.setSimpleFields(new TreeMap<>(record.getSimpleFields()));
+    TreeMap<String, Map<String, String>> mapFields = new TreeMap<>(record.getMapFields());
+    mapFields.replaceAll((key, value) -> value != null ? new LinkedHashMap<>(value) : null);
+    copyRecord.setMapFields(mapFields);
+    TreeMap<String, List<String>> listFields = new TreeMap<>(record.getListFields());
+    listFields.replaceAll((key, value) -> value != null ? new ArrayList<>(value) : null);
+    copyRecord.setListFields(listFields);
+    byte[] rawPayload = record.getRawPayload();
+    if (rawPayload != null) {
+      copyRecord.setRawPayload(rawPayload.clone());
+    }
+    return copy;
   }
 
   /// Returns whether the given record came from the compact parser of [CompactZNRecordSerializer], that is, its map
