@@ -60,8 +60,9 @@ public class OpenStructIndexType
   private static final List<String> EXTENSIONS = List.of(".open_struct.idx");
   private static final String FIXED_FORWARD_INDEX =
       "materialized keys always use a dictionary-encoded or LZ4 raw forward index";
-  private static final String KEY_ENCODING_RULE = "a key is dictionary-encoded when its encodingType is DICTIONARY or "
-      + "its inverted index is enabled, and raw with LZ4 otherwise";
+  private static final String KEY_ENCODING_RULE = "a key is dictionary-encoded when its encodingType is "
+      + "DICTIONARY, or indexes.dictionary enables one, or its inverted index is enabled, and raw with LZ4 "
+      + "otherwise";
 
   protected OpenStructIndexType() {
     super(StandardIndexes.OPEN_STRUCT_ID);
@@ -175,7 +176,10 @@ public class OpenStructIndexType
     // Mirrors OpenStructColumnSplitter: a key gets a dictionary and a dictionary-encoded forward index when its
     // encodingType is DICTIONARY or its inverted index is enabled. Inverted is the only vetted per-key index that
     // requires a dictionary, so it overrides a RAW encodingType.
+    JsonNode declaredDictionary = indexes.get(StandardIndexes.DICTIONARY_ID);
     boolean dictionaryEncoded = fieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW
+        || (declaredDictionary != null && declaredDictionary.isObject()
+            && !declaredDictionary.path("disabled").asBoolean(false))
         || isEnabled(indexes.get(StandardIndexes.inverted().getPrettyName()));
     if (forwardIndex != null && !forwardIndex.isNull()) {
       validatePerKeyForwardIndex(forwardIndex, dictionaryEncoded, column, target);

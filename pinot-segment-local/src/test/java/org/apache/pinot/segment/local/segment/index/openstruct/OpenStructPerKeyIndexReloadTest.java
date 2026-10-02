@@ -180,6 +180,60 @@ public class OpenStructPerKeyIndexReloadTest {
         List.of(views, cpu, host));
   }
 
+  /// The spelling every other kind of column uses: RAW encoding, with the dictionary asked for under `indexes`.
+  ///
+  /// An External Table requires RAW on a column's own field config, so this is the shape a reader who has
+  /// configured one before will reach for. An enabled inverted index already forced a dictionary on its own, so
+  /// this combination worked before `indexes.dictionary` was honoured; it is here to keep it working.
+  @Test
+  public void testADictionaryAskedForUnderIndexesIsBuilt()
+      throws Exception {
+    File segmentDir = buildSegment("dictionaryViaIndexes", withoutPerKeyIndex());
+    reload(segmentDir, rawKeyWithDictionaryUnderIndexes());
+
+    assertTrue(hasIndex(segmentDir, CHILD, StandardIndexes.dictionary()),
+        "indexes.dictionary must enable the dictionary on a RAW key");
+    assertTrue(hasIndex(segmentDir, CHILD, StandardIndexes.inverted()),
+        "and the inverted index built on top of it must exist");
+  }
+
+  /// The same spelling on a key whose only index is a range one, and the case that was actually broken.
+  ///
+  /// Unlike an inverted index, a range index needs a dictionary without forcing one, so nothing rescued a key
+  /// written this way: the dictionary entry was ignored, the key stayed raw, and the range index was built over
+  /// no dictionary at all. Reverting the fix fails this test and not the one above it.
+  @Test
+  public void testARangeOnlyKeyCanAskForADictionaryUnderIndexes()
+      throws Exception {
+    File segmentDir = buildSegment("rangeViaIndexes", withoutPerKeyIndex());
+    reload(segmentDir, rawRangeKeyWithDictionaryUnderIndexes());
+
+    assertTrue(hasIndex(segmentDir, OpenStructNaming.materializedColumnName(COLUMN, "views"),
+        StandardIndexes.dictionary()), "a range-only key may ask for a dictionary the same way");
+  }
+
+  private static OpenStructIndexConfig rawKeyWithDictionaryUnderIndexes() {
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("dictionary", JsonUtils.newObjectNode());
+    indexes.set("inverted", JsonUtils.newObjectNode());
+    FieldConfig keyConfig = new FieldConfig.Builder(KEY)
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
+    return new OpenStructIndexConfig(false, null, -1, Set.of(KEY), 0.0, List.of(keyConfig));
+  }
+
+  private static OpenStructIndexConfig rawRangeKeyWithDictionaryUnderIndexes() {
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("dictionary", JsonUtils.newObjectNode());
+    indexes.set("range", JsonUtils.newObjectNode());
+    FieldConfig keyConfig = new FieldConfig.Builder("views")
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
+    return new OpenStructIndexConfig(false, null, -1, Set.of("views"), 0.0, List.of(keyConfig));
+  }
+
   // ---------------------------------------------------------------- fixtures
 
   private static OpenStructIndexConfig withoutPerKeyIndex() {
