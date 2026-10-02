@@ -28,6 +28,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.server.api.resources.ReingestionResource.CHECK_INTERVAL_MS;
 import static org.apache.pinot.server.api.resources.ReingestionResource.getConsumptionTimeoutMs;
 import static org.apache.pinot.server.api.resources.ReingestionResource.waitForCondition;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_REINGESTION_CONSUMPTION_TIMEOUT_MS;
@@ -123,6 +124,21 @@ public class ReingestionResourceTest extends BaseResourceTest {
     // Without saturation, the deadline overflows to the past and the wait times out before checking the condition
     waitForCondition(v -> true, 1, Long.MAX_VALUE, 0);
     assertThatThrownBy(() -> waitForCondition(v -> false, 1, 10, 0)).hasMessageContaining("Timeout");
+  }
+
+  @Test
+  public void testWaitForConditionDetectsCompletionWithTimeoutShorterThanCheckInterval() {
+    // The condition becomes true after the first check. It must be checked again at the deadline instead of timing out
+    // after sleeping a full check interval.
+    long completionTimeMs = System.currentTimeMillis() + 100;
+    waitForCondition(v -> System.currentTimeMillis() >= completionTimeMs, CHECK_INTERVAL_MS, 1_000, 0);
+  }
+
+  @Test
+  public void testWaitForConditionDoesNotSleepPastTimeout() {
+    long startTimeMs = System.currentTimeMillis();
+    assertThatThrownBy(() -> waitForCondition(v -> false, CHECK_INTERVAL_MS, 100, 0)).hasMessageContaining("Timeout");
+    assertThat(System.currentTimeMillis() - startTimeMs).isLessThan(CHECK_INTERVAL_MS);
   }
 
   private static DefaultClusterConfigChangeHandler clusterConfigProvider(Map<String, String> clusterConfigs) {

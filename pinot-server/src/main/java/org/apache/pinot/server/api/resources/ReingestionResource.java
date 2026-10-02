@@ -309,13 +309,18 @@ public class ReingestionResource {
       }
     }
 
-    while (System.currentTimeMillis() < endTime) {
+    while (true) {
       try {
         if (Boolean.TRUE.equals(condition.apply(null))) {
           LOGGER.info("Condition satisfied: {}", condition);
           return;
         }
-        Thread.sleep(checkIntervalMs);
+        long remainingMs = endTime - System.currentTimeMillis();
+        if (remainingMs <= 0) {
+          break;
+        }
+        // Do not sleep past the deadline, so that the condition is checked once more at the deadline before timing out
+        Thread.sleep(Math.min(checkIntervalMs, remainingMs));
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while checking the condition", e);
       }
