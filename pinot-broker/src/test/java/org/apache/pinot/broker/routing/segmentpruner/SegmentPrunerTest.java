@@ -643,9 +643,12 @@ public class SegmentPrunerTest extends ControllerTest {
     assertEquals(segmentPruner.prune(brokerRequest, input), input);
 
     // Still consuming: a subsequent assignment change must re-fetch (not permanently skip) the segment, since
-    // its own metadata has not reached a terminal status yet.
+    // its own metadata has not reached a terminal status yet. The re-pulled interval is still DEFAULT_INTERVAL
+    // (unchanged), so the tree itself must not be rebuilt even though the segment was re-pulled.
+    IntervalTree<String> intervalTree = segmentPruner.getIntervalTree();
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
     assertEquals(segmentPruner.prune(brokerRequest, input), input);
+    assertSame(segmentPruner.getIntervalTree(), intervalTree);
 
     // Segment commits: real time-range metadata is written and status becomes DONE
     SegmentZKMetadata committedSegmentZKMetadata = new SegmentZKMetadata(segment);
@@ -656,6 +659,8 @@ public class SegmentPrunerTest extends ControllerTest {
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, committedSegmentZKMetadata);
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
 
+    // The interval actually changed (DEFAULT_INTERVAL -> real committed range), so the tree must be rebuilt
+    assertNotSame(segmentPruner.getIntervalTree(), intervalTree);
     // Committed interval no longer overlaps the query range: segment should now be pruned
     assertEquals(segmentPruner.prune(brokerRequest, input), Set.of());
   }

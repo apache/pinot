@@ -118,20 +118,29 @@ public class TimeSegmentPruner implements SegmentPruner {
     //       ones. The refreshed segment ZK metadata change won't be picked up.
     boolean treeWasStale = _intervalTreeStale;
     _intervalTreeStale = true;
-    int numSegmentsBefore = _intervalMap.size();
+    boolean intervalReplaced = false;
     for (int idx = 0; idx < pulledSegments.size(); idx++) {
       String segment = pulledSegments.get(idx);
       ZNRecord zNrecord = znRecords.get(idx);
-      // Always update segments that have DEFAULT_INTERVAL, which covers two cases:
+      // Always re-evaluate segments that have DEFAULT_INTERVAL, which covers two cases:
       // 1. New segments not yet in the map
       // 2. Segments that transitioned from CONSUMING (DEFAULT_INTERVAL) to COMMITTED (valid time range)
-      _intervalMap.compute(segment, (k, existing) ->
-          (existing == null || existing == DEFAULT_INTERVAL) ? extractIntervalFromSegmentZKMetaZNRecord(k, zNrecord)
-              : existing);
+      // Still-consuming segments are re-pulled on every assignment change (see SegmentZkMetadataFetcher), so only
+      // treat this as an actual change -- and pay for a tree rebuild -- when the interval's value differs from what's
+      // already in the map, not merely whenever this re-evaluation happens.
+      Interval existing = _intervalMap.get(segment);
+      if (existing == null || existing == DEFAULT_INTERVAL) {
+        Interval newInterval = extractIntervalFromSegmentZKMetaZNRecord(segment, zNrecord);
+        if (!newInterval.equals(existing)) {
+          _intervalMap.put(segment, newInterval);
+          intervalReplaced = true;
+        }
+      }
     }
-    // Only insertions can change the size because computeIfAbsent never replaces an existing interval. An external
-    // view change that adds and removes no segment (e.g. a replica changing state) leaves the tree correct as is.
-    boolean segmentsChanged = _intervalMap.size() != numSegmentsBefore;
+    // Besides insertions/removals (which change the size), a segment transitioning from DEFAULT_INTERVAL to a real
+    // interval also requires a rebuild even though the size is unchanged, so track that explicitly instead of relying
+    // on size alone.
+    boolean segmentsChanged = intervalReplaced;
     segmentsChanged |= _intervalMap.keySet().retainAll(onlineSegments);
     if (segmentsChanged || treeWasStale) {
       _intervalTree = new IntervalTree<>(_intervalMap);
