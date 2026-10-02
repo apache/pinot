@@ -18,15 +18,26 @@
  */
 package org.apache.pinot.common.utils.helix;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
+import org.apache.helix.zookeeper.util.GZipCompressionUtil;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -139,5 +150,61 @@ public class HelixHelperTest {
     assertEquals(record.getMapField("segment_2").get("Server_2"), "CONSUMING");
     assertTrue(record.getMapFields().containsKey("segment_1"));
     assertEquals(record.getListField("segment_2"), List.of("Server_2", "Server_1"));
+  }
+
+  /// cloneIdealState copies a ZNRecord field by field, so it must know every field an IdealState stores in ZK. If a
+  /// Helix upgrade fails this test, make cloneIdealState copy the new state (or leave it out if it is not stored, like
+  /// the ZK stat fields), then update the expected values.
+  @Test
+  public void testCloneIdealStateKnowsAllStoredFields()
+      throws IOException {
+    // Instance fields, including inherited ones, sorted
+    assertEquals(getInstanceFieldNames(ZNRecord.class),
+        List.of("_creationTime", "_deltaList", "_ephemeralOwner", "_modifiedTime", "_serializer", "_version", "id",
+            "listFields", "mapFields", "rawPayload", "simpleFields"));
+    assertEquals(getInstanceFieldNames(IdealState.class), List.of("_record", "_stat"));
+
+    // Of these, only the following are stored in ZK: the properties the serializer's mapper can write, whatever their
+    // values, and the properties it writes for a record with all of them set
+    Set<String> storedFields = Set.of("id", "simpleFields", "mapFields", "listFields", "rawPayload");
+    ObjectMapper mapper = ZNRecordSerializerMapper.get();
+    assertEquals(mapper.getSerializationConfig().introspect(mapper.constructType(ZNRecord.class)).findProperties()
+        .stream()
+        .filter(BeanPropertyDefinition::couldSerialize)
+        .map(BeanPropertyDefinition::getName)
+        .collect(Collectors.toSet()), storedFields);
+    ZNRecord record = new ZNRecord("myTable_REALTIME");
+    record.setSimpleField("REPLICAS", "2");
+    record.setMapField("segment_1", Map.of("Server_1", "ONLINE"));
+    record.setListField("segment_1", List.of("Server_1"));
+    record.setRawPayload(new byte[]{1});
+    byte[] bytes = new ZNRecordSerializer().serialize(record);
+    if (GZipCompressionUtil.isCompressed(bytes)) {
+      bytes = GZipCompressionUtil.uncompress(new ByteArrayInputStream(bytes));
+    }
+    Set<String> writtenFields = new HashSet<>();
+    JsonUtils.bytesToJsonNode(bytes).fieldNames().forEachRemaining(writtenFields::add);
+    assertEquals(writtenFields, storedFields);
+  }
+
+  /// Keeps duplicates, so that a field hiding an inherited one is caught.
+  private static List<String> getInstanceFieldNames(Class<?> clazz) {
+    List<String> fieldNames = new ArrayList<>();
+    for (Class<?> c = clazz; c != Object.class; c = c.getSuperclass()) {
+      for (Field field : c.getDeclaredFields()) {
+        if (!Modifier.isStatic(field.getModifiers()) && !field.isSynthetic()) {
+          fieldNames.add(field.getName());
+        }
+      }
+    }
+    fieldNames.sort(null);
+    return fieldNames;
+  }
+
+  /// Exposes the ObjectMapper that ZNRecordSerializer writes ZNRecords with.
+  private static class ZNRecordSerializerMapper extends ZNRecordSerializer {
+    static ObjectMapper get() {
+      return mapper;
+    }
   }
 }
