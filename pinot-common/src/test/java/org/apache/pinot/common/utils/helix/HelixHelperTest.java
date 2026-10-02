@@ -18,13 +18,20 @@
  */
 package org.apache.pinot.common.utils.helix;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -87,5 +94,50 @@ public class HelixHelperTest {
     assertFalse(instanceConfig.getDisabledPartitionsMap().isEmpty());
     assertTrue(HelixHelper.removeDisabledPartitions(instanceConfig));
     assertTrue(instanceConfig.getDisabledPartitionsMap().isEmpty());
+  }
+
+  @Test
+  public void testCloneIdealState() {
+    IdealState idealState = new IdealState("myTable_REALTIME");
+    ZNRecord record = idealState.getRecord();
+    record.setSimpleField("REPLICAS", "2");
+    record.setBooleanField("enableCompression", true);
+    // Insertion order that differs from the sorted order, as in a deserialized ZNRecord
+    Map<String, Map<String, String>> mapFields = new LinkedHashMap<>();
+    Map<String, String> instanceStateMap = new LinkedHashMap<>();
+    instanceStateMap.put("Server_2", "CONSUMING");
+    instanceStateMap.put("Server_1", "CONSUMING");
+    mapFields.put("segment_2", instanceStateMap);
+    mapFields.put("segment_1", new LinkedHashMap<>(Map.of("Server_1", "ONLINE")));
+    record.setMapFields(mapFields);
+    record.setListField("segment_2", new ArrayList<>(List.of("Server_2", "Server_1")));
+    record.setRawPayload(new byte[]{1, 2, 3});
+    record.setVersion(5);
+
+    // Expected result of cloning through a serialization round trip
+    ZNRecordSerializer serializer = new ZNRecordSerializer();
+    ZNRecord expected =
+        new IdealState((ZNRecord) serializer.deserialize(serializer.serialize(record))).getRecord();
+    ZNRecord copy = HelixHelper.cloneIdealState(idealState).getRecord();
+
+    // Same content and iteration order
+    assertEquals(copy.getId(), expected.getId());
+    assertEquals(copy, expected);
+    assertEquals(new ArrayList<>(copy.getMapFields().keySet()), new ArrayList<>(expected.getMapFields().keySet()));
+    assertEquals(new ArrayList<>(copy.getMapField("segment_2").keySet()),
+        new ArrayList<>(expected.getMapField("segment_2").keySet()));
+    assertEquals(copy.getRawPayload(), expected.getRawPayload());
+    assertEquals(copy.getVersion(), expected.getVersion());
+
+    // Modifying the copy does not modify the original
+    assertNotSame(copy.getRawPayload(), record.getRawPayload());
+    copy.getSimpleFields().put("REPLICAS", "3");
+    copy.getMapField("segment_2").put("Server_2", "ONLINE");
+    copy.getMapFields().remove("segment_1");
+    copy.getListField("segment_2").add("Server_3");
+    assertEquals(record.getSimpleField("REPLICAS"), "2");
+    assertEquals(record.getMapField("segment_2").get("Server_2"), "CONSUMING");
+    assertTrue(record.getMapFields().containsKey("segment_1"));
+    assertEquals(record.getListField("segment_2"), List.of("Server_2", "Server_1"));
   }
 }
