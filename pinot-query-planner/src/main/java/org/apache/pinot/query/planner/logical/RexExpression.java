@@ -57,6 +57,85 @@ public interface RexExpression {
     }
   }
 
+  /// Reference to a column of the row bound to a specific MATCH_RECOGNIZE pattern variable, as it appears inside
+  /// MEASURES and DEFINE expressions. It is the serializable form of Calcite's `RexPatternFieldRef`, and is
+  /// only meaningful inside a `MatchNode`, whose pattern symbol table the ordinal indexes into.
+  ///
+  /// This deliberately does **not** extend [InputRef]. `RexPatternFieldRef` extends
+  /// `RexInputRef`, so any code that only looks at the index silently turns
+  /// `DEFINE UP AS UP.price > PREV(UP.price)` into a read of the current row's column: results that are wrong
+  /// but still type-correct, and therefore invisible. Consumers that do not understand this class must fail loudly.
+  class PatternFieldRef implements RexExpression {
+    /// Ordinal used while converting from Calcite, before the pattern symbol table has been built. It must never
+    /// reach the wire: `RexExpressionToProtoExpression` rejects it.
+    public static final int UNRESOLVED_SYMBOL_ORDINAL = -1;
+    /// Ordinal of the SQL:2016 *universal* row pattern variable, i.e. a column reference in MEASURES or DEFINE
+    /// that is not qualified by a pattern variable, such as `price` in
+    /// `DEFINE UP AS price > PREV(price)`. It denotes the rows of the match regardless of which variable they
+    /// are mapped to, so it is **not** an index into the symbol table and must never be confused with one:
+    /// `LAST(price)` is the last row of the whole match, whereas `LAST(X.price)` is the last row mapped
+    /// to `X`.
+    ///
+    /// Calcite has no dedicated representation for it: it reuses the row source alias (the table alias) as the
+    /// [alpha][#getAlpha()], which is why the planner maps any alpha that is not a pattern variable onto this
+    /// ordinal. It is a legal wire value, unlike [#UNRESOLVED_SYMBOL_ORDINAL].
+    public static final int UNIVERSAL_SYMBOL_ORDINAL = -2;
+
+    private final int _index;
+    private final int _symbolOrdinal;
+    private final String _alpha;
+
+    public PatternFieldRef(int index, int symbolOrdinal, String alpha) {
+      _index = index;
+      _symbolOrdinal = symbolOrdinal;
+      _alpha = alpha;
+    }
+
+    /// Column index into the input row of the enclosing `MatchNode`.
+    public int getIndex() {
+      return _index;
+    }
+
+    /// Ordinal of the pattern variable, i.e. the index into the enclosing `MatchNode`'s symbol table. This is
+    /// the authoritative identification of the variable.
+    public int getSymbolOrdinal() {
+      return _symbolOrdinal;
+    }
+
+    /// Pattern variable name as written in the query, for explain plans and error messages only. Consumers must
+    /// resolve the variable through [#getSymbolOrdinal()] and never string-match on this value.
+    public String getAlpha() {
+      return _alpha;
+    }
+
+    /// Returns a copy of this reference bound to the given pattern symbol ordinal.
+    public PatternFieldRef withSymbolOrdinal(int symbolOrdinal) {
+      return new PatternFieldRef(_index, symbolOrdinal, _alpha);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof PatternFieldRef)) {
+        return false;
+      }
+      PatternFieldRef that = (PatternFieldRef) o;
+      return _index == that._index && _symbolOrdinal == that._symbolOrdinal && Objects.equals(_alpha, that._alpha);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(_index, _symbolOrdinal, _alpha);
+    }
+
+    @Override
+    public String toString() {
+      return _alpha + "." + _index;
+    }
+  }
+
   class Literal implements RexExpression {
     public static final Literal TRUE = new Literal(ColumnDataType.BOOLEAN, 1);
     public static final Literal FALSE = new Literal(ColumnDataType.BOOLEAN, 0);
