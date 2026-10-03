@@ -379,6 +379,34 @@ public class MutableSegmentImplIngestionAggregationTest {
     assertThrows(IllegalArgumentException.class, () -> {
       mutableSegmentImpl.index(row, METADATA);
     });
+    // Strict mode still publishes the repaired initial value so column lengths stay aligned.
+    assertEquals(mutableSegmentImpl.getNumDocsIndexed(), 1);
+    assertEquals(mutableSegmentImpl.getRecord(0, new GenericRow()).getValue(m1), BigDecimal.ZERO);
+
+    mutableSegmentImpl.destroy();
+  }
+
+  @Test
+  public void testBigDecimalTooBigIsFailSoft()
+      throws Exception {
+    String m1 = "sumPrecision1";
+    Schema schema = getSchemaBuilder().addMetric(m1, DataType.BIG_DECIMAL).build();
+
+    int seed = 1;
+    Random random = new Random(seed);
+
+    MutableSegmentImpl mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1), VAR_LENGTH_SET, INVERTED_INDEX_SET,
+            List.of(new AggregationConfig(m1, "SUM_PRECISION(metric, 3)")), true);
+
+    BigDecimal large = BigDecimalUtils.generateMaximumNumberWithPrecision(5);
+    GenericRow row = getRow(random, 1);
+    row.putValue("metric", large);
+    mutableSegmentImpl.index(row, METADATA);
+
+    assertEquals(mutableSegmentImpl.getNumDocsIndexed(), 1);
+    GenericRow result = mutableSegmentImpl.getRecord(0, new GenericRow());
+    assertEquals(result.getValue(m1), BigDecimal.ZERO);
 
     mutableSegmentImpl.destroy();
   }

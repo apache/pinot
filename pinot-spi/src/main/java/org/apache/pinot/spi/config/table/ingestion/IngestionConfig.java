@@ -56,7 +56,9 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configs related to record aggregation function applied during ingestion")
   private List<AggregationConfig> _aggregationConfigs;
 
-  @JsonPropertyDescription("Configs related to skip any row which has error and continue during ingestion")
+  @JsonPropertyDescription("When true, recoverable transform or index errors are logged and ingestion continues. A "
+      + "started realtime row is always finished or the mutable segment is marked terminal; this flag only controls "
+      + "whether the error is rethrown after a successful repair.")
   private boolean _continueOnError;
 
   @JsonPropertyDescription("Max consecutive failures allowed while fetching record from source.")

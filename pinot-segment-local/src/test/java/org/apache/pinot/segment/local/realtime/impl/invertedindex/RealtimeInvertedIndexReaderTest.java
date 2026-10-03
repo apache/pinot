@@ -126,6 +126,20 @@ public class RealtimeInvertedIndexReaderTest {
   }
 
   @Test
+  public void testAddSkipsAheadToLaterDictionaryId() {
+    RealtimeInvertedIndex realtimeInvertedIndex = new RealtimeInvertedIndex();
+    realtimeInvertedIndex.add(2, 7);
+
+    assertTrue(realtimeInvertedIndex.getDocIds(0).isEmpty());
+    assertTrue(realtimeInvertedIndex.getDocIds(1).isEmpty());
+    assertTrue(realtimeInvertedIndex.getDocIds(2).contains(7));
+
+    realtimeInvertedIndex.add(0, 3);
+    assertTrue(realtimeInvertedIndex.getDocIds(0).contains(3));
+    assertTrue(realtimeInvertedIndex.getDocIds(2).contains(7));
+  }
+
+  @Test
   public void testReserveNextDictIdOnEmptyIndex() {
     RealtimeInvertedIndex realtimeInvertedIndex = new RealtimeInvertedIndex();
     realtimeInvertedIndex.reserveNextDictId();

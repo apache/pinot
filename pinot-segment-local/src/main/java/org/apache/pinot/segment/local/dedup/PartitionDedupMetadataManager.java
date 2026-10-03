@@ -55,6 +55,14 @@ public interface PartitionDedupMetadataManager extends Closeable {
   /// Remove the expired primary keys from the metadata when TTL is enabled.
   void removeExpiredPrimaryKeys();
 
+  /// Returns true if the primary key is already present and within TTL. Does not insert the key.
+  ///
+  /// Call this before writing a new consuming row so a failed write cannot leave a ghost key that drops a later retry.
+  /// Default is absent so existing test doubles keep the previous always-insert behavior until they override it.
+  default boolean isRecordPresent(DedupRecordInfo dedupRecordInfo) {
+    return false;
+  }
+
   /// Add the primary key to the given segment to the dedup metadata if it is absent and within the retention time.
   /// Returns true if the key was already present, i.e., the new record associated with the given
   /// [DedupRecordInfo] is a duplicate and should be skipped/dropped.
