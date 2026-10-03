@@ -46,8 +46,8 @@ import static org.testng.Assert.fail;
 public class ControllerClusterBasicAuthAuthorizationTest extends ControllerTest {
   private static final String ADMIN_USER = "clusterAdmin";
   private static final String ADMIN_PASSWORD = "clusterAdminPassword";
-  private static final String RESTRICTED_USER = "clusterReader";
-  private static final String RESTRICTED_PASSWORD = "clusterReaderPassword";
+  private static final String TABLE_READ_USER = "tableReader";
+  private static final String TABLE_READ_PASSWORD = "tableReaderPassword";
   private static final String CREATE_USER = "clusterCreator";
   private static final String CREATE_PASSWORD = "clusterCreatorPassword";
   private static final String UPDATE_USER = "clusterUpdater";
@@ -56,6 +56,8 @@ public class ControllerClusterBasicAuthAuthorizationTest extends ControllerTest 
   private static final String DELETE_PASSWORD = "clusterDeleterPassword";
   private static final String TABLE_UPDATE_USER = "tableUpdater";
   private static final String TABLE_UPDATE_PASSWORD = "tableUpdaterPassword";
+  private static final String TABLE_ADMIN_USER = "tableAdmin";
+  private static final String TABLE_ADMIN_PASSWORD = "tableAdminPassword";
   private static final String ALLOWED_TABLE = "allowedTable";
   private static final String DISALLOWED_TABLE = "disallowedTable";
 
@@ -80,39 +82,43 @@ public class ControllerClusterBasicAuthAuthorizationTest extends ControllerTest 
       controllerStarted = true;
 
       Map<String, String> adminHeaders = authHeaders(ADMIN_USER, ADMIN_PASSWORD);
-      Map<String, String> restrictedHeaders = authHeaders(RESTRICTED_USER, RESTRICTED_PASSWORD);
+      Map<String, String> tableReadHeaders = authHeaders(TABLE_READ_USER, TABLE_READ_PASSWORD);
       Map<String, String> createHeaders = authHeaders(CREATE_USER, CREATE_PASSWORD);
       Map<String, String> updateHeaders = authHeaders(UPDATE_USER, UPDATE_PASSWORD);
       Map<String, String> deleteHeaders = authHeaders(DELETE_USER, DELETE_PASSWORD);
       Map<String, String> tableUpdateHeaders = authHeaders(TABLE_UPDATE_USER, TABLE_UPDATE_PASSWORD);
+      Map<String, String> tableAdminHeaders = authHeaders(TABLE_ADMIN_USER, TABLE_ADMIN_PASSWORD);
       String clusterConfigsUrl = _controllerBaseApiUrl + "/cluster/configs";
       if (zkBacked) {
         addZkUsers();
-        TestUtils.waitForCondition(aVoid -> getStatus(clusterConfigsUrl, restrictedHeaders) == 200
+        // Unloaded users answer 401; once loaded every non-admin principal here is denied cluster access with 403.
+        TestUtils.waitForCondition(aVoid -> getStatus(clusterConfigsUrl, tableReadHeaders) == 403
                 && getStatus(clusterConfigsUrl, createHeaders) == 403
                 && getStatus(clusterConfigsUrl, updateHeaders) == 403
                 && getStatus(clusterConfigsUrl, deleteHeaders) == 403
-                && getStatus(clusterConfigsUrl, tableUpdateHeaders) == 403, TIMEOUT_MS,
+                && getStatus(clusterConfigsUrl, tableUpdateHeaders) == 403
+                && getStatus(clusterConfigsUrl, tableAdminHeaders) == 403, TIMEOUT_MS,
             "Controller users were not loaded from ZooKeeper");
       }
 
       assertGetStatus(clusterConfigsUrl, authHeaders("unknown", "incorrect"), 401);
-      assertGetStatus(clusterConfigsUrl, restrictedHeaders, 200);
+      assertGetStatus(clusterConfigsUrl, adminHeaders, 200);
       assertTrue(JsonUtils.stringToJsonNode(
-          sendPostRequest(_controllerBaseApiUrl + "/query/tableNames", "[]", restrictedHeaders)).isEmpty());
+          sendPostRequest(_controllerBaseApiUrl + "/query/tableNames", "[]", adminHeaders)).isEmpty());
       assertTrue(JsonUtils.stringToJsonNode(
-          sendPostRequest(_controllerBaseApiUrl + "/instances/updateTags/validate", "[]", restrictedHeaders))
+          sendPostRequest(_controllerBaseApiUrl + "/instances/updateTags/validate", "[]", adminHeaders))
           .isEmpty());
 
-      assertTableScope(restrictedHeaders, tableUpdateHeaders, authHeaders("unknown", "incorrect"));
+      assertClusterScope(tableReadHeaders, tableAdminHeaders);
+      assertTableScope(tableReadHeaders, tableUpdateHeaders, authHeaders("unknown", "incorrect"));
 
       String configKey = "pinot.controller.auth.test." + configKeySuffix;
       String zkPath = "/controller-auth-test-" + configKeySuffix;
       String zkCreateUrl = _controllerBaseApiUrl + "/zk/create?path=" + zkPath;
       String zkDeleteUrl = _controllerBaseApiUrl + "/zk/delete?path=" + zkPath;
-      assertHttpError(403, () -> sendPostRequest(zkCreateUrl, "{not-json", restrictedHeaders));
-      assertHttpError(403, () -> sendPostRequest(clusterConfigsUrl, "{not-json", restrictedHeaders));
-      assertHttpError(403, () -> sendDeleteRequest(clusterConfigsUrl + "/" + configKey, restrictedHeaders));
+      assertHttpError(403, () -> sendPostRequest(zkCreateUrl, "{not-json", tableReadHeaders));
+      assertHttpError(403, () -> sendPostRequest(clusterConfigsUrl, "{not-json", tableReadHeaders));
+      assertHttpError(403, () -> sendDeleteRequest(clusterConfigsUrl + "/" + configKey, tableReadHeaders));
 
       assertHttpError(403, () -> sendPostRequest(zkCreateUrl, "{not-json", updateHeaders));
       assertHttpError(403, () -> sendPostRequest(clusterConfigsUrl, "{not-json", createHeaders));
@@ -163,20 +169,24 @@ public class ControllerClusterBasicAuthAuthorizationTest extends ControllerTest 
     }
 
     controllerConfiguration.put("controller.admin.access.control.principals",
-        String.join(",", ADMIN_USER, RESTRICTED_USER, CREATE_USER, UPDATE_USER, DELETE_USER, TABLE_UPDATE_USER));
+        String.join(",", ADMIN_USER, TABLE_READ_USER, CREATE_USER, UPDATE_USER, DELETE_USER, TABLE_UPDATE_USER,
+            TABLE_ADMIN_USER));
     controllerConfiguration.put("controller.admin.access.control.principals." + ADMIN_USER + ".password",
         ADMIN_PASSWORD);
-    controllerConfiguration.put("controller.admin.access.control.principals." + RESTRICTED_USER + ".password",
-        RESTRICTED_PASSWORD);
-    controllerConfiguration.put("controller.admin.access.control.principals." + RESTRICTED_USER + ".tables",
+    controllerConfiguration.put("controller.admin.access.control.principals." + TABLE_READ_USER + ".password",
+        TABLE_READ_PASSWORD);
+    controllerConfiguration.put("controller.admin.access.control.principals." + TABLE_READ_USER + ".tables",
         ALLOWED_TABLE);
-    controllerConfiguration.put("controller.admin.access.control.principals." + RESTRICTED_USER + ".permissions",
+    controllerConfiguration.put("controller.admin.access.control.principals." + TABLE_READ_USER + ".permissions",
         "read");
     addStaticPrincipal(controllerConfiguration, CREATE_USER, CREATE_PASSWORD, "create");
     addStaticPrincipal(controllerConfiguration, UPDATE_USER, UPDATE_PASSWORD, "update");
     addStaticPrincipal(controllerConfiguration, DELETE_USER, DELETE_PASSWORD, "delete");
     addStaticPrincipal(controllerConfiguration, TABLE_UPDATE_USER, TABLE_UPDATE_PASSWORD, "update");
     controllerConfiguration.put("controller.admin.access.control.principals." + TABLE_UPDATE_USER + ".tables",
+        ALLOWED_TABLE);
+    addStaticPrincipal(controllerConfiguration, TABLE_ADMIN_USER, TABLE_ADMIN_PASSWORD, "create,read,update,delete");
+    controllerConfiguration.put("controller.admin.access.control.principals." + TABLE_ADMIN_USER + ".tables",
         ALLOWED_TABLE);
   }
 
@@ -189,13 +199,67 @@ public class ControllerClusterBasicAuthAuthorizationTest extends ControllerTest 
 
   private void addZkUsers()
       throws IOException {
-    addZkUser(RESTRICTED_USER, RESTRICTED_PASSWORD, List.of(ALLOWED_TABLE),
+    addZkUser(TABLE_READ_USER, TABLE_READ_PASSWORD, List.of(ALLOWED_TABLE),
         org.apache.pinot.spi.config.user.AccessType.READ);
     addZkUser(CREATE_USER, CREATE_PASSWORD, null, org.apache.pinot.spi.config.user.AccessType.CREATE);
     addZkUser(UPDATE_USER, UPDATE_PASSWORD, null, org.apache.pinot.spi.config.user.AccessType.UPDATE);
     addZkUser(DELETE_USER, DELETE_PASSWORD, null, org.apache.pinot.spi.config.user.AccessType.DELETE);
     addZkUser(TABLE_UPDATE_USER, TABLE_UPDATE_PASSWORD, List.of(ALLOWED_TABLE),
         org.apache.pinot.spi.config.user.AccessType.UPDATE);
+    addZkUser(TABLE_ADMIN_USER, TABLE_ADMIN_PASSWORD, List.of(ALLOWED_TABLE),
+        org.apache.pinot.spi.config.user.AccessType.values());
+  }
+
+  /// Asserts the fix for [issue 14595](https://github.com/apache/pinot/issues/14595): principals confined to a subset
+  /// of tables are denied endpoints that address the cluster rather than a table, whatever permissions they hold.
+  private void assertClusterScope(Map<String, String> tableReadHeaders, Map<String, String> tableAdminHeaders)
+      throws IOException {
+    // The reported exploit: a table-scoped user deleting another user through a cluster-level endpoint.
+    assertHttpError(403,
+        () -> sendDeleteRequest(_controllerBaseApiUrl + "/users/" + ADMIN_USER + "?component=CONTROLLER",
+            tableAdminHeaders));
+    assertGetStatus(_controllerBaseApiUrl + "/users", tableAdminHeaders, 403);
+
+    // Other cluster-level endpoints follow the same rule, including read-only ones.
+    for (Map<String, String> tableScopedHeaders : List.of(tableReadHeaders, tableAdminHeaders)) {
+      assertGetStatus(_controllerBaseApiUrl + "/cluster/configs", tableScopedHeaders, 403);
+      assertGetStatus(_controllerBaseApiUrl + "/cluster/info", tableScopedHeaders, 403);
+      assertGetStatus(_controllerBaseApiUrl + "/instances", tableScopedHeaders, 403);
+      assertHttpError(403,
+          () -> sendPostRequest(_controllerBaseApiUrl + "/query/tableNames", "[]", tableScopedHeaders));
+
+      // Cluster-wide listings are denied too: they enumerate every table in the cluster rather than filtering to the
+      // principal's scope, so the controller UI's listing pages are unavailable to a table-scoped principal.
+      assertGetStatus(_controllerBaseApiUrl + "/tables", tableScopedHeaders, 403);
+      assertGetStatus(_controllerBaseApiUrl + "/schemas", tableScopedHeaders, 403);
+
+      // Naming a table the principal owns must not make a cluster endpoint pass as a table-scoped request. These
+      // endpoints declare no table parameter, so the parameter is not theirs to be scoped by.
+      for (String tableParam : List.of("tableName", "tableNameWithType", "schemaName")) {
+        String scopedSuffix = "?" + tableParam + "=" + ALLOWED_TABLE;
+        assertGetStatus(_controllerBaseApiUrl + "/cluster/configs" + scopedSuffix, tableScopedHeaders, 403);
+        assertGetStatus(_controllerBaseApiUrl + "/users" + scopedSuffix, tableScopedHeaders, 403);
+      }
+    }
+    assertHttpError(403, () -> sendDeleteRequest(
+        _controllerBaseApiUrl + "/users/" + ADMIN_USER + "?component=CONTROLLER&tableName=" + ALLOWED_TABLE,
+        tableAdminHeaders));
+
+    // The principal keeps the endpoints that genuinely declare a table parameter, cluster action or not.
+    assertGetStatus(_controllerBaseApiUrl + "/periodictask/run?taskname=missing&tableName=" + ALLOWED_TABLE,
+        tableAdminHeaders, 404);
+    // Omitting that parameter means "every table", which is the escalation this change closes for this endpoint.
+    assertGetStatus(_controllerBaseApiUrl + "/periodictask/run?taskname=missing", tableAdminHeaders, 403);
+
+    // Segment upload documents tableName as optional, falling back to the segment metadata. A table-scoped principal
+    // must now send it, because without it the request names no table and is treated as cluster-wide.
+    assertHttpError(403, () -> sendPostRequest(_controllerBaseApiUrl + "/segments", "", tableAdminHeaders));
+
+    // The controller's multi-stage query path authorizes cluster-wide by design (it has no cross-table rule), so a
+    // table-scoped principal is denied there even for a table it owns. The broker path is unaffected.
+    assertHttpError(403, () -> sendPostRequest(_controllerBaseApiUrl + "/sql",
+        "{\"sql\":\"SELECT 1 FROM " + ALLOWED_TABLE + "\",\"queryOptions\":\"useMultistageEngine=true\"}",
+        tableAdminHeaders));
   }
 
   private void assertTableScope(Map<String, String> readHeaders, Map<String, String> updateHeaders,
@@ -212,10 +276,10 @@ public class ControllerClusterBasicAuthAuthorizationTest extends ControllerTest 
   }
 
   private void addZkUser(String username, String password, List<String> tables,
-      org.apache.pinot.spi.config.user.AccessType permission)
+      org.apache.pinot.spi.config.user.AccessType... permissions)
       throws IOException {
     _helixResourceManager.addUser(new UserConfig(username, password, ComponentType.CONTROLLER.name(),
-        RoleType.USER.name(), tables, null, List.of(permission)));
+        RoleType.USER.name(), tables, null, List.of(permissions)));
   }
 
   private static Map<String, String> authHeaders(String username, String password) {
