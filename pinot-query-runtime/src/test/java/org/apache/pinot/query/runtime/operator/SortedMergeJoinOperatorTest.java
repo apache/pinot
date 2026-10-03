@@ -18,30 +18,48 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.routing.MailboxInfo;
+import org.apache.pinot.query.routing.MailboxInfos;
+import org.apache.pinot.query.routing.SharedMailboxInfos;
+import org.apache.pinot.query.routing.StageMetadata;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -415,6 +433,104 @@ public class SortedMergeJoinOperatorTest {
     }
     assertEquals(rows.get(3000), withResidualFilter
         ? new Object[]{7, "m", null, null} : new Object[]{7, "m", 0, "m"});
+  }
+
+  @DataProvider
+  public Object[][] mailboxCompletion() {
+    return new Object[][]{{"early", false}, {"early", true}, {"emptyLeft", false}, {"emptyLeft", true},
+        {"emptyRight", false}, {"emptyRight", true}, {"break", false}, {"break", true}};
+  }
+
+  @Test(dataProvider = "mailboxCompletion", timeOut = 10_000)
+  @SuppressWarnings("unchecked")
+  public void shouldDrainMailboxTerminalsOnCompletion(String completion, boolean lateError)
+      throws IOException {
+    MailboxService service = mock(MailboxService.class);
+    when(service.getHostname()).thenReturn("localhost");
+    when(service.getPort()).thenReturn(1234);
+    ReceivingMailbox leftMailbox = mock(ReceivingMailbox.class);
+    ReceivingMailbox rightMailbox = mock(ReceivingMailbox.class);
+    when(leftMailbox.getStatMap()).thenReturn(new StatMap<>(ReceivingMailbox.StatKey.class));
+    when(rightMailbox.getStatMap()).thenReturn(new StatMap<>(ReceivingMailbox.StatKey.class));
+    when(service.getReceivingMailbox(MailboxIdUtils.toMailboxId(0, 1, 0, 0, 0))).thenReturn(leftMailbox);
+    when(service.getReceivingMailbox(MailboxIdUtils.toMailboxId(0, 2, 0, 0, 0))).thenReturn(rightMailbox);
+    MailboxInfos infos = new SharedMailboxInfos(new MailboxInfo("localhost", 1234, List.of(0)));
+    StageMetadata stage = new StageMetadata(0,
+        List.of(new WorkerMetadata(0, Map.of(1, infos, 2, infos), Map.of())), Map.of());
+    OpChainExecutionContext context = OperatorTestUtil.getOpChainContext(service, Long.MAX_VALUE, stage);
+    Object[][] leftRows = new Object[4000][];
+    for (int i = 0; i < leftRows.length; i++) {
+      leftRows[i] = new Object[]{1, "left"};
+    }
+    ReceivingMailbox.MseBlockWithStats leftEos = OperatorTestUtil.eosWithStats(leafStats(1, 41).serialize());
+    ReceivingMailbox.MseBlockWithStats rightEos = lateError
+        ? OperatorTestUtil.errorWithStats(new RuntimeException("late right error"), leafStats(2, 42).serialize())
+        : OperatorTestUtil.eosWithStats(leafStats(2, 42).serialize());
+    when(leftMailbox.poll()).thenReturn(completion.equals("emptyLeft") ? leftEos
+        : OperatorTestUtil.blockWithStats(CHILD_SCHEMA, leftRows), leftEos);
+    // Empty-right completion still has a successful first EOS; the late error is then supplied by the left peer.
+    if (completion.equals("emptyRight")) {
+      when(rightMailbox.poll()).thenReturn(OperatorTestUtil.eosWithStats(leafStats(2, 42).serialize()));
+      when(leftMailbox.poll()).thenReturn(OperatorTestUtil.blockWithStats(CHILD_SCHEMA, leftRows), lateError
+          ? OperatorTestUtil.errorWithStats(new RuntimeException("late left error"), leafStats(1, 41).serialize())
+          : leftEos);
+    } else {
+      Object[][] rightRows = completion.equals("break")
+          ? new Object[][]{{1, "right"}, {1, "duplicate"}, {2, "tail"}}
+          : new Object[][]{{1, "right"}, {2, "tail"}};
+      when(rightMailbox.poll()).thenReturn(OperatorTestUtil.blockWithStats(CHILD_SCHEMA, rightRows), rightEos);
+    }
+    PlanNode.NodeHint hint = completion.equals("break") ? new PlanNode.NodeHint(Map.of(
+        PinotHintOptions.JOIN_HINT_OPTIONS, Map.of(PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "1",
+        PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "BREAK"))) : PlanNode.NodeHint.EMPTY;
+    try (SortedMergeJoinOperator operator = getOperator(mailboxInput(context, 1), mailboxInput(context, 2),
+        RESULT_SCHEMA, JoinRelType.INNER, List.of(0), List.of(0), hint)) {
+      if (completion.equals("early")) {
+        assertEquals(((MseBlock.Data) operator.nextBlock()).getNumRows(), 1024);
+        operator.earlyTerminate();
+      }
+      MseBlock terminal = operator.nextBlock();
+      assertEquals(terminal.isError(), lateError);
+      assertEquals(terminal.isSuccess(), !lateError);
+      if (lateError) {
+        String message = completion.equals("emptyRight") ? "late left error" : "late right error";
+        assertTrue(((ErrorMseBlock) terminal).getErrorMessages().get(QueryErrorCode.UNKNOWN).contains(message));
+      }
+      MultiStageQueryStats stats = operator.calculateStats();
+      for (int sender : List.of(1, 2)) {
+        MultiStageQueryStats.StageStats.Closed upstream = stats.getUpstreamStageStats(sender);
+        assertNotNull(upstream, "Both mailbox terminal stats must survive completion");
+        StatMap<LeafOperator.StatKey> leaf = (StatMap<LeafOperator.StatKey>) upstream.getLastOperatorStats();
+        assertEquals(leaf.getLong(LeafOperator.StatKey.EMITTED_ROWS), 40L + sender);
+      }
+      if (!completion.equals("emptyLeft")) {
+        verify(leftMailbox).earlyTerminate();
+      }
+      if (!completion.equals("emptyRight")) {
+        verify(rightMailbox).earlyTerminate();
+      }
+      assertFalse(operator.hasBufferedState());
+    }
+  }
+
+  private static MultiStageQueryStats leafStats(int stage, long emitted) {
+    StatMap<LeafOperator.StatKey> stats = new StatMap<>(LeafOperator.StatKey.class);
+    stats.merge(LeafOperator.StatKey.EMITTED_ROWS, emitted);
+    MultiStageQueryStats upstream = MultiStageQueryStats.emptyStats(stage);
+    upstream.getCurrentStats().addLastOperator(MultiStageOperator.Type.LEAF, stats);
+    return upstream;
+  }
+
+  private static SortedMailboxMergeReceiveOperator mailboxInput(OpChainExecutionContext context, int senderStage) {
+    MailboxMergeReceiveNode node = mock(MailboxMergeReceiveNode.class);
+    when(node.getDistributionType()).thenReturn(RelDistribution.Type.SINGLETON);
+    when(node.getSenderStageId()).thenReturn(senderStage);
+    when(node.getDataSchema()).thenReturn(CHILD_SCHEMA);
+    when(node.getCollations()).thenReturn(List.of(new RelFieldCollation(0, RelFieldCollation.Direction.ASCENDING,
+        RelFieldCollation.NullDirection.LAST)));
+    when(node.getFetch()).thenReturn(-1);
+    when(node.getOffset()).thenReturn(-1);
+    return new SortedMailboxMergeReceiveOperator(context, node);
   }
 
   @Test

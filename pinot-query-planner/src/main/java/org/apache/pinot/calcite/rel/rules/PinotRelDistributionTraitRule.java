@@ -32,6 +32,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.SetOp;
+import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
@@ -130,7 +131,8 @@ public class PinotRelDistributionTraitRule extends RelOptRule {
         // ... skip;
         LOGGER.warn("Failed to derive distribution from input for node: {}", node, e);
       }
-    } else if (node instanceof LogicalFilter) {
+    } else if (node instanceof LogicalFilter || node instanceof Sort) {
+      // Filtering and sorting change rows/order within each worker, without changing their distribution.
       assert inputs.size() == 1;
       RelDistribution inputRelDistribution = input.getTraitSet().getDistribution();
       if (inputRelDistribution != null) {

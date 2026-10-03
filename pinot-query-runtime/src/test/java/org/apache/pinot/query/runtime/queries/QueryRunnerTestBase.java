@@ -121,6 +121,12 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   /// `rlsFilters-<table>` entries carrying row-level-security filters.
   protected QueryDispatcher.QueryResult queryRunner(String sql, boolean trace,
       Map<String, String> extraRequestMetadata) {
+    return queryRunner(sql, trace, extraRequestMetadata, _queryEnvironment);
+  }
+
+  /// Runs a query with an explicit capability snapshot, without changing the default test environment.
+  protected QueryDispatcher.QueryResult queryRunner(String sql, boolean trace, Map<String, String> extraRequestMetadata,
+      QueryEnvironment queryEnvironment) {
     long startTimeMs = System.currentTimeMillis();
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
@@ -138,7 +144,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     long activeDeadlineMs = startTimeMs + timeoutMs;
     long passiveDeadlineMs = activeDeadlineMs + extraPassiveTimeoutMs;
     QueryEnvironment.QueryPlannerResult queryPlannerResult;
-    try (QueryEnvironment.CompiledQuery compiledQuery = _queryEnvironment.compile(sql, sqlNodeAndOptions)) {
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(sql, sqlNodeAndOptions)) {
       queryPlannerResult = compiledQuery.planQuery(requestId);
     }
     DispatchableSubPlan dispatchableSubPlan = queryPlannerResult.getQueryPlan();
