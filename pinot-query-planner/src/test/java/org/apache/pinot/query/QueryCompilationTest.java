@@ -1401,6 +1401,62 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
+  @Test
+  public void testQueryOptionCannotBypassMergeCapability() {
+    String query = "SET windowSortOnSender=true; SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d";
+    try (CompiledQuery compiled = _queryEnvironment.compile(query)) {
+      WindowNode window = findWindowNode(compiled.planQuery(0).getQueryPlan());
+      assertTrue(window.getInputs().get(0) instanceof SortNode);
+      assertFalse(window.getInputs().get(0).getInputs().get(0) instanceof MailboxMergeReceiveNode);
+    }
+  }
+
+  @DataProvider
+  public Object[][] orderedLeafCases() {
+    return new Object[][]{
+        {"SELECT col1 FROM a ORDER BY col1 LIMIT 10 OFFSET 5", true, true, true},
+        {"SELECT col1 FROM c WHERE col3 > 0 ORDER BY col1 LIMIT 10 OFFSET 5", true, true, true},
+        {"SELECT col1 FROM d ORDER BY col1 LIMIT 10 OFFSET 5", true, true, false},
+        {"SELECT col1 FROM d_OFFLINE ORDER BY col1 LIMIT 10 OFFSET 5", true, true, true},
+        {"SELECT col1 FROM a ORDER BY col1 LIMIT 10 OFFSET 5", false, true, false},
+        {"SELECT col1 FROM a ORDER BY col1 LIMIT 10 OFFSET 5", true, false, false},
+        {"SELECT col1, COUNT(*) FROM a GROUP BY col1 ORDER BY col1 LIMIT 10 OFFSET 5", true, true, false}
+    };
+  }
+
+  @Test(dataProvider = "orderedLeafCases")
+  public void testOrderedLeafMergeIsEstablishedLogically(String query, boolean capability, boolean enabled,
+      boolean expected) {
+    QueryEnvironment environment = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS,
+        SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP, capability);
+    DispatchableSubPlan plan;
+    try (CompiledQuery compiled = environment.compile("SET streamingSortedMailboxReceive=" + enabled + "; " + query)) {
+      plan = compiled.planQuery(0).getQueryPlan();
+    }
+    MailboxMergeReceiveNode merge = null;
+    for (DispatchablePlanFragment fragment : plan.getQueryStages()) {
+      MailboxMergeReceiveNode candidate = findNodeOfType(fragment.getPlanFragment().getFragmentRoot(),
+          MailboxMergeReceiveNode.class);
+      if (candidate != null) {
+        merge = candidate;
+        break;
+      }
+    }
+    assertEquals(merge != null, expected, query);
+    if (merge != null) {
+      assertEquals(merge.getFetch(), 10);
+      assertEquals(merge.getOffset(), 5);
+      MailboxSendNode sender = (MailboxSendNode) plan.getQueryStageMap().get(merge.getSenderStageId())
+          .getPlanFragment().getFragmentRoot();
+      assertFalse(sender.isSort());
+      assertTrue(sender.getInputs().get(0) instanceof SortNode);
+      SortNode senderSort = (SortNode) sender.getInputs().get(0);
+      assertEquals(senderSort.getCollations(), merge.getCollations());
+      assertEquals(senderSort.getFetch(), 15);
+      assertTrue(senderSort.getOffset() <= 0);
+    }
+  }
+
   /// A partitioned ordered window keeps its authoritative full sort after the hash exchange.
   @Test
   public void testPartitionedOrderedWindowUsesReceiverFullSort() {
