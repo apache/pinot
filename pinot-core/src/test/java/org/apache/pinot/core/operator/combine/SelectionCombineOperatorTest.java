@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.combine;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -58,7 +59,8 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/// Test for [SelectionOnlyCombineOperator] and [SelectionOrderByCombineOperator].
+/// Test for [SelectionOnlyCombineOperator], [SelectionOrderByCombineOperator] and
+/// [MinMaxValueBasedSelectionOrderByCombineOperator].
 public class SelectionCombineOperatorTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SelectionCombineOperatorTest");
   private static final String RAW_TABLE_NAME = "testTable";
@@ -77,7 +79,20 @@ public class SelectionCombineOperatorTest {
   private static final PlanMaker PLAN_MAKER = new InstancePlanMakerImplV2();
   private static final ExecutorService EXECUTOR = Executors.newCachedThreadPool();
 
+  // Segments for the min/max value based segment skipping tests under null handling
+  private static final TableConfig NULL_HANDLING_TABLE_CONFIG =
+      new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNullHandlingEnabled(true).build();
+  private static final Schema COLUMN_BASED_NULL_HANDLING_SCHEMA =
+      new Schema.SchemaBuilder().setEnableColumnBasedNullHandling(true)
+          .addDimensionField(INT_COLUMN, FieldSpec.DataType.INT, fieldSpec -> fieldSpec.setNullable(false)).build();
+  private static final String NULL_HANDLING_OPTIONS = "SET enableNullHandling=true; ";
+
   private List<IndexSegment> _indexSegments;
+  private IndexSegment _highSegment;
+  private IndexSegment _lowSegment;
+  private IndexSegment _lowSegmentWithNulls;
+  private IndexSegment _highNonNullableSegment;
+  private IndexSegment _lowNonNullableSegment;
 
   @BeforeClass
   public void setUp()
@@ -87,6 +102,34 @@ public class SelectionCombineOperatorTest {
     for (int i = 0; i < NUM_SEGMENTS; i++) {
       _indexSegments.add(createOfflineSegment(i));
     }
+    _highSegment = createSegment("highSegment", NULL_HANDLING_TABLE_CONFIG, SCHEMA, 100, 101, 102);
+    _lowSegment = createSegment("lowSegment", NULL_HANDLING_TABLE_CONFIG, SCHEMA, 5, 6, 7);
+    _lowSegmentWithNulls = createSegment("lowSegmentWithNulls", NULL_HANDLING_TABLE_CONFIG, SCHEMA, 5, null, null);
+    _highNonNullableSegment =
+        createSegment("highNonNullableSegment", TABLE_CONFIG, COLUMN_BASED_NULL_HANDLING_SCHEMA, 100, 101, 102);
+    _lowNonNullableSegment =
+        createSegment("lowNonNullableSegment", TABLE_CONFIG, COLUMN_BASED_NULL_HANDLING_SCHEMA, 5, 6, 7);
+  }
+
+  private IndexSegment createSegment(String segmentName, TableConfig tableConfig, Schema schema, Integer... values)
+      throws Exception {
+    List<GenericRow> records = new ArrayList<>(values.length);
+    for (Integer value : values) {
+      GenericRow record = new GenericRow();
+      record.putValue(INT_COLUMN, value);
+      records.add(record);
+    }
+
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
+    segmentGeneratorConfig.setSegmentName(segmentName);
+    segmentGeneratorConfig.setOutDir(TEMP_DIR.getPath());
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
+    driver.build();
+
+    return ImmutableSegmentLoader.load(new File(TEMP_DIR, segmentName), ReadMode.mmap);
   }
 
   private IndexSegment createOfflineSegment(int index)
@@ -304,10 +347,78 @@ public class SelectionCombineOperatorTest {
     assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
   }
 
+  /// Under null handling, a segment without nulls is still skipped when its max cannot beat the boundary, even though
+  /// nulls sort first under `DESC`.
+  @Test
+  public void selectionOrderByMinMaxSkipsSegmentWithoutNullsUnderNullHandling() {
+    SelectionResultsBlock combineResult =
+        getSingleThreadCombineResult(NULL_HANDLING_OPTIONS + "SELECT * FROM testTable ORDER BY intColumn DESC LIMIT 3",
+            List.of(_highSegment, _lowSegment));
+    assertEquals(getIntColumnValues(combineResult), Arrays.asList(102, 101, 100));
+    assertEquals(combineResult.getNumSegmentsProcessed(), 2);
+    assertEquals(combineResult.getNumSegmentsMatched(), 1);
+  }
+
+  /// When nulls sort last, a segment with nulls is still skipped when its max cannot beat the boundary: its nulls rank
+  /// below any non-null boundary.
+  @Test
+  public void selectionOrderByMinMaxSkipsSegmentWithNullsWhenNullsSortLast() {
+    SelectionResultsBlock combineResult = getSingleThreadCombineResult(
+        NULL_HANDLING_OPTIONS + "SELECT * FROM testTable ORDER BY intColumn DESC NULLS LAST LIMIT 3",
+        List.of(_highSegment, _lowSegmentWithNulls));
+    assertEquals(getIntColumnValues(combineResult), Arrays.asList(102, 101, 100));
+    assertEquals(combineResult.getNumSegmentsProcessed(), 2);
+    assertEquals(combineResult.getNumSegmentsMatched(), 1);
+  }
+
+  /// When nulls sort first, a segment with nulls must not be skipped: the segment min/max does not account for its
+  /// null rows.
+  @Test
+  public void selectionOrderByMinMaxProcessesSegmentWithNullsWhenNullsSortFirst() {
+    SelectionResultsBlock combineResult =
+        getSingleThreadCombineResult(NULL_HANDLING_OPTIONS + "SELECT * FROM testTable ORDER BY intColumn DESC LIMIT 3",
+            List.of(_highSegment, _lowSegmentWithNulls));
+    assertEquals(getIntColumnValues(combineResult), Arrays.asList(null, null, 102));
+    assertEquals(combineResult.getNumSegmentsProcessed(), 2);
+    assertEquals(combineResult.getNumSegmentsMatched(), 2);
+  }
+
+  /// With column-based null handling, a non-nullable column has no nulls, so segment skipping still applies.
+  @Test
+  public void selectionOrderByMinMaxSkipsSegmentForNonNullableColumn() {
+    SelectionResultsBlock combineResult =
+        getSingleThreadCombineResult(NULL_HANDLING_OPTIONS + "SELECT * FROM testTable ORDER BY intColumn DESC LIMIT 3",
+            List.of(_highNonNullableSegment, _lowNonNullableSegment));
+    assertEquals(getIntColumnValues(combineResult), Arrays.asList(102, 101, 100));
+    assertEquals(combineResult.getNumSegmentsProcessed(), 2);
+    assertEquals(combineResult.getNumSegmentsMatched(), 1);
+  }
+
+  private static List<Integer> getIntColumnValues(SelectionResultsBlock combineResult) {
+    List<Integer> values = new ArrayList<>();
+    for (Object[] row : combineResult.getRows()) {
+      values.add((Integer) row[0]);
+    }
+    return values;
+  }
+
   private SelectionResultsBlock getCombineResult(@Language("sql") String query) {
+    return getCombineResult(QueryContextConverterUtils.getQueryContext(query), _indexSegments);
+  }
+
+  /// Runs the query with a single thread, which processes the segments in min/max order and makes the segment skipping
+  /// deterministic. `SET maxExecutionThreads` would not apply here: the server plan maker is what copies it into the
+  /// query context.
+  private SelectionResultsBlock getSingleThreadCombineResult(@Language("sql") String query,
+      List<IndexSegment> indexSegments) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
-    List<PlanNode> planNodes = new ArrayList<>(NUM_SEGMENTS);
-    for (IndexSegment indexSegment : _indexSegments) {
+    queryContext.setMaxExecutionThreads(1);
+    return getCombineResult(queryContext, indexSegments);
+  }
+
+  private SelectionResultsBlock getCombineResult(QueryContext queryContext, List<IndexSegment> indexSegments) {
+    List<PlanNode> planNodes = new ArrayList<>(indexSegments.size());
+    for (IndexSegment indexSegment : indexSegments) {
       planNodes.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(indexSegment), queryContext));
     }
     queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
@@ -319,6 +430,10 @@ public class SelectionCombineOperatorTest {
   public void tearDown()
       throws IOException {
     for (IndexSegment indexSegment : _indexSegments) {
+      indexSegment.destroy();
+    }
+    for (IndexSegment indexSegment : List.of(_highSegment, _lowSegment, _lowSegmentWithNulls, _highNonNullableSegment,
+        _lowNonNullableSegment)) {
       indexSegment.destroy();
     }
     FileUtils.deleteDirectory(TEMP_DIR);
