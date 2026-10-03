@@ -28,11 +28,14 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
 import org.apache.commons.lang3.StringUtils;
@@ -49,6 +52,15 @@ public class AuditRequestProcessor {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditRequestProcessor.class);
   static final String TRUNCATION_MARKER = "...[truncated]";
+  /// Emitted in place of a body whose media type is not text, or whose bytes are not valid UTF-8.
+  /// Recording that a body existed, and its type, keeps the audit trail complete without copying
+  /// the bytes into the log.
+  static final String NON_TEXT_BODY_MARKER = "[body omitted: non-text media type %s]";
+  static final String BINARY_BODY_MARKER = "[body omitted: %d bytes of non-UTF-8 data]";
+  /// A body that is mostly U+FFFD after decoding was not text. A legitimately truncated UTF-8
+  /// body can only lose the few bytes of one character at the cut, so a low ratio is expected
+  /// and must not be misclassified.
+  private static final int MAX_REPLACEMENT_PERCENT = 10;
 
   private final AuditConfigManager _configManager;
   private final AuditIdentityResolver _identityResolver;
@@ -170,9 +182,17 @@ public class AuditRequestProcessor {
       }
 
       if (config.isCaptureRequestPayload() && requestContext.hasEntity()) {
-        String requestBody = readRequestBody(requestContext, config.getMaxPayloadSize());
-        if (StringUtils.isNotBlank(requestBody)) {
-          payload.setBody(requestBody);
+        final MediaType mediaType = requestContext.getMediaType();
+        if (isTextualMediaType(mediaType)) {
+          String requestBody = readRequestBody(requestContext, config.getMaxPayloadSize());
+          if (StringUtils.isNotBlank(requestBody)) {
+            payload.setBody(requestBody);
+          }
+        } else {
+          // Segment uploads arrive as multipart/form-data wrapping a gzipped tarball. Copying
+          // those bytes into the audit record adds no auditable information -- the record cannot
+          // be read back as text -- while making each record orders of magnitude larger.
+          payload.setBody(String.format(NON_TEXT_BODY_MARKER, mediaType));
         }
       }
 
@@ -246,6 +266,12 @@ public class AuditRequestProcessor {
 
       if (capturedBytes.length > 0) {
         String requestBody = new String(capturedBytes, StandardCharsets.UTF_8);
+        if (isMostlyReplacementChars(requestBody)) {
+          // Decoding non-UTF-8 bytes yields one U+FFFD per bad byte, and each of those is three
+          // bytes again once the record is written out -- so binary bodies inflate rather than
+          // truncate. Record the size instead of the soup.
+          return String.format(BINARY_BODY_MARKER, capturedBytes.length);
+        }
         if (capturedBytes.length >= maxPayloadSize) {
           requestBody += TRUNCATION_MARKER;
           _auditMetrics.addMeteredGlobalValue(AuditMetrics.AuditMeter.AUDIT_REQUEST_PAYLOAD_TRUNCATED, 1L);
@@ -256,5 +282,34 @@ public class AuditRequestProcessor {
       LOG.warn("Failed to capture request body", e);
     }
     return null;
+  }
+
+  /// Only text-shaped bodies are worth copying into an audit record. Anything else (multipart
+  /// segment uploads, octet-stream) is recorded by type and size instead.
+  /// A missing media type is treated as textual so that behaviour is unchanged for clients that
+  /// do not set Content-Type.
+  @VisibleForTesting
+  static boolean isTextualMediaType(@Nullable MediaType mediaType) {
+    if (mediaType == null) {
+      return true;
+    }
+    if ("text".equalsIgnoreCase(mediaType.getType())) {
+      return true;
+    }
+    if (!"application".equalsIgnoreCase(mediaType.getType())) {
+      return false;
+    }
+    final String subtype = mediaType.getSubtype().toLowerCase(Locale.ROOT);
+    return subtype.equals("json") || subtype.equals("xml") || subtype.equals("x-www-form-urlencoded")
+        || subtype.endsWith("+json") || subtype.endsWith("+xml");
+  }
+
+  @VisibleForTesting
+  static boolean isMostlyReplacementChars(String decoded) {
+    if (decoded.isEmpty()) {
+      return false;
+    }
+    long replacements = decoded.chars().filter(c -> c == 0xFFFD).count();
+    return replacements * 100 > (long) decoded.length() * MAX_REPLACEMENT_PERCENT;
   }
 }
