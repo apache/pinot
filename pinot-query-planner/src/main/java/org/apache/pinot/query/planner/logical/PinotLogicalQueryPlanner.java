@@ -32,6 +32,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.core.Exchange;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
@@ -58,10 +59,18 @@ public class PinotLogicalQueryPlanner {
   public static SubPlan makePlan(RelRoot relRoot,
       @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools,
       String hashFunction, boolean pruneUnnestColumns) {
-    PlanNode rootNode = new RelToPlanNodeConverter(tracker, hashFunction,
-        !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE, pruneUnnestColumns).toPlanNode(relRoot.rel);
+    return makePlan(relRoot, tracker, useSpools, hashFunction, pruneUnnestColumns, null, Map.of());
+  }
 
-    PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker, useSpools, hashFunction);
+  public static SubPlan makePlan(RelRoot relRoot,
+      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools,
+      String hashFunction, boolean pruneUnnestColumns, @Nullable WindowSortAutoPlan selector,
+      Map<Exchange, WindowSortAutoPlanner.Selection> autoExchanges) {
+    RelToPlanNodeConverter converter = new RelToPlanNodeConverter(tracker, hashFunction,
+        !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE, pruneUnnestColumns, autoExchanges);
+    PlanNode rootNode = converter.toPlanNode(relRoot.rel);
+    PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker, useSpools, hashFunction, selector,
+        converter.getAutoBindings());
     return new SubPlan(rootFragment,
         new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields), List.of());
 
@@ -107,8 +116,9 @@ public class PinotLogicalQueryPlanner {
 
   private static PlanFragment planNodeToPlanFragment(
       PlanNode node, @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools,
-      String hashFunction) {
-    PlanFragmenter fragmenter = new PlanFragmenter();
+      String hashFunction, @Nullable WindowSortAutoPlan selector,
+      Map<ExchangeNode, WindowSortAutoPlanner.Selection> autoBindings) {
+    PlanFragmenter fragmenter = new PlanFragmenter(selector, autoBindings);
     PlanFragmenter.Context fragmenterContext = fragmenter.createContext();
     node = node.visit(fragmenter, fragmenterContext);
 
