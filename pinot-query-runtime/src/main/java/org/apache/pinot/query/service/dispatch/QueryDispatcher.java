@@ -28,6 +28,7 @@ import io.grpc.Deadline;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -91,6 +92,7 @@ import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -131,6 +133,8 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
   private final GrpcKeepAliveConfig _keepAliveConfig;
   // maps broker-generated query id to the set of servers that the query was dispatched to
   private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
+  private final boolean _enableCancellation;
+  private final boolean _enableProgress;
   private final FailureDetector _failureDetector;
   private final Duration _cancelTimeout;
   /// Cluster-level default for stream-stats mode. Used as the fallback in [#submitAndReduce] when the query
@@ -145,7 +149,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout) {
-    this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, enableCancellation, cancelTimeout,
         GrpcKeepAliveConfig.DISABLED, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS,
         CommonConstants.Broker.DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST);
   }
@@ -165,14 +169,32 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
       boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
       boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs,
       boolean enableProtoSegmentList) {
-    this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, enableCancellation, cancelTimeout,
+        new GrpcKeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls), streamStatsDefault,
+        statsDrainMs, enableProtoSegmentList);
+  }
+
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, boolean enableProgress, Duration cancelTimeout, int keepAliveTimeMs,
+      int keepAliveTimeoutMs, boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, enableProgress, cancelTimeout,
+        new GrpcKeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls),
+        streamStatsDefault, statsDrainMs, CommonConstants.Broker.DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST);
+  }
+
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, boolean enableProgress, Duration cancelTimeout, int keepAliveTimeMs,
+      int keepAliveTimeoutMs, boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs,
+      boolean enableProtoSegmentList) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, enableProgress, cancelTimeout,
         new GrpcKeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls),
         streamStatsDefault, statsDrainMs, enableProtoSegmentList);
   }
 
   private QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
-      boolean enableCancellation, Duration cancelTimeout, GrpcKeepAliveConfig keepAliveConfig,
-      boolean streamStatsDefault, long statsDrainMs, boolean enableProtoSegmentList) {
+      boolean enableCancellation, boolean enableProgress, Duration cancelTimeout,
+      GrpcKeepAliveConfig keepAliveConfig, boolean streamStatsDefault, long statsDrainMs,
+      boolean enableProtoSegmentList) {
     _cancelTimeout = cancelTimeout;
     _statsDrainMs = statsDrainMs;
     _mailboxService = mailboxService;
@@ -184,8 +206,10 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
     _failureDetector = failureDetector;
     _streamStatsDefault = streamStatsDefault;
     _enableProtoSegmentList = enableProtoSegmentList;
+    _enableCancellation = enableCancellation;
+    _enableProgress = enableProgress;
 
-    if (enableCancellation) {
+    if (enableCancellation || enableProgress) {
       _serversByQuery = new ConcurrentHashMap<>();
     } else {
       _serversByQuery = null;
@@ -261,7 +285,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
           statsManager.recordStatsUponResponseArrival(requestId, server.getInstanceId(), -1);
         }
       }
-      if (isQueryCancellationEnabled()) {
+      if (isQueryTrackingEnabled()) {
         _serversByQuery.remove(requestId);
       }
     }
@@ -351,7 +375,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
           statsManager.recordStatsUponResponseArrival(requestId, server.getInstanceId(), -1);
         }
       }
-      if (isQueryCancellationEnabled()) {
+      if (isQueryTrackingEnabled()) {
         _serversByQuery.remove(requestId);
       }
     }
@@ -413,7 +437,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
       }
     }, deadline, ackQueue);
 
-    if (isQueryCancellationEnabled()) {
+    if (isQueryTrackingEnabled()) {
       _serversByQuery.put(requestId, serversOut);
     }
   }
@@ -608,7 +632,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
                     serverInstance, response.getMetadataOrDefault(ServerResponseStatus.STATUS_ERROR, "null")));
           }
         });
-    if (isQueryCancellationEnabled()) {
+    if (isQueryTrackingEnabled()) {
       _serversByQuery.put(requestId, serversOut);
     }
   }
@@ -636,6 +660,10 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
   }
 
   private boolean isQueryCancellationEnabled() {
+    return _enableCancellation;
+  }
+
+  private boolean isQueryTrackingEnabled() {
     return _serversByQuery != null;
   }
 
@@ -858,7 +886,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
         LOGGER.warn("Caught exception while cancelling query: {} on server: {}", requestId, queryServerInstance, t);
       }
     }
-    if (isQueryCancellationEnabled()) {
+    if (isQueryTrackingEnabled()) {
       _serversByQuery.remove(requestId);
     }
     return true;
@@ -886,6 +914,86 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
 
   private static String toHostnamePortKey(String hostname, int port) {
     return String.format("%s_%d", hostname, port);
+  }
+
+  @Nullable
+  public QueryProgressStats getQueryProgressStats(long requestId, int timeoutMs) {
+    if (!_enableProgress) {
+      return null;
+    }
+    Set<QueryServerInstance> servers = _serversByQuery.get(requestId);
+    if (servers == null || servers.isEmpty()) {
+      return null;
+    }
+
+    Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
+    SendRequest<Long, Worker.QueryProgressResponse> sendRequest = DispatchClient::getQueryProgress;
+    BlockingQueue<AsyncResponse<Worker.QueryProgressResponse>> dispatchCallbacks =
+        dispatch(sendRequest, new HashSet<>(servers), deadline, serverInstance -> requestId);
+    Set<QueryServerInstance> pendingServers = new HashSet<>(servers);
+    List<QueryProgressStats> details = new ArrayList<>(servers.size());
+    int numResponses = 0;
+    while (!deadline.isExpired() && numResponses < servers.size()) {
+      try {
+        AsyncResponse<Worker.QueryProgressResponse> response =
+            dispatchCallbacks.poll(Math.max(1, deadline.timeRemaining(TimeUnit.MILLISECONDS)), TimeUnit.MILLISECONDS);
+        if (response == null) {
+          LOGGER.debug("No progress response from server for query: {}", requestId);
+          continue;
+        }
+        numResponses++;
+        QueryServerInstance serverInstance = response.getServerInstance();
+        pendingServers.remove(serverInstance);
+        if (response.getThrowable() != null) {
+          LOGGER.debug("Failed to get progress for query: {} from server: {}", requestId, serverInstance,
+              response.getThrowable());
+          details.add(unknownServerProgress(serverInstance));
+          continue;
+        }
+        Worker.QueryProgressResponse queryProgressResponse = response.getResponse();
+        if (queryProgressResponse != null && queryProgressResponse.hasProgress()) {
+          details.add(toProgressStats(queryProgressResponse.getProgress(), getServerProgressLabel(serverInstance)));
+        } else {
+          details.add(unknownServerProgress(serverInstance));
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        LOGGER.debug("Interrupted while getting progress for query: {}", requestId, e);
+        break;
+      }
+    }
+    if (deadline.isExpired()) {
+      LOGGER.debug("Timed out waiting for progress response for query: {}", requestId);
+    }
+    for (QueryServerInstance serverInstance : pendingServers) {
+      details.add(unknownServerProgress(serverInstance));
+    }
+    details.sort(Comparator.comparing(QueryProgressStats::getLabel, Comparator.nullsFirst(String::compareTo)));
+    return details.isEmpty() ? null : QueryProgressStats.aggregate(details).withLabel("Servers").withDetails(details);
+  }
+
+  private static QueryProgressStats unknownServerProgress(QueryServerInstance serverInstance) {
+    return QueryProgressStats.unknown(getServerProgressLabel(serverInstance), true);
+  }
+
+  private static String getServerProgressLabel(QueryServerInstance serverInstance) {
+    String instanceId = serverInstance.getInstanceId();
+    if (instanceId != null && !instanceId.isEmpty()) {
+      return "Server " + instanceId;
+    }
+    return String.format("Server %s:%d", serverInstance.getHostname(), serverInstance.getQueryServicePort());
+  }
+
+  @VisibleForTesting
+  static QueryProgressStats toProgressStats(Worker.QueryProgress queryProgress,
+      @Nullable String label) {
+    List<QueryProgressStats> details = new ArrayList<>(queryProgress.getDetailsCount());
+    for (Worker.QueryProgress detail : queryProgress.getDetailsList()) {
+      details.add(toProgressStats(detail, detail.getLabel().isEmpty() ? null : detail.getLabel()));
+    }
+    return new QueryProgressStats(label, queryProgress.getProcessedWorkUnits(), queryProgress.getTotalWorkUnits(),
+        queryProgress.getProcessedSegments(), queryProgress.getTotalSegmentsToProcess(), queryProgress.getEstimated(),
+        details);
   }
 
   @Nullable
