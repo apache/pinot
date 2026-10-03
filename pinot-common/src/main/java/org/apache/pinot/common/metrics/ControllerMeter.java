@@ -85,6 +85,8 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   PAGE_CACHE_WARMUP_REQUEST_ERRORS("pageCacheWarmupRequestErrors", true),
   // Upsert compact merge task metrics
   UPSERT_COMPACT_MERGE_SEGMENT_SKIPPED_CONSENSUS_FAILURE("UpsertCompactMergeSegmentsSkipped", false),
+  // Segments UpsertCompactionTask refused to schedule because the replicas reported different valid doc counts
+  UPSERT_COMPACTION_SEGMENT_SKIPPED_CONSENSUS_FAILURE("UpsertCompactionSegmentsSkipped", false),
   // Query workload propagation metrics
   QUERY_WORKLOAD_PROPAGATION_COUNT("count", true),
   QUERY_WORKLOAD_PROPAGATION_ERROR("count", true),
