@@ -76,7 +76,7 @@ public class PinotLogicalSortExchange extends SortExchange {
         isSortOnReceiver, null);
   }
 
-  /// Defers the global-window ordering choice until stage ids are assigned by the fragmenter.
+  /// Marks an AUTO exchange for resolution on the finalized logical tree, before stage allocation.
   public static PinotLogicalSortExchange createWindowAuto(RelNode input, RelDistribution distribution,
       RelCollation collation) {
     return create(input, distribution, PinotRelExchangeType.getDefaultExchangeType(), collation, false, true, true,
