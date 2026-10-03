@@ -86,6 +86,13 @@ public abstract class ServerPrometheusMetricsTest extends PinotPrometheusMetrics
   private static final String OPEN_STRUCT_KEY_EXPORTED = "clicks.v2$promo%22code";
   private static final String LABEL_KEY_COLUMN = "column";
   private static final String LABEL_KEY_KEY = "key";
+  private static final String LABEL_KEY_DECODER_CLASS = "decoderClass";
+
+  // CONSUMING_SEGMENT_DECODER uses a compound key "<topic>.<partitionGroupId>.<simpleDecoderClassName>" + a
+  // tableNameWithType, so it is dispatched separately (like OPEN_STRUCT) to assert against its real 5-segment name.
+  private static final String DECODER_TOPIC = "rt-control-tower";
+  private static final int DECODER_PARTITION_GROUP_ID = 0;
+  private static final String DECODER_SIMPLE_CLASS_NAME = "CLPLogMessageDecoder";
 
   private static final List<ServerGauge> GAUGES_ACCEPTING_OPEN_STRUCT_COLUMN =
       List.of(ServerGauge.OPEN_STRUCT_LAST_SEGMENT_DENSE_KEY_COUNT,
@@ -192,6 +199,17 @@ public abstract class ServerPrometheusMetricsTest extends PinotPrometheusMetrics
       } else if (GAUGES_ACCEPTING_OPEN_STRUCT_COLUMN.contains(serverGauge)) {
         _serverMetrics.setOrUpdateTableGauge(TABLE_NAME_WITH_TYPE, OPEN_STRUCT_COLUMN, serverGauge, 100L);
         assertGaugeExportedCorrectly(serverGauge.getGaugeName(), TABLENAME_TABLETYPE_COLUMN, EXPORTED_METRIC_PREFIX);
+      } else if (serverGauge == ServerGauge.CONSUMING_SEGMENT_DECODER) {
+        // Mirror the emit-site composition: setValueOfTableGauge(tableWithType, "<topic>.<pgId>.<simpleName>", ...).
+        String compoundKey = DECODER_TOPIC + "." + DECODER_PARTITION_GROUP_ID + "." + DECODER_SIMPLE_CLASS_NAME;
+        _serverMetrics.setValueOfTableGauge(TABLE_NAME_WITH_TYPE, compoundKey, serverGauge, 1L);
+        assertGaugeExportedCorrectly(serverGauge.getGaugeName(),
+            List.of(ExportedLabelKeys.TABLE, ExportedLabelValues.TABLENAME,
+                ExportedLabelKeys.TABLETYPE, ExportedLabelValues.TABLETYPE_REALTIME,
+                ExportedLabelKeys.TOPIC, DECODER_TOPIC,
+                ExportedLabelKeys.PARTITION, String.valueOf(DECODER_PARTITION_GROUP_ID),
+                LABEL_KEY_DECODER_CLASS, DECODER_SIMPLE_CLASS_NAME),
+            EXPORTED_METRIC_PREFIX);
       } else {
         addGaugeWithLabels(serverGauge, TABLE_NAME_WITH_TYPE);
         assertGaugeExportedCorrectly(serverGauge.getGaugeName(), ExportedLabels.TABLENAME_TABLETYPE,

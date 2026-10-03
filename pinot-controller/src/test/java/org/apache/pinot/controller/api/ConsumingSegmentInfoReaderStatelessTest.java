@@ -67,6 +67,9 @@ public class ConsumingSegmentInfoReaderStatelessTest {
   private static final String TABLE_NAME = "myTable_REALTIME";
   private static final String SEGMENT_NAME_PARTITION_0 = "table__0__29__12345";
   private static final String SEGMENT_NAME_PARTITION_1 = "table__1__32__12345";
+  private static final String DECODER_CLASS = "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder";
+  // A distinct decoder for partition 1 fixtures so the passthrough assertion catches a cross-wired/hardcoded value.
+  private static final String DECODER_CLASS_ALT = "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder";
   private static final int TIMEOUT_MSEC = 10000;
   private static final int EXTENDED_TIMEOUT_FACTOR = 100;
 
@@ -89,10 +92,10 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     FakeConsumingInfoServer s0 = new FakeConsumingInfoServer(Lists.newArrayList(
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0,
             new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset0, Map.of(),
-                Map.of(), Map.of())),
+                Map.of(), Map.of()), DECODER_CLASS),
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1,
             new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset1, Map.of(),
-                Map.of(), Map.of()))));
+                Map.of(), Map.of()), DECODER_CLASS_ALT)));
     s0.start(uriPath, createHandler(200, s0._consumerInfos, 0));
     _serverMap.put("server0", s0);
 
@@ -100,10 +103,10 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     FakeConsumingInfoServer s1 = new FakeConsumingInfoServer(Lists.newArrayList(
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0,
             new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset0, Map.of(),
-                Map.of(), Map.of())),
+                Map.of(), Map.of()), DECODER_CLASS),
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1,
             new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset1, Map.of(),
-                Map.of(), Map.of()))));
+                Map.of(), Map.of()), DECODER_CLASS_ALT)));
     s1.start(uriPath, createHandler(200, s1._consumerInfos, 0));
     _serverMap.put("server1", s1);
 
@@ -111,10 +114,10 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     FakeConsumingInfoServer s2 = new FakeConsumingInfoServer(Lists.newArrayList(
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "NOT_CONSUMING", 0, partitionToOffset0,
             new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset0, Map.of(),
-                Map.of(), Map.of())),
+                Map.of(), Map.of()), DECODER_CLASS),
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1,
             new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset1, Map.of(),
-                Map.of(), Map.of()))));
+                Map.of(), Map.of()), DECODER_CLASS_ALT)));
     s2.start(uriPath, createHandler(200, s2._consumerInfos, 0));
     _serverMap.put("server2", s2);
 
@@ -122,7 +125,7 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     FakeConsumingInfoServer s3 = new FakeConsumingInfoServer(Lists.newArrayList(
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1,
             new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset1, Map.of(),
-                Map.of(), Map.of()))));
+                Map.of(), Map.of()), DECODER_CLASS_ALT)));
     s3.start(uriPath, createHandler(200, s3._consumerInfos, 0));
     _serverMap.put("server3", s3);
 
@@ -130,10 +133,10 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     FakeConsumingInfoServer s4 = new FakeConsumingInfoServer(Lists.newArrayList(
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0,
             new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset0, Map.of(),
-                Map.of(), Map.of())),
+                Map.of(), Map.of()), DECODER_CLASS),
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1,
             new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset1, Map.of(),
-                Map.of(), Map.of()))));
+                Map.of(), Map.of()), DECODER_CLASS_ALT)));
     s4.start(uriPath, createHandler(200, s4._consumerInfos, TIMEOUT_MSEC * EXTENDED_TIMEOUT_FACTOR));
     _serverMap.put("server4", s4);
   }
@@ -352,5 +355,19 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     assertTrue(serverNames.contains(info._serverName));
     assertEquals(info._consumerState, consumerState);
     assertEquals(info._partitionOffsetInfo._currentOffsetsMap.get(partition), offset);
+    // decoderClassName from the server-side DTO must survive the controller-aggregate reader passthrough. Partition 0
+    // and 1 fixtures use different decoders, so this also catches a cross-wired or hardcoded value.
+    assertEquals(info._decoderClassName, partition.equals("0") ? DECODER_CLASS : DECODER_CLASS_ALT);
+  }
+
+  /// An older server may return a payload without the decoderClassName field; it must deserialize to null rather
+  /// than failing, preserving rolling-upgrade compatibility.
+  @Test
+  public void testDecoderClassNameMissingDeserializesToNull()
+      throws IOException {
+    SegmentConsumerInfo info = JsonUtils.stringToObject(
+        "{\"segmentName\":\"seg\",\"consumerState\":\"CONSUMING\",\"lastConsumedTimestamp\":0,"
+            + "\"partitionToOffsetMap\":{}}", SegmentConsumerInfo.class);
+    assertNull(info.getDecoderClassName());
   }
 }

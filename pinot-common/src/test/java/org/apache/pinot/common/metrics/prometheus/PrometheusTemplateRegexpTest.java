@@ -380,6 +380,74 @@ public class PrometheusTemplateRegexpTest {
     Assert.assertEquals(m.group(3), "Value");
   }
 
+  // ---- consumingSegmentDecoder patterns (server.yml and pinot.yml) ----
+
+  @DataProvider(name = "consumingSegmentDecoderConfigs")
+  public Object[][] consumingSegmentDecoderConfigs() {
+    return new Object[][]{{"server.yml"}, {"pinot.yml"}};
+  }
+
+  /// consumingSegmentDecoder gauge: verifies both the capture groups and that the label templates fold the database
+  /// prefix into the table label (dropping it exports an incomplete table for database-qualified tables).
+  @Test(dataProvider = "consumingSegmentDecoderConfigs")
+  public void testConsumingSegmentDecoderGaugePattern(String configFile)
+      throws Exception {
+    String ruleName = "pinot_server_consumingSegmentDecoder_$8";
+    Matcher m = Pattern.compile(loadPatternByName(configFile, ruleName)).matcher(
+        "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", "
+            + "name=\"pinot.server.consumingSegmentDecoder.myDb.myTable_REALTIME.rt-control-tower.0."
+            + "CLPLogMessageDecoder\"><>Value");
+    Assert.assertTrue(m.matches(), "Pattern should match db-qualified consumingSegmentDecoder gauge in " + configFile);
+    Assert.assertEquals(m.group(2), "myDb");
+    Assert.assertEquals(m.group(3), "myTable");
+    Assert.assertEquals(m.group(4), "REALTIME");
+    Assert.assertEquals(m.group(5), "rt-control-tower");
+    Assert.assertEquals(m.group(6), "0");
+    Assert.assertEquals(m.group(7), "CLPLogMessageDecoder");
+    Assert.assertEquals(m.group(8), "Value");
+
+    Map<String, String> labels = loadLabelsByName(configFile, ruleName);
+    Assert.assertEquals(labels.get("database"), "$2");
+    Assert.assertEquals(labels.get("table"), "$1$3", "table label must fold the database prefix ($1) with the "
+        + "raw table name ($3) in " + configFile);
+    Assert.assertEquals(labels.get("tableType"), "$4");
+    Assert.assertEquals(labels.get("topic"), "$5");
+    Assert.assertEquals(labels.get("partition"), "$6");
+    Assert.assertEquals(labels.get("decoderClass"), "$7");
+  }
+
+  /// The non-database form leaves the database group empty and the whole name still round-trips.
+  @Test(dataProvider = "consumingSegmentDecoderConfigs")
+  public void testConsumingSegmentDecoderGaugePatternNoDatabase(String configFile)
+      throws Exception {
+    Matcher m = Pattern.compile(loadPatternByName(configFile, "pinot_server_consumingSegmentDecoder_$8")).matcher(
+        "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", "
+            + "name=\"pinot.server.consumingSegmentDecoder.myTable_REALTIME.topic1.5.JSONMessageDecoder\"><>Value");
+    Assert.assertTrue(m.matches(), "Pattern should match non-database consumingSegmentDecoder gauge in " + configFile);
+    Assert.assertEquals(m.group(3), "myTable");
+    Assert.assertEquals(m.group(5), "topic1");
+    Assert.assertEquals(m.group(6), "5");
+    Assert.assertEquals(m.group(7), "JSONMessageDecoder");
+  }
+
+  /// Returns the labels map for the rule whose `name` field equals `ruleName`, failing unless exactly one matches.
+  @SuppressWarnings("unchecked")
+  private Map<String, String> loadLabelsByName(String configFile, String ruleName)
+      throws Exception {
+    Yaml yaml = new Yaml();
+    try (FileReader reader = new FileReader(CONFIG_BASE_PATH + "/" + configFile)) {
+      Map<String, Object> config = yaml.load(reader);
+      List<Map<String, Object>> rules = (List<Map<String, Object>>) config.get("rules");
+      List<Map<String, String>> matches = rules.stream()
+          .filter(rule -> ruleName.equals(rule.get("name")))
+          .map(rule -> (Map<String, String>) rule.get("labels"))
+          .filter(labels -> labels != null)
+          .collect(Collectors.toList());
+      Assert.assertEquals(matches.size(), 1, "Expected exactly one rule named '" + ruleName + "' in " + configFile);
+      return matches.get(0);
+    }
+  }
+
   /// Returns the pattern string for the rule whose `name` field equals `ruleName`. Fails when more
   /// than one rule shares that name — use [#loadPatternByName(String,String,String)] instead.
   ///
