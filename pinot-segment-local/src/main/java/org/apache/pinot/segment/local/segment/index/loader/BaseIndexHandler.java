@@ -24,14 +24,20 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,5 +131,76 @@ public abstract class BaseIndexHandler implements IndexHandler {
     LOGGER.info("Rebuilt the forward index for column: {}, is temporary: {}", columnName, isTemporaryForwardIndex);
 
     return _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(columnName);
+  }
+
+  /// Loads the segment {@code metadata.properties} file for this handler's segment directory, or returns {@code null}
+  /// if the file is unavailable (e.g. in-memory segments used in tests).
+  ///
+  /// Subclasses should call this once per [needUpdateIndices] / [updateIndices] invocation and pass the result to
+  /// [readStoredIndexConfig] and [setStoredIndexConfig] so that the file is read from disk only once.
+  @Nullable
+  protected PropertiesConfiguration loadMetadataProperties() {
+    try {
+      return SegmentMetadataUtils.getPropertiesConfiguration(_segmentDirectory.getSegmentMetadata());
+    } catch (Exception e) {
+      LOGGER.warn("Cannot load segment metadata properties for segment: {}, config-change detection disabled",
+          _segmentDirectory.getSegmentMetadata().getName(), e);
+      return null;
+    }
+  }
+
+  /// Reads a previously-persisted index config from {@code metadata.properties}.
+  ///
+  /// Returns {@code null} when:
+  /// - {@code properties} is {@code null} (in-memory segment)
+  /// - the key is absent (index was built before config persistence was added — "legacy segment")
+  /// - deserialization fails (corrupt entry)
+  ///
+  /// The {@code configKey} must be a stable, index-type-specific suffix used when the config was written, e.g.
+  /// {@code "jsonIndexConfig"}, {@code "bloomFilterConfig"}. It is combined with the column name via
+  /// [V1Constants.MetadataKeys.Column#getKeyFor].
+  @Nullable
+  protected static <T> T readStoredIndexConfig(String columnName, String configKey, Class<T> configClass,
+      @Nullable PropertiesConfiguration properties) {
+    if (properties == null) {
+      return null;
+    }
+    try {
+      String key = V1Constants.MetadataKeys.Column.getKeyFor(columnName, configKey);
+      String escaped = properties.getString(key, null);
+      if (escaped == null) {
+        return null;
+      }
+      String serialized = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(escaped);
+      return JsonUtils.stringToObject(serialized, configClass);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to read stored index config '{}' for column: {}, treating as legacy (no stored config)",
+          configKey, columnName, e);
+      return null;
+    }
+  }
+
+  /// Writes an index config into the in-memory {@code properties} object (does **not** flush to disk).
+  ///
+  /// The caller is responsible for saving the file after all updates are complete, e.g. via
+  /// [SegmentMetadataUtils#savePropertiesConfiguration].
+  ///
+  /// Uses the same {@code configKey} convention as [readStoredIndexConfig].
+  protected static <T> void setStoredIndexConfig(String columnName, String configKey, T config,
+      PropertiesConfiguration properties) {
+    try {
+      String serialized = JsonUtils.objectToString(config);
+      String escaped = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(serialized);
+      if (escaped == null) {
+        LOGGER.warn("Cannot persist index config '{}' for column: {} due to unsupported characters", configKey,
+            columnName);
+        return;
+      }
+      String key = V1Constants.MetadataKeys.Column.getKeyFor(columnName, configKey);
+      properties.setProperty(key, escaped);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to serialize index config '{}' for column: {}, config changes will not trigger rebuild",
+          configKey, columnName, e);
+    }
   }
 }
