@@ -126,7 +126,7 @@ public class MailboxReceiveNode extends BasePlanNode {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof MailboxReceiveNode)) {
+    if (o == null || getClass() != o.getClass()) {
       return false;
     }
     if (!super.equals(o)) {

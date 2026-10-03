@@ -183,13 +183,6 @@ public class ReceivingMailbox {
   /// This method is executed by a shared gRPC executor thread rather than a query execution thread.
   /// Therefore, CPU and memory usage must be tracked explicitly and independently.
   public ReceivingMailboxStatus offerRaw(List<ByteBuffer> byteBuffers, long timeoutMs) {
-    return offerRaw(byteBuffers, timeoutMs, false);
-  }
-
-  /// Offers a raw block and records whether its sender confirmed that the complete stream is sorted by the exchange
-  /// collation. The confirmation is transport metadata rather than part of the data-block serialization, so older
-  /// receivers safely ignore it and older senders are distinguishable by its absence.
-  public ReceivingMailboxStatus offerRaw(List<ByteBuffer> byteBuffers, long timeoutMs, boolean sortedOnSender) {
     ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
     updateWaitCpuTime();
     MseBlock block;
@@ -237,7 +230,7 @@ public class ReceivingMailbox {
       }
       stats = List.of();
     }
-    ReceivingMailboxStatus status = offerPrivate(block, stats, timeoutMs, sortedOnSender);
+    ReceivingMailboxStatus status = offerPrivate(block, stats, timeoutMs);
     long cpuTimeNs = resourceSnapshot.getCpuTimeNs();
     long allocatedBytes = resourceSnapshot.getAllocatedBytes();
     synchronized (this) {
@@ -253,25 +246,18 @@ public class ReceivingMailbox {
 
   /// Offers a block into the mailbox within the timeout specified, returns the status of the mailbox.
   public ReceivingMailboxStatus offer(MseBlock block, List<DataBuffer> serializedStats, long timeoutMs) {
-    return offer(block, serializedStats, timeoutMs, false);
-  }
-
-  /// Offers an in-memory block with the same sender-sort confirmation used by the gRPC transport.
-  public ReceivingMailboxStatus offer(MseBlock block, List<DataBuffer> serializedStats, long timeoutMs,
-      boolean sortedOnSender) {
     updateWaitCpuTime();
     _stats.merge(StatKey.IN_MEMORY_MESSAGES, 1);
-    return offerPrivate(block, serializedStats, timeoutMs, sortedOnSender);
+    return offerPrivate(block, serializedStats, timeoutMs);
   }
 
   /// Offers a block into the mailbox within the timeout specified, returns the status of the mailbox.
-  private ReceivingMailboxStatus offerPrivate(MseBlock block, List<DataBuffer> stats, long timeoutMs,
-      boolean sortedOnSender) {
+  private ReceivingMailboxStatus offerPrivate(MseBlock block, List<DataBuffer> stats, long timeoutMs) {
     if (block.isEos()) {
       // Set before the reader can see the EOS
       _senderFinished = true;
     }
-    ReceivingMailboxStatus status = offerToQueue(block, stats, timeoutMs, sortedOnSender);
+    ReceivingMailboxStatus status = offerToQueue(block, stats, timeoutMs);
     if (status == ReceivingMailboxStatus.LAST_BLOCK || status == ReceivingMailboxStatus.ALREADY_TERMINATED) {
       // The sender stops sending when it gets either status
       _senderFinished = true;
@@ -279,15 +265,14 @@ public class ReceivingMailbox {
     return status;
   }
 
-  private ReceivingMailboxStatus offerToQueue(MseBlock block, List<DataBuffer> stats, long timeoutMs,
-      boolean sortedOnSender) {
+  private ReceivingMailboxStatus offerToQueue(MseBlock block, List<DataBuffer> stats, long timeoutMs) {
     long start = System.currentTimeMillis();
     try {
       ReceivingMailboxStatus result;
       if (block.isEos()) {
         result = _blocks.offerEos((MseBlock.Eos) block, stats);
       } else {
-        result = _blocks.offerData((MseBlock.Data) block, sortedOnSender, timeoutMs, TimeUnit.MILLISECONDS);
+        result = _blocks.offerData((MseBlock.Data) block, timeoutMs, TimeUnit.MILLISECONDS);
       }
 
       switch (result) {
@@ -429,16 +414,10 @@ public class ReceivingMailbox {
   public static class MseBlockWithStats {
     private final MseBlock _block;
     private final List<DataBuffer> _serializedStats;
-    private final boolean _sortedOnSender;
 
     public MseBlockWithStats(MseBlock block, List<DataBuffer> serializedStats) {
-      this(block, serializedStats, false);
-    }
-
-    public MseBlockWithStats(MseBlock block, List<DataBuffer> serializedStats, boolean sortedOnSender) {
       _block = block;
       _serializedStats = serializedStats;
-      _sortedOnSender = sortedOnSender;
     }
 
     public MseBlock getBlock() {
@@ -447,11 +426,6 @@ public class ReceivingMailbox {
 
     public List<DataBuffer> getSerializedStats() {
       return _serializedStats;
-    }
-
-    /// Returns whether the sender confirmed that its complete stream is sorted by the exchange collation.
-    public boolean isSortedOnSender() {
-      return _sortedOnSender;
     }
   }
 
@@ -533,7 +507,7 @@ public class ReceivingMailbox {
     /// downstream thread calls [#poll]. Unlike normal blocking queues, elements will be [removed][#drainDataBlocks()]
     /// when transitioning to [State#WAITING_EOS] or [State#FULL_CLOSED].
     @GuardedBy("_lock")
-    private final MseBlockWithStats[] _dataBlocks;
+    private final MseBlock.Data[] _dataBlocks;
     @GuardedBy("_lock")
     private int _takeIndex;
     @GuardedBy("_lock")
@@ -559,7 +533,7 @@ public class ReceivingMailbox {
 
     public CancellableBlockingQueue(String id, int capacity) {
       _id = id;
-      _dataBlocks = new MseBlockWithStats[capacity];
+      _dataBlocks = new MseBlock.Data[capacity];
     }
 
     /// Notifies the downstream that there is data to read.
@@ -609,8 +583,7 @@ public class ReceivingMailbox {
     }
 
     /// Offers a data block into the queue within the timeout specified, returning the status of the operation.
-    public ReceivingMailboxStatus offerData(MseBlock.Data block, boolean sortedOnSender, long timeout,
-        TimeUnit timeUnit)
+    public ReceivingMailboxStatus offerData(MseBlock.Data block, long timeout, TimeUnit timeUnit)
         throws InterruptedException, TimeoutException {
       ReentrantLock lock = _lock;
       lock.lockInterruptibly();
@@ -627,7 +600,7 @@ public class ReceivingMailbox {
               LOGGER.debug("Mailbox: {} is not interesting in late data block", _id);
               return ReceivingMailboxStatus.WAITING_EOS;
             case FULL_OPEN:
-              if (offerDataToBuffer(new MseBlockWithStats(block, List.of(), sortedOnSender), timeout, timeUnit)) {
+              if (offerDataToBuffer(block, timeout, timeUnit)) {
                 notifyReader();
                 return ReceivingMailboxStatus.SUCCESS;
               }
@@ -657,13 +630,13 @@ public class ReceivingMailbox {
     /// @throws InterruptedException if the thread is interrupted while waiting for space in the queue.
     /// @throws TimeoutException if the timeout specified elapsed before space was available in the queue.
     @GuardedBy("_lock")
-    private boolean offerDataToBuffer(MseBlockWithStats block, long timeout, TimeUnit timeUnit)
+    private boolean offerDataToBuffer(MseBlock.Data block, long timeout, TimeUnit timeUnit)
         throws InterruptedException, TimeoutException {
 
       assert _state == State.FULL_OPEN;
 
       long nanos = timeUnit.toNanos(timeout);
-      MseBlockWithStats[] items = _dataBlocks;
+      MseBlock.Data[] items = _dataBlocks;
       _pendingData++;
       try {
         while (_count == items.length && nanos > 0L) {
@@ -747,8 +720,8 @@ public class ReceivingMailbox {
             throw new IllegalStateException("Unexpected state: " + _state);
         }
         assert _count > 0 : "if we reach here, there must be data in the queue";
-        MseBlockWithStats[] items = _dataBlocks;
-        MseBlockWithStats block = items[_takeIndex];
+        MseBlock.Data[] items = _dataBlocks;
+        MseBlock.Data block = items[_takeIndex];
         assert block != null : "data block in the queue must not be null";
         items[_takeIndex] = null;
         if (++_takeIndex == items.length) {
@@ -757,7 +730,7 @@ public class ReceivingMailbox {
         _count--;
         _notFull.signal();
 
-        return block;
+        return new MseBlockWithStats(block, List.of());
       } finally {
         lock.unlock();
       }

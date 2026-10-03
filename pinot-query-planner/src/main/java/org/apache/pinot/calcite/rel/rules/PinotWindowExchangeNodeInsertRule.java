@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -47,6 +48,7 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.calcite.rel.logical.PinotKWayMergeSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -130,9 +132,16 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         // retain the legacy post-exchange full-sort path. This switch supports rolling upgrades and rapid rollback.
         // TODO: Revisit whether we should use hash distribution
         boolean sortOnSender = isWindowSortOnSenderEnabled(call);
-        exchange =
-            PinotLogicalSortExchange.create(input, RelDistributions.hash(List.of()), windowGroup.orderKeys,
-                sortOnSender, sortOnSender);
+        if (sortOnSender) {
+          // An unbounded sender sort retains every row, independent of the broker response limit.
+          RelNode orderedInput = LogicalSort.create(input, windowGroup.orderKeys, null,
+              window.getCluster().getRexBuilder().makeExactLiteral(BigDecimal.valueOf(Integer.MAX_VALUE)));
+          exchange = PinotKWayMergeSortExchange.create(orderedInput, RelDistributions.hash(List.of()),
+              windowGroup.orderKeys);
+        } else {
+          exchange = PinotLogicalSortExchange.create(input, RelDistributions.hash(List.of()), windowGroup.orderKeys,
+              false, false);
+        }
       }
     } else {
       // All other variants
@@ -175,7 +184,8 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
       if (context != null) {
         PlannerContext plannerContext = context.unwrap(PlannerContext.class);
         if (plannerContext != null) {
-          return QueryOptionsUtils.isWindowSortOnSender(plannerContext.getOptions(),
+          return plannerContext.getEnvConfig().isKWayMergeSupported()
+              && QueryOptionsUtils.isWindowSortOnSender(plannerContext.getOptions(),
               plannerContext.getEnvConfig().defaultWindowSortOnSender());
         }
       }

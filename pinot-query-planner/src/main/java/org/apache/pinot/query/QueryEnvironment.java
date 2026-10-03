@@ -1033,6 +1033,12 @@ public class QueryEnvironment {
       return false;
     }
 
+    /// Whether the broker verified all cluster workers support the merge receive wire node.
+    @Value.Default
+    default boolean isKWayMergeSupported() {
+      return false;
+    }
+
     /// See [CommonConstants.Broker#CONFIG_OF_WINDOW_SORT_ON_SENDER]
     @Value.Default
     default boolean defaultWindowSortOnSender() {

@@ -59,6 +59,7 @@ import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.calcite.rel.logical.PinotKWayMergeSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalMvAggregate;
@@ -78,6 +79,7 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MvAggregateNode;
+import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNode.NodeHint;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -607,6 +609,12 @@ public final class RelToPlanNodeConverter {
     List<RelFieldCollation> collations;
     boolean sortOnSender;
     boolean sortOnReceiver;
+    if (node instanceof PinotKWayMergeSortExchange) {
+      PinotKWayMergeSortExchange merge = (PinotKWayMergeSortExchange) node;
+      return new KWayMergeExchangeNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()),
+          convertInputs(node.getInputs()), distributionType, distribution.getKeys(), false,
+          merge.getCollation().getFieldCollations(), _hashFunction);
+    }
     if (node instanceof PinotLogicalSortExchange) {
       PinotLogicalSortExchange sortExchange = (PinotLogicalSortExchange) node;
       exchangeType = sortExchange.getExchangeType();
