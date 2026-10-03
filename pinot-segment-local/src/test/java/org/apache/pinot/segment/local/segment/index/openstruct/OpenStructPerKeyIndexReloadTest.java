@@ -166,6 +166,19 @@ public class OpenStructPerKeyIndexReloadTest {
     assertFalse(hasIndex(segmentDir, host, StandardIndexes.dictionary()), "the raw key must stay raw");
   }
 
+  private static List<FieldConfig> mixedMatrixKeys() {
+    FieldConfig views = new FieldConfig.Builder("views")
+        .withIndexes(JsonUtils.objectToJsonNode(Map.of("inverted", Map.of())))
+        .build();
+    FieldConfig cpu = new FieldConfig.Builder("cpu")
+        .withEncodingType(FieldConfig.EncodingType.DICTIONARY)
+        .build();
+    FieldConfig host = new FieldConfig.Builder("host")
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .build();
+    return List.of(views, cpu, host);
+  }
+
   private static OpenStructIndexConfig withMixedMatrix() {
     FieldConfig views = new FieldConfig.Builder("views")
         .withIndexes(JsonUtils.objectToJsonNode(Map.of("inverted", Map.of())))
@@ -178,6 +191,109 @@ public class OpenStructPerKeyIndexReloadTest {
         .build();
     return new OpenStructIndexConfig(false, null, 3, Set.of("views", "cpu", "host"), 0.5,
         List.of(views, cpu, host));
+  }
+
+  /// The spelling every other kind of column uses: RAW encoding, with the dictionary asked for under `indexes`.
+  ///
+  /// An External Table requires RAW on a column's own field config, so this is the shape a reader who has
+  /// configured one before will reach for. An enabled inverted index already forced a dictionary on its own, so
+  /// this combination worked before `indexes.dictionary` was honoured; it is here to keep it working.
+  @Test
+  public void testADictionaryAskedForUnderIndexesIsBuilt()
+      throws Exception {
+    File segmentDir = buildSegment("dictionaryViaIndexes", withoutPerKeyIndex());
+    reload(segmentDir, rawKeyWithDictionaryUnderIndexes());
+
+    assertTrue(hasIndex(segmentDir, CHILD, StandardIndexes.dictionary()),
+        "indexes.dictionary must enable the dictionary on a RAW key");
+    assertTrue(hasIndex(segmentDir, CHILD, StandardIndexes.inverted()),
+        "and the inverted index built on top of it must exist");
+  }
+
+  /// The same spelling on a key whose only index is a range one, and the case that was actually broken.
+  ///
+  /// Unlike an inverted index, a range index needs a dictionary without forcing one, so nothing rescued a key
+  /// written this way: the dictionary entry was ignored, the key stayed raw, and the range index was built over
+  /// no dictionary at all. Reverting the fix fails this test and not the one above it.
+  @Test
+  public void testARangeOnlyKeyCanAskForADictionaryUnderIndexes()
+      throws Exception {
+    File segmentDir = buildSegment("rangeViaIndexes", withoutPerKeyIndex());
+    reload(segmentDir, rawRangeKeyWithDictionaryUnderIndexes());
+
+    assertTrue(hasIndex(segmentDir, OpenStructNaming.materializedColumnName(COLUMN, "views"),
+        StandardIndexes.dictionary()), "a range-only key may ask for a dictionary the same way");
+  }
+
+  private static OpenStructIndexConfig rawKeyWithDictionaryUnderIndexes() {
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("dictionary", JsonUtils.newObjectNode());
+    indexes.set("inverted", JsonUtils.newObjectNode());
+    FieldConfig keyConfig = new FieldConfig.Builder(KEY)
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
+    return new OpenStructIndexConfig(false, null, -1, Set.of(KEY), 0.0, List.of(keyConfig));
+  }
+
+  private static OpenStructIndexConfig rawRangeKeyWithDictionaryUnderIndexes() {
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("dictionary", JsonUtils.newObjectNode());
+    indexes.set("range", JsonUtils.newObjectNode());
+    FieldConfig keyConfig = new FieldConfig.Builder("views")
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
+    return new OpenStructIndexConfig(false, null, -1, Set.of("views"), 0.0, List.of(keyConfig));
+  }
+
+  /// The shared blob is an ordinary single-value STRING column holding each row's document, so an index that
+  /// reads JSON out of a STRING column applies to it. Without one, every predicate on an unshredded key scans.
+  @Test
+  public void testAJsonIndexCanBeBuiltOnTheSparseBlob()
+      throws Exception {
+    // The blob only exists when some key is left out of the dense set, so the segment is built with a budget.
+    File segmentDir = buildSegment("blobJsonIndex", withMixedMatrix());
+    String sparse = OpenStructNaming.sparseColumnName(COLUMN);
+    assertTrue(new SegmentMetadataImpl(segmentDir).getColumnMetadataMap().containsKey(sparse),
+        "precondition: a key was left unmaterialized, so the blob column exists");
+    assertFalse(hasIndex(segmentDir, sparse, StandardIndexes.json()),
+        "precondition: the blob starts with no index");
+
+    reload(segmentDir, withSparseJsonIndex());
+
+    assertTrue(hasIndex(segmentDir, sparse, StandardIndexes.json()),
+        "sparseJsonIndex must build a JSON index over the blob");
+    assertFalse(hasIndex(segmentDir, sparse, StandardIndexes.dictionary()),
+        "and the blob must never get a dictionary -- its values are whole documents");
+  }
+
+  /// `sparseFieldConfig` names the index directly, so any registered index type that accepts a STRING column can
+  /// be asked for on the blob rather than only the one `sparseJsonIndex` hard-codes.
+  @Test
+  public void testTheBlobIndexCanBeNamedDirectly()
+      throws Exception {
+    File segmentDir = buildSegment("blobNamedIndex", withMixedMatrix());
+    reload(segmentDir, withSparseFieldConfig("json"));
+
+    assertTrue(hasIndex(segmentDir, OpenStructNaming.sparseColumnName(COLUMN), StandardIndexes.json()),
+        "an index named under sparseFieldConfig.indexes must be built on the blob");
+  }
+
+  private static OpenStructIndexConfig withSparseJsonIndex() {
+    return new OpenStructIndexConfig(false, null, 3, Set.of("views", "cpu", "host"), 0.5,
+        mixedMatrixKeys(), true);
+  }
+
+  private static OpenStructIndexConfig withSparseFieldConfig(String indexName) {
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set(indexName, JsonUtils.newObjectNode());
+    FieldConfig blob = new FieldConfig.Builder(OpenStructNaming.sparseColumnName(COLUMN))
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
+    return new OpenStructIndexConfig(false, null, 3, Set.of("views", "cpu", "host"), 0.5,
+        mixedMatrixKeys(), null, null, null, null, blob);
   }
 
   // ---------------------------------------------------------------- fixtures

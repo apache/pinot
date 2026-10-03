@@ -261,9 +261,6 @@ public class OpenStructIndexTypeTest {
         {"{'name': 'clicks', 'indexes': {'dictionary': {'disabled': true}}}",
             "OPEN_STRUCT column 'payload': indexes.dictionary of key 'clicks' disables the dictionary, but the key is "
                 + "built with one; "},
-        {"{'name': 'clicks', 'encodingType': 'RAW', 'indexes': {'dictionary': {}}}",
-            "OPEN_STRUCT column 'payload': indexes.dictionary of key 'clicks' enables the dictionary, but the key is "
-                + "built without one; "},
         // An enabled inverted index requires a dictionary, so a RAW key with one is still built with a dictionary.
         {"{'name': 'clicks', 'encodingType': 'RAW', 'indexes': {'inverted': {}, 'dictionary': {'disabled': true}}}",
             "OPEN_STRUCT column 'payload': indexes.dictionary of key 'clicks' disables the dictionary, but the key is "
