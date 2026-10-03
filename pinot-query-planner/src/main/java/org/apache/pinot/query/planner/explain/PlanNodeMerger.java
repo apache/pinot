@@ -292,7 +292,8 @@ class PlanNodeMerger {
       if (node.isSort() != otherNode.isSort()) {
         return null;
       }
-      if (node.isSortedOnSender() != otherNode.isSortedOnSender()) {
+      if (node.isSortedOnSender() != otherNode.isSortedOnSender()
+          || node.isAutoProfile() != otherNode.isAutoProfile()) {
         return null;
       }
       List<PlanNode> children = mergeChildren(node, context);

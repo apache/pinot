@@ -37,10 +37,12 @@ import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.calcite.rel.logical.PinotRelExchangeType.STREAMING;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.expectThrows;
 
@@ -70,6 +72,19 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
       PlanNode deserializedStagePlan = PlanNodeDeserializer.process(PlanNodeSerializer.process(stagePlan));
       assertEquals(stagePlan, deserializedStagePlan);
     }
+  }
+
+  @Test
+  public void testAutoProfileReceiveNodeSerDe() {
+    DataSchema schema = new DataSchema(new String[]{"sort_key"}, new ColumnDataType[]{ColumnDataType.INT});
+    MailboxReceiveNode receiveNode = new MailboxReceiveNode(1, schema, 2, STREAMING,
+        RelDistribution.Type.SINGLETON, List.of(), List.of(new RelFieldCollation(0)), false, false, true, null);
+
+    MailboxReceiveNode deserialized =
+        (MailboxReceiveNode) PlanNodeDeserializer.process(PlanNodeSerializer.process(receiveNode));
+    assertEquals(deserialized, receiveNode);
+    assertEquals(deserialized.isAutoProfile(), true,
+        "The AUTO profile flag must survive broker-to-server serialization");
   }
 
   @Test

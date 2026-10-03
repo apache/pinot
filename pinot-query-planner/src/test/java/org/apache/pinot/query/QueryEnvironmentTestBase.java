@@ -34,6 +34,7 @@ import org.apache.pinot.core.routing.MockRoutingManagerFactory;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo.PartitionInfo;
+import org.apache.pinot.query.planner.logical.WindowSortAutoPlan;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -311,6 +312,14 @@ public class QueryEnvironmentTestBase {
   protected static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
       Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
       @Nullable Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap, boolean mergeSupported) {
+    return getQueryEnvironment(reducerPort, port1, port2, schemaMap, segmentMap1, segmentMap2, partitionedSegmentsMap,
+        mergeSupported, null);
+  }
+
+  protected static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
+      Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
+      @Nullable Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap, boolean mergeSupported,
+      @Nullable WindowSortAutoPlan windowSortAutoPlan) {
     MockRoutingManagerFactory factory = new MockRoutingManagerFactory(port1, port2);
     for (Map.Entry<String, Schema> entry : schemaMap.entrySet()) {
       factory.registerTable(entry.getValue(), entry.getKey());
@@ -351,7 +360,9 @@ public class QueryEnvironmentTestBase {
     return new QueryEnvironment(QueryEnvironment.configBuilder().requestId(-1L)
         .database(CommonConstants.DEFAULT_DATABASE).tableCache(tableCache).isNullHandlingEnabled(true)
         .workerManager(new WorkerManager("Broker_localhost", "localhost", reducerPort, routingManager))
-        .isKWayMergeSupported(mergeSupported).build());
+        .isKWayMergeSupported(mergeSupported)
+        .defaultWindowSortOnSenderMode(windowSortAutoPlan != null ? "auto" : "false")
+        .windowSortAutoPlan(windowSortAutoPlan).build());
   }
 
   /// JSON test case definition for query planner test cases. Tables and schemas will come from those already defined

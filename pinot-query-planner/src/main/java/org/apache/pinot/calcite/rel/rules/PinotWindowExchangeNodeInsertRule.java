@@ -23,8 +23,8 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
-import org.apache.calcite.plan.Context;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptRule;
@@ -52,7 +52,6 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotKWayMergeSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -133,8 +132,11 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         // When enabled, sort each sender explicitly and merge the sorted mailbox streams at the receiver. Otherwise,
         // retain the legacy post-exchange full-sort path. This switch supports rolling upgrades and rapid rollback.
         // TODO: Revisit whether we should use hash distribution
-        boolean sortOnSender = isWindowSortOnSenderEnabled(call);
-        if (sortOnSender) {
+        String mode = getWindowSortMode(call);
+        if ("auto".equals(mode)) {
+          exchange = PinotLogicalSortExchange.createWindowAuto(input, RelDistributions.hash(List.of()),
+              windowGroup.orderKeys);
+        } else if ("true".equals(mode)) {
           // An unbounded sender sort retains every row, independent of the broker response limit.
           RelNode orderedInput = LogicalSort.create(input, windowGroup.orderKeys, null,
               window.getCluster().getRexBuilder().makeExactLiteral(BigDecimal.valueOf(Integer.MAX_VALUE)));
@@ -170,9 +172,10 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     // old servers sort the same rows twice during a rolling upgrade. Keep an explicit Sort only for post-exchange
     // full-sort paths.
     // PinotSortExchangeNodeInsertRule does not re-fire on it: its matches() rejects a Sort whose input is an
-    // exchange. Window sorts must retain every input row, independently of the broker response limit.
+    // exchange. Window sorts retain every input row, independently of the response limit.
     RelNode windowInput = exchange instanceof PinotLogicalSortExchange
         && !((PinotLogicalSortExchange) exchange).isSortOnReceiver()
+        && !((PinotLogicalSortExchange) exchange).isAutoWindowSort()
             ? LogicalSort.create(exchange, ((PinotLogicalSortExchange) exchange).getCollation(), null,
                 window.getCluster().getRexBuilder().makeExactLiteral(BigDecimal.valueOf(Integer.MAX_VALUE))) : exchange;
     // NOTE: Need to create a new LogicalWindow to use the modified window group.
@@ -180,20 +183,26 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         List.of(windowGroup)));
   }
 
-  private static boolean isWindowSortOnSenderEnabled(RelOptRuleCall call) {
+  private static String getWindowSortMode(RelOptRuleCall call) {
     RelOptPlanner planner = call.getPlanner();
-    if (planner != null) {
-      Context context = planner.getContext();
+    if (planner != null && planner.getContext() != null) {
+      PlannerContext context = planner.getContext().unwrap(PlannerContext.class);
       if (context != null) {
-        PlannerContext plannerContext = context.unwrap(PlannerContext.class);
-        if (plannerContext != null) {
-          return plannerContext.getEnvConfig().isKWayMergeSupported()
-              && QueryOptionsUtils.isWindowSortOnSender(plannerContext.getOptions(),
-              plannerContext.getEnvConfig().defaultWindowSortOnSender());
-        }
+        String option = context.getOptions().get(CommonConstants.Broker.Request.QueryOptionKey.WINDOW_SORT_ON_SENDER);
+        String mode = validateWindowSortMode(option != null ? option
+            : context.getEnvConfig().defaultWindowSortOnSenderMode());
+        return context.getEnvConfig().isKWayMergeSupported() && !context.isUsePhysicalOptimizer() ? mode : "false";
       }
     }
-    return CommonConstants.Broker.DEFAULT_WINDOW_SORT_ON_SENDER;
+    return CommonConstants.Broker.DEFAULT_WINDOW_SORT_ON_SENDER_MODE;
+  }
+
+  private static String validateWindowSortMode(String mode) {
+    String normalized = mode.toLowerCase(Locale.ROOT);
+    if (!"auto".equals(normalized) && !"true".equals(normalized) && !"false".equals(normalized)) {
+      throw new IllegalArgumentException("windowSortOnSender must be auto, true or false: " + mode);
+    }
+    return normalized;
   }
 
   private boolean isPartitionByOnlyQuery(Window.Group windowGroup) {

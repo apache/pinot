@@ -233,6 +233,7 @@ public class EquivalentStagesFinder {
             //  require some extra checks or transformation on the spooling logic. We are not doing that for now.
             && node1.isSort() == that.isSort()
             && node1.isSortedOnSender() == that.isSortedOnSender()
+            && node1.isAutoProfile() == that.isAutoProfile()
             && Objects.equals(node1.getCollations(), that.getCollations())
             && node1.getExchangeType() == that.getExchangeType();
       }

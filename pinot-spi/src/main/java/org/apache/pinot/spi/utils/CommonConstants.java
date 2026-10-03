@@ -823,6 +823,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_WINDOW_SORT_ON_SENDER =
         "pinot.broker.multistage.window.sort.on.sender";
     public static final boolean DEFAULT_WINDOW_SORT_ON_SENDER = false;
+    public static final String DEFAULT_WINDOW_SORT_ON_SENDER_MODE = "false";
 
     public static class Request {
       public static final String SQL = "sql";
@@ -1181,7 +1182,7 @@ public class CommonConstants {
         /// whether the leaf sorts its rows in memory or streams physically sorted segments. No-op for the V2 planner.
         public static final String STREAMING_SORTED_MAILBOX_RECEIVE = "streamingSortedMailboxReceive";
 
-        /// Per-query override of [Broker#CONFIG_OF_WINDOW_SORT_ON_SENDER].
+        /// Per-query auto, true, or false override of [Broker#CONFIG_OF_WINDOW_SORT_ON_SENDER].
         public static final String WINDOW_SORT_ON_SENDER = "windowSortOnSender";
 
         // Vector search query options
