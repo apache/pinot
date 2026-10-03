@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api;
 
+import java.net.URI;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -25,9 +26,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
@@ -174,6 +180,75 @@ public class PinotSegmentRestletResourceTest {
 
     // Check crc api
     checkCrcRequest(adminClient, rawTableName, segmentMetadataTable, 9);
+  }
+
+  @Test
+  public void testUpdateSegmentZKMetadataCustomMapApi()
+      throws Exception {
+    String rawTableName = "metadataUpdateTestTable";
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    String segmentName = "metadata+UpdateSegment";
+    TEST_INSTANCE.addDummySchema(rawTableName);
+    TEST_INSTANCE.getHelixResourceManager().addTable(
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setNumReplicas(1).build());
+    SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(rawTableName, segmentName);
+    TEST_INSTANCE.getHelixResourceManager().addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
+
+    SegmentZKMetadata originalMetadata =
+        TEST_INSTANCE.getHelixResourceManager().getSegmentZKMetadata(offlineTableName, segmentName);
+    assertNotNull(originalMetadata);
+    long originalCrc = originalMetadata.getCrc();
+    long originalRefreshTime = originalMetadata.getRefreshTime();
+    URI endpoint = FileUploadDownloadClient.getUpdateSegmentZKMetadataURI(
+        URI.create(TEST_INSTANCE.getControllerBaseApiUrl()), offlineTableName, segmentName);
+    String modifier = new SegmentZKMetadataCustomMapModifier(
+        SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Map.of("task.lastProcessedTime", "1234"))
+        .toJsonString();
+
+    SimpleHttpResponse response = ControllerTest.getHttpClient().sendJsonPutRequest(endpoint, modifier,
+        Map.of(HttpHeaders.IF_MATCH, Long.toString(originalCrc)));
+    assertEquals(response.getStatusCode(), 200);
+    SegmentZKMetadata updatedMetadata =
+        TEST_INSTANCE.getHelixResourceManager().getSegmentZKMetadata(offlineTableName, segmentName);
+    assertNotNull(updatedMetadata);
+    // Updating custom metadata does not replace the segment, so its refresh time must keep its documented meaning.
+    // Callers that need the metadata mutation time can use the ZK node mtime.
+    assertEquals(updatedMetadata.getRefreshTime(), originalRefreshTime);
+    assertEquals(updatedMetadata.getCustomMap(), Map.of("task.lastProcessedTime", "1234"));
+    assertEquals(updatedMetadata.getCrc(), originalCrc);
+    assertEquals(updatedMetadata.getDownloadUrl(), "downloadUrl");
+
+    response = ControllerTest.getHttpClient().sendJsonPutRequest(endpoint, modifier, Map.of());
+    assertEquals(response.getStatusCode(), 400);
+
+    response = ControllerTest.getHttpClient().sendJsonPutRequest(endpoint, "not-json",
+        Map.of(HttpHeaders.IF_MATCH, Long.toString(originalCrc)));
+    assertEquals(response.getStatusCode(), 400);
+
+    response = ControllerTest.getHttpClient().sendJsonPutRequest(endpoint, "x".repeat(64 * 1024 + 1),
+        Map.of(HttpHeaders.IF_MATCH, Long.toString(originalCrc)));
+    assertEquals(response.getStatusCode(), 413);
+
+    for (String malformedModifier : List.of(
+        "[]",
+        "{}",
+        "{\"mapModifyMode\":null,\"map\":{}}",
+        "{\"mapModifyMode\":1,\"map\":{}}",
+        "{\"mapModifyMode\":\"UPDATE\",\"map\":[]}",
+        "{\"mapModifyMode\":\"UPDATE\",\"map\":{\"key\":1}}",
+        "{\"mapModifyMode\":\"UPDATE\",\"map\":{\"key\":{\"nested\":\"value\"}}}")) {
+      response = ControllerTest.getHttpClient().sendJsonPutRequest(endpoint, malformedModifier,
+          Map.of(HttpHeaders.IF_MATCH, Long.toString(originalCrc)));
+      assertEquals(response.getStatusCode(), 400);
+    }
+
+    response = ControllerTest.getHttpClient().sendJsonPutRequest(endpoint, modifier,
+        Map.of(HttpHeaders.IF_MATCH, Long.toString(originalCrc + 1)));
+    assertEquals(response.getStatusCode(), 412);
+
+    response = ControllerTest.getHttpClient().sendJsonPutRequest(URI.create(endpoint + "-missing"), modifier,
+        Map.of(HttpHeaders.IF_MATCH, Long.toString(originalCrc)));
+    assertEquals(response.getStatusCode(), 404);
   }
 
   @Test

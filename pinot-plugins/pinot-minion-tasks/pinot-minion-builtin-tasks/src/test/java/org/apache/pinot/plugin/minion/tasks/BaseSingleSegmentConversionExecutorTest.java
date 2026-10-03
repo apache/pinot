@@ -30,6 +30,8 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.HttpStatus;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -38,6 +40,7 @@ import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.event.MinionEventObservers;
+import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
@@ -59,6 +62,7 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -147,6 +151,72 @@ public class BaseSingleSegmentConversionExecutorTest {
     }
   }
 
+  @Test
+  public void testExecuteTaskUpdatesMetadataWithoutUploadingUnchangedSegment()
+      throws Exception {
+    try (MockedStatic<SegmentConversionUtils> mocked = Mockito.mockStatic(SegmentConversionUtils.class)) {
+      TestSingleSegmentConversionExecutor executor =
+          new TestSingleSegmentConversionExecutor(_segmentCrc, false, true, true);
+      SegmentConversionResult result = executor.executeTask(createTaskConfig(_segmentCrc));
+
+      Assert.assertEquals(result.getSegmentName(), SEGMENT_NAME);
+      mocked.verify(() -> SegmentConversionUtils.updateSegmentZKMetadata(Mockito.any(),
+          Mockito.eq(TABLE_NAME_WITH_TYPE), Mockito.eq(SEGMENT_NAME), Mockito.anyString(),
+          Mockito.eq(Long.toString(_segmentCrc)), Mockito.any(), Mockito.any()));
+      mocked.verifyNoMoreInteractions();
+    }
+  }
+
+  @Test
+  public void testCancelledTaskDoesNotUpdateMetadataForUnchangedSegment()
+      throws Exception {
+    try (MockedStatic<SegmentConversionUtils> mocked = Mockito.mockStatic(SegmentConversionUtils.class)) {
+      TestSingleSegmentConversionExecutor executor =
+          new TestSingleSegmentConversionExecutor(_segmentCrc, false, true, true);
+      executor.cancel();
+
+      Assert.expectThrows(TaskCancelledException.class, () -> executor.executeTask(createTaskConfig(_segmentCrc)));
+      mocked.verifyNoInteractions();
+    }
+  }
+
+  @Test
+  public void testExecuteTaskUploadsUnchangedSegmentWithoutTaskOptIn()
+      throws Exception {
+    try (MockedStatic<SegmentConversionUtils> mocked = Mockito.mockStatic(SegmentConversionUtils.class)) {
+      TestSingleSegmentConversionExecutor executor =
+          new TestSingleSegmentConversionExecutor(_segmentCrc, false, true, false);
+      SegmentConversionResult result = executor.executeTask(createTaskConfig(_segmentCrc));
+
+      Assert.assertEquals(result.getSegmentName(), SEGMENT_NAME);
+      mocked.verify(() -> SegmentConversionUtils.uploadSegment(Mockito.any(), Mockito.any(), Mockito.any(),
+          Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any(File.class)));
+      mocked.verifyNoMoreInteractions();
+    }
+  }
+
+  @Test(dataProvider = "metadataApiUnavailableStatusCodes")
+  public void testExecuteTaskFallsBackToUploadWhenMetadataApiIsUnavailable(int statusCode)
+      throws Exception {
+    try (MockedStatic<SegmentConversionUtils> mocked = Mockito.mockStatic(SegmentConversionUtils.class)) {
+      mocked.when(() -> SegmentConversionUtils.updateSegmentZKMetadata(Mockito.any(), Mockito.anyString(),
+              Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any(), Mockito.any()))
+          .thenThrow(new HttpErrorStatusException("metadata API unavailable", statusCode));
+
+      TestSingleSegmentConversionExecutor executor =
+          new TestSingleSegmentConversionExecutor(_segmentCrc, false, true, true);
+      SegmentConversionResult result = executor.executeTask(createTaskConfig(_segmentCrc));
+
+      Assert.assertEquals(result.getSegmentName(), SEGMENT_NAME);
+      mocked.verify(() -> SegmentConversionUtils.uploadSegment(Mockito.any(), Mockito.any(), Mockito.any(),
+          Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any(File.class)));
+    }
+  }
+
+  @DataProvider(name = "metadataApiUnavailableStatusCodes")
+  public Object[][] metadataApiUnavailableStatusCodes() {
+    return new Object[][]{{HttpStatus.SC_NOT_FOUND}, {HttpStatus.SC_METHOD_NOT_ALLOWED}};
+  }
   /// Verifies that when a METADATA-mode push fails after the converted tar was already staged to the output PinotFS,
   /// the staged tar is deleted before the exception propagates. Without this cleanup the rethrow would make the retry
   /// fail in moveSegmentToOutputPinotFS with "Output file already exists" (overwriteOutput defaults to false), so
@@ -414,19 +484,33 @@ public class BaseSingleSegmentConversionExecutorTest {
   private class TestSingleSegmentConversionExecutor extends BaseSingleSegmentConversionExecutor {
     private final long _zkSegmentCrc;
     private final boolean _copyToDeepStore;
+    private final boolean _returnInputSegment;
+    private final boolean _updateMetadataWithoutUpload;
 
     TestSingleSegmentConversionExecutor(long zkSegmentCrc) {
-      this(zkSegmentCrc, false);
+      this(zkSegmentCrc, false, false, false);
     }
 
     TestSingleSegmentConversionExecutor(long zkSegmentCrc, boolean copyToDeepStore) {
+      this(zkSegmentCrc, copyToDeepStore, false, false);
+    }
+
+    TestSingleSegmentConversionExecutor(long zkSegmentCrc, boolean copyToDeepStore, boolean returnInputSegment,
+        boolean updateMetadataWithoutUpload) {
       _zkSegmentCrc = zkSegmentCrc;
       _copyToDeepStore = copyToDeepStore;
+      _returnInputSegment = returnInputSegment;
+      _updateMetadataWithoutUpload = updateMetadataWithoutUpload;
     }
 
     @Override
     protected boolean isCopyToDeepStoreForMetadataPush() {
       return _copyToDeepStore;
+    }
+
+    @Override
+    protected boolean shouldUpdateZKMetadataWithoutUpload() {
+      return _updateMetadataWithoutUpload;
     }
 
     @Override
@@ -446,6 +530,11 @@ public class BaseSingleSegmentConversionExecutorTest {
     @Override
     protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
         throws Exception {
+      if (_returnInputSegment) {
+        return new SegmentConversionResult.Builder().setFile(indexDir)
+            .setTableNameWithType(pinotTaskConfig.getConfigs().get(MinionConstants.TABLE_NAME_KEY))
+            .setSegmentName(SEGMENT_NAME).build();
+      }
       File convertedDir = new File(workingDir, SEGMENT_NAME);
       FileUtils.copyDirectory(indexDir, convertedDir);
       return new SegmentConversionResult.Builder().setFile(convertedDir)

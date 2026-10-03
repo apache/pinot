@@ -31,9 +31,11 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -72,6 +74,12 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
   /// Converts the segment based on the given task config and returns the conversion result.
   protected abstract SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
       throws Exception;
+
+  /// Returns whether this task can update only ZK metadata when conversion leaves the segment unchanged. Tasks must
+  /// explicitly opt in so custom executors retain the existing tar-and-upload behavior.
+  protected boolean shouldUpdateZKMetadataWithoutUpload() {
+    return false;
+  }
 
   @Override
   public SegmentConversionResult executeTask(PinotTaskConfig pinotTaskConfig)
@@ -131,9 +139,6 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
         return segmentConversionResult;
       }
 
-      // Publish metrics related to segment upload
-      reportSegmentUploadMetrics(workingDir, tableNameWithType, taskType);
-
       // Collect the task processing metrics from various single segment executors and publish them here.
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
       Object numRecordsPurged = segmentConversionResult.getCustomProperty(PurgeTaskExecutor.NUM_RECORDS_PURGED_KEY);
@@ -143,6 +148,40 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       } else {
         reportTaskProcessingMetrics(tableNameWithType, taskType, segmentMetadata.getTotalDocs());
       }
+
+      SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
+          getSegmentZKMetadataCustomMapModifier(pinotTaskConfig, segmentConversionResult);
+      if (shouldUpdateZKMetadataWithoutUpload()
+          && convertedSegmentDir.getCanonicalFile().equals(indexDir.getCanonicalFile())) {
+        checkCancelled(taskType, tableNameWithType, segmentName);
+        _eventObserver.notifyProgress(_pinotTaskConfig,
+            "Updating ZK metadata without uploading unchanged segment: " + segmentName);
+        try {
+          SegmentConversionUtils.updateSegmentZKMetadata(configs, tableNameWithType, segmentName, uploadURL,
+              originalSegmentCrc, segmentZKMetadataCustomMapModifier, authProvider);
+          LOGGER.info("Updated ZK metadata without uploading unchanged segment: {} of table: {}", segmentName,
+              tableNameWithType);
+          return segmentConversionResult;
+        } catch (HttpErrorStatusException e) {
+          if (e.getStatusCode() != HttpStatus.SC_NOT_FOUND
+              && e.getStatusCode() != HttpStatus.SC_METHOD_NOT_ALLOWED) {
+            _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_UPLOAD_FAIL_COUNT, 1L);
+            _eventObserver.notifyTaskError(_pinotTaskConfig, e);
+            throw e;
+          }
+          // Older controllers return 405 because this path only supports GET. Controllers without the path return 404.
+          // A missing segment can also return 404 and is rejected by the refresh-only upload fallback.
+          LOGGER.info("Segment ZK metadata update API is unavailable for segment: {} of table: {}, falling back to "
+              + "segment upload", segmentName, tableNameWithType);
+        } catch (Exception e) {
+          _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_UPLOAD_FAIL_COUNT, 1L);
+          _eventObserver.notifyTaskError(_pinotTaskConfig, e);
+          throw e;
+        }
+      }
+
+      // Publish metrics related to segment upload
+      reportSegmentUploadMetrics(workingDir, tableNameWithType, taskType);
 
       BatchConfigProperties.SegmentPushType pushType = getSegmentPushType(configs);
       boolean copyToDeepStore =
@@ -176,12 +215,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
         LOGGER.warn("Failed to delete input segment: {}", indexDir.getAbsolutePath());
       }
 
-      // Check whether the task get cancelled before uploading the segment
-      if (_cancelled) {
-        LOGGER.info("{} on table: {}, segment: {} got cancelled", taskType, tableNameWithType, segmentName);
-        throw new TaskCancelledException(
-            taskType + " on table: " + tableNameWithType + ", segment: " + segmentName + " got cancelled");
-      }
+      checkCancelled(taskType, tableNameWithType, segmentName);
 
       // Set original segment CRC into HTTP IF-MATCH header to check whether the original segment get refreshed, so that
       // the newer segment won't get override
@@ -191,10 +225,6 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       Header refreshOnlyHeader = new BasicHeader(FileUploadDownloadClient.CustomHeaders.REFRESH_ONLY, "true");
 
       // Set segment ZK metadata custom map modifier into HTTP header to modify the segment ZK metadata
-      // NOTE: even segment is not changed, still need to upload the segment to update the segment ZK metadata so that
-      // segment will not be submitted again
-      SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
-          getSegmentZKMetadataCustomMapModifier(pinotTaskConfig, segmentConversionResult);
       Header segmentZKMetadataCustomMapModifierHeader =
           new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
               segmentZKMetadataCustomMapModifier.toJsonString());
@@ -248,6 +278,14 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       return segmentConversionResult;
     } finally {
       FileUtils.deleteQuietly(tempDataDir);
+    }
+  }
+
+  private void checkCancelled(String taskType, String tableNameWithType, String segmentName) {
+    if (_cancelled) {
+      LOGGER.info("{} on table: {}, segment: {} got cancelled", taskType, tableNameWithType, segmentName);
+      throw new TaskCancelledException(
+          taskType + " on table: " + tableNameWithType + ", segment: " + segmentName + " got cancelled");
     }
   }
 
