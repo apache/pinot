@@ -36,6 +36,7 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -175,6 +176,17 @@ public class PlanNodeSerializer {
 
     @Override
     public Void visitMailboxReceive(MailboxReceiveNode node, Plan.PlanNode.Builder builder) {
+      if (node instanceof MailboxMergeReceiveNode) {
+        MailboxMergeReceiveNode merge = (MailboxMergeReceiveNode) node;
+        builder.setMailboxMergeReceiveNode(Plan.MailboxMergeReceiveNode.newBuilder()
+            .setSenderStageId(merge.getSenderStageId())
+            .setExchangeType(convertExchangeType(merge.getExchangeType()))
+            .setDistributionType(convertDistributionType(merge.getDistributionType()))
+            .addAllKeys(merge.getKeys())
+            .addAllCollations(convertCollations(merge.getCollations()))
+            .setFetch(merge.getFetch()).setOffset(merge.getOffset()));
+        return null;
+      }
       Plan.MailboxReceiveNode mailboxReceiveNode = Plan.MailboxReceiveNode.newBuilder()
           .setSenderStageId(node.getSenderStageId())
           .setExchangeType(convertExchangeType(node.getExchangeType()))

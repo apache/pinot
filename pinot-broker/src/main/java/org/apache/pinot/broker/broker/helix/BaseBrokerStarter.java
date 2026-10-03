@@ -59,6 +59,7 @@ import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
 import org.apache.pinot.broker.requesthandler.BrokerRequestIdGenerator;
 import org.apache.pinot.broker.requesthandler.BrokerWarmupConfig;
 import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.KWayMergeSupportPredicate;
 import org.apache.pinot.broker.requesthandler.MultiStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageQueryThrottler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
@@ -583,6 +584,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
               _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
               _serverRoutingStatsManager);
+      KWayMergeSupportPredicate mergeSupport = new KWayMergeSupportPredicate(_spectatorHelixManager);
+      try {
+        _spectatorHelixManager.addInstanceConfigChangeListener(mergeSupport);
+        multiStageBrokerRequestHandler.setKWayMergeSupported(mergeSupport);
+      } catch (Exception e) {
+        LOGGER.warn("Cannot register k-way merge version listener; feature remains disabled", e);
+      }
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
       _routingManager.setServerReenableCallback(
           serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));

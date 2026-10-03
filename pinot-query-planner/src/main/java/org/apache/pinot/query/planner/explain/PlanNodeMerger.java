@@ -36,6 +36,7 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -261,10 +262,17 @@ class PlanNodeMerger {
     @Nullable
     @Override
     public PlanNode visitMailboxReceive(MailboxReceiveNode node, PlanNode context) {
-      if (context.getClass() != MailboxReceiveNode.class) {
+      if (context.getClass() != node.getClass()) {
         return null;
       }
       MailboxReceiveNode otherNode = (MailboxReceiveNode) context;
+      if (node instanceof MailboxMergeReceiveNode) {
+        MailboxMergeReceiveNode merge = (MailboxMergeReceiveNode) node;
+        MailboxMergeReceiveNode otherMerge = (MailboxMergeReceiveNode) otherNode;
+        if (merge.getFetch() != otherMerge.getFetch() || merge.getOffset() != otherMerge.getOffset()) {
+          return null;
+        }
+      }
       if (node.getSenderStageId() != otherNode.getSenderStageId()) {
         return null;
       }
@@ -466,7 +474,7 @@ class PlanNodeMerger {
     @Nullable
     @Override
     public PlanNode visitExchange(ExchangeNode exchangeNode, PlanNode context) {
-      if (context.getClass() != ExchangeNode.class) {
+      if (context.getClass() != exchangeNode.getClass()) {
         return null;
       }
       ExchangeNode otherNode = (ExchangeNode) context;
