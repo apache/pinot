@@ -90,6 +90,7 @@ import org.apache.pinot.core.routing.timeboundary.TimeBoundaryStrategy;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryStrategyService;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -127,7 +128,8 @@ import org.slf4j.LoggerFactory;
 ///
 /// TODO: Expose RoutingEntry class to get a consistent view in the broker request handler and save the redundant map
 ///       lookups.
-public abstract class BaseBrokerRoutingManager implements RoutingManager, ClusterChangeHandler {
+public abstract class BaseBrokerRoutingManager
+    implements RoutingManager, ClusterChangeHandler, PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRoutingManager.class);
 
   protected final BrokerMetrics _brokerMetrics;
@@ -137,6 +139,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   private final Set<String> _excludedServers = new HashSet<>();
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final PinotConfiguration _pinotConfig;
+  private volatile int _partitionPruningPreparationThreshold =
+      CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD;
   private final boolean _enablePartitionMetadataManager;
   private final long _newSegmentExpirationMs;
   private final ExecutorService _executorService;
@@ -207,6 +211,25 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     _idealStatePathPrefix = helixDataAccessor.keyBuilder().idealStates().getPath() + "/";
     _instanceConfigsPath = helixDataAccessor.keyBuilder().instanceConfigs().getPath();
     _propertyStore = helixManager.getHelixPropertyStore();
+  }
+
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    String key = CommonConstants.Broker.CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD;
+    int updatedThreshold = CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD;
+    String value = clusterConfigs.get(key);
+    if (value != null) {
+      try {
+        updatedThreshold = Integer.parseInt(value);
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Ignoring invalid partition pruning threshold: {}={}", key, value);
+      }
+    }
+    _partitionPruningPreparationThreshold = updatedThreshold;
+  }
+
+  int getPartitionPruningPreparationThreshold() {
+    return _partitionPruningPreparationThreshold;
   }
 
   /// Sets a callback to be invoked when a server is re-enabled after being excluded.
@@ -812,7 +835,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       segmentSelector.init(idealState, externalView, preSelectedOnlineSegments);
 
       // Register segment pruners and initialize segment zk metadata fetcher.
-      List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+      List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore,
+          this::getPartitionPruningPreparationThreshold);
 
       AdaptiveServerSelector adaptiveServerSelector =
           AdaptiveServerSelectorFactory.getAdaptiveServerSelector(_serverRoutingStatsManager, _pinotConfig);

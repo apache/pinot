@@ -64,6 +64,25 @@ public class ByteArrayPartitionFunction implements PartitionFunction {
     return _normalizer;
   }
 
+  @Override
+  public boolean equals(Object other) {
+    if (this == other) {
+      return true;
+    }
+    if (other == null || getClass() != other.getClass()) {
+      return false;
+    }
+    ByteArrayPartitionFunction that = (ByteArrayPartitionFunction) other;
+    return _numPartitions == that._numPartitions && _normalizer == that._normalizer;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = _numPartitions;
+    result = 31 * result + _normalizer.hashCode();
+    return result;
+  }
+
   // Keep it for backward-compatibility, use getName() instead
   @Override
   public String toString() {
