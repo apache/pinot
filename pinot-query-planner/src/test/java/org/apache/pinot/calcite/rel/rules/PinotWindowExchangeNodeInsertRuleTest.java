@@ -67,10 +67,10 @@ public class PinotWindowExchangeNodeInsertRuleTest {
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
+    when(_cluster.getRexBuilder()).thenReturn(REX_BUILDER);
     RelTraitSet traits = RelTraitSet.createEmpty();
     Mockito.when(_input.getTraitSet()).thenReturn(traits);
     Mockito.when(_input.getCluster()).thenReturn(_cluster);
-    when(_cluster.getRexBuilder()).thenReturn(REX_BUILDER);
   }
 
   @AfterMethod
