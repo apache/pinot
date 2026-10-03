@@ -108,7 +108,9 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     String zkAddress = _config.getZkAddress();
     String helixClusterName = _config.getHelixClusterName();
     ServiceStartableUtils.applyClusterConfig(_config, zkAddress, helixClusterName, ServiceRole.MINION);
+    boolean disableGroovy = _config.isIngestionGroovyDisabled();
     applyCustomConfigs(_config);
+    ServiceStartableUtils.enforceIngestionGroovyPolicy(_config, disableGroovy, ServiceRole.MINION);
 
     PinotInsecureMode.setPinotInInsecureMode(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
     PinotMd5Mode.setPinotMd5Disabled(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED,

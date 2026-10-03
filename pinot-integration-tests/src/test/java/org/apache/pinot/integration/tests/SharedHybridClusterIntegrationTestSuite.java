@@ -46,6 +46,7 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
@@ -318,7 +319,8 @@ public abstract class SharedHybridClusterIntegrationTestSuite extends BaseCluste
     TableConfig offlineTableConfig = createStandardOfflineTableConfig(lease);
     TableConfig realtimeTableConfig = createStandardRealtimeTableConfig(lease, realtimeAvroFiles.get(0));
     addScenarioTables(lease, offlineTableConfig, realtimeTableConfig);
-    buildAndUploadOfflineSegments(lease, offlineAvroFiles, offlineTableConfig, schema);
+    buildAndUploadOfflineSegments(lease, offlineAvroFiles, offlineTableConfig, schema,
+        IngestionGroovyPolicy.DISABLED);
     pushRealtimeRecords(lease, realtimeAvroFiles);
 
     lease._offlineInputCount = countRecords(offlineAvroFiles);
@@ -342,7 +344,7 @@ public abstract class SharedHybridClusterIntegrationTestSuite extends BaseCluste
         createIngestionConfigTableConfig(lease._tableName, TableType.REALTIME, streamConfig);
     installScenarioDecoder(lease, realtimeAvroFiles.get(0));
     addScenarioTables(lease, offlineTableConfig, realtimeTableConfig);
-    buildAndUploadOfflineSegments(lease, offlineAvroFiles, offlineTableConfig, schema);
+    buildAndUploadOfflineSegments(lease, offlineAvroFiles, offlineTableConfig, schema, IngestionGroovyPolicy.ENABLED);
     pushRealtimeRecords(lease, realtimeAvroFiles);
     waitForScenarioCount(lease._tableName, FILTERED_HYBRID_COUNT, 600_000L);
     return schema;
@@ -434,10 +436,10 @@ public abstract class SharedHybridClusterIntegrationTestSuite extends BaseCluste
   }
 
   private void buildAndUploadOfflineSegments(HybridScenarioLease lease, List<File> offlineAvroFiles,
-      TableConfig offlineTableConfig, Schema schema)
+      TableConfig offlineTableConfig, Schema schema, IngestionGroovyPolicy ingestionGroovyPolicy)
       throws Exception {
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0,
-        lease._segmentDir, lease._tarDir);
+        lease._segmentDir, lease._tarDir, ingestionGroovyPolicy);
     uploadSegments(lease._tableName, lease._tarDir);
   }
 

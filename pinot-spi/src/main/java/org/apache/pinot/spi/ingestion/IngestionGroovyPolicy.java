@@ -16,23 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.mergerollup;
-
-import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.minion.executor.PinotTaskExecutor;
-import org.apache.pinot.plugin.minion.tasks.BaseTaskExecutorFactory;
-import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
+package org.apache.pinot.spi.ingestion;
 
 
-@TaskExecutorFactory
-public class MergeRollupTaskExecutorFactory extends BaseTaskExecutorFactory {
-  @Override
-  public String getTaskType() {
-    return MinionConstants.MergeRollupTask.TASK_TYPE;
+/// Immutable ingestion policy for Groovy-backed transform functions.
+///
+/// Enum instances are inherently thread-safe and can be shared across ingestion components.
+public enum IngestionGroovyPolicy {
+  ENABLED(false),
+  DISABLED(true);
+
+  private final boolean _ingestionGroovyDisabled;
+
+  IngestionGroovyPolicy(boolean ingestionGroovyDisabled) {
+    _ingestionGroovyDisabled = ingestionGroovyDisabled;
   }
 
-  @Override
-  public PinotTaskExecutor create() {
-    return new MergeRollupTaskExecutor(_minionConf);
+  /// Returns the policy corresponding to the given disabled flag.
+  public static IngestionGroovyPolicy fromDisabled(boolean ingestionGroovyDisabled) {
+    return ingestionGroovyDisabled ? DISABLED : ENABLED;
+  }
+
+  /// Returns whether Groovy-backed ingestion transforms are disabled.
+  public boolean isIngestionGroovyDisabled() {
+    return _ingestionGroovyDisabled;
   }
 }

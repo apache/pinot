@@ -26,11 +26,14 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.event.DefaultMinionEventObserver;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationTaskSpec;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -41,6 +44,15 @@ import static org.testng.Assert.assertTrue;
 
 /// Tests for [SegmentGenerationAndPushTaskExecutor]
 public class SegmentGenerationAndPushTaskExecutorTest {
+
+  @Test
+  public void testFactoryPropagatesExplicitGroovyOptIn()
+      throws IllegalAccessException {
+    SegmentGenerationAndPushTaskExecutorFactory factory = new SegmentGenerationAndPushTaskExecutorFactory();
+    factory.init(null, new MinionConf(Map.of(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY, false)));
+    SegmentGenerationAndPushTaskExecutor executor = (SegmentGenerationAndPushTaskExecutor) factory.create();
+    assertEquals(FieldUtils.readField(executor, "_ingestionGroovyPolicy", true), IngestionGroovyPolicy.ENABLED);
+  }
 
   @Test
   public void testGenerateTaskSpec()

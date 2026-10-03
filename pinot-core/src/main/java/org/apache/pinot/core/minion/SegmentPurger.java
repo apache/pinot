@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -36,6 +37,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +55,7 @@ public class SegmentPurger {
   private final RecordPurger _recordPurger;
   private final RecordModifier _recordModifier;
   private final SegmentGeneratorCustomConfigs _segmentGeneratorCustomConfigs;
+  private final IngestionGroovyPolicy _ingestionGroovyPolicy;
   private SegmentGeneratorConfig _segmentGeneratorConfig;
   private int _numRecordsPurged;
   private int _numRecordsModified;
@@ -60,6 +63,14 @@ public class SegmentPurger {
   public SegmentPurger(File indexDir, File workingDir, TableConfig tableConfig, Schema schema,
       @Nullable RecordPurger recordPurger, @Nullable RecordModifier recordModifier,
       @Nullable SegmentGeneratorCustomConfigs segmentGeneratorCustomConfigs) {
+    this(indexDir, workingDir, tableConfig, schema, recordPurger, recordModifier, segmentGeneratorCustomConfigs,
+        IngestionGroovyPolicy.fromDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled()));
+  }
+
+  public SegmentPurger(File indexDir, File workingDir, TableConfig tableConfig, Schema schema,
+      @Nullable RecordPurger recordPurger, @Nullable RecordModifier recordModifier,
+      @Nullable SegmentGeneratorCustomConfigs segmentGeneratorCustomConfigs,
+      IngestionGroovyPolicy ingestionGroovyPolicy) {
     Preconditions.checkArgument(recordPurger != null || recordModifier != null,
         "At least one of record purger and modifier should be non-null");
     _indexDir = indexDir;
@@ -69,6 +80,7 @@ public class SegmentPurger {
     _recordPurger = recordPurger;
     _recordModifier = recordModifier;
     _segmentGeneratorCustomConfigs = segmentGeneratorCustomConfigs;
+    _ingestionGroovyPolicy = ingestionGroovyPolicy;
   }
 
   public File purgeSegment()
@@ -120,6 +132,7 @@ public class SegmentPurger {
   @VisibleForTesting
   void initSegmentGeneratorConfig(String segmentName) {
     _segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
+    _segmentGeneratorConfig.setIngestionGroovyDisabled(_ingestionGroovyPolicy.isIngestionGroovyDisabled());
     _segmentGeneratorConfig.setInstanceType(InstanceType.MINION);
     _segmentGeneratorConfig.setOutDir(_workingDir.getPath());
 

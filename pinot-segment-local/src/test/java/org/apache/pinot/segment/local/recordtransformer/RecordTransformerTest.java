@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -47,6 +48,8 @@ import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -59,6 +62,16 @@ public class RecordTransformerTest {
 
   // Transform multiple times should return the same result
   private static final int NUM_ROUNDS = 5;
+
+  @BeforeClass
+  public void enableGroovyForLegacyTransformerTests() {
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(false);
+  }
+
+  @AfterClass(alwaysRun = true)
+  public void restoreDefaultGroovyPolicy() {
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(true);
+  }
 
   private static Schema createSchema() {
     Schema schema = new Schema.SchemaBuilder()

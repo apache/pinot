@@ -31,6 +31,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
 
@@ -49,13 +51,14 @@ public class SegmentProcessorConfig {
   private final Consumer<Object> _progressObserver;
   private final SegmentNameGenerator _segmentNameGenerator;
   private final Long _customCreationTime;
+  private final IngestionGroovyPolicy _ingestionGroovyPolicy;
 
   private SegmentProcessorConfig(TableConfig tableConfig, Schema schema, TimeHandlerConfig timeHandlerConfig,
       List<PartitionerConfig> partitionerConfigs, MergeType mergeType,
       Map<String, AggregationFunctionType> aggregationTypes,
       Map<String, Map<String, String>> aggregationFunctionParameters, SegmentConfig segmentConfig,
       Consumer<Object> progressObserver, @Nullable SegmentNameGenerator segmentNameGenerator,
-      @Nullable Long customCreationTime) {
+      @Nullable Long customCreationTime, IngestionGroovyPolicy ingestionGroovyPolicy) {
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     _tableConfig = tableConfig;
     _schema = schema;
@@ -70,6 +73,7 @@ public class SegmentProcessorConfig {
     };
     _segmentNameGenerator = segmentNameGenerator;
     _customCreationTime = customCreationTime;
+    _ingestionGroovyPolicy = ingestionGroovyPolicy;
   }
 
   /// The Pinot table config
@@ -140,6 +144,10 @@ public class SegmentProcessorConfig {
     return _customCreationTime != null ? _customCreationTime : System.currentTimeMillis();
   }
 
+  public IngestionGroovyPolicy getIngestionGroovyPolicy() {
+    return _ingestionGroovyPolicy;
+  }
+
   @Override
   public String toString() {
     return "SegmentProcessorConfig{" + "_tableConfig=" + _tableConfig + ", _schema=" + _schema + ", _timeHandlerConfig="
@@ -161,6 +169,9 @@ public class SegmentProcessorConfig {
     private Consumer<Object> _progressObserver;
     private SegmentNameGenerator _segmentNameGenerator;
     private Long _customCreationTime;
+    private IngestionGroovyPolicy _ingestionGroovyPolicy = IngestionGroovyPolicy.fromDisabled(
+        CommonConstants.Groovy.isIngestionGroovyDisabled(
+            System.getProperty(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY)));
 
     public Builder setTableConfig(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -217,6 +228,11 @@ public class SegmentProcessorConfig {
       return this;
     }
 
+    public Builder setIngestionGroovyPolicy(IngestionGroovyPolicy ingestionGroovyPolicy) {
+      _ingestionGroovyPolicy = ingestionGroovyPolicy;
+      return this;
+    }
+
     public SegmentProcessorConfig build() {
       Preconditions.checkState(_tableConfig != null, "Must provide table config in SegmentProcessorConfig");
       Preconditions.checkState(_schema != null, "Must provide schema in SegmentProcessorConfig");
@@ -241,7 +257,7 @@ public class SegmentProcessorConfig {
       }
       return new SegmentProcessorConfig(_tableConfig, _schema, _timeHandlerConfig, _partitionerConfigs, _mergeType,
           _aggregationTypes, _aggregationFunctionParameters, _segmentConfig, _progressObserver,
-              _segmentNameGenerator, _customCreationTime);
+          _segmentNameGenerator, _customCreationTime, _ingestionGroovyPolicy);
     }
   }
 }

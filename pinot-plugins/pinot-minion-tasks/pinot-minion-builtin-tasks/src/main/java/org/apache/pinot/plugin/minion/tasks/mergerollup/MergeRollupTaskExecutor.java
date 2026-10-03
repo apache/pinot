@@ -38,6 +38,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.utils.Obfuscator;
 import org.slf4j.Logger;
@@ -76,7 +77,8 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     }
 
     SegmentProcessorConfig.Builder segmentProcessorConfigBuilder =
-        new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema);
+        new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema)
+            .setIngestionGroovyPolicy(IngestionGroovyPolicy.fromDisabled(isIngestionGroovyDisabled()));
 
     // Time handler config
     segmentProcessorConfigBuilder

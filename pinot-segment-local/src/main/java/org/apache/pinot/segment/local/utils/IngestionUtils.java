@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
@@ -55,6 +56,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
@@ -299,6 +301,12 @@ public final class IngestionUtils {
   /// 2. The ingestion config in the table config. The ingestion config (e.g. filter, complexType) can have fields which
   /// are not in the schema.
   public static Set<String> getFieldsForRecordExtractor(TableConfig tableConfig, Schema schema) {
+    return getFieldsForRecordExtractor(tableConfig, schema,
+        FunctionEvaluatorFactory.isIngestionGroovyDisabled());
+  }
+
+  public static Set<String> getFieldsForRecordExtractor(TableConfig tableConfig, Schema schema,
+      boolean disableGroovy) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig != null && ingestionConfig.getSchemaConformingTransformerConfig() != null) {
       // The SchemaConformingTransformer requires that all fields are extracted, indicated by returning an empty set
@@ -317,7 +325,8 @@ public final class IngestionUtils {
         }
       }
     }
-    fields.addAll(new TransformPipeline(tableConfig, schema).getInputColumns());
+    fields.addAll(new TransformPipeline(tableConfig, schema, IngestionGroovyPolicy.fromDisabled(disableGroovy))
+        .getInputColumns());
     return getFieldsToReadWithComplexType(fields, ingestionConfig);
   }
 

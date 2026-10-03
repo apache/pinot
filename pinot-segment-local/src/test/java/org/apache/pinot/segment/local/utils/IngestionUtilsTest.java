@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
@@ -40,11 +41,23 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 /// Tests fields extraction from Schema dna TableConfig for ingestion
 public class IngestionUtilsTest {
+
+  @BeforeClass
+  public void enableGroovyForLegacyIngestionTests() {
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(false);
+  }
+
+  @AfterClass(alwaysRun = true)
+  public void restoreDefaultGroovyPolicy() {
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(true);
+  }
 
   /// Transform functions have moved to table config. This test remains for backward compatible handling testing
   @Test

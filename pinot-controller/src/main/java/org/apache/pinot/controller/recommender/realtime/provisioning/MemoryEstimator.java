@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.recommender.data.DataGenerationHelpers;
 import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
@@ -60,6 +61,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
@@ -124,8 +126,18 @@ public class MemoryEstimator {
   public MemoryEstimator(TableConfig tableConfig, Schema schema, SchemaWithMetaData schemaWithMetadata,
       int numberOfRows, double ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours,
       File workingDir) {
+    this(tableConfig, schema, schemaWithMetadata, numberOfRows, ingestionRatePerPartition, maxUsableHostMemory,
+        tableRetentionHours, workingDir,
+        IngestionGroovyPolicy.fromDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled()));
+  }
+
+  /// Constructor used for processing the given data characteristics with an explicit ingestion Groovy policy.
+  public MemoryEstimator(TableConfig tableConfig, Schema schema, SchemaWithMetaData schemaWithMetadata,
+      int numberOfRows, double ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours,
+      File workingDir, IngestionGroovyPolicy ingestionGroovyPolicy) {
     this(tableConfig, schema,
-        generateCompletedSegment(schemaWithMetadata, schema, tableConfig, numberOfRows, workingDir),
+        generateCompletedSegment(schemaWithMetadata, schema, tableConfig, numberOfRows, workingDir,
+            ingestionGroovyPolicy),
         ingestionRatePerPartition, maxUsableHostMemory, tableRetentionHours, workingDir);
   }
 
@@ -446,8 +458,9 @@ public class MemoryEstimator {
   }
 
   private static File generateCompletedSegment(SchemaWithMetaData schemaWithMetadata, Schema schema,
-      TableConfig tableConfig, int numberOfRows, File workingDir) {
-    return new SegmentGenerator(schemaWithMetadata, schema, tableConfig, numberOfRows, true, workingDir).generate();
+      TableConfig tableConfig, int numberOfRows, File workingDir, IngestionGroovyPolicy ingestionGroovyPolicy) {
+    return new SegmentGenerator(schemaWithMetadata, schema, tableConfig, numberOfRows, true, workingDir,
+        ingestionGroovyPolicy).generate();
   }
 
   /// This class is used in Memory Estimator to generate segment based on the given characteristics of data
@@ -460,15 +473,23 @@ public class MemoryEstimator {
     private int _numberOfRows;
     private boolean _deleteCsv;
     private File _workingDir;
+    private IngestionGroovyPolicy _ingestionGroovyPolicy;
 
     public SegmentGenerator(SchemaWithMetaData schemaWithMetadata, Schema schema, TableConfig tableConfig,
         int numberOfRows, boolean deleteCsv, File workingDir) {
+      this(schemaWithMetadata, schema, tableConfig, numberOfRows, deleteCsv, workingDir,
+          IngestionGroovyPolicy.fromDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled()));
+    }
+
+    public SegmentGenerator(SchemaWithMetaData schemaWithMetadata, Schema schema, TableConfig tableConfig,
+        int numberOfRows, boolean deleteCsv, File workingDir, IngestionGroovyPolicy ingestionGroovyPolicy) {
       _schemaWithMetadata = schemaWithMetadata;
       _schema = schema;
       _tableConfig = tableConfig;
       _numberOfRows = numberOfRows;
       _deleteCsv = deleteCsv;
       _workingDir = workingDir;
+      _ingestionGroovyPolicy = ingestionGroovyPolicy;
     }
 
     public File generate() {
@@ -585,6 +606,7 @@ public class MemoryEstimator {
       segmentGeneratorConfig.setOutDir(outDir);
       segmentGeneratorConfig.setTableName(_tableConfig.getTableName());
       segmentGeneratorConfig.setSequenceId(0);
+      segmentGeneratorConfig.setIngestionGroovyDisabled(_ingestionGroovyPolicy.isIngestionGroovyDisabled());
 
       CSVRecordReaderConfig recordReaderConfig = new CSVRecordReaderConfig();
       recordReaderConfig.setEscapeCharacter('\\');

@@ -45,6 +45,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.utils.Obfuscator;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.RoaringBitmap;
@@ -81,7 +82,8 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     Schema schema = getSchema(tableNameWithType);
 
     SegmentProcessorConfig.Builder segmentProcessorConfigBuilder =
-        new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema);
+        new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema)
+            .setIngestionGroovyPolicy(IngestionGroovyPolicy.fromDisabled(isIngestionGroovyDisabled()));
 
     // Progress observer
     segmentProcessorConfigBuilder.setProgressObserver(p -> _eventObserver.notifyProgress(_pinotTaskConfig, p));
