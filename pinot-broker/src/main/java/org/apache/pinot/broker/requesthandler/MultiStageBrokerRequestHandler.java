@@ -42,6 +42,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
@@ -144,6 +145,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   // uses the empty IdSet in their place.
   private static final String EXPLAIN_ID_SET_SUBQUERIES_FIELD = "ID_SET_SUBQUERIES_NOT_RUN";
 
+  private volatile BooleanSupplier _kWayMergeSupported = () -> false;
   private final WorkerManager _workerManager;
   private final WorkerManager _multiClusterWorkerManager;
   private final MailboxService _mailboxService;
@@ -279,6 +281,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
     return Set.copyOf(
         config.getCommaSeparatedList(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES, List.of()));
+  }
+
+  public void setKWayMergeSupported(BooleanSupplier supported) {
+    _kWayMergeSupported = supported;
   }
 
   @Override
@@ -653,6 +659,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultSortExchangeCopyLimit(sortExchangeCopyThreshold)
         .defaultSealedInListThreshold(sealedInListThreshold)
         .defaultWindowSortOnSender(windowSortOnSender)
+        .isKWayMergeSupported(!QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
+            && _kWayMergeSupported.getAsBoolean())
         .build();
   }
 
