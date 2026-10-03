@@ -423,6 +423,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Nullable
+  public PartitionUpsertMetadataManager getPartitionUpsertMetadataManager() {
+    return _partitionUpsertMetadataManager;
+  }
+
+  @Nullable
   @Override
   public ThreadSafeMutableRoaringBitmap getValidDocIds() {
     return _validDocIds;
