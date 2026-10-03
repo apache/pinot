@@ -33,7 +33,9 @@ public interface FineGrainedAccessControl {
   /// @param action type to validate
   /// @return true if user is allowed to perform the action
   default boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
-    return true;
+    // Raw ZK reads can expose the persisted form of table configs, so implementations must grant this action
+    // explicitly. Keep the legacy allow-by-default behavior for all other fine-grained actions.
+    return !Actions.Cluster.GET_ZNODE.equals(action);
   }
 
   /// Checks whether the user has access to perform action on the particular resource type.
