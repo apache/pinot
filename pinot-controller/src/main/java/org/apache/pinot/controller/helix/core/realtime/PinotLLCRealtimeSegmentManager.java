@@ -217,6 +217,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   private final AtomicInteger _numCompletingSegments = new AtomicInteger(0);
   private final ExecutorService _deepStoreUploadExecutor;
   private final Set<String> _deepStoreUploadExecutorPendingSegments;
+  // Partitions of each table that have a PARTITION_END_OF_LIFE gauge, so that the gauges can be removed later
+  private final Map<String, Set<Integer>> _partitionEndOfLifeGauges = new ConcurrentHashMap<>();
 
   private volatile boolean _isStopping = false;
 
@@ -853,8 +855,40 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       LOGGER.info(
           "Skipping creation of new segment metadata after segment: {} during commit. Reason: Partition ID: {} not "
               + "found in upstream metadata.", committingSegmentName, committingSegmentPartitionGroupId);
+      setPartitionEndOfLifeGauge(realtimeTableName, committingSegmentPartitionGroupId, true);
     }
     return newConsumingSegmentName;
+  }
+
+  private void setPartitionEndOfLifeGauge(String realtimeTableName, int partitionId, boolean endOfLife) {
+    _partitionEndOfLifeGauges.computeIfAbsent(realtimeTableName, k -> ConcurrentHashMap.newKeySet()).add(partitionId);
+    _controllerMetrics.setValueOfPartitionGauge(realtimeTableName, partitionId, ControllerGauge.PARTITION_END_OF_LIFE,
+        endOfLife ? 1 : 0);
+  }
+
+  /// Removes the PARTITION_END_OF_LIFE gauges of the table, except the ones of the given partitions.
+  private void removePartitionEndOfLifeGauges(String realtimeTableName, Set<Integer> partitionIdsToKeep) {
+    Set<Integer> partitionIds = _partitionEndOfLifeGauges.get(realtimeTableName);
+    if (partitionIds == null) {
+      return;
+    }
+    partitionIds.removeIf(partitionId -> {
+      if (partitionIdsToKeep.contains(partitionId)) {
+        return false;
+      }
+      _controllerMetrics.removePartitionGauge(realtimeTableName, partitionId, ControllerGauge.PARTITION_END_OF_LIFE);
+      return true;
+    });
+  }
+
+  /// Removes all PARTITION_END_OF_LIFE gauges of the table, e.g. when this controller no longer leads it.
+  public void removePartitionEndOfLifeGauges(String realtimeTableName) {
+    Set<Integer> partitionIds = _partitionEndOfLifeGauges.remove(realtimeTableName);
+    if (partitionIds != null) {
+      for (int partitionId : partitionIds) {
+        _controllerMetrics.removePartitionGauge(realtimeTableName, partitionId, ControllerGauge.PARTITION_END_OF_LIFE);
+      }
+    }
   }
 
   private void removeSegmentZKMetadataBestEffort(String realtimeTableName, String segmentName) {
@@ -1778,6 +1812,11 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     Status statusPostSegmentMetadataUpdate =
         PauselessConsumptionUtils.isPauselessEnabled(tableConfig) ? Status.COMMITTING : Status.DONE;
 
+    // PARTITION_END_OF_LIFE decisions of this run: true when a partition stops for end of life, false when this run
+    // creates a consuming segment for it. Partitions that consume normally are left alone, so that a commit that marks
+    // a partition as ended while this run works from an older snapshot is not overwritten.
+    Map<Integer, Boolean> partitionIdToEndOfLife = new HashMap<>();
+
     for (Map.Entry<Integer, SegmentZKMetadata> entry : latestSegmentZKMetadataMap.entrySet()) {
       int partitionId = entry.getKey();
       SegmentZKMetadata latestSegmentZKMetadata = entry.getValue();
@@ -1812,12 +1851,14 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
                   committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
               updateInstanceStatesForNewConsumingSegment(instanceStatesMap, latestSegmentName, newSegmentName,
                   segmentAssignment, instancePartitionsMap);
+              partitionIdToEndOfLife.put(partitionId, false);
             } else { // partition group reached end of life
               LOGGER.info("PartitionGroup: {} has reached end of life. Updating ideal state for segment: {}. "
                       + "Skipping creation of new ZK metadata and new segment in ideal state", partitionId,
                   latestSegmentName);
               updateInstanceStatesForNewConsumingSegment(instanceStatesMap, latestSegmentName, null, segmentAssignment,
                   instancePartitionsMap);
+              partitionIdToEndOfLife.put(partitionId, true);
             }
           } else if (latestSegmentZKMetadata.getStatus() == Status.IN_PROGRESS
               && _isPartialOfflineReplicaRepairEnabled) {
@@ -1871,6 +1912,10 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
           if (!partitionIdToSmallestOffset.containsKey(partitionId)) {
             LOGGER.info("PartitionGroup: {} has reached end of life. Skipping creation of new segment {}", partitionId,
                 latestSegmentName);
+            // When all replicas are OFFLINE, the last segment never came online, so keep alerting on the partition
+            if (allInstancesOnlineAndMetadataNotInProgress) {
+              partitionIdToEndOfLife.put(partitionId, true);
+            }
             continue;
           }
 
@@ -1892,6 +1937,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
                 currentTimeMs, numPartitions, instancePartitions, instanceStatesMap, segmentAssignment,
                 instancePartitionsMap, startOffset);
           }
+          partitionIdToEndOfLife.put(partitionId, false);
         }
       } else {
         // idealstate does not have an entry for the segment (but metadata is present)
@@ -1923,6 +1969,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
           }
           updateInstanceStatesForNewConsumingSegment(instanceStatesMap, previousConsumingSegment, latestSegmentName,
               segmentAssignment, instancePartitionsMap);
+          partitionIdToEndOfLife.put(partitionId, false);
         } else {
           LOGGER.error("Got unexpected status: {} in segment ZK metadata for segment: {}",
               latestSegmentZKMetadata.getStatus(), latestSegmentName);
@@ -1940,9 +1987,17 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
                   currentTimeMs, instancePartitions, numPartitions, numReplicas);
           updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, newSegmentName, segmentAssignment,
               instancePartitionsMap);
+          partitionIdToEndOfLife.put(partitionId, false);
         }
       }
     }
+
+    // Drop the gauges of partitions that no longer have segments, e.g. an ended partition removed by retention
+    Set<Integer> partitionIdsToKeep = new HashSet<>(latestSegmentZKMetadataMap.keySet());
+    partitionIdsToKeep.addAll(partitionIdToEndOfLife.keySet());
+    removePartitionEndOfLifeGauges(realtimeTableName, partitionIdsToKeep);
+    partitionIdToEndOfLife.forEach(
+        (partitionId, endOfLife) -> setPartitionEndOfLifeGauge(realtimeTableName, partitionId, endOfLife));
 
     return idealState;
   }

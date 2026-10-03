@@ -59,7 +59,9 @@ import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.common.restlet.resources.BatchConfig;
 import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
@@ -88,6 +90,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -983,6 +986,57 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // makes the IS to ONLINE, but creates no new entries, because end of shard.
     testRepairs(segmentManager, Lists.newArrayList(1));
+  }
+
+  @Test
+  public void testPartitionEndOfLifeGauge() {
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mock(PinotHelixResourceManager.class), controllerMetrics);
+    setUpNewTable(segmentManager, 2, 5, 4);
+    List<StreamMetadata> allPartitions =
+        segmentManager.getNewStreamMetadataList(segmentManager._streamConfigs, List.of(), mock(IdealState.class));
+    StreamMetadata streamMetadata = allPartitions.get(0);
+    List<PartitionGroupMetadata> partitionsWithout0 = new ArrayList<>(streamMetadata.getPartitionGroupMetadataList());
+    partitionsWithout0.remove(0);
+
+    // Partition 0 reaches end of life, so its last commit creates no new consuming segment
+    segmentManager._streamMetadataList = List.of(
+        new StreamMetadata(streamMetadata.getStreamConfig(), streamMetadata.getNumPartitions(), partitionsWithout0));
+    String lastSegmentOfPartition0 = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME,
+        createCommittingSegmentDescriptor(lastSegmentOfPartition0));
+    assertEquals(getPartitionEndOfLife(controllerMetrics, 0), 1L);
+
+    // The validation task keeps partition 0 marked as ended, and emits nothing for partitions that consume normally
+    segmentManager._exceededMaxSegmentCompletionTime = true;
+    segmentManager.ensureAllPartitionsConsuming();
+    assertEquals(getPartitionEndOfLife(controllerMetrics, 0), 1L);
+    for (int partitionId = 1; partitionId < 4; partitionId++) {
+      assertNull(getPartitionEndOfLife(controllerMetrics, partitionId));
+    }
+
+    // Retention deletes the last segment of partition 0, so its gauge is removed
+    segmentManager._idealState.getRecord().getMapFields().remove(lastSegmentOfPartition0);
+    segmentManager._segmentZKMetadataMap.remove(lastSegmentOfPartition0);
+    segmentManager.ensureAllPartitionsConsuming();
+    assertNull(getPartitionEndOfLife(controllerMetrics, 0));
+
+    // A partition that comes back (e.g. a stream recreated under the same name) gets a consuming segment and 0
+    segmentManager._streamMetadataList = allPartitions;
+    segmentManager.ensureAllPartitionsConsuming();
+    assertEquals(getPartitionEndOfLife(controllerMetrics, 0), 0L);
+
+    // A controller that no longer leads the table removes the gauges
+    segmentManager.removePartitionEndOfLifeGauges(REALTIME_TABLE_NAME);
+    assertNull(getPartitionEndOfLife(controllerMetrics, 0));
+  }
+
+  @Nullable
+  private static Long getPartitionEndOfLife(ControllerMetrics controllerMetrics, int partitionId) {
+    return MetricValueUtils.partitionGaugeExists(controllerMetrics, REALTIME_TABLE_NAME, partitionId,
+        ControllerGauge.PARTITION_END_OF_LIFE) ? MetricValueUtils.getPartitionGaugeValue(controllerMetrics,
+        REALTIME_TABLE_NAME, partitionId, ControllerGauge.PARTITION_END_OF_LIFE) : null;
   }
 
   @Test
@@ -2454,6 +2508,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager) {
       super(pinotHelixResourceManager, CONTROLLER_CONF, mock(ControllerMetrics.class));
+      _mockResourceManager = pinotHelixResourceManager;
+    }
+
+    FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager,
+        ControllerMetrics controllerMetrics) {
+      super(pinotHelixResourceManager, CONTROLLER_CONF, controllerMetrics);
       _mockResourceManager = pinotHelixResourceManager;
     }
 
