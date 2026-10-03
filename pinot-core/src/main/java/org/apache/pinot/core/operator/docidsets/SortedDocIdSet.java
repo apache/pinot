@@ -34,7 +34,7 @@ public final class SortedDocIdSet implements BlockDocIdSet {
 
   // NOTE: No need to track numDocs because sorted index can only apply to ImmutableSegment, so the document ids are
   //       always smaller than numDocs.
-  public SortedDocIdSet(List<IntPair> docIdRanges) {
+  private SortedDocIdSet(List<IntPair> docIdRanges) {
     _docIdRanges = docIdRanges;
   }
 

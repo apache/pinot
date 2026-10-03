@@ -72,7 +72,7 @@ public class AndDocIdSetTest {
       List<BlockDocIdSet> docIdSets = new ArrayList<>(numBitmaps);
       for (int i = 0; i < numBitmaps; i++) {
         copies[i] = bitmaps[i].toMutableRoaringBitmap();
-        docIdSets.add(new BitmapDocIdSet(bitmaps[i], NUM_DOCS));
+        docIdSets.add(BitmapDocIdSet.create(bitmaps[i], NUM_DOCS));
       }
 
       int[] actualDocIds = collectDocIds(new AndDocIdSet(docIdSets, null));
@@ -90,7 +90,7 @@ public class AndDocIdSetTest {
     MutableRoaringBitmap first = MutableRoaringBitmap.bitmapOf(1, 3, 5);
     MutableRoaringBitmap second = MutableRoaringBitmap.bitmapOf(0, 2, 4);
     List<BlockDocIdSet> docIdSets =
-        List.of(new BitmapDocIdSet(first, NUM_DOCS), new BitmapDocIdSet(second, NUM_DOCS));
+        List.of(BitmapDocIdSet.create(first, NUM_DOCS), BitmapDocIdSet.create(second, NUM_DOCS));
 
     int[] actualDocIds = collectDocIds(new AndDocIdSet(docIdSets, null));
 

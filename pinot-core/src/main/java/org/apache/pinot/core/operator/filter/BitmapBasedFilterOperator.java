@@ -80,7 +80,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getNulls() {
-    return _nullBitmap != null ? new BitmapDocIdSet(_nullBitmap, _numDocs) : EmptyDocIdSet.unscanned();
+    return _nullBitmap != null ? BitmapDocIdSet.create(_nullBitmap, _numDocs) : EmptyDocIdSet.unscanned();
   }
 
   @Override
