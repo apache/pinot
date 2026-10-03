@@ -266,7 +266,9 @@ public class LineageDeleteInterleavingIntegrationTest {
 
     // Simulate the lost-race outcome via the bypass overload (the only path that can produce this state — the
     // public REST DELETE would be rejected by the new check).
-    _resourceManager.deleteSegmentsForLineageCleanup(OFFLINE_TABLE_NAME, List.of(s1));
+    int lineageVersion = SegmentLineageAccessHelper.getSegmentLineageZNRecord(_resourceManager.getPropertyStore(),
+        OFFLINE_TABLE_NAME).getVersion();
+    _resourceManager.deleteSegmentsForLineageCleanup(OFFLINE_TABLE_NAME, List.of(s1), lineageVersion);
     assertFalse(getSegments(OFFLINE_TABLE_NAME).contains(s1));
     // Lineage entry must NOT mutate as a side effect of the bypass delete.
     assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, List.of(s1),
@@ -309,7 +311,9 @@ public class LineageDeleteInterleavingIntegrationTest {
 
     String entryId = postStartReplaceSegments(OFFLINE_TABLE_NAME, List.of(s1),
         List.of(s2));
-    _resourceManager.deleteSegmentsForLineageCleanup(OFFLINE_TABLE_NAME, List.of(s1));
+    int lineageVersion = SegmentLineageAccessHelper.getSegmentLineageZNRecord(_resourceManager.getPropertyStore(),
+        OFFLINE_TABLE_NAME).getVersion();
+    _resourceManager.deleteSegmentsForLineageCleanup(OFFLINE_TABLE_NAME, List.of(s1), lineageVersion);
     addSegments(OFFLINE_TABLE_NAME, s2);
 
     // Attempting revertReplaceSegments without forceRevert against an IN_PROGRESS entry should fail.
@@ -385,6 +389,61 @@ public class LineageDeleteInterleavingIntegrationTest {
         "Expected sExpired to be removed from IdealState by the lineage-cleanup pass");
     assertTrue(getSegments(RETENTION_OFFLINE_TABLE_NAME).contains(sNew));
     assertTrue(segmentsAfterFirstPass.contains(sKept));
+  }
+
+  @Test
+  public void testLineageCleanupPreservesDestinationReusedByCompletedEntry() {
+    String sourceSegment = "t5b_source";
+    String destinationSegment = "t5b_destination";
+    addSegments(OFFLINE_TABLE_NAME, sourceSegment, destinationSegment);
+
+    long nowMs = System.currentTimeMillis();
+    SegmentLineage lineage = new SegmentLineage(OFFLINE_TABLE_NAME);
+    lineage.addLineageEntry("reverted",
+        new LineageEntry(List.of(sourceSegment), List.of(destinationSegment), LineageEntryState.REVERTED,
+            nowMs - TimeUnit.DAYS.toMillis(2L)));
+    lineage.addLineageEntry("completed",
+        new LineageEntry(List.of(sourceSegment), List.of(destinationSegment), LineageEntryState.COMPLETED, nowMs));
+    assertTrue(SegmentLineageAccessHelper.writeSegmentLineage(_resourceManager.getPropertyStore(), lineage, -1));
+
+    _retentionManager.runProcessTable(OFFLINE_TABLE_NAME);
+
+    assertTrue(getSegments(OFFLINE_TABLE_NAME).contains(destinationSegment),
+        "Lineage cleanup must not delete a destination reused by a successful replacement");
+    SegmentLineage updatedLineage =
+        SegmentLineageAccessHelper.getSegmentLineage(_resourceManager.getPropertyStore(), OFFLINE_TABLE_NAME);
+    assertNotNull(updatedLineage);
+    assertFalse(updatedLineage.getLineageEntries().containsKey("reverted"));
+    assertTrue(updatedLineage.getLineageEntries().containsKey("completed"));
+  }
+
+  @Test
+  public void testForceCleanupPreservesDestinationReusedByCompletedEntry() {
+    String sourceSegment = "t5c_source";
+    String reusedSegment = "t5c_reused";
+    String unrelatedSource = "t5c_unrelated";
+    String newDestination = "t5c_new";
+    addSegments(OFFLINE_TABLE_NAME, sourceSegment, reusedSegment, unrelatedSource);
+
+    SegmentLineage lineage = new SegmentLineage(OFFLINE_TABLE_NAME);
+    lineage.addLineageEntry("reverted",
+        new LineageEntry(List.of(sourceSegment), List.of(reusedSegment), LineageEntryState.REVERTED,
+            System.currentTimeMillis()));
+    lineage.addLineageEntry("completed",
+        new LineageEntry(List.of(sourceSegment), List.of(reusedSegment), LineageEntryState.COMPLETED,
+            System.currentTimeMillis()));
+    assertTrue(SegmentLineageAccessHelper.writeSegmentLineage(_resourceManager.getPropertyStore(), lineage, -1));
+
+    String newEntryId = _resourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, List.of(unrelatedSource),
+        List.of(newDestination), true, null);
+
+    assertTrue(getSegments(OFFLINE_TABLE_NAME).contains(reusedSegment),
+        "Force cleanup must preserve a destination reused by a completed replacement");
+    SegmentLineage updatedLineage =
+        SegmentLineageAccessHelper.getSegmentLineage(_resourceManager.getPropertyStore(), OFFLINE_TABLE_NAME);
+    assertNotNull(updatedLineage);
+    assertTrue(updatedLineage.getLineageEntries().containsKey("completed"));
+    assertEquals(updatedLineage.getLineageEntry(newEntryId).getSegmentsFrom(), List.of(unrelatedSource));
   }
 
   // ---------------------------------------------------------------------------------------------------------------
