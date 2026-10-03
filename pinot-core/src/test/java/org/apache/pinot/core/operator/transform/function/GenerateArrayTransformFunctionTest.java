@@ -150,10 +150,12 @@ public class GenerateArrayTransformFunctionTest {
       arrayExpressions.add(ExpressionContext.forLiteral(DataType.INT, j));
     }
 
+    // Argument validation now lives in ArrayFunctions, shared with the multi-stage engine, and rejects a bad step
+    // with IllegalArgumentException rather than IllegalStateException.
     try {
       GenerateArrayTransformFunction intArray = new GenerateArrayTransformFunction(arrayExpressions);
       Assert.fail();
-    } catch (IllegalStateException ignored) {
+    } catch (IllegalArgumentException ignored) {
     }
   }
 }

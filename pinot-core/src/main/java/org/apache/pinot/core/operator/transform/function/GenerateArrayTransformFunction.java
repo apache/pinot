@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.function.scalar.ArrayFunctions;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -68,88 +69,52 @@ public class GenerateArrayTransformFunction implements TransformFunction {
     }
     // Get the type of the first member in the literalContext and generate an array
     _dataType = literalContexts.get(0).getLiteral().getType();
+    boolean hasIncrement = literalContexts.size() == 3;
 
     switch (_dataType) {
-      case INT:
-        int startInt = literalContexts.get(0).getLiteral().getIntValue();
-        int endInt = literalContexts.get(1).getLiteral().getIntValue();
-        int incInt;
-        if (literalContexts.size() == 3) {
-          incInt = literalContexts.get(2).getLiteral().getIntValue();
-        } else {
-          incInt = 1;
-        }
-        Preconditions.checkState((endInt > startInt && incInt > 0) || (startInt > endInt
-            && incInt < 0), "Incorrect Step value.");
-        int size = (endInt - startInt) / incInt + 1;
-        _intArrayLiteral = new int[size];
-        for (int i = 0, value = startInt; i < size; i++, value += incInt) {
-          _intArrayLiteral[i] = value;
-        }
+      case INT: {
+        int start = literalContexts.get(0).getLiteral().getIntValue();
+        int end = literalContexts.get(1).getLiteral().getIntValue();
+        _intArrayLiteral = hasIncrement ? ArrayFunctions.generateIntArray(start, end,
+            literalContexts.get(2).getLiteral().getIntValue()) : ArrayFunctions.generateIntArray(start, end);
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
         break;
-      case LONG:
-        long startLong = Long.parseLong(literalContexts.get(0).getLiteral().getStringValue());
-        long endLong = Long.parseLong(literalContexts.get(1).getLiteral().getStringValue());
-        long incLong;
-        if (literalContexts.size() == 3) {
-          incLong = Long.parseLong(literalContexts.get(2).getLiteral().getStringValue());
-        } else {
-          incLong = 1L;
-        }
-        Preconditions.checkState((endLong > startLong && incLong > 0) || (startLong > endLong
-            && incLong < 0), "Incorrect Step value.");
-        size = (int) ((endLong - startLong) / incLong + 1);
-        _longArrayLiteral = new long[size];
-        for (int i = 0; i < size; i++, startLong += incLong) {
-          _longArrayLiteral[i] = startLong;
-        }
+      }
+      case LONG: {
+        long start = Long.parseLong(literalContexts.get(0).getLiteral().getStringValue());
+        long end = Long.parseLong(literalContexts.get(1).getLiteral().getStringValue());
+        _longArrayLiteral = hasIncrement ? ArrayFunctions.generateLongArray(start, end,
+            Long.parseLong(literalContexts.get(2).getLiteral().getStringValue()))
+            : ArrayFunctions.generateLongArray(start, end);
         _intArrayLiteral = null;
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
         break;
-      case FLOAT:
-        float startFloat = Float.parseFloat(literalContexts.get(0).getLiteral().getStringValue());
-        float endFloat = Float.parseFloat(literalContexts.get(1).getLiteral().getStringValue());
-        float incFloat;
-        if (literalContexts.size() == 3) {
-          incFloat = Float.parseFloat(literalContexts.get(2).getLiteral().getStringValue());
-        } else {
-          incFloat = 1;
-        }
-        Preconditions.checkState((endFloat > startFloat && incFloat > 0) || (startFloat > endFloat
-            && incFloat < 0), "Incorrect Step value.");
-        size = (int) ((endFloat - startFloat) / incFloat + 1);
-        _floatArrayLiteral = new float[size];
-        for (int i = 0; i < size; i++, startFloat += incFloat) {
-          _floatArrayLiteral[i] = startFloat;
-        }
+      }
+      case FLOAT: {
+        float start = Float.parseFloat(literalContexts.get(0).getLiteral().getStringValue());
+        float end = Float.parseFloat(literalContexts.get(1).getLiteral().getStringValue());
+        _floatArrayLiteral = hasIncrement ? ArrayFunctions.generateFloatArray(start, end,
+            Float.parseFloat(literalContexts.get(2).getLiteral().getStringValue()))
+            : ArrayFunctions.generateFloatArray(start, end);
         _intArrayLiteral = null;
         _longArrayLiteral = null;
         _doubleArrayLiteral = null;
         break;
-      case DOUBLE:
-        double startDouble = Double.parseDouble(literalContexts.get(0).getLiteral().getStringValue());
-        double endDouble = Double.parseDouble(literalContexts.get(1).getLiteral().getStringValue());
-        double incDouble;
-        if (literalContexts.size() == 3) {
-          incDouble = Double.parseDouble(literalContexts.get(2).getLiteral().getStringValue());
-        } else {
-          incDouble = 1.0;
-        }
-        Preconditions.checkState((endDouble > startDouble && incDouble > 0) || (startDouble > endDouble
-            && incDouble < 0), "Incorrect Step value.");
-        size = (int) ((endDouble - startDouble) / incDouble + 1);
-        _doubleArrayLiteral = new double[size];
-        for (int i = 0; i < size; i++, startDouble += incDouble) {
-          _doubleArrayLiteral[i] = startDouble;
-        }
+      }
+      case DOUBLE: {
+        double start = Double.parseDouble(literalContexts.get(0).getLiteral().getStringValue());
+        double end = Double.parseDouble(literalContexts.get(1).getLiteral().getStringValue());
+        _doubleArrayLiteral = hasIncrement ? ArrayFunctions.generateDoubleArray(start, end,
+            Double.parseDouble(literalContexts.get(2).getLiteral().getStringValue()))
+            : ArrayFunctions.generateDoubleArray(start, end);
         _intArrayLiteral = null;
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
         break;
+      }
       default:
         throw new IllegalStateException(
             "Illegal data type for GenerateArrayTransformFunction: " + _dataType + ", literal contexts: "
