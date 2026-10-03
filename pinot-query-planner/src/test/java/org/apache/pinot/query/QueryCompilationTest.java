@@ -1434,6 +1434,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertFalse(sendNode.getInputs().get(0) instanceof SortNode);
     assertTrue(findWindowNode(plan).getInputs().get(0) instanceof SortNode,
         "The disabled path must retain the legacy post-exchange full sort");
+    assertEquals(((SortNode) findWindowNode(plan).getInputs().get(0)).getFetch(), Integer.MAX_VALUE,
+        "The disabled path must retain the complete window input");
   }
 
   @Test
@@ -1442,6 +1444,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     try (CompiledQuery compiled = _queryEnvironment.compile(query)) {
       WindowNode window = findWindowNode(compiled.planQuery(0).getQueryPlan());
       assertTrue(window.getInputs().get(0) instanceof SortNode);
+      assertEquals(((SortNode) window.getInputs().get(0)).getFetch(), Integer.MAX_VALUE,
+          "Compatibility fallback must retain the complete window input");
       assertFalse(window.getInputs().get(0).getInputs().get(0) instanceof MailboxMergeReceiveNode);
     }
   }
