@@ -1432,6 +1432,7 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   public void testValidateFieldConfig() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addDateTime(TIME_COLUMN, DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
@@ -1444,7 +1445,7 @@ public class TableConfigUtilsTest {
         .build();
 
     try {
-      FieldConfig fieldConfig = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null);
+      FieldConfig fieldConfig = fieldConfigWithForwardEncoding("myCol1", FieldConfig.EncodingType.RAW);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -1452,8 +1453,44 @@ public class TableConfigUtilsTest {
     }
 
     try {
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, CompressionCodec.DELTADELTA, null, null);
+      FieldConfig fieldConfig = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for deprecated field-level encoding type");
+    } catch (Exception e) {
+      assertEquals(e.getMessage(), "FieldConfig.encodingType is deprecated for column: myCol1. Use "
+          + "fieldConfigList[].indexes.forward.encodingType instead.");
+    }
+
+    try {
+      FieldConfig fieldConfig = new FieldConfig.Builder("myCol1")
+          .withCompressionCodec(CompressionCodec.SNAPPY)
+          .build();
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for deprecated field-level compression codec");
+    } catch (Exception e) {
+      assertEquals(e.getMessage(), "FieldConfig.compressionCodec is deprecated for column: myCol1. Use "
+          + "fieldConfigList[].indexes.forward.compressionCodec instead.");
+    }
+
+    try {
+      FieldConfig fieldConfig = new FieldConfig.Builder("myCol1")
+          .withProperties(Map.of(FieldConfig.RAW_INDEX_WRITER_VERSION, "4"))
+          .build();
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for deprecated field-level properties");
+    } catch (Exception e) {
+      assertEquals(e.getMessage(), "FieldConfig.properties is deprecated for column: myCol1. Move these settings into "
+          + "the relevant fieldConfigList[].indexes.<indexName> block instead.");
+    }
+
+    try {
+      FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("myCol1", FieldConfig.EncodingType.RAW)
+          .withIndexes(withForwardCompression(indexesWithForwardEncoding(FieldConfig.EncodingType.RAW),
+              CompressionCodec.DELTADELTA))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -1462,8 +1499,10 @@ public class TableConfigUtilsTest {
     }
 
     try {
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, null, null, CompressionCodec.DELTADELTA, null, null);
+      FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("myCol2", FieldConfig.EncodingType.RAW)
+          .withIndexes(withForwardCompression(indexesWithForwardEncoding(FieldConfig.EncodingType.RAW),
+              CompressionCodec.DELTADELTA))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -1472,31 +1511,30 @@ public class TableConfigUtilsTest {
     }
 
     try {
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST), null,
-              null);
+      FieldConfig fieldConfig = fieldConfigWithForwardEncoding("myCol1", FieldConfig.EncodingType.DICTIONARY);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
-      fail("Should fail for with conflicting encoding type of myCol1");
+      fail("Should fail when forward DICTIONARY encoding conflicts with noDictionaryColumns");
     } catch (Exception e) {
-      assertEquals(e.getMessage(), "FieldConfig encoding type is different from indexingConfig for column: myCol1");
+      assertEquals(e.getMessage(), "Dictionary must be enabled for dictionary-encoded forward index column: myCol1");
     }
 
     // FST on RAW column is valid when explicit dictionary config is provided in indexes
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     ObjectNode rawFstIndexes = JsonUtils.newObjectNode();
     rawFstIndexes.set("dictionary", JsonUtils.newObjectNode());
-    FieldConfig rawFstFieldConfig =
-        new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, Arrays.asList(FieldConfig.IndexType.FST),
-            null, null, rawFstIndexes, null, null);
+    FieldConfig rawFstFieldConfig = new FieldConfig.Builder("myCol1")
+        .withIndexes(withForwardEncoding(rawFstIndexes, FieldConfig.EncodingType.RAW))
+        .withIndexTypes(Arrays.asList(FieldConfig.IndexType.FST))
+        .build();
     tableConfig.setFieldConfigList(Arrays.asList(rawFstFieldConfig));
     TableConfigUtils.validate(tableConfig, schema);
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST), null,
-              null);
+      FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("myCol2", FieldConfig.EncodingType.DICTIONARY)
+          .withIndexTypes(Arrays.asList(FieldConfig.IndexType.FST))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail since FST index is enabled on multi value column");
@@ -1506,9 +1544,9 @@ public class TableConfigUtilsTest {
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
-      FieldConfig fieldConfig =
-          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST), null,
-              null);
+      FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("intCol", FieldConfig.EncodingType.DICTIONARY)
+          .withIndexTypes(Arrays.asList(FieldConfig.IndexType.FST))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail since FST index is enabled on non String column");
@@ -1520,8 +1558,9 @@ public class TableConfigUtilsTest {
         .setNoDictionaryColumns(Arrays.asList("myCol2", "intCol"))
         .build();
     try {
-      FieldConfig fieldConfig =
-          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT), null, null);
+      FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("intCol", FieldConfig.EncodingType.RAW)
+          .withIndexTypes(Arrays.asList(FieldConfig.IndexType.TEXT))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail since TEXT index is enabled on non String column");
@@ -1533,8 +1572,9 @@ public class TableConfigUtilsTest {
         .setNoDictionaryColumns(Arrays.asList("myCol1"))
         .build();
     try {
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol21", FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.FST), null, null);
+      FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("myCol21", FieldConfig.EncodingType.RAW)
+          .withIndexTypes(Arrays.asList(FieldConfig.IndexType.FST))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail since field name is not present in schema");
@@ -1544,8 +1584,11 @@ public class TableConfigUtilsTest {
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
-      FieldConfig fieldConfig = new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, List.of(),
-          CompressionCodec.SNAPPY, null);
+      FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("intCol", FieldConfig.EncodingType.DICTIONARY)
+          .withIndexTypes(List.of())
+          .withIndexes(withForwardCompression(indexesWithForwardEncoding(FieldConfig.EncodingType.DICTIONARY),
+              CompressionCodec.SNAPPY))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail since dictionary encoding does not support compression codec SNAPPY");
@@ -1555,8 +1598,11 @@ public class TableConfigUtilsTest {
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
-      FieldConfig fieldConfig = new FieldConfig("intCol", FieldConfig.EncodingType.RAW, List.of(),
-          CompressionCodec.MV_ENTRY_DICT, null);
+      FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("intCol", FieldConfig.EncodingType.RAW)
+          .withIndexTypes(List.of())
+          .withIndexes(withForwardCompression(indexesWithForwardEncoding(FieldConfig.EncodingType.RAW),
+              CompressionCodec.MV_ENTRY_DICT))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail since raw encoding does not support compression codec MV_ENTRY_DICT");
@@ -1570,10 +1616,9 @@ public class TableConfigUtilsTest {
     try {
       // Enable forward index disabled flag for a raw column. This should succeed as though the forward index cannot
       // be rebuilt without a dictionary, the constraint to have a dictionary has been lifted.
-      Map<String, String> fieldConfigProperties = new HashMap<>();
-      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, fieldConfigProperties);
+      FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("myCol1", FieldConfig.EncodingType.RAW)
+          .withIndexes(indexesWithDisabledForwardIndex(FieldConfig.EncodingType.RAW))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -1584,10 +1629,9 @@ public class TableConfigUtilsTest {
       // Enable forward index disabled flag for a column without inverted index. This should succeed as though the
       // forward index cannot be rebuilt without an inverted index, the constraint to have an inverted index has been
       // lifted.
-      Map<String, String> fieldConfigProperties = new HashMap<>();
-      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, null, null, null, null, fieldConfigProperties);
+      FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("myCol2", FieldConfig.EncodingType.DICTIONARY)
+          .withIndexes(indexesWithDisabledForwardIndex(FieldConfig.EncodingType.DICTIONARY))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -1596,8 +1640,6 @@ public class TableConfigUtilsTest {
 
     try {
       // Enable forward index disabled flag for a column and verify that dictionary override options are not set.
-      Map<String, String> fieldConfigProperties = new HashMap<>();
-      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
       tableConfig.getIndexingConfig().setOptimizeDictionaryForMetrics(true);
       tableConfig.getIndexingConfig().setOptimizeDictionaryForMetrics(true);
       TableConfigUtils.validate(tableConfig, schema);
@@ -1612,11 +1654,10 @@ public class TableConfigUtilsTest {
         .build();
     try {
       // Enable forward index disabled flag for a column with inverted index
-      Map<String, String> fieldConfigProperties = new HashMap<>();
-      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null, null,
-              null, fieldConfigProperties);
+      FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("myCol2", FieldConfig.EncodingType.DICTIONARY)
+          .withIndexTypes(Arrays.asList(FieldConfig.IndexType.INVERTED))
+          .withIndexes(indexesWithDisabledForwardIndex(FieldConfig.EncodingType.DICTIONARY))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -1630,11 +1671,10 @@ public class TableConfigUtilsTest {
         .build();
     try {
       // Enable forward index disabled flag for a column with inverted index and is sorted
-      Map<String, String> fieldConfigProperties = new HashMap<>();
-      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null, null,
-              null, fieldConfigProperties);
+      FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("myCol1", FieldConfig.EncodingType.DICTIONARY)
+          .withIndexTypes(Arrays.asList(FieldConfig.IndexType.INVERTED))
+          .withIndexes(indexesWithDisabledForwardIndex(FieldConfig.EncodingType.DICTIONARY))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -1648,12 +1688,10 @@ public class TableConfigUtilsTest {
         .build();
     try {
       // Enable forward index disabled flag for a multi-value column with inverted index and range index
-      Map<String, String> fieldConfigProperties = new HashMap<>();
-      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED,
-              Arrays.asList(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE), null, null,
-              fieldConfigProperties);
+      FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("myCol2", FieldConfig.EncodingType.DICTIONARY)
+          .withIndexTypes(Arrays.asList(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE))
+          .withIndexes(indexesWithDisabledForwardIndex(FieldConfig.EncodingType.DICTIONARY))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail for MV myCol2 with forward index disabled but has range and inverted index");
@@ -1668,12 +1706,10 @@ public class TableConfigUtilsTest {
         .build();
     try {
       // Enable forward index disabled flag for a singe-value column with inverted index and range index v1
-      Map<String, String> fieldConfigProperties = new HashMap<>();
-      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED,
-              Arrays.asList(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE), null, null,
-              fieldConfigProperties);
+      FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("myCol1", FieldConfig.EncodingType.DICTIONARY)
+          .withIndexTypes(Arrays.asList(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE))
+          .withIndexes(indexesWithDisabledForwardIndex(FieldConfig.EncodingType.DICTIONARY))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       tableConfig.getIndexingConfig().setRangeIndexVersion(1);
       TableConfigUtils.validate(tableConfig, schema);
@@ -1690,11 +1726,10 @@ public class TableConfigUtilsTest {
         .build();
     try {
       // Enable forward index disabled flag for a column with inverted index and disable dictionary
-      Map<String, String> fieldConfigProperties = new HashMap<>();
-      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.INVERTED, null, null, null,
-              fieldConfigProperties);
+      FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("myCol2", FieldConfig.EncodingType.RAW)
+          .withIndexTypes(Arrays.asList(FieldConfig.IndexType.INVERTED))
+          .withIndexes(indexesWithDisabledForwardIndex(FieldConfig.EncodingType.RAW))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should not be able to disable dictionary but keep inverted index");
@@ -1706,10 +1741,9 @@ public class TableConfigUtilsTest {
     // producing a shared-dict + RAW forward index. No validation error expected.
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     {
-      FieldConfig fieldConfig =
-          new FieldConfig.Builder("myCol2").withIndexTypes(Arrays.asList(FieldConfig.IndexType.INVERTED))
-              .withEncodingType(FieldConfig.EncodingType.RAW)
-              .build();
+      FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("myCol2", FieldConfig.EncodingType.RAW)
+          .withIndexTypes(Arrays.asList(FieldConfig.IndexType.INVERTED))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     }
@@ -1719,11 +1753,10 @@ public class TableConfigUtilsTest {
         .build();
     try {
       // Enable forward index disabled flag for a column with FST index and disable dictionary
-      Map<String, String> fieldConfigProperties = new HashMap<>();
-      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfigWithFst =
-          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.FST, null, null, null,
-              fieldConfigProperties);
+      FieldConfig fieldConfigWithFst = fieldConfigBuilderWithForwardEncoding("myCol2", FieldConfig.EncodingType.RAW)
+          .withIndexTypes(Arrays.asList(FieldConfig.IndexType.FST))
+          .withIndexes(indexesWithDisabledForwardIndex(FieldConfig.EncodingType.RAW))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfigWithFst));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should not be able to disable dictionary but keep FST index");
@@ -1740,11 +1773,10 @@ public class TableConfigUtilsTest {
         .build();
     try {
       // Enable forward index disabled flag for a column with FST index and disable dictionary
-      Map<String, String> fieldConfigProperties = new HashMap<>();
-      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfigWithRange =
-          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.RANGE, null, null, null,
-              fieldConfigProperties);
+      FieldConfig fieldConfigWithRange = fieldConfigBuilderWithForwardEncoding("intCol", FieldConfig.EncodingType.RAW)
+          .withIndexTypes(Arrays.asList(FieldConfig.IndexType.RANGE))
+          .withIndexes(indexesWithDisabledForwardIndex(FieldConfig.EncodingType.RAW))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfigWithRange));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -1759,13 +1791,12 @@ public class TableConfigUtilsTest {
         .build();
     try {
       // Enable forward index disabled flag for a column with inverted index index and disable dictionary
-      Map<String, String> fieldConfigProperties = new HashMap<>();
-      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
       ObjectNode indexes = JsonUtils.newObjectNode();
       indexes.set("dictionary", JsonUtils.newObjectNode());
-      FieldConfig realtimeFieldConfig =
-          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, null, Arrays.asList(FieldConfig.IndexType.INVERTED),
-              null, null, indexes, fieldConfigProperties, null);
+      FieldConfig realtimeFieldConfig = new FieldConfig.Builder("intCol")
+          .withIndexes(withForwardDisabled(withForwardEncoding(indexes, FieldConfig.EncodingType.RAW)))
+          .withIndexTypes(Arrays.asList(FieldConfig.IndexType.INVERTED))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(realtimeFieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -1776,9 +1807,9 @@ public class TableConfigUtilsTest {
     // and validation passes — the runtime builds a shared-dict + RAW forward index.
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     {
-      FieldConfig rawInvertedConfig =
-          new FieldConfig("intCol", FieldConfig.EncodingType.RAW,
-              Arrays.asList(FieldConfig.IndexType.INVERTED), null, null);
+      FieldConfig rawInvertedConfig = fieldConfigBuilderWithForwardEncoding("intCol", FieldConfig.EncodingType.RAW)
+          .withIndexTypes(Arrays.asList(FieldConfig.IndexType.INVERTED))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(rawInvertedConfig));
       TableConfigUtils.validate(tableConfig, schema);
     }
@@ -1788,9 +1819,10 @@ public class TableConfigUtilsTest {
     try {
       ObjectNode dictIndexes = JsonUtils.newObjectNode();
       dictIndexes.set("dictionary", JsonUtils.newObjectNode());
-      FieldConfig rawInvertedWithDictConfig =
-          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, null,
-              Arrays.asList(FieldConfig.IndexType.INVERTED), null, null, dictIndexes, null, null);
+      FieldConfig rawInvertedWithDictConfig = new FieldConfig.Builder("intCol")
+          .withIndexes(withForwardEncoding(dictIndexes, FieldConfig.EncodingType.RAW))
+          .withIndexTypes(Arrays.asList(FieldConfig.IndexType.INVERTED))
+          .build();
       tableConfig.setFieldConfigList(Arrays.asList(rawInvertedWithDictConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -1845,32 +1877,19 @@ public class TableConfigUtilsTest {
     assertEquals(Throwables.getRootCause(exception).getMessage(), "codecSpec requires RAW forward-index encoding");
 
     ObjectNode disabledForward = JsonUtils.newObjectNode();
+    disabledForward.put("encodingType", FieldConfig.EncodingType.RAW.name());
     disabledForward.put("disabled", true);
     disabledForward.put("codecSpec", "LZ4");
     ObjectNode disabledIndexes = JsonUtils.newObjectNode();
     disabledIndexes.set("forward", disabledForward);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     tableConfig.setFieldConfigList(List.of(new FieldConfig.Builder("intCol")
-        .withEncodingType(FieldConfig.EncodingType.RAW)
         .withIndexes(disabledIndexes)
         .build()));
     TableConfig disabledTableConfig = tableConfig;
     exception = expectThrows(IllegalStateException.class,
         () -> TableConfigUtils.validate(disabledTableConfig, schema));
     assertTrue(exception.getMessage().contains("codecSpec cannot be configured when the forward index is disabled"),
-        exception.getMessage());
-
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.setFieldConfigList(List.of(new FieldConfig.Builder("intCol")
-        .withEncodingType(FieldConfig.EncodingType.RAW)
-        .withIndexes(disabledIndexes)
-        .withProperties(Map.of(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString()))
-        .build()));
-    TableConfig legacyDisabledTableConfig = tableConfig;
-    exception = expectThrows(IllegalStateException.class,
-        () -> TableConfigUtils.validate(legacyDisabledTableConfig, schema));
-    assertTrue(Throwables.getRootCause(exception).getMessage()
-            .contains("codecSpec cannot be configured when the forward index is disabled"),
         exception.getMessage());
   }
 
@@ -1905,6 +1924,7 @@ public class TableConfigUtilsTest {
   private static FieldConfig fieldConfigWithCodecSpec(String column, FieldConfig.EncodingType encodingType,
       String codecSpec, @Nullable Integer targetDocsPerChunk) {
     ObjectNode forward = JsonUtils.newObjectNode();
+    forward.put("encodingType", encodingType.name());
     forward.put("codecSpec", codecSpec);
     if (targetDocsPerChunk != null) {
       forward.put("targetDocsPerChunk", targetDocsPerChunk);
@@ -1912,7 +1932,6 @@ public class TableConfigUtilsTest {
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("forward", forward);
     return new FieldConfig.Builder(column)
-        .withEncodingType(encodingType)
         .withIndexes(indexes)
         .build();
   }
@@ -1925,8 +1944,8 @@ public class TableConfigUtilsTest {
     final TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(TABLE_NAME).build();
 
-    final FieldConfig fc1 = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null);
-    final FieldConfig fc2 = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null);
+    final FieldConfig fc1 = fieldConfigWithForwardEncoding("myCol1", FieldConfig.EncodingType.RAW);
+    final FieldConfig fc2 = fieldConfigWithForwardEncoding("myCol1", FieldConfig.EncodingType.RAW);
     tableConfig.setFieldConfigList(Arrays.asList(fc1, fc2));
 
     try {
@@ -1945,9 +1964,8 @@ public class TableConfigUtilsTest {
     final TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(TABLE_NAME).build();
 
-    final FieldConfig fc1 = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null);
-    final FieldConfig fc2 =
-        new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, null, null, null, null, null);
+    final FieldConfig fc1 = fieldConfigWithForwardEncoding("myCol1", FieldConfig.EncodingType.RAW);
+    final FieldConfig fc2 = fieldConfigWithForwardEncoding("myCol1", FieldConfig.EncodingType.DICTIONARY);
     tableConfig.setFieldConfigList(Arrays.asList(fc1, fc2));
 
     try {
@@ -1970,10 +1988,9 @@ public class TableConfigUtilsTest {
     final ObjectNode indexes = JsonNodeFactory.instance.objectNode();
     indexes.set("forward", JsonNodeFactory.instance.objectNode().put("compressionCodec", "ZSTANDARD"));
     final FieldConfig fc1 = new FieldConfig.Builder("myCol1")
-        .withEncodingType(FieldConfig.EncodingType.RAW)
-        .withIndexes(indexes)
+        .withIndexes(withForwardEncoding(indexes, FieldConfig.EncodingType.RAW))
         .build();
-    final FieldConfig fc2 = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null);
+    final FieldConfig fc2 = fieldConfigWithForwardEncoding("myCol1", FieldConfig.EncodingType.RAW);
     tableConfig.setFieldConfigList(Arrays.asList(fc1, fc2));
 
     try {
@@ -1993,9 +2010,8 @@ public class TableConfigUtilsTest {
     final TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(TABLE_NAME).build();
 
-    final FieldConfig fc1 = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null);
-    final FieldConfig fc2 =
-        new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, null, null, null, null, null);
+    final FieldConfig fc1 = fieldConfigWithForwardEncoding("myCol1", FieldConfig.EncodingType.RAW);
+    final FieldConfig fc2 = fieldConfigWithForwardEncoding("myCol2", FieldConfig.EncodingType.DICTIONARY);
     tableConfig.setFieldConfigList(Arrays.asList(fc1, fc2));
 
     try {
@@ -2013,7 +2029,7 @@ public class TableConfigUtilsTest {
     final TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(TABLE_NAME).build();
 
-    final FieldConfig fc1 = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null);
+    final FieldConfig fc1 = fieldConfigWithForwardEncoding("myCol1", FieldConfig.EncodingType.RAW);
     tableConfig.setFieldConfigList(Arrays.asList(fc1));
 
     try {
@@ -2107,8 +2123,7 @@ public class TableConfigUtilsTest {
     TableConfig tableconfig3 = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
     ObjectNode indexesNode = JsonNodeFactory.instance.objectNode();
     indexesNode.putObject("bloom");
-    FieldConfig fieldConfig =
-        new FieldConfig("MyCol", FieldConfig.EncodingType.DICTIONARY, null, null, null, null, indexesNode, null, null);
+    FieldConfig fieldConfig = new FieldConfig.Builder("MyCol").withIndexes(indexesNode).build();
     tableconfig3.setFieldConfigList(Arrays.asList(fieldConfig));
     assertThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableconfig3, schema));
   }
@@ -4151,7 +4166,7 @@ public class TableConfigUtilsTest {
   @Test
   public void testOverwriteTableConfigForTierFastPathReturnsSameInstance() {
     FieldConfig col1 = new FieldConfig.Builder("col1")
-        .withEncodingType(FieldConfig.EncodingType.DICTIONARY)
+        .withIndexes(indexesWithForwardEncoding(FieldConfig.EncodingType.DICTIONARY))
         .build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(col1))
@@ -4849,5 +4864,58 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       assertTrue(e.getMessage().contains("metrics$v2"));
     }
+  }
+
+  private static FieldConfig fieldConfigWithForwardEncoding(String column, FieldConfig.EncodingType encodingType) {
+    return fieldConfigBuilderWithForwardEncoding(column, encodingType).build();
+  }
+
+  private static FieldConfig.Builder fieldConfigBuilderWithForwardEncoding(String column,
+      FieldConfig.EncodingType encodingType) {
+    return new FieldConfig.Builder(column).withIndexes(indexesWithForwardEncoding(encodingType));
+  }
+
+  private static ObjectNode indexesWithForwardEncoding(FieldConfig.EncodingType encodingType) {
+    return withForwardEncoding(JsonUtils.newObjectNode(), encodingType);
+  }
+
+  private static ObjectNode withForwardEncoding(ObjectNode indexes, FieldConfig.EncodingType encodingType) {
+    ObjectNode forward;
+    if (indexes.has("forward") && indexes.get("forward").isObject()) {
+      forward = (ObjectNode) indexes.get("forward");
+    } else {
+      forward = JsonUtils.newObjectNode();
+      indexes.set("forward", forward);
+    }
+    forward.put("encodingType", encodingType.name());
+    return indexes;
+  }
+
+  private static ObjectNode withForwardCompression(ObjectNode indexes, CompressionCodec compressionCodec) {
+    ObjectNode forward;
+    if (indexes.has("forward") && indexes.get("forward").isObject()) {
+      forward = (ObjectNode) indexes.get("forward");
+    } else {
+      forward = JsonUtils.newObjectNode();
+      indexes.set("forward", forward);
+    }
+    forward.put("compressionCodec", compressionCodec.name());
+    return indexes;
+  }
+
+  private static ObjectNode indexesWithDisabledForwardIndex(FieldConfig.EncodingType encodingType) {
+    return withForwardDisabled(indexesWithForwardEncoding(encodingType));
+  }
+
+  private static ObjectNode withForwardDisabled(ObjectNode indexes) {
+    ObjectNode forward;
+    if (indexes.has("forward") && indexes.get("forward").isObject()) {
+      forward = (ObjectNode) indexes.get("forward");
+    } else {
+      forward = JsonUtils.newObjectNode();
+      indexes.set("forward", forward);
+    }
+    forward.put("disabled", true);
+    return indexes;
   }
 }
