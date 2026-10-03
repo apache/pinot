@@ -1,3 +1,4 @@
+{{- if .Values.namespace.create }}
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -18,16 +19,13 @@
 #
 
 apiVersion: v1
-kind: ConfigMap
+kind: Namespace
 metadata:
-  name: {{ include "pinot.server.config" . }}
-  namespace: {{ include "pinot.namespace" . }}
-data:
-  pinot-server.conf: |-
-{{- if .Values.server.ConfigureServerPort }}
-    pinot.server.netty.port={{ .Values.server.service.nettyPort }}
-    pinot.server.adminapi.port={{ .Values.server.service.adminPort }}
+  name: {{ include "pinot.namespace" . }}
+  labels:
+    {{- include "pinot.labels" . | nindent 4 }}
+  {{- with .Values.namespaceAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 {{- end }}
-    pinot.server.instance.dataDir={{ .Values.server.dataDir }}
-    pinot.server.instance.segmentTarDir={{ .Values.server.segmentTarDir }}
-{{ .Values.server.extra.configs | indent 4 }}
