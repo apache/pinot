@@ -841,4 +841,40 @@ public class SchemaTest {
     ComplexFieldSpec cfs = (ComplexFieldSpec) fs;
     Assert.assertEquals(cfs.getChildFieldSpec("count").getDataType(), FieldSpec.DataType.INT);
   }
+
+  @Test
+  public void testConfigMigrationVersionMarker()
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("test")
+        .addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        .build();
+    // Default marker is 0 and is not emitted, so schemas that predate the framework serialize unchanged. Assert via
+    // both toJsonObject() and the full objectToString() path (Schema uses @JsonValue, so both go through toJsonObject).
+    Assert.assertEquals(schema.getConfigMigrationVersion(), 0);
+    Assert.assertFalse(schema.toJsonObject().has("configMigrationVersion"));
+    Assert.assertFalse(JsonUtils.objectToString(schema).contains("configMigrationVersion"));
+
+    schema.setConfigMigrationVersion(2);
+    Assert.assertTrue(schema.toJsonObject().has("configMigrationVersion"));
+    Assert.assertTrue(JsonUtils.objectToString(schema).contains("configMigrationVersion"));
+
+    // The marker survives a JSON round-trip.
+    Schema deserialized = JsonUtils.stringToObject(JsonUtils.objectToString(schema), Schema.class);
+    Assert.assertEquals(deserialized.getConfigMigrationVersion(), 2);
+
+    // Backward/forward compatibility: JSON carrying the marker plus an unknown future field still deserializes
+    // (older readers ignore both via @JsonIgnoreProperties(ignoreUnknown = true)).
+    String json = "{\"schemaName\":\"test\",\"configMigrationVersion\":4,\"someFutureField\":\"x\","
+        + "\"dimensionFieldSpecs\":[{\"name\":\"svDimension\",\"dataType\":\"INT\"}]}";
+    Schema fromFutureJson = JsonUtils.stringToObject(json, Schema.class);
+    Assert.assertEquals(fromFutureJson.getConfigMigrationVersion(), 4);
+
+    // The marker is bookkeeping, not identity: two schemas differing only by marker are equal.
+    Schema other = new Schema.SchemaBuilder().setSchemaName("test")
+        .addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        .build();
+    other.setConfigMigrationVersion(5);
+    Assert.assertEquals(schema, other);
+    Assert.assertEquals(schema.hashCode(), other.hashCode());
+  }
 }
