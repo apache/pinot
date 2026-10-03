@@ -42,6 +42,7 @@ import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.integration.tests.SharedKafkaRealtimeIntegrationTestSuite.ScenarioLease;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -86,6 +87,9 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest {
       long expectedRecords = RECORDS_PER_TRANSACTIONAL_PHASE;
       pushTransactionalData(owner, lease, avroFiles, expectedRecords);
       waitForPinotCount(owner, lease, expectedRecords, 1_200_000L);
+      // After the last commit marker, read_committed polls are empty but position() is at LSO.
+      // The consume loop must advance past that control-record tail so freshness/readiness pass.
+      waitForConsumingOffsetsToReachLatest(owner, lease, 120_000L);
     } catch (Throwable t) {
       primaryFailure = t;
       throw t;
@@ -378,6 +382,47 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest {
       List<PartitionInfo> partitions = consumer.partitionsFor(topic, Duration.ofSeconds(5));
       return partitions != null && partitions.size() >= expectedPartitions;
     } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void waitForConsumingOffsetsToReachLatest(SharedKafkaRealtimeIntegrationTestSuite owner,
+      ScenarioLease lease, long timeoutMs) {
+    TestUtils.waitForCondition(aVoid -> consumingOffsetsHaveReachedLatest(owner, lease._tableName), 200L, timeoutMs,
+        "Consuming offsets did not reach latest after control-record tail for " + lease._tableName);
+  }
+
+  private boolean consumingOffsetsHaveReachedLatest(SharedKafkaRealtimeIntegrationTestSuite owner, String tableName) {
+    try {
+      ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap info = owner.getOrCreateAdminClient().getTableClient()
+          .getConsumingSegmentsInfo(tableName, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
+      if (info._segmentToConsumingInfoMap == null || info._segmentToConsumingInfoMap.isEmpty()) {
+        return false;
+      }
+      boolean comparedAnyPartition = false;
+      for (List<ConsumingSegmentInfoReader.ConsumingSegmentInfo> infos : info._segmentToConsumingInfoMap.values()) {
+        // Empty list means IdealState CONSUMING but no server report (putIfAbsent(..., List.of())).
+        if (infos == null || infos.isEmpty()) {
+          return false;
+        }
+        for (ConsumingSegmentInfoReader.ConsumingSegmentInfo segmentInfo : infos) {
+          ConsumingSegmentInfoReader.PartitionOffsetInfo offsetInfo = segmentInfo._partitionOffsetInfo;
+          if (offsetInfo == null || offsetInfo._currentOffsetsMap == null || offsetInfo._currentOffsetsMap.isEmpty()
+              || offsetInfo._latestUpstreamOffsetMap == null) {
+            return false;
+          }
+          for (Map.Entry<String, String> entry : offsetInfo._currentOffsetsMap.entrySet()) {
+            String latest = offsetInfo._latestUpstreamOffsetMap.get(entry.getKey());
+            if (latest == null || Long.parseLong(entry.getValue()) < Long.parseLong(latest)) {
+              return false;
+            }
+            comparedAnyPartition = true;
+          }
+        }
+      }
+      return comparedAnyPartition;
+    } catch (Exception e) {
+      LOGGER.debug("Failed to read consuming segments info while waiting for offset catchup", e);
       return false;
     }
   }
