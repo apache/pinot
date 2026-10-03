@@ -23,64 +23,57 @@ import java.util.List;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
-import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 
 
-/// Tests the physical-table and collation proof used to enable leaf ORDER BY merge receive.
+/// Verifies fragmentation preserves the explicit ordered exchange contract without discovering leaf ordering.
 public class PlanFragmenterTest {
-  @DataProvider
-  public Object[][] leafSortCases() {
-    return new Object[][]{
-        {"table", false, List.of("OFFLINE"), false, true, true, false},
-        {"table", true, List.of("OFFLINE"), false, true, true, true},
-        {"table", true, List.of("OFFLINE", "REALTIME"), false, true, true, false},
-        {"table", true, List.of("OFFLINE"), true, true, true, false},
-        {"table", true, List.of(), false, true, true, false},
-        {"table", true, List.of("OFFLINE"), false, false, true, false},
-        {"table", true, List.of("OFFLINE"), false, true, false, false},
-        {"table_OFFLINE", true, List.of("OFFLINE", "REALTIME"), false, true, true, true}
-    };
-  }
-
-  @Test(dataProvider = "leafSortCases")
-  public void shouldMergeOnlyProvenPhysicalLeafSort(String tableName, boolean enabled, List<String> tableTypes,
-      boolean logical, boolean cacheAvailable, boolean matchingCollation, boolean expected) {
-    TableCache cache = mock(TableCache.class);
-    when(cache.getActualTableName(tableName)).thenReturn(tableName);
-    when(cache.isLogicalTable(tableName)).thenReturn(logical);
-    for (String tableType : tableTypes) {
-      when(cache.getTableConfig("table_" + tableType)).thenReturn(mock(TableConfig.class));
-    }
+  @Test
+  public void shouldLowerOnlyExplicitMergeExchange() {
     DataSchema schema = new DataSchema(new String[]{"key"}, new ColumnDataType[]{ColumnDataType.INT});
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0));
-    TableScanNode scan = new TableScanNode(0, schema, PlanNode.NodeHint.EMPTY, new ArrayList<>(), tableName,
+    TableScanNode scan = new TableScanNode(0, schema, PlanNode.NodeHint.EMPTY, new ArrayList<>(), "table_OFFLINE",
         List.of("key"));
-    SortNode sort = new SortNode(0, schema, PlanNode.NodeHint.EMPTY, new ArrayList<>(List.of(scan)), collations, 10,
-        -1);
-    ExchangeNode exchange = new ExchangeNode(0, schema, List.of(sort), PinotRelExchangeType.STREAMING,
-        RelDistribution.Type.HASH_DISTRIBUTED, List.of(), false,
-        matchingCollation ? collations : List.of(new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING)),
-        false, false, null, null, null);
-    PlanFragmenter fragmenter = new PlanFragmenter(enabled, cacheAvailable ? cache : null);
-    MailboxReceiveNode receive = (MailboxReceiveNode) exchange.visit(fragmenter, fragmenter.createContext());
-    assertEquals(receive.isSort(), expected);
-    assertEquals(receive.isSortedOnSender(), expected);
-    assertSame(fragmenter.getPlanFragmentMap().get(2).getFragmentRoot().getInputs().get(0), sort,
-        "An existing leaf sort must be reused without an extra materializing sender sort");
+    SortNode sort =
+        new SortNode(0, schema, PlanNode.NodeHint.EMPTY, new ArrayList<>(List.of(scan)), collations, 15, -1);
+    for (boolean merge : new boolean[]{false, true}) {
+      ExchangeNode exchange = merge
+          ? new KWayMergeExchangeNode(0, schema, List.of(sort), RelDistribution.Type.HASH_DISTRIBUTED,
+              List.of(), false, collations, 10, 5, "hashCode")
+          : new ExchangeNode(0, schema, List.of(sort), PinotRelExchangeType.STREAMING,
+              RelDistribution.Type.HASH_DISTRIBUTED, List.of(), false, collations, false, false, null, null,
+              "hashCode");
+      PlanFragmenter fragmenter = new PlanFragmenter();
+      MailboxReceiveNode receive = (MailboxReceiveNode) exchange.visit(fragmenter, fragmenter.createContext());
+      assertEquals(receive instanceof MailboxMergeReceiveNode, merge);
+      assertFalse(receive.isSort());
+      assertFalse(receive.isSortedOnSender());
+      MailboxSendNode send = (MailboxSendNode) fragmenter.getPlanFragmentMap().get(2).getFragmentRoot();
+      assertFalse(send.isSort());
+      assertSame(send.getInputs().get(0), sort, "The logical sender sort must be reused");
+      if (merge) {
+        assertEquals(((MailboxMergeReceiveNode) receive).getFetch(), 10);
+        assertEquals(((MailboxMergeReceiveNode) receive).getOffset(), 5);
+        KWayMergeExchangeNode copy = (KWayMergeExchangeNode) exchange.withInputs(List.of(sort));
+        assertEquals(copy.getFetch(), 10);
+        assertEquals(copy.getOffset(), 5);
+        assertTrue(copy.equals(exchange));
+      }
+    }
   }
 }
