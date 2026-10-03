@@ -195,6 +195,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       throws Exception {
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = serverConf.clone();
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler(_serverConf);
     _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER);
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
@@ -270,8 +271,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
           + DataTableBuilderFactory.DEFAULT_VERSION);
     }
     DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
-
-    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
 
     // Register configuration change listener for dynamic max clause count updates
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
