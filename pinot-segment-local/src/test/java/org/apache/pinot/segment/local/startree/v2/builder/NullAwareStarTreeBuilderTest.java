@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -43,6 +44,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.DataProvider;
@@ -77,6 +79,8 @@ public class NullAwareStarTreeBuilderTest {
 
   private static final String MIN_COLUMN =
       new AggregationFunctionColumnPair(AggregationFunctionType.MIN, METRIC).toColumnName();
+  private static final String BITMAP_COLUMN =
+      new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTBITMAP, METRIC).toColumnName();
 
   @AfterMethod
   public void cleanUp()
@@ -113,6 +117,43 @@ public class NullAwareStarTreeBuilderTest {
       for (double minimum : minimums) {
         assertEquals(minimum, 10.0, "A null row must not be aggregated as the column default");
       }
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  /// A variable-length metric is serialized before its forward index is sized, which the on-heap builder does in a
+  /// pass of its own. An all-null group has nothing to serialize: it must end up in the null vector while the other
+  /// groups keep their values.
+  @Test(dataProvider = "buildModes")
+  public void anAllNullGroupSurvivesTheBuildWithAVariableLengthMetric(BuildMode buildMode)
+      throws Exception {
+    File indexDir = createSegment();
+    buildStarTrees(indexDir, buildMode, starTreeConfig(true, AggregationFunctionType.DISTINCTCOUNTBITMAP));
+
+    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
+    try {
+      StarTreeV2 starTree = segment.getStarTrees().get(0);
+      ImmutableRoaringBitmap nullBitmap = nullBitmap(starTree, BITMAP_COLUMN);
+      assertNotNull(nullBitmap, "A null-aware star-tree must write a null vector for a metric with an all-null group");
+      assertFalse(nullBitmap.isEmpty());
+
+      // Every group that did aggregate something holds some of the two non-null values and nothing else
+      RoaringBitmap nonNullValues = RoaringBitmap.bitmapOf(10, 20);
+      ForwardIndexReader reader = starTree.getDataSource(BITMAP_COLUMN).getForwardIndex();
+      assertNotNull(reader);
+      int numAggregatedGroups = 0;
+      try (ForwardIndexReaderContext context = reader.createContext()) {
+        for (int docId = 0; docId < starTree.getMetadata().getNumDocs(); docId++) {
+          if (!nullBitmap.contains(docId)) {
+            RoaringBitmap bitmap = RoaringBitmapUtils.deserialize(reader.getBytes(docId, context));
+            assertFalse(bitmap.isEmpty());
+            assertTrue(nonNullValues.contains(bitmap));
+            numAggregatedGroups++;
+          }
+        }
+      }
+      assertTrue(numAggregatedGroups > 0, "Some group must have aggregated a value, or the loop proves nothing");
     } finally {
       segment.destroy();
     }
@@ -185,8 +226,13 @@ public class NullAwareStarTreeBuilderTest {
   }
 
   private static StarTreeIndexConfig starTreeConfig(boolean nullHandlingEnabled) {
+    return starTreeConfig(nullHandlingEnabled, AggregationFunctionType.MIN);
+  }
+
+  private static StarTreeIndexConfig starTreeConfig(boolean nullHandlingEnabled,
+      AggregationFunctionType aggregationType) {
     return new StarTreeIndexConfig(List.of(DIMENSION), null,
-        List.of(new AggregationFunctionColumnPair(AggregationFunctionType.MIN, METRIC).toColumnName()), null,
+        List.of(new AggregationFunctionColumnPair(aggregationType, METRIC).toColumnName()), null,
         MAX_LEAF_RECORDS, nullHandlingEnabled);
   }
 

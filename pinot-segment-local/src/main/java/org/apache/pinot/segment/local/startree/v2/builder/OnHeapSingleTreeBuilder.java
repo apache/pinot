@@ -24,8 +24,10 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.configuration2.Configuration;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /// The `OnHeapSingleTreeBuilder` class is the single star-tree builder that uses on-heap memory.
@@ -51,6 +53,29 @@ public class OnHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   @Override
   Record getStarTreeRecord(int docId) {
     return _records.get(docId);
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  boolean[] preSerializeMetrics() {
+    // Records stay on heap until the forward indexes are written, so serialize the variable-length metrics now and
+    // keep the bytes in place of the aggregated values (the bytes are smaller than the objects they replace). This
+    // completes the aggregators' maximum serialized size before it is consumed.
+    boolean[] preSerializedMetrics = new boolean[_numMetrics];
+    for (int i = 0; i < _numMetrics; i++) {
+      ValueAggregator valueAggregator = _valueAggregators[i];
+      if (valueAggregator.getAggregatedValueType() != DataType.BYTES) {
+        continue;
+      }
+      for (Record record : _records) {
+        Object value = record._metrics[i];
+        if (value != null) {
+          record._metrics[i] = valueAggregator.serializeAggregatedValue(value);
+        }
+      }
+      preSerializedMetrics[i] = true;
+    }
+    return preSerializedMetrics;
   }
 
   @Override
