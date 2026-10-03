@@ -34,6 +34,8 @@ import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.PropagationEntity;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
+import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
 import org.testng.Assert;
@@ -89,7 +91,7 @@ public class PropagationUtilsTest {
   }
 
   @Test
-    public void getHelixTagsForTableTest() {
+  public void getHelixTagsForTableTest() {
         // Mock the behavior of getHelixTagsForTable to return a set of helix tags
     TableConfig tableConfig = createTableConfig("table1", "serverTag1", "brokerTenant1", TableType.OFFLINE);
     TableConfig tableConfig2 = createTableConfig("table1", "serverTag2", "brokerTenant2", TableType.REALTIME);
@@ -118,6 +120,20 @@ public class PropagationUtilsTest {
                         "Expected helix tag " + helixTag + " for table " + tableName + " but found " + helixTags);
       }
     }
+  }
+
+  @Test
+  public void testLogicalTableBrokerTagResolution() {
+    PinotHelixResourceManager resourceManager = Mockito.mock(PinotHelixResourceManager.class);
+    LogicalTableConfig logicalTableConfig = new LogicalTableConfigBuilder()
+        .setTableName("logicalTable")
+        .setBrokerTenant("logicalTenant")
+        .build();
+    Mockito.when(resourceManager.getLogicalTableConfig("logicalTable")).thenReturn(logicalTableConfig);
+
+    Assert.assertEquals(
+        PropagationUtils.getHelixTagsForTable(resourceManager, "logicalTable", NodeConfig.Type.BROKER_NODE),
+        Set.of("logicalTenant_BROKER"));
   }
 
   @Test
@@ -154,7 +170,7 @@ public class PropagationUtilsTest {
   }
 
   @Test
-    public void getQueryWorkloadConfigsForTagsTest() {
+  public void getQueryWorkloadConfigsForTagsTest() {
         // Create a list of query workload configurations
     PropagationEntity entity1 = new PropagationEntity("table1", 100L, 100L, null);
     PropagationEntity entity2 = new PropagationEntity("table2", 100L, 100L, null);
@@ -195,6 +211,25 @@ public class PropagationUtilsTest {
                     "Expected workload config " + workloadConfig.getQueryWorkloadName()
                             + " but not found in the expected set");
     }
+  }
+
+  @Test
+  public void testLogicalTableWorkloadMatchesBrokerTag() {
+    PinotHelixResourceManager resourceManager = Mockito.mock(PinotHelixResourceManager.class);
+    LogicalTableConfig logicalTableConfig = new LogicalTableConfigBuilder()
+        .setTableName("logicalTable")
+        .setBrokerTenant("logicalTenant")
+        .build();
+    Mockito.when(resourceManager.getLogicalTableConfig("logicalTable")).thenReturn(logicalTableConfig);
+    Mockito.when(resourceManager.getAllTableConfigs()).thenReturn(List.of());
+    PropagationEntity logicalTable = new PropagationEntity("logicalTable", 100L, 100L, null);
+    QueryWorkloadConfig workloadConfig = createQueryWorkloadConfig("logicalWorkload",
+        new PropagationScheme(PropagationScheme.Type.TENANT,
+            List.of(new PropagationEntity("unmatchedServerTenant", 100L, 100L, null))),
+        new PropagationScheme(PropagationScheme.Type.TABLE, List.of(logicalTable)));
+
+    Assert.assertEquals(PropagationUtils.getQueryWorkloadConfigsForTags(resourceManager,
+        Set.of("logicalTenant_BROKER"), List.of(workloadConfig)), Set.of(workloadConfig));
   }
 
   public TableConfig createTableConfig(String tableName, String serverTag, String brokerTenant, TableType type) {

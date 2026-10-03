@@ -18,11 +18,18 @@
  */
 package org.apache.pinot.broker.grpc;
 
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import org.apache.pinot.broker.broker.BrokerDrainManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -55,6 +62,7 @@ public class BrokerGrpcServerTest {
   private BrokerMetrics _brokerMetrics;
 
   private BrokerGrpcServer _brokerGrpcServer;
+  private PinotConfiguration _brokerConfig;
   private int _grpcPort;
 
   @BeforeMethod
@@ -68,9 +76,9 @@ public class BrokerGrpcServerTest {
     }
 
     // Create config with gRPC port so server is created
-    PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_PORT, _grpcPort);
-    _brokerGrpcServer = new BrokerGrpcServer(config, "testBroker", _brokerMetrics, _brokerRequestHandler);
+    _brokerConfig = new PinotConfiguration();
+    _brokerConfig.setProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_PORT, _grpcPort);
+    _brokerGrpcServer = new BrokerGrpcServer(_brokerConfig, "testBroker", _brokerMetrics, _brokerRequestHandler);
   }
 
   @AfterMethod
@@ -254,6 +262,92 @@ public class BrokerGrpcServerTest {
     assertEquals(optionsCaptor.getValue().getOptions()
             .get(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_MATERIALIZED_VIEW_REWRITE),
         "true", "Without the metadata flag, the SQL-set option must be preserved");
+  }
+
+  @Test
+  public void testDrainPermitIsHeldUntilObserverCompletionReturns()
+      throws Exception {
+    BrokerDrainManager drainManager = BrokerDrainManager.localOnly("testBroker", () -> {
+    }, () -> {
+    }, 0L);
+    BrokerGrpcServer drainAwareServer =
+        new BrokerGrpcServer(_brokerConfig, "testBroker", _brokerMetrics, _brokerRequestHandler, drainManager);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    CountDownLatch completionEntered = new CountDownLatch(1);
+    CountDownLatch allowCompletion = new CountDownLatch(1);
+    when(_brokerRequestHandler.handleRequestWithPreAcquiredPermit(any(), any(), any(), any(), any()))
+        .thenReturn(new BrokerResponseNative());
+    StreamObserver<Broker.BrokerResponse> blockingObserver = new StreamObserver<>() {
+      @Override
+      public void onNext(Broker.BrokerResponse response) {
+      }
+
+      @Override
+      public void onError(Throwable throwable) {
+        fail("Query should complete successfully", throwable);
+      }
+
+      @Override
+      public void onCompleted() {
+        completionEntered.countDown();
+        try {
+          assertTrue(allowCompletion.await(10, TimeUnit.SECONDS));
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new RuntimeException(e);
+        }
+      }
+    };
+
+    try {
+      Future<?> submitFuture = executor.submit(() -> drainAwareServer.submit(validRequest(), blockingObserver));
+      assertTrue(completionEntered.await(10, TimeUnit.SECONDS));
+
+      BrokerDrainManager.DrainStatus status = drainManager.drain(0L, false);
+      assertFalse(status.isDrained());
+      assertEquals(status.getInFlightQueries(), 1);
+
+      allowCompletion.countDown();
+      submitFuture.get(10, TimeUnit.SECONDS);
+      assertTrue(drainManager.isDrainComplete());
+      verify(_brokerRequestHandler).handleRequestWithPreAcquiredPermit(any(), any(), any(), any(), any());
+      verify(_brokerRequestHandler, never()).handleRequest(any(), any(), any(), any(), any());
+    } finally {
+      allowCompletion.countDown();
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+      drainAwareServer.shutdown();
+    }
+  }
+
+  @Test
+  public void testDrainingBrokerRejectsGrpcRequestBeforeHandler() throws Exception {
+    BrokerDrainManager drainManager = BrokerDrainManager.localOnly("testBroker", () -> {
+    }, () -> {
+    }, 0L);
+    drainManager.drain(0L, false);
+    BrokerGrpcServer drainAwareServer =
+        new BrokerGrpcServer(_brokerConfig, "testBroker", _brokerMetrics, _brokerRequestHandler, drainManager);
+    @SuppressWarnings("unchecked")
+    StreamObserver<Broker.BrokerResponse> responseObserver = mock(StreamObserver.class);
+
+    try {
+      drainAwareServer.submit(validRequest(), responseObserver);
+
+      ArgumentCaptor<Throwable> errorCaptor = ArgumentCaptor.forClass(Throwable.class);
+      verify(responseObserver).onError(errorCaptor.capture());
+      assertEquals(Status.fromThrowable(errorCaptor.getValue()).getCode(), Status.Code.UNAVAILABLE);
+      assertEquals(Status.fromThrowable(errorCaptor.getValue()).getDescription(), drainManager.getRejectMessage());
+      verify(responseObserver, never()).onNext(any());
+      verify(responseObserver, never()).onCompleted();
+      verifyNoInteractions(_brokerRequestHandler);
+    } finally {
+      drainAwareServer.shutdown();
+    }
+  }
+
+  private static Broker.BrokerRequest validRequest() {
+    return Broker.BrokerRequest.newBuilder().setSql("SELECT * FROM testTable").build();
   }
 
   /// Helper method to create a mock StreamObserver that captures all responses.

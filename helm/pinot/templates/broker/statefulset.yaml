@@ -94,6 +94,7 @@ spec:
           {{- if ne (len .Values.broker.persistence.extraVolumeMounts) 0 }}
 {{ toYaml .Values.broker.persistence.extraVolumeMounts | indent 10 }}
           {{- end }}
+        {{- $legacyBrokerProbeEndpoint := .Values.broker.probes.endpoint | default "" }}
         {{- if .Values.broker.probes.livenessEnabled }}
         livenessProbe:
           initialDelaySeconds: {{ .Values.broker.probes.liveness.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
@@ -102,7 +103,8 @@ spec:
           successThreshold: {{ .Values.broker.probes.liveness.successThreshold | default .Values.probes.successThreshold }}
           timeoutSeconds: {{ .Values.broker.probes.liveness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
           httpGet:
-            path: {{ .Values.broker.probes.endpoint }}
+            path: {{ $legacyBrokerProbeEndpoint
+              | default (.Values.broker.probes.liveness.endpoint | default "/health?checkType=liveness") | quote }}
             port: {{ .Values.broker.service.port }}
         {{- end }}
         {{- if .Values.broker.probes.readinessEnabled }}
@@ -113,7 +115,8 @@ spec:
           successThreshold: {{ .Values.broker.probes.readiness.successThreshold | default .Values.probes.successThreshold }}
           timeoutSeconds: {{ .Values.broker.probes.readiness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
           httpGet:
-            path: {{ .Values.broker.probes.endpoint }}
+            path: {{ $legacyBrokerProbeEndpoint
+              | default (.Values.broker.probes.readiness.endpoint | default "/health") | quote }}
             port: {{ .Values.broker.service.port }}
         {{- end }}
         {{- if .Values.broker.probes.startupEnabled }}
@@ -124,7 +127,8 @@ spec:
           successThreshold: {{ .Values.broker.probes.startup.successThreshold | default .Values.probes.successThreshold }}
           timeoutSeconds: {{ .Values.broker.probes.startup.timeoutSeconds | default .Values.probes.timeoutSeconds }}
           httpGet:
-            path: {{ .Values.broker.probes.endpoint }}
+            path: {{ $legacyBrokerProbeEndpoint
+              | default (.Values.broker.probes.startup.endpoint | default "/health") | quote }}
             port: {{ .Values.broker.service.port }}
         {{- end }}
         resources:

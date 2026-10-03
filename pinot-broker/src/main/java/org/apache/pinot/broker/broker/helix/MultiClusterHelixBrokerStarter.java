@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
@@ -52,6 +53,7 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("unused")
 public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiClusterHelixBrokerStarter.class);
+  private final AtomicBoolean _multiClusterStopTriggered = new AtomicBoolean();
 
   // Remote cluster configuration
   protected List<String> _remoteClusterNames;
@@ -86,7 +88,13 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
     super.start();
     // build routing tables for remote clusters
     initRemoteClusterRouting();
+    markBrokerStartupReady();
     LOGGER.info("[multi-cluster] Multi-cluster broker started successfully");
+  }
+
+  @Override
+  protected boolean shouldMarkBrokerStartupReadyAfterBaseStart() {
+    return false;
   }
 
   @Override
@@ -369,10 +377,19 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
   }
 
   @Override
-  public void stop() {
-    LOGGER.info("[multi-cluster] Shutting down multi-cluster broker");
-    super.stop();
-    stopRemoteClusterComponents();
-    LOGGER.info("[multi-cluster] Multi-cluster broker shut down successfully");
+  public synchronized void stop() {
+    if (!_multiClusterStopTriggered.compareAndSet(false, true)) {
+      LOGGER.info("[multi-cluster] Broker shutdown is already in progress or complete");
+      return;
+    }
+    try {
+      LOGGER.info("[multi-cluster] Shutting down multi-cluster broker");
+      super.stop();
+      stopRemoteClusterComponents();
+      LOGGER.info("[multi-cluster] Multi-cluster broker shut down successfully");
+    } catch (RuntimeException | Error e) {
+      _multiClusterStopTriggered.set(false);
+      throw e;
+    }
   }
 }
