@@ -53,6 +53,7 @@ import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.server.access.AllowAllAccessFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -161,7 +162,7 @@ public abstract class BaseResourceTest {
     serverConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, _instanceId);
     configureServerConf(serverConf);
     _adminApiApplication = new AdminApiApplication(_serverInstance, new AllowAllAccessFactory(),
-        mock(ServerReloadJobStatusCache.class),
+        mock(ServerReloadJobStatusCache.class), mock(PinotClusterConfigProvider.class),
         serverConf);
     _adminApiApplication.start(List.of(
         new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0", 0,
