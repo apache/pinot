@@ -237,7 +237,7 @@ public class PinotBrokerRestletResource {
       throw new ControllerApplicationException(LOGGER, String.format("Table '%s' not found.", tableName),
           Response.Status.NOT_FOUND);
     } catch (IllegalArgumentException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.FORBIDDEN);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.FORBIDDEN, e);
     }
   }
 

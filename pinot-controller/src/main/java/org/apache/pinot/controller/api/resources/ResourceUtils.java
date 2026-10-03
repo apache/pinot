@@ -57,9 +57,9 @@ public class ResourceUtils {
     try {
       return pinotHelixResourceManager.getExistingTableNamesWithType(tableName, tableType);
     } catch (TableNotFoundException e) {
-      throw new ControllerApplicationException(logger, e.getMessage(), Response.Status.NOT_FOUND);
+      throw new ControllerApplicationException(logger, e.getMessage(), Response.Status.NOT_FOUND, e);
     } catch (IllegalArgumentException e) {
-      throw new ControllerApplicationException(logger, e.getMessage(), Response.Status.FORBIDDEN);
+      throw new ControllerApplicationException(logger, e.getMessage(), Response.Status.FORBIDDEN, e);
     }
   }
 

@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.creator;
 
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
+import org.apache.pinot.segment.spi.creator.RecordProcessingException;
 import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
@@ -70,7 +71,7 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
           }
         } catch (Exception e) {
           if (!continueOnError) {
-            throw new RuntimeException("Caught exception while reading data", e);
+            throw new RecordProcessingException("Caught exception while reading data", e);
           }
           LOGGER.debug("Caught exception while reading data", e);
         }

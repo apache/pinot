@@ -472,7 +472,7 @@ public class ZKOperator {
     } catch (IllegalArgumentException e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Got invalid segment metadata when adding segment: %s for table: %s, reason: %s", segmentName,
-              tableNameWithType, e.getMessage()), Response.Status.BAD_REQUEST);
+              tableNameWithType, e.getMessage()), Response.Status.BAD_REQUEST, e);
     }
 
     // Update zk metadata customer map
