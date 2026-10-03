@@ -36,7 +36,8 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 /// [org.apache.pinot.core.operator.blocks.FilterBlock].
 ///
 /// A result known to be empty is represented as an [EmptyDocIdSet], so that a parent can recognize it by type and
-/// short-circuit. The index-based implementations offer a `create` factory that returns one for an empty input.
+/// short-circuit. The index-based implementations are built only through a `create` factory, which returns one for
+/// an empty input.
 public interface BlockDocIdSet {
 
   /// Returns an iterator of the matching document ids. The document ids returned from the iterator should be in
