@@ -38,6 +38,10 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-materialized-view</artifactId>
+      <!-- Provided for the same reason as pinot-spi in the parent pom: Pinot's own modules are already
+           present wherever a plugin is loaded, and bundling this one also pulled in fastutil,
+           calcite-core and grpc-netty-shaded -->
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>

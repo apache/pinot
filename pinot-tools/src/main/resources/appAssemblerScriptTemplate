@@ -112,6 +112,11 @@ fi
 # $PLUGINS_DIR is semi-colon separated list of plugin directories, default to '"$BASEDIR"/plugins' if not set.
 # $PLUGINS_INCLUDE is semi-colon separated plugins name, e.g. pinot-avro;pinot-batch-ingestion-standalone. Default is not set, which means load all the plugin jars.
 # If the same plugin is found in multiple directories, it will only be picked up from the first directory it was found. The directories in $PLUGINS_DIR are traversed by their order.
+#
+# A plugin ships as a thin jar plus a pinot-plugin.classpath file listing the shared-store jars it
+# needs, as distribution-relative paths. Selecting a subset with $PLUGINS_INCLUDE therefore
+# means taking each named plugin's jars *and* the store entries its index names - the store as a
+# whole is not per-plugin, so adding all of it would defeat the selection.
 if [ -z "$PLUGINS_CLASSPATH" ] ; then
   if [ -z "$PLUGINS_DIR" ] ; then
     PLUGINS_DIR="$BASEDIR"/plugins
@@ -134,13 +139,28 @@ if [ -z "$PLUGINS_CLASSPATH" ] ; then
             exit 1
         fi
         export IFS=';'
-        for PLUGIN_JAR in $PLUGINS_INCLUDE; do
-            PLUGIN_JAR_PATH=$(find "$DIR" -path \*/"$PLUGIN_JAR"/"$PLUGIN_JAR"-\*.jar)
-            if [ -n "$PLUGINS_CLASSPATH" ] ; then
-              PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR_PATH
-            else
-              PLUGINS_CLASSPATH=$PLUGIN_JAR_PATH
-            fi
+        for PLUGIN_NAME in $PLUGINS_INCLUDE; do
+            unset IFS
+            for PLUGIN_JAR_PATH in $(find "$DIR" -path \*/"$PLUGIN_NAME"/\*.jar) ; do
+              if [ -n "$PLUGINS_CLASSPATH" ] ; then
+                PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR_PATH
+              else
+                PLUGINS_CLASSPATH=$PLUGIN_JAR_PATH
+              fi
+            done
+            # Add the shared-store jars this plugin declares. Paths are relative to $BASEDIR.
+            for PLUGIN_INDEX in $(find "$DIR" -path \*/"$PLUGIN_NAME"/pinot-plugin.classpath) ; do
+              # The index is a classpath fragment: entries separated by ':' and/or newlines.
+              for PLUGIN_DEP in $(tr ':' '\n' < "$PLUGIN_INDEX") ; do
+                if [ -n "$PLUGIN_DEP" ] && [ -f "$BASEDIR/$PLUGIN_DEP" ] ; then
+                  case ":$PLUGINS_CLASSPATH:" in
+                    *":$BASEDIR/$PLUGIN_DEP:"*) ;;
+                    *) PLUGINS_CLASSPATH=${PLUGINS_CLASSPATH:+$PLUGINS_CLASSPATH:}$BASEDIR/$PLUGIN_DEP ;;
+                  esac
+                fi
+              done
+            done
+            export IFS=';'
         done
         unset IFS
       else
@@ -152,6 +172,10 @@ if [ -z "$PLUGINS_CLASSPATH" ] ; then
             PLUGINS_CLASSPATH=$PLUGIN_JAR
           fi
         done
+        # No selection was made, so every plugin is loaded and the whole shared store is needed.
+        if [ -d "$BASEDIR"/plugin-libs ] ; then
+          PLUGINS_CLASSPATH=${PLUGINS_CLASSPATH:+$PLUGINS_CLASSPATH:}"$BASEDIR"/plugin-libs/*
+        fi
       fi
     fi
   done
