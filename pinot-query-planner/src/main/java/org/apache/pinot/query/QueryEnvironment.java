@@ -43,6 +43,7 @@ import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexExecutor;
 import org.apache.calcite.runtime.CalciteContextException;
@@ -85,6 +86,8 @@ import org.apache.pinot.query.planner.explain.PhysicalExplainPlanVisitor;
 import org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.TransformationTracker;
+import org.apache.pinot.query.planner.logical.WindowSortAutoPlan;
+import org.apache.pinot.query.planner.logical.WindowSortAutoPlanner;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
@@ -319,8 +322,9 @@ public class QueryEnvironment {
       } else {
         queryNode = sqlNode;
       }
-      RelRoot relRoot = compileQuery(queryNode, plannerContext);
-      return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, plannerContext, sqlNodeAndOptions);
+      CompiledRelations compiled = compileQuery(queryNode, plannerContext);
+      return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, compiled.root(), plannerContext, sqlNodeAndOptions,
+          compiled.selections());
     } catch (QueryException e) {
       throw e;
     } catch (Throwable t) {
@@ -396,17 +400,29 @@ public class QueryEnvironment {
   // steps
   // --------------------------------------------------------------------------
 
-  private RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext) {
+  private record CompiledRelations(RelRoot root, Map<Exchange,
+      WindowSortAutoPlanner.Selection> selections) {
+  }
+
+  private CompiledRelations compileQuery(SqlNode sqlNode, PlannerContext plannerContext) {
     SqlNode validated = validate(sqlNode, plannerContext);
     RelRoot relation = toRelation(validated, plannerContext);
     RelNode optimized = optimize(relation, plannerContext);
+    String windowSortMode = plannerContext.getOptions().getOrDefault(
+        CommonConstants.Broker.Request.QueryOptionKey.WINDOW_SORT_ON_SENDER,
+        _envConfig.defaultWindowSortOnSenderMode());
+    WindowSortAutoPlanner.Result resolved = _envConfig.isKWayMergeSupported()
+        && !plannerContext.isUsePhysicalOptimizer() && "auto".equalsIgnoreCase(windowSortMode)
+        ? WindowSortAutoPlanner.resolve(optimized, _envConfig.getWindowSortAutoPlan())
+        : new WindowSortAutoPlanner.Result(optimized, Map.of());
+    optimized = resolved.root();
     if (plannerContext.isUsePhysicalOptimizer()) {
       Preconditions.checkNotNull(plannerContext.getPhysicalPlannerContext(), "Physical planner context is null");
       optimized = RelToPRelConverter.toPRelNode(optimized, plannerContext.getPhysicalPlannerContext(),
           _envConfig.getTableCache()).unwrap();
       PRelNodeTreeValidator.validate((PRelNode) optimized, plannerContext.getPhysicalPlannerContext());
     }
-    return relation.withRel(optimized);
+    return new CompiledRelations(relation.withRel(optimized), resolved.selections());
   }
 
   /// Query validation is a transformation from SqlNode to SqlNode where each node is validated.
@@ -531,12 +547,9 @@ public class QueryEnvironment {
     }
   }
 
-  private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext) {
-    return toDispatchableSubPlan(relRoot, plannerContext, null);
-  }
-
   private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext,
-      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
+      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
+      Map<Exchange, WindowSortAutoPlanner.Selection> autoExchanges) {
     long requestId = _envConfig.getRequestId();
     if (plannerContext.isUsePhysicalOptimizer()) {
       Pair<SubPlan, PlanFragmentAndMailboxAssignment.Result> plan = PinotLogicalQueryPlanner.makePlanV2(relRoot,
@@ -546,7 +559,8 @@ public class QueryEnvironment {
       return pinotDispatchPlanner.createDispatchableSubPlanV2(plan.getLeft(), plan.getRight());
     }
     SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, useSpools(plannerContext.getOptions()),
-        _envConfig.defaultHashFunction(), pruneUnnestColumns(plannerContext.getOptions()));
+        _envConfig.defaultHashFunction(), pruneUnnestColumns(plannerContext.getOptions()),
+        _envConfig.getWindowSortAutoPlan(), autoExchanges);
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
             _envConfig.getTableCache());
@@ -970,6 +984,16 @@ public class QueryEnvironment {
     default boolean defaultWindowSortOnSender() {
       return CommonConstants.Broker.DEFAULT_WINDOW_SORT_ON_SENDER;
     }
+
+    /// Per-exchange adaptive mode is enabled explicitly; boolean defaults remain supported.
+    @Value.Default
+    default String defaultWindowSortOnSenderMode() {
+      return Boolean.toString(defaultWindowSortOnSender());
+    }
+
+    /// Optional broker-owned selector. Standalone planners conservatively use the receiver sort.
+    @Nullable
+    WindowSortAutoPlan getWindowSortAutoPlan();
   }
 
   /// A query that have been parsed, validates, transformed into a [RelNode] and optimized with Calcite.
@@ -989,9 +1013,12 @@ public class QueryEnvironment {
     private final PlannerContext _plannerContext;
     private final SqlNodeAndOptions _sqlNodeAndOptions;
     private final Set<String> _tableNames;
+    private final Map<Exchange, WindowSortAutoPlanner.Selection> _autoExchanges;
 
     private CompiledQuery(String database, String textQuery, RelRoot relRoot, PlannerContext plannerContext,
-        SqlNodeAndOptions sqlNodeAndOptions) {
+        SqlNodeAndOptions sqlNodeAndOptions,
+        Map<Exchange, WindowSortAutoPlanner.Selection> autoExchanges) {
+      _autoExchanges = autoExchanges;
       _database = database;
       _textQuery = textQuery;
       _relRoot = relRoot;
@@ -1028,7 +1055,8 @@ public class QueryEnvironment {
         SqlExplainFormat format = _plannerContext.getSqlExplainFormat();
         if (explain instanceof SqlPhysicalExplain) {
           // get the physical plan for query.
-          DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext);
+          DispatchableSubPlan dispatchableSubPlan =
+              toDispatchableSubPlan(_relRoot, _plannerContext, null, _autoExchanges);
           return getQueryPlannerResult(_plannerContext, dispatchableSubPlan,
               PhysicalExplainPlanVisitor.explain(dispatchableSubPlan), dispatchableSubPlan.getTableNames());
         } else {
@@ -1044,7 +1072,8 @@ public class QueryEnvironment {
             // Build the dispatchable subplan even though only the logical plan is rendered: some planning errors are
             // raised while converting the plan or assigning workers (e.g. a `tableOptions` partition hint that
             // disagrees with the table's actual partitioning), and EXPLAIN must fail wherever execution would.
-            DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext);
+            DispatchableSubPlan dispatchableSubPlan =
+                toDispatchableSubPlan(_relRoot, _plannerContext, null, _autoExchanges);
             return getQueryPlannerResult(_plannerContext, dispatchableSubPlan,
                 PlannerUtils.explainPlan(_relRoot.rel, format, level), dispatchableSubPlan.getTableNames());
           } else {
@@ -1056,7 +1085,7 @@ public class QueryEnvironment {
                 new TransformationTracker.ByIdentity.Builder<>();
             // Transform RelNodes into DispatchableSubPlan
             DispatchableSubPlan dispatchableSubPlan =
-                toDispatchableSubPlan(_relRoot, _plannerContext, nodeTracker);
+                toDispatchableSubPlan(_relRoot, _plannerContext, nodeTracker, _autoExchanges);
 
             AskingServerStageExplainer serversExplainer = new AskingServerStageExplainer(
                 onServerExplainer, explainPlanVerbose, RelBuilder.create(_config));
@@ -1081,7 +1110,8 @@ public class QueryEnvironment {
         // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
         // Each SubPlan should be able to run independently from Broker then set the results into the dependent
         // SubPlan for further processing.
-        DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext);
+        DispatchableSubPlan dispatchableSubPlan =
+            toDispatchableSubPlan(_relRoot, _plannerContext, null, _autoExchanges);
         return getQueryPlannerResult(_plannerContext, dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
       } catch (QueryException e) {
         throw e;
@@ -1109,6 +1139,11 @@ public class QueryEnvironment {
 
     public Map<String, String> getOptions() {
       return _sqlNodeAndOptions.getOptions();
+    }
+
+    @Nullable
+    public WindowSortAutoPlan getWindowSortAutoPlan() {
+      return _envConfig.getWindowSortAutoPlan();
     }
 
     public RelRoot getRelRoot() {

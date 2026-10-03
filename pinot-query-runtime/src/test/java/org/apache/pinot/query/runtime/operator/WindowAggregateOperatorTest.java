@@ -1188,10 +1188,10 @@ public class WindowAggregateOperatorTest {
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
-  /// The global window receiver sort establishes window ordering without applying the broker response cap to its input.
+  /// The cold AUTO receiver sort establishes window ordering without applying the broker response cap to its input.
   /// Following frames and RANGE peers both need rows beyond that cap, even when the sort emits several blocks.
   @Test(dataProvider = "windowFrameTypes")
-  public void testReceiverSortRetainsCompleteWindowInput(WindowNode.WindowFrameType frameType) {
+  public void testColdReceiverSortRetainsCompleteWindowInput(WindowNode.WindowFrameType frameType) {
     DataSchema inputSchema = new DataSchema(new String[]{"key", "value"}, new ColumnDataType[]{INT, INT});
     DataSchema resultSchema =
         new DataSchema(new String[]{"key", "value", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
