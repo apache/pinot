@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.startree.v2;
 
+import java.io.IOException;
 import java.util.Random;
 import org.apache.pinot.segment.local.aggregator.DistinctCountBitmapValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
@@ -28,6 +29,13 @@ import static org.testng.Assert.assertEquals;
 
 
 public class DistinctCountBitmapWithMVStarTreeV2Test extends BaseStarTreeV2Test<Object, RoaringBitmap> {
+
+  @Override
+  protected void testQuery(String query)
+      throws IOException {
+    super.testQuery(query);
+    super.testQuery("SET useBufferBackedDistinctCountBitmap = true; " + query);
+  }
 
   @Override
   ValueAggregator<Object, RoaringBitmap> getValueAggregator() {

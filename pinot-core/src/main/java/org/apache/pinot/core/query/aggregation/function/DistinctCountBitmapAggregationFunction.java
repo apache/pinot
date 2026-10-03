@@ -75,6 +75,21 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     DataType dataType = blockValSet.getValueType();
     boolean singleValue = blockValSet.isSingleValue();
     if (dataType == DataType.BYTES && singleValue) {
+      if (blockValSet.isBytesBufferEnabled()) {
+        forEachNotNull(length, blockValSet, (from, to) -> blockValSet.forEachBytesValueSV(from, to, (buffer, index) -> {
+          // Deserialize the borrowed view straight into a heap bitmap: this copies it into owned storage before the
+          // callback returns, and keeps unions on heap containers, which are much faster than buffer-backed ones for
+          // sparse inputs.
+          RoaringBitmap value = RoaringBitmapUtils.deserialize(buffer);
+          RoaringBitmap valueBitmap = aggregationResultHolder.getResult();
+          if (valueBitmap != null) {
+            valueBitmap.or(value);
+          } else {
+            aggregationResultHolder.setValue(value);
+          }
+        }));
+        return;
+      }
       // Logical BYTES is a serialized RoaringBitmap and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -267,6 +282,20 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     DataType dataType = blockValSet.getValueType();
     boolean singleValue = blockValSet.isSingleValue();
     if (dataType == DataType.BYTES && singleValue) {
+      if (blockValSet.isBytesBufferEnabled()) {
+        forEachNotNull(length, blockValSet, (from, to) -> blockValSet.forEachBytesValueSV(from, to, (buffer, index) -> {
+          // Heap deserialization copies the borrowed view into owned storage; see the scalar path for rationale.
+          RoaringBitmap value = RoaringBitmapUtils.deserialize(buffer);
+          int groupKey = groupKeyArray[index];
+          RoaringBitmap valueBitmap = groupByResultHolder.getResult(groupKey);
+          if (valueBitmap != null) {
+            valueBitmap.or(value);
+          } else {
+            groupByResultHolder.setValueForKey(groupKey, value);
+          }
+        }));
+        return;
+      }
       // Logical BYTES is a serialized RoaringBitmap and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -455,6 +484,22 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     DataType dataType = blockValSet.getValueType();
     boolean singleValue = blockValSet.isSingleValue();
     if (dataType == DataType.BYTES && singleValue) {
+      if (blockValSet.isBytesBufferEnabled()) {
+        forEachNotNull(length, blockValSet, (from, to) -> blockValSet.forEachBytesValueSV(from, to, (buffer, index) -> {
+          // Heap deserialization copies the borrowed view into owned storage; see the scalar path for rationale.
+          RoaringBitmap value = RoaringBitmapUtils.deserialize(buffer);
+          for (int groupKey : groupKeysArray[index]) {
+            RoaringBitmap bitmap = groupByResultHolder.getResult(groupKey);
+            if (bitmap != null) {
+              bitmap.or(value);
+            } else {
+              // Clone a bitmap for the group
+              groupByResultHolder.setValueForKey(groupKey, value.clone());
+            }
+          }
+        }));
+        return;
+      }
       // Logical BYTES is a serialized RoaringBitmap and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
