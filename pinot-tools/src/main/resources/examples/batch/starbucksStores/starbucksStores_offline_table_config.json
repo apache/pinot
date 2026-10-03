@@ -4,16 +4,16 @@
   "segmentsConfig": {
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "1",
-    "segmentPushType": "APPEND",
     "replication": "1"
   },
-  "tenants": {
-  },
+  "tenants": {},
   "fieldConfigList": [
     {
       "name": "location_st_point",
       "encodingType": "RAW",
-      "indexType": "H3",
+      "indexTypes": [
+        "H3"
+      ],
       "properties": {
         "resolutions": "5"
       }
@@ -25,8 +25,12 @@
       "location_st_point"
     ]
   },
-  "metadata": {
-    "customConfigs": {
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
     }
+  },
+  "metadata": {
+    "customConfigs": {}
   }
 }

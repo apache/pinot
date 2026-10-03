@@ -4,7 +4,6 @@
   "tenants": {
   },
   "segmentsConfig": {
-    "segmentPushType": "REFRESH",
     "replication": "1",
     "timeColumnName": "created_at_timestamp"
   },
@@ -15,13 +14,16 @@
       "repo",
       "payload"
     ],
-    "jsonIndexColumns": [
-      "actor",
-      "repo",
-      "payload"
-    ]
+    "jsonIndexConfigs": {
+      "actor": {},
+      "repo": {},
+      "payload": {}
+    }
   },
   "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "REFRESH"
+    },
     "transformConfigs": [
       {
         "columnName": "created_at_timestamp",

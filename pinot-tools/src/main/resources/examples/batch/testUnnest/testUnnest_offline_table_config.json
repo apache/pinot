@@ -3,11 +3,9 @@
   "tableType": "OFFLINE",
   "segmentsConfig": {
     "deletedSegmentsRetentionPeriod": "0d",
-    "segmentPushType": "APPEND",
     "timeColumnName": "event_time",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "180",
-    "minimizeDataMovement": false,
     "replication": "1"
   },
   "tenants": {
@@ -24,7 +22,6 @@
     "optimizeDictionaryType": false,
     "enableDynamicStarTreeCreation": false,
     "columnMajorSegmentBuilderEnabled": true,
-    "createInvertedIndexDuringSegmentGeneration": true,
     "optimizeDictionaryForMetrics": false,
     "noDictionarySizeRatioThreshold": 0,
     "loadMode": "MMAP",
@@ -38,6 +35,9 @@
   },
   "metadata": {},
   "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
+    },
     "transformConfigs": [],
     "enrichmentConfigs": [
       {

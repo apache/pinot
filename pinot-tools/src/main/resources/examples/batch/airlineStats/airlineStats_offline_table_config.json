@@ -4,7 +4,6 @@
   "segmentsConfig": {
     "timeColumnName": "DaysSinceEpoch",
     "timeType": "DAYS",
-    "segmentPushType": "APPEND",
     "replication": "1"
   },
   "tenants": {},
@@ -117,6 +116,9 @@
     }
   ],
   "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
+    },
     "transformConfigs": [
       {
         "columnName": "ts",
