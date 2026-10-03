@@ -21,6 +21,8 @@ package org.apache.pinot.common.utils;
 import java.nio.ByteBuffer;
 import java.util.Random;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MappeableContainer;
+import org.roaringbitmap.buffer.MappeableContainerPointer;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
@@ -185,6 +187,58 @@ public class MutableRoaringBitmapUnionTest {
       }
     }
     assertValid(union.take(), expected);
+  }
+
+  @Test
+  public void testRepeatedSparseMappedInputsStayInPlace() {
+    MutableRoaringBitmap input = new MutableRoaringBitmap();
+    for (int key = 0; key < 24; key++) {
+      input.add(key << 16);
+    }
+    for (int presentation = 1; presentation <= 2; presentation++) {
+      ImmutableRoaringBitmap mapped = present(input, presentation);
+      MutableRoaringBitmapUnion seed = new MutableRoaringBitmapUnion();
+      seed.add(mapped);
+      MutableRoaringBitmap owned = seed.take();
+      MappeableContainer[] containers = new MappeableContainer[owned.getContainerCount()];
+      MappeableContainerPointer pointer = owned.getContainerPointer();
+      for (int i = 0; i < containers.length; i++) {
+        containers[i] = pointer.getContainer();
+        pointer.advance();
+      }
+      MutableRoaringBitmapUnion union = MutableRoaringBitmapUnion.takeOwnership(owned);
+      // Exercise read-only heap and direct buffers without publishing intermediate accumulator state.
+      for (int i = 0; i < 2048; i++) {
+        union.add(mapped);
+      }
+      MutableRoaringBitmap result = union.take();
+      assertValid(result, input);
+      assertTrue(mapped.equals(input));
+      pointer = result.getContainerPointer();
+      for (MappeableContainer container : containers) {
+        assertSame(pointer.getContainer(), container);
+        pointer.advance();
+      }
+    }
+  }
+
+  @Test
+  public void testDenseMappedInputsStillUseLazyUnion() {
+    MutableRoaringBitmap input = new MutableRoaringBitmap();
+    for (int value = 0; value < 1024; value++) {
+      input.add(value);
+    }
+    MutableRoaringBitmapUnion seed = new MutableRoaringBitmapUnion();
+    seed.add(input);
+    MutableRoaringBitmap owned = seed.take();
+    MappeableContainer container = owned.getContainerPointer().getContainer();
+    MutableRoaringBitmapUnion union = MutableRoaringBitmapUnion.takeOwnership(owned);
+    MutableRoaringBitmap duplicate = new MutableRoaringBitmap();
+    duplicate.add(0);
+    union.add(present(duplicate, 2));
+    MutableRoaringBitmap result = union.take();
+    assertValid(result, input);
+    assertNotSame(result.getContainerPointer().getContainer(), container);
   }
 
   @Test

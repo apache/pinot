@@ -88,6 +88,9 @@ public final class RoaringBitmapUnion {
   // Number of values added so far, counting duplicates: an upper bound of the cardinality that is known without
   // repairing, used to estimate how dense the containers are
   private long _numValuesAdded;
+  // A cardinality observed on repaired state. Unions never remove values, so this remains a lower bound and proves
+  // density without repairing every lazy union. New container keys can invalidate that density proof.
+  private long _lastKnownCardinality;
 
   /// Creates an empty union.
   public RoaringBitmapUnion() {
@@ -99,6 +102,7 @@ public final class RoaringBitmapUnion {
     // Adopted state is normalized on the first read, like the library class does
     _dirty = true;
     _numValuesAdded = adopted.getLongCardinality();
+    _lastKnownCardinality = _numValuesAdded;
   }
 
   /// Creates a union whose initial state is the given bitmap. The caller relinquishes the instance: it must not be
@@ -133,7 +137,7 @@ public final class RoaringBitmapUnion {
       return;
     }
     beforeMutation();
-    boolean dense = _numValuesAdded >= (long) MIN_VALUES_PER_CONTAINER_FOR_LAZY_UNION * _bitmap.getContainerCount();
+    boolean dense = isDenseForLazyUnion();
     _numValuesAdded += input.getLongCardinality();
     if (dense && !insertsManyNewKeys(input)) {
       _dirty = true;
@@ -170,6 +174,7 @@ public final class RoaringBitmapUnion {
     _dirty = false;
     _published = false;
     _numValuesAdded = 0;
+    _lastKnownCardinality = 0;
     return result;
   }
 
@@ -196,6 +201,21 @@ public final class RoaringBitmapUnion {
       other.advance();
     }
     return false;
+  }
+
+  private boolean isDenseForLazyUnion() {
+    long minCardinality = (long) MIN_VALUES_PER_CONTAINER_FOR_LAZY_UNION * _bitmap.getContainerCount();
+    if (_lastKnownCardinality >= minCardinality) {
+      return true;
+    }
+    if (_numValuesAdded < minCardinality) {
+      return false;
+    }
+    // The estimate counts duplicates. Confirm actual density before switching a sparse accumulator to lazy unions.
+    repairIfDirty();
+    _lastKnownCardinality = _bitmap.getLongCardinality();
+    _numValuesAdded = _lastKnownCardinality;
+    return _lastKnownCardinality >= minCardinality;
   }
 
   private void repairIfDirty() {

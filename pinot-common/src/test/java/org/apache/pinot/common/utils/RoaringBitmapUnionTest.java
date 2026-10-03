@@ -19,6 +19,8 @@
 package org.apache.pinot.common.utils;
 
 import java.util.Random;
+import org.roaringbitmap.Container;
+import org.roaringbitmap.ContainerPointer;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
@@ -281,6 +283,54 @@ public class RoaringBitmapUnionTest {
       expected.add(3 * i);
     }
     assertValid(union.get(), expected);
+  }
+
+  @Test
+  public void testRepeatedSparseInputsStayInPlace() {
+    RoaringBitmap input = new RoaringBitmap();
+    for (int key = 0; key < 24; key++) {
+      input.add(key << 16);
+    }
+    RoaringBitmapUnion seed = new RoaringBitmapUnion();
+    seed.add(input);
+    RoaringBitmap owned = seed.take();
+    Container[] containers = new Container[owned.getContainerCount()];
+    ContainerPointer pointer = owned.getContainerPointer();
+    for (int i = 0; i < containers.length; i++) {
+      containers[i] = pointer.getContainer();
+      pointer.advance();
+    }
+    RoaringBitmapUnion union = RoaringBitmapUnion.takeOwnership(owned);
+    // Duplicate counts exceed the lazy threshold, but the result remains one value per container.
+    for (int i = 0; i < 2048; i++) {
+      union.add(input);
+    }
+    RoaringBitmap result = union.take();
+    assertValid(result, input);
+    pointer = result.getContainerPointer();
+    for (Container container : containers) {
+      // Eager unions reuse these sparse arrays; lazy unions replace them even when no values change.
+      assertSame(pointer.getContainer(), container);
+      pointer.advance();
+    }
+  }
+
+  @Test
+  public void testDenseInputsStillUseLazyUnion() {
+    RoaringBitmap input = new RoaringBitmap();
+    for (int value = 0; value < 1024; value++) {
+      input.add(value);
+    }
+    RoaringBitmapUnion seed = new RoaringBitmapUnion();
+    seed.add(input);
+    RoaringBitmap owned = seed.take();
+    Container container = owned.getContainerPointer().getContainer();
+    RoaringBitmapUnion union = RoaringBitmapUnion.takeOwnership(owned);
+    union.add(RoaringBitmap.bitmapOf(0));
+    RoaringBitmap result = union.take();
+    assertValid(result, input);
+    // Lazy union promotes the dense array and repair replaces it; eager union would keep the array.
+    assertNotSame(result.getContainerPointer().getContainer(), container);
   }
 
   @Test
