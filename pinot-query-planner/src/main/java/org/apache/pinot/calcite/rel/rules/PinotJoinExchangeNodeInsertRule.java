@@ -19,6 +19,7 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -37,8 +38,9 @@ import org.apache.calcite.rel.logical.LogicalAsofJoin;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.calcite.rel.logical.PinotKWayMergeSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
-import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
+import org.apache.pinot.query.QueryEnvironment;
 
 
 /// Special rule for Pinot, this rule is fixed to always insert exchange after JOIN node.
@@ -53,6 +55,12 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
   @Override
   public boolean matches(RelOptRuleCall call) {
     Join join = call.rel(0);
+    if (PinotHintOptions.JoinHintOptions.useSortedMergeJoinStrategy(join)) {
+      QueryEnvironment.Config envConfig = call.getPlanner().getContext() == null ? null
+          : call.getPlanner().getContext().unwrap(QueryEnvironment.Config.class);
+      Preconditions.checkArgument(envConfig != null && envConfig.isKWayMergeSupported(),
+          "Sorted merge join requires a cluster supporting k-way merge plans");
+    }
     return !PinotRuleUtils.isExchange(join.getLeft()) && !PinotRuleUtils.isExchange(join.getRight());
   }
 
@@ -197,8 +205,9 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
           RelFieldCollation.NullDirection.LAST));
     }
     RelCollation collation = RelCollations.of(fieldCollations);
-    RelNode sortedInput = LogicalSort.create(input, collation, null, null);
-    return PinotLogicalSortExchange.create(sortedInput, RelDistributions.hash(joinKeys), collation, true, true,
-        prePartitioned);
+    // Join inputs must include every row; a missing fetch would apply the default selection response limit at runtime.
+    RelNode sortedInput = LogicalSort.create(input, collation, null,
+        input.getCluster().getRexBuilder().makeExactLiteral(BigDecimal.valueOf(Integer.MAX_VALUE)));
+    return PinotKWayMergeSortExchange.create(sortedInput, RelDistributions.hash(joinKeys), collation, prePartitioned);
   }
 }

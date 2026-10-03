@@ -234,7 +234,7 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
       return _eos;
     }
     if (_isEarlyTerminated) {
-      _eos = SuccessMseBlock.INSTANCE;
+      _eos = finishInputs();
       return _eos;
     }
     int blockSize = Math.min(TARGET_BLOCK_SIZE_ROWS, _maxRowsInJoin);
@@ -246,7 +246,7 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
         return _eos;
       }
       if (!leftHasRow) {
-        _eos = SuccessMseBlock.INSTANCE;
+        _eos = finishInputs();
         break;
       }
       Object[] leftRow = _leftCursor.peek();
@@ -270,7 +270,7 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
           checkTerminationAndSampleUsagePeriodically(++_numRowsProcessed, MERGE_LOOP_SCOPE);
           continue;
         }
-        _eos = SuccessMseBlock.INSTANCE;
+        _eos = finishInputs();
         break;
       }
       Object[] rightRow = _rightCursor.peek();
@@ -303,6 +303,20 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
     return _eos;
   }
 
+  /// Stops producing rows, but consumes both terminal blocks so mailbox inputs retain upstream stats and errors.
+  private MseBlock.Eos finishInputs() {
+    releaseBuffers();
+    if (!_isEarlyTerminated) {
+      _isEarlyTerminated = true;
+      // Signal both inputs before waiting on either one, so an idle sender does not wait on an unused peer.
+      _leftCursor.earlyTerminate();
+      _rightCursor.earlyTerminate();
+    }
+    MseBlock.Eos leftEos = _leftCursor.drain();
+    MseBlock.Eos rightEos = _rightCursor.drain();
+    return leftEos.isError() ? leftEos : rightEos.isError() ? rightEos : SuccessMseBlock.INSTANCE;
+  }
+
   /// Buffers the right rows for one join key. Unlike a hash join, the resource limit applies to this buffered run,
   /// rather than the entire right input. Output is separately emitted in blocks bounded by `maxRowsInJoin`, so the
   /// total streamed result may exceed that budget without retaining it in memory.
@@ -320,8 +334,7 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
                   + "single join key: " + _maxRowsInJoin);
         }
         _statMap.merge(StatKey.MAX_ROWS_IN_JOIN_REACHED, true);
-        earlyTerminate();
-        _eos = SuccessMseBlock.INSTANCE;
+        _eos = finishInputs();
         return false;
       }
       _rightRun.add(rightRow);
@@ -460,6 +473,23 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
         }
       }
       return true;
+    }
+
+    void earlyTerminate() {
+      if (_eosBlock == null) {
+        _input.earlyTerminate();
+      }
+    }
+
+    MseBlock.Eos drain() {
+      releaseRows();
+      while (_eosBlock == null) {
+        MseBlock block = _input.nextBlock();
+        if (block.isEos()) {
+          _eosBlock = (MseBlock.Eos) block;
+        }
+      }
+      return _eosBlock;
     }
 
     void releaseRows() {
