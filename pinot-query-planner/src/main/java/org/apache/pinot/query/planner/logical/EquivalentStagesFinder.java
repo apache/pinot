@@ -27,6 +27,7 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -194,7 +195,7 @@ public class EquivalentStagesFinder {
 
       @Override
       public Boolean visitMailboxReceive(MailboxReceiveNode node1, PlanNode node2) {
-        if (!(node2 instanceof MailboxReceiveNode)) {
+        if (node1.getClass() != node2.getClass()) {
           return false;
         }
         MailboxReceiveNode that = (MailboxReceiveNode) node2;
@@ -210,6 +211,13 @@ public class EquivalentStagesFinder {
           return false;
         }
 
+        if (node1 instanceof MailboxMergeReceiveNode) {
+          MailboxMergeReceiveNode left = (MailboxMergeReceiveNode) node1;
+          MailboxMergeReceiveNode right = (MailboxMergeReceiveNode) that;
+          if (left.getFetch() != right.getFetch() || left.getOffset() != right.getOffset()) {
+            return false;
+          }
+        }
         // Fields of MailboxReceiveNode that are deliberately not compared here are listed, with the reason, in
         // NodeEquivalenceFieldCoverageTest.NOT_COMPARED.
         return areBaseNodesEquivalent(node1, node2)

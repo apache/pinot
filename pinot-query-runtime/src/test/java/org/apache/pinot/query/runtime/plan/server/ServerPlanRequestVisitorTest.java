@@ -35,7 +35,6 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
-import static org.testng.Assert.assertTrue;
 
 
 /// Tests the boundary between the V1 leaf request and the MSE operator chain.
@@ -53,11 +52,10 @@ public class ServerPlanRequestVisitorTest {
     TableScanNode tableScan = new TableScanNode(STAGE_ID, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(),
         "testTable", List.of("orderKey"));
     SortNode sortNode = new SortNode(STAGE_ID, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(tableScan), COLLATIONS,
-        -1, -1);
+        Integer.MAX_VALUE, -1);
     MailboxSendNode sendNode = new MailboxSendNode(STAGE_ID, DATA_SCHEMA, List.of(sortNode), 2,
-        PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED, List.of(), false, COLLATIONS, true,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED, List.of(), false, List.of(), false,
         null);
-    assertTrue(sendNode.hasExplicitSortInput());
     ServerPlanRequestContext context = new ServerPlanRequestContext(new StagePlan(sendNode, null), null, null, null);
 
     ServerPlanRequestVisitor.walkPlanNode(sendNode, context);

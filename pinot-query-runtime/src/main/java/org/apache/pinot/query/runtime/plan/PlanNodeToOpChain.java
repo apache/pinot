@@ -33,6 +33,7 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -194,11 +195,10 @@ public class PlanNodeToOpChain {
     @Override
     public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, OpChainExecutionContext context) {
       try {
-        // isSort is the receiver's ordering contract. A new broker sets both flags only when an explicit sender Sort
-        // backs the exchange, selecting the streaming merge with a mixed-version fallback. isSort without the sender
-        // guarantee retains the full mailbox sort; a false isSort leaves ordering to a separate SortNode above it.
-        if (node.isSort() && node.isSortedOnSender()) {
-          return new SortedMailboxMergeReceiveOperator(context, node);
+        // The distinct merge node requires ordered streams. Legacy sort=true nodes still use the compatible
+        // receiver sort; current plain receives leave ordering to an explicit downstream SortNode.
+        if (node instanceof MailboxMergeReceiveNode) {
+          return new SortedMailboxMergeReceiveOperator(context, (MailboxMergeReceiveNode) node);
         } else if (node.isSort()) {
           return new SortedMailboxReceiveOperator(context, node);
         } else {

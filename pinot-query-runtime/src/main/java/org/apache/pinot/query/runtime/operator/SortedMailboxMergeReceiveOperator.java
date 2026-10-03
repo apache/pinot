@@ -34,38 +34,28 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.utils.AsyncStream;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Receives streams that the plan declares sorted on the sender and merges them by the exchange collation.
+/// K-way merges streams whose ordering is guaranteed by the logical plan.
 ///
-/// An explicit sender [SortOperator] establishes the row ordering; [MailboxSendOperator] only transports that
-/// ordering. The transport marker confirms rollout compatibility and is not itself a sorting mechanism.
+/// The broker only emits this operator's plan node in a homogeneous cluster. Ordering is established upstream;
+/// mailbox senders preserve it without transport metadata or runtime structural checks.
 ///
-/// The plan declaration alone is not trusted during a rolling upgrade. Every data block must carry the transport's
-/// sender-sort confirmation. Before this operator emits its first row it obtains a head row, or EOS, from every live
-/// sender. If any sender's first data is unconfirmed, all tentatively buffered rows are folded into a full receiver
-/// sort. Once output starts, losing the confirmation is a protocol violation because already emitted rows cannot be
-/// recovered into that fallback.
+/// Reads whichever mailbox is ready to avoid cross-receiver backpressure cycles. Multi-sender output blocks contain
+/// at most 10,000 rows; a single sender preserves its input blocks. Read-ahead retained while another sender is starved
+/// can approach the legacy full receiver sort's memory footprint.
 ///
-/// The merge reads whichever mailbox is ready instead of blocking on one sender. This prevents a sender that is
-/// backpressured by another receiver from creating a cross-receiver wait cycle. Multi-sender merge and fallback rows
-/// are emitted in blocks of at most 10,000 while cursor state carries the ordering frontier across calls. A confirmed
-/// single sender is passed through with its original block boundaries. A fast sender can be read ahead while another
-/// sender is starved, so retained input is workload-dependent and can approach the legacy full receiver sort in the
-/// worst case.
-///
-/// This operator is driven by a single consumer thread and is not thread-safe.
+/// Driven by a single consumer thread; not thread-safe.
 public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SortedMailboxMergeReceiveOperator.class);
 
@@ -75,29 +65,23 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
   private final Comparator<Object[]> _comparator;
   private final PriorityQueue<SenderCursor> _readyCursors;
   private final boolean _singleSortedSender;
+  private int _rowsToSkip;
+  private long _rowsToEmit;
   /// Senders that have not finished but do not currently have a row ready. Nothing can be emitted while this is
   /// non-empty because any one of these senders may hold the next row.
   private final Set<SenderCursor> _starvedCursors = Collections.newSetFromMap(new IdentityHashMap<>());
   private final Map<AsyncStream<ReceivingMailbox.MseBlockWithStats>, SenderCursor> _cursorsByStream =
       new IdentityHashMap<>();
-  private boolean _mergeOutputStarted;
-  private boolean _fallbackToSort;
-  private int _fallbackOutputIndex = -1;
-
-  /// Rows buffered only for the mixed-version fallback. The sorted list is handed downstream as-is, so cleanup must
-  /// drop this reference rather than clear it.
-  @Nullable
-  private List<Object[]> _rows;
 
   @Nullable
   private MseBlock _eosBlock;
 
-  public SortedMailboxMergeReceiveOperator(OpChainExecutionContext context, MailboxReceiveNode node) {
+  public SortedMailboxMergeReceiveOperator(OpChainExecutionContext context, MailboxMergeReceiveNode node) {
     super(context, node);
-    Preconditions.checkState(node.isSort(), "Receiver-side sorting must be enabled");
-    Preconditions.checkState(node.isSortedOnSender(), "Sender-side sorting must be enabled");
     Preconditions.checkState(!CollectionUtils.isEmpty(node.getCollations()), "Field collations must be set");
     _dataSchema = node.getDataSchema();
+    _rowsToSkip = Math.max(node.getOffset(), 0);
+    _rowsToEmit = node.getFetch() < 0 ? Long.MAX_VALUE : node.getFetch();
     _comparator = new SortUtils.SortComparator(List.copyOf(node.getCollations()), false);
     List<AsyncStream<ReceivingMailbox.MseBlockWithStats>> streams = _multiConsumer.getLiveStreamsSnapshot();
     _readyCursors = new PriorityQueue<>(Math.max(streams.size(), 1),
@@ -124,19 +108,40 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
 
   @Override
   protected MseBlock getNextBlock() {
-    if (_fallbackOutputIndex >= 0 && _rows != null) {
-      return emitFallbackBlock();
-    }
     if (_eosBlock != null) {
       return _eosBlock;
     }
     if (_isEarlyTerminated) {
       return readUntilEos();
     }
-    return _singleSortedSender ? readSingleSortedSender() : mergeNextBlock();
+    if (_rowsToEmit == 0) {
+      earlyTerminate();
+      return readUntilEos();
+    }
+    while (true) {
+      MseBlock block = _singleSortedSender ? readSingleSortedSender() : mergeNextBlock();
+      if (block.isEos()) {
+        return block;
+      }
+      if (_rowsToSkip == 0 && _rowsToEmit == Long.MAX_VALUE) {
+        return block;
+      }
+      List<Object[]> rows = ((MseBlock.Data) block).asRowHeap().getRows();
+      int from = Math.min(_rowsToSkip, rows.size());
+      _rowsToSkip -= from;
+      int count = (int) Math.min(rows.size() - from, _rowsToEmit);
+      _rowsToEmit -= count;
+      if (_rowsToEmit == 0) {
+        earlyTerminate();
+      }
+      if (count > 0) {
+        return from == 0 && count == rows.size() ? block
+            : new RowHeapDataBlock(rows.subList(from, from + count), _dataSchema);
+      }
+    }
   }
 
-  /// Passes through one confirmed sorted sender without copying its rows through the merge heap.
+  /// Passes through one sorted sender without copying its rows through the merge heap.
   private MseBlock readSingleSortedSender() {
     while (true) {
       MseBlock block = _multiConsumer.readMseBlockBlocking();
@@ -145,12 +150,8 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
       }
       MseBlock.Data dataBlock = (MseBlock.Data) block;
       checkActiveTerminationAndSampleUsage();
-      if (!_multiConsumer.isLastBlockSortedOnSender()) {
-        fallbackToFullSort(dataBlock.asRowHeap().getRows());
-        return sortAllRows();
-      }
+
       if (dataBlock.getNumRows() > 0) {
-        _mergeOutputStarted = true;
         return dataBlock;
       }
     }
@@ -177,11 +178,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
         if (error != null) {
           return terminate(error);
         }
-        if (_fallbackToSort) {
-          // These rows were already removed from cursors while building this not-yet-emitted block.
-          _rows.addAll(rows);
-          return sortAllRows();
-        }
+
         continue;
       }
       if (_readyCursors.isEmpty()) {
@@ -200,7 +197,6 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
     if (rows.isEmpty()) {
       return terminate(SuccessMseBlock.INSTANCE);
     }
-    _mergeOutputStarted = true;
     return new RowHeapDataBlock(rows, _dataSchema);
   }
 
@@ -234,10 +230,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
     Preconditions.checkState(cursor != null, "Read a data block from unknown mailbox: %s", stream.getId());
     List<Object[]> rows = ((MseBlock.Data) block).asRowHeap().getRows();
     checkActiveTerminationAndSampleUsage();
-    if (!_multiConsumer.isLastBlockSortedOnSender()) {
-      fallbackToFullSort(rows);
-      return null;
-    }
+
     cursor.offer(rows);
     updateFinishedCursors();
     if (cursor.hasRow() && _starvedCursors.remove(cursor)) {
@@ -258,58 +251,6 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
         }
       }
     }
-  }
-
-  /// Switches to a full receiver sort when a legacy sender omits the transport confirmation.
-  private void fallbackToFullSort(List<Object[]> unconfirmedRows) {
-    if (_mergeOutputStarted) {
-      throw QueryErrorCode.INTERNAL.asException(
-          "Sender ordering confirmation changed after merge output started on stage " + _context.getStageId()
-              + "; retry after the rolling upgrade completes or disable windowSortOnSender");
-    }
-    _rows = new ArrayList<>();
-    for (SenderCursor cursor : _cursorsByStream.values()) {
-      cursor.drainTo(_rows);
-    }
-    _rows.addAll(unconfirmedRows);
-    releaseCursors();
-    _fallbackToSort = true;
-    checkActiveTerminationAndSampleUsage();
-  }
-
-  /// Buffers the remaining sender rows and sorts all rows retained for fallback.
-  private MseBlock sortAllRows() {
-    assert _rows != null : "Fallback rows must not be released while the operator is running";
-    while (true) {
-      MseBlock block = _multiConsumer.readMseBlockBlocking();
-      if (block.isData()) {
-        _rows.addAll(((MseBlock.Data) block).asRowHeap().getRows());
-        checkActiveTerminationAndSampleUsage();
-        continue;
-      }
-      MseBlock.Eos eosBlock = (MseBlock.Eos) block;
-      if (eosBlock.isError() || _rows.isEmpty()) {
-        return terminate(eosBlock);
-      }
-      _rows.sort(SortUtils.withTerminationAndUsageSampling(_comparator, MERGE_SCOPE,
-          _context.getActiveDeadlineMs()));
-      checkActiveTerminationAndSampleUsage();
-      onEos();
-      _eosBlock = eosBlock;
-      _fallbackOutputIndex = 0;
-      return emitFallbackBlock();
-    }
-  }
-
-  private MseBlock emitFallbackBlock() {
-    assert _rows != null : "Fallback rows must exist while fallback output is pending";
-    int endIndex = Math.min(_fallbackOutputIndex + SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK, _rows.size());
-    List<Object[]> rows = new ArrayList<>(_rows.subList(_fallbackOutputIndex, endIndex));
-    _fallbackOutputIndex = endIndex;
-    if (endIndex == _rows.size()) {
-      _rows = null;
-    }
-    return new RowHeapDataBlock(rows, _dataSchema);
   }
 
   private void checkActiveTerminationAndSampleUsage() {
@@ -341,13 +282,12 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
 
   @Override
   protected void releaseBuffers() {
-    _rows = null;
     releaseCursors();
   }
 
   @Override
   protected boolean hasBufferedState() {
-    return _rows != null || !_cursorsByStream.isEmpty() || !_readyCursors.isEmpty() || !_starvedCursors.isEmpty();
+    return !_cursorsByStream.isEmpty() || !_readyCursors.isEmpty() || !_starvedCursors.isEmpty();
   }
 
   private void releaseCursors() {
@@ -398,14 +338,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
       return _rows.get(_index++);
     }
 
-    void drainTo(List<Object[]> rows) {
-      if (_index < _rows.size()) {
-        rows.addAll(_rows.subList(_index, _rows.size()));
-      }
-      for (List<Object[]> pendingRows : _pending) {
-        rows.addAll(pendingRows);
-      }
-    }
+
 
     int getRetainedRowCount() {
       int retainedRowCount = _rows.size();

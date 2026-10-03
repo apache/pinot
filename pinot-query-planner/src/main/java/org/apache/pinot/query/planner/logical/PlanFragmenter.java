@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.planner.logical;
 
-import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -34,6 +33,8 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -186,18 +187,6 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
 
     // Create a new context for the next PlanFragment with MailboxSendNode as the root node.
     PlanNode nextPlanFragmentRoot = node.getInputs().get(0).visit(this, new Context(senderPlanFragmentId));
-    Preconditions.checkState(!node.isSortOnSender() || node.isSortOnReceiver(),
-        "Sender sorting requires the receiver merge-sort contract");
-    if (node.isSortOnSender()) {
-      Preconditions.checkState(!node.getCollations().isEmpty(),
-          "Sender sorting requires a non-empty exchange collation");
-      // Ordering belongs to an explicit operator in the sender fragment. MailboxSendOperator only preserves and
-      // transports this output; ServerPlanRequestVisitor keeps this SortNode above the V1 leaf boundary.
-      // SortOperator applies the broker response limit when fetch is absent. This internal sort must retain every
-      // sender row, so use the largest representable fetch with a zero effective offset.
-      nextPlanFragmentRoot = new SortNode(senderPlanFragmentId, nextPlanFragmentRoot.getDataSchema(), null,
-          List.of(nextPlanFragmentRoot), node.getCollations(), Integer.MAX_VALUE, -1);
-    }
     PinotRelExchangeType exchangeType = node.getExchangeType();
     RelDistribution.Type distributionType = node.getDistributionType();
     List<Integer> keys = node.getKeys();
@@ -210,8 +199,10 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     _mailboxSendToExchangeNodeMap.put(mailboxSendNode, node);
 
     // Return the MailboxReceiveNode as the leave node of the current PlanFragment.
-    MailboxReceiveNode mailboxReceiveNode =
-        new MailboxReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
+    MailboxReceiveNode mailboxReceiveNode = node instanceof KWayMergeExchangeNode
+        ? new MailboxMergeReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
+            senderPlanFragmentId, exchangeType, distributionType, keys, node.getCollations(), mailboxSendNode)
+        : new MailboxReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
             senderPlanFragmentId, exchangeType, distributionType, keys, node.getCollations(), node.isSortOnReceiver(),
             node.isSortOnSender(), mailboxSendNode);
     _mailboxReceiveToExchangeNodeMap.put(mailboxReceiveNode, node);

@@ -260,15 +260,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   @Override
   public Void visitMailboxSend(MailboxSendNode node, ServerPlanRequestContext context) {
     PlanNode input = node.getInputs().get(0);
-    if (node.hasExplicitSortInput()) {
-      // Keep the sender SortNode in the MSE op-chain. Pushing it into the V1 request would sort each physical request
-      // independently; a hybrid or logical-table leaf can execute several such requests and interleave their output,
-      // which is not one sorted mailbox stream.
-      PlanNode sortInput = input.getInputs().get(0);
-      if (visit(sortInput, context)) {
-        context.setLeafStageBoundaryNode(sortInput);
-      }
-    } else if (visit(input, context)) {
+    if (visit(input, context)) {
       context.setLeafStageBoundaryNode(input);
     }
     return null;
@@ -291,6 +283,12 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   @Override
   public Void visitSort(SortNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
+      if (node.getFetch() == Integer.MAX_VALUE) {
+        // An unbounded sort must cover the complete MSE input. Sorting each V1 physical request separately can
+        // interleave multiple runs (hybrid and logical tables), violating downstream ordered-input requirements.
+        context.setLeafStageBoundaryNode(node.getInputs().get(0));
+        return null;
+      }
       PinotQuery pinotQuery = context.getPinotQuery();
       if (pinotQuery.getOrderByList() == null) {
         List<RelFieldCollation> collations = node.getCollations();
