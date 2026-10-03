@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
@@ -62,6 +63,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
   private static final String EXPLAIN_NAME = "SORTED_MAILBOX_MERGE_RECEIVE";
   private static final String MERGE_SCOPE = "SortedMailboxMergeReceiveOperator";
   private final DataSchema _dataSchema;
+  private final List<RelFieldCollation> _collations;
   private final Comparator<Object[]> _comparator;
   private final PriorityQueue<SenderCursor> _readyCursors;
   private final boolean _singleSortedSender;
@@ -82,7 +84,8 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
     _dataSchema = node.getDataSchema();
     _rowsToSkip = Math.max(node.getOffset(), 0);
     _rowsToEmit = node.getFetch() < 0 ? Long.MAX_VALUE : node.getFetch();
-    _comparator = new SortUtils.SortComparator(List.copyOf(node.getCollations()), false);
+    _collations = List.copyOf(node.getCollations());
+    _comparator = new SortUtils.SortComparator(_collations, false);
     List<AsyncStream<ReceivingMailbox.MseBlockWithStats>> streams = _multiConsumer.getLiveStreamsSnapshot();
     _readyCursors = new PriorityQueue<>(Math.max(streams.size(), 1),
         (left, right) -> _comparator.compare(left.peek(), right.peek()));
@@ -139,6 +142,11 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
             : new RowHeapDataBlock(rows.subList(from, from + count), _dataSchema);
       }
     }
+  }
+
+  @Override
+  public boolean isSortedOn(List<RelFieldCollation> collations) {
+    return !collations.isEmpty() && _collations.equals(collations);
   }
 
   /// Passes through one sorted sender without copying its rows through the merge heap.

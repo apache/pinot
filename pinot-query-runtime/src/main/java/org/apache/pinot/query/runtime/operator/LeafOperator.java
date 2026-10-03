@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Plan;
@@ -57,6 +58,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
@@ -64,6 +66,7 @@ import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.TerminationException;
@@ -134,6 +137,18 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
     _blockingQueue = new ArrayBlockingQueue<>(maxStreamingPendingBlocks != null ? maxStreamingPendingBlocks
         : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
     _pipelineBreakerStats = pipelineBreakerStats;
+  }
+
+  @Override
+  public boolean isSortedOn(List<RelFieldCollation> collations) {
+    ServerPlanRequestContext leafContext = _context.getLeafStageContext();
+    if (collations.isEmpty() || _requests.size() != 1 || leafContext == null
+        || !leafContext.isSinglePhysicalTable()) {
+      return false;
+    }
+    PlanNode boundary = leafContext.getLeafStageBoundaryNode();
+    return boundary instanceof SortNode && ((SortNode) boundary).isLeafSelectionSort()
+        && ((SortNode) boundary).getCollations().equals(collations);
   }
 
   public List<ServerQueryRequest> getRequests() {

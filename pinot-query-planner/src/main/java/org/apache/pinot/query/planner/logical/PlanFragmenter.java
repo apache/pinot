@@ -201,7 +201,8 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     // Return the MailboxReceiveNode as the leave node of the current PlanFragment.
     MailboxReceiveNode mailboxReceiveNode = node instanceof KWayMergeExchangeNode
         ? new MailboxMergeReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
-            senderPlanFragmentId, exchangeType, distributionType, keys, node.getCollations(), mailboxSendNode)
+            senderPlanFragmentId, exchangeType, distributionType, keys, node.getCollations(),
+            ((KWayMergeExchangeNode) node).getFetch(), ((KWayMergeExchangeNode) node).getOffset(), mailboxSendNode)
         : new MailboxReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
             senderPlanFragmentId, exchangeType, distributionType, keys, node.getCollations(), node.isSortOnReceiver(),
             node.isSortOnSender(), mailboxSendNode);
