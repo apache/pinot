@@ -494,7 +494,8 @@ public class StringFunctions {
   }
 
   /// Empty fields from leading, consecutive, and trailing delimiters are discarded.
-  /// TODO: Revisit if index should be one-based (both Presto and Postgres use one-based index, which starts with 1)
+  /// TODO: Revisit whether to use one-based indexes and preserve empty fields from leading, consecutive, and trailing
+  /// delimiters, as Presto and Postgres do.
   /// @param input the input String to be split into parts.
   /// @param delimiter the specified delimiter to split the input string.
   /// @param index we allow negative value for index which indicates the index from the end.
