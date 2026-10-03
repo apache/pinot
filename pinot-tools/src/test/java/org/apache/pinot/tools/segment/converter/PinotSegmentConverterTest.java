@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordReader;
@@ -175,16 +176,18 @@ public class PinotSegmentConverterTest {
       recordReader.init(outputFile, SCHEMA.getFieldSpecMap().keySet(), null);
 
       GenericRow record = recordReader.next();
+      // Integral literals stay Integer / Long; floating point literals are read as BigDecimal, so they are
+      // compared by numeric value rather than by boxed type.
       assertEquals(record.getValue(INT_SV_COLUMN), 1);
       assertEquals(record.getValue(LONG_SV_COLUMN), 2);
-      assertEquals(record.getValue(FLOAT_SV_COLUMN), 3.0);
-      assertEquals(record.getValue(DOUBLE_SV_COLUMN), 4.0);
+      assertEquals(((Number) record.getValue(FLOAT_SV_COLUMN)).doubleValue(), 3.0);
+      assertEquals(((Number) record.getValue(DOUBLE_SV_COLUMN)).doubleValue(), 4.0);
       assertEquals(record.getValue(STRING_SV_COLUMN), "5");
       assertEquals(record.getValue(BYTES_SV_COLUMN), BytesUtils.toHexString(new byte[]{6, 12, 34, 56}));
       assertEquals(record.getValue(INT_MV_COLUMN), new Object[]{7, 8});
       assertEquals(record.getValue(LONG_MV_COLUMN), new Object[]{9, 10});
-      assertEquals(record.getValue(FLOAT_MV_COLUMN), new Object[]{11.0, 12.0});
-      assertEquals(record.getValue(DOUBLE_MV_COLUMN), new Object[]{13.0, 14.0});
+      assertEquals(toDoubles(record.getValue(FLOAT_MV_COLUMN)), new double[]{11.0, 12.0});
+      assertEquals(toDoubles(record.getValue(DOUBLE_MV_COLUMN)), new double[]{13.0, 14.0});
       assertEquals(record.getValue(STRING_MV_COLUMN), new Object[]{"15", "16"});
 
       assertFalse(recordReader.hasNext());
@@ -337,6 +340,12 @@ public class PinotSegmentConverterTest {
     assertEquals(record.getValue(BOOLEAN_MV_COLUMN), new Object[]{Boolean.TRUE, Boolean.FALSE});
     assertEquals(record.getValue(TIMESTAMP_MV_COLUMN),
         new Object[]{new Timestamp(TIMESTAMP_VALUE), new Timestamp(0L)});
+  }
+
+  /// Numeric values of an MV column, so assertions do not depend on which boxed number type the reader
+  /// produced (the JSON reader returns `BigDecimal` for floating point literals).
+  private static double[] toDoubles(Object mvValue) {
+    return Arrays.stream((Object[]) mvValue).mapToDouble(value -> ((Number) value).doubleValue()).toArray();
   }
 
   private static void assertUuidRecord(GenericRow record) {

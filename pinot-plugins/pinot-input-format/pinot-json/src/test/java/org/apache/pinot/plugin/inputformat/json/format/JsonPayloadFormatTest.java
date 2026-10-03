@@ -22,12 +22,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 import com.fasterxml.jackson.dataformat.cbor.CBORGenerator;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -120,12 +123,46 @@ public class JsonPayloadFormatTest {
   public void testText()
       throws Exception {
     JsonPayloadParser parser = JsonPayloadFormat.TEXT.getParser();
-    Map<String, Object> map = parse(parser, utf8("  {\"a\": 1, \"b\": \"x\"}"));
+    Map<String, Object> map = parse(parser, utf8("  {\"a\": 1, \"b\": \"x\", \"c\": 1.5}"));
     assertEquals(map.get("a"), 1);
     assertEquals(map.get("b"), "x");
+    assertEquals(map.get("c"), new BigDecimal("1.5"));
     assertTrue(parser.matches(utf8("{\"a\":1}"), 0, 7));
     assertTrue(parser.matches(utf8("  [1,2]"), 0, 7));
     assertFalse(parser.matches(bytes(0xFF), 0, 1));
+  }
+
+  @Test
+  public void testTextStreamingPreservesBigDecimalAndSkipsUnselectedContainers()
+      throws Exception {
+    String precise = "12345678901234567890.12345678901234567890";
+    byte[] payload = utf8("{\"decimalMetric\":" + precise + ",\"ignored\":{\"deep\":[1,2,3]},\"keep\":\"ok\"}");
+    JsonPayloadParser parser = JsonPayloadFormat.TEXT.getParser();
+    GenericRow row = new GenericRow();
+    row.putValue("unselected", "preserved");
+
+    assertTrue(parser.parse(payload, 0, payload.length, row, Set.of("decimalMetric", "keep")));
+    assertEquals(row.getValue("decimalMetric"), new BigDecimal(precise));
+    assertEquals(row.getValue("keep"), "ok");
+    assertEquals(row.getValue("unselected"), "preserved");
+    assertFalse(row.getFieldToValueMap().containsKey("ignored"));
+  }
+
+  @Test
+  public void testTextNestedDecimalIsBigDecimal()
+      throws Exception {
+    String precise = "12345678901234567890.12345678901234567890";
+    Map<String, Object> map =
+        parse(JsonPayloadFormat.TEXT.getParser(), utf8("{\"nested\":{\"value\":" + precise + "}}"));
+    assertEquals(((Map<?, ?>) map.get("nested")).get("value"), new BigDecimal(precise));
+  }
+
+  @Test
+  public void testTextScientificNotationIsBigDecimal()
+      throws Exception {
+    Map<String, Object> map = parse(JsonPayloadFormat.TEXT.getParser(), utf8("{\"large\":1.23e10,\"tiny\":1.23e-10}"));
+    assertEquals(((BigDecimal) map.get("large")).toPlainString(), "12300000000");
+    assertEquals(((BigDecimal) map.get("tiny")).toPlainString(), "0.000000000123");
   }
 
   // ------------------------------------------------------------------------------------------------------
@@ -210,10 +247,19 @@ public class JsonPayloadFormatTest {
     // Identical type contract to TEXT, since the body is plain text JSON.
     assertEquals(map.get("a"), 1);
     assertEquals(map.get("b"), "x");
-    assertEquals(map.get("c"), 1.5);
+    assertEquals(map.get("c"), new BigDecimal("1.5"));
     assertEquals(map.get("d"), true);
     assertNull(map.get("e"));
     assertEquals(map.get("f"), List.of(1, 2));
+  }
+
+  @Test
+  public void testPostgresPreservesDecimalPrecision()
+      throws Exception {
+    String precise = "12345678901234567890.12345678901234567890";
+    Map<String, Object> map = parse(JsonPayloadFormat.POSTGRES_JSONB.getParser(),
+        postgres("{\"decimalMetric\":" + precise + "}"));
+    assertEquals(map.get("decimalMetric"), new BigDecimal(precise));
   }
 
   @Test
