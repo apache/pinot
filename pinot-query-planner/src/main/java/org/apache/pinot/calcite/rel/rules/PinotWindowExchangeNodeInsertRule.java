@@ -43,6 +43,7 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -95,7 +96,8 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
       return true;
     }
     Sort sort = (Sort) input;
-    return !(PinotRuleUtils.isExchange(sort.getInput()) && sort.fetch == null && sort.offset == null
+    return !(PinotRuleUtils.isExchange(sort.getInput())
+        && (sort.fetch == null || RexLiteral.intValue(sort.fetch) == Integer.MAX_VALUE) && sort.offset == null
         && sort.getCollation().equals(window.groups.get(0).orderKeys));
   }
 
@@ -168,10 +170,11 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     // old servers sort the same rows twice during a rolling upgrade. Keep an explicit Sort only for post-exchange
     // full-sort paths.
     // PinotSortExchangeNodeInsertRule does not re-fire on it: its matches() rejects a Sort whose input is an
-    // exchange. PinotSortExchangeCopyRule does not either: it declines when there is no fetch.
+    // exchange. Window sorts must retain every input row, independently of the broker response limit.
     RelNode windowInput = exchange instanceof PinotLogicalSortExchange
         && !((PinotLogicalSortExchange) exchange).isSortOnReceiver()
-            ? LogicalSort.create(exchange, ((PinotLogicalSortExchange) exchange).getCollation(), null, null) : exchange;
+            ? LogicalSort.create(exchange, ((PinotLogicalSortExchange) exchange).getCollation(), null,
+                window.getCluster().getRexBuilder().makeExactLiteral(BigDecimal.valueOf(Integer.MAX_VALUE))) : exchange;
     // NOTE: Need to create a new LogicalWindow to use the modified window group.
     call.transformTo(LogicalWindow.create(window.getTraitSet(), windowInput, window.constants, window.getRowType(),
         List.of(windowGroup)));
