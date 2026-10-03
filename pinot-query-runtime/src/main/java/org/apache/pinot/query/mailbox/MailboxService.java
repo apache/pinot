@@ -22,19 +22,33 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
+import io.grpc.Status;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.proto.Mailbox;
+import org.apache.pinot.common.proto.PinotMailboxGrpc;
+import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.core.instance.context.BrokerContext;
 import org.apache.pinot.core.instance.context.ControllerContext;
@@ -44,6 +58,11 @@ import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.grpc.GrpcKeepAliveConfig;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
+import org.apache.pinot.query.mailbox.materialized.MaterializedMailboxKey;
+import org.apache.pinot.query.mailbox.materialized.MaterializedMailboxStore;
+import org.apache.pinot.query.mailbox.materialized.MaterializedSendingMailbox;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -81,6 +100,11 @@ public class MailboxService {
   private final InstanceType _instanceType;
   private final PinotConfiguration _config;
   private final ChannelManager _channelManager;
+  private final Path _materializedMailboxRoot;
+  private final Object _materializedMailboxStoreLock = new Object();
+  @Nullable
+  private MaterializedMailboxStore _materializedMailboxStore;
+  private boolean _shutdown;
   @Nullable private final TlsConfig _tlsConfig;
   @Nullable
   private final SslContext _clientSslContext;
@@ -111,6 +135,14 @@ public class MailboxService {
 
   public MailboxService(String hostname, int port, InstanceType instanceType, PinotConfiguration config,
       @Nullable TlsConfig tlsConfig, @Nullable QueryAccessControlFactory accessControlFactory) {
+    this(hostname, port, instanceType, config, tlsConfig, accessControlFactory,
+        MaterializedMailboxStore.defaultRoot(hostname, port));
+  }
+
+  @VisibleForTesting
+  MailboxService(String hostname, int port, InstanceType instanceType, PinotConfiguration config,
+      @Nullable TlsConfig tlsConfig, @Nullable QueryAccessControlFactory accessControlFactory,
+      Path materializedMailboxRoot) {
     _hostname = hostname;
     _port = port;
     _instanceType = instanceType;
@@ -135,6 +167,7 @@ public class MailboxService {
     GrpcKeepAliveConfig keepAliveConfig = GrpcKeepAliveConfig.forMailboxChannels(config);
     _channelManager = new ChannelManager(_clientSslContext, _maxInboundMessageSize, getIdleTimeout(config),
         writeBufferHighWaterMarkBytes, writeBufferLowWaterMarkBytes, keepAliveConfig);
+    _materializedMailboxRoot = materializedMailboxRoot;
     _accessControlFactory = accessControlFactory;
     registerMailboxClientGauges();
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}, channel {}", hostname, port,
@@ -192,7 +225,19 @@ public class MailboxService {
   /// Shuts down the mailbox service.
   public void shutdown() {
     LOGGER.info("Shutting down GrpcMailboxServer");
-    _grpcMailboxServer.shutdown();
+    MaterializedMailboxStore materializedMailboxStore;
+    synchronized (_materializedMailboxStoreLock) {
+      _shutdown = true;
+      materializedMailboxStore = _materializedMailboxStore;
+      _materializedMailboxStore = null;
+    }
+    try {
+      _grpcMailboxServer.shutdown();
+    } finally {
+      if (materializedMailboxStore != null) {
+        materializedMailboxStore.close();
+      }
+    }
   }
 
   public String getHostname() {
@@ -220,6 +265,97 @@ public class MailboxService {
     } else {
       return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap,
           _maxInboundMessageSize, _grpcSenderBackpressureEnabled);
+    }
+  }
+
+  /// Returns a producer-local mailbox that publishes its output handle only after successful EOS.
+  public SendingMailbox getMaterializedSendingMailbox(long requestId, int producerStageId, int producerWorkerId,
+      int logicalPartitionId, StatMap<MailboxSendOperator.StatKey> statMap,
+      Consumer<Worker.MaterializedPartitionHandle> onCommit) {
+    MaterializedMailboxKey key =
+        new MaterializedMailboxKey(requestId, producerStageId, producerWorkerId, logicalPartitionId);
+    return new MaterializedSendingMailbox(getMaterializedMailboxStore(), key, statMap, onCommit);
+  }
+
+  /// Reads one producer partition as a lazy iterator of serialized MSE data blocks.
+  ///
+  /// Local and remote reads have the same contract: creation waits for atomic commit until `deadlineMs`; iteration
+  /// throws on storage or transport failure; exhausting the iterator causes the producer to delete the file.
+  public Iterator<MseBlock.Data> readMaterializedPartition(String hostname, int port, long requestId,
+      int producerStageId, int producerWorkerId, int logicalPartitionId, long deadlineMs) {
+    Iterator<byte[]> records;
+    if (_hostname.equals(hostname) && _port == port) {
+      records = readMaterializedPartitionRecords(requestId, producerStageId, producerWorkerId, logicalPartitionId,
+          deadlineMs);
+    } else {
+      long remainingMs = deadlineMs - System.currentTimeMillis();
+      if (remainingMs <= 0) {
+        throw Status.DEADLINE_EXCEEDED.withDescription("Materialized partition deadline elapsed").asRuntimeException();
+      }
+      Mailbox.MaterializedPartitionRequest request = Mailbox.MaterializedPartitionRequest.newBuilder()
+          .setRequestId(requestId)
+          .setProducerStageId(producerStageId)
+          .setProducerWorkerId(producerWorkerId)
+          .setLogicalPartitionId(logicalPartitionId)
+          .setDeadlineMs(deadlineMs)
+          .build();
+      Iterator<Mailbox.MaterializedPartitionContent> chunks =
+          PinotMailboxGrpc.newBlockingStub(_channelManager.getChannel(hostname, port))
+              .withDeadlineAfter(remainingMs, TimeUnit.MILLISECONDS)
+              .readMaterializedPartition(request);
+      records = new MaterializedRecordIterator(chunks);
+    }
+    return new Iterator<MseBlock.Data>() {
+      @Override
+      public boolean hasNext() {
+        return records.hasNext();
+      }
+
+      @Override
+      public MseBlock.Data next() {
+        byte[] payload = records.next();
+        try {
+          return new SerializedDataBlock(DataBlockUtils.deserialize(List.of(ByteBuffer.wrap(payload))));
+        } catch (IOException e) {
+          throw new UncheckedIOException("Failed to deserialize materialized partition", e);
+        }
+      }
+    };
+  }
+
+  /// Internal transport seam used by [GrpcMailboxServer] to stream the exact records stored on disk.
+  public Iterator<byte[]> readMaterializedPartitionRecords(long requestId, int producerStageId, int producerWorkerId,
+      int logicalPartitionId, long deadlineMs) {
+    try {
+      return getMaterializedMailboxStore().read(
+          new MaterializedMailboxKey(requestId, producerStageId, producerWorkerId, logicalPartitionId), deadlineMs);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to open materialized partition", e);
+    }
+  }
+
+  /// Cancels pending readers and removes all materialized output for a query request.
+  public void cleanupMaterializedMailboxRequest(long requestId) {
+    synchronized (_materializedMailboxStoreLock) {
+      if (_materializedMailboxStore != null) {
+        _materializedMailboxStore.cleanupRequest(requestId);
+      }
+    }
+  }
+
+  private MaterializedMailboxStore getMaterializedMailboxStore() {
+    synchronized (_materializedMailboxStoreLock) {
+      if (_shutdown) {
+        throw new IllegalStateException("Mailbox service is shut down");
+      }
+      if (_materializedMailboxStore == null) {
+        try {
+          _materializedMailboxStore = new MaterializedMailboxStore(_materializedMailboxRoot, _hostname, _port);
+        } catch (IOException e) {
+          throw new UncheckedIOException("Failed to initialize materialized mailbox store", e);
+        }
+      }
+      return _materializedMailboxStore;
     }
   }
 
@@ -293,6 +429,52 @@ public class MailboxService {
   /// being created.
   public void releaseReceivingMailbox(ReceivingMailbox mailbox) {
     _receivingMailboxCache.invalidate(mailbox.getId());
+  }
+
+  private static final class MaterializedRecordIterator implements Iterator<byte[]> {
+    private final Iterator<Mailbox.MaterializedPartitionContent> _chunks;
+    private final ByteArrayOutputStream _record = new ByteArrayOutputStream();
+    private byte[] _next;
+    private boolean _finished;
+
+    private MaterializedRecordIterator(Iterator<Mailbox.MaterializedPartitionContent> chunks) {
+      _chunks = chunks;
+    }
+
+    @Override
+    public boolean hasNext() {
+      if (_next != null) {
+        return true;
+      }
+      if (_finished) {
+        return false;
+      }
+      while (_chunks.hasNext()) {
+        Mailbox.MaterializedPartitionContent chunk = _chunks.next();
+        byte[] payload = chunk.getPayload().toByteArray();
+        _record.write(payload, 0, payload.length);
+        if (chunk.getEndOfBlock()) {
+          _next = _record.toByteArray();
+          _record.reset();
+          return true;
+        }
+      }
+      _finished = true;
+      if (_record.size() != 0) {
+        throw new IllegalStateException("Materialized partition stream ended in the middle of a data block");
+      }
+      return false;
+    }
+
+    @Override
+    public byte[] next() {
+      if (!hasNext()) {
+        throw new NoSuchElementException();
+      }
+      byte[] next = _next;
+      _next = null;
+      return next;
+    }
   }
 
   private static Duration getIdleTimeout(PinotConfiguration config) {

@@ -31,14 +31,45 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 /// Unit tests for [StreamingQuerySession]. Covers the broker-side accumulator, early completion (returns true
 /// as soon as all expected opchains have reported, without waiting for the timeout), timeout fall-through, and
 /// fan-out cancel behaviour.
 public class StreamingQuerySessionTest {
+
+  @Test
+  public void testCollectsMaterializedOutputsFromSuccessfulOpChains() {
+    Worker.MaterializedPartitionHandle handle = Worker.MaterializedPartitionHandle.newBuilder()
+        .setRequestId(1L)
+        .setProducerStageId(2)
+        .setProducerWorkerId(3)
+        .setLogicalPartitionId(4)
+        .build();
+    StreamingQuerySession session = new StreamingQuerySession(1L, 2);
+
+    session.recordOpChainComplete(Worker.OpChainComplete.newBuilder()
+        .setStageId(2)
+        .setWorkerId(3)
+        .setSuccess(true)
+        .addMaterializedOutput(handle)
+        .build());
+    session.recordOpChainComplete(Worker.OpChainComplete.newBuilder()
+        .setStageId(2)
+        .setWorkerId(4)
+        .setSuccess(false)
+        .addMaterializedOutput(handle.toBuilder().setProducerWorkerId(4))
+        .build());
+
+    assertEquals(session.getMaterializedOutputs(), List.of(handle));
+  }
 
   /// Early completion: when all expected opchains report before the wait window, awaitCompletion returns true
   /// immediately rather than burning the full timeout.
@@ -54,9 +85,9 @@ public class StreamingQuerySessionTest {
     boolean done = session.awaitCompletion(10, TimeUnit.SECONDS);
     long elapsedMs = (System.nanoTime() - start) / 1_000_000;
 
-    Assert.assertTrue(done, "expected early completion");
-    Assert.assertTrue(elapsedMs < 1000, "expected immediate return, took " + elapsedMs + "ms");
-    Assert.assertEquals(session.getOutstandingCount(), 0L);
+    assertTrue(done, "expected early completion");
+    assertTrue(elapsedMs < 1000, "expected immediate return, took " + elapsedMs + "ms");
+    assertEquals(session.getOutstandingCount(), 0L);
   }
 
   /// Timeout fall-through: awaitCompletion returns false when the timeout fires before all opchains have reported,
@@ -68,12 +99,12 @@ public class StreamingQuerySessionTest {
     session.recordOpChainComplete(buildOpChainComplete(0, 0, 1, 5));
     // Only 1 of 3 reports.
     boolean done = session.awaitCompletion(50, TimeUnit.MILLISECONDS);
-    Assert.assertFalse(done, "expected timeout, not early completion");
-    Assert.assertEquals(session.getOutstandingCount(), 2L);
+    assertFalse(done, "expected timeout, not early completion");
+    assertEquals(session.getOutstandingCount(), 2L);
 
     StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
-    Assert.assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 1);
-    Assert.assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 0);
+    assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 1);
+    assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 0);
   }
 
   /// Cross-worker stats sum: two opchains for the same stage merge into one accumulator entry by tree-shape match.
@@ -84,13 +115,13 @@ public class StreamingQuerySessionTest {
     session.recordOpChainComplete(buildOpChainComplete(0, 0, 1, 5));
     session.recordOpChainComplete(buildOpChainComplete(0, 1, 1, 7));
 
-    Assert.assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS));
+    assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS));
     StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
-    Assert.assertEquals((int) coverage.getRespondedByStage().get(0), 2);
+    assertEquals((int) coverage.getRespondedByStage().get(0), 2);
     @SuppressWarnings("unchecked")
     StatMap<AggregateOperator.StatKey> merged =
         (StatMap<AggregateOperator.StatKey>) coverage.getStageAccumulator().get(0).getStatMap();
-    Assert.assertEquals(merged.getLong(AggregateOperator.StatKey.EMITTED_ROWS), 12);
+    assertEquals(merged.getLong(AggregateOperator.StatKey.EMITTED_ROWS), 12);
   }
 
   /// Regression for the snapshot data race: [StreamingQuerySession#snapshotCoverage()] must hand back a snapshot
@@ -110,23 +141,23 @@ public class StreamingQuerySessionTest {
     StreamingQuerySession.Coverage snapshot = session.snapshotCoverage();
     StatMap<AggregateOperator.StatKey> snapshotStat =
         (StatMap<AggregateOperator.StatKey>) snapshot.getStageAccumulator().get(0).getStatMap();
-    Assert.assertEquals(snapshotStat.getLong(AggregateOperator.StatKey.EMITTED_ROWS), 5);
+    assertEquals(snapshotStat.getLong(AggregateOperator.StatKey.EMITTED_ROWS), 5);
 
     // A late worker reports another 7 rows for the same stage AFTER the snapshot was taken. With the old shallow copy
     // + no finalize guard this merged into the snapshot's StatMap (5 -> 12).
     session.recordOpChainComplete(buildOpChainComplete(0, 1, 1, 7));
 
     // The already-handed-out snapshot must be untouched...
-    Assert.assertEquals(snapshotStat.getLong(AggregateOperator.StatKey.EMITTED_ROWS), 5,
+    assertEquals(snapshotStat.getLong(AggregateOperator.StatKey.EMITTED_ROWS), 5,
         "snapshot StatMap must not be mutated by a post-snapshot report");
     // ...and the late report must have been dropped entirely (session finalized), so a fresh snapshot also shows 5
     // and the responded counter did not advance.
     StreamingQuerySession.Coverage after = session.snapshotCoverage();
     StatMap<AggregateOperator.StatKey> afterStat =
         (StatMap<AggregateOperator.StatKey>) after.getStageAccumulator().get(0).getStatMap();
-    Assert.assertEquals(afterStat.getLong(AggregateOperator.StatKey.EMITTED_ROWS), 5,
+    assertEquals(afterStat.getLong(AggregateOperator.StatKey.EMITTED_ROWS), 5,
         "late report after finalize must be ignored");
-    Assert.assertEquals((int) after.getRespondedByStage().getOrDefault(0, 0), 1,
+    assertEquals((int) after.getRespondedByStage().getOrDefault(0, 0), 1,
         "responded count must not advance after finalize");
   }
 
@@ -147,11 +178,11 @@ public class StreamingQuerySessionTest {
     // Server B reports an error; should fan-out cancel to A and C (and B itself, since fan-out walks all open
     // streams — they're best-effort anyway).
     session.recordOpChainComplete(buildErrorOpChainComplete(0, 1, "boom"));
-    Assert.assertEquals(cancelCalls.get(), 3);
+    assertEquals(cancelCalls.get(), 3);
 
     // A second error does not re-fire fan-out (idempotent).
     session.recordOpChainComplete(buildErrorOpChainComplete(0, 2, "boom2"));
-    Assert.assertEquals(cancelCalls.get(), 3);
+    assertEquals(cancelCalls.get(), 3);
   }
 
   /// Stream onError (transport failure) drains the latch and triggers fan-out cancel; the dispatcher's
@@ -171,8 +202,8 @@ public class StreamingQuerySessionTest {
     // 'other' delivered its 1 opchain.
     session.recordOpChainComplete(buildOpChainComplete(0, 0, 1, 1));
 
-    Assert.assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS), "expected completion after dead drained");
-    Assert.assertEquals(cancelCalls.get(), 1, "fan-out cancel should hit only 'other' (dead removed first)");
+    assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS), "expected completion after dead drained");
+    assertEquals(cancelCalls.get(), 1, "fan-out cancel should hit only 'other' (dead removed first)");
   }
 
   /// Concurrent opchain reports across many threads: latch drains correctly with no lost updates.
@@ -200,16 +231,16 @@ public class StreamingQuerySessionTest {
       threads.add(t);
     }
     start.countDown();
-    Assert.assertTrue(session.awaitCompletion(5, TimeUnit.SECONDS));
+    assertTrue(session.awaitCompletion(5, TimeUnit.SECONDS));
     for (Thread t : threads) {
       t.join();
     }
     StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
-    Assert.assertEquals((int) coverage.getRespondedByStage().get(0), n);
+    assertEquals((int) coverage.getRespondedByStage().get(0), n);
     @SuppressWarnings("unchecked")
     StatMap<AggregateOperator.StatKey> merged =
         (StatMap<AggregateOperator.StatKey>) coverage.getStageAccumulator().get(0).getStatMap();
-    Assert.assertEquals(merged.getLong(AggregateOperator.StatKey.EMITTED_ROWS), n);
+    assertEquals(merged.getLong(AggregateOperator.StatKey.EMITTED_ROWS), n);
   }
 
   /// An opchain whose stats tree contains an operator type id absent from
@@ -225,14 +256,14 @@ public class StreamingQuerySessionTest {
     // Type id 9999 is not in the registry — decode throws DecodeFailedException.
     session.recordOpChainComplete(buildOpChainCompleteWithTypeId(0, 1, 9999, ByteString.EMPTY));
 
-    Assert.assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS),
+    assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS),
         "query should complete despite unknown operator type id");
     StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
-    Assert.assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 1,
+    assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 1,
         "only the successfully decoded opchain should be counted as responded");
-    Assert.assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 1,
+    assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 1,
         "the unknown-type opchain should be counted as merge-failed");
-    Assert.assertNotNull(coverage.getStageAccumulator().get(0),
+    assertNotNull(coverage.getStageAccumulator().get(0),
         "first worker's valid stats should remain in the accumulator");
   }
 
@@ -259,16 +290,16 @@ public class StreamingQuerySessionTest {
     session.recordOpChainComplete(
         buildOpChainCompleteWithTypeId(0, 1, MultiStageOperator.Type.HASH_JOIN.getId(), emptyStatBytes()));
 
-    Assert.assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS),
+    assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS),
         "query should complete despite shape mismatch");
     StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
     // The mismatch drops the stage tree, so worker 0's cleanly-merged data is gone too: both workers count as
     // merge-failed and none as responded. responded + mergeFailed = 2 = expected (reconciles).
-    Assert.assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 0,
+    assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 0,
         "no worker counts as responded once the stage tree is dropped");
-    Assert.assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 2,
+    assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 2,
         "both the pre-mismatch and the mismatching worker should be counted as merge-failed");
-    Assert.assertNull(coverage.getStageAccumulator().get(0),
+    assertNull(coverage.getStageAccumulator().get(0),
         "the partially-merged stage entry should be discarded from the accumulator after the failed merge");
   }
 
@@ -287,13 +318,13 @@ public class StreamingQuerySessionTest {
     // Worker 2 decodes cleanly, but the stage is poisoned.
     session.recordOpChainComplete(buildOpChainComplete(0, 2, 1, 15));
 
-    Assert.assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS));
+    assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS));
     StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
-    Assert.assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 0,
+    assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 0,
         "no worker counts as responded for a poisoned stage");
-    Assert.assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 3,
+    assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 3,
         "all reports for a poisoned stage count as merge-failed");
-    Assert.assertNull(coverage.getStageAccumulator().get(0),
+    assertNull(coverage.getStageAccumulator().get(0),
         "a poisoned stage must not be re-seeded by a later clean report");
   }
 
@@ -312,14 +343,14 @@ public class StreamingQuerySessionTest {
     session.recordOpChainComplete(
         buildOpChainCompleteWithTypeId(0, 1, MultiStageOperator.Type.AGGREGATE.getId(), ByteString.EMPTY));
 
-    Assert.assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS),
+    assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS),
         "query should complete despite corrupted stat bytes");
     StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
-    Assert.assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 1,
+    assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 1,
         "only the successfully decoded opchain should be counted as responded");
-    Assert.assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 1,
+    assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 1,
         "the opchain with corrupted stat bytes should be counted as merge-failed");
-    Assert.assertNotNull(coverage.getStageAccumulator().get(0),
+    assertNotNull(coverage.getStageAccumulator().get(0),
         "first worker's valid stats should remain in the accumulator");
   }
 

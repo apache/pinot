@@ -199,6 +199,7 @@ message MailboxReceiveNode {
   repeated Collation collations = 5;
   bool sort = 6;
   bool sortedOnSender = 7;
+  bool materialized = 8;
 }
 
 message MailboxSendNode {
@@ -212,6 +213,7 @@ message MailboxSendNode {
   bool sort = 7;
   repeated int32 receiverStageIds = 8;
   string hashFunction = 9;
+  bool materialized = 10;
 }
 
 message ProjectNode {
