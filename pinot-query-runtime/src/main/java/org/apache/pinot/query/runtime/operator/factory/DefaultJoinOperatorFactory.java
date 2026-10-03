@@ -27,6 +27,7 @@ import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.LookupJoinOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.NonEquiJoinOperator;
+import org.apache.pinot.query.runtime.operator.SortedMergeJoinOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
@@ -49,6 +50,8 @@ public class DefaultJoinOperatorFactory implements JoinOperatorFactory {
         return new LookupJoinOperator(context, leftOperator, leftSchema, rightOperator, joinNode);
       case ASOF:
         return new AsofJoinOperator(context, leftOperator, leftSchema, rightOperator, joinNode);
+      case SORTED:
+        return new SortedMergeJoinOperator(context, leftOperator, leftSchema, rightOperator, joinNode);
       default:
         throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
     }
