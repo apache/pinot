@@ -389,7 +389,6 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     @Nullable
     private MultiStageQueryStats _stats;
     private final int _senderStageId;
-    private boolean _lastBlockSortedOnSender;
 
     public OfMseBlock(OpChainExecutionContext context,
         List<? extends AsyncStream<ReceivingMailbox.MseBlockWithStats>> asyncProducers, int senderStageId) {
@@ -505,7 +504,6 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     public MseBlock readMseBlockOrStreamCompletionBlocking() {
       ReceivingMailbox.MseBlockWithStats blockWithStats = readBlockOrStreamCompletionBlocking();
       if (blockWithStats == null) {
-        _lastBlockSortedOnSender = false;
         return null;
       }
       return extractMseBlock(blockWithStats);
@@ -517,21 +515,13 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     public MseBlock pollMseBlockOrStreamCompletion() {
       ReceivingMailbox.MseBlockWithStats blockWithStats = pollBlockOrStreamCompletion();
       if (blockWithStats == null) {
-        _lastBlockSortedOnSender = false;
         return null;
       }
       return extractMseBlock(blockWithStats);
     }
 
     private MseBlock extractMseBlock(ReceivingMailbox.MseBlockWithStats blockWithStats) {
-      _lastBlockSortedOnSender = blockWithStats.isSortedOnSender();
       return blockWithStats.getBlock();
-    }
-
-    /// Returns whether the data block returned by the last [#readMseBlockBlocking()] call carried an explicit
-    /// confirmation that its sender established the exchange ordering before transport.
-    public boolean isLastBlockSortedOnSender() {
-      return _lastBlockSortedOnSender;
     }
   }
 }

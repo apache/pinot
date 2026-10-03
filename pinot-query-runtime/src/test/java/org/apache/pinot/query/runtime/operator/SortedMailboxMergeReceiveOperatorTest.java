@@ -38,7 +38,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
-import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.routing.SharedMailboxInfos;
@@ -118,22 +118,22 @@ public class SortedMailboxMergeReceiveOperatorTest {
   }
 
   @Test
-  public void shouldMergeConfirmedSortedSenders() {
+  public void shouldMergeSortedSenders() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     Object[] row1 = new Object[]{1, 1};
     Object[] row2 = new Object[]{3, 1};
     Object[] row3 = new Object[]{5, 1};
     when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, row1, row2),
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, row3),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1, row2),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row3),
         OperatorTestUtil.eosWithEmptyStats());
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row4 = new Object[]{-1, 2};
     Object[] row5 = new Object[]{2, 2};
     Object[] row6 = new Object[]{4, 2};
     when(_mailbox2.poll()).thenReturn(
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, row4),
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, row5, row6),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row4),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row5, row6),
         OperatorTestUtil.eosWithEmptyStats());
 
     try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadataBoth,
@@ -207,17 +207,17 @@ public class SortedMailboxMergeReceiveOperatorTest {
         List.of(new RelFieldCollation(0, Direction.DESCENDING, NullDirection.FIRST));
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA,
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA,
             new Object[]{null, 1}, new Object[]{5, 1}, new Object[]{3, 1}),
         OperatorTestUtil.eosWithEmptyStats());
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     when(_mailbox2.poll()).thenReturn(
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA,
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA,
             new Object[]{null, 2}, new Object[]{5, 2}, new Object[]{4, 2}, new Object[]{3, 2}),
         OperatorTestUtil.eosWithEmptyStats());
 
     try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadataBoth,
-        RelDistribution.Type.HASH_DISTRIBUTED, DATA_SCHEMA, collations, Long.MAX_VALUE, true, true)) {
+        RelDistribution.Type.HASH_DISTRIBUTED, DATA_SCHEMA, collations, Long.MAX_VALUE, -1, -1)) {
       List<Object[]> rows = drain(operator);
       assertEquals(rows.stream().map(row -> row[0]).collect(Collectors.toList()),
           Arrays.asList(null, null, 5, 5, 4, 3, 3));
@@ -225,12 +225,12 @@ public class SortedMailboxMergeReceiveOperatorTest {
   }
 
   @Test
-  public void shouldPassThroughConfirmedSingleSenderBlock() {
+  public void shouldPassThroughSingleSenderBlock() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     MseBlock.Data dataBlock = mock(MseBlock.Data.class);
     when(dataBlock.getNumRows()).thenReturn(2);
     when(_mailbox1.poll()).thenReturn(
-        new ReceivingMailbox.MseBlockWithStats(dataBlock, List.of(), true),
+        new ReceivingMailbox.MseBlockWithStats(dataBlock, List.of()),
         OperatorTestUtil.eosWithEmptyStats());
 
     try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadata1,
@@ -252,8 +252,8 @@ public class SortedMailboxMergeReceiveOperatorTest {
       evenRows[i] = new Object[]{i * 2, 1};
       oddRows[i] = new Object[]{i * 2 + 1, 2};
     }
-    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, evenRows));
-    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, oddRows));
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, evenRows));
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, oddRows));
 
     try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadataBoth,
         RelDistribution.Type.HASH_DISTRIBUTED)) {
@@ -265,108 +265,6 @@ public class SortedMailboxMergeReceiveOperatorTest {
     }
   }
 
-  @Test
-  public void shouldEmitFallbackRowsInBoundedBlocks() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, sortedRows(0, 12_001, 1)),
-        OperatorTestUtil.eosWithEmptyStats());
-
-    try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadata1,
-        RelDistribution.Type.SINGLETON)) {
-      assertEquals(((MseBlock.Data) operator.nextBlock()).getNumRows(), 10_000);
-      assertEquals(((MseBlock.Data) operator.nextBlock()).getNumRows(), 2_001);
-      assertTrue(operator.nextBlock().isSuccess());
-    }
-  }
-
-  @Test
-  public void shouldReleasePendingFallbackRowsAfterEarlyTermination() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, sortedRows(0, 10_001, 1)),
-        OperatorTestUtil.eosWithEmptyStats());
-
-    try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadata1,
-        RelDistribution.Type.SINGLETON)) {
-      assertEquals(((MseBlock.Data) operator.nextBlock()).getNumRows(), 10_000);
-      assertTrue(operator.hasBufferedState());
-      operator.earlyTerminate();
-      assertFalse(operator.hasBufferedState());
-      assertTrue(operator.nextBlock().isSuccess());
-    }
-  }
-
-  @Test
-  public void shouldPreserveTentativeRowsWhenFallingBack() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    Object[] row1 = new Object[]{1, 1};
-    Object[] row2 = new Object[]{4, 1};
-    Object[] row3 = new Object[]{0, 1};
-    when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, row1),
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2, row3),
-        OperatorTestUtil.eosWithEmptyStats());
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
-    Object[] row4 = new Object[]{2, 2};
-    when(_mailbox2.poll()).thenReturn(
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, row4),
-        OperatorTestUtil.eosWithEmptyStats());
-
-    try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadataBoth,
-        RelDistribution.Type.HASH_DISTRIBUTED)) {
-      assertEquals(drain(operator), List.of(row3, row1, row4, row2));
-    }
-  }
-
-  @Test
-  public void shouldPreserveQueuedReadAheadRowsWhenFallingBack() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    Object[] row1 = new Object[]{1, 1};
-    Object[] row3 = new Object[]{3, 1};
-    when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, row1),
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, row3),
-        OperatorTestUtil.eosWithEmptyStats());
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
-    Object[] row2 = new Object[]{2, 2};
-    // Keep this sender starved while both confirmed blocks from the other sender are read ahead.
-    when(_mailbox2.poll()).thenReturn(
-        null,
-        null,
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
-        OperatorTestUtil.eosWithEmptyStats());
-
-    try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadataBoth,
-        RelDistribution.Type.HASH_DISTRIBUTED)) {
-      assertEquals(drain(operator), List.of(row1, row2, row3));
-    }
-  }
-
-  @Test
-  public void shouldRejectMissingConfirmationAfterOutputStarts() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    Object[] confirmedRow = new Object[]{1, 1};
-    when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, confirmedRow),
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{2, 1}),
-        OperatorTestUtil.eosWithEmptyStats());
-
-    try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadata1,
-        RelDistribution.Type.SINGLETON)) {
-      assertEquals(((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows(), List.<Object[]>of(confirmedRow));
-
-      MseBlock block = operator.nextBlock();
-      assertTrue(block.isError());
-      ErrorMseBlock errorBlock = (ErrorMseBlock) block;
-      assertTrue(errorBlock.getErrorMessages().containsKey(QueryErrorCode.INTERNAL));
-      assertTrue(errorBlock.getErrorMessages().get(QueryErrorCode.INTERNAL)
-          .contains("retry after the rolling upgrade completes or disable windowSortOnSender"));
-    }
-  }
-
-  /// Consuming one sender's EOS is itself merge progress. The operator must not wait for another mailbox
-  /// notification when the remaining sender already has rows buffered behind that ordering frontier.
   @Test(timeOut = 10_000)
   public void shouldEmitBufferedRowsWhenAnotherSenderFinishes() {
     MailboxService mailboxService = mock(MailboxService.class);
@@ -378,7 +276,7 @@ public class SortedMailboxMergeReceiveOperatorTest {
     when(mailbox2.getStatMap()).thenReturn(new StatMap<>(ReceivingMailbox.StatKey.class));
     when(mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(mailbox1);
     Object[] row = new Object[]{1, 1};
-    when(mailbox1.poll()).thenReturn(OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, row)).thenReturn(null);
+    when(mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row)).thenReturn(null);
     when(mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(mailbox2);
     when(mailbox2.poll()).thenReturn(OperatorTestUtil.eosWithEmptyStats());
 
@@ -396,15 +294,15 @@ public class SortedMailboxMergeReceiveOperatorTest {
     Object[] row1 = new Object[]{1, 1};
     Object[] row3 = new Object[]{3, 1};
     when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, row1, row3),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1, row3),
         OperatorTestUtil.eosWithEmptyStats());
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row2 = new Object[]{2, 2};
     Object[] row4 = new Object[]{4, 2};
     when(_mailbox2.poll()).thenReturn(
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, row2),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
         null,
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, row4),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row4),
         OperatorTestUtil.eosWithEmptyStats());
 
     try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadataBoth,
@@ -417,12 +315,12 @@ public class SortedMailboxMergeReceiveOperatorTest {
   public void shouldReleaseBufferedCursorsOnSenderError() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, new Object[]{1, 1}),
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, new Object[]{3, 1}),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{1, 1}),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{3, 1}),
         OperatorTestUtil.eosWithEmptyStats());
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     String errorMessage = "TEST ERROR AFTER BUFFERING";
-    // Keep this sender starved while both confirmed blocks from the other sender are read ahead.
+    // Keep this sender starved while both ordered blocks from the other sender are read ahead.
     when(_mailbox2.poll()).thenReturn(
         null,
         null,
@@ -444,14 +342,14 @@ public class SortedMailboxMergeReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     Object[] firstRow = new Object[]{0, 1};
     when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, firstRow),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, firstRow),
         OperatorTestUtil.eosWithEmptyStats());
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[][] continuingRows = sortedRows(1, 10_000, 2);
     Object[] nextRow = new Object[]{10_001, 2};
     when(_mailbox2.poll()).thenReturn(
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, continuingRows),
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, nextRow));
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, continuingRows),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, nextRow));
 
     try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadataBoth,
         RelDistribution.Type.HASH_DISTRIBUTED)) {
@@ -468,17 +366,17 @@ public class SortedMailboxMergeReceiveOperatorTest {
       throws IOException {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, sortedRows(0, 5_000, 1)),
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, sortedRows(5_000, 5_000, 1)),
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, sortedRows(10_000, 5_000, 1)),
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, new Object[]{15_000, 1}),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, sortedRows(0, 5_000, 1)),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, sortedRows(5_000, 5_000, 1)),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, sortedRows(10_000, 5_000, 1)),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{15_000, 1}),
         OperatorTestUtil.eosWithStats(leafStats(1).serialize()));
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     when(_mailbox2.poll()).thenReturn(
         null,
         null,
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, new Object[]{100_000, 2}),
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, new Object[]{100_001, 2}),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{100_000, 2}),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{100_001, 2}),
         OperatorTestUtil.eosWithStats(leafStats(2).serialize()));
 
     try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadataBoth,
@@ -506,8 +404,8 @@ public class SortedMailboxMergeReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     String errorMessage = "TEST ERROR AFTER EARLY TERMINATION";
     when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, new Object[]{1, 1}),
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, new Object[]{2, 1}),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{1, 1}),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{2, 1}),
         OperatorTestUtil.errorWithEmptyStats(new RuntimeException(errorMessage)));
 
     try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadata1,
@@ -519,6 +417,38 @@ public class SortedMailboxMergeReceiveOperatorTest {
       assertTrue(block.isError());
       assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.UNKNOWN).contains(errorMessage));
       verify(_mailbox1).earlyTerminate();
+    }
+  }
+
+  @Test
+  public void shouldApplyFetchAndOffsetAfterGlobalMerge() {
+    Object[] row0 = new Object[]{0, 1};
+    Object[] row1 = new Object[]{1, 2};
+    Object[] row2 = new Object[]{2, 1};
+    Object[] row3 = new Object[]{3, 2};
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row0, row2),
+        OperatorTestUtil.eosWithEmptyStats());
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1, row3),
+        OperatorTestUtil.eosWithEmptyStats());
+    try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadataBoth,
+        RelDistribution.Type.HASH_DISTRIBUTED, DATA_SCHEMA, FIELD_COLLATIONS, Long.MAX_VALUE, 2, 1)) {
+      assertEquals(drain(operator), List.of(row1, row2));
+      assertFalse(operator.hasBufferedState());
+    }
+  }
+
+  @Test
+  public void shouldHonorZeroFetchAndOffsetBeyondInput() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    for (int fetch : new int[]{0, 10}) {
+      when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{0, 1}),
+          OperatorTestUtil.eosWithEmptyStats());
+      try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadata1,
+          RelDistribution.Type.SINGLETON, DATA_SCHEMA, FIELD_COLLATIONS, Long.MAX_VALUE, fetch, 10)) {
+        assertTrue(drain(operator).isEmpty());
+      }
     }
   }
 
@@ -537,7 +467,7 @@ public class SortedMailboxMergeReceiveOperatorTest {
       addTemporaryStarvation(responses, random.nextInt(4));
       int blockSize = 1 + random.nextInt(Math.min(13, rows.size() - rowIndex));
       Object[][] blockRows = rows.subList(rowIndex, rowIndex + blockSize).toArray(new Object[0][]);
-      responses.add(OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, blockRows));
+      responses.add(OperatorTestUtil.blockWithStats(DATA_SCHEMA, blockRows));
       rowIndex += blockSize;
     }
     addTemporaryStarvation(responses, random.nextInt(4));
@@ -598,27 +528,27 @@ public class SortedMailboxMergeReceiveOperatorTest {
   private SortedMailboxMergeReceiveOperator getOperator(MailboxService mailboxService, StageMetadata stageMetadata,
       RelDistribution.Type distributionType) {
     return getOperator(mailboxService, stageMetadata, distributionType, DATA_SCHEMA, FIELD_COLLATIONS, Long.MAX_VALUE,
-        true, true);
+        -1, -1);
   }
 
   private SortedMailboxMergeReceiveOperator getOperator(StageMetadata stageMetadata,
       RelDistribution.Type distributionType, DataSchema dataSchema, List<RelFieldCollation> collations,
-      long deadlineMs, boolean sort, boolean sortedOnSender) {
-    return getOperator(_mailboxService, stageMetadata, distributionType, dataSchema, collations, deadlineMs, sort,
-        sortedOnSender);
+      long deadlineMs, int fetch, int offset) {
+    return getOperator(_mailboxService, stageMetadata, distributionType, dataSchema, collations, deadlineMs, fetch,
+        offset);
   }
 
   private SortedMailboxMergeReceiveOperator getOperator(MailboxService mailboxService, StageMetadata stageMetadata,
       RelDistribution.Type distributionType, DataSchema dataSchema, List<RelFieldCollation> collations,
-      long deadlineMs, boolean sort, boolean sortedOnSender) {
+      long deadlineMs, int fetch, int offset) {
     OpChainExecutionContext context = OperatorTestUtil.getOpChainContext(mailboxService, deadlineMs, stageMetadata);
-    MailboxReceiveNode node = mock(MailboxReceiveNode.class);
+    MailboxMergeReceiveNode node = mock(MailboxMergeReceiveNode.class);
     when(node.getDistributionType()).thenReturn(distributionType);
     when(node.getSenderStageId()).thenReturn(1);
     when(node.getDataSchema()).thenReturn(dataSchema);
     when(node.getCollations()).thenReturn(collations);
-    when(node.isSort()).thenReturn(sort);
-    when(node.isSortedOnSender()).thenReturn(sortedOnSender);
+    when(node.getFetch()).thenReturn(fetch);
+    when(node.getOffset()).thenReturn(offset);
     return new SortedMailboxMergeReceiveOperator(context, node);
   }
 }
