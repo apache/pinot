@@ -34,7 +34,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
-import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
@@ -59,18 +58,10 @@ public class PinotLogicalQueryPlanner {
   public static SubPlan makePlan(RelRoot relRoot,
       @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools,
       String hashFunction, boolean pruneUnnestColumns) {
-    return makePlan(relRoot, tracker, useSpools, hashFunction, pruneUnnestColumns, false, null);
-  }
-
-  public static SubPlan makePlan(RelRoot relRoot,
-      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools,
-      String hashFunction, boolean pruneUnnestColumns, boolean streamingSortedMailboxReceiveEnabled,
-      @Nullable TableCache tableCache) {
     PlanNode rootNode = new RelToPlanNodeConverter(tracker, hashFunction,
         !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE, pruneUnnestColumns).toPlanNode(relRoot.rel);
 
-    PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker, useSpools, hashFunction,
-        streamingSortedMailboxReceiveEnabled, tableCache);
+    PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker, useSpools, hashFunction);
     return new SubPlan(rootFragment,
         new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields), List.of());
 
@@ -116,8 +107,8 @@ public class PinotLogicalQueryPlanner {
 
   private static PlanFragment planNodeToPlanFragment(
       PlanNode node, @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools,
-      String hashFunction, boolean streamingSortedMailboxReceiveEnabled, @Nullable TableCache tableCache) {
-    PlanFragmenter fragmenter = new PlanFragmenter(streamingSortedMailboxReceiveEnabled, tableCache);
+      String hashFunction) {
+    PlanFragmenter fragmenter = new PlanFragmenter();
     PlanFragmenter.Context fragmenterContext = fragmenter.createContext();
     node = node.visit(fragmenter, fragmenterContext);
 

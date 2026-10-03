@@ -40,6 +40,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 
 
 /// Tests the boundary between the V1 leaf request and the MSE operator chain.
@@ -74,12 +75,12 @@ public class ServerPlanRequestVisitorTest {
   }
 
   @Test
-  public void shouldPushConfirmedPhysicalSelectionSortIntoLeaf() {
+  public void shouldPushSinglePhysicalSelectionSortIntoLeaf() {
     TableScanNode scan = new TableScanNode(STAGE_ID, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(),
         "testTable", List.of("orderKey"));
     SortNode sort = new SortNode(STAGE_ID, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(scan), COLLATIONS, 10, -1);
     MailboxSendNode send = new MailboxSendNode(STAGE_ID, DATA_SCHEMA, List.of(sort), 2,
-        PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED, List.of(), false, COLLATIONS, true,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED, List.of(), false, List.of(), false,
         null);
     WorkerMetadata offline = new WorkerMetadata(0, Map.of());
     offline.setTableSegmentsMap(Map.of("OFFLINE", List.of("segment")));
@@ -101,6 +102,10 @@ public class ServerPlanRequestVisitorTest {
     offline.setTableSegmentsMap(Map.of("OFFLINE", List.of("segment")));
     offline.setLogicalTableSegmentsMap(Map.of("physical_OFFLINE", List.of("segment")));
     assertFalse(context.isSinglePhysicalTable());
+    context = new ServerPlanRequestContext(context.getStagePlan(), null, null, null, offline);
+    ServerPlanRequestVisitor.walkPlanNode(send, context);
+    assertSame(context.getLeafStageBoundaryNode(), scan);
+    assertNull(context.getPinotQuery().getOrderByList());
   }
 
   /// An ordinary receiver-sorted exchange does not establish sender ordering. Its SortNode remains eligible for V1
