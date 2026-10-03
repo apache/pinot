@@ -2392,7 +2392,7 @@
         <plugin>
           <groupId>net.alchim31.maven</groupId>
           <artifactId>scala-maven-plugin</artifactId>
-          <version>4.9.10</version>
+          <version>4.10.0</version>
           <executions>
             <execution>
               <id>add-source</id>
