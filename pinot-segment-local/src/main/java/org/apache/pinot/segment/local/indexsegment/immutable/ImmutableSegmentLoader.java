@@ -140,6 +140,7 @@ public class ImmutableSegmentLoader {
         .setSegmentTier(indexLoadingConfig.getSegmentTier())
         .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
         .setSegmentCustomConfigs(zkMetadata != null ? zkMetadata.getCustomMap() : Map.of())
+        .setMaxMmapPrefetchBytes(indexLoadingConfig.getMaxMmapPrefetchBytes())
         .build();
     if (needPreprocess) {
       // Probe with the default (non-tier-aware) loader so this check never physically moves the segment across
@@ -340,6 +341,7 @@ public class ImmutableSegmentLoader {
         .setSegmentName(segmentName)
         .setSegmentCrc(segmentCrc)
         .setSegmentCustomConfigs(zkMetadata != null ? zkMetadata.getCustomMap() : Map.of())
+        .setMaxMmapPrefetchBytes(indexLoadingConfig.getMaxMmapPrefetchBytes())
         .build();
     SegmentDirectory segmentDirectory =
         SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(indexDir.toURI(), segmentLoaderContext);

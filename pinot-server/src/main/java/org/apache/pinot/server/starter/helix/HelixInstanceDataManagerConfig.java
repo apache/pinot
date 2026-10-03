@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -250,6 +251,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
+  public long getMaxMmapPrefetchBytes() {
+    String maxPrefetchSize = _serverConfig.getProperty(MMAP_PREFETCH_MAX_SIZE);
+    return maxPrefetchSize != null ? DataSizeUtils.toBytes(maxPrefetchSize) : DEFAULT_MMAP_PREFETCH_MAX_SIZE_BYTES;
+  }
+
   public boolean shouldReloadConsumingSegment() {
     return _serverConfig.getProperty(RELOAD_CONSUMING_SEGMENT, DEFAULT_RELOAD_CONSUMING_SEGMENT);
   }

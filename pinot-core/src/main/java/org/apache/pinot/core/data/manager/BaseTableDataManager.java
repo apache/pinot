@@ -2061,6 +2061,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         .setSegmentTier(indexLoadingConfig.getSegmentTier())
         .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
         .setSegmentCustomConfigs(zkMetadata != null ? zkMetadata.getCustomMap() : Map.of())
+        .setMaxMmapPrefetchBytes(indexLoadingConfig.getMaxMmapPrefetchBytes())
         .build();
     SegmentDirectoryLoader segmentDirectoryLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());

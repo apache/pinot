@@ -25,6 +25,7 @@ import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -119,6 +120,74 @@ public class SegmentLocalFSDirectoryTest implements PinotBuffersAfterClassCheckR
       PinotDataBuffer newDataBuffer = reader.getIndexFor("newColumn", StandardIndexes.forward());
       verifyData(newDataBuffer);
     }
+  }
+
+  private static SegmentDirectoryLoaderContext prefetchLoaderContext(long maxMmapPrefetchBytes) {
+    return new SegmentDirectoryLoaderContext.Builder()
+        .setMaxMmapPrefetchBytes(maxMmapPrefetchBytes)
+        .build();
+  }
+
+  /// The prefetched-page counter is JVM-wide, so each case resets it via [SegmentLocalFSDirectory#resetPrefetchedPages]
+  /// to get a deterministic baseline before asserting on how many pages actually got faulted in.
+  @Test
+  public void testPrefetchLimitDisabledStillReadsData()
+      throws Exception {
+    File prefetchDir = new File(SegmentLocalFSDirectoryTest.class.getName() + "-prefetch_disabled");
+    FileUtils.deleteQuietly(prefetchDir);
+    try {
+      FileUtils.copyDirectory(_segmentDirectory.getPath().toFile(), prefetchDir);
+      SegmentLocalFSDirectory.resetPrefetchedPages();
+      // 0 bytes disables prefetching entirely
+      try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(prefetchDir, _metadata,
+          ReadMode.mmap, prefetchLoaderContext(0))) {
+        try (SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+          PinotDataBuffer buffer = writer.newIndexFor("noPrefetchColumn", StandardIndexes.forward(), 1024);
+          loadData(buffer);
+          writer.save();
+        }
+        try (SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+          verifyData(reader.getIndexFor("noPrefetchColumn", StandardIndexes.forward()));
+        }
+        Assert.assertEquals(SegmentLocalFSDirectory.getPrefetchedPages(), 0,
+            "No pages should be faulted in when the prefetch limit is 0");
+      }
+    } finally {
+      FileUtils.deleteQuietly(prefetchDir);
+    }
+  }
+
+  @Test
+  public void testSmallPrefetchLimitStillReadsData()
+      throws Exception {
+    File prefetchDir = new File(SegmentLocalFSDirectoryTest.class.getName() + "-prefetch_small");
+    FileUtils.deleteQuietly(prefetchDir);
+    try {
+      FileUtils.copyDirectory(_segmentDirectory.getPath().toFile(), prefetchDir);
+      SegmentLocalFSDirectory.resetPrefetchedPages();
+      // 8KB, i.e. a 2 page budget: exercises the slowdown branch that only faults in header pages
+      try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(prefetchDir, _metadata,
+          ReadMode.mmap, prefetchLoaderContext(8 * 1024))) {
+        try (SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+          PinotDataBuffer buffer = writer.newIndexFor("smallPrefetchColumn", StandardIndexes.forward(), 1024);
+          loadData(buffer);
+          writer.save();
+        }
+        try (SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+          verifyData(reader.getIndexFor("smallPrefetchColumn", StandardIndexes.forward()));
+        }
+        // Slowdown threshold is floor(0.67 * 2) = 1 page, so exactly 1 page gets faulted in from a zero baseline
+        Assert.assertEquals(SegmentLocalFSDirectory.getPrefetchedPages(), 1,
+            "Exactly one page should be faulted in before the slowdown threshold kicks in");
+      }
+    } finally {
+      FileUtils.deleteQuietly(prefetchDir);
+    }
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testNegativePrefetchLimitRejected() {
+    new SegmentLocalFSDirectory(TEST_DIRECTORY, _metadata, ReadMode.mmap, prefetchLoaderContext(-1));
   }
 
   @Test
