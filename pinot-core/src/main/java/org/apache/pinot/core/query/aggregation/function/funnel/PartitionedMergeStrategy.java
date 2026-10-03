@@ -47,4 +47,9 @@ class PartitionedMergeStrategy implements MergeStrategy<List<Long>> {
   private LongArrayList toLongArrayList(List<Long> longList) {
     return longList instanceof LongArrayList ? ((LongArrayList) longList).clone() : new LongArrayList(longList);
   }
+
+  @Override
+  public boolean isMergeableAcrossGroups() {
+    return false;
+  }
 }

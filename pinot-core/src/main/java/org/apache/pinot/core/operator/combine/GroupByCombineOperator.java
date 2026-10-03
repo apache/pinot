@@ -22,10 +22,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.data.table.GroupingSetsBaseIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
@@ -55,15 +57,28 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
 
   private final int _numAggregationFunctions;
-  /// Number of key columns: union group-by columns plus the synthetic $groupingId column for grouping sets.
-  /// Key columns precede the aggregation columns in the record layout.
+  /// Full-layout record shape: the group-by key columns (union columns plus the synthetic $groupingId column for
+  /// grouping-set queries) followed by the aggregation columns.
   private final int _numKeyColumns;
   private final int _numColumns;
+  /// Whether this is a grouping-set query, in which segments may emit either FULL-layout records (per-row
+  /// expansion, with the $groupingId column) or BASE-layout records (base aggregation: union columns only). The
+  /// choice is per segment -- the MV-column carve-out and the base-group cardinality gate are evaluated against
+  /// each segment's own metadata -- so a single query can produce a mix of both layouts. Each block is routed by
+  /// its schema width into the matching table; [#mergeResults()] derives the grouping sets from the base table
+  /// and merges the full-layout records in.
+  private final boolean _groupingSets;
+  /// BASE-layout record shape (grouping-set base aggregation): union key columns followed by aggregations.
+  private final int _numBaseKeyColumns;
+  private final int _numBaseColumns;
   // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
   // _futures (try to interrupt the execution if it already started).
   private final CountDownLatch _operatorLatch;
 
+  /// Merge table for FULL-layout blocks (also the only table for non-grouping-set queries).
   private volatile IndexedTable _indexedTable;
+  /// Merge table for BASE-layout blocks (grouping-set base aggregation); derived into grouping sets on merge.
+  private volatile GroupingSetsBaseIndexedTable _baseIndexedTable;
   private volatile boolean _groupsTrimmed;
   private volatile boolean _numGroupsLimitReached;
   private volatile boolean _numGroupsWarningLimitReached;
@@ -77,6 +92,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     assert _queryContext.getGroupByExpressions() != null;
     _numKeyColumns = _queryContext.getNumGroupByKeyColumns();
     _numColumns = _numKeyColumns + _numAggregationFunctions;
+    _groupingSets = _queryContext.isGroupingSets();
+    _numBaseKeyColumns = _queryContext.getGroupByExpressions().size();
+    _numBaseColumns = _numBaseKeyColumns + _numAggregationFunctions;
     _operatorLatch = new CountDownLatch(_numTasks);
   }
 
@@ -106,14 +124,20 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
-        if (_indexedTable == null) {
-          synchronized (this) {
-            if (_indexedTable == null) {
-              _indexedTable = GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks,
-                  _executorService);
-            }
-          }
+        /// Route the block by its record layout. A base-aggregation grouping-set segment emits BASE-layout
+        /// blocks (no synthetic $groupingId column, exactly `numUnionColumns + numAggregationFunctions`
+        /// columns); the expansion path (and non-grouping-set queries) emits full-layout blocks. The layout is
+        /// per segment -- MV carve-out and cardinality gate are per-segment decisions -- so both tables can be
+        /// live in the same query.
+        boolean baseLayout = _groupingSets && resultsBlock.getDataSchema() != null
+            && resultsBlock.getDataSchema().size() == _numBaseColumns;
+        if (!baseLayout) {
+          GroupByUtils.validateFullGroupingSetsLayout(resultsBlock, _queryContext);
         }
+        IndexedTable indexedTable = baseLayout ? ensureBaseIndexedTable(resultsBlock)
+            : ensureIndexedTable(resultsBlock);
+        int numKeyColumns = baseLayout ? _numBaseKeyColumns : _numKeyColumns;
+        int numColumns = baseLayout ? _numBaseColumns : _numColumns;
 
         if (resultsBlock.isGroupsTrimmed()) {
           _groupsTrimmed = true;
@@ -143,12 +167,12 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
                 QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
                 GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
                 Object[] keys = groupKey._keys;
-                Object[] values = Arrays.copyOf(keys, _numColumns);
+                Object[] values = Arrays.copyOf(keys, numColumns);
                 int groupId = groupKey._groupId;
                 for (int i = 0; i < _numAggregationFunctions; i++) {
-                  values[_numKeyColumns + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+                  values[numKeyColumns + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
                 }
-                _indexedTable.upsert(new Key(keys), new Record(values));
+                indexedTable.upsert(new Key(keys), new Record(values));
               }
             } finally {
               // Release the resources used by the group key generator
@@ -159,7 +183,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           for (IntermediateRecord intermediateResult : intermediateRecords) {
             QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
             //TODO: change upsert api so that it accepts intermediateRecord directly
-            _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
+            indexedTable.upsert(intermediateResult._key, intermediateResult._record);
           }
         }
       } catch (RuntimeException e) {
@@ -170,6 +194,41 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         }
       }
     }
+  }
+
+  private IndexedTable ensureIndexedTable(GroupByResultsBlock resultsBlock) {
+    IndexedTable indexedTable = _indexedTable;
+    if (indexedTable == null) {
+      synchronized (this) {
+        indexedTable = _indexedTable;
+        if (indexedTable == null) {
+          indexedTable = GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks,
+              _executorService);
+          _indexedTable = indexedTable;
+        }
+      }
+    }
+    return indexedTable;
+  }
+
+  private IndexedTable ensureBaseIndexedTable(GroupByResultsBlock resultsBlock) {
+    GroupingSetsBaseIndexedTable baseIndexedTable = _baseIndexedTable;
+    if (baseIndexedTable == null) {
+      synchronized (this) {
+        baseIndexedTable = _baseIndexedTable;
+        if (baseIndexedTable == null) {
+          // The planner bounds all local BASE and derived keys before choosing base aggregation. Keep the
+          // combine cap as a fail-closed guard against a stale or incorrect bound.
+          int resultSize = _queryContext.getNumGroupsLimit();
+          int initialCapacity = GroupByUtils.getIndexedTableInitialCapacity(resultSize,
+              resultsBlock.getNumGroups(), _queryContext.getMinInitialIndexedTableCapacity());
+          baseIndexedTable = new GroupingSetsBaseIndexedTable(resultsBlock.getDataSchema(), _queryContext,
+              resultSize, initialCapacity, _executorService);
+          _baseIndexedTable = baseIndexedTable;
+        }
+      }
+    }
+    return baseIndexedTable;
   }
 
   @Override
@@ -216,11 +275,53 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       return new ExceptionResultsBlock(errMsg);
     }
 
-    if (_indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
+    if (_indexedTable != null && _indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
       _groupsTrimmed = true;
     }
 
     IndexedTable indexedTable = _indexedTable;
+    /// Base aggregation: `_baseIndexedTable` holds the merged BASE groups (union grouping). Derive the
+    /// individual grouping sets from them once, in parallel across the combine executor, into the final
+    /// grouping-set table. This is where the per-set fan-out happens -- after the row-collapsing base merge and
+    /// multi-threaded, so it never repeats the per-row expansion the segment phase would otherwise pay. When
+    /// some segments used the expansion path (per-segment MV carve-out or cardinality gate), their full-layout
+    /// records are merged into the derived table afterwards: both hold intermediate aggregates under the same
+    /// grouping-set key space, so this is a plain aggregate merge.
+    GroupingSetsBaseIndexedTable baseIndexedTable = _baseIndexedTable;
+    if (baseIndexedTable != null) {
+      // Concurrent inserts can race at the final slot before either observes the cap. Reject that overshoot
+      // after all workers finish, before a bounded-output proof is used for derivation.
+      if (baseIndexedTable.size() > _queryContext.getNumGroupsLimit()) {
+        throw new IllegalStateException("Grouping-set base groups exceeded the planned group limit");
+      }
+      IndexedTable derivedTable = GroupByUtils.deriveGroupingSetsFromMergedBaseTable(baseIndexedTable, _queryContext,
+          _numTasks, _executorService);
+      if (indexedTable != null) {
+        // Merge full-layout (expansion-path) records into the derived table.
+        int derivedCap = Math.max(_queryContext.getNumGroupsLimit(), _queryContext.getGroupingSets().size());
+        int mergedKeys = 0;
+        for (Map.Entry<Key, Record> entry : indexedTable.getRecordEntries()) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
+          if (derivedTable.size() < derivedCap) {
+            derivedTable.upsert(entry.getKey(), entry.getValue());
+          } else if (!derivedTable.upsertExistingIfPresent(entry.getKey(), entry.getValue())) {
+            derivedTable.markNumGroupsLimitReached();
+          }
+        }
+      }
+      // The per-set server trim (groupingSetsMinServerTrimSize) and the derived-output cap drop groups;
+      // propagate the trimmed flag so the broker response reports the approximation.
+      if (derivedTable.isTrimmed()) {
+        _groupsTrimmed = true;
+      }
+      if (derivedTable.isNumGroupsLimitReached()) {
+        _numGroupsLimitReached = true;
+      }
+      if (derivedTable.size() >= _queryContext.getNumGroupsWarningLimit()) {
+        _numGroupsWarningLimitReached = true;
+      }
+      indexedTable = derivedTable;
+    }
     if (_queryContext.isServerReturnFinalResult()) {
       indexedTable.finish(true, true);
     } else if (_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {

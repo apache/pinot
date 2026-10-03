@@ -59,6 +59,8 @@ public abstract class IndexedTable extends BaseTable {
   protected Collection<Record> _topRecords;
   private int _numResizes;
   private long _resizeTimeNs;
+  private boolean _markedTrimmed;
+  private boolean _numGroupsLimitReached;
 
   /// Constructor for the IndexedTable.
   ///
@@ -84,10 +86,14 @@ public abstract class IndexedTable extends BaseTable {
 
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
-    /// Includes the synthetic $groupingId key column for GROUP BY GROUPING SETS / ROLLUP / CUBE queries, so
-    /// that rows from different grouping sets are keyed (and therefore merged) independently.
-    _numKeyColumns = queryContext.getNumGroupByKeyColumns();
     _aggregationFunctions = queryContext.getAggregationFunctions();
+    /// Derive the key-column count from the schema (total columns minus aggregation columns) rather than the
+    /// query context, so it matches the actual record layout. This normally equals
+    /// `queryContext.getNumGroupByKeyColumns()` -- which includes the synthetic $groupingId column for GROUP BY
+    /// GROUPING SETS / ROLLUP / CUBE so rows from different grouping sets are keyed (and merged) independently --
+    /// but for a base-aggregation grouping-set combine table the records are BASE groups WITHOUT the $groupingId
+    /// column, so the key count is the union-column count. Deriving from the schema keeps both layouts correct.
+    _numKeyColumns = dataSchema.size() - _aggregationFunctions.length;
     _hasOrderBy = queryContext.getOrderByExpressions() != null;
     _tableResizer = _hasOrderBy ? new TableResizer(dataSchema, hasFinalInput, queryContext) : null;
     // NOTE: Trim should be disabled when there is no ORDER BY
@@ -116,6 +122,18 @@ public abstract class IndexedTable extends BaseTable {
   /// Updates a record with existing key. Record with new key will be ignored.
   protected void updateExistingRecord(Key key, Record newRecord) {
     _lookupMap.computeIfPresent(key, (k, v) -> updateRecord(v, newRecord));
+  }
+
+  /// Same as [#updateExistingRecord], additionally reporting whether a record with the key existed (and was
+  /// therefore merged into).
+  protected boolean updateExistingRecordIfPresent(Key key, Record newRecord) {
+    return _lookupMap.computeIfPresent(key, (k, v) -> updateRecord(v, newRecord)) != null;
+  }
+
+  /// Merges a record only when its key is already present, reporting whether it was retained. Used when a
+  /// grouping-set derived table has reached its group limit and cannot admit a new full-layout group.
+  public boolean upsertExistingIfPresent(Key key, Record newRecord) {
+    return updateExistingRecordIfPresent(key, newRecord);
   }
 
   private Record updateRecord(Record existingRecord, Record newRecord) {
@@ -260,6 +278,14 @@ public abstract class IndexedTable extends BaseTable {
     return _topRecords.iterator();
   }
 
+  /// Returns the (key, record) entries accumulated so far, before [#finish]. Used by the grouping-sets base
+  /// aggregation path to read the merged base groups and derive the individual grouping sets from them. The
+  /// returned view is backed by the live map and must be treated as read-only; callers must not mutate it, and
+  /// must not add to the table while iterating it.
+  public Collection<Map.Entry<Key, Record>> getRecordEntries() {
+    return _lookupMap.entrySet();
+  }
+
   public int getNumResizes() {
     return _numResizes;
   }
@@ -268,7 +294,23 @@ public abstract class IndexedTable extends BaseTable {
     // single resize occurs on finish() if there's orderBy
     // all other re-sizes are triggered by trim size and threshold
     int min = _topRecords != null && _hasOrderBy ? 1 : 0;
-    return _numResizes > min;
+    return _markedTrimmed || _numResizes > min;
+  }
+
+  /// Marks this table as holding a trimmed (group-dropping) result even though no resize ran on it, e.g. when
+  /// it was rebuilt from the survivors of an external trim such as the grouping-sets per-set server trim.
+  public void markTrimmed() {
+    _markedTrimmed = true;
+  }
+
+  /// Records that the grouping-set derive or mixed-layout merge dropped a group at the server group limit.
+  public void markNumGroupsLimitReached() {
+    _numGroupsLimitReached = true;
+    markTrimmed();
+  }
+
+  public boolean isNumGroupsLimitReached() {
+    return _numGroupsLimitReached;
   }
 
   public long getResizeTimeMs() {

@@ -31,5 +31,12 @@ import javax.annotation.concurrent.ThreadSafe;
 interface MergeStrategy<I> {
   I merge(I intermediateResult1, I intermediateResult2);
 
+  /// Whether [#merge] is valid for intermediates of DIFFERENT groups (see
+  /// [org.apache.pinot.core.query.aggregation.function.AggregationFunction#canMergeIntermediatesAcrossGroups]).
+  /// Partitioned strategies keep per-segment-final counts and must only merge the same group across segments.
+  default boolean isMergeableAcrossGroups() {
+    return true;
+  }
+
   LongArrayList extractFinalResult(I intermediateResult);
 }
