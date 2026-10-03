@@ -24,7 +24,9 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.Arrays;
+import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
@@ -331,6 +333,13 @@ public class ArrayFunctions {
       }
       return doubleArr;
     }
+    if (clazz == BigDecimal.class) {
+      BigDecimal[] bigDecimalArr = new BigDecimal[arr.length];
+      for (int i = 0; i < arr.length; i++) {
+        bigDecimalArr[i] = (BigDecimal) arr[i];
+      }
+      return bigDecimalArr;
+    }
     if (clazz == Boolean.class) {
       boolean[] boolArr = new boolean[arr.length];
       for (int i = 0; i < arr.length; i++) {
@@ -338,12 +347,12 @@ public class ArrayFunctions {
       }
       return boolArr;
     }
-    if (clazz == BigDecimal.class) {
-      BigDecimal[] bigDecimalArr = new BigDecimal[arr.length];
+    if (clazz == Timestamp.class) {
+      Timestamp[] timestampArr = new Timestamp[arr.length];
       for (int i = 0; i < arr.length; i++) {
-        bigDecimalArr[i] = (BigDecimal) arr[i];
+        timestampArr[i] = (Timestamp) arr[i];
       }
-      return bigDecimalArr;
+      return timestampArr;
     }
     if (clazz == String.class) {
       String[] strArr = new String[arr.length];
@@ -358,6 +367,13 @@ public class ArrayFunctions {
         bytesArr[i] = (byte[]) arr[i];
       }
       return bytesArr;
+    }
+    if (clazz == UUID.class) {
+      UUID[] uuidArr = new UUID[arr.length];
+      for (int i = 0; i < arr.length; i++) {
+        uuidArr[i] = (UUID) arr[i];
+      }
+      return uuidArr;
     }
     return arr;
   }

@@ -20,21 +20,25 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
 /// The `LiteralTransformFunction` class is a special transform function which is a wrapper on top of a
 /// LITERAL. The data type is inferred from the literal string.
-// TODO: Support BIG_DECIMAL literal type, then implement transformToBigDecimalValuesMV.
 public class ArrayLiteralTransformFunction implements TransformFunction {
   public static final String FUNCTION_NAME = "arrayValueConstructor";
 
@@ -44,6 +48,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
   private final long[] _longArrayLiteral;
   private final float[] _floatArrayLiteral;
   private final double[] _doubleArrayLiteral;
+  private final BigDecimal[] _bigDecimalArrayLiteral;
   private final String[] _stringArrayLiteral;
   private final byte[][] _bytesArrayLiteral;
 
@@ -55,6 +60,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
   private volatile long[][] _longArrayResult;
   private volatile float[][] _floatArrayResult;
   private volatile double[][] _doubleArrayResult;
+  private volatile BigDecimal[][] _bigDecimalArrayResult;
   private volatile String[][] _stringArrayResult;
   private volatile byte[][][] _bytesArrayResult;
 
@@ -66,6 +72,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       _longArrayLiteral = new long[0];
       _floatArrayLiteral = new float[0];
       _doubleArrayLiteral = new double[0];
+      _bigDecimalArrayLiteral = new BigDecimal[0];
       _stringArrayLiteral = new String[0];
       _bytesArrayLiteral = new byte[0][];
       return;
@@ -76,6 +83,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
         _stringArrayLiteral = null;
         _bytesArrayLiteral = null;
         break;
@@ -84,6 +92,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _intArrayLiteral = null;
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
         _stringArrayLiteral = null;
         _bytesArrayLiteral = null;
         break;
@@ -92,6 +101,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _intArrayLiteral = null;
         _longArrayLiteral = null;
         _doubleArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
         _stringArrayLiteral = null;
         _bytesArrayLiteral = null;
         break;
@@ -100,6 +110,62 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _intArrayLiteral = null;
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
+        _stringArrayLiteral = null;
+        _bytesArrayLiteral = null;
+        break;
+      case BIG_DECIMAL:
+        _bigDecimalArrayLiteral = (BigDecimal[]) value;
+        _intArrayLiteral = null;
+        _longArrayLiteral = null;
+        _floatArrayLiteral = null;
+        _doubleArrayLiteral = null;
+        _stringArrayLiteral = null;
+        _bytesArrayLiteral = null;
+        break;
+      case BOOLEAN:
+        if (value instanceof boolean[]) {
+          boolean[] boolArr = (boolean[]) value;
+          _intArrayLiteral = new int[boolArr.length];
+          for (int i = 0; i < boolArr.length; i++) {
+            _intArrayLiteral[i] = boolArr[i] ? 1 : 0;
+          }
+        } else if (value instanceof Boolean[]) {
+          Boolean[] boolArr = (Boolean[]) value;
+          _intArrayLiteral = new int[boolArr.length];
+          for (int i = 0; i < boolArr.length; i++) {
+            _intArrayLiteral[i] = Boolean.TRUE.equals(boolArr[i]) ? 1 : 0;
+          }
+        } else {
+          _intArrayLiteral = (int[]) value;
+        }
+        _longArrayLiteral = null;
+        _floatArrayLiteral = null;
+        _doubleArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
+        _stringArrayLiteral = null;
+        _bytesArrayLiteral = null;
+        break;
+      case TIMESTAMP:
+        if (value instanceof Timestamp[]) {
+          Timestamp[] timestampArr = (Timestamp[]) value;
+          _longArrayLiteral = new long[timestampArr.length];
+          for (int i = 0; i < timestampArr.length; i++) {
+            _longArrayLiteral[i] = timestampArr[i].getTime();
+          }
+        } else if (value instanceof Long[]) {
+          Long[] longArr = (Long[]) value;
+          _longArrayLiteral = new long[longArr.length];
+          for (int i = 0; i < longArr.length; i++) {
+            _longArrayLiteral[i] = longArr[i];
+          }
+        } else {
+          _longArrayLiteral = (long[]) value;
+        }
+        _intArrayLiteral = null;
+        _floatArrayLiteral = null;
+        _doubleArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
         _stringArrayLiteral = null;
         _bytesArrayLiteral = null;
         break;
@@ -109,6 +175,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
         _bytesArrayLiteral = null;
         break;
       case BYTES:
@@ -117,6 +184,24 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
+        _stringArrayLiteral = null;
+        break;
+      case UUID:
+        if (value instanceof UUID[]) {
+          UUID[] uuidArr = (UUID[]) value;
+          _bytesArrayLiteral = new byte[uuidArr.length][];
+          for (int i = 0; i < uuidArr.length; i++) {
+            _bytesArrayLiteral[i] = UuidUtils.toBytes(uuidArr[i]);
+          }
+        } else {
+          _bytesArrayLiteral = (byte[][]) value;
+        }
+        _intArrayLiteral = null;
+        _longArrayLiteral = null;
+        _floatArrayLiteral = null;
+        _doubleArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
         _stringArrayLiteral = null;
         break;
       default:
@@ -134,6 +219,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       _longArrayLiteral = new long[0];
       _floatArrayLiteral = new float[0];
       _doubleArrayLiteral = new double[0];
+      _bigDecimalArrayLiteral = new BigDecimal[0];
       _stringArrayLiteral = new String[0];
       _bytesArrayLiteral = new byte[0][];
       return;
@@ -152,6 +238,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
         _stringArrayLiteral = null;
         _bytesArrayLiteral = null;
         break;
@@ -163,6 +250,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _intArrayLiteral = null;
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
         _stringArrayLiteral = null;
         _bytesArrayLiteral = null;
         break;
@@ -174,6 +262,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _intArrayLiteral = null;
         _longArrayLiteral = null;
         _doubleArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
         _stringArrayLiteral = null;
         _bytesArrayLiteral = null;
         break;
@@ -185,6 +274,43 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _intArrayLiteral = null;
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
+        _stringArrayLiteral = null;
+        _bytesArrayLiteral = null;
+        break;
+      case BIG_DECIMAL:
+        _bigDecimalArrayLiteral = new BigDecimal[literalContexts.size()];
+        for (int i = 0; i < _bigDecimalArrayLiteral.length; i++) {
+          _bigDecimalArrayLiteral[i] = literalContexts.get(i).getLiteral().getBigDecimalValue();
+        }
+        _intArrayLiteral = null;
+        _longArrayLiteral = null;
+        _floatArrayLiteral = null;
+        _doubleArrayLiteral = null;
+        _stringArrayLiteral = null;
+        _bytesArrayLiteral = null;
+        break;
+      case BOOLEAN:
+        _intArrayLiteral = new int[literalContexts.size()];
+        for (int i = 0; i < _intArrayLiteral.length; i++) {
+          _intArrayLiteral[i] = literalContexts.get(i).getLiteral().getBooleanValue() ? 1 : 0;
+        }
+        _longArrayLiteral = null;
+        _floatArrayLiteral = null;
+        _doubleArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
+        _stringArrayLiteral = null;
+        _bytesArrayLiteral = null;
+        break;
+      case TIMESTAMP:
+        _longArrayLiteral = new long[literalContexts.size()];
+        for (int i = 0; i < _longArrayLiteral.length; i++) {
+          _longArrayLiteral[i] = literalContexts.get(i).getLiteral().getLongValue();
+        }
+        _intArrayLiteral = null;
+        _floatArrayLiteral = null;
+        _doubleArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
         _stringArrayLiteral = null;
         _bytesArrayLiteral = null;
         break;
@@ -197,9 +323,11 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
         _bytesArrayLiteral = null;
         break;
       case BYTES:
+      case UUID:
         _bytesArrayLiteral = new byte[literalContexts.size()][];
         for (int i = 0; i < _bytesArrayLiteral.length; i++) {
           _bytesArrayLiteral[i] = literalContexts.get(i).getLiteral().getBytesValue();
@@ -208,6 +336,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
+        _bigDecimalArrayLiteral = null;
         _stringArrayLiteral = null;
         break;
       default:
@@ -235,6 +364,10 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
 
   public String[] getStringArrayLiteral() {
     return _stringArrayLiteral;
+  }
+
+  public BigDecimal[] getBigDecimalArrayLiteral() {
+    return _bigDecimalArrayLiteral;
   }
 
   public byte[][] getBytesArrayLiteral() {
@@ -310,6 +443,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       if (intArrayLiteral == null) {
         switch (_dataType) {
           case LONG:
+          case TIMESTAMP:
             intArrayLiteral = new int[_longArrayLiteral.length];
             for (int i = 0; i < _longArrayLiteral.length; i++) {
               intArrayLiteral[i] = (int) _longArrayLiteral[i];
@@ -325,6 +459,12 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
             intArrayLiteral = new int[_doubleArrayLiteral.length];
             for (int i = 0; i < _doubleArrayLiteral.length; i++) {
               intArrayLiteral[i] = (int) _doubleArrayLiteral[i];
+            }
+            break;
+          case BIG_DECIMAL:
+            intArrayLiteral = new int[_bigDecimalArrayLiteral.length];
+            for (int i = 0; i < _bigDecimalArrayLiteral.length; i++) {
+              intArrayLiteral[i] = _bigDecimalArrayLiteral[i].intValue();
             }
             break;
           case STRING:
@@ -353,6 +493,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       if (longArrayLiteral == null) {
         switch (_dataType) {
           case INT:
+          case BOOLEAN:
             longArrayLiteral = new long[_intArrayLiteral.length];
             for (int i = 0; i < _intArrayLiteral.length; i++) {
               longArrayLiteral[i] = _intArrayLiteral[i];
@@ -368,6 +509,12 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
             longArrayLiteral = new long[_doubleArrayLiteral.length];
             for (int i = 0; i < _doubleArrayLiteral.length; i++) {
               longArrayLiteral[i] = (long) _doubleArrayLiteral[i];
+            }
+            break;
+          case BIG_DECIMAL:
+            longArrayLiteral = new long[_bigDecimalArrayLiteral.length];
+            for (int i = 0; i < _bigDecimalArrayLiteral.length; i++) {
+              longArrayLiteral[i] = _bigDecimalArrayLiteral[i].longValue();
             }
             break;
           case STRING:
@@ -396,21 +543,29 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       if (floatArrayLiteral == null) {
         switch (_dataType) {
           case INT:
+          case BOOLEAN:
             floatArrayLiteral = new float[_intArrayLiteral.length];
             for (int i = 0; i < _intArrayLiteral.length; i++) {
               floatArrayLiteral[i] = _intArrayLiteral[i];
             }
             break;
           case LONG:
+          case TIMESTAMP:
             floatArrayLiteral = new float[_longArrayLiteral.length];
             for (int i = 0; i < _longArrayLiteral.length; i++) {
-              floatArrayLiteral[i] = _longArrayLiteral[i];
+              floatArrayLiteral[i] = (float) _longArrayLiteral[i];
             }
             break;
           case DOUBLE:
             floatArrayLiteral = new float[_doubleArrayLiteral.length];
             for (int i = 0; i < _doubleArrayLiteral.length; i++) {
               floatArrayLiteral[i] = (float) _doubleArrayLiteral[i];
+            }
+            break;
+          case BIG_DECIMAL:
+            floatArrayLiteral = new float[_bigDecimalArrayLiteral.length];
+            for (int i = 0; i < _bigDecimalArrayLiteral.length; i++) {
+              floatArrayLiteral[i] = _bigDecimalArrayLiteral[i].floatValue();
             }
             break;
           case STRING:
@@ -439,12 +594,14 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       if (doubleArrayLiteral == null) {
         switch (_dataType) {
           case INT:
+          case BOOLEAN:
             doubleArrayLiteral = new double[_intArrayLiteral.length];
             for (int i = 0; i < _intArrayLiteral.length; i++) {
               doubleArrayLiteral[i] = _intArrayLiteral[i];
             }
             break;
           case LONG:
+          case TIMESTAMP:
             doubleArrayLiteral = new double[_longArrayLiteral.length];
             for (int i = 0; i < _longArrayLiteral.length; i++) {
               doubleArrayLiteral[i] = _longArrayLiteral[i];
@@ -454,6 +611,12 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
             doubleArrayLiteral = new double[_floatArrayLiteral.length];
             for (int i = 0; i < _floatArrayLiteral.length; i++) {
               doubleArrayLiteral[i] = _floatArrayLiteral[i];
+            }
+            break;
+          case BIG_DECIMAL:
+            doubleArrayLiteral = new double[_bigDecimalArrayLiteral.length];
+            for (int i = 0; i < _bigDecimalArrayLiteral.length; i++) {
+              doubleArrayLiteral[i] = _bigDecimalArrayLiteral[i].doubleValue();
             }
             break;
           case STRING:
@@ -474,7 +637,53 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
 
   @Override
   public BigDecimal[][] transformToBigDecimalValuesMV(ValueBlock valueBlock) {
-    throw new UnsupportedOperationException();
+    int numDocs = valueBlock.getNumDocs();
+    BigDecimal[][] bigDecimalArrayResult = _bigDecimalArrayResult;
+    if (bigDecimalArrayResult == null || bigDecimalArrayResult.length < numDocs) {
+      bigDecimalArrayResult = new BigDecimal[numDocs][];
+      BigDecimal[] bigDecimalArrayLiteral = _bigDecimalArrayLiteral;
+      if (bigDecimalArrayLiteral == null) {
+        switch (_dataType) {
+          case INT:
+          case BOOLEAN:
+            bigDecimalArrayLiteral = new BigDecimal[_intArrayLiteral.length];
+            for (int i = 0; i < _intArrayLiteral.length; i++) {
+              bigDecimalArrayLiteral[i] = BigDecimal.valueOf(_intArrayLiteral[i]);
+            }
+            break;
+          case LONG:
+          case TIMESTAMP:
+            bigDecimalArrayLiteral = new BigDecimal[_longArrayLiteral.length];
+            for (int i = 0; i < _longArrayLiteral.length; i++) {
+              bigDecimalArrayLiteral[i] = BigDecimal.valueOf(_longArrayLiteral[i]);
+            }
+            break;
+          case FLOAT:
+            bigDecimalArrayLiteral = new BigDecimal[_floatArrayLiteral.length];
+            for (int i = 0; i < _floatArrayLiteral.length; i++) {
+              bigDecimalArrayLiteral[i] = BigDecimal.valueOf(_floatArrayLiteral[i]);
+            }
+            break;
+          case DOUBLE:
+            bigDecimalArrayLiteral = new BigDecimal[_doubleArrayLiteral.length];
+            for (int i = 0; i < _doubleArrayLiteral.length; i++) {
+              bigDecimalArrayLiteral[i] = BigDecimal.valueOf(_doubleArrayLiteral[i]);
+            }
+            break;
+          case STRING:
+            bigDecimalArrayLiteral = new BigDecimal[_stringArrayLiteral.length];
+            for (int i = 0; i < _stringArrayLiteral.length; i++) {
+              bigDecimalArrayLiteral[i] = new BigDecimal(_stringArrayLiteral[i]);
+            }
+            break;
+          default:
+            throw new IllegalStateException("Unable to convert data type: " + _dataType + " to BigDecimal array");
+        }
+      }
+      Arrays.fill(bigDecimalArrayResult, bigDecimalArrayLiteral);
+      _bigDecimalArrayResult = bigDecimalArrayResult;
+    }
+    return bigDecimalArrayResult;
   }
 
   @Override
@@ -510,6 +719,36 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
               stringArrayLiteral[i] = Double.toString(_doubleArrayLiteral[i]);
             }
             break;
+          case BIG_DECIMAL:
+            stringArrayLiteral = new String[_bigDecimalArrayLiteral.length];
+            for (int i = 0; i < _bigDecimalArrayLiteral.length; i++) {
+              stringArrayLiteral[i] = _bigDecimalArrayLiteral[i].toPlainString();
+            }
+            break;
+          case BOOLEAN:
+            stringArrayLiteral = new String[_intArrayLiteral.length];
+            for (int i = 0; i < _intArrayLiteral.length; i++) {
+              stringArrayLiteral[i] = Boolean.toString(_intArrayLiteral[i] == 1);
+            }
+            break;
+          case TIMESTAMP:
+            stringArrayLiteral = new String[_longArrayLiteral.length];
+            for (int i = 0; i < _longArrayLiteral.length; i++) {
+              stringArrayLiteral[i] = new Timestamp(_longArrayLiteral[i]).toString();
+            }
+            break;
+          case BYTES:
+            stringArrayLiteral = new String[_bytesArrayLiteral.length];
+            for (int i = 0; i < _bytesArrayLiteral.length; i++) {
+              stringArrayLiteral[i] = BytesUtils.toHexString(_bytesArrayLiteral[i]);
+            }
+            break;
+          case UUID:
+            stringArrayLiteral = new String[_bytesArrayLiteral.length];
+            for (int i = 0; i < _bytesArrayLiteral.length; i++) {
+              stringArrayLiteral[i] = UuidUtils.toUUID(_bytesArrayLiteral[i]).toString();
+            }
+            break;
           default:
             throw new IllegalStateException("Unable to convert data type: " + _dataType + " to string array");
         }
@@ -526,7 +765,26 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
     byte[][][] bytesArrayResult = _bytesArrayResult;
     if (bytesArrayResult == null || bytesArrayResult.length < numDocs) {
       bytesArrayResult = new byte[numDocs][][];
-      Arrays.fill(bytesArrayResult, _bytesArrayLiteral);
+      byte[][] bytesArrayLiteral = _bytesArrayLiteral;
+      if (bytesArrayLiteral == null) {
+        switch (_dataType) {
+          case BIG_DECIMAL:
+            bytesArrayLiteral = new byte[_bigDecimalArrayLiteral.length][];
+            for (int i = 0; i < _bigDecimalArrayLiteral.length; i++) {
+              bytesArrayLiteral[i] = BigDecimalUtils.serialize(_bigDecimalArrayLiteral[i]);
+            }
+            break;
+          case STRING:
+            bytesArrayLiteral = new byte[_stringArrayLiteral.length][];
+            for (int i = 0; i < _stringArrayLiteral.length; i++) {
+              bytesArrayLiteral[i] = BytesUtils.toBytes(_stringArrayLiteral[i]);
+            }
+            break;
+          default:
+            throw new IllegalStateException("Unable to convert data type: " + _dataType + " to bytes array");
+        }
+      }
+      Arrays.fill(bytesArrayResult, bytesArrayLiteral);
       _bytesArrayResult = bytesArrayResult;
     }
     return bytesArrayResult;
