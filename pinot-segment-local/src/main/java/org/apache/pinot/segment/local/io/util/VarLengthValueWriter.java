@@ -24,7 +24,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -71,7 +73,7 @@ public class VarLengthValueWriter implements Closeable {
   static final int HEADER_LENGTH = DATA_SECTION_OFFSET_POSITION + Integer.BYTES;
 
   private final FileChannel _fileChannel;
-  private final ByteBuffer _offsetBuffer;
+  private final MappedByteBuffer _offsetBuffer;
   private final ByteBuffer _valueBuffer;
 
   public VarLengthValueWriter(File outputFile, int numValues)
@@ -107,11 +109,18 @@ public class VarLengthValueWriter implements Closeable {
       throws IOException {
     int fileLength = _valueBuffer.position();
     _offsetBuffer.putInt(fileLength);
-    _fileChannel.truncate(fileLength);
-    _fileChannel.close();
-    if (CleanerUtil.UNMAP_SUPPORTED) {
-      CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();
-      cleaner.freeBuffer(_offsetBuffer);
+    try {
+      FileUtils.forceMappedBuffers(_offsetBuffer);
+      _fileChannel.truncate(fileLength);
+    } finally {
+      try {
+        FileUtils.syncAndClose(_fileChannel);
+      } finally {
+        if (CleanerUtil.UNMAP_SUPPORTED) {
+          CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();
+          cleaner.freeBuffer(_offsetBuffer);
+        }
+      }
     }
   }
 }

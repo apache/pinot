@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
@@ -106,7 +107,7 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
     // Write the header and close the file.
     _header.flip();
     _dataFile.write(_header, 0);
-    _dataFile.close();
+    FileUtils.syncAndClose(_dataFile);
     _chunkCompressor.close();
   }
 

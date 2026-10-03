@@ -486,9 +486,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   @Override
   public void close()
       throws IOException {
-    for (PinotDataBuffer buf : _allocBuffers) {
-      buf.close();
-    }
+    PinotDataBuffer.flushAndClose(_allocBuffers.toArray(new PinotDataBuffer[0]));
     // Cleanup removed indices after closing and flushing buffers, so
     // that potential index updates can be persisted across cleanups.
     if (_shouldCleanupRemovedIndices) {
@@ -568,6 +566,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
         retained.add(new IndexEntry(index._key, nextOffset, index._size));
         nextOffset += index._size;
       }
+      // Force before the rename below swaps it in, so the swap can't expose a partially-written file.
+      dstCh.force(true);
     }
     return retained;
   }
