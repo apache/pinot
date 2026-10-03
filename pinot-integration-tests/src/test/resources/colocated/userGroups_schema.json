@@ -1,0 +1,7 @@
+{
+  "schemaName": "userGroups",
+  "dimensionFieldSpecs": [
+    {"dataType": "STRING", "name": "userUUID"},
+    {"dataType": "STRING", "name": "groupUUID"}
+  ]
+}
