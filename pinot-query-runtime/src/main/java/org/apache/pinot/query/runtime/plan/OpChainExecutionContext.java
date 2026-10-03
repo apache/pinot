@@ -37,6 +37,7 @@ import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFacto
 import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -108,7 +109,7 @@ public class OpChainExecutionContext {
     _id = new OpChainId(requestId, workerMetadata.getWorkerId(), stageMetadata.getStageId());
     _pipelineBreakerResult = pipelineBreakerResult;
     _traceEnabled = Boolean.parseBoolean(opChainMetadata.get(CommonConstants.Broker.Request.TRACE));
-    _queryOperatorFactoryProvider = getDefaultQueryOperatorFactoryProvider();
+    _queryOperatorFactoryProvider = getDefaultQueryOperatorFactoryProvider(mailboxService);
     _keepPipelineBreakerStats = keepPipelineBreakerStats;
   }
 
@@ -278,15 +279,18 @@ public class OpChainExecutionContext {
     return _planNodeIds == null ? Map.of() : Collections.unmodifiableMap(_planNodeIds);
   }
 
-  private static QueryOperatorFactoryProvider getDefaultQueryOperatorFactoryProvider() {
-    // Prefer server context when explicitly configured, otherwise fall back to broker, then default.
-    Object serverProvider = ServerContext.getInstance().getQueryOperatorFactoryProvider();
-    if (serverProvider instanceof QueryOperatorFactoryProvider) {
-      return (QueryOperatorFactoryProvider) serverProvider;
-    }
-    Object brokerProvider = BrokerContext.getInstance().getQueryOperatorFactoryProvider();
-    if (brokerProvider instanceof QueryOperatorFactoryProvider) {
-      return (QueryOperatorFactoryProvider) brokerProvider;
+  private static QueryOperatorFactoryProvider getDefaultQueryOperatorFactoryProvider(MailboxService mailboxService) {
+    return getDefaultQueryOperatorFactoryProvider(mailboxService,
+        BrokerContext.getInstance().getQueryOperatorFactoryProvider(),
+        ServerContext.getInstance().getQueryOperatorFactoryProvider());
+  }
+
+  @VisibleForTesting
+  static QueryOperatorFactoryProvider getDefaultQueryOperatorFactoryProvider(MailboxService mailboxService,
+      @Nullable Object brokerProvider, @Nullable Object serverProvider) {
+    Object roleProvider = mailboxService.getInstanceType() == InstanceType.BROKER ? brokerProvider : serverProvider;
+    if (roleProvider instanceof QueryOperatorFactoryProvider) {
+      return (QueryOperatorFactoryProvider) roleProvider;
     }
     return DefaultQueryOperatorFactoryProvider.INSTANCE;
   }

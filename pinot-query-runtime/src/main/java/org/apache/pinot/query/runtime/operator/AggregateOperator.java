@@ -51,6 +51,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.operator.groupby.GroupIdGeneratorProvider;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -94,6 +95,13 @@ public class AggregateOperator extends MultiStageOperator {
   private final Comparator<Object[]> _comparator;
 
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator input, AggregateNode node) {
+    this(context, input, node, GroupIdGeneratorProvider.DEFAULT);
+  }
+
+  /// Creates an aggregate operator with a query-local group-ID generator provider. Aggregate functions and their
+  /// result holders are unchanged; the provider only selects the key-to-dense-ID implementation.
+  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator input, AggregateNode node,
+      GroupIdGeneratorProvider groupIdGeneratorProvider) {
     super(context);
     _resultSchema = node.getDataSchema();
     _aggFunctions = getAggFunctions(node.getAggCalls());
@@ -148,7 +156,8 @@ public class AggregateOperator extends MultiStageOperator {
     } else {
       _groupByExecutor =
           new MultistageGroupByExecutor(getGroupKeyIds(groupKeys), _aggFunctions, filterArgIds, maxFilterArgId, aggType,
-              leafReturnFinalResult, _resultSchema, context.getOpChainMetadata(), node.getNodeHint());
+              leafReturnFinalResult, _resultSchema, context.getOpChainMetadata(), node.getNodeHint(),
+              groupIdGeneratorProvider);
       _aggregationExecutor = null;
     }
   }
@@ -206,18 +215,32 @@ public class AggregateOperator extends MultiStageOperator {
     if (_eosBlock != null) {
       return _eosBlock;
     }
-    MseBlock.Eos finalBlock = _isGroupBy ? consumeGroupBy() : consumeAggregation();
-    _eosBlock = finalBlock;
+    try {
+      MseBlock.Eos finalBlock = _isGroupBy ? consumeGroupBy() : consumeAggregation();
+      _eosBlock = finalBlock;
 
-    if (finalBlock.isError()) {
-      // The upstream failed, so no result will ever be produced from what we accumulated: drop it right away instead
-      // of waiting for close()/cancel().
+      if (finalBlock.isError()) {
+        // Preserve the original upstream error even if native key cleanup fails and enters its retry path.
+        try {
+          releaseBuffers();
+        } catch (RuntimeException | Error closeFailure) {
+          LOGGER.error("Failed to release group-by keys after an upstream error", closeFailure);
+        }
+        return finalBlock;
+      }
+      MseBlock mseBlock = produceAggregatedBlock();
       releaseBuffers();
-      return finalBlock;
+      return mseBlock;
+    } catch (RuntimeException | Error failure) {
+      try {
+        releaseBuffers();
+      } catch (RuntimeException | Error closeFailure) {
+        if (failure != closeFailure) {
+          failure.addSuppressed(closeFailure);
+        }
+      }
+      throw failure;
     }
-    MseBlock mseBlock = produceAggregatedBlock();
-    releaseBuffers();
-    return mseBlock;
   }
 
   /// Drops the executors, and with them the group-by hash maps and the aggregate result holders they own. Marks the
@@ -225,10 +248,14 @@ public class AggregateOperator extends MultiStageOperator {
   /// of trying to consume the input again with a dropped executor.
   @Override
   protected void releaseBuffers() {
+    MultistageGroupByExecutor groupByExecutor = _groupByExecutor;
     _aggregationExecutor = null;
     _groupByExecutor = null;
     if (_eosBlock == null) {
       _eosBlock = SuccessMseBlock.INSTANCE;
+    }
+    if (groupByExecutor != null) {
+      groupByExecutor.close();
     }
   }
 
