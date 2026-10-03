@@ -1,0 +1,9 @@
+{
+  "schemaName": "dimAsset",
+  "primaryKeyColumns": ["assetId"],
+  "dimensionFieldSpecs": [
+    {"name": "assetId", "dataType": "BYTES"},
+    {"name": "assetName", "dataType": "STRING"},
+    {"name": "contentHash", "dataType": "BYTES"}
+  ]
+}

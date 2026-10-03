@@ -48,7 +48,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
-
 /// Dimension Table is a special type of OFFLINE table which is assigned to all servers
 /// in a tenant and is used to execute a LOOKUP Transform Function. DimensionTableDataManager
 /// loads the contents into a HashMap for faster access thus the size should be small
@@ -174,7 +173,6 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     INSTANCES.remove(_tableNameWithType);
   }
 
-
   private void closeDimensionTable(DimensionTable dimensionTable) {
     try {
       dimensionTable.close();
@@ -228,9 +226,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         int numTotalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
         if (numTotalDocs > 0) {
           try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
-            recordReader.init(indexSegment);
+            recordReader.init(indexSegment, primaryKeyColumns);
 
-            int[] pkIndexes = recordReader.getIndexesForColumns(primaryKeyColumns);
             int[] valIndexes = recordReader.getIndexesForColumns(valueColumns);
 
             for (int i = 0; i < numTotalDocs; i++) {
@@ -239,7 +236,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
                 return null;
               }
 
-              Object[] primaryKey = recordReader.getRecordValues(i, pkIndexes);
+              Object[] primaryKey = recordReader.getPrimaryKeys(i);
               Object[] values = recordReader.getRecordValues(i, valIndexes);
 
               Object[] previousValue = lookupTable.put(primaryKey, values);
@@ -306,9 +303,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         try {
           int readerIdx = recordReaders.size();
           PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
-          recordReader.init(indexSegment);
+          recordReader.init(indexSegment, primaryKeyColumns);
           recordReaders.add(recordReader);
-          int[] pkIndexes = recordReader.getIndexesForColumns(primaryKeyColumns);
 
           for (int i = 0; i < numTotalDocs; i++) {
             if (_loadToken.get() != token) {
@@ -317,7 +313,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
               return null;
             }
 
-            Object[] primaryKey = recordReader.getRecordValues(i, pkIndexes);
+            Object[] primaryKey = recordReader.getPrimaryKeys(i);
 
             long readerIdxAndDocId = (((long) readerIdx) << 32) | (i & 0xffffffffL);
             long previousValue = lookupTable.put(primaryKey, readerIdxAndDocId);

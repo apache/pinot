@@ -242,5 +242,56 @@
         "ignoreLiteMode": true
       }
     ]
+  },
+  "lookup_join_bytes_primary_key": {
+    "comment": "Regression test for issue 19228. This fixes the case where a dimension table contains bytes type primary key.The equals and hashcode of bytes array is object identity based and so fails on equality check. This fix wraps bytes primary in the internal ByteArray.",
+    "tables": {
+      "fact_tbl": {
+        "schema": [
+          {"name": "bytes_value", "type": "BYTES"},
+          {"name": "int_value", "type": "INT"}
+        ],
+        "inputs": [
+          ["f47ac10b58cc4372a5670e02b2c3d479", 1],
+          ["9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", 2],
+          ["3c9b7e128a4d4e90b183f6a89c25e21a", 3],
+          ["a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d", 4]
+        ]
+      },
+      "dim_tbl": {
+        "schema": [
+          {"name": "bytes_value", "type": "BYTES"},
+          {"name": "int_value", "type": "INT"}
+        ],
+        "inputs": [
+          ["f47ac10b58cc4372a5670e02b2c3d479", 1],
+          ["9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", 2],
+          ["a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d", 4]
+        ],
+        "replicated": true,
+        "isDimTable": true,
+        "isActualDimTableNeeded": true,
+        "primaryKeyColumns": ["bytes_value"]
+      }
+    }, "queries": [
+      {
+        "description": "Checking with a constant value check",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.int_value FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.bytes_value = 'a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d' AND {dim_tbl}.bytes_value = {fact_tbl}.bytes_value",
+        "outputs": [
+          [4]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Checking full table join",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.bytes_value,{dim_tbl}.int_value FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.bytes_value = {fact_tbl}.bytes_value",
+        "outputs": [
+          ["f47ac10b58cc4372a5670e02b2c3d479", 1],
+          ["9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", 2],
+          ["a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d", 4]
+        ],
+        "ignoreLiteMode": true
+      }
+    ]
   }
 }

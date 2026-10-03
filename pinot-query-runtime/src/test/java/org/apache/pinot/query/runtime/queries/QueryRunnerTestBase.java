@@ -591,6 +591,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public boolean _replicated;
       @JsonProperty("isDimTable")
       public boolean _isDimTable;
+      @JsonProperty("isActualDimTableNeeded")
+      public boolean _isActualDimTableNeeded;
       @JsonProperty("primaryKeyColumns")
       public List<String> _primaryKeyColumns;
     }
