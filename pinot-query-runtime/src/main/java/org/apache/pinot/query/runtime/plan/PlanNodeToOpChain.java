@@ -158,9 +158,15 @@ public class PlanNodeToOpChain {
         } else {
           pipelineBreakerQueryStats = null;
         }
-        result = new LeafOperator(context, leafStageContext.getServerQueryRequests(),
-            leafStageContext.getLeafStageBoundaryNode().getDataSchema(), leafStageContext.getLeafQueryExecutor(),
-            leafStageContext.getExecutorService(), pipelineBreakerQueryStats);
+        DataSchema dataSchema = leafStageContext.getLeafStageBoundaryNode().getDataSchema();
+        if (leafStageContext.shouldSkipLeafQueryExecution()) {
+          result = LeafOperator.forSkippedExecution(context, dataSchema, leafStageContext.getLeafQueryExecutor(),
+              leafStageContext.getExecutorService(), pipelineBreakerQueryStats);
+        } else {
+          result = new LeafOperator(context, leafStageContext.getServerQueryRequests(), dataSchema,
+              leafStageContext.getLeafQueryExecutor(), leafStageContext.getExecutorService(),
+              pipelineBreakerQueryStats);
+        }
       } else {
         result = node.visit(this, context);
       }
