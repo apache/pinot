@@ -493,6 +493,7 @@ public class StringFunctions {
     return suffixArr;
   }
 
+  /// Empty fields from leading, consecutive, and trailing delimiters are discarded.
   /// TODO: Revisit if index should be one-based (both Presto and Postgres use one-based index, which starts with 1)
   /// @param input the input String to be split into parts.
   /// @param delimiter the specified delimiter to split the input string.
@@ -517,8 +518,8 @@ public class StringFunctions {
     while (start < len && input.startsWith(delimiter, start)) {
       start += delimLen;
     }
-    // Guard against Integer.MIN_VALUE since negating it overflows (remains negative)
-    if (index == Integer.MIN_VALUE) {
+    // No fields remain if the input contains only delimiters. Negating Integer.MIN_VALUE would overflow.
+    if (start == len || index == Integer.MIN_VALUE) {
       return "null";
     }
     // optimization for negative index with single-char delimiter since common case
@@ -532,7 +533,7 @@ public class StringFunctions {
     if (adjustedIndex < 0) {
       int totalFields = 0;
       int pos = start;
-      while (pos <= len) {
+      while (pos < len) {
         totalFields++;
         int end = input.indexOf(delimiter, pos);
         if (end == -1) {
@@ -561,34 +562,23 @@ public class StringFunctions {
       }
     }
 
+    if (start == len) {
+      return "null";
+    }
     int end = input.indexOf(delimiter, start);
     return end == -1 ? input.substring(start) : input.substring(start, end);
   }
 
   private static String splitPartNegativeIdxSingleCharDelim(
       String input, char delimiter, int index, int len, int start) {
-    // input is empty or contains only delimiters
-    if (start == len) {
-      return index == 1 ? "" : "null";
-    }
-
-    // scan backwards and handle trailing delimiters
+    // Scan backwards past trailing delimiters without counting empty fields.
     int end = len;
     while (end > start && input.charAt(end - 1) == delimiter) {
       end--;
     }
 
-    // handle trailing delimiters
-    int resultIdx = index;
-    if (end < len) {
-      if (index == 1) {
-        return "";
-      }
-      resultIdx--;
-    }
-
     int curEnd = end;
-    for (int i = 1; i <= resultIdx; i++) {
+    for (int i = 1; i <= index; i++) {
       // handle left out of bound index
       if (curEnd <= start) {
         return "null";
@@ -600,7 +590,7 @@ public class StringFunctions {
         curStart--;
       }
 
-      if (i == resultIdx) {
+      if (i == index) {
         return input.substring(curStart + 1, curEnd);
       }
 
@@ -628,8 +618,8 @@ public class StringFunctions {
   /// Avoids allocating the full String array by scanning the input directly.
   ///
   /// Replicates the semantics of [StringUtils#splitByWholeSeparator(String, String, int)]:
-  /// leading separators are stripped, consecutive separators in the middle are collapsed,
-  /// and trailing separators produce one empty trailing token.
+  /// empty fields from leading, consecutive, and trailing separators are discarded.
+  /// Once the limit is reached, the last field contains the unsplit remainder, including any trailing separators.
   ///
   /// @param input the input String to be split into parts.
   /// @param delimiter the specified delimiter to split the input string.
@@ -674,8 +664,8 @@ public class StringFunctions {
   }
 
   /// Counts the number of fields produced by splitting input with the given delimiter and limit,
-  /// following splitByWholeSeparator semantics (leading seps stripped, consecutive collapsed,
-  /// trailing seps produce one empty field). Does not allocate any String objects.
+  /// following splitByWholeSeparator semantics (empty fields discarded, final field contains the unsplit remainder
+  /// when the limit is reached). Does not allocate any String objects.
   private static int countFieldsLimited(String input, String delimiter, int effectiveLimit,
       int inputLen, int delimLen) {
     int pos = 0;
@@ -683,11 +673,6 @@ public class StringFunctions {
     while (pos < inputLen && input.startsWith(delimiter, pos)) {
       pos += delimLen;
     }
-    if (pos >= inputLen) {
-      // Entire string is separators — produces a single empty trailing token
-      return 1;
-    }
-
     int totalFields = 0;
     while (pos < inputLen) {
       totalFields++;
@@ -706,18 +691,13 @@ public class StringFunctions {
       while (pos < inputLen && input.startsWith(delimiter, pos)) {
         pos += delimLen;
       }
-      // If we've consumed to end after delimiters, there's a trailing empty field
-      if (pos >= inputLen) {
-        totalFields++;
-        break;
-      }
     }
     return totalFields;
   }
 
   /// Extracts the field at the given positive index by scanning forward through the input.
-  /// Follows splitByWholeSeparator semantics: leading separators stripped, consecutive collapsed,
-  /// trailing separators produce one empty token. With limit, the last field gets the remainder.
+  /// Follows splitByWholeSeparator semantics: empty fields discarded.
+  /// With limit, the last field gets the unsplit remainder, including any trailing separators.
   private static String splitPartLimitedForward(String input, String delimiter, int effectiveLimit, int index,
       int inputLen, int delimLen) {
     int pos = 0;
@@ -725,13 +705,8 @@ public class StringFunctions {
     while (pos < inputLen && input.startsWith(delimiter, pos)) {
       pos += delimLen;
     }
-    if (pos >= inputLen) {
-      // Entire string is separators — single empty trailing token at index 0
-      return index == 0 ? "" : "null";
-    }
-
     int fieldCount = 0;
-    while (pos <= inputLen) {
+    while (pos < inputLen) {
       // Check if this is the last field due to limit
       if (fieldCount + 1 >= effectiveLimit) {
         // Limit reached — remainder from pos to end is the last field
@@ -745,8 +720,6 @@ public class StringFunctions {
         if (fieldCount == index) {
           return input.substring(pos);
         }
-        // Check if input ends with delimiter characters that were already consumed
-        // (this case is handled by the trailing-delimiter logic below)
         return "null";
       }
 
@@ -761,14 +734,6 @@ public class StringFunctions {
         pos += delimLen;
       }
       fieldCount++;
-
-      // If we've consumed to the end after delimiters, there's a trailing empty field
-      if (pos >= inputLen) {
-        if (fieldCount == index) {
-          return "";
-        }
-        return "null";
-      }
     }
     return "null";
   }
