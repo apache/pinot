@@ -46,6 +46,7 @@ import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.plan.StreamingInstanceResponsePlanNode;
 import org.apache.pinot.core.plan.StreamingSelectionPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.OffHeapGroupByBufferPool;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.prefetch.FetchPlanner;
 import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
@@ -114,6 +115,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   private int _minSegmentGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SEGMENT_GROUP_TRIM_SIZE;
   private int _minServerGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SERVER_GROUP_TRIM_SIZE;
   private int _groupByTrimThreshold = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD;
+  // Whether to store group-by key tables and fixed-width result holders in off-heap (direct) memory
+  private boolean _groupByOffHeap = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_OFF_HEAP;
 
   @Override
   public void init(PinotConfiguration queryExecutorConfig) {
@@ -144,11 +147,16 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD);
     Preconditions.checkState(_groupByTrimThreshold > 0,
         "Invalid configurable: groupByTrimThreshold: %d must be positive", _groupByTrimThreshold);
+    _groupByOffHeap =
+        queryExecutorConfig.getProperty(Server.GROUPBY_OFF_HEAP, Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_OFF_HEAP);
+    OffHeapGroupByBufferPool.setMaxBytesPerThread(
+        queryExecutorConfig.getProperty(Server.GROUPBY_OFF_HEAP_POOL_MAX_BYTES_PER_THREAD,
+            Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_OFF_HEAP_POOL_MAX_BYTES_PER_THREAD));
     LOGGER.info("Initialized plan maker with maxExecutionThreads: {}, defaultExecutionThreads: {}, "
             + "maxInitialResultHolderCapacity: {}, numGroupsLimit: {}, minSegmentGroupTrimSize: {}, "
-            + "minServerGroupTrimSize: {}, groupByTrimThreshold: {}",
+            + "minServerGroupTrimSize: {}, groupByTrimThreshold: {}, groupByOffHeap: {}",
         _maxExecutionThreads, _defaultExecutionThreads, _maxInitialResultHolderCapacity, _numGroupsLimit,
-        _minSegmentGroupTrimSize, _minServerGroupTrimSize, _groupByTrimThreshold);
+        _minSegmentGroupTrimSize, _minServerGroupTrimSize, _groupByTrimThreshold, _groupByOffHeap);
   }
 
   @VisibleForTesting
@@ -199,6 +207,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @VisibleForTesting
   public void setGroupByTrimThreshold(int groupByTrimThreshold) {
     _groupByTrimThreshold = groupByTrimThreshold;
+  }
+
+  @VisibleForTesting
+  public void setGroupByOffHeap(boolean groupByOffHeap) {
+    _groupByOffHeap = groupByOffHeap;
   }
 
   @Override
@@ -293,6 +306,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       } else {
         queryContext.setNumGroupsLimit(_numGroupsLimit);
       }
+      // Set groupByOffHeap
+      Boolean groupByOffHeap = QueryOptionsUtils.isGroupByOffHeap(queryOptions);
+      queryContext.setGroupByOffHeap(groupByOffHeap != null ? groupByOffHeap : _groupByOffHeap);
       // Set numGroupsWarningThreshold
       queryContext.setNumGroupsWarningLimit(_numGroupsWarningLimit);
       // Set minSegmentGroupTrimSize

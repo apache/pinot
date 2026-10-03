@@ -47,6 +47,11 @@ public class LongGroupByResultHolder implements GroupByResultHolder {
     }
   }
 
+  /// Returns the default value for un-initialized results. Used to mirror this holder off-heap.
+  long getDefaultValue() {
+    return _defaultValue;
+  }
+
   @Override
   public void ensureCapacity(int capacity) {
     Preconditions.checkArgument(capacity <= _maxCapacity);
