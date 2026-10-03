@@ -40,6 +40,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
@@ -102,7 +103,8 @@ public class RequestUtils {
 
   /// Merges the request payload options (`queryOptions` and `trace`) into the options parsed from the SQL. The SQL
   /// options take precedence, unless the request sets [Request.QueryOptionKey#SQL_OPTIONS_MODE] to `IGNORE` (the SQL
-  /// options are dropped) or `REJECT` (the query fails when it carries any).
+  /// options are dropped, or a DELETE statement fails when it carries any) or `REJECT` (the query fails when it carries
+  /// any).
   @VisibleForTesting
   public static void setOptions(SqlNodeAndOptions sqlNodeAndOptions, JsonNode jsonRequest) {
     Map<String, String> requestOptions = new HashMap<>();
@@ -123,6 +125,11 @@ public class RequestUtils {
       if (sqlOptionsMode == SqlOptionsMode.REJECT) {
         throw QueryErrorCode.QUERY_VALIDATION.asException(
             "Query options are not allowed in the SQL for this request, found: " + sqlOptions.keySet());
+      }
+      // Dropping a DELETE option (e.g. dryRun) would change its effect.
+      if (sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
+        throw QueryErrorCode.QUERY_VALIDATION.asException(
+            "SQL options cannot be ignored for DELETE, found: " + sqlOptions.keySet());
       }
       sqlOptions.clear();
     }

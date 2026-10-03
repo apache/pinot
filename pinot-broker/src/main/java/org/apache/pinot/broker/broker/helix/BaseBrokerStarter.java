@@ -667,12 +667,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
     _brokerRequestHandler.start();
 
-    String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
-    if (controllerUrl != null) {
-      _sqlQueryExecutor = new SqlQueryExecutor(controllerUrl);
-    } else {
-      _sqlQueryExecutor = new SqlQueryExecutor(_spectatorHelixManager);
-    }
+    _sqlQueryExecutor = createSqlQueryExecutor();
 
     LOGGER.info("Wiring up cluster config change handler with helix");
     _spectatorHelixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
@@ -1267,11 +1262,18 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     return _threadAccountant;
   }
 
+  /// Creates the executor of the DML statements sent to the broker. Override it to execute the statements that Pinot
+  /// parses but does not execute itself, e.g. `DELETE` (see `SqlQueryExecutor#executeDelete`).
+  protected SqlQueryExecutor createSqlQueryExecutor() {
+    String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
+    return controllerUrl != null ? new SqlQueryExecutor(controllerUrl) : new SqlQueryExecutor(_spectatorHelixManager);
+  }
+
   protected BrokerAdminApiApplication createBrokerAdminApp() {
     BrokerAdminApiApplication brokerAdminApiApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
-            _queryQuotaManager, _threadAccountant, _responseStore);
+            _queryQuotaManager, _threadAccountant, _responseStore, _tableCache);
     brokerAdminApiApplication.register(
         new AuditServiceBinder(_clusterConfigChangeHandler, getServiceRole(), _brokerMetrics));
     registerExtraComponents(brokerAdminApiApplication);
