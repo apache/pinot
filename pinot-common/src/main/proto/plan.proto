@@ -44,6 +44,7 @@ message PlanNode {
     // serialized by an older-version broker can still be deserialized. No current broker sets this field.
     EnrichedJoinNode enrichedJoinNode = 17 [deprecated = true];
     UnnestNode unnestNode = 18;
+    MailboxMergeReceiveNode mailboxMergeReceiveNode = 19;
   }
 }
 
@@ -199,6 +200,18 @@ message MailboxReceiveNode {
   repeated Collation collations = 5;
   bool sort = 6;
   bool sortedOnSender = 7;
+}
+
+// Each input stream is ordered by the logical plan. Older servers reject the unknown PlanNode oneof tag.
+// Brokers only emit this node after verifying homogeneous supported versions.
+message MailboxMergeReceiveNode {
+  int32 senderStageId = 1;
+  ExchangeType exchangeType = 2;
+  DistributionType distributionType = 3;
+  repeated int32 keys = 4;
+  repeated Collation collations = 5;
+  int32 fetch = 6;
+  int32 offset = 7;
 }
 
 message MailboxSendNode {

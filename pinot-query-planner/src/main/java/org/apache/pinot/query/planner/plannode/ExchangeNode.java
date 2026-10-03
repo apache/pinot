@@ -129,7 +129,7 @@ public class ExchangeNode extends BasePlanNode {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof ExchangeNode)) {
+    if (o == null || getClass() != o.getClass()) {
       return false;
     }
     if (!super.equals(o)) {

@@ -91,10 +91,6 @@ public class OperatorTestUtil {
     return new ReceivingMailbox.MseBlockWithStats(block(schema, rows), List.of());
   }
 
-  public static ReceivingMailbox.MseBlockWithStats sortedBlockWithStats(DataSchema schema, Object[]... rows) {
-    return new ReceivingMailbox.MseBlockWithStats(block(schema, rows), List.of(), true);
-  }
-
   public static ReceivingMailbox.MseBlockWithStats errorWithEmptyStats(Exception e) {
     return new ReceivingMailbox.MseBlockWithStats(ErrorMseBlock.fromException(e), List.of());
   }

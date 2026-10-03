@@ -18,9 +18,14 @@
  */
 package org.apache.pinot.query.planner.serde;
 
+import com.google.protobuf.UnknownFieldSet;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -31,14 +36,31 @@ import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.expectThrows;
 
 
 public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
+
+  @Test
+  public void testMergeReceiveWireContract() {
+    DataSchema schema = new DataSchema(new String[]{"key"}, new ColumnDataType[]{ColumnDataType.INT});
+    MailboxMergeReceiveNode node = new MailboxMergeReceiveNode(1, schema, 2, PinotRelExchangeType.STREAMING,
+        RelDistribution.Type.SINGLETON, List.of(), List.of(new RelFieldCollation(0)), 10, 3, null);
+    Plan.PlanNode proto = PlanNodeSerializer.process(node);
+    assertEquals(proto.getNodeCase(), Plan.PlanNode.NodeCase.MAILBOXMERGERECEIVENODE);
+    assertEquals(PlanNodeDeserializer.process(proto), node);
+    // Emulate a legacy parser retaining tag 19 as unknown: there is no recognized executable node, so fail loudly.
+    Plan.PlanNode unknown = proto.toBuilder().clearMailboxMergeReceiveNode().setUnknownFields(
+        UnknownFieldSet.newBuilder().addField(19, UnknownFieldSet.Field.newBuilder()
+            .addLengthDelimited(proto.getMailboxMergeReceiveNode().toByteString()).build()).build()).build();
+    expectThrows(IllegalStateException.class, () -> PlanNodeDeserializer.process(unknown));
+  }
 
   @Test(dataProvider = "testQueryDataProvider")
   public void testQueryStagePlanSerDe(String query) {
