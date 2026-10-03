@@ -143,8 +143,8 @@ public class AuditRequestProcessorTest {
     _defaultConfig.setCaptureRequestHeaders("Content-Type,X-Custom-Header,Authorization,X-Password");
     MultivaluedMap<String, String> headers =
         createHeaders("Content-Type", "application/json", "X-Custom-Header", "custom-value", "Authorization",
-            "Bearer token123",  // Should be filtered out
-            "X-Password", "secret123"  // Should be filtered out
+            "Bearer token123",  // Captured, but redacted
+            "X-Password", "secret123"  // Captured, but redacted
         );
 
     when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
@@ -162,8 +162,9 @@ public class AuditRequestProcessorTest {
     Map<String, Object> capturedHeaders = payload.getHeaders();
     assertThat(capturedHeaders).containsEntry("Content-Type", "application/json");
     assertThat(capturedHeaders).containsEntry("X-Custom-Header", "custom-value");
-    assertThat(capturedHeaders).containsEntry("Authorization", "Bearer token123");
-    assertThat(capturedHeaders).containsEntry("X-Password", "secret123");
+    // Allow-listing a credential-bearing header records that it was sent, not what it said.
+    assertThat(capturedHeaders).containsEntry("Authorization", AuditRedactor.MASKED_VALUE);
+    assertThat(capturedHeaders).containsEntry("X-Password", AuditRedactor.MASKED_VALUE);
   }
 
   @Test
@@ -193,8 +194,7 @@ public class AuditRequestProcessorTest {
     MultivaluedMap<String, String> headers =
         createHeaders("authorization", "Bearer token123", "x-auth-token", "token456", "password-header", "pass123",
             "api-secret", "secret789", "x-api-key", "key123",
-            // Should be filtered (contains 'secret' logic might not catch this)
-            "content-type", "application/json"  // Should be kept
+            "content-type", "application/json"  // The only non-credential header here
         );
 
     when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
@@ -210,11 +210,11 @@ public class AuditRequestProcessorTest {
     assertThat(payload).isNotNull();
     Map<String, Object> capturedHeaders = payload.getHeaders();
     assertThat(capturedHeaders).containsEntry("content-type", "application/json");
-    assertThat(capturedHeaders).containsEntry("authorization", "Bearer token123");
-    assertThat(capturedHeaders).containsEntry("x-auth-token", "token456");
-    assertThat(capturedHeaders).containsEntry("password-header", "pass123");
-    assertThat(capturedHeaders).containsEntry("api-secret", "secret789");
-    assertThat(capturedHeaders).containsEntry("x-api-key", "key123");
+    assertThat(capturedHeaders).containsEntry("authorization", AuditRedactor.MASKED_VALUE);
+    assertThat(capturedHeaders).containsEntry("x-auth-token", AuditRedactor.MASKED_VALUE);
+    assertThat(capturedHeaders).containsEntry("password-header", AuditRedactor.MASKED_VALUE);
+    assertThat(capturedHeaders).containsEntry("api-secret", AuditRedactor.MASKED_VALUE);
+    assertThat(capturedHeaders).containsEntry("x-api-key", AuditRedactor.MASKED_VALUE);
   }
 
   @Test
@@ -623,5 +623,123 @@ public class AuditRequestProcessorTest {
     InputStream capturedStream = streamCaptor.getValue();
     byte[] readBytes = ByteStreams.toByteArray(capturedStream);
     assertThat(new String(readBytes, StandardCharsets.UTF_8)).isEqualTo(nestedJson);
+  }
+
+  // Redaction tests (STC-6446): nothing captured from the caller may carry credential material.
+
+  private static final String AWS_SECRET = "wJalrXUtnFEMI-K7MDENG-bPxRfiCYEXAMPLEKEY";
+
+  @Test
+  public void testCapturedBodyRedactsCredentials() {
+    _defaultConfig.setCaptureRequestPayload(true);
+    String body = "{\"connection\":{\"type\":\"CUSTOM_BATCH\",\"params\":{\"input.fs.prop.accessKey\":\""
+        + AWS_SECRET + "\",\"input.fs.prop.secretKey\":\"" + AWS_SECRET + "\"}}}";
+
+    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
+    when(_uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(_uriInfo.getPath()).thenReturn("/connections/browse");
+    when(_requestContext.getMethod()).thenReturn("POST");
+    when(_requestContext.getHeaders()).thenReturn(new MultivaluedHashMap<>());
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(
+        new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)));
+
+    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
+
+    assertThat(result).isNotNull();
+    String capturedBody = result.getRequest().getBody();
+    assertThat(capturedBody).doesNotContain(AWS_SECRET);
+    assertThat(capturedBody).contains(AuditRedactor.MASKED_VALUE);
+    assertThat(capturedBody).contains("CUSTOM_BATCH");
+  }
+
+  @Test
+  public void testCapturedBodyPreservedForDownstreamAfterRedaction() {
+    _defaultConfig.setCaptureRequestPayload(true);
+    String body = "{\"password\":\"" + AWS_SECRET + "\"}";
+
+    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
+    when(_uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(_uriInfo.getPath()).thenReturn("/tables");
+    when(_requestContext.getMethod()).thenReturn("POST");
+    when(_requestContext.getHeaders()).thenReturn(new MultivaluedHashMap<>());
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(
+        new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)));
+
+    _processor.processRequest(_requestContext, "10.0.0.1");
+
+    // Redaction must not disturb the entity stream handed to the resource method.
+    ArgumentCaptor<InputStream> streamCaptor = ArgumentCaptor.forClass(InputStream.class);
+    verify(_requestContext).setEntityStream(streamCaptor.capture());
+    assertThat(new String(readFully(streamCaptor.getValue()), StandardCharsets.UTF_8)).isEqualTo(body);
+  }
+
+  @Test
+  public void testCapturedQueryParametersRedactCredentials() {
+    MultivaluedMap<String, String> queryParams =
+        createQueryParams("tableName", "myTable", "accessToken", AWS_SECRET);
+
+    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
+    when(_uriInfo.getQueryParameters()).thenReturn(queryParams);
+    when(_uriInfo.getPath()).thenReturn("/test");
+    when(_requestContext.getMethod()).thenReturn("GET");
+    when(_requestContext.getHeaders()).thenReturn(new MultivaluedHashMap<>());
+
+    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
+
+    assertThat(result).isNotNull();
+    Map<String, Object> captured = result.getRequest().getQueryParameters();
+    assertThat(captured).containsEntry("tableName", "myTable");
+    assertThat(captured).containsEntry("accessToken", AuditRedactor.MASKED_VALUE);
+  }
+
+  @Test
+  public void testCapturedHeadersRedactAuthorization() {
+    _defaultConfig.setCaptureRequestHeaders("content-type,authorization");
+    MultivaluedMap<String, String> headers =
+        createHeaders("Content-Type", "application/json", "Authorization", "Bearer " + AWS_SECRET);
+
+    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
+    when(_uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(_uriInfo.getPath()).thenReturn("/test");
+    when(_requestContext.getMethod()).thenReturn("GET");
+    when(_requestContext.getHeaders()).thenReturn(headers);
+
+    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
+
+    assertThat(result).isNotNull();
+    Map<String, Object> captured = result.getRequest().getHeaders();
+    assertThat(captured).containsEntry("Content-Type", "application/json");
+    assertThat(captured).containsEntry("Authorization", AuditRedactor.MASKED_VALUE);
+  }
+
+  @Test
+  public void testUnparseableBodyCapturedBySizeOnly() {
+    _defaultConfig.setCaptureRequestPayload(true);
+    String body = "accessKey=" + AWS_SECRET;
+
+    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
+    when(_uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(_uriInfo.getPath()).thenReturn("/test");
+    when(_requestContext.getMethod()).thenReturn("POST");
+    when(_requestContext.getHeaders()).thenReturn(new MultivaluedHashMap<>());
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(
+        new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)));
+
+    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
+
+    assertThat(result).isNotNull();
+    assertThat(result.getRequest().getBody()).isEqualTo(
+        "[redacted: unparseable payload, " + body.length() + " bytes]");
+  }
+
+  private static byte[] readFully(InputStream stream) {
+    try {
+      return ByteStreams.toByteArray(stream);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 }
