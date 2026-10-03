@@ -37,6 +37,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
+import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
@@ -44,6 +45,7 @@ import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.StreamingSelectionOrderByOperator;
 import org.apache.pinot.core.plan.CombinePlanNode;
 import org.apache.pinot.core.plan.ExplainInfo;
+import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
@@ -1320,6 +1322,41 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     assertTrue(planCombineOperator(_sortedSegments, queryContext, true)
             instanceof StreamingSelectionOrderByCombineOperator,
         "The resolved mode must select the streaming combine");
+  }
+
+  @Test
+  public void testStreamingInstancePlanPreservesLeafOrderingAndBlockBudget()
+      throws Exception {
+    // The MSE planner pushes LIMIT + OFFSET to each physical leaf and applies the global slice after its merge.
+    // Execute the actual streaming instance plan for that leaf request, rather than driving the combine directly.
+    String leafQuery = "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 15";
+    Result baseline = run(_sortedSegments, leafQuery, false, false, false, 0);
+    for (SortedSelectionMergeMode mode : List.of(SortedSelectionMergeMode.ON, SortedSelectionMergeMode.AUTO)) {
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+          "SET sortedSelectionMergeMode='" + mode + "'; SET sortedSelectionMergeBlockSize=3; " + leafQuery);
+      queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+      List<SegmentContext> segments = new ArrayList<>();
+      for (IndexSegment segment : _sortedSegments) {
+        segments.add(new SegmentContext(segment));
+      }
+      List<Object[]> streamedRows = new ArrayList<>();
+      List<Integer> blockSizes = new ArrayList<>();
+      Plan plan = PLAN_MAKER.makeStreamingInstancePlan(segments, queryContext, EXECUTOR, block -> {
+        assertTrue(block instanceof SelectionResultsBlock);
+        assertEquals(block.getDataSchema(), baseline._schema);
+        assertNull(block.getErrorMessages());
+        blockSizes.add(block.getNumRows());
+        streamedRows.addAll(block.getRows());
+      });
+      assertEquals(queryContext.getSortedSelectionMergeMode(), SortedSelectionMergeMode.ON);
+      InstanceResponseBlock response = plan.execute();
+      assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
+      assertTrue(response.getRows() == null || response.getRows().isEmpty());
+      assertEquals(blockSizes, List.of(3, 3, 3, 3, 3));
+      assertEquals(streamedRows.size(), 15);
+      assertSorted(streamedRows, orderByComparator(leafQuery, false));
+      assertMultisetEquals(streamedRows, baseline._rows);
+    }
   }
 
   @Test
