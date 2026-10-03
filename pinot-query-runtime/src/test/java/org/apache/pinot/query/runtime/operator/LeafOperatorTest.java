@@ -121,7 +121,7 @@ public class LeafOperatorTest {
   }
 
   @Test
-  public void shouldConfirmOnlyOnePhysicalOrderedLeafRequest() {
+  public void shouldDeclareOrderingOnlyForOnePhysicalOrderedLeafRequest() {
     OpChainExecutionContext context = OperatorTestUtil.getTracingContext();
     DataSchema schema = new DataSchema(new String[]{"key"}, new ColumnDataType[]{ColumnDataType.INT});
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0));
@@ -138,6 +138,12 @@ public class LeafOperatorTest {
       when(leafContext.getLeafStageBoundaryNode()).thenReturn(scan);
       assertFalse(leaf.isSortedOn(collations));
       when(leafContext.getLeafStageBoundaryNode()).thenReturn(sort);
+      when(leafContext.isSinglePhysicalTable()).thenReturn(false);
+      assertFalse(leaf.isSortedOn(collations));
+      when(leafContext.isSinglePhysicalTable()).thenReturn(true);
+      context.setLeafStageContext(null);
+      assertFalse(leaf.isSortedOn(collations));
+      context.setLeafStageContext(leafContext);
     }
     try (LeafOperator hybrid = new LeafOperator(context, mockQueryRequests(2), schema, null, _executorService)) {
       assertFalse(hybrid.isSortedOn(collations));
