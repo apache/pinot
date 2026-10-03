@@ -89,6 +89,7 @@ public class IndexLoadingConfig {
     private final String _instanceId;
     private final boolean _isRealtimeOffHeapAllocation;
     private final boolean _isDirectRealtimeOffHeapAllocation;
+    private final boolean _lazyColumnMaterialization;
     private final int _realtimeAvgMultiValueCount;
     @Nullable
     private final String _segmentStoreURI;
@@ -174,6 +175,8 @@ public class IndexLoadingConfig {
       _segmentVersion = segmentVersion;
       _isRealtimeOffHeapAllocation = isRealtimeOffHeapAllocation;
       _isDirectRealtimeOffHeapAllocation = isDirectRealtimeOffHeapAllocation;
+      _lazyColumnMaterialization =
+          instanceDataManagerConfig != null && instanceDataManagerConfig.isLazyColumnMaterialization();
       _realtimeAvgMultiValueCount = realtimeAvgMultiValueCount;
       _segmentStoreURI = segmentStoreURI;
       _segmentDirectoryLoader = segmentDirectoryLoader;
@@ -431,6 +434,12 @@ public class IndexLoadingConfig {
 
   public void setForwardIndexOnly(boolean forwardIndexOnly) {
     _forwardIndexOnly = forwardIndexOnly;
+  }
+
+  /// Whether immutable segments create physical column readers on first access. This instance setting is shared by
+  /// derived segment configs and defaults to eager loading.
+  public boolean isLazyColumnMaterialization() {
+    return _immutableState._lazyColumnMaterialization;
   }
 
   public boolean isSkipSegmentPreprocess() {
