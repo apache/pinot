@@ -95,7 +95,9 @@ public final class MaterializedViewAggregationCatalog {
       "COUNT", DataType.LONG,
       "DISTINCTCOUNTRAWHLL", DataType.BYTES,
       "DISTINCTCOUNTRAWHLLPLUS", DataType.BYTES,
-      "DISTINCTCOUNTRAWTHETASKETCH", DataType.BYTES
+      "DISTINCTCOUNTRAWTHETASKETCH", DataType.BYTES,
+      "DISTINCTCOUNTRAWCPCSKETCH", DataType.BYTES,
+      "DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH", DataType.BYTES
   );
 
   /// Returns the canonicalised set of aggregation operator names this catalog supports.
