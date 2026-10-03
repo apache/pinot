@@ -744,4 +744,148 @@ public class SegmentDeletionManagerTest {
       }
     }
   }
+
+  /// A filesystem whose moves succeed but whose touch reports failure, to exercise the warning path.
+  public static class TouchFailingPinotFs extends LocalPinotFS {
+    @Override
+    public boolean touch(URI uri) {
+      return false;
+    }
+  }
+
+  /// A filesystem whose moves throw, to exercise the IOException path around the move.
+  public static class MoveThrowingPinotFs extends LocalPinotFS {
+    @Override
+    public boolean move(URI srcUri, URI dstUri, boolean overwrite)
+        throws IOException {
+      throw new IOException("simulated deep store failure");
+    }
+  }
+
+  /// A failed touch must not fail the deletion: the segment has already been moved, it just may age out on the
+  /// cluster default schedule instead of its own.
+  @Test
+  public void testFailedTouchStillCompletesTheMove()
+      throws Exception {
+    PinotFSFactory.register(PinotFSFactory.LOCAL_PINOT_FS_SCHEME, TouchFailingPinotFs.class.getName(),
+        new PinotConfiguration());
+    try {
+      File tempDir = Files.createTempDirectory("pinot-test-").toFile();
+      tempDir.deleteOnExit();
+      SegmentDeletionManager deletionManager =
+          createDeletionManager(tempDir.getAbsolutePath(), makeHelixAdmin(), CLUSTER_NAME, makePropertyStore(), 7);
+      List<String> segments = segmentsThatShouldBeDeleted();
+      createTableAndSegmentFiles(tempDir, segments);
+
+      deletionManager.removeSegmentsFromStoreInBatch(TABLE_NAME, segments, TimeUnit.DAYS.toMillis(7));
+
+      File deletedTableDir = new File(
+          tempDir.getAbsolutePath() + File.separator + SegmentDeletionManager.DELETED_SEGMENTS + File.separator
+              + TABLE_NAME);
+      File[] moved = deletedTableDir.listFiles();
+      Assert.assertNotNull(moved);
+      Assert.assertEquals(moved.length, segments.size(), "Segments should still be moved when touch fails");
+    } finally {
+      PinotFSFactory.register(PinotFSFactory.LOCAL_PINOT_FS_SCHEME, LocalPinotFS.class.getName(),
+          new PinotConfiguration());
+    }
+  }
+
+  /// A move that throws must be reported rather than aborting the whole batch, and must not leave a destination
+  /// behind.
+  @Test
+  public void testMoveThrowingIsContainedPerSegment()
+      throws Exception {
+    PinotFSFactory.register(PinotFSFactory.LOCAL_PINOT_FS_SCHEME, MoveThrowingPinotFs.class.getName(),
+        new PinotConfiguration());
+    try {
+      File tempDir = Files.createTempDirectory("pinot-test-").toFile();
+      tempDir.deleteOnExit();
+      SegmentDeletionManager deletionManager =
+          createDeletionManager(tempDir.getAbsolutePath(), makeHelixAdmin(), CLUSTER_NAME, makePropertyStore(), 7);
+      List<String> segments = segmentsThatShouldBeDeleted();
+      createTableAndSegmentFiles(tempDir, segments);
+
+      // Must not propagate: one bad segment should not abort the rest of the table's cleanup.
+      deletionManager.removeSegmentsFromStoreInBatch(TABLE_NAME, segments, TimeUnit.DAYS.toMillis(7));
+
+      File deletedTableDir = new File(
+          tempDir.getAbsolutePath() + File.separator + SegmentDeletionManager.DELETED_SEGMENTS + File.separator
+              + TABLE_NAME);
+      File[] phantoms = deletedTableDir.listFiles();
+      Assert.assertTrue(phantoms == null || phantoms.length == 0,
+          "A throwing move must not leave anything in the deleted-segments directory");
+    } finally {
+      PinotFSFactory.register(PinotFSFactory.LOCAL_PINOT_FS_SCHEME, LocalPinotFS.class.getName(),
+          new PinotConfiguration());
+    }
+  }
+
+  /// A filesystem whose moves always fail, recording attempted moves and touches so a test can assert that we
+  /// never touch a destination we did not create.
+  public static class MoveFailingPinotFs extends LocalPinotFS {
+    static final List<URI> ATTEMPTED_MOVES = new ArrayList<>();
+    static final List<URI> TOUCHED_URIS = new ArrayList<>();
+
+    static synchronized void reset() {
+      ATTEMPTED_MOVES.clear();
+      TOUCHED_URIS.clear();
+    }
+
+    @Override
+    public synchronized boolean move(URI srcUri, URI dstUri, boolean overwrite) {
+      ATTEMPTED_MOVES.add(srcUri);
+      return false;
+    }
+
+    @Override
+    public synchronized boolean touch(URI uri) {
+      TOUCHED_URIS.add(uri);
+      return true;
+    }
+  }
+
+  /// Touching a destination whose move failed materializes an empty file in the deleted-segments directory on
+  /// object stores, leaving a phantom segment for the retention manager to track. Only successful moves may be
+  /// touched.
+  @Test
+  public void testFailedMoveDoesNotTouchDestination()
+      throws Exception {
+    MoveFailingPinotFs.reset();
+    // The data dir is a local path, so the deletion manager resolves the "file" scheme. Override that scheme and
+    // restore it afterwards so the rest of the suite keeps the real local filesystem.
+    PinotFSFactory.register(PinotFSFactory.LOCAL_PINOT_FS_SCHEME, MoveFailingPinotFs.class.getName(),
+        new PinotConfiguration());
+    try {
+      File tempDir = Files.createTempDirectory("pinot-test-").toFile();
+      tempDir.deleteOnExit();
+      SegmentDeletionManager deletionManager =
+          createDeletionManager(tempDir.getAbsolutePath(), makeHelixAdmin(), CLUSTER_NAME, makePropertyStore(), 7);
+
+      List<String> segments = segmentsThatShouldBeDeleted();
+      createTableAndSegmentFiles(tempDir, segments);
+
+      // Retention > 0 takes the move path rather than the immediate-delete path.
+      deletionManager.removeSegmentsFromStoreInBatch(TABLE_NAME, segments, TimeUnit.DAYS.toMillis(7));
+
+      synchronized (MoveFailingPinotFs.class) {
+        // Guard against the test silently passing because the move path was never reached at all.
+        Assert.assertEquals(MoveFailingPinotFs.ATTEMPTED_MOVES.size(), segments.size(),
+            "Expected one move attempt per segment on the retention > 0 path");
+        Assert.assertTrue(MoveFailingPinotFs.TOUCHED_URIS.isEmpty(),
+            "No destination should be touched when every move failed, but touched: "
+                + MoveFailingPinotFs.TOUCHED_URIS);
+      }
+
+      File deletedTableDir = new File(
+          tempDir.getAbsolutePath() + File.separator + SegmentDeletionManager.DELETED_SEGMENTS + File.separator
+              + TABLE_NAME);
+      File[] phantoms = deletedTableDir.listFiles();
+      Assert.assertTrue(phantoms == null || phantoms.length == 0,
+          "Failed moves must not leave phantom files in the deleted-segments directory");
+    } finally {
+      PinotFSFactory.register(PinotFSFactory.LOCAL_PINOT_FS_SCHEME, LocalPinotFS.class.getName(),
+          new PinotConfiguration());
+    }
+  }
 }
