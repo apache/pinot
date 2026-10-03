@@ -952,6 +952,18 @@ public class QueryEnvironment {
     default int defaultSealedInListThreshold() {
       return CommonConstants.Broker.DEFAULT_SEALED_IN_LIST_THRESHOLD;
     }
+
+    /// Whether the broker verified all cluster workers support the merge receive wire node.
+    @Value.Default
+    default boolean isKWayMergeSupported() {
+      return false;
+    }
+
+    /// See [CommonConstants.Broker#CONFIG_OF_WINDOW_SORT_ON_SENDER]
+    @Value.Default
+    default boolean defaultWindowSortOnSender() {
+      return CommonConstants.Broker.DEFAULT_WINDOW_SORT_ON_SENDER;
+    }
   }
 
   /// A query that have been parsed, validates, transformed into a [RelNode] and optimized with Calcite.

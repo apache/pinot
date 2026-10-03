@@ -33,6 +33,7 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -54,6 +55,7 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.RepeatOperator;
 import org.apache.pinot.query.runtime.operator.SortOperator;
+import org.apache.pinot.query.runtime.operator.SortedMailboxMergeReceiveOperator;
 import org.apache.pinot.query.runtime.operator.SortedMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
 import org.apache.pinot.query.runtime.operator.UnnestOperator;
@@ -193,7 +195,11 @@ public class PlanNodeToOpChain {
     @Override
     public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, OpChainExecutionContext context) {
       try {
-        if (node.isSort()) {
+        // The distinct merge node requires ordered streams. Legacy sort=true nodes still use the compatible
+        // receiver sort; current plain receives leave ordering to an explicit downstream SortNode.
+        if (node instanceof MailboxMergeReceiveNode) {
+          return new SortedMailboxMergeReceiveOperator(context, (MailboxMergeReceiveNode) node);
+        } else if (node.isSort()) {
           return new SortedMailboxReceiveOperator(context, node);
         } else {
           return new MailboxReceiveOperator(context, node);

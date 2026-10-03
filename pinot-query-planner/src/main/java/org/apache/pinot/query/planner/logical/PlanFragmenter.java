@@ -33,6 +33,8 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -197,8 +199,10 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     _mailboxSendToExchangeNodeMap.put(mailboxSendNode, node);
 
     // Return the MailboxReceiveNode as the leave node of the current PlanFragment.
-    MailboxReceiveNode mailboxReceiveNode =
-        new MailboxReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
+    MailboxReceiveNode mailboxReceiveNode = node instanceof KWayMergeExchangeNode
+        ? new MailboxMergeReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
+            senderPlanFragmentId, exchangeType, distributionType, keys, node.getCollations(), mailboxSendNode)
+        : new MailboxReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
             senderPlanFragmentId, exchangeType, distributionType, keys, node.getCollations(), node.isSortOnReceiver(),
             node.isSortOnSender(), mailboxSendNode);
     _mailboxReceiveToExchangeNodeMap.put(mailboxReceiveNode, node);
