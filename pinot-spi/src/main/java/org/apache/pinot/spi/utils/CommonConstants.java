@@ -823,6 +823,7 @@ public class CommonConstants {
     public static final int DEFAULT_SEALED_IN_LIST_THRESHOLD = 20;
 
     /// Whether global ordered windows sort on each sender and merge the ordered streams at the receiver.
+    /// Sender sorting also requires a homogeneous broker/server release build; snapshots retain receiver sorting.
     public static final String CONFIG_OF_WINDOW_SORT_ON_SENDER =
         "pinot.broker.multistage.window.sort.on.sender";
     public static final boolean DEFAULT_WINDOW_SORT_ON_SENDER = false;

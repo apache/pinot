@@ -26,6 +26,7 @@ import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -51,7 +52,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -116,13 +116,13 @@ public class OpChainConverterDispatcherTest {
   }
 
   @Test
-  public void testExplicitSortInputUsesSortedSendingMailbox() {
+  public void testExplicitSortInputUsesPlainSendingMailbox() {
     int stageId = 1;
     int receiverStageId = 0;
     MailboxService mailboxService = mock(MailboxService.class);
     when(mailboxService.getHostname()).thenReturn("localhost");
     when(mailboxService.getPort()).thenReturn(8000);
-    when(mailboxService.getSendingMailbox(anyString(), anyInt(), anyString(), anyLong(), any(), eq(true)))
+    when(mailboxService.getSendingMailbox(anyString(), anyInt(), anyString(), anyLong(), any()))
         .thenReturn(mock(SendingMailbox.class));
 
     MailboxInfo receiverMailboxInfo = new MailboxInfo("localhost", 18080, List.of(0));
@@ -134,16 +134,16 @@ public class OpChainConverterDispatcherTest {
     PlanNode sortNode = new SortNode(stageId, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(valueNode), COLLATIONS,
         Integer.MAX_VALUE, 0);
     MailboxSendNode sendNode = new MailboxSendNode(stageId, DATA_SCHEMA, List.of(sortNode), receiverStageId,
-        PinotRelExchangeType.STREAMING, RelDistribution.Type.RANDOM_DISTRIBUTED, List.of(), false, COLLATIONS, true,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.RANDOM_DISTRIBUTED, List.of(), false, List.of(), false,
         "MURMUR3");
 
     try (OpChain opChain = PlanNodeToOpChain.convert(sendNode, context)) {
       Assert.assertTrue(opChain.getRoot() instanceof MailboxSendOperator);
-      verify(mailboxService).getSendingMailbox(anyString(), anyInt(), anyString(), anyLong(), any(), eq(true));
+      verify(mailboxService).getSendingMailbox(anyString(), anyInt(), anyString(), anyLong(), any());
     }
   }
 
-  // Verify the legacy receiver fallback used by mixed-version plans.
+  // Distinguish the new merge wire node from legacy receive-with-sort plans.
   @Test
   @SuppressWarnings("deprecation")
   public void testSortedReceiveOperatorSelection() {
@@ -156,8 +156,8 @@ public class OpChainConverterDispatcherTest {
     StageMetadata stageMetadata = new StageMetadata(stageId, List.of(workerMetadata), Map.of());
     OpChainExecutionContext context = createContext(mailboxService, stageMetadata, workerMetadata);
 
-    MailboxReceiveNode mergeReceiveNode = new MailboxReceiveNode(stageId, DATA_SCHEMA, senderStageId,
-        PinotRelExchangeType.STREAMING, RelDistribution.Type.SINGLETON, List.of(), COLLATIONS, true, true, null);
+    MailboxReceiveNode mergeReceiveNode = new MailboxMergeReceiveNode(stageId, DATA_SCHEMA, senderStageId,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.SINGLETON, List.of(), COLLATIONS, null);
     try (OpChain opChain = PlanNodeToOpChain.convert(mergeReceiveNode, context)) {
       assertTrue(opChain.getRoot() instanceof SortedMailboxMergeReceiveOperator);
     }

@@ -41,6 +41,7 @@ import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -1288,23 +1289,24 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   }
 
   /// A global ordered window keeps the sender-sort/receiver-merge path. Sender-sorted exchanges must express their
-  /// ordering as an operator in the sending fragment: the send node's flag alone is only metadata.
+  /// ordering as an explicit logical Sort in the sending fragment; the send node only transports its output.
   @Test
   public void testGlobalOrderedWindowSenderHasExplicitMatchingSortInput() {
+    QueryEnvironment supportedEnv = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS,
+        SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP, true);
     String query = "SET windowSortOnSender=true; SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d";
     DispatchableSubPlan plan;
-    try (CompiledQuery compiled = _queryEnvironment.compile(query)) {
+    try (CompiledQuery compiled = supportedEnv.compile(query)) {
       plan = compiled.planQuery(0).getQueryPlan();
     }
     MailboxSendNode sendNode = findWindowInputSendNode(plan);
 
-    assertTrue(sendNode.isSort(), "The ordered window exchange should advertise sorted sender streams");
-    assertTrue(sendNode.hasExplicitSortInput(),
-        "The sender sort flag must be backed by a matching SortNode directly below MailboxSendNode");
+    assertFalse(sendNode.isSort(), "Ordering belongs to upstream plan nodes, not the sender");
     assertEquals(sendNode.getInputs().size(), 1);
     assertTrue(sendNode.getInputs().get(0) instanceof SortNode);
     SortNode sortNode = (SortNode) sendNode.getInputs().get(0);
-    assertEquals(sortNode.getCollations(), sendNode.getCollations());
+    assertEquals(sortNode.getCollations(),
+        ((MailboxReceiveNode) findWindowNode(plan).getInputs().get(0)).getCollations());
     assertEquals(sortNode.getFetch(), Integer.MAX_VALUE);
     assertEquals(sortNode.getOffset(), -1);
     assertEquals(sortNode.getInputs().size(), 1, "The explicit sender sort should preserve the exchange input");
@@ -1313,16 +1315,17 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertTrue(window.getInputs().get(0) instanceof MailboxReceiveNode,
         "The merge receiver itself establishes ordering; no redundant SortNode should remain above it");
     MailboxReceiveNode receiveNode = (MailboxReceiveNode) window.getInputs().get(0);
-    assertTrue(receiveNode.isSort());
-    assertTrue(receiveNode.isSortedOnSender());
+    assertTrue(receiveNode instanceof MailboxMergeReceiveNode);
+    assertFalse(receiveNode.isSort());
+    assertFalse(receiveNode.isSortedOnSender());
 
     String explain;
-    try (CompiledQuery compiled = _queryEnvironment.compile(
+    try (CompiledQuery compiled = supportedEnv.compile(
         "SET windowSortOnSender=true; EXPLAIN IMPLEMENTATION PLAN FOR "
             + "SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d")) {
       explain = compiled.explain(RANDOM_REQUEST_ID_GEN.nextLong(), null).getExplainPlan();
     }
-    assertTrue(explain.contains("[SORTED]"), explain);
+    assertTrue(explain.contains("MAIL_MERGE_RECEIVE"), explain);
     assertTrue(explain.contains("SORT LIMIT 2147483647"), explain);
   }
 
@@ -1333,9 +1336,19 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     MailboxSendNode sendNode = findWindowInputSendNode(plan);
 
     assertFalse(sendNode.isSort());
-    assertFalse(sendNode.hasExplicitSortInput());
+    assertFalse(sendNode.getInputs().get(0) instanceof SortNode);
     assertTrue(findWindowNode(plan).getInputs().get(0) instanceof SortNode,
         "The disabled path must retain the legacy post-exchange full sort");
+  }
+
+  @Test
+  public void testQueryOptionCannotBypassMergeCapability() {
+    String query = "SET windowSortOnSender=true; SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d";
+    try (CompiledQuery compiled = _queryEnvironment.compile(query)) {
+      WindowNode window = findWindowNode(compiled.planQuery(0).getQueryPlan());
+      assertTrue(window.getInputs().get(0) instanceof SortNode);
+      assertFalse(window.getInputs().get(0).getInputs().get(0) instanceof MailboxMergeReceiveNode);
+    }
   }
 
   /// A partitioned ordered window keeps its authoritative full sort after the hash exchange.
@@ -1348,7 +1361,6 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
 
     assertFalse(sendNode.isSort(), "The partitioned exchange must not advertise a globally sorted sender stream");
-    assertFalse(sendNode.hasExplicitSortInput(), "The partitioned exchange must not sort before hash distribution");
     assertFalse(sendNode.getInputs().get(0) instanceof SortNode,
         "The explicit full sort belongs in the receiving fragment after hash distribution");
   }

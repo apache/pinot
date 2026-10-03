@@ -51,10 +51,7 @@ import org.slf4j.LoggerFactory;
 
 /// This `MailboxSendOperator` is created to send [MseBlock]s to the receiving end.
 ///
-/// This operator preserves the order produced by its input and does not establish ordering itself. When a mailbox
-/// receive performs a k-way merge, the planner places a [SortOperator] in this operator's input op-chain. The
-/// mailbox transport only confirms that structural guarantee so a mixed-version receiver can safely fall back when
-/// an older sender does not keep the sort above its leaf boundary.
+/// TODO: Add support to sort the data prior to sending if sorting is enabled
 public class MailboxSendOperator extends MultiStageOperator {
   public static final EnumSet<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPES =
       EnumSet.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED,
@@ -67,15 +64,11 @@ public class MailboxSendOperator extends MultiStageOperator {
   private final BlockExchange _exchange;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
+  // TODO: Support sort on sender
   public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator input, MailboxSendNode node) {
-    this(context, input, statMap -> getBlockExchange(context, node, statMap, isSortedOnSender(input, node)));
+    this(context, input, statMap -> getBlockExchange(context, node, statMap));
     _statMap.merge(StatKey.STAGE, context.getStageId());
     _statMap.merge(StatKey.PARALLELISM, 1);
-  }
-
-  @VisibleForTesting
-  static boolean isSortedOnSender(MultiStageOperator input, MailboxSendNode node) {
-    return input instanceof SortOperator && node.hasExplicitSortInput();
   }
 
   @VisibleForTesting
@@ -89,7 +82,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   /// Creates a [BlockExchange] for the given [MailboxSendNode].
   ///
   /// In normal cases, where the sender sends data to a single receiver stage, this method just delegates on
-  /// [#getBlockExchange(OpChainExecutionContext, int, MailboxSendNode, StatMap, BlockSplitter, boolean)].
+  /// [#getBlockExchange(OpChainExecutionContext, int, MailboxSendNode, StatMap, BlockSplitter)].
   ///
   /// In case of a multi-sender node, this method creates a two steps exchange:
   ///
@@ -101,19 +94,19 @@ public class MailboxSendOperator extends MultiStageOperator {
   ///
   /// @see BlockExchange#asSendingMailbox(String)
   private static BlockExchange getBlockExchange(OpChainExecutionContext ctx, MailboxSendNode node,
-      StatMap<StatKey> statMap, boolean sortedOnSender) {
+      StatMap<StatKey> statMap) {
     BlockSplitter mainSplitter = BlockSplitter.DEFAULT;
     if (!node.isMultiSend()) {
       // it is guaranteed that there is exactly one receiver stage
       int receiverStageId = node.getReceiverStageIds().iterator().next();
-      return getBlockExchange(ctx, receiverStageId, node, statMap, mainSplitter, sortedOnSender);
+      return getBlockExchange(ctx, receiverStageId, node, statMap, mainSplitter);
     }
     List<SendingMailbox> perStageSendingMailboxes = new ArrayList<>();
     // The inner splitter is a NO_OP because the outer splitter will take care of splitting the blocks
     BlockSplitter innerSplitter = BlockSplitter.NO_OP;
     for (int receiverStageId : node.getReceiverStageIds()) {
       BlockExchange blockExchange =
-          getBlockExchange(ctx, receiverStageId, node, statMap, innerSplitter, sortedOnSender);
+          getBlockExchange(ctx, receiverStageId, node, statMap, innerSplitter);
       perStageSendingMailboxes.add(blockExchange.asSendingMailbox(Integer.toString(receiverStageId)));
     }
 
@@ -156,7 +149,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   ///
   /// In case of a multi-sender node, this method will be called for each receiver stage.
   private static BlockExchange getBlockExchange(OpChainExecutionContext context, int receiverStageId,
-      MailboxSendNode node, StatMap<StatKey> statMap, BlockSplitter splitter, boolean sortedOnSender) {
+      MailboxSendNode node, StatMap<StatKey> statMap, BlockSplitter splitter) {
     RelDistribution.Type distributionType = node.getDistributionType();
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(distributionType), "Unsupported distribution type: %s",
         distributionType);
@@ -172,10 +165,7 @@ public class MailboxSendOperator extends MultiStageOperator {
         MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
             mailboxInfos);
     List<SendingMailbox> sendingMailboxes = routingInfos.stream()
-        .map(v -> sortedOnSender
-            ? mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap,
-                true)
-            : mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap))
+        .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap))
         .collect(Collectors.toList());
     statMap.merge(StatKey.FAN_OUT, sendingMailboxes.size());
     return BlockExchange.getExchange(sendingMailboxes, distributionType, node.getKeys(), splitter,
