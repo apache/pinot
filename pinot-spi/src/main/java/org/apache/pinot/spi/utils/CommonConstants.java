@@ -827,6 +827,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_WINDOW_K_WAY_MERGE =
         "pinot.broker.multistage.window.k.way.merge";
     public static final boolean DEFAULT_WINDOW_K_WAY_MERGE = false;
+    public static final String DEFAULT_WINDOW_K_WAY_MERGE_MODE = "false";
 
     public static class Request {
       public static final String SQL = "sql";
@@ -1189,7 +1190,7 @@ public class CommonConstants {
         /// whether the leaf sorts its rows in memory or streams physically sorted segments. No-op for the V2 planner.
         public static final String STREAMING_SORTED_MAILBOX_RECEIVE = "streamingSortedMailboxReceive";
 
-        /// Per-query override of [Broker#CONFIG_OF_WINDOW_K_WAY_MERGE].
+        /// Per-query auto, true, or false override of [Broker#CONFIG_OF_WINDOW_K_WAY_MERGE].
         public static final String WINDOW_K_WAY_MERGE = "windowKWayMerge";
 
         // Vector search query options

@@ -50,7 +50,7 @@ public final class WindowSortAutoTuner {
   private static final int RESAMPLE_EVERY = 8;
   private static final int SLOWDOWN_PERCENT = 15;
 
-  private final Cache<ExchangeKey, Evidence> _observations = CacheBuilder.newBuilder()
+  private final Cache<ObservationKey, Evidence> _observations = CacheBuilder.newBuilder()
       .maximumSize(1_024).expireAfterWrite(Duration.ofMinutes(30)).build();
   private final AtomicLong _nextGeneration = new AtomicLong();
 
@@ -61,7 +61,8 @@ public final class WindowSortAutoTuner {
   /// A single query's planner decisions and, on successful completion, its receiver-stage observations.
   public final class Session implements WindowSortAutoPlan {
     private final long _queryHash;
-    private final Map<ExchangeKey, Decision> _decisions = new HashMap<>();
+    private final Map<ObservationKey, Decision> _decisions = new HashMap<>();
+    private final Map<ObservationKey, Integer> _receiverStages = new HashMap<>();
     private final AtomicBoolean _observed = new AtomicBoolean();
 
     private Session(long queryHash) {
@@ -69,17 +70,24 @@ public final class WindowSortAutoTuner {
     }
 
     @Override
-    public boolean useSenderSort(int receiverStageId, int senderStageId, int inputHash, int collationHash) {
-      return decisionFor(receiverStageId, senderStageId, inputHash, collationHash).senderSort();
+    public boolean useSenderSort(WindowSortAutoPlan.ExchangeKey key) {
+      return decisionFor(key).senderSort();
     }
 
     @Override
-    public boolean shouldProfile(int receiverStageId, int senderStageId, int inputHash, int collationHash) {
-      return decisionFor(receiverStageId, senderStageId, inputHash, collationHash).profile();
+    public boolean shouldProfile(WindowSortAutoPlan.ExchangeKey key) {
+      return decisionFor(key).profile();
     }
 
-    private Decision decisionFor(int receiverStageId, int senderStageId, int inputHash, int collationHash) {
-      ExchangeKey key = new ExchangeKey(_queryHash, receiverStageId, senderStageId, inputHash, collationHash);
+    @Override
+    public void bind(WindowSortAutoPlan.ExchangeKey logicalKey, int receiverStageId, int senderStageId) {
+      ObservationKey key = new ObservationKey(_queryHash, logicalKey);
+      // Repeated planning may allocate a different stage. Ambiguous bindings never train a candidate.
+      _receiverStages.merge(key, receiverStageId, (previous, current) -> previous.equals(current) ? current : -1);
+    }
+
+    private Decision decisionFor(WindowSortAutoPlan.ExchangeKey logicalKey) {
+      ObservationKey key = new ObservationKey(_queryHash, logicalKey);
       return _decisions.computeIfAbsent(key, ignored -> {
         Evidence evidence = _observations.getIfPresent(key);
         if (evidence == null) {
@@ -147,12 +155,12 @@ public final class WindowSortAutoTuner {
         return;
       }
       Map<Integer, Integer> candidateCountByStage = new HashMap<>();
-      for (ExchangeKey key : _decisions.keySet()) {
-        candidateCountByStage.merge(key.receiverStageId(), 1, Integer::sum);
+      for (ObservationKey key : _decisions.keySet()) {
+        candidateCountByStage.merge(_receiverStages.getOrDefault(key, -1), 1, Integer::sum);
       }
-      for (Map.Entry<ExchangeKey, Decision> entry : _decisions.entrySet()) {
+      for (Map.Entry<ObservationKey, Decision> entry : _decisions.entrySet()) {
         Decision decision = entry.getValue();
-        ExchangeKey key = entry.getKey();
+        ObservationKey key = entry.getKey();
         if (decision.senderSort()) {
           // End-to-end latency cannot attribute a slowdown to one of several AUTO exchanges in a query.
           if (_decisions.size() == 1) {
@@ -163,8 +171,9 @@ public final class WindowSortAutoTuner {
         if (!decision.profile()) {
           continue;
         }
-        ProfileResult result = candidateCountByStage.get(key.receiverStageId()) == 1
-            ? profile(stageStats, key.receiverStageId())
+        int receiverStageId = _receiverStages.getOrDefault(key, -1);
+        ProfileResult result = candidateCountByStage.get(receiverStageId) == 1
+            ? profile(stageStats, receiverStageId)
             : ProfileResult.INCOMPLETE;
         Evidence snapshot = _observations.getIfPresent(key);
         if (snapshot == null || snapshot.generation() != decision.generation()
@@ -207,7 +216,7 @@ public final class WindowSortAutoTuner {
       }
     }
 
-    private void observeSender(ExchangeKey key, Decision decision, long elapsedNanos) {
+    private void observeSender(ObservationKey key, Decision decision, long elapsedNanos) {
       if (elapsedNanos <= 0) {
         return;
       }
@@ -295,8 +304,7 @@ public final class WindowSortAutoTuner {
     CANDIDATE, NON_CANDIDATE, INCOMPLETE
   }
 
-  private record ExchangeKey(long queryHash, int receiverStageId, int senderStageId, int inputHash,
-                             int collationHash) {
+  private record ObservationKey(long queryHash, WindowSortAutoPlan.ExchangeKey logicalKey) {
   }
 
   /// A negative observation uses -1 and counts down unprofiled receiver queries; -2 disables sender choice until TTL.

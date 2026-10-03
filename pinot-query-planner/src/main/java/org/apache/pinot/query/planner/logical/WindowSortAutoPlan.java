@@ -19,16 +19,21 @@
 package org.apache.pinot.query.planner.logical;
 
 
-/// Selects one ordering strategy for every worker of a global window exchange.
-///
-/// The receiver and sender stage identifiers are stable within one planned query. Implementations must return false
-/// when evidence for this exchange is absent or ambiguous. A selector is shared only during planning and must not
-/// mutate the physical plan after dispatch.
+/// Selects ordering for global windows on the finalized logical tree, before stage allocation.
+/// Implementations must fail closed when evidence is absent or ambiguous. The logical key remains stable across
+/// repeated compilations; allocated stage identifiers are bound separately for one query's observations.
 public interface WindowSortAutoPlan {
-  boolean useSenderSort(int receiverStageId, int senderStageId, int inputHash, int collationHash);
+  boolean useSenderSort(ExchangeKey key);
 
-  /// Whether a receiver-sort execution should collect a fresh AUTO sample. The default preserves existing selectors.
-  default boolean shouldProfile(int receiverStageId, int senderStageId, int inputHash, int collationHash) {
+  default boolean shouldProfile(ExchangeKey key) {
     return true;
+  }
+
+  /// Binds an already selected logical exchange to this query's receiver stage. It cannot change the decision.
+  default void bind(ExchangeKey key, int receiverStageId, int senderStageId) {
+  }
+
+  /// A deterministic path in the finalized logical tree plus ordering/input fingerprints, without stage identifiers.
+  record ExchangeKey(String path, int inputHash, int collationHash) {
   }
 }
