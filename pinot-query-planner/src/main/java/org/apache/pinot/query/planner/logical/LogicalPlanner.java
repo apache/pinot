@@ -25,9 +25,13 @@ import org.apache.calcite.plan.RelTraitDef;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgram;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 
 
 /// The `LogicalPlanner` is an extended implementation of the Calcite's [HepPlanner].
+///
+/// Unlike [HepPlanner], it stops before the next rule fires when the planning thread is interrupted (see
+/// [#checkCancel()]).
 public class LogicalPlanner extends HepPlanner {
 
   private List<RelTraitDef> _traitDefs;
@@ -49,6 +53,22 @@ public class LogicalPlanner extends HepPlanner {
   @Override
   public List<RelTraitDef> getRelTraitDefs() {
     return _traitDefs;
+  }
+
+  /// Throws if planning must stop. Calcite calls this before it fires each rule.
+  ///
+  /// Calcite stops planning only when the [org.apache.calcite.util.CancelFlag] of the planner [Context] is set. It
+  /// ignores thread interrupts, but Pinot cancels planning with an interrupt: for example, when the broker times out
+  /// waiting for the plan, or when the query is terminated. Without this check, an interrupted thread keeps planning
+  /// to the end, which can take minutes.
+  ///
+  /// This check does not clear the interrupt status.
+  @Override
+  public void checkCancel() {
+    if (Thread.currentThread().isInterrupted()) {
+      throw new EarlyTerminationException("Interrupted while planning query");
+    }
+    super.checkCancel();
   }
 
   @Override
