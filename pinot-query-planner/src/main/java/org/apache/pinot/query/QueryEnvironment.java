@@ -64,6 +64,7 @@ import org.apache.pinot.calcite.rel.rules.PinotJoinToDynamicBroadcastRule;
 import org.apache.pinot.calcite.rel.rules.PinotRelDistributionTraitRule;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.rel.rules.PinotSortExchangeCopyRule;
+import org.apache.pinot.calcite.rel.rules.PinotSortedLeafExchangeRule;
 import org.apache.pinot.calcite.rex.PinotRexExecutor;
 import org.apache.pinot.calcite.rex.SearchSealer;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
@@ -223,7 +224,8 @@ public class QueryEnvironment {
     boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(options,
         _envConfig.defaultUsePhysicalOptimizer());
     HepProgram traitProgram = getTraitProgram(
-        workerManager, _envConfig, usePhysicalOptimizer, useRuleSet, sortExchangeCopyLimit);
+        workerManager, _envConfig, usePhysicalOptimizer, useRuleSet, sortExchangeCopyLimit,
+        _envConfig.isKWayMergeSupported() && QueryOptionsUtils.isStreamingSortedMailboxReceiveEnabled(options));
     SqlExplainFormat format = SqlExplainFormat.DOT;
     if (sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
@@ -576,8 +578,7 @@ public class QueryEnvironment {
     }
     Map<String, String> options = plannerContext.getOptions();
     SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, getSpoolMode(options),
-        isSpoolsFeedback(options), _envConfig.defaultHashFunction(), pruneUnnestColumns(options),
-        QueryOptionsUtils.isStreamingSortedMailboxReceiveEnabled(options), _envConfig.getTableCache());
+        isSpoolsFeedback(options), _envConfig.defaultHashFunction(), pruneUnnestColumns(options));
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
             _envConfig.getTableCache());
@@ -694,7 +695,8 @@ public class QueryEnvironment {
   }
 
   private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager, Config config,
-      boolean usePhysicalOptimizer, Set<String> useRuleSet, int sortExchangeCopyLimit) {
+      boolean usePhysicalOptimizer, Set<String> useRuleSet, int sortExchangeCopyLimit,
+      boolean streamingSortedMailboxReceiveEnabled) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     PinotRuleSet ruleSet = config.getRuleSet();
 
@@ -719,6 +721,9 @@ public class QueryEnvironment {
       for (RelOptRule relOptRule : postLogical) {
         if (isEligibleQueryPostRule(relOptRule, config)) {
           hepProgramBuilder.addRuleInstance(relOptRule);
+          if (streamingSortedMailboxReceiveEnabled && relOptRule instanceof PinotSortExchangeCopyRule) {
+            hepProgramBuilder.addRuleInstance(new PinotSortedLeafExchangeRule(config.getTableCache()));
+          }
         }
       }
       // Enriched joins have been removed. The JoinToEnrichedJoin planner rule is intentionally not registered here

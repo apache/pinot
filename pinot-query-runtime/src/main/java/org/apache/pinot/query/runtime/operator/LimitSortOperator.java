@@ -28,10 +28,10 @@ import org.slf4j.LoggerFactory;
 
 
 /// A [SortOperator] that only applies `offset` and `fetch`, used when the
-/// [org.apache.pinot.query.planner.plannode.SortNode] carries no collation at all - a plain `LIMIT`, where any
-/// `fetch` rows after skipping `offset` are a correct answer.
+/// [org.apache.pinot.query.planner.plannode.SortNode] carries no collation, or its input already guarantees the
+/// requested ordering. The factory establishes which case applies before constructing this operator.
 ///
-/// It therefore assumes nothing about the input. Blocks are forwarded as they arrive, with the first `offset` rows
+/// Blocks are forwarded as they arrive, with the first `offset` rows
 /// skipped and at most `fetch` rows emitted in total, after which the input is early-terminated. Nothing is
 /// accumulated across blocks: the only state is two counters, so peak memory is one input block. This is the only
 /// [SortOperator] that does not break the pipeline - a consumer sees rows before the input has finished.
