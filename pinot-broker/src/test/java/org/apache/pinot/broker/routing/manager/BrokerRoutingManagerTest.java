@@ -24,6 +24,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
@@ -65,6 +71,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.apache.zookeeper.data.Stat;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -152,6 +159,7 @@ public class BrokerRoutingManagerTest {
   @AfterMethod
   public void tearDown()
       throws Exception {
+    _routingManager.stop();
     _mocks.close();
   }
 
@@ -275,6 +283,28 @@ public class BrokerRoutingManagerTest {
 
     // Server should be re-enabled in the map
     assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+  }
+
+  @Test
+  public void testServerRoutableState() {
+    assertFalse(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+
+    List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertTrue(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+
+    _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
+    assertFalse(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+
+    _routingManager.includeServerToRouting(SERVER_INSTANCE_ID);
+    assertTrue(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertFalse(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
   }
 
   @Test
@@ -804,6 +834,205 @@ public class BrokerRoutingManagerTest {
     // Routable map contains the server again.
     assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
     assertTrue(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+  }
+
+  @Test
+  public void testOnlyChangedServerIsNotAcknowledgedUntilRoutingUpdateCompletes()
+      throws Exception {
+    String newServerInstanceId = "Server_localhost_8001";
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertTrue(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+
+    CountDownLatch routingUpdateStarted = new CountDownLatch(1);
+    CountDownLatch releaseRoutingUpdate = new CountDownLatch(1);
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.isServerAssigned(newServerInstanceId)).thenReturn(true);
+    doAnswer(invocation -> {
+      routingUpdateStarted.countDown();
+      assertTrue(releaseRoutingUpdate.await(5, TimeUnit.SECONDS));
+      return null;
+    }).when(instanceSelector).onInstancesChange(any(), any());
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID),
+            createEnabledServerZNRecord(newServerInstanceId)));
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<?> update = executor.submit(() -> _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG));
+      assertTrue(routingUpdateStarted.await(5, TimeUnit.SECONDS));
+
+      assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(newServerInstanceId));
+      assertFalse(_routingManager.isServerRoutable(newServerInstanceId));
+      assertTrue(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+
+      releaseRoutingUpdate.countDown();
+      update.get(5, TimeUnit.SECONDS);
+      assertTrue(_routingManager.isServerRoutable(newServerInstanceId));
+      assertTrue(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+    } finally {
+      releaseRoutingUpdate.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testServerIsAcknowledgedOnlyAfterFailedRoutingUpdateIsRetried()
+      throws Exception {
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.isServerAssigned(SERVER_INSTANCE_ID)).thenReturn(true);
+    AtomicInteger updateAttempts = new AtomicInteger();
+    doAnswer(invocation -> {
+      if (updateAttempts.getAndIncrement() == 0) {
+        throw new RuntimeException("simulated routing update failure");
+      }
+      return null;
+    }).when(instanceSelector).onInstancesChange(any(), any());
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    assertFalse(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+
+    TestUtils.waitForCondition(aVoid -> _routingManager.isServerRoutable(SERVER_INSTANCE_ID), 50L, 5_000L,
+        "Server was not acknowledged after the routing update retry succeeded");
+    verify(instanceSelector, times(2)).onInstancesChange(any(), any());
+    assertEquals(_routingManager.getInstanceConfigRetryDelayMs(), 1_000L);
+  }
+
+  @Test
+  public void testPersistentRoutingUpdateFailureBacksOffRetries()
+      throws Exception {
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.isServerAssigned(SERVER_INSTANCE_ID)).thenReturn(true);
+    AtomicInteger updateAttempts = new AtomicInteger();
+    doAnswer(invocation -> {
+      updateAttempts.incrementAndGet();
+      throw new RuntimeException("simulated persistent routing update failure");
+    }).when(instanceSelector).onInstancesChange(any(), any());
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertEquals(_routingManager.getInstanceConfigRetryDelayMs(), 2_000L);
+    TestUtils.waitForCondition(
+        aVoid -> updateAttempts.get() >= 2 && _routingManager.getInstanceConfigRetryDelayMs() == 4_000L
+            && _routingManager.isInstanceConfigRetryScheduled(),
+        50L, 3_000L, "The first routing update retry did not schedule with backoff");
+    assertEquals(_routingManager.getInstanceConfigRetryDelayMs(), 4_000L);
+    assertTrue(_routingManager.isInstanceConfigRetryScheduled());
+  }
+
+  @Test
+  public void testUnrelatedTableFailureDoesNotBlockServerAcknowledgement()
+      throws Exception {
+    InstanceSelector relevantSelector = mock(InstanceSelector.class);
+    when(relevantSelector.isServerAssigned(SERVER_INSTANCE_ID)).thenReturn(true);
+    putRoutingEntry("relevant_OFFLINE",
+        createRoutingEntry("relevant_OFFLINE", null, null, Map.of(), relevantSelector, false));
+
+    InstanceSelector unrelatedSelector = mock(InstanceSelector.class);
+    when(unrelatedSelector.isServerAssigned(SERVER_INSTANCE_ID)).thenReturn(false);
+    doThrow(new RuntimeException("simulated unrelated table failure")).when(unrelatedSelector)
+        .onInstancesChange(any(), any());
+    putRoutingEntry("unrelated_OFFLINE",
+        createRoutingEntry("unrelated_OFFLINE", null, null, Map.of(), unrelatedSelector, false));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    assertTrue(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+    assertTrue(_routingManager.isInstanceConfigRetryScheduled());
+    verify(relevantSelector).onInstancesChange(any(), any());
+    verify(unrelatedSelector).onInstancesChange(any(), any());
+  }
+
+  @Test
+  public void testReincludedServerWaitsForRelevantTableRetry()
+      throws Exception {
+    enableTestServer();
+    _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
+
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.isServerAssigned(SERVER_INSTANCE_ID)).thenReturn(true);
+    AtomicInteger updateAttempts = new AtomicInteger();
+    doAnswer(invocation -> {
+      if (updateAttempts.getAndIncrement() == 0) {
+        throw new RuntimeException("simulated re-inclusion failure");
+      }
+      return null;
+    }).when(instanceSelector).onInstancesChange(any(), any());
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+
+    _routingManager.includeServerToRouting(SERVER_INSTANCE_ID);
+
+    assertTrue(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    assertFalse(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+    TestUtils.waitForCondition(aVoid -> _routingManager.isServerRoutable(SERVER_INSTANCE_ID), 50L, 5_000L,
+        "Re-included server was not acknowledged after its relevant table update succeeded");
+    verify(instanceSelector, times(2)).onInstancesChange(any(), any());
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testDisabledServerIsProcessedWhenAnotherServerIsExcluded()
+      throws Exception {
+    String disabledServer = "Server_localhost_8001";
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID),
+            createEnabledServerZNRecord(disabledServer)));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
+    clearInvocations(instanceSelector);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    ArgumentCaptor<List<String>> changedServers = ArgumentCaptor.forClass(List.class);
+    verify(instanceSelector).onInstancesChange(eq(Set.of()), changedServers.capture());
+    assertTrue(changedServers.getValue().contains(disabledServer));
+    assertFalse(_routingManager.getEnabledServerInstanceMap().containsKey(disabledServer));
+  }
+
+  @Test
+  public void testDisabledServerUpdateFailureIsRetried()
+      throws Exception {
+    enableTestServer();
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    AtomicInteger updateAttempts = new AtomicInteger();
+    doAnswer(invocation -> {
+      if (updateAttempts.getAndIncrement() == 0) {
+        throw new RuntimeException("simulated disable failure");
+      }
+      return null;
+    }).when(instanceSelector).onInstancesChange(any(), any());
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of());
+
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    assertFalse(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    TestUtils.waitForCondition(aVoid -> updateAttempts.get() >= 2, 50L, 5_000L,
+        "Disabled-server routing update was not retried");
+    verify(instanceSelector, times(2)).onInstancesChange(any(), any());
+    assertEquals(_routingManager.getInstanceConfigRetryDelayMs(), 1_000L);
   }
 
   /// Creates a ZNRecord representing an enabled server instance.

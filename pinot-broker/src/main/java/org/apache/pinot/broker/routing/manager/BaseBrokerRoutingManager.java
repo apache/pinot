@@ -35,8 +35,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
@@ -129,10 +134,22 @@ import org.slf4j.LoggerFactory;
 ///       lookups.
 public abstract class BaseBrokerRoutingManager implements RoutingManager, ClusterChangeHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRoutingManager.class);
+  private static final long INITIAL_INSTANCE_CONFIG_RETRY_DELAY_MS = 1_000L;
+  private static final long MAX_INSTANCE_CONFIG_RETRY_DELAY_MS = 30_000L;
+  private static final long INSTANCE_CONFIG_RETRY_LOG_INTERVAL_MS = 60_000L;
 
   protected final BrokerMetrics _brokerMetrics;
   protected final Map<String, RoutingEntry> _routingEntryMap = new ConcurrentHashMap<>();
   private final Map<String, ServerInstance> _enabledServerInstanceMap = new ConcurrentHashMap<>();
+  // A server is inserted with an empty marker before it is published in _enabledServerInstanceMap. Before it is
+  // published in the routable map, the marker is replaced with the tables that can route to that server. Each table is
+  // removed only after its selector processes the change, so a failure for an unrelated table does not block the
+  // server's readiness acknowledgement. Values are immutable snapshots because the readiness path reads this map
+  // without taking the global lock.
+  private final Map<String, Set<String>> _serversPendingRoutingUpdate = new ConcurrentHashMap<>();
+  // Failed instance changes retained per table. This is separate from server readiness because removals and failures
+  // for unrelated tables still need retrying even though they must not hold a server's readiness acknowledgement.
+  private final Map<String, Set<String>> _pendingRoutingUpdatesByTable = new ConcurrentHashMap<>();
   // NOTE: _excludedServers doesn't need to be concurrent because it is only accessed within the _globalLock write lock
   private final Set<String> _excludedServers = new HashSet<>();
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
@@ -140,6 +157,10 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   private final boolean _enablePartitionMetadataManager;
   private final long _newSegmentExpirationMs;
   private final ExecutorService _executorService;
+  private final ScheduledExecutorService _instanceConfigRetryExecutor;
+  private final AtomicBoolean _instanceConfigRetryScheduled = new AtomicBoolean();
+  private final AtomicLong _instanceConfigRetryDelayMs = new AtomicLong(INITIAL_INSTANCE_CONFIG_RETRY_DELAY_MS);
+  private final AtomicLong _lastInstanceConfigRetryFailureLogMs = new AtomicLong();
   @Nullable
   private Consumer<ServerInstance> _serverReenableCallback;
 
@@ -176,7 +197,6 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   /// outside of per-table instance selection (MSE intermediate-stage worker picking) read the map directly so that
   /// FailureDetector-driven exclusions are honored.
   private volatile Map<String, ServerInstance> _routableServerInstanceMap = Map.of();
-
   // Process assignment change timestamp. Used to check if buildRouting needs to be re-run for a given table to avoid
   // race conditions with processSegmentAssignmentChange()
   private long _processAssignmentChangeSnapshotTimestampMs;
@@ -197,6 +217,9 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
             CommonConstants.Broker.DEFAULT_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM);
     ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("async-broker-assignment-change-%d").build();
     _executorService = Executors.newFixedThreadPool(processSegmentAssignmentChangeNumThreads, threadFactory);
+    ThreadFactory retryThreadFactory = new ThreadFactoryBuilder().setDaemon(true)
+        .setNameFormat("broker-instance-config-retry-%d").build();
+    _instanceConfigRetryExecutor = Executors.newSingleThreadScheduledExecutor(retryThreadFactory);
   }
 
   @Override
@@ -423,7 +446,14 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
           // hit the identity fast path
           instanceId = serverInstance.getInstanceId();
           enabledServers.add(instanceId);
-          if (_enabledServerInstanceMap.put(instanceId, serverInstance) == null) {
+          // Writers are serialized by _globalLock. Mark a new server pending before publishing it in the enabled map so
+          // the lock-free readiness path cannot acknowledge it until all routing entries have processed the change.
+          boolean newlyEnabled = !_enabledServerInstanceMap.containsKey(instanceId);
+          if (newlyEnabled) {
+            _serversPendingRoutingUpdate.put(instanceId, Set.of());
+          }
+          _enabledServerInstanceMap.put(instanceId, serverInstance);
+          if (newlyEnabled) {
             newEnabledServers.add(instanceId);
 
             // NOTE: Remove new enabled server from excluded servers because the server is likely being restarted
@@ -449,26 +479,28 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       }
     }
 
-    // Calculate the routable servers and the changed routable servers
-    List<String> changedServers = new ArrayList<>(newEnabledServers.size() + newDisabledServers.size());
-    if (_excludedServers.isEmpty()) {
-      changedServers.addAll(newEnabledServers);
-      changedServers.addAll(newDisabledServers);
-    } else {
-      enabledServers.removeAll(_excludedServers);
-      // NOTE: All new enabled servers are routable
-      changedServers.addAll(newEnabledServers);
-      for (String newDisabledServer : newDisabledServers) {
-        if (_excludedServers.contains(newDisabledServer)) {
-          changedServers.add(newDisabledServer);
-        }
+    // Calculate the routable servers and the changed routable servers. Include servers left pending by an aborted prior
+    // refresh so the next callback retries their routing publication.
+    List<String> pendingEnabledServers = new ArrayList<>();
+    for (String server : enabledServers) {
+      if (_serversPendingRoutingUpdate.containsKey(server)) {
+        pendingEnabledServers.add(server);
       }
     }
-    _routableServerInstanceMap = buildRoutableServerInstanceMap(enabledServers);
+    List<String> changedServers = new ArrayList<>(pendingEnabledServers.size() + newDisabledServers.size());
+    changedServers.addAll(pendingEnabledServers);
+    // A disabled server must reach every selector regardless of whether a different server is excluded. Otherwise the
+    // disabled server can remain in the selectors indefinitely.
+    changedServers.addAll(newDisabledServers);
+    markServersPendingRelevantTableUpdates(pendingEnabledServers);
+    Set<String> routableServers = new HashSet<>(enabledServers);
+    routableServers.removeAll(_excludedServers);
+    _routableServerInstanceMap = buildRoutableServerInstanceMap(routableServers);
     long calculateChangedServersEndTimeMs = System.currentTimeMillis();
 
-    // Early terminate if there is no changed servers
-    if (changedServers.isEmpty()) {
+    // Early terminate only when there is neither a new change nor failed per-table work to retry.
+    if (changedServers.isEmpty() && _pendingRoutingUpdatesByTable.isEmpty()) {
+      _instanceConfigRetryDelayMs.set(INITIAL_INSTANCE_CONFIG_RETRY_DELAY_MS);
       LOGGER.info("Processed instance config change in {}ms "
               + "(fetch {} instance configs: {}ms, calculate changed servers: {}ms) without instance change",
           calculateChangedServersEndTimeMs - startTimeMs, instanceConfigZNRecords.size(),
@@ -477,25 +509,23 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       return;
     }
 
-    // Update routing entry for all tables
-    for (RoutingEntry routingEntry : _routingEntryMap.values()) {
-      String tableNameWithType = routingEntry.getTableNameWithType();
-      try {
-        Object tableLock = getRoutingTableBuildLock(tableNameWithType);
-        synchronized (tableLock) {
-          updateRoutingEntryOnInstancesChange(routingEntry, _routableServerInstanceMap.keySet(), changedServers);
-        }
-      } catch (Exception e) {
-        LOGGER.error("Caught unexpected exception while updating routing entry on instances change for table: {}",
-            tableNameWithType, e);
-      }
-    }
+    updateRoutingEntriesOnInstancesChange(changedServers);
     long updateRoutingEntriesEndTimeMs = System.currentTimeMillis();
+
+    if (_pendingRoutingUpdatesByTable.isEmpty()) {
+      _instanceConfigRetryDelayMs.set(INITIAL_INSTANCE_CONFIG_RETRY_DELAY_MS);
+    } else {
+      logInstanceConfigRetryFailure(
+          "Keeping failed per-table instance changes pending for retry: {}", null,
+          _pendingRoutingUpdatesByTable.keySet());
+      scheduleInstanceConfigRetry();
+    }
 
     // Remove new disabled servers from _enabledServerInstanceMap after updating all routing entries to ensure it
     // always contains the selected servers
     for (String newDisabledInstance : newDisabledServers) {
       _enabledServerInstanceMap.remove(newDisabledInstance);
+      _serversPendingRoutingUpdate.remove(newDisabledInstance);
     }
 
     LOGGER.info("Processed instance config change in {}ms "
@@ -505,6 +535,138 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
         fetchInstanceConfigsEndTimeMs - startTimeMs, calculateChangedServersEndTimeMs - fetchInstanceConfigsEndTimeMs,
         _routingEntryMap.size(), updateRoutingEntriesEndTimeMs - calculateChangedServersEndTimeMs, newEnabledServers,
         newDisabledServers, _excludedServers);
+  }
+
+  /// Replaces each server's publication marker with the exact tables whose primary selector can route to it. Must run
+  /// before the server is published in `_routableServerInstanceMap` so the lock-free readiness check cannot observe a
+  /// routable server without also observing its pending acknowledgements.
+  @GuardedBy("_globalLock.writeLock()")
+  private void markServersPendingRelevantTableUpdates(List<String> servers) {
+    for (String server : servers) {
+      Set<String> relevantTables = new HashSet<>();
+      for (RoutingEntry routingEntry : _routingEntryMap.values()) {
+        if (routingEntry.isServerAssigned(server)) {
+          relevantTables.add(routingEntry.getTableNameWithType());
+        }
+      }
+      _serversPendingRoutingUpdate.put(server, Set.copyOf(relevantTables));
+    }
+  }
+
+  /// Applies the current instance change plus any retained failed work independently to each table. Successful tables
+  /// acknowledge only the servers they can route; failed tables retain their complete change set for the retry.
+  @GuardedBy("_globalLock.writeLock()")
+  private void updateRoutingEntriesOnInstancesChange(List<String> changedServers) {
+    for (RoutingEntry routingEntry : _routingEntryMap.values()) {
+      String tableNameWithType = routingEntry.getTableNameWithType();
+      List<String> tableChangedServers = new ArrayList<>(changedServers);
+      Set<String> pendingServers = _pendingRoutingUpdatesByTable.get(tableNameWithType);
+      if (pendingServers != null) {
+        for (String pendingServer : pendingServers) {
+          if (!tableChangedServers.contains(pendingServer)) {
+            tableChangedServers.add(pendingServer);
+          }
+        }
+      }
+      if (tableChangedServers.isEmpty()) {
+        continue;
+      }
+
+      try {
+        Object tableLock = getRoutingTableBuildLock(tableNameWithType);
+        synchronized (tableLock) {
+          updateRoutingEntryOnInstancesChange(routingEntry, _routableServerInstanceMap.keySet(), tableChangedServers);
+        }
+        _pendingRoutingUpdatesByTable.remove(tableNameWithType);
+        acknowledgeRoutingUpdate(tableNameWithType);
+      } catch (Exception e) {
+        _pendingRoutingUpdatesByTable.put(tableNameWithType, Set.copyOf(tableChangedServers));
+        logInstanceConfigRetryFailure(
+            "Caught unexpected exception while updating routing entry on instances change for table: "
+                + tableNameWithType, e);
+      }
+    }
+
+    // A table can disappear after work was retained but before a retry. It can no longer route to any server, so it
+    // must neither be retried forever nor keep a readiness acknowledgement pending.
+    for (String tableNameWithType : Set.copyOf(_pendingRoutingUpdatesByTable.keySet())) {
+      if (!_routingEntryMap.containsKey(tableNameWithType)) {
+        _pendingRoutingUpdatesByTable.remove(tableNameWithType);
+        acknowledgeRoutingUpdate(tableNameWithType);
+      }
+    }
+
+    // Empty values are publication markers for servers without a relevant table. They can be acknowledged only after
+    // the routable map has been published and the update pass has completed.
+    _serversPendingRoutingUpdate.entrySet().removeIf(entry -> entry.getValue().isEmpty());
+  }
+
+  private void acknowledgeRoutingUpdate(String tableNameWithType) {
+    for (String server : Set.copyOf(_serversPendingRoutingUpdate.keySet())) {
+      _serversPendingRoutingUpdate.computeIfPresent(server, (key, pendingTables) -> {
+        if (!pendingTables.contains(tableNameWithType)) {
+          return pendingTables;
+        }
+        Set<String> remainingTables = new HashSet<>(pendingTables);
+        remainingTables.remove(tableNameWithType);
+        return remainingTables.isEmpty() ? null : Set.copyOf(remainingTables);
+      });
+    }
+  }
+
+  void scheduleInstanceConfigRetry() {
+    if (_instanceConfigRetryExecutor.isShutdown() || !_instanceConfigRetryScheduled.compareAndSet(false, true)) {
+      return;
+    }
+    long baseDelayMs = _instanceConfigRetryDelayMs.getAndUpdate(
+        delayMs -> Math.min(delayMs * 2, MAX_INSTANCE_CONFIG_RETRY_DELAY_MS));
+    long jitterMs = ThreadLocalRandom.current().nextLong(Math.max(1L, baseDelayMs / 4L));
+    try {
+      _instanceConfigRetryExecutor.schedule(() -> {
+        try {
+          processInstanceConfigChange();
+        } catch (Exception e) {
+          logInstanceConfigRetryFailure("Caught exception while retrying instance config change", e);
+        } finally {
+          _instanceConfigRetryScheduled.set(false);
+          if (!_pendingRoutingUpdatesByTable.isEmpty() || !_serversPendingRoutingUpdate.isEmpty()) {
+            scheduleInstanceConfigRetry();
+          }
+        }
+      }, baseDelayMs + jitterMs, TimeUnit.MILLISECONDS);
+    } catch (RejectedExecutionException e) {
+      _instanceConfigRetryScheduled.set(false);
+      if (!_instanceConfigRetryExecutor.isShutdown()) {
+        LOGGER.error("Failed to schedule instance config change retry", e);
+      }
+    }
+  }
+
+  private void logInstanceConfigRetryFailure(String message, @Nullable Throwable throwable, Object... arguments) {
+    long currentTimeMs = System.currentTimeMillis();
+    long lastLogTimeMs = _lastInstanceConfigRetryFailureLogMs.get();
+    if (currentTimeMs - lastLogTimeMs >= INSTANCE_CONFIG_RETRY_LOG_INTERVAL_MS
+        && _lastInstanceConfigRetryFailureLogMs.compareAndSet(lastLogTimeMs, currentTimeMs)) {
+      if (throwable == null) {
+        LOGGER.warn(message, arguments);
+      } else {
+        LOGGER.warn(message, throwable);
+      }
+    } else {
+      LOGGER.debug(message, arguments);
+    }
+  }
+
+  boolean isInstanceConfigRetryScheduled() {
+    return _instanceConfigRetryScheduled.get();
+  }
+
+  boolean isInstanceConfigRetryExecutorShutdown() {
+    return _instanceConfigRetryExecutor.isShutdown() || _instanceConfigRetryExecutor.isTerminated();
+  }
+
+  long getInstanceConfigRetryDelayMs() {
+    return _instanceConfigRetryDelayMs.get();
   }
 
   private static boolean isEnabledServer(ZNRecord instanceConfigZNRecord) {
@@ -552,18 +714,13 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     Map<String, ServerInstance> routableServerInstanceMap = new HashMap<>(_routableServerInstanceMap);
     routableServerInstanceMap.remove(instanceId);
     _routableServerInstanceMap = routableServerInstanceMap;
+    _serversPendingRoutingUpdate.remove(instanceId);
     List<String> changedServers = List.of(instanceId);
-    for (RoutingEntry routingEntry : _routingEntryMap.values()) {
-      String tableNameWithType = routingEntry.getTableNameWithType();
-      try {
-        Object tableLock = getRoutingTableBuildLock(tableNameWithType);
-        synchronized (tableLock) {
-          updateRoutingEntryOnInstancesChange(routingEntry, _routableServerInstanceMap.keySet(), changedServers);
-        }
-      } catch (Exception e) {
-        LOGGER.error("Caught unexpected exception while updating routing entry when excluding server: {} for table: {}",
-            instanceId, tableNameWithType, e);
-      }
+    updateRoutingEntriesOnInstancesChange(changedServers);
+    if (_pendingRoutingUpdatesByTable.isEmpty()) {
+      _instanceConfigRetryDelayMs.set(INITIAL_INSTANCE_CONFIG_RETRY_DELAY_MS);
+    } else {
+      scheduleInstanceConfigRetry();
     }
     LOGGER.info("Excluded server: {} from routing in {}ms (updated {} routing entries)", instanceId,
         System.currentTimeMillis() - startTimeMs, _routingEntryMap.size());
@@ -597,20 +754,16 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     Preconditions.checkState(serverInstance != null,
         "Enabled server instance map missing entry for server: %s", instanceId);
     Map<String, ServerInstance> routableServerInstanceMap = new HashMap<>(_routableServerInstanceMap);
+    _serversPendingRoutingUpdate.put(instanceId, Set.of());
+    markServersPendingRelevantTableUpdates(List.of(instanceId));
     routableServerInstanceMap.put(instanceId, serverInstance);
     _routableServerInstanceMap = routableServerInstanceMap;
     List<String> changedServers = List.of(instanceId);
-    for (RoutingEntry routingEntry : _routingEntryMap.values()) {
-      String tableNameWithType = routingEntry.getTableNameWithType();
-      try {
-        Object tableLock = getRoutingTableBuildLock(tableNameWithType);
-        synchronized (tableLock) {
-          updateRoutingEntryOnInstancesChange(routingEntry, _routableServerInstanceMap.keySet(), changedServers);
-        }
-      } catch (Exception e) {
-        LOGGER.error("Caught unexpected exception while updating routing entry when including server: {} for table: {}",
-            instanceId, tableNameWithType, e);
-      }
+    updateRoutingEntriesOnInstancesChange(changedServers);
+    if (_pendingRoutingUpdatesByTable.isEmpty()) {
+      _instanceConfigRetryDelayMs.set(INITIAL_INSTANCE_CONFIG_RETRY_DELAY_MS);
+    } else {
+      scheduleInstanceConfigRetry();
     }
     LOGGER.info("Included server: {} to routing in {}ms (updated {} routing entries)", instanceId,
         System.currentTimeMillis() - startTimeMs, _routingEntryMap.size());
@@ -961,6 +1114,10 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       } else {
         LOGGER.info("Rebuilt routing for table: {}", tableNameWithType);
       }
+      // Initialization used the current routable-server snapshot, so a successful build also completes any retained
+      // instance update for this table.
+      _pendingRoutingUpdatesByTable.remove(tableNameWithType);
+      acknowledgeRoutingUpdate(tableNameWithType);
       // Reported only once the entry is stored, so that a build that failed earlier cannot leave gauges
       // behind with no routing entry to ever clean them up. The IS / EV re-check below reports again if it
       // ends up updating the entry.
@@ -1045,6 +1202,9 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
 
       if (_routingEntryMap.remove(tableNameWithType) != null) {
         LOGGER.info("Removed routing for table: {}", tableNameWithType);
+
+        _pendingRoutingUpdatesByTable.remove(tableNameWithType);
+        acknowledgeRoutingUpdate(tableNameWithType);
 
         // Stop reporting the table level gauges owned by the routing, otherwise they keep being exported
         // for a table this broker no longer serves
@@ -1351,6 +1511,14 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return routingEntry._instanceSelector.getServingInstances();
   }
 
+  /// Returns whether the broker sees the server as routable.
+  public boolean isServerRoutable(String instanceId) {
+    // Read the map first. A new entry is inserted only after the server is marked pending, and removing the pending
+    // marker publishes all routing-entry updates that precede it.
+    return _routableServerInstanceMap.containsKey(instanceId)
+        && !_serversPendingRoutingUpdate.containsKey(instanceId);
+  }
+
   /// Returns the table-level query timeout in milliseconds for the given table, or `null` if the timeout is not
   /// configured in the table config.
   @Nullable
@@ -1360,6 +1528,13 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   }
 
   public void stop() {
+    _instanceConfigRetryExecutor.shutdownNow();
+    try {
+      _instanceConfigRetryExecutor.awaitTermination(10L, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOGGER.warn("Interrupted while waiting for the instance config retry executor to terminate", e);
+    }
     LOGGER.info("Stopping executor service for BrokerRoutingManager");
     _executorService.shutdownNow();
     try {
@@ -1457,6 +1632,10 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
 
     boolean isDisabled() {
       return _disabled;
+    }
+
+    boolean isServerAssigned(String instanceId) {
+      return !_disabled && _instanceSelector.isServerAssigned(instanceId);
     }
 
     private void updateSamplerInfos(IdealState idealState, ExternalView externalView,
