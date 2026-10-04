@@ -24,17 +24,38 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class BitmapDocIdSet implements BlockDocIdSet {
-  private final ImmutableRoaringBitmap _bitmap;
   private final BitmapDocIdIterator _iterator;
+  private final long _numEntriesScannedInFilter;
+
+  /// Returns a doc id set over the given documents, or [EmptyDocIdSet] when there is none.
+  public static BlockDocIdSet create(ImmutableRoaringBitmap docIds, int numDocs) {
+    return docIds.isEmpty() ? EmptyDocIdSet.unscanned() : new BitmapDocIdSet(docIds, numDocs);
+  }
+
+  /// Returns a doc id set over the given documents found by scanning `numEntriesScannedInFilter` entries, or
+  /// [EmptyDocIdSet] when there is none.
+  public static BlockDocIdSet create(ImmutableRoaringBitmap docIds, int numDocs, long numEntriesScannedInFilter) {
+    return docIds.isEmpty() ? new EmptyDocIdSet(numEntriesScannedInFilter)
+        : new BitmapDocIdSet(docIds, numDocs, numEntriesScannedInFilter);
+  }
+
+  /// Returns a doc id set over the documents of the given iterator, or [EmptyDocIdSet] when there is none.
+  public static BlockDocIdSet create(BitmapDocIdIterator iterator) {
+    return iterator.getDocIds().isEmpty() ? EmptyDocIdSet.unscanned() : new BitmapDocIdSet(iterator);
+  }
 
   public BitmapDocIdSet(ImmutableRoaringBitmap docIds, int numDocs) {
-    _bitmap = docIds;
+    this(docIds, numDocs, 0L);
+  }
+
+  public BitmapDocIdSet(ImmutableRoaringBitmap docIds, int numDocs, long numEntriesScannedInFilter) {
     _iterator = new BitmapDocIdIterator(docIds, numDocs);
+    _numEntriesScannedInFilter = numEntriesScannedInFilter;
   }
 
   public BitmapDocIdSet(BitmapDocIdIterator iterator) {
-    _bitmap = null;
     _iterator = iterator;
+    _numEntriesScannedInFilter = 0L;
   }
 
   @Override
@@ -44,14 +65,6 @@ public class BitmapDocIdSet implements BlockDocIdSet {
 
   @Override
   public long getNumEntriesScannedInFilter() {
-    return 0L;
-  }
-
-  @Override
-  public BlockDocIdSet getOptimizedDocIdSet() {
-    if (_bitmap != null && _bitmap.isEmpty()) {
-      return EmptyDocIdSet.getInstance();
-    }
-    return this;
+    return _numEntriesScannedInFilter;
   }
 }

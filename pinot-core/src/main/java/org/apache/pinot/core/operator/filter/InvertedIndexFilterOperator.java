@@ -62,7 +62,7 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
     int[] dictIds = _exclusive ? _predicateEvaluator.getNonMatchingDictIds() : _predicateEvaluator.getMatchingDictIds();
     int numDictIds = dictIds.length;
     if (numDictIds == 0) {
-      return EmptyDocIdSet.getInstance();
+      return EmptyDocIdSet.unscanned();
     }
     if (numDictIds == 1) {
       ImmutableRoaringBitmap docIds = _invertedIndexReader.getDocIds(dictIds[0]);
@@ -70,12 +70,12 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
         if (docIds instanceof MutableRoaringBitmap) {
           MutableRoaringBitmap mutableRoaringBitmap = (MutableRoaringBitmap) docIds;
           mutableRoaringBitmap.flip(0L, _numDocs);
-          return new BitmapDocIdSet(mutableRoaringBitmap, _numDocs);
+          return BitmapDocIdSet.create(mutableRoaringBitmap, _numDocs);
         } else {
-          return new BitmapDocIdSet(ImmutableRoaringBitmap.flip(docIds, 0L, _numDocs), _numDocs);
+          return BitmapDocIdSet.create(ImmutableRoaringBitmap.flip(docIds, 0L, _numDocs), _numDocs);
         }
       } else {
-        return new BitmapDocIdSet(docIds, _numDocs);
+        return BitmapDocIdSet.create(docIds, _numDocs);
       }
     } else {
       ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[numDictIds];
@@ -92,7 +92,7 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
         recording.setNumDocsMatchingAfterFilter(docIds.getCardinality());
         recording.setFilter(FilterType.INDEX, String.valueOf(_predicateEvaluator.getPredicateType()));
       }
-      return new BitmapDocIdSet(docIds, _numDocs);
+      return BitmapDocIdSet.create(docIds, _numDocs);
     }
   }
 

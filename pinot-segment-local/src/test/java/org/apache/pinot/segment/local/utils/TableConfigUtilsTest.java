@@ -1812,11 +1812,23 @@ public class TableConfigUtilsTest {
         fieldConfigWithCodecSpec("intCol", FieldConfig.EncodingType.RAW, "DELTA,LZ4"),
         fieldConfigWithCodecSpec("longCol", FieldConfig.EncodingType.RAW, "ZSTD(3)")));
     TableConfigUtils.validate(tableConfig, schema);
+    // Chained value transforms, a value transform feeding a packing transform, and transform chains on LONG.
+    assertCodecSpecValidationPasses(schema, "intCol", "DELTA,ZSTD(3)");
+    assertCodecSpecValidationPasses(schema, "intCol", "DELTA,DELTADELTA,LZ4");
+    assertCodecSpecValidationPasses(schema, "intCol", "DELTA,T64,LZ4");
+    assertCodecSpecValidationPasses(schema, "longCol", "DELTADELTA,LZ4");
 
     assertCodecSpecValidationFails(schema, "intCol", FieldConfig.EncodingType.RAW, "LZ4,UNKNOWN", "Unknown codec");
     assertCodecSpecValidationFails(schema, "intCol", FieldConfig.EncodingType.RAW, "LZ4,DELTA",
         "all transforms must precede any compression stage");
+    // T64 output is not a typed value array, so a value transform cannot follow it.
+    assertCodecSpecValidationFails(schema, "intCol", FieldConfig.EncodingType.RAW, "T64,DELTA,LZ4",
+        "must operate on column values");
+    // Every codecSpec, compression-only or transform, uses the V7 writer, which only supports single-value
+    // INT/LONG columns.
     assertCodecSpecValidationFails(schema, "mvIntCol", FieldConfig.EncodingType.RAW, "LZ4",
+        "only supports single-value columns");
+    assertCodecSpecValidationFails(schema, "mvIntCol", FieldConfig.EncodingType.RAW, "DELTA,LZ4",
         "only supports single-value columns");
     assertCodecSpecValidationFails(schema, "stringCol", FieldConfig.EncodingType.RAW, "SNAPPY",
         "only supports INT and LONG columns");
@@ -1860,6 +1872,12 @@ public class TableConfigUtilsTest {
     assertTrue(Throwables.getRootCause(exception).getMessage()
             .contains("codecSpec cannot be configured when the forward index is disabled"),
         exception.getMessage());
+  }
+
+  private static void assertCodecSpecValidationPasses(Schema schema, String column, String codecSpec) {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfig.setFieldConfigList(List.of(fieldConfigWithCodecSpec(column, FieldConfig.EncodingType.RAW, codecSpec)));
+    TableConfigUtils.validate(tableConfig, schema);
   }
 
   private static void assertCodecSpecValidationFails(Schema schema, String column,

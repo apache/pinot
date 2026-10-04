@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -42,11 +43,14 @@ import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
@@ -56,6 +60,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
@@ -179,7 +184,8 @@ public class SegmentPreProcessor implements AutoCloseable {
       // build dict-id-based indexes on top of the new shared dictionary. If this order is violated, downstream
       // handlers fail with an IllegalStateException because the dictionary they require does not yet exist.
       // Any future change to handler scheduling MUST preserve: ForwardIndexHandler → reloadMetadata → other handlers.
-      IndexHandler forwardHandler = createHandler(StandardIndexes.forward());
+      Map<String, FieldIndexConfigs> configsByCol = _indexLoadingConfig.getFieldIndexConfigByColName();
+      IndexHandler forwardHandler = createHandler(StandardIndexes.forward(), configsByCol);
       indexHandlers.add(forwardHandler);
       forwardHandler.updateIndices(segmentWriter);
       _segmentDirectory.reloadMetadata();
@@ -187,7 +193,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       // Now that ForwardIndexHandler.updateIndices has been updated, we can run all other indexes in any order
       for (IndexType<?, ?, ?> type : IndexService.getInstance().getAllIndexes()) {
         if (type != StandardIndexes.forward()) {
-          IndexHandler handler = createHandler(type);
+          IndexHandler handler = createHandler(type, configsByCol);
           indexHandlers.add(handler);
           handler.updateIndices(segmentWriter);
         }
@@ -230,9 +236,39 @@ public class SegmentPreProcessor implements AutoCloseable {
     }
   }
 
-  private IndexHandler createHandler(IndexType<?, ?, ?> type) {
-    return type.createIndexHandler(_segmentDirectory, _indexLoadingConfig.getFieldIndexConfigByColName(), _schema,
+  private IndexHandler createHandler(IndexType<?, ?, ?> type, Map<String, FieldIndexConfigs> configsByCol) {
+    return type.createIndexHandler(_segmentDirectory, configsByCol, schemaWithMaterializedChildColumns(configsByCol),
         _tableConfig);
+  }
+
+  /// The table schema plus one entry per OPEN_STRUCT materialized child that has index configs.
+  ///
+  /// A materialized child (`col$key`) is a real column of the segment but not of the table schema, and
+  /// [ForwardIndexHandler] skips a column it cannot find in the schema. That is why a key never got the
+  /// raw-to-dictionary conversion an inverted or range index depends on: its configs were in the config map
+  /// (see [IndexLoadingConfig#withOpenStructChildConfigs]) but the column was invisible to the one handler that
+  /// had to act first. The child's spec comes from segment metadata; the table's own schema is left untouched.
+  private Schema schemaWithMaterializedChildColumns(Map<String, FieldIndexConfigs> configsByCol) {
+    Map<String, ColumnMetadata> columnMetadataMap = _segmentDirectory.getSegmentMetadata().getColumnMetadataMap();
+    Schema augmented = null;
+    for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
+      String column = entry.getKey();
+      if (_schema.hasColumn(column) || !configsByCol.containsKey(column)) {
+        continue;
+      }
+      if (!(entry.getValue() instanceof ColumnMetadataImpl columnMetadata) || !columnMetadata.isMaterializedChild()) {
+        continue;
+      }
+      if (augmented == null) {
+        augmented = new Schema();
+        augmented.setSchemaName(_schema.getSchemaName());
+        for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+          augmented.addField(fieldSpec);
+        }
+      }
+      augmented.addField(columnMetadata.getFieldSpec());
+    }
+    return augmented == null ? _schema : augmented;
   }
 
   /// This method checks if there is any discrepancy between the segment and current table config and schema.
@@ -253,9 +289,14 @@ public class SegmentPreProcessor implements AutoCloseable {
         LOGGER.info("Found default columns need updates in segment: {}", segmentName);
         return true;
       }
-      // Check if there is need to update single-column indices, like inverted index, json index etc.
+      // Check if there is need to update single-column indices, like inverted index, json index etc. The
+      // OPEN_STRUCT child configs are resolved here for the same reason process() resolves them: without them a
+      // key's index settings are invisible, and a reload that would apply them is never triggered in the first
+      // place. A derived copy is used so a config shared across segments does not pick up this segment's children.
+      Map<String, FieldIndexConfigs> configsByCol =
+          _indexLoadingConfig.withOpenStructChildConfigs(segmentMetadata).getFieldIndexConfigByColName();
       for (IndexType<?, ?, ?> type : IndexService.getInstance().getAllIndexes()) {
-        if (createHandler(type).needUpdateIndices(segmentReader)) {
+        if (createHandler(type, configsByCol).needUpdateIndices(segmentReader)) {
           LOGGER.info("Found index type: {} needs updates in segment: {}", type, segmentName);
           return true;
         }
