@@ -32,6 +32,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
@@ -71,7 +74,11 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ERROR;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
 import static org.testng.Assert.*;
 
 
@@ -2538,6 +2545,31 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       }
       assertTrue(hasServingReplica, "Segment: " + segmentName + " does not have any serving replica");
     }
+
+    // ERROR replicas count as converged for best-efforts, but are not serving. Exercise the actual convergence
+    // wait with failed targets so that it cannot bypass the last-serving-replica safeguard.
+    HelixDataAccessor helixDataAccessor = spy(_helixDataAccessor);
+    PropertyKey externalViewKey = helixDataAccessor.keyBuilder().externalView(offlineTableName);
+    doAnswer(invocation -> {
+      ExternalView actualExternalView = _helixDataAccessor.getProperty(externalViewKey);
+      ExternalView failedTargetsExternalView = new ExternalView(offlineTableName);
+      for (Map.Entry<String, Map<String, String>> segmentEntry
+          : actualExternalView.getRecord().getMapFields().entrySet()) {
+        Map<String, String> instanceStates = new HashMap<>(segmentEntry.getValue());
+        for (int i = 0; i < numServers; i++) {
+          instanceStates.put(newServerPrefix + i, ERROR);
+        }
+        failedTargetsExternalView.getRecord().setMapField(segmentEntry.getKey(), instanceStates);
+      }
+      return failedTargetsExternalView;
+    }).when(helixDataAccessor).getProperty(externalViewKey);
+    HelixManager helixManager = spy(_helixManager);
+    doReturn(helixDataAccessor).when(helixManager).getHelixDataAccessor();
+    rebalanceResult = new TableRebalancer(helixManager).rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
+    assertTrue(rebalanceResult.getDescription().contains("cannot make progress"), rebalanceResult.getDescription());
+    assertEquals(_helixResourceManager.getTableIdealState(offlineTableName).getRecord().getMapFields(),
+        currentAssignment);
 
     // Restart the new servers and rebalance again, the rebalance should succeed and all the segments should be moved
     // to the new servers
