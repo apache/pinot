@@ -95,14 +95,10 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "false")
   private boolean _lowDiskMode = false;
 
-  // Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot be achieved)
-  // When using best-efforts to rebalance, the following scenarios won't fail the rebalance (will log warnings instead):
-  // - Segment falls into ERROR state in ExternalView -> count ERROR state as good state
-  // - ExternalView has not converged within the maximum wait time -> continue to the next stage for the segments that
-  //   can be moved without dropping the replicas actually serving them (ONLINE/CONSUMING in ExternalView) below the
-  //   minimum available replicas. Note that the rebalance still fails when no segment can be moved this way, because
-  //   making progress would require dropping the last serving replicas of the segments (causing query downtime); it
-  //   can be retried once the instances hosting the segments are healthy again
+  // Whether to continue despite ERROR replicas or ExternalView convergence timeouts. Best-efforts may proceed below
+  // minAvailableReplicas, but a positive minimum still protects the last observed serving replica (and a common
+  // serving instance for strict replica group routing). Already unavailable segments and minAvailableReplicas=0 do
+  // not block progress. The rebalance fails if no safe move remains; retry after the target replicas recover.
   @JsonProperty("bestEfforts")
   @ApiModelProperty(example = "false")
   private boolean _bestEfforts = false;
