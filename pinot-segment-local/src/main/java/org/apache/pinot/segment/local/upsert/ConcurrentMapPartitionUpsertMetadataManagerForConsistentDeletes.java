@@ -371,7 +371,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                     _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
                   int prevDocId = prevLocation.getDocId();
                   RecordInfo recordInfo = recordInfoReader.getRecordInfo(prevDocId);
-                  replaceDocId(prevSegment, prevValidDocIds, prevSegment.getQueryableDocIds(), segment, docId,
+                  restoreDocId(prevSegment, prevValidDocIds, prevSegment.getQueryableDocIds(), segment, docId,
                       prevDocId, recordInfo);
                   if (!uniquePrimaryKeys.add(pk)) {
                     return prevLocation;

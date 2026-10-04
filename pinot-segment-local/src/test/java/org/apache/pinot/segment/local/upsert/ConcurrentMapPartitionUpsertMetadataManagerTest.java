@@ -2483,6 +2483,51 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     };
   }
 
+  /// Without restoreDocId() the immutable segment the revert restored into is never marked dirty.
+  @Test
+  public void testRevertMarksRestoredSegmentForSnapshot()
+      throws IOException {
+    UpsertContext upsertContext = _contextBuilder.setConsistencyMode(UpsertConfig.ConsistencyMode.NONE)
+        .setDropOutOfOrderRecord(true).setEnableSnapshot(true).build();
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, upsertContext);
+    Set<IndexSegment> trackedSegments = upsertMetadataManager._trackedSegments;
+
+    int[] mutablePrimaryKeys = new int[]{10, 20, 30};
+    ThreadSafeMutableRoaringBitmap validDocIdsMutable = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment mutableSegment = mockMutableSegmentWithDataSource(1, validDocIdsMutable, null, mutablePrimaryKeys);
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(10), 0, Integer.valueOf(1000),
+        false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(20), 1, Integer.valueOf(2000),
+        false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(30), 2, Integer.valueOf(3000),
+        false));
+    trackedSegments.add(mutableSegment);
+
+    int numRecords = 3;
+    int[] primaryKeys = new int[]{10, 20, 30};
+    int[] timestamps = new int[]{900, 1900, 3500};
+    ThreadSafeMutableRoaringBitmap validDocIdsImmutable = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl immutableSegment = mockImmutableSegmentWithTimestamps(1, validDocIdsImmutable, null,
+        getPrimaryKeyList(numRecords, primaryKeys), timestamps);
+    trackedSegments.add(immutableSegment);
+    upsertMetadataManager._updatedSegmentsSinceLastSnapshot.clear();
+
+    ConsumingSegmentConsistencyModeListener consistencyModeListener =
+        ConsumingSegmentConsistencyModeListener.getInstance();
+    consistencyModeListener.setMode(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED);
+    try {
+      upsertMetadataManager.replaceSegment(immutableSegment, validDocIdsImmutable, null,
+          getRecordInfoListWithIntegerComparison(numRecords, primaryKeys, timestamps, null).iterator(), mutableSegment);
+    } finally {
+      consistencyModeListener.reset();
+    }
+
+    assertEquals(validDocIdsImmutable.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2});
+    assertTrue(upsertMetadataManager._updatedSegmentsSinceLastSnapshot.contains(immutableSegment),
+        "The segment the revert restored docs into must be snapshotted before the next startup reads its file");
+  }
+
   @Test(dataProvider = "handledRevertFailureCases")
   public void testHandledRevertFailuresKeepExistingBehavior(String failure) {
     ConsumingSegmentConsistencyModeListener listener = ConsumingSegmentConsistencyModeListener.getInstance();

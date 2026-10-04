@@ -1220,6 +1220,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   ///   take RLock when to access the segment bitmaps.
   /// - For snapshot mode, upsert threads take RLock to make updates on segments' bitmaps so that they can be
   ///   synchronized with threads taking the snapshot of bitmaps, which take the WLock.
+  /// A revert moves a doc back into the segment that owned it before, which can be immutable -- so unlike
+  /// replaceDocId(), it is the gaining segment whose validDocIds snapshot goes stale.
+  protected void restoreDocId(IndexSegment prevSegment, ThreadSafeMutableRoaringBitmap prevValidDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap prevQueryableDocIds, IndexSegment currentSegment, int currentDocId,
+      int prevDocId, RecordInfo recordInfo) {
+    replaceDocId(prevSegment, prevValidDocIds, prevQueryableDocIds, currentSegment, currentDocId, prevDocId,
+        recordInfo);
+    trackUpdatedSegmentsSinceLastSnapshot(prevSegment);
+  }
+
   protected void replaceDocId(IndexSegment newSegment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, IndexSegment oldSegment, int oldDocId, int newDocId,
       RecordInfo recordInfo) {
