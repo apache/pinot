@@ -82,15 +82,19 @@ public class KWayMergeSupportPredicateTest {
     KWayMergeSupportPredicate predicate = new KWayMergeSupportPredicate(manager, VERSION);
     predicate.onInstanceConfigChange(List.of(), context(manager, NotificationContext.Type.INIT));
     assertTrue(predicate.getAsBoolean());
+    String snapshotVersion = VERSION + "-SNAPSHOT";
+    when(admin.getInstanceConfig(CLUSTER, BROKER)).thenReturn(config(BROKER, snapshotVersion));
+    when(admin.getInstanceConfig(CLUSTER, SERVER)).thenReturn(config(SERVER, snapshotVersion));
+    KWayMergeSupportPredicate snapshot = new KWayMergeSupportPredicate(manager, snapshotVersion);
+    snapshot.onInstanceConfigChange(List.of(), context(manager, NotificationContext.Type.INIT));
+    assertFalse(snapshot.getAsBoolean());
+    when(admin.getInstanceConfig(CLUSTER, BROKER)).thenReturn(config(BROKER, VERSION));
     when(admin.getInstanceConfig(CLUSTER, SERVER)).thenThrow(new IllegalStateException("unreadable"));
     predicate.onInstanceConfigChange(List.of(), context(manager, NotificationContext.Type.CALLBACK));
     assertFalse(predicate.getAsBoolean());
     when(admin.getInstancesInCluster(CLUSTER)).thenThrow(new IllegalStateException("unreadable"));
     predicate.onInstanceConfigChange(List.of(), context(manager, NotificationContext.Type.CALLBACK));
     assertFalse(predicate.getAsBoolean());
-    KWayMergeSupportPredicate snapshot = new KWayMergeSupportPredicate(manager, "1.6.0-SNAPSHOT");
-    snapshot.onInstanceConfigChange(List.of(), context(manager, NotificationContext.Type.INIT));
-    assertFalse(snapshot.getAsBoolean());
   }
 
   private static InstanceConfig config(String name, String version) {
