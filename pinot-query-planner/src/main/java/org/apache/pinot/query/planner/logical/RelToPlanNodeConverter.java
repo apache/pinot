@@ -1085,6 +1085,11 @@ public final class RelToPlanNodeConverter {
         return isArray ? ColumnDataType.BYTES_ARRAY : ColumnDataType.BYTES;
       case UUID:
         return isArray ? ColumnDataType.UUID_ARRAY : ColumnDataType.UUID;
+      case VARIANT:
+        if (isArray) {
+          throw new IllegalArgumentException("ARRAY<VARIANT> is not supported");
+        }
+        return ColumnDataType.VARIANT;
       case MAP:
         return ColumnDataType.MAP;
       case OTHER:

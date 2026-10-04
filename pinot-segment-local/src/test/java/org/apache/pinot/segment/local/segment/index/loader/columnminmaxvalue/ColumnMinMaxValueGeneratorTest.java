@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
@@ -45,16 +46,18 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/// Regression tests for [ColumnMinMaxValueGenerator] on raw (no-dictionary) BYTES and UUID columns.
+/// Regression tests for [ColumnMinMaxValueGenerator] on raw BYTES, UUID, and VARIANT columns.
 ///
 /// The generator reads the forward index when column metadata does not contain min/max values. These tests exercise
 /// the single-value, multi-value, and UUID (storedType=BYTES) forward index paths and verify their unsigned byte-wise
 /// ordering. The raw-BYTES loop once had its comparison directions inverted, silently persisting swapped min/max
-/// metadata that value-based segment pruning then consumed.
+/// metadata that value-based segment pruning then consumed. VARIANT is intentionally excluded because its physical
+/// envelope bytes have no logical ordering.
 public class ColumnMinMaxValueGeneratorTest {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), ColumnMinMaxValueGeneratorTest.class.getSimpleName());
@@ -62,6 +65,8 @@ public class ColumnMinMaxValueGeneratorTest {
   private static final String BYTES_COLUMN = "bytesCol";
   private static final String BYTES_MV_COLUMN = "bytesMvCol";
   private static final String UUID_COLUMN = "uuidCol";
+  private static final String VARIANT_COLUMN = "variantCol";
+  private static final String STRING_COLUMN = "stringCol";
 
   // Ordered ascending by unsigned byte-wise comparison
   private static final byte[] BYTES_SMALL = new byte[]{0x00, 0x01};
@@ -117,6 +122,58 @@ public class ColumnMinMaxValueGeneratorTest {
     assertTrue(reloaded.getColumnMetadataFor(BYTES_COLUMN).isMinMaxValueInvalid());
   }
 
+  @Test
+  public void testVariantExcludedFromMinMaxGeneration()
+      throws Exception {
+    for (ColumnMinMaxValueGeneratorMode mode
+        : List.of(ColumnMinMaxValueGeneratorMode.ALL, ColumnMinMaxValueGeneratorMode.NON_METRIC)) {
+      Schema schema = new Schema.SchemaBuilder().setSchemaName("variantSchema")
+          .setEnableColumnBasedNullHandling(true)
+          .addSingleValueDimension(VARIANT_COLUMN, DataType.VARIANT)
+          .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
+          .build();
+      TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("variantTable")
+          .setNoDictionaryColumns(List.of(VARIANT_COLUMN))
+          .setNullHandlingEnabled(true)
+          .build();
+      GenericRow firstRow = new GenericRow();
+      firstRow.putValue(VARIANT_COLUMN, VariantUtils.parseJsonToVariant("{\"value\":2}"));
+      firstRow.putValue(STRING_COLUMN, "z");
+      GenericRow secondRow = new GenericRow();
+      secondRow.putValue(VARIANT_COLUMN, VariantUtils.parseJsonToVariant("{\"value\":1}"));
+      secondRow.putValue(STRING_COLUMN, "a");
+
+      File indexDir = buildSegment(tableConfig, schema, List.of(firstRow, secondRow));
+      removeMinMaxValuesFromMetadataFile(indexDir);
+      generateMinMaxValues(indexDir, mode);
+
+      SegmentMetadataImpl reloaded = new SegmentMetadataImpl(indexDir);
+      assertNull(reloaded.getColumnMetadataFor(VARIANT_COLUMN).getMinValue());
+      assertNull(reloaded.getColumnMetadataFor(VARIANT_COLUMN).getMaxValue());
+      assertEquals(reloaded.getColumnMetadataFor(STRING_COLUMN).getMinValue(), "a");
+      assertEquals(reloaded.getColumnMetadataFor(STRING_COLUMN).getMaxValue(), "z");
+    }
+  }
+
+  @Test
+  public void testSingleValueVariantIsNeverMarkedSorted()
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("variantSortedSchema")
+        .addSingleValueDimension(VARIANT_COLUMN, DataType.VARIANT)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("variantSortedTable")
+        .setNoDictionaryColumns(List.of(VARIANT_COLUMN))
+        .build();
+    GenericRow row = new GenericRow();
+    row.putValue(VARIANT_COLUMN, VariantUtils.parseJsonToVariant("{\"value\":1}"));
+
+    File indexDir = buildSegment(tableConfig, schema, List.of(row));
+
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(indexDir);
+    assertFalse(metadata.getColumnMetadataFor(VARIANT_COLUMN).isSorted(),
+        "Physical envelope ordering must never be advertised as semantic VARIANT ordering");
+  }
+
   private static void assertMinMax(SegmentMetadataImpl segmentMetadata, String column, byte[] expectedMin,
       byte[] expectedMax) {
     ByteArray min = (ByteArray) segmentMetadata.getColumnMetadataFor(column).getMinValue();
@@ -128,11 +185,15 @@ public class ColumnMinMaxValueGeneratorTest {
 
   private static void generateMinMaxValues(File indexDir)
       throws Exception {
+    generateMinMaxValues(indexDir, ColumnMinMaxValueGeneratorMode.ALL);
+  }
+
+  private static void generateMinMaxValues(File indexDir, ColumnMinMaxValueGeneratorMode mode)
+      throws Exception {
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(indexDir, segmentMetadata, ReadMode.mmap);
         SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
-      ColumnMinMaxValueGenerator generator =
-          new ColumnMinMaxValueGenerator(segmentMetadata, writer, ColumnMinMaxValueGeneratorMode.ALL);
+      ColumnMinMaxValueGenerator generator = new ColumnMinMaxValueGenerator(segmentMetadata, writer, mode);
       generator.addColumnMinMaxValue();
     }
   }

@@ -35,12 +35,18 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.PinotScalarFunction;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Tests [PinotRuleUtils#isRelocatable], which decides whether an expression may be moved to a different position in
@@ -62,9 +68,14 @@ public class PinotRuleUtilsTest {
   /// Resolves the operator a query would actually bind to, which is not always the [FunctionRegistry] entry --
   /// `PinotOperatorTable#registerScalarFunctions` skips names already present in its hard-coded list.
   private SqlOperator resolvedOperator(String name) {
+    return resolvedOperator(name, false);
+  }
+
+  private SqlOperator resolvedOperator(String name, boolean nullHandlingEnabled) {
     List<SqlOperator> matches = new ArrayList<>();
-    PinotOperatorTable.instance(false).lookupOperatorOverloads(new SqlIdentifier(name, SqlParserPos.ZERO),
-        SqlFunctionCategory.USER_DEFINED_FUNCTION, SqlSyntax.FUNCTION, matches, null);
+    PinotOperatorTable.instance(nullHandlingEnabled).lookupOperatorOverloads(
+        new SqlIdentifier(name, SqlParserPos.ZERO), SqlFunctionCategory.USER_DEFINED_FUNCTION, SqlSyntax.FUNCTION,
+        matches, null);
     assertFalse(matches.isEmpty(), "Failed to resolve operator: " + name);
     return matches.get(0);
   }
@@ -148,6 +159,32 @@ public class PinotRuleUtilsTest {
     assertTrue(((PinotSqlFunction) resolvedNow).isVolatile(),
         "the operator NOW() actually binds to must also report volatile");
     assertFalse(PinotRuleUtils.isRelocatable(call(resolvedNow)));
+  }
+
+  @Test
+  public void testVariantFunctionRegistrationAndNullHandlingGate() {
+    assertEquals(TransformFunctionType.PARSE_JSON_TO_VARIANT.getName(), "parseJsonToVariant");
+    assertEquals(TransformFunctionType.PARSE_JSON_TO_VARIANT.getNames(),
+        List.of("parseJsonToVariant", "parseJson"));
+    assertEquals(TransformFunctionType.TRY_PARSE_JSON_TO_VARIANT.getName(), "tryParseJsonToVariant");
+    assertEquals(TransformFunctionType.TRY_PARSE_JSON_TO_VARIANT.getNames(),
+        List.of("tryParseJsonToVariant", "tryParseJson"));
+    assertSame(TransformFunctionType.getNullHandlingRequiredCanonicalNames(),
+        TransformFunctionType.getNullHandlingRequiredCanonicalNames());
+
+    for (String name : List.of("parseJsonToVariant", "parseJson", "tryParseJsonToVariant", "tryParseJson")) {
+      assertEquals(FunctionRegistry.canonicalize(resolvedOperator(name, true).getName()),
+          FunctionRegistry.canonicalize(name.startsWith("try") ? "tryParseJsonToVariant" : "parseJsonToVariant"));
+      QueryException exception = expectThrows(QueryException.class, () -> resolvedOperator(name, false));
+      assertEquals(exception.getErrorCode(), QueryErrorCode.QUERY_VALIDATION);
+      assertTrue(exception.getMessage().contains("requires query null handling"));
+    }
+
+    List<SqlOperator> matches = new ArrayList<>();
+    PinotOperatorTable.instance(false).lookupOperatorOverloads(
+        new SqlIdentifier("notARegisteredOperator", SqlParserPos.ZERO), SqlFunctionCategory.USER_DEFINED_FUNCTION,
+        SqlSyntax.FUNCTION, matches, null);
+    assertTrue(matches.isEmpty());
   }
 
   @Test

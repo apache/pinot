@@ -115,6 +115,9 @@ public class CompatibilityOpsRunner {
               case "streamOp":
                 node.setType(StreamOp.class);
                 break;
+              case "fileContainsOp":
+                node.setType(FileContainsOp.class);
+                break;
               default:
                 throw new RuntimeException("Unknown type: " + type);
             }

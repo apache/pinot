@@ -148,7 +148,8 @@ public class RexExpressionUtils {
         assert value != null;
         return rexBuilder.makeLiteral((String) value);
       }
-      case BYTES: {
+      case BYTES:
+      case VARIANT: {
         assert value != null;
         ByteArray byteArray = (ByteArray) value;
         byte[] bytes = byteArray.getBytes();
@@ -271,6 +272,7 @@ public class RexExpressionUtils {
         value = ((NlsString) value).getValue();
         break;
       case BYTES:
+      case VARIANT:
         value = new ByteArray(((ByteString) value).getBytes());
         break;
       case UUID:

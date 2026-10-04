@@ -259,4 +259,25 @@ public class MergeTaskUtilsTest {
         Map.of(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "true"));
     assertFalse(MergeTaskUtils.allowMerge(segmentZKMetadata));
   }
+
+  @Test
+  public void testValidateMergeTypeForVariantColumns() {
+    Schema variantSchema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("payload", DataType.VARIANT)
+        .addSingleValueDimension("name", DataType.STRING).build();
+    Schema plainSchema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("name", DataType.STRING).build();
+
+    for (String rejected : new String[]{"ROLLUP", "rollup", "DEDUP"}) {
+      IllegalStateException exception = expectThrows(IllegalStateException.class,
+          () -> MergeTaskUtils.validateMergeTypeForVariantColumns(variantSchema, rejected));
+      assertTrue(exception.getMessage().contains("VARIANT"), exception.getMessage());
+    }
+    // CONCAT, absent, and unknown merge types are ignored here; validity of the string is checked separately.
+    MergeTaskUtils.validateMergeTypeForVariantColumns(variantSchema, "CONCAT");
+    MergeTaskUtils.validateMergeTypeForVariantColumns(variantSchema, null);
+    MergeTaskUtils.validateMergeTypeForVariantColumns(variantSchema, "not-a-merge-type");
+    // No VARIANT column: everything passes.
+    MergeTaskUtils.validateMergeTypeForVariantColumns(plainSchema, "ROLLUP");
+  }
 }

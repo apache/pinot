@@ -163,6 +163,7 @@ public class DriverUtils {
     Integer columnsSQLDataType;
     switch (columnDataType) {
       case "STRING":
+      case "VARIANT":
         columnsSQLDataType = Types.VARCHAR;
         break;
       case "INT":
