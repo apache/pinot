@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.loader;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 
 
@@ -36,10 +37,12 @@ public class SegmentDirectoryLoaderContext {
   private final String _segmentTier;
   private final Map<String, Map<String, String>> _instanceTierConfigs;
   private final Map<String, String> _segmentCustomConfigs;
+  private final long _maxMmapPrefetchBytes;
 
   private SegmentDirectoryLoaderContext(ReadMode readMode, TableConfig tableConfig, Schema schema, String instanceId,
       String tableDataDir, String segmentName, long segmentCrc, String segmentTier,
-      Map<String, Map<String, String>> instanceTierConfigs, Map<String, String> segmentCustomConfigs) {
+      Map<String, Map<String, String>> instanceTierConfigs, Map<String, String> segmentCustomConfigs,
+      long maxMmapPrefetchBytes) {
     _readMode = readMode;
     _tableConfig = tableConfig;
     _schema = schema;
@@ -50,6 +53,7 @@ public class SegmentDirectoryLoaderContext {
     _segmentTier = segmentTier;
     _instanceTierConfigs = instanceTierConfigs;
     _segmentCustomConfigs = segmentCustomConfigs;
+    _maxMmapPrefetchBytes = maxMmapPrefetchBytes;
   }
 
   public ReadMode getReadMode() {
@@ -93,6 +97,12 @@ public class SegmentDirectoryLoaderContext {
     return _segmentCustomConfigs;
   }
 
+  /// Max amount of mmap'ed segment data to proactively fault into memory on segment load, in bytes. Zero disables
+  /// prefetching. Only applies when [#getReadMode()] is [ReadMode#mmap].
+  public long getMaxMmapPrefetchBytes() {
+    return _maxMmapPrefetchBytes;
+  }
+
   public static class Builder {
     private ReadMode _readMode = ReadMode.DEFAULT_MODE;
     private TableConfig _tableConfig;
@@ -104,6 +114,7 @@ public class SegmentDirectoryLoaderContext {
     private String _segmentTier;
     private Map<String, Map<String, String>> _instanceTierConfigs;
     private Map<String, String> _segmentCustomConfigs;
+    private long _maxMmapPrefetchBytes = CommonConstants.Server.DEFAULT_MMAP_PREFETCH_MAX_SIZE_BYTES;
 
     public Builder setReadMode(ReadMode readMode) {
       _readMode = readMode;
@@ -155,9 +166,15 @@ public class SegmentDirectoryLoaderContext {
       return this;
     }
 
+    public Builder setMaxMmapPrefetchBytes(long maxMmapPrefetchBytes) {
+      _maxMmapPrefetchBytes = maxMmapPrefetchBytes;
+      return this;
+    }
+
     public SegmentDirectoryLoaderContext build() {
       return new SegmentDirectoryLoaderContext(_readMode, _tableConfig, _schema, _instanceId, _tableDataDir,
-          _segmentName, _segmentCrc, _segmentTier, _instanceTierConfigs, _segmentCustomConfigs);
+          _segmentName, _segmentCrc, _segmentTier, _instanceTierConfigs, _segmentCustomConfigs,
+          _maxMmapPrefetchBytes);
     }
   }
 }

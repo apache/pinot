@@ -25,6 +25,7 @@ import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -33,6 +34,8 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class SegmentLocalFSDirectoryTest implements PinotBuffersAfterClassCheckRule {
@@ -119,6 +122,87 @@ public class SegmentLocalFSDirectoryTest implements PinotBuffersAfterClassCheckR
       PinotDataBuffer newDataBuffer = reader.getIndexFor("newColumn", StandardIndexes.forward());
       verifyData(newDataBuffer);
     }
+  }
+
+  private static SegmentDirectoryLoaderContext prefetchLoaderContext(long maxMmapPrefetchBytes) {
+    return new SegmentDirectoryLoaderContext.Builder()
+        .setMaxMmapPrefetchBytes(maxMmapPrefetchBytes)
+        .build();
+  }
+
+  /// The prefetched-page counter is JVM-wide, so each case resets it via [SegmentLocalFSDirectory#resetPrefetchedPages]
+  /// to get a deterministic baseline before asserting on how many pages actually got faulted in.
+  @Test
+  public void testPrefetchLimitDisabledStillReadsData()
+      throws Exception {
+    File prefetchDir = new File(SegmentLocalFSDirectoryTest.class.getName() + "-prefetch_disabled");
+    FileUtils.deleteQuietly(prefetchDir);
+    try {
+      FileUtils.copyDirectory(_segmentDirectory.getPath().toFile(), prefetchDir);
+      SegmentLocalFSDirectory.resetPrefetchedPages();
+      // 0 bytes disables prefetching entirely
+      try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(prefetchDir, _metadata,
+          ReadMode.mmap, prefetchLoaderContext(0))) {
+        try (SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+          PinotDataBuffer buffer = writer.newIndexFor("noPrefetchColumn", StandardIndexes.forward(), 1024);
+          loadData(buffer);
+          writer.save();
+        }
+        try (SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+          verifyData(reader.getIndexFor("noPrefetchColumn", StandardIndexes.forward()));
+        }
+        assertEquals(SegmentLocalFSDirectory.getPrefetchedPages(), 0,
+            "No pages should be faulted in when the prefetch limit is 0");
+      }
+    } finally {
+      FileUtils.deleteQuietly(prefetchDir);
+    }
+  }
+
+  /// With a 2 page budget and a slowdown threshold of floor(0.67 * 2) = 1 page, three reads from a zero baseline
+  /// walk through every branch of `prefetchMmapData`: the normal loop (0 -> 1), the header-only slowdown path
+  /// (1 -> 2), and the hard limit that stops prefetching once the budget is reached (2 -> 2).
+  @Test
+  public void testSmallPrefetchLimitStillReadsData()
+      throws Exception {
+    File prefetchDir = new File(SegmentLocalFSDirectoryTest.class.getName() + "-prefetch_small");
+    FileUtils.deleteQuietly(prefetchDir);
+    try {
+      FileUtils.copyDirectory(_segmentDirectory.getPath().toFile(), prefetchDir);
+      SegmentLocalFSDirectory.resetPrefetchedPages();
+      // 8KB, i.e. a 2 page budget
+      try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(prefetchDir, _metadata,
+          ReadMode.mmap, prefetchLoaderContext(8 * 1024))) {
+        try (SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+          PinotDataBuffer buffer = writer.newIndexFor("smallPrefetchColumn", StandardIndexes.forward(), 1024);
+          loadData(buffer);
+          writer.save();
+        }
+        try (SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+          // Normal loop: faults in the single page up to the slowdown threshold.
+          verifyData(reader.getIndexFor("smallPrefetchColumn", StandardIndexes.forward()));
+          assertEquals(SegmentLocalFSDirectory.getPrefetchedPages(), 1,
+              "The normal loop should fault in exactly one page before the slowdown threshold");
+
+          // Slowdown branch: only the header byte gets faulted in.
+          verifyData(reader.getIndexFor("smallPrefetchColumn", StandardIndexes.forward()));
+          assertEquals(SegmentLocalFSDirectory.getPrefetchedPages(), 2,
+              "The slowdown branch should fault in exactly one more page for the header");
+
+          // Hard limit: the budget is exhausted, so no further pages are faulted in.
+          verifyData(reader.getIndexFor("smallPrefetchColumn", StandardIndexes.forward()));
+          assertEquals(SegmentLocalFSDirectory.getPrefetchedPages(), 2,
+              "No further pages should be faulted in once the prefetch limit is reached");
+        }
+      }
+    } finally {
+      FileUtils.deleteQuietly(prefetchDir);
+    }
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testNegativePrefetchLimitRejected() {
+    new SegmentLocalFSDirectory(TEST_DIRECTORY, _metadata, ReadMode.mmap, prefetchLoaderContext(-1));
   }
 
   @Test

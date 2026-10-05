@@ -24,11 +24,45 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_MMAP_PREFETCH_MAX_SIZE_BYTES;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.INSTANCE_ID;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.MMAP_PREFETCH_MAX_SIZE;
 import static org.testng.Assert.assertEquals;
 
 
 public class HelixInstanceDataManagerConfigTest {
+
+  @Test
+  public void testMaxMmapPrefetchBytesDefaultsWhenUnset() throws ConfigurationException {
+    Map<String, Object> props = new HashMap<>();
+    props.put(INSTANCE_ID, "testInstance");
+
+    HelixInstanceDataManagerConfig config = new HelixInstanceDataManagerConfig(new PinotConfiguration(props));
+
+    assertEquals(config.getMaxMmapPrefetchBytes(), DEFAULT_MMAP_PREFETCH_MAX_SIZE_BYTES);
+  }
+
+  @Test
+  public void testMaxMmapPrefetchBytesParsesHumanReadableSize() throws ConfigurationException {
+    Map<String, Object> props = new HashMap<>();
+    props.put(INSTANCE_ID, "testInstance");
+    props.put(MMAP_PREFETCH_MAX_SIZE, "2G");
+
+    HelixInstanceDataManagerConfig config = new HelixInstanceDataManagerConfig(new PinotConfiguration(props));
+
+    assertEquals(config.getMaxMmapPrefetchBytes(), 2L * 1024 * 1024 * 1024);
+  }
+
+  @Test
+  public void testMaxMmapPrefetchBytesCanBeDisabled() throws ConfigurationException {
+    Map<String, Object> props = new HashMap<>();
+    props.put(INSTANCE_ID, "testInstance");
+    props.put(MMAP_PREFETCH_MAX_SIZE, "0");
+
+    HelixInstanceDataManagerConfig config = new HelixInstanceDataManagerConfig(new PinotConfiguration(props));
+
+    assertEquals(config.getMaxMmapPrefetchBytes(), 0L);
+  }
 
   @Test
   public void testTierConfigsWithMultipleTiers() throws ConfigurationException {
