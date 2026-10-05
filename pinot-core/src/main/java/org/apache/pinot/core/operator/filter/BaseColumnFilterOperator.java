@@ -55,7 +55,7 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getNulls() {
-    return _nullBitmap != null ? new BitmapDocIdSet(_nullBitmap, _numDocs) : EmptyDocIdSet.unscanned();
+    return _nullBitmap != null ? BitmapDocIdSet.create(_nullBitmap, _numDocs) : EmptyDocIdSet.unscanned();
   }
 
   /// The not-false documents are the ones matching the predicate over the stored values together with the null ones.
@@ -67,9 +67,9 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
       return matches;
     }
     if (matches instanceof EmptyDocIdSet) {
-      return new BitmapDocIdSet(_nullBitmap, _numDocs, matches.getNumEntriesScannedInFilter());
+      return BitmapDocIdSet.create(_nullBitmap, _numDocs, matches.getNumEntriesScannedInFilter());
     }
-    return new OrDocIdSet(List.of(matches, new BitmapDocIdSet(_nullBitmap, _numDocs)), _numDocs);
+    return new OrDocIdSet(List.of(matches, BitmapDocIdSet.create(_nullBitmap, _numDocs)), _numDocs);
   }
 
   @Override
@@ -102,8 +102,11 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
     if (blockDocIdSet instanceof EmptyDocIdSet) {
       return blockDocIdSet;
     }
-    return new AndDocIdSet(List.of(blockDocIdSet,
-        new BitmapDocIdSet(ImmutableRoaringBitmap.flip(nullBitmap, 0, (long) _numDocs), _numDocs)),
-        _queryContext.getQueryOptions());
+    BlockDocIdSet nonNulls = BitmapDocIdSet.create(ImmutableRoaringBitmap.flip(nullBitmap, 0, (long) _numDocs),
+        _numDocs);
+    if (nonNulls instanceof EmptyDocIdSet) {
+      return new EmptyDocIdSet(blockDocIdSet.getNumEntriesScannedInFilter());
+    }
+    return new AndDocIdSet(List.of(blockDocIdSet, nonNulls), _queryContext.getQueryOptions());
   }
 }

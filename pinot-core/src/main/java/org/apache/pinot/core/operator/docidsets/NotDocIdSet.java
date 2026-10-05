@@ -23,7 +23,7 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.NotDocIdIterator;
 
 
-public class NotDocIdSet implements BlockDocIdSet {
+public final class NotDocIdSet implements BlockDocIdSet {
   private final BlockDocIdSet _childDocIdSet;
   private final int _numDocs;
 

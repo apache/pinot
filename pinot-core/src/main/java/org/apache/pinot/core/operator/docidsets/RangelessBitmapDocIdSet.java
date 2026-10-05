@@ -23,7 +23,7 @@ import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterato
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-public class RangelessBitmapDocIdSet implements BlockDocIdSet {
+public final class RangelessBitmapDocIdSet implements BlockDocIdSet {
   private final RangelessBitmapDocIdIterator _iterator;
 
   /// Returns a doc id set over the given documents, or [EmptyDocIdSet] when there is none.
@@ -36,11 +36,11 @@ public class RangelessBitmapDocIdSet implements BlockDocIdSet {
     return iterator.getDocIds().isEmpty() ? EmptyDocIdSet.unscanned() : new RangelessBitmapDocIdSet(iterator);
   }
 
-  public RangelessBitmapDocIdSet(ImmutableRoaringBitmap docIds) {
+  private RangelessBitmapDocIdSet(ImmutableRoaringBitmap docIds) {
     this(new RangelessBitmapDocIdIterator(docIds));
   }
 
-  public RangelessBitmapDocIdSet(RangelessBitmapDocIdIterator iterator) {
+  private RangelessBitmapDocIdSet(RangelessBitmapDocIdIterator iterator) {
     _iterator = iterator;
   }
 
