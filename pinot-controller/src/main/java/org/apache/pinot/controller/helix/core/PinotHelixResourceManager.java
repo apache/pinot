@@ -161,6 +161,7 @@ import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
+import org.apache.pinot.controller.util.PageCacheWarmupControllerExecutor;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.core.util.NumberUtils;
 import org.apache.pinot.core.util.NumericException;
@@ -266,6 +267,7 @@ public class PinotHelixResourceManager {
   private TableCache _tableCache;
   private final LineageManager _lineageManager;
   private QueryWorkloadManager _queryWorkloadManager;
+  private final PageCacheWarmupControllerExecutor _pageCacheWarmupControllerExecutor;
   // Dedicated ZkClient for transactional multi-path writes (atomic ZK multi()). Lazily built on
   // first multiWriteZK call. A dedicated session is used because Helix 1.3.2 does not expose
   // multi() on BaseDataAccessor, and the underlying ZkClient inside ZKHelixManager is not publicly
@@ -311,6 +313,7 @@ public class PinotHelixResourceManager {
       _lineageUpdaterLocks[i] = new Object();
     }
     _lineageManager = lineageManager;
+    _pageCacheWarmupControllerExecutor = new PageCacheWarmupControllerExecutor(this, controllerConf);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -374,6 +377,7 @@ public class PinotHelixResourceManager {
   /// Stop the Pinot controller instance.
   public synchronized void stop() {
     _segmentDeletionManager.stop();
+    _pageCacheWarmupControllerExecutor.shutdown();
     ZkClient zkClient = _zkClient;
     if (zkClient != null) {
       _zkClient = null;
@@ -1674,6 +1678,7 @@ public class PinotHelixResourceManager {
       // Update existing schema
       if (override) {
         updateSchema(schema, oldSchema, force);
+        refreshTablesUsingSchema(schemaName);
       } else {
         throw new SchemaAlreadyExistsException("Schema: " + schemaName + " already exists");
       }
@@ -1706,30 +1711,43 @@ public class PinotHelixResourceManager {
     }
 
     updateSchema(schema, oldSchema, forceTableSchemaUpdate);
+    if (reload) {
+      reloadTablesUsingSchema(schemaName);
+    } else {
+      refreshTablesUsingSchema(schemaName);
+    }
+  }
+
+  /// Reloads all segments of the tables using the given schema. Logical table schemas are skipped because no
+  /// segments are backed by them.
+  private void reloadTablesUsingSchema(String schemaName)
+      throws TableNotFoundException {
     if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, schemaName)) {
-      // For logical table schemas, we do not need to reload segments or send schema refresh messages
-      LOGGER.info("Logical table schema: {} updated, no need to reload segments or send schema refresh messages",
-          schemaName);
+      LOGGER.info("Logical table schema: {} updated, no need to reload segments", schemaName);
       return;
     }
+    LOGGER.info("Reloading tables with name: {}", schemaName);
+    for (String tableNameWithType : getExistingTableNamesWithType(schemaName, null)) {
+      reloadAllSegments(tableNameWithType, false, null);
+    }
+  }
+
+  /// Sends the table config and schema refresh message to the servers hosting the tables using the given schema.
+  /// Servers reuse their cached schema for ordinary segment loads and only refresh it on this message, an explicit
+  /// reload or a table config update, so every schema update has to send it or newly loaded segments keep being
+  /// processed against the previous schema. Logical table schemas are skipped because no segments are backed by them.
+  private void refreshTablesUsingSchema(String schemaName) {
+    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, schemaName)) {
+      LOGGER.info("Logical table schema: {} updated, no need to send schema refresh messages", schemaName);
+      return;
+    }
+    LOGGER.info("Refreshing schema for tables with name: {}", schemaName);
     try {
-      List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
-      if (reload) {
-        LOGGER.info("Reloading tables with name: {}", schemaName);
-        for (String tableNameWithType : tableNamesWithType) {
-          reloadAllSegments(tableNameWithType, false, null);
-        }
-      } else {
-        LOGGER.info("Refreshing schema for tables with name: {}", schemaName);
-        for (String tableNameWithType : tableNamesWithType) {
-          sendTableConfigSchemaRefreshMessage(tableNameWithType);
-        }
+      for (String tableNameWithType : getExistingTableNamesWithType(schemaName, null)) {
+        sendTableConfigSchemaRefreshMessage(tableNameWithType);
       }
     } catch (TableNotFoundException e) {
-      if (reload) {
-        throw e;
-      }
-      // We don't throw exception if no tables found for schema when reload is false. Since this could be valid case
+      // A schema can exist before any table uses it
       LOGGER.warn("No tables found for schema (refresh only): {}", schemaName, e);
     }
   }
@@ -4698,7 +4716,7 @@ public class PinotHelixResourceManager {
   ///                     on it.
   protected void preSegmentReplaceUpdateRouting(String tableNameWithType, List<String> segmentsTo,
       List<String> segmentsFrom) {
-    // No-op by default
+    _pageCacheWarmupControllerExecutor.triggerPageCacheWarmup(tableNameWithType, segmentsTo);
   }
 
   /// List the segment lineage

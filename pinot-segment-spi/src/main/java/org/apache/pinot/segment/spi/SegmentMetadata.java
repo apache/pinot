@@ -58,9 +58,12 @@ public interface SegmentMetadata {
 
   Interval getTimeInterval();
 
-  String getCrc();
+  /// Returns the CRC of the whole segment, or `Long.MIN_VALUE` when the segment has no CRC recorded.
+  long getCrc();
 
-  String getDataCrc();
+  /// Returns the CRC of the segment data only (excluding the metadata), or `Long.MIN_VALUE` when the segment has no
+  /// data CRC recorded.
+  long getDataCrc();
 
   SegmentVersion getVersion();
 

@@ -1,19 +1,21 @@
 # review-process-scope
 
-You are a specialized reviewer for **Apache Pinot domain 8: Process & Scope**. Read `kb/code-review-principles.md` section 8 and `CLAUDE.md`.
+Review **Apache Pinot domain 8: Process & Scope**. Read the applicable parts of section 8 in
+`kb/code-review-principles.md` and relevant repository conventions not already loaded. Reuse material already read.
 
-Severity:
-- **CRITICAL** — revert without referencing the original PR or explaining the regression; test-retry / sleep added to mask a flake (never fix by retry — investigate root cause); missing rolling-upgrade note on a backward-incompat change.
-- **MAJOR** — PR bundles multiple unrelated concerns; commit message doesn't explain WHY; new TODO with no issue link.
-- **MINOR** — PR title style; label missing.
+Use the canonical severity definitions and Review Delivery rules in `kb/code-review-principles.md`. Assess demonstrated
+impact; pattern matches are investigation triggers, not findings or automatic severity assignments.
 
 ## 1. Broad scan
 
-- Diff size + module count. If > 500 lines or > 4 modules, flag for scope review.
-- Commit messages (`git log <base>..HEAD`): check each for a WHY clause.
+- Use diff size and module count to plan coverage. Report scope issues only when the diff includes unrelated concerns,
+  not because it crosses a fixed size threshold.
+- Commit messages (`git log <base>..HEAD`): check that the purpose of the change is understandable from the available context.
 - New `// TODO` / `// FIXME` — confirm each has a linked issue.
 - Test retry patterns: `@Test(retryAnalyzer = ...)`, `Thread.sleep` added in tests, `@Flaky` annotations.
 - PR title / labels if available.
+- Required checks for the reviewed SHA: apply C6.1, classify failures, and report pending or failing merge gates.
+  Read-only review does not change Git state or retry CI; authorized remediation addresses attributable failures within scope.
 
 ## 2. Deep analysis
 
@@ -25,7 +27,8 @@ Severity:
 
 ## 3. Findings
 
-Tag `skill: review-process-scope`, cite `C8.x`, use `[PROC]` for process nits. Most findings MINOR; the retry-to-fix-flake and revert-without-reference cases are CRITICAL.
+Tag `skill: review-process-scope`, cite `C8.x`, use `[PROC]` for process nits. Distinguish missing process context from a
+demonstrated production or test-reliability problem, and use the canonical severity definitions.
 
 ## When to defer to the developer
 

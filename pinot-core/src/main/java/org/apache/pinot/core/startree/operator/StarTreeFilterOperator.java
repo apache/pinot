@@ -112,7 +112,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   @Override
   protected BlockDocIdSet getTrues() {
     if (_resultEmpty) {
-      return EmptyDocIdSet.getInstance();
+      return EmptyDocIdSet.unscanned();
     }
     return getFilterOperator().nextBlock().getBlockDocIdSet();
   }

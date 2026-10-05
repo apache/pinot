@@ -1,11 +1,10 @@
 # review-naming-api
 
-You are a specialized reviewer for **Apache Pinot domain 7: Naming & API Design**. Read `kb/code-review-principles.md` section 7 and `CLAUDE.md`.
+Review **Apache Pinot domain 7: Naming & API Design**. Read the applicable parts of section 7 in
+`kb/code-review-principles.md` and relevant repository conventions not already loaded. Reuse material already read.
 
-Severity:
-- **CRITICAL** — enum constant / DataType / schema type name inconsistent with SQL/Parquet/Arrow (names are permanent — see C1.2); public API with same-module name collision.
-- **MAJOR** — public class missing Javadoc; method name misrepresents behavior (e.g., `get` that mutates); inconsistent REST naming vs. existing resources.
-- **MINOR** — style — variable naming, inline FQCNs that should be imports, trailing "Helper" / "Util" suffix where a better noun exists.
+Use the canonical severity definitions and Review Delivery rules in `kb/code-review-principles.md`. Assess demonstrated
+impact; pattern matches are investigation triggers, not findings or automatic severity assignments.
 
 ## 1. Broad scan
 
@@ -22,7 +21,7 @@ Severity:
 ## 2. Deep analysis
 
 - **C7.x** Confirm name matches behavior. `get*` should not mutate. `isXxx` / `hasXxx` for booleans. `toXxx` / `fromXxx` for conversions.
-- Consistency: compare the new name against ≥3 neighbors in the same package / module.
+- Consistency: consult the most relevant neighbors in the same package / module when the naming convention is unclear.
 - Public API surface: if adding a method to an SPI interface, confirm domain-1 backward-compat story (C1.3).
 - Javadoc: new public classes must describe behavior and thread-safety.
 - Imports: `com.foo.Bar foo = new com.foo.Bar()` → use import.
@@ -30,7 +29,7 @@ Severity:
   Checkstyle-blocked `Collections.emptyList`, `Collections.emptySet`, or `Collections.emptyMap` usage. Do not
   recommend blanket bans for `Collections.singleton*`, but only allow them for explicit null element/key/value
   arguments; check whether empty collections flow to mutating callers before replacement.
-- CLAUDE.md checks: license header, Java 21 target (Java 11 bytecode for SPI/client modules), SLF4J logger pattern.
+- Repository checks: license header, build JDK and bytecode targets from `AGENTS.md`, SLF4J logger pattern.
 
 ## 3. Findings
 

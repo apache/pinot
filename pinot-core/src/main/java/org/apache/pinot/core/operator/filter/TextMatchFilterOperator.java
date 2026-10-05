@@ -63,11 +63,12 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
   @Override
   protected BlockDocIdSet getTrues() {
     if (_textIndexReader.isMultiColumn()) {
-      return new BitmapDocIdSet(
+      return BitmapDocIdSet.create(
           ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue(),
               _predicate.getOptions()), _numDocs);
     } else {
-      return new BitmapDocIdSet(_textIndexReader.getDocIds(_predicate.getValue(), _predicate.getOptions()), _numDocs);
+      return BitmapDocIdSet.create(_textIndexReader.getDocIds(_predicate.getValue(), _predicate.getOptions()),
+          _numDocs);
     }
   }
 

@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.openstruct;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -38,6 +39,7 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
@@ -50,6 +52,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -64,6 +67,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class OpenStructColumnSplitterTest {
@@ -94,6 +98,16 @@ public class OpenStructColumnSplitterTest {
       boolean perKeyMetricsEnabled) {
     return new OpenStructIndexConfig(false, null, maxDenseKeys, denseKeys, minFillRate, null, null,
         perKeyMetricsEnabled);
+  }
+
+  @DataProvider(name = "codecSpecOpenStructConfigs")
+  public Object[][] codecSpecOpenStructConfigs() {
+    FieldConfig valueFieldConfig = rawCodecSpecFieldConfig("clicks");
+    FieldConfig defaultValueFieldConfig = rawCodecSpecFieldConfig("default");
+    return new Object[][]{
+        {new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(valueFieldConfig), null, null, null)},
+        {new OpenStructIndexConfig(false, defaultValueFieldConfig, -1, null, 0.5, null, null, null, null)}
+    };
   }
 
   @Test
@@ -219,7 +233,19 @@ public class OpenStructColumnSplitterTest {
     }
     s.seal();
     String sparseCol = OpenStructNaming.sparseColumnName("metrics");
-    assertTrue(s.getMaterializedColumnMetadata().containsKey(sparseCol));
+    PropertiesConfiguration props = s.getMaterializedColumnMetadata().get(sparseCol);
+    assertNotNull(props);
+
+    // Regression: the hand-rolled metadata this replaced never wrote FieldConfig.EncodingType or
+    // LENGTH_OF_LONGEST_ELEMENT, and approximated CARDINALITY as the non-null doc count (1 here) rather than the
+    // real distinct-value count (2: the one non-empty json blob, plus the "" default shared by the 9 absent docs).
+    // Assert the values that only the real addColumnMetadataInfo()/statsCollector path can produce.
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(props, 10, sparseCol);
+    assertEquals(metadata.getFieldSpec().getDataType(), DataType.STRING);
+    assertFalse(metadata.hasDictionary());
+    assertEquals(metadata.getForwardIndexEncoding(), FieldConfig.EncodingType.RAW);
+    assertEquals(metadata.getCardinality(), 2);
+    assertTrue(metadata.getLengthOfLongestElement() > 0);
   }
 
   @Test
@@ -395,6 +421,32 @@ public class OpenStructColumnSplitterTest {
     assertFalse(new File(_tempDir, denseCol + V1Constants.Dict.FILE_EXTENSION).exists());
     assertTrue(new File(_tempDir,
         denseCol + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION).exists());
+  }
+
+  @Test(dataProvider = "codecSpecOpenStructConfigs")
+  public void testSealRejectsCodecSpecBeforeReplacingChildForwardConfig(OpenStructIndexConfig openStructConfig)
+      throws Exception {
+    OpenStructColumnSplitter splitter = new OpenStructColumnSplitter(
+        _tempDir, "metrics", "testTable_OFFLINE", spec(), openStructConfig);
+    for (int docId = 0; docId < 10; docId++) {
+      splitter.add(Map.of("clicks", docId), docId);
+    }
+
+    IllegalStateException exception = expectThrows(IllegalStateException.class, splitter::seal);
+    assertEquals(exception.getMessage(), "OPEN_STRUCT column 'metrics': codecSpec is not supported for key 'clicks'; "
+        + "materialized keys always use a dictionary-encoded or LZ4 raw forward index");
+  }
+
+  private static FieldConfig rawCodecSpecFieldConfig(String name) {
+    ObjectNode forward = JsonUtils.newObjectNode();
+    forward.put("encodingType", FieldConfig.EncodingType.RAW.name());
+    forward.put("codecSpec", "LZ4");
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("forward", forward);
+    return new FieldConfig.Builder(name)
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
   }
 
   @Test

@@ -31,6 +31,7 @@ import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.PageCacheWarmupConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -196,12 +197,18 @@ public class TableConfigSerDeUtils {
       });
     }
 
+    PageCacheWarmupConfig pageCacheWarmupConfig = null;
+    String pageCacheWarmupConfigString = simpleFields.get(TableConfig.PAGE_CACHE_WARMUP_CONFIG_KEY);
+    if (pageCacheWarmupConfigString != null) {
+      pageCacheWarmupConfig = JsonUtils.stringToObject(pageCacheWarmupConfigString, PageCacheWarmupConfig.class);
+    }
+
     TableConfig tableConfig =
         new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
             quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList,
             upsertConfig, dedupConfig, dimensionTableConfig, ingestionConfig, tierConfigList, isDimTable,
             tunerConfigList, instancePartitionsMap, segmentAssignmentConfigMap,
-            tableSamplerConfigs, isMaterializedView);
+            tableSamplerConfigs, isMaterializedView, pageCacheWarmupConfig);
     tableConfig.setDescription(description);
     tableConfig.setTags(tags);
     return tableConfig;
@@ -291,6 +298,10 @@ public class TableConfigSerDeUtils {
     List<String> tags = tableConfig.getTags();
     if (tags != null && !tags.isEmpty()) {
       simpleFields.put(TableConfig.TAGS_KEY, JsonUtils.objectToString(tags));
+    }
+    PageCacheWarmupConfig pageCacheWarmupConfig = tableConfig.getPageCacheWarmupConfig();
+    if (pageCacheWarmupConfig != null) {
+      simpleFields.put(TableConfig.PAGE_CACHE_WARMUP_CONFIG_KEY, pageCacheWarmupConfig.toJsonString());
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());

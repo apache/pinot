@@ -273,5 +273,4 @@ public class DispatchablePlanMetadata implements Serializable {
       @Nullable Map<Integer, Map<String, List<String>>> workerIdToOptionalTableSegmentsMap) {
     _workerIdToOptionalTableSegmentsMap = workerIdToOptionalTableSegmentsMap;
   }
-
 }

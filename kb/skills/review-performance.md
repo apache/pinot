@@ -1,28 +1,30 @@
 # review-performance
 
-You are a specialized reviewer for **Apache Pinot domain 4: Performance & Efficiency**. Read `kb/code-review-principles.md` section 4 and `CLAUDE.md`.
+Review **Apache Pinot domain 4: Performance & Efficiency**. Read the applicable parts of section 4 in
+`kb/code-review-principles.md` and relevant repository conventions not already loaded. Reuse material already read.
 
-Severity:
-- **CRITICAL** — documented benchmark regresses significantly; per-row allocation in top-level operator loop; large synchronized block on query-path singleton.
-- **MAJOR** — missing primitive fast-path (e.g., reusing `Long` boxing); unnecessary intermediate collection on the scan path; string concat inside a per-row loop.
-- **MINOR** — minor inefficiency off the hot path; logging at INFO inside a tight loop.
+Use the canonical severity definitions and Review Delivery rules in `kb/code-review-principles.md`. Assess demonstrated
+impact; pattern matches are investigation triggers, not findings or automatic severity assignments.
 
 ## 1. Broad scan
 
 - Per-row methods: search for `getInt`, `getLong`, `getDouble`, `getString`, `getBytes`, `getValue`, `transform`, `filter`, `accept` inside operator / transform / aggregator files.
 - Allocations in loops: `new `, `Arrays.asList`, `Collections.singletonList`, `String.format`, `"x" + y`, lambdas capturing variables.
 - Boxing: use of `Integer`, `Long`, `Double`, `Boolean` where `int`, `long`, `double`, `boolean` would do; `Map<K, Integer>`-style in hot code.
-- Virtual dispatch in hot loops: fields typed as an interface where a concrete class would let JIT inline.
+- Dispatch in hot loops: investigate polymorphic call sites when profiling or code-path evidence suggests an inlining issue;
+  an interface-typed field alone does not demonstrate a regression.
 - `synchronized` / lock acquisition inside for-loops on the scan path.
 - Missing type-specific aggregator (e.g., `Sum` falls back to `BigDecimal` when `Long` would suffice — see recent PRs on `SumLongWindowValueAggregator`).
 - `ByteBuffer.duplicate()` / `slice()` in loops.
 
 ## 2. Deep analysis
 
-- **C4.x** Ask: does this code run per-row, per-segment, or per-query? Apply the budget of each (per-row: zero allocations, no boxing, no virtual dispatch where avoidable).
+- **C4.x** Establish whether code runs per-row, per-segment, or per-query. Assess added allocation, boxing, dispatch,
+  and contention against the relevant workload; do not infer runtime cost from syntax alone.
 - Check for type-dispatch on `getStoredType()` rather than a double-coercion fallback. Precision loss past 2^53 is a correctness issue but also a perf giveaway (extra unbox + cast).
 - If the PR claims a perf gain, confirm a benchmark is attached or point to the `/bench-compare` skill as a next step.
-- If a benchmark shows a regression > 5%, flag CRITICAL regardless of other merits.
+- Evaluate benchmark regressions using comparable workloads, environments, repeated measurements, noise, and affected
+  production paths. Assign severity from demonstrated impact, not a fixed percentage alone; report missing evidence.
 - Avoid introducing `LOGGER.debug(String.format(...))` in per-row loops — even when debug is off, formatting may be eager.
 
 ## 3. Findings

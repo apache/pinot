@@ -20,9 +20,9 @@ package org.apache.pinot.plugin.minion.tasks.upsertcompactmerge;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
@@ -102,8 +102,9 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     long maxCreationTimeOfMergingSegments = getMaxZKCreationTimeFromConfig(configs);
 
     // validate if crc of deepstore copies is same as that in ZK of segments
-    List<String> originalSegmentCrcFromTaskGenerator =
-        List.of(configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY).split(","));
+    List<Long> originalSegmentCrcFromTaskGenerator =
+        Arrays.stream(configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY).split(",")).map(Long::parseLong)
+            .collect(Collectors.toList());
     validateCRCForInputSegments(segmentMetadataList, originalSegmentCrcFromTaskGenerator);
 
     // Executor-only: read comparison mode string from task config (no auth resolution or URL hits).
@@ -199,10 +200,10 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     return partitionIDSet.iterator().next();
   }
 
-  void validateCRCForInputSegments(List<SegmentMetadataImpl> segmentMetadataList, List<String> expectedCRCList) {
+  void validateCRCForInputSegments(List<SegmentMetadataImpl> segmentMetadataList, List<Long> expectedCRCList) {
     for (int i = 0; i < segmentMetadataList.size(); i++) {
       SegmentMetadataImpl segmentMetadata = segmentMetadataList.get(i);
-      if (!Objects.equals(segmentMetadata.getCrc(), expectedCRCList.get(i))) {
+      if (segmentMetadata.getCrc() != expectedCRCList.get(i)) {
         String message = String.format("Crc mismatched between ZK and deepstore copy of segment: %s. Expected crc "
                 + "from ZK: %s, crc from deepstore: %s", segmentMetadata.getName(), expectedCRCList.get(i),
             segmentMetadata.getCrc());

@@ -86,6 +86,7 @@ import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.config.QueryOptionConfigListener;
 import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -421,7 +422,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Broker.CONFIG_OF_METRICS_NAME_PREFIX, Broker.DEFAULT_METRICS_NAME_PREFIX),
         _metricsRegistry,
         _brokerConf.getProperty(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS),
-        _brokerConf.getProperty(Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, List.of()));
+        getAllowedTablesForEmittingMetrics(_brokerConf));
     _brokerMetrics.initializeGlobalMeters();
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ZK_JUTE_MAX_BUFFER,
@@ -585,6 +586,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
       _routingManager.setServerReenableCallback(
           serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));
+      // Lets an operator turn the proto segment list encoding on and off through cluster config, without a restart.
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+          multiStageBrokerRequestHandler.getQueryDispatcher());
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
@@ -651,6 +655,16 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerRequestHandler =
         new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
             timeSeriesRequestHandler, _responseStore);
+    // Lets the approximate-function rewrite defaults be changed from the cluster config without a broker restart.
+    // Registering here is a no-op in itself, because the cluster config handler is not wired to Helix yet, so the
+    // snapshot it hands the listener is empty. The real values arrive from that handler's first Helix callback,
+    // which is set up below and still runs before the broker starts serving traffic.
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        singleStageBrokerRequestHandler.getApproximateFunctionOverrideProvider());
+    if (multiStageBrokerRequestHandler != null) {
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+          multiStageBrokerRequestHandler.getApproximateFunctionOverrideProvider());
+    }
     _brokerRequestHandler.start();
 
     String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
@@ -662,6 +676,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     LOGGER.info("Wiring up cluster config change handler with helix");
     _spectatorHelixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
+    // Registered before the query endpoints start so that the cluster configs are applied before the first query
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_serverRoutingStatsManager);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(new QueryOptionConfigListener());
 
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _brokerAdminApplication = createBrokerAdminApp();
@@ -732,12 +750,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerMetrics.addTimedValue(BrokerTimer.STARTUP_SUCCESS_DURATION_MS,
         System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
 
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_serverRoutingStatsManager);
-
     NettyInspector.registerMetrics(_brokerMetrics);
 
     LOGGER.info("Finish starting Pinot broker");
+  }
+
+  /// Returns the tables that emit table-level metrics even when table-level metrics are disabled.
+  @VisibleForTesting
+  static List<String> getAllowedTablesForEmittingMetrics(PinotConfiguration brokerConf) {
+    return brokerConf.getCommaSeparatedList(Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, List.of());
   }
 
   protected void initClusterChangeMediator() throws Exception {

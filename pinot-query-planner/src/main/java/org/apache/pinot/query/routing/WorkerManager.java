@@ -25,7 +25,6 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -61,6 +60,8 @@ import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -892,7 +893,10 @@ public class WorkerManager {
     if (routingTableMap == null) {
       routingTableMap = getRoutingTable(tableName, context.getRequestId(), context.getPlannerContext().getOptions());
     }
-    Preconditions.checkState(!routingTableMap.isEmpty(), "Unable to find routing entries for table: %s", tableName);
+    if (routingTableMap.isEmpty()) {
+      throw QueryErrorCode.BROKER_RESOURCE_MISSING.asException(
+          "Unable to find routing entries for table: " + tableName);
+    }
 
     // acquire time boundary info if it is a hybrid table.
     if (routingTableMap.size() > 1) {
@@ -969,6 +973,9 @@ public class WorkerManager {
 
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
+    if (!workerIdToOptionalSegmentMap.isEmpty()) {
+      metadata.setWorkerIdToOptionalSegmentsMap(workerIdToOptionalSegmentMap);
+    }
   }
 
   /// Acquire routing table for items listed in [org.apache.pinot.query.planner.plannode.TableScanNode].
@@ -1572,11 +1579,6 @@ public class WorkerManager {
             workerIdToServerInstanceMap, workerIdToSegmentsMap);
         continue;
       }
-      PartitionInfo partitionInfo = partitionInfoMap[i];
-      // TODO: Currently we don't support the case when a partition doesn't contain any segment. The reason is that
-      //       the leaf stage won't be able to directly return empty response.
-      Preconditions.checkState(partitionInfo != null, "Failed to find any segment for table: %s, partition: %s",
-          tableName, i);
       // NOTE: Pick worker based on the request id plus the partition id (not a running counter) so that the same worker
       //       is picked across different table scans when the segments for the same partition are colocated, and so
       //       that skipping pruned or empty partitions does not shift the server assignment of the surviving ones.
@@ -1809,7 +1811,7 @@ public class WorkerManager {
           .partitionFunction(partitionTableInfo._partitionFunction)
           .partitionSize(partitionTableInfo._partitionInfoMap.length)
           .build();
-    } catch (IllegalStateException e) {
+    } catch (IllegalStateException | QueryException e) {
       return null;
     }
   }
@@ -1821,8 +1823,10 @@ public class WorkerManager {
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       boolean offlineRoutingExists = _routingManager.routingExists(offlineTableName);
       boolean realtimeRoutingExists = _routingManager.routingExists(realtimeTableName);
-      Preconditions.checkState(offlineRoutingExists || realtimeRoutingExists, "Routing doesn't exist for table: %s",
-          tableName);
+      if (!offlineRoutingExists && !realtimeRoutingExists) {
+        throw QueryErrorCode.BROKER_RESOURCE_MISSING.asException(
+            "Routing doesn't exist for table: " + tableName);
+      }
 
       if (offlineRoutingExists && realtimeRoutingExists) {
         TablePartitionReplicatedServersInfo offlineTpi = _routingManager.getTablePartitionReplicatedServersInfo(

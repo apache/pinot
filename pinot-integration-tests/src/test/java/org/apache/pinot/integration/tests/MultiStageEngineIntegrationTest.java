@@ -48,7 +48,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
 import org.apache.pinot.controller.api.resources.PinotQueryResource.MultiStageQueryValidationRequest;
+import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -291,6 +293,56 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertAllLeafStagesEmptyRows(prefix,
         "SELECT AirlineID, COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0 GROUP BY AirlineID",
         List.of(), "LONG", "LONG");
+  }
+
+  /// The proto segment list encoding ships disabled, so a query uses the legacy JSON encoding until an operator turns
+  /// it on in cluster config, which has to take effect without restarting the broker. Both encodings must return
+  /// identical results, for queries with one and with several leaf stages.
+  @Test
+  public void testProtoSegmentListEncodingIsTransparent()
+      throws Exception {
+    QueryDispatcher dispatcher = ((BrokerRequestHandlerDelegate) _brokerStarters.get(0).getBrokerRequestHandler())
+        .getMultiStageBrokerRequestHandler().getQueryDispatcher();
+    assertFalse(dispatcher.isEnableProtoSegmentList(), "The proto segment list encoding must ship disabled");
+
+    String table = getTableName();
+    List<String> queries = List.of(
+        "SELECT COUNT(*) FROM " + table,
+        "SELECT Carrier, COUNT(*), MAX(ArrDelay) FROM " + table + " WHERE DaysSinceEpoch > 16312 "
+            + "GROUP BY Carrier ORDER BY Carrier",
+        "SELECT COUNT(*) FROM " + table + " a JOIN (SELECT DISTINCT Carrier FROM " + table + ") b "
+            + "ON a.Carrier = b.Carrier");
+
+    Map<String, JsonNode> legacyRows = new HashMap<>();
+    for (String query : queries) {
+      JsonNode response = postQuery(query);
+      assertTrue(response.get("exceptions").isEmpty(), "Unexpected exceptions with the legacy encoding: " + response);
+      legacyRows.put(query, response.get("resultTable").get("rows"));
+    }
+
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    try {
+      // What an operator does once every server has been upgraded.
+      _helixManager.getConfigAccessor()
+          .set(scope, CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST, "true");
+      TestUtils.waitForCondition(aVoid -> dispatcher.isEnableProtoSegmentList(), 10_000L,
+          "Enabling the proto segment list encoding in cluster config did not reach the broker");
+
+      for (String query : queries) {
+        JsonNode response = postQuery(query);
+        assertTrue(response.get("exceptions").isEmpty(),
+            "Unexpected exceptions with the proto encoding: " + response);
+        assertEquals(response.get("resultTable").get("rows"), legacyRows.get(query),
+            "The segment list encoding changed the result of: " + query);
+      }
+    } finally {
+      _helixManager.getConfigAccessor()
+          .set(scope, CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST, "false");
+      TestUtils.waitForCondition(aVoid -> !dispatcher.isEnableProtoSegmentList(), 10_000L,
+          "Disabling the proto segment list encoding in cluster config did not reach the broker");
+    }
   }
 
   @Test

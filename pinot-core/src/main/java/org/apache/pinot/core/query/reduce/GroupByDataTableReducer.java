@@ -178,6 +178,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
     // with extractFinalResult(...). Required by the regular reduce path: the downstream consumers
     // (PostAggregationHandler, HavingFilterHandler, ResultTable serialization) expect final scalars.
     indexedTable.finish(true, true);
+    // The indexed table can own a different server's schema from the caller's canonical schema.
+    // Derive final types explicitly instead of depending on shared mutable column-type arrays.
+    dataSchema = getPrePostAggregationDataSchema(dataSchema);
     if (indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
       brokerResponseNative.setGroupsTrimmed(true);
     }

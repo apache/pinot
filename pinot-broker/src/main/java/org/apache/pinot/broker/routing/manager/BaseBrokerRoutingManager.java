@@ -416,11 +416,13 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       String instanceId = instanceConfigZNRecord.getId();
       try {
         if (isEnabledServer(instanceConfigZNRecord)) {
-          enabledServers.add(instanceId);
-
           // Always refresh the server instance with the latest instance config in case it changes
           InstanceConfig instanceConfig = new InstanceConfig(instanceConfigZNRecord);
           ServerInstance serverInstance = new ServerInstance(instanceConfig);
+          // Key the maps by the interned instance id so that lookups with the Jackson-interned instance ids from IS/EV
+          // hit the identity fast path
+          instanceId = serverInstance.getInstanceId();
+          enabledServers.add(instanceId);
           if (_enabledServerInstanceMap.put(instanceId, serverInstance) == null) {
             newEnabledServers.add(instanceId);
 
@@ -1193,30 +1195,31 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   private Map<ServerInstance, SegmentsToQuery> getServerInstanceToSegmentsMap(String tableNameWithType,
       InstanceSelector.SelectionResult selectionResult) {
     Map<ServerInstance, SegmentsToQuery> merged = new HashMap<>();
-    for (Map.Entry<String, String> entry : selectionResult.getSegmentToInstanceMap().entrySet()) {
-      ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
+    // Flat selection maps can traverse their arrays directly without allocating an entry object per segment.
+    selectionResult.getSegmentToInstanceMap().forEach((segment, instanceId) -> {
+      ServerInstance serverInstance = _enabledServerInstanceMap.get(instanceId);
       if (serverInstance != null) {
         SegmentsToQuery segmentsToQuery =
             merged.computeIfAbsent(serverInstance, k -> new SegmentsToQuery(new ArrayList<>(), new ArrayList<>()));
-        segmentsToQuery.getSegments().add(entry.getKey());
+        segmentsToQuery.getSegments().add(segment);
       } else {
         // Should not happen in normal case unless encountered unexpected exception when updating routing entries
         _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
       }
-    }
-    for (Map.Entry<String, String> entry : selectionResult.getOptionalSegmentToInstanceMap().entrySet()) {
-      ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
+    });
+    selectionResult.getOptionalSegmentToInstanceMap().forEach((segment, instanceId) -> {
+      ServerInstance serverInstance = _enabledServerInstanceMap.get(instanceId);
       if (serverInstance != null) {
         SegmentsToQuery segmentsToQuery = merged.get(serverInstance);
         // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
         // to process, to be backward compatible.
         // TODO: allow servers only with optional segments
         if (segmentsToQuery != null) {
-          segmentsToQuery.getOptionalSegments().add(entry.getKey());
+          segmentsToQuery.getOptionalSegments().add(segment);
         }
       }
       // TODO: Report missing server metrics when we allow servers only with optional segments.
-    }
+    });
     return merged;
   }
 

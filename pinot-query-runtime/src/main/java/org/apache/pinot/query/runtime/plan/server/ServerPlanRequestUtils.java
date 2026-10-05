@@ -29,7 +29,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -466,14 +465,14 @@ public class ServerPlanRequestUtils {
         return List.of(
             compileInstanceRequest(executionContext, pinotQuery, timeBoundaryInfo, TableType.OFFLINE, offlineTableName,
                 logicalTableContext.getRefOfflineTableConfig(), logicalTableContext.getLogicalTableSchema(), null,
-                routeInfoList,null));
+                routeInfoList, null));
       } else {
         Preconditions.checkNotNull(logicalTableContext.getRefRealtimeTableConfig());
         String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(logicalTableName);
         return List.of(
             compileInstanceRequest(executionContext, pinotQuery, timeBoundaryInfo, TableType.REALTIME,
                 realtimeTableName, logicalTableContext.getRefRealtimeTableConfig(),
-                logicalTableContext.getLogicalTableSchema(), null, routeInfoList,null));
+                logicalTableContext.getLogicalTableSchema(), null, routeInfoList, null));
       }
     } else {
       Preconditions.checkNotNull(logicalTableContext.getRefOfflineTableConfig());
@@ -485,10 +484,10 @@ public class ServerPlanRequestUtils {
       return List.of(
           compileInstanceRequest(executionContext, offlinePinotQuery, timeBoundaryInfo, TableType.OFFLINE,
               offlineTableName, logicalTableContext.getRefOfflineTableConfig(),
-              logicalTableContext.getLogicalTableSchema(), null, offlineTableRouteInfoList,null),
+              logicalTableContext.getLogicalTableSchema(), null, offlineTableRouteInfoList, null),
           compileInstanceRequest(executionContext, realtimePinotQuery, timeBoundaryInfo, TableType.REALTIME,
               realtimeTableName, logicalTableContext.getRefRealtimeTableConfig(),
-              logicalTableContext.getLogicalTableSchema(), null, realtimeTableRouteInfoList,null));
+              logicalTableContext.getLogicalTableSchema(), null, realtimeTableRouteInfoList, null));
     }
   }
 

@@ -300,7 +300,7 @@ public class ZKOperator {
           customMapModifierStr != null ? new SegmentZKMetadataCustomMapModifier(customMapModifierStr) : null;
 
       // Update ZK metadata and refresh the segment if necessary
-      long newCrc = Long.parseLong(segmentMetadata.getCrc());
+      long newCrc = segmentMetadata.getCrc();
       if (newCrc == existingCrc) {
         LOGGER.info(
             "New segment crc '{}' is the same as existing segment crc for segment '{}'. Updating ZK metadata without "

@@ -129,7 +129,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // The following variables are always accessed within synchronized block
   private boolean _stopped;
   // Initialize with 1 pending operation to indicate the metadata manager can take more operations
-  private int _numPendingOperations = 1;
+  protected int _numPendingOperations = 1;
   private boolean _closed;
   // The lock and boolean flag ensure only one thread can start preloading and preloading happens only once.
   private final Lock _preloadLock = new ReentrantLock();
@@ -729,8 +729,19 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _logger.info("Inconsistencies noticed for the segment: {} across servers, reverting the metadata to resolve...",
         segmentName);
     // Revert the keys in the segment to previous location and remove the newly added keys
-    removeSegment(oldSegment, validDocIdsForOldSegment);
-    if (getPrevKeyToRecordLocationSize() == 0) {
+    try {
+      removeSegment(oldSegment, validDocIdsForOldSegment);
+    } catch (RuntimeException e) {
+      String message = "UPSERT_METADATA_REVERT_FAILED: table=" + _tableNameWithType + ", partition=" + _partitionId
+          + ", segment=" + segmentName + ". Protected metadata revert did not complete; "
+          + "manual reconstruction and replay are required.";
+      _logger.error(message, e);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
+      // Moving the segment to ERROR does not repair partially reverted metadata. Report the failure for alerting
+      // instead, so operators can reconstruct and replay the affected partition from the failed segment's sequence.
+      return;
+    }
+    if (!hasPrevKeyToRecordLocations()) {
       _logger.info("Successfully resolved inconsistency for segment: {} across servers", segmentName);
       return;
     }
@@ -1361,6 +1372,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected abstract int getPrevKeyToRecordLocationSize();
+
+  protected boolean hasPrevKeyToRecordLocations() {
+    return getPrevKeyToRecordLocationSize() > 0;
+  }
 
   protected abstract void clearPrevKeyToRecordLocation();
 }
