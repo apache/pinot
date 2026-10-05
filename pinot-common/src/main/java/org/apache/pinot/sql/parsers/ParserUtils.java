@@ -18,12 +18,77 @@
  */
 package org.apache.pinot.sql.parsers;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.StringJoiner;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.SqlUtils;
 
 
 public class ParserUtils {
   private ParserUtils() {
+  }
+
+  /// Converts a raw or SQL-quoted identifier into a safe SQL identifier fragment. Qualified identifiers are split on
+  /// dots outside quoted components. Valid bare Pinot identifier components and wildcards remain bare, while other
+  /// components are double-quoted. Backtick-quoted and double-quoted components are normalized to double quotes.
+  ///
+  /// @param identifier Raw or SQL-quoted identifier, optionally qualified
+  /// @return Identifier formatted for use in a SQL statement
+  /// @throws IllegalArgumentException If the identifier is empty or has invalid quoted structure
+  public static String sanitizeIdentifier(String identifier) {
+    String trimmed = identifier.trim();
+    if (trimmed.isEmpty()) {
+      throw new IllegalArgumentException("identifier cannot be empty");
+    }
+    if (trimmed.indexOf('.') < 0 && trimmed.indexOf('`') < 0 && trimmed.indexOf('"') < 0) {
+      return sanitizeIdentifierSegment(trimmed);
+    }
+
+    StringJoiner result = new StringJoiner(".");
+    for (String segment : splitIdentifier(trimmed)) {
+      result.add(sanitizeIdentifierSegment(segment));
+    }
+    return result.toString();
+  }
+
+  /// Validates and normalizes an aggregation function name for use in a generated SQL statement.
+  ///
+  /// @param aggregationFunction Aggregation function name
+  /// @return Trimmed aggregation function name
+  /// @throws IllegalArgumentException If the function is not a registered Pinot aggregation function
+  public static String sanitizeAggregationFunction(String aggregationFunction) {
+    String trimmed = aggregationFunction.trim();
+    if (!AggregationFunctionType.isAggregationFunction(trimmed)) {
+      throw new IllegalArgumentException("Invalid aggregation function: " + trimmed);
+    }
+    return trimmed;
+  }
+
+  /// Validates a predicate for use in a generated SQL statement. Statement separators and comments outside quoted
+  /// content are rejected, and the predicate must compile as a Pinot SQL expression.
+  ///
+  /// @param predicate Predicate expression, or `null`
+  /// @return Trimmed predicate, or `null` when the input is null or blank
+  /// @throws IllegalArgumentException If the predicate contains blocked SQL content or is not a Pinot filter
+  @Nullable
+  public static String sanitizePredicate(@Nullable String predicate) {
+    if (predicate == null || predicate.trim().isEmpty()) {
+      return null;
+    }
+    String trimmed = predicate.trim();
+    if (containsDangerousPredicateContent(trimmed)) {
+      throw new IllegalArgumentException("Invalid predicate content");
+    }
+    try {
+      CalciteSqlParser.compileToExpression(trimmed);
+    } catch (RuntimeException e) {
+      throw new IllegalArgumentException("Invalid predicate content", e);
+    }
+    return trimmed;
   }
 
   public static void validateFunction(String canonicalName, List<Expression> operands) {
@@ -136,6 +201,138 @@ public class ParserUtils {
       }
     }
     return result.toString();
+  }
+
+  private static List<String> splitIdentifier(String identifier) {
+    List<String> segments = new ArrayList<>();
+    StringBuilder segment = new StringBuilder();
+    char quote = 0;
+    boolean segmentStarted = false;
+    int index = 0;
+    while (index < identifier.length()) {
+      char current = identifier.charAt(index);
+      if (quote == 0) {
+        if (current == '.') {
+          segments.add(segment.toString());
+          segment.setLength(0);
+          segmentStarted = false;
+          index++;
+          continue;
+        }
+        if (!segmentStarted && (current == '`' || current == '"')) {
+          quote = current;
+        }
+        if (!Character.isWhitespace(current)) {
+          segmentStarted = true;
+        }
+      } else if (current == quote) {
+        if (index + 1 < identifier.length() && identifier.charAt(index + 1) == quote) {
+          segment.append(current);
+          segment.append(identifier.charAt(index + 1));
+          index += 2;
+          continue;
+        }
+        quote = 0;
+      }
+      segment.append(current);
+      index++;
+    }
+    if (quote != 0) {
+      throw new IllegalArgumentException("Unterminated quoted identifier");
+    }
+    segments.add(segment.toString());
+    return segments;
+  }
+
+  private static String sanitizeIdentifierSegment(String segment) {
+    String trimmed = segment.trim();
+    if (trimmed.isEmpty()) {
+      throw new IllegalArgumentException("Identifier segment cannot be empty");
+    }
+    if ("*".equals(trimmed)) {
+      return trimmed;
+    }
+    if (trimmed.charAt(0) == '`' || trimmed.charAt(0) == '"') {
+      return sanitizeQuotedIdentifierSegment(trimmed);
+    }
+    return sanitizeUnquotedIdentifierSegment(trimmed);
+  }
+
+  private static String sanitizeUnquotedIdentifierSegment(String segment) {
+    try {
+      Expression expression = CalciteSqlParser.compileToExpression(segment);
+      if (expression.getType() == ExpressionType.IDENTIFIER
+          && expression.isSetIdentifier()
+          && segment.equals(expression.getIdentifier().getName())) {
+        return segment;
+      }
+    } catch (SqlCompilationException ignored) {
+      // Not a bare Pinot identifier; quote it below.
+    }
+    return SqlUtils.quoteIdentifier(segment);
+  }
+
+  private static String sanitizeQuotedIdentifierSegment(String segment) {
+    char quote = segment.charAt(0);
+    if (segment.length() < 2 || segment.charAt(segment.length() - 1) != quote) {
+      throw new IllegalArgumentException("Invalid quoted identifier segment: " + segment);
+    }
+
+    StringBuilder unquoted = new StringBuilder(segment.length() - 2);
+    int index = 1;
+    while (index < segment.length() - 1) {
+      char current = segment.charAt(index);
+      if (current == quote) {
+        if (index + 1 >= segment.length() - 1 || segment.charAt(index + 1) != quote) {
+          throw new IllegalArgumentException("Invalid quoted identifier segment: " + segment);
+        }
+        index++;
+      }
+      unquoted.append(current);
+      index++;
+    }
+    if (unquoted.length() == 0) {
+      throw new IllegalArgumentException("Quoted identifier segment cannot be empty");
+    }
+    return SqlUtils.quoteIdentifier(unquoted.toString());
+  }
+
+  private static boolean containsDangerousPredicateContent(String predicate) {
+    char quote = 0;
+    int index = 0;
+    while (index < predicate.length()) {
+      char current = predicate.charAt(index);
+      if (quote != 0) {
+        if (current == quote) {
+          if (index + 1 < predicate.length() && predicate.charAt(index + 1) == quote) {
+            index += 2;
+            continue;
+          }
+          quote = 0;
+        }
+        index++;
+        continue;
+      }
+
+      if (current == '\'' || current == '"' || current == '`') {
+        quote = current;
+        index++;
+        continue;
+      }
+      if (current == ';') {
+        return true;
+      }
+      if (index + 1 < predicate.length()) {
+        char next = predicate.charAt(index + 1);
+        if ((current == '-' && next == '-')
+            || (current == '/' && next == '*')
+            || (current == '*' && next == '/')) {
+          return true;
+        }
+      }
+      index++;
+    }
+    return quote != 0;
   }
 
   private static void validateJsonExtractScalarFunction(String functionName, List<Expression> operands) {

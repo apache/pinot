@@ -31,8 +31,8 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 
 public class FunnelMaxStepAggregationFunction extends FunnelBaseAggregationFunction<Integer> {
 
-  public FunnelMaxStepAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments);
+  public FunnelMaxStepAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments, nullHandlingEnabled);
   }
 
   @Override

@@ -24,19 +24,26 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.GuavaBloomFilterReaderUtils;
+import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
@@ -44,6 +51,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 @SuppressWarnings({"rawtypes", "unchecked"})
 abstract public class ValueBasedSegmentPruner implements SegmentPruner {
   public static final String IN_PREDICATE_THRESHOLD = "inpredicate.threshold";
+  private static final int TARGET_NUM_SEGMENTS_PER_THREAD = 10;
   protected int _inPredicateThreshold;
 
   @Override
@@ -57,7 +65,7 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
     if (query.getFilter() == null) {
       return false;
     }
-    return isApplicableToFilter(query.getFilter());
+    return isApplicableToFilter(query.getFilter(), query.getQueryOptions());
   }
 
   /// 1. NOT is not applicable for segment pruning;
@@ -65,12 +73,12 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
   /// 3. For AND, if one of the child filter is applicable for pruning, the parent filter is applicable, but it
   ///    doesn't mean this child filter can prune the segment.
   /// 4. The specific pruners decide their own applicable predicate types.
-  private boolean isApplicableToFilter(FilterContext filter) {
+  private boolean isApplicableToFilter(FilterContext filter, Map<String, String> queryOptions) {
     switch (filter.getType()) {
       case AND:
         assert filter.getChildren() != null;
         for (FilterContext child : filter.getChildren()) {
-          if (isApplicableToFilter(child)) {
+          if (isApplicableToFilter(child, queryOptions)) {
             return true;
           }
         }
@@ -78,7 +86,7 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
       case OR:
         assert filter.getChildren() != null;
         for (FilterContext child : filter.getChildren()) {
-          if (!isApplicableToFilter(child)) {
+          if (!isApplicableToFilter(child, queryOptions)) {
             return false;
           }
         }
@@ -87,30 +95,107 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
         // Do not prune NOT filter
         return false;
       case PREDICATE:
-        return isApplicableToPredicate(filter.getPredicate());
+        return isApplicableToPredicate(filter.getPredicate(), queryOptions);
       default:
         throw new IllegalStateException();
     }
   }
 
-  abstract boolean isApplicableToPredicate(Predicate predicate);
+  /// Returns whether IN-pruning should run. Negative threshold means always prune.
+  protected boolean shouldPruneInPredicate(int numValues, Map<String, String> queryOptions) {
+    int threshold = getEffectiveInPredicateThreshold(queryOptions);
+    return threshold < 0 || numValues <= threshold;
+  }
+
+  /// Returns the query override when set, otherwise the server threshold.
+  protected int getEffectiveInPredicateThreshold(Map<String, String> queryOptions) {
+    Integer threshold = QueryOptionsUtils.getInPredicatePruningThreshold(queryOptions);
+    return threshold != null ? threshold : _inPredicateThreshold;
+  }
+
+  abstract boolean isApplicableToPredicate(Predicate predicate, Map<String, String> queryOptions);
 
   @Override
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
+    return prune(segments, query, null, null);
+  }
+
+  @Override
+  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query,
+      @Nullable ExecutorService executorService) {
+    return prune(segments, query, executorService, null);
+  }
+
+  /// Each worker owns its caches. Parallel pruning may return segments in a different order.
+  protected List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query,
+      @Nullable ExecutorService executorService, @Nullable FetchContext[] fetchContexts) {
     if (segments.isEmpty()) {
       return segments;
     }
-    FilterContext filter = Objects.requireNonNull(query.getFilter());
-    ValueCache cachedValues = new ValueCache();
-    Map<String, DataSource> dataSourceCache = new HashMap<>();
-    List<IndexSegment> selectedSegments = new ArrayList<>(segments.size());
-    for (IndexSegment segment : segments) {
-      dataSourceCache.clear();
-      if (!pruneSegment(segment, filter, dataSourceCache, cachedValues, query)) {
-        selectedSegments.add(segment);
+    if (executorService == null || segments.size() <= TARGET_NUM_SEGMENTS_PER_THREAD) {
+      FilterContext filter = Objects.requireNonNull(query.getFilter());
+      ValueCache cachedValues = new ValueCache();
+      Map<String, DataSource> dataSourceCache = new HashMap<>();
+      List<IndexSegment> selectedSegments = new ArrayList<>(segments.size());
+      int i = 0;
+      for (IndexSegment segment : segments) {
+        dataSourceCache.clear();
+        FetchContext fetchContext = fetchContexts != null ? fetchContexts[i++] : null;
+        if (!pruneSegmentWithFetchContext(segment, fetchContext, filter, dataSourceCache, cachedValues, query)) {
+          selectedSegments.add(segment);
+        }
       }
+      return selectedSegments;
     }
-    return selectedSegments;
+    int numSegments = segments.size();
+    int numTasks = QueryMultiThreadingUtils.getNumTasks(numSegments, TARGET_NUM_SEGMENTS_PER_THREAD,
+        query.getMaxExecutionThreads());
+    List<IndexSegment> allSelectedSegments = new ArrayList<>(numSegments);
+    QueryMultiThreadingUtils.runTasksWithDeadline(numTasks, index -> {
+      FilterContext filter = Objects.requireNonNull(query.getFilter());
+      ValueCache cachedValues = new ValueCache();
+      Map<String, DataSource> dataSourceCache = new HashMap<>();
+      List<IndexSegment> selectedSegments = new ArrayList<>();
+      for (int i = index; i < numSegments; i += numTasks) {
+        if (Thread.currentThread().isInterrupted()) {
+          throw new QueryCancelledException("Cancelled while running " + getClass().getSimpleName());
+        }
+        dataSourceCache.clear();
+        IndexSegment segment = segments.get(i);
+        FetchContext fetchContext = fetchContexts != null ? fetchContexts[i] : null;
+        if (!pruneSegmentWithFetchContext(segment, fetchContext, filter, dataSourceCache, cachedValues, query)) {
+          selectedSegments.add(segment);
+        }
+      }
+      return selectedSegments;
+    }, taskRes -> {
+      if (taskRes != null) {
+        allSelectedSegments.addAll(taskRes);
+      }
+    }, e -> {
+      Throwable cause = e.getCause();
+      if (cause instanceof QueryException) {
+        throw (QueryException) cause;
+      }
+      if (e instanceof InterruptedException) {
+        throw new QueryCancelledException("Cancelled while running " + getClass().getSimpleName(), e);
+      }
+      throw new RuntimeException("Caught exception while running " + getClass().getSimpleName(), e);
+    }, executorService, query.getEndTimeMs());
+    return allSelectedSegments;
+  }
+
+  private boolean pruneSegmentWithFetchContext(IndexSegment segment, @Nullable FetchContext fetchContext,
+      FilterContext filter, Map<String, DataSource> dataSourceCache, ValueCache cachedValues, QueryContext query) {
+    if (fetchContext == null) {
+      return pruneSegment(segment, filter, dataSourceCache, cachedValues, query);
+    }
+    segment.acquire(fetchContext);
+    try {
+      return pruneSegment(segment, filter, dataSourceCache, cachedValues, query);
+    } finally {
+      segment.release(fetchContext);
+    }
   }
 
   protected boolean pruneSegment(IndexSegment segment, FilterContext filter, Map<String, DataSource> dataSourceCache,

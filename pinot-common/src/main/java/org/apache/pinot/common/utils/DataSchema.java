@@ -589,6 +589,17 @@ public class DataSchema {
           if (value instanceof Timestamp[]) {
             return fromTimestampArray((Timestamp[]) value);
           }
+          if (value instanceof byte[][]) {
+            byte[][] bytesArray = (byte[][]) value;
+            ByteArray[] internalBytesArray = new ByteArray[bytesArray.length];
+            for (int i = 0; i < bytesArray.length; i++) {
+              internalBytesArray[i] = new ByteArray(bytesArray[i]);
+            }
+            return internalBytesArray;
+          }
+          if (value instanceof UUID[]) {
+            return fromUuidArray(value);
+          }
           return value;
         default:
           return value;

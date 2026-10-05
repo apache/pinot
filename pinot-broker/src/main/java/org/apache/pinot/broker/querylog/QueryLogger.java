@@ -50,7 +50,7 @@ public class QueryLogger {
   private static final String FULLY_REDACTED = "REDACTED";
 
   public enum SqlRedactionMode {
-    // Log the full SQL query text as-is.
+    // Log the full SQL query text with backslashes and line endings escaped.
     // e.g. "SELECT name FROM users WHERE id = 42 AND status = 'active'"
     NONE,
     // Replace literal values with placeholders using the query fingerprint, preserving query structure.
@@ -201,8 +201,20 @@ public class QueryLogger {
         return queryFingerprint != null ? queryFingerprint.getFingerprint() : FINGERPRINT_FAILED_QUERY_REDACTED;
       case NONE:
       default:
-        return query;
+        return toSingleLine(query);
     }
+  }
+
+  /// Escapes backslashes, CR and LF as `\\`, `\r` and `\n` so the query occupies a single log line.
+  /// A line ending can terminate a `--` or `//` comment, so replacing it with a space changes SQL semantics.
+  /// Escaping existing backslashes distinguishes literal escape sequences from encoded line endings.
+  /// Decode these three escape sequences in a single pass before replaying untruncated logged SQL.
+  @Nullable
+  private static String toSingleLine(@Nullable String query) {
+    if (query == null || (query.indexOf('\\') < 0 && query.indexOf('\n') < 0 && query.indexOf('\r') < 0)) {
+      return query;
+    }
+    return query.replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n");
   }
 
   private boolean shouldForceLog(@Nullable QueryLogParams params) {

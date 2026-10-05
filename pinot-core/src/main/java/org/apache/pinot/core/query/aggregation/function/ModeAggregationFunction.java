@@ -57,8 +57,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// - Expression: expression that contains the column to be calculated mode on, can be any Numeric column
 /// - MultiModeReducerType (optional): the reducer to use in case of multiple modes present in data
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class ModeAggregationFunction
-    extends NullableSingleInputAggregationFunction<Map<? extends Number, Long>, Double> {
+public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<Map<? extends Number, Long>, Double> {
 
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 

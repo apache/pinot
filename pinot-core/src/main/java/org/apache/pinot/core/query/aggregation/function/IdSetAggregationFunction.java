@@ -66,8 +66,8 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
   private final int _expectedInsertions;
   private final double _fpp;
 
-  public IdSetAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments.get(0));
+  public IdSetAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments.get(0), nullHandlingEnabled);
     if (arguments.size() == 1) {
       _sizeThresholdInBytes = IdSets.DEFAULT_SIZE_THRESHOLD_IN_BYTES;
       _expectedInsertions = IdSets.DEFAULT_EXPECTED_INSERTIONS;
@@ -127,94 +127,146 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    DataType storedType = blockValSet.getValueType().getStoredType();
-    IdSet idSet = getIdSet(aggregationResultHolder, storedType);
     if (blockValSet.isSingleValue()) {
-      switch (storedType) {
-        case INT:
-          int[] intValuesSV = blockValSet.getIntValuesSV();
-          for (int i = 0; i < length; i++) {
+      aggregateSV(length, aggregationResultHolder, blockValSet);
+    } else {
+      aggregateMV(length, aggregationResultHolder, blockValSet);
+    }
+  }
+
+  private void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
+      case INT:
+        int[] intValuesSV = blockValSet.getIntValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          IdSet idSet = getIdSet(aggregationResultHolder, storedType);
+          for (int i = from; i < to; i++) {
             idSet.add(intValuesSV[i]);
           }
-          break;
-        case LONG:
-          long[] longValuesSV = blockValSet.getLongValuesSV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case LONG:
+        long[] longValuesSV = blockValSet.getLongValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          IdSet idSet = getIdSet(aggregationResultHolder, storedType);
+          for (int i = from; i < to; i++) {
             idSet.add(longValuesSV[i]);
           }
-          break;
-        case FLOAT:
-          float[] floatValuesSV = blockValSet.getFloatValuesSV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case FLOAT:
+        float[] floatValuesSV = blockValSet.getFloatValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          IdSet idSet = getIdSet(aggregationResultHolder, storedType);
+          for (int i = from; i < to; i++) {
             idSet.add(floatValuesSV[i]);
           }
-          break;
-        case DOUBLE:
-          double[] doubleValuesSV = blockValSet.getDoubleValuesSV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case DOUBLE:
+        double[] doubleValuesSV = blockValSet.getDoubleValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          IdSet idSet = getIdSet(aggregationResultHolder, storedType);
+          for (int i = from; i < to; i++) {
             idSet.add(doubleValuesSV[i]);
           }
-          break;
-        case STRING:
-          String[] stringValuesSV = blockValSet.getStringValuesSV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case STRING:
+        String[] stringValuesSV = blockValSet.getStringValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          IdSet idSet = getIdSet(aggregationResultHolder, storedType);
+          for (int i = from; i < to; i++) {
             idSet.add(stringValuesSV[i]);
           }
-          break;
-        case BYTES:
-          byte[][] bytesValuesSV = blockValSet.getBytesValuesSV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case BYTES:
+        byte[][] bytesValuesSV = blockValSet.getBytesValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          IdSet idSet = getIdSet(aggregationResultHolder, storedType);
+          for (int i = from; i < to; i++) {
             idSet.add(bytesValuesSV[i]);
           }
-          break;
-        default:
-          throw new IllegalStateException("Illegal SV data type for ID_SET aggregation function: " + storedType);
-      }
-    } else {
-      switch (storedType) {
-        case INT:
-          int[][] intValuesMV = blockValSet.getIntValuesMV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      default:
+        throw new IllegalStateException("Illegal SV data type for ID_SET aggregation function: " + storedType);
+    }
+  }
+
+  private void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
+      case INT:
+        int[][] intValuesMV = blockValSet.getIntValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          IdSet idSet = getIdSet(aggregationResultHolder, storedType);
+          for (int i = from; i < to; i++) {
             for (int intValue : intValuesMV[i]) {
               idSet.add(intValue);
             }
           }
-          break;
-        case LONG:
-          long[][] longValuesMV = blockValSet.getLongValuesMV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case LONG:
+        long[][] longValuesMV = blockValSet.getLongValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          IdSet idSet = getIdSet(aggregationResultHolder, storedType);
+          for (int i = from; i < to; i++) {
             for (long longValue : longValuesMV[i]) {
               idSet.add(longValue);
             }
           }
-          break;
-        case FLOAT:
-          float[][] floatValuesMV = blockValSet.getFloatValuesMV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case FLOAT:
+        float[][] floatValuesMV = blockValSet.getFloatValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          IdSet idSet = getIdSet(aggregationResultHolder, storedType);
+          for (int i = from; i < to; i++) {
             for (float floatValue : floatValuesMV[i]) {
               idSet.add(floatValue);
             }
           }
-          break;
-        case DOUBLE:
-          double[][] doubleValuesMV = blockValSet.getDoubleValuesMV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case DOUBLE:
+        double[][] doubleValuesMV = blockValSet.getDoubleValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          IdSet idSet = getIdSet(aggregationResultHolder, storedType);
+          for (int i = from; i < to; i++) {
             for (double doubleValue : doubleValuesMV[i]) {
               idSet.add(doubleValue);
             }
           }
-          break;
-        case STRING:
-          String[][] stringValuesMV = blockValSet.getStringValuesMV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case STRING:
+        String[][] stringValuesMV = blockValSet.getStringValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          IdSet idSet = getIdSet(aggregationResultHolder, storedType);
+          for (int i = from; i < to; i++) {
             for (String stringValue : stringValuesMV[i]) {
               idSet.add(stringValue);
             }
           }
-          break;
-        default:
-          throw new IllegalStateException("Illegal MV data type for ID_SET aggregation function: " + storedType);
-      }
+        });
+        break;
+      case BYTES:
+        byte[][][] bytesValuesMV = blockValSet.getBytesValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          IdSet idSet = getIdSet(aggregationResultHolder, storedType);
+          for (int i = from; i < to; i++) {
+            for (byte[] bytesValue : bytesValuesMV[i]) {
+              idSet.add(bytesValue);
+            }
+          }
+        });
+        break;
+      default:
+        throw new IllegalStateException("Illegal MV data type for ID_SET aggregation function: " + storedType);
     }
   }
 
@@ -222,98 +274,142 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    DataType storedType = blockValSet.getValueType().getStoredType();
     if (blockValSet.isSingleValue()) {
-      switch (storedType) {
-        case INT:
-          int[] intValuesSV = blockValSet.getIntValuesSV();
-          for (int i = 0; i < length; i++) {
+      aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet);
+    } else {
+      aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet);
+    }
+  }
+
+  private void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
+      case INT:
+        int[] intValuesSV = blockValSet.getIntValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             getIdSet(groupByResultHolder, groupKeyArray[i], DataType.INT).add(intValuesSV[i]);
           }
-          break;
-        case LONG:
-          long[] longValuesSV = blockValSet.getLongValuesSV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case LONG:
+        long[] longValuesSV = blockValSet.getLongValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             getIdSet(groupByResultHolder, groupKeyArray[i], DataType.LONG).add(longValuesSV[i]);
           }
-          break;
-        case FLOAT:
-          float[] floatValuesSV = blockValSet.getFloatValuesSV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case FLOAT:
+        float[] floatValuesSV = blockValSet.getFloatValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             getIdSet(groupByResultHolder, groupKeyArray[i], DataType.FLOAT).add(floatValuesSV[i]);
           }
-          break;
-        case DOUBLE:
-          double[] doubleValuesSV = blockValSet.getDoubleValuesSV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case DOUBLE:
+        double[] doubleValuesSV = blockValSet.getDoubleValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             getIdSet(groupByResultHolder, groupKeyArray[i], DataType.DOUBLE).add(doubleValuesSV[i]);
           }
-          break;
-        case STRING:
-          String[] stringValuesSV = blockValSet.getStringValuesSV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case STRING:
+        String[] stringValuesSV = blockValSet.getStringValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             getIdSet(groupByResultHolder, groupKeyArray[i], DataType.STRING).add(stringValuesSV[i]);
           }
-          break;
-        case BYTES:
-          byte[][] bytesValuesSV = blockValSet.getBytesValuesSV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case BYTES:
+        byte[][] bytesValuesSV = blockValSet.getBytesValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             getIdSet(groupByResultHolder, groupKeyArray[i], DataType.BYTES).add(bytesValuesSV[i]);
           }
-          break;
-        default:
-          throw new IllegalStateException("Illegal SV data type for ID_SET aggregation function: " + storedType);
-      }
-    } else {
-      switch (storedType) {
-        case INT:
-          int[][] intValuesMV = blockValSet.getIntValuesMV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      default:
+        throw new IllegalStateException("Illegal SV data type for ID_SET aggregation function: " + storedType);
+    }
+  }
+
+  private void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
+      case INT:
+        int[][] intValuesMV = blockValSet.getIntValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             IdSet idSet = getIdSet(groupByResultHolder, groupKeyArray[i], DataType.INT);
             for (int intValue : intValuesMV[i]) {
               idSet.add(intValue);
             }
           }
-          break;
-        case LONG:
-          long[][] longValuesMV = blockValSet.getLongValuesMV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case LONG:
+        long[][] longValuesMV = blockValSet.getLongValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             IdSet idSet = getIdSet(groupByResultHolder, groupKeyArray[i], DataType.LONG);
             for (long longValue : longValuesMV[i]) {
               idSet.add(longValue);
             }
           }
-          break;
-        case FLOAT:
-          float[][] floatValuesMV = blockValSet.getFloatValuesMV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case FLOAT:
+        float[][] floatValuesMV = blockValSet.getFloatValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             IdSet idSet = getIdSet(groupByResultHolder, groupKeyArray[i], DataType.FLOAT);
             for (float floatValue : floatValuesMV[i]) {
               idSet.add(floatValue);
             }
           }
-          break;
-        case DOUBLE:
-          double[][] doubleValuesMV = blockValSet.getDoubleValuesMV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case DOUBLE:
+        double[][] doubleValuesMV = blockValSet.getDoubleValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             IdSet idSet = getIdSet(groupByResultHolder, groupKeyArray[i], DataType.DOUBLE);
             for (double doubleValue : doubleValuesMV[i]) {
               idSet.add(doubleValue);
             }
           }
-          break;
-        case STRING:
-          String[][] stringValuesMV = blockValSet.getStringValuesMV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case STRING:
+        String[][] stringValuesMV = blockValSet.getStringValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             IdSet idSet = getIdSet(groupByResultHolder, groupKeyArray[i], DataType.STRING);
             for (String stringValue : stringValuesMV[i]) {
               idSet.add(stringValue);
             }
           }
-          break;
-        default:
-          throw new IllegalStateException("Illegal MV data type for ID_SET aggregation function: " + storedType);
-      }
+        });
+        break;
+      case BYTES:
+        byte[][][] bytesValuesMV = blockValSet.getBytesValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            IdSet idSet = getIdSet(groupByResultHolder, groupKeyArray[i], DataType.BYTES);
+            for (byte[] bytesValue : bytesValuesMV[i]) {
+              idSet.add(bytesValue);
+            }
+          }
+        });
+        break;
+      default:
+        throw new IllegalStateException("Illegal MV data type for ID_SET aggregation function: " + storedType);
     }
   }
 
@@ -321,71 +417,96 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    DataType storedType = blockValSet.getValueType().getStoredType();
     if (blockValSet.isSingleValue()) {
-      switch (storedType) {
-        case INT:
-          int[] intValuesSV = blockValSet.getIntValuesSV();
-          for (int i = 0; i < length; i++) {
+      aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet);
+    } else {
+      aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet);
+    }
+  }
+
+  private void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
+      case INT:
+        int[] intValuesSV = blockValSet.getIntValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             int intValue = intValuesSV[i];
             for (int groupKey : groupKeysArray[i]) {
               getIdSet(groupByResultHolder, groupKey, DataType.INT).add(intValue);
             }
           }
-          break;
-        case LONG:
-          long[] longValuesSV = blockValSet.getLongValuesSV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case LONG:
+        long[] longValuesSV = blockValSet.getLongValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             long longValue = longValuesSV[i];
             for (int groupKey : groupKeysArray[i]) {
               getIdSet(groupByResultHolder, groupKey, DataType.LONG).add(longValue);
             }
           }
-          break;
-        case FLOAT:
-          float[] floatValuesSV = blockValSet.getFloatValuesSV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case FLOAT:
+        float[] floatValuesSV = blockValSet.getFloatValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             float floatValue = floatValuesSV[i];
             for (int groupKey : groupKeysArray[i]) {
               getIdSet(groupByResultHolder, groupKey, DataType.FLOAT).add(floatValue);
             }
           }
-          break;
-        case DOUBLE:
-          double[] doubleValuesSV = blockValSet.getDoubleValuesSV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case DOUBLE:
+        double[] doubleValuesSV = blockValSet.getDoubleValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             double doubleValue = doubleValuesSV[i];
             for (int groupKey : groupKeysArray[i]) {
               getIdSet(groupByResultHolder, groupKey, DataType.DOUBLE).add(doubleValue);
             }
           }
-          break;
-        case STRING:
-          String[] stringValuesSV = blockValSet.getStringValuesSV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case STRING:
+        String[] stringValuesSV = blockValSet.getStringValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             String stringValue = stringValuesSV[i];
             for (int groupKey : groupKeysArray[i]) {
               getIdSet(groupByResultHolder, groupKey, DataType.STRING).add(stringValue);
             }
           }
-          break;
-        case BYTES:
-          byte[][] bytesValuesSV = blockValSet.getBytesValuesSV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case BYTES:
+        byte[][] bytesValuesSV = blockValSet.getBytesValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             byte[] bytesValue = bytesValuesSV[i];
             for (int groupKey : groupKeysArray[i]) {
               getIdSet(groupByResultHolder, groupKey, DataType.BYTES).add(bytesValue);
             }
           }
-          break;
-        default:
-          throw new IllegalStateException("Illegal SV data type for ID_SET aggregation function: " + storedType);
-      }
-    } else {
-      switch (storedType) {
-        case INT:
-          int[][] intValuesMV = blockValSet.getIntValuesMV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      default:
+        throw new IllegalStateException("Illegal SV data type for ID_SET aggregation function: " + storedType);
+    }
+  }
+
+  private void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
+      case INT:
+        int[][] intValuesMV = blockValSet.getIntValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             int[] intValues = intValuesMV[i];
             for (int groupKey : groupKeysArray[i]) {
               IdSet idSet = getIdSet(groupByResultHolder, groupKey, DataType.INT);
@@ -394,10 +515,12 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
               }
             }
           }
-          break;
-        case LONG:
-          long[][] longValuesMV = blockValSet.getLongValuesMV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case LONG:
+        long[][] longValuesMV = blockValSet.getLongValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             long[] longValues = longValuesMV[i];
             for (int groupKey : groupKeysArray[i]) {
               IdSet idSet = getIdSet(groupByResultHolder, groupKey, DataType.LONG);
@@ -406,10 +529,12 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
               }
             }
           }
-          break;
-        case FLOAT:
-          float[][] floatValuesMV = blockValSet.getFloatValuesMV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case FLOAT:
+        float[][] floatValuesMV = blockValSet.getFloatValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             float[] floatValues = floatValuesMV[i];
             for (int groupKey : groupKeysArray[i]) {
               IdSet idSet = getIdSet(groupByResultHolder, groupKey, DataType.FLOAT);
@@ -418,10 +543,12 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
               }
             }
           }
-          break;
-        case DOUBLE:
-          double[][] doubleValuesMV = blockValSet.getDoubleValuesMV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case DOUBLE:
+        double[][] doubleValuesMV = blockValSet.getDoubleValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             double[] doubleValues = doubleValuesMV[i];
             for (int groupKey : groupKeysArray[i]) {
               IdSet idSet = getIdSet(groupByResultHolder, groupKey, DataType.DOUBLE);
@@ -430,10 +557,12 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
               }
             }
           }
-          break;
-        case STRING:
-          String[][] stringValuesMV = blockValSet.getStringValuesMV();
-          for (int i = 0; i < length; i++) {
+        });
+        break;
+      case STRING:
+        String[][] stringValuesMV = blockValSet.getStringValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             String[] stringValues = stringValuesMV[i];
             for (int groupKey : groupKeysArray[i]) {
               IdSet idSet = getIdSet(groupByResultHolder, groupKey, DataType.STRING);
@@ -442,23 +571,45 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
               }
             }
           }
-          break;
-        default:
-          throw new IllegalStateException("Illegal MV data type for ID_SET aggregation function: " + storedType);
-      }
+        });
+        break;
+      case BYTES:
+        byte[][][] bytesValuesMV = blockValSet.getBytesValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            byte[][] bytesValues = bytesValuesMV[i];
+            for (int groupKey : groupKeysArray[i]) {
+              IdSet idSet = getIdSet(groupByResultHolder, groupKey, DataType.BYTES);
+              for (byte[] bytesValue : bytesValues) {
+                idSet.add(bytesValue);
+              }
+            }
+          }
+        });
+        break;
+      default:
+        throw new IllegalStateException("Illegal MV data type for ID_SET aggregation function: " + storedType);
     }
   }
 
   @Override
+  @Nullable
   public IdSet extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     IdSet idSet = aggregationResultHolder.getResult();
-    return idSet != null ? idSet : IdSets.emptyIdSet();
+    if (idSet != null) {
+      return idSet;
+    }
+    // With the option disabled an untouched holder still renders the empty accumulator, which is the
+    // intermediate this mode has always emitted; with it enabled the null is the signal that nothing was
+    // aggregated.
+    return _nullHandlingEnabled ? null : IdSets.emptyIdSet();
   }
 
   @Override
+  @Nullable
   public IdSet extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     IdSet idSet = groupByResultHolder.getResult(groupKey);
-    return idSet != null ? idSet : IdSets.emptyIdSet();
+    return idSet != null ? idSet : (_nullHandlingEnabled ? null : IdSets.emptyIdSet());
   }
 
   @Override
@@ -490,12 +641,18 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
   @Nullable
   @Override
   public String extractFinalResult(@Nullable IdSet intermediateResult) {
-    // A null intermediate result means nothing was aggregated, and there is no id set to serialize
-    if (intermediateResult == null) {
-      return null;
+    // A null intermediate result means nothing was aggregated. With null handling enabled there is no id set to
+    // serialize and the answer is NULL; with it disabled it is the serialized empty id set, which is the answer this
+    // mode has always given.
+    IdSet idSet = intermediateResult;
+    if (idSet == null) {
+      if (_nullHandlingEnabled) {
+        return null;
+      }
+      idSet = IdSets.emptyIdSet();
     }
     try {
-      return intermediateResult.toBase64String();
+      return idSet.toBase64String();
     } catch (IOException e) {
       throw new RuntimeException("Caught exception while serializing IdSet", e);
     }

@@ -19,17 +19,29 @@
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
@@ -58,7 +70,7 @@ public class MutableOpenStructIndexTest {
   public void testAddAndGetKeys()
       throws IOException {
     try (MutableOpenStructIndex idx = new MutableOpenStructIndex(
-        "metrics", openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 1000)) {
+        "metrics", "testTable_REALTIME", openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 1000)) {
 
       idx.index(0, Map.of("clicks", 42L, "impressions", 100L));
       idx.index(1, Map.of("clicks", 7L, "revenue", "1.5"));
@@ -75,7 +87,7 @@ public class MutableOpenStructIndexTest {
   public void testIndexNullIsNoop()
       throws IOException {
     try (MutableOpenStructIndex idx = new MutableOpenStructIndex(
-        "metrics", openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 1000)) {
+        "metrics", "testTable_REALTIME", openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 1000)) {
 
       idx.index(0, null);
 
@@ -88,7 +100,7 @@ public class MutableOpenStructIndexTest {
   public void testFillRateTracking()
       throws IOException {
     try (MutableOpenStructIndex idx = new MutableOpenStructIndex(
-        "metrics", openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 1000)) {
+        "metrics", "testTable_REALTIME", openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 1000)) {
 
       for (int docId = 0; docId < 10; docId++) {
         if (docId < 7) {
@@ -111,7 +123,7 @@ public class MutableOpenStructIndexTest {
       throws IOException {
     // No childFieldSpecs — type inference from rawValue
     ComplexFieldSpec spec = new ComplexFieldSpec("metrics", DataType.OPEN_STRUCT, true, Map.of());
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec,
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec,
         OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
       idx.index(0, java.util.Map.of("clicks", 5L));
       assertEquals(idx.getKeyColumn("clicks").getStoredType(), DataType.LONG);
@@ -122,7 +134,7 @@ public class MutableOpenStructIndexTest {
 
   @Test
   public void testImplementsOpenStructIndexReader() throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", openStructSpec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", openStructSpec(),
         OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
       assertTrue(idx instanceof org.apache.pinot.segment.spi.index.reader.OpenStructIndexReader);
     }
@@ -130,7 +142,7 @@ public class MutableOpenStructIndexTest {
 
   @Test
   public void testGetIndexesReturnsForwardIndexForMaterializedKey() throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", openStructSpec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", openStructSpec(),
         OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
       idx.index(0, Map.of("clicks", 5L));
       Map<org.apache.pinot.segment.spi.index.IndexType, org.apache.pinot.segment.spi.index.IndexReader> indexes =
@@ -141,7 +153,7 @@ public class MutableOpenStructIndexTest {
 
   @Test
   public void testGetIndexesUnknownKeyReturnsEmpty() throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", openStructSpec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", openStructSpec(),
         OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
       assertTrue(idx.getIndexes("missing").isEmpty());
     }
@@ -149,12 +161,120 @@ public class MutableOpenStructIndexTest {
 
   @Test
   public void testGetColumnMetadataReturnsKeyMetadata() throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", openStructSpec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", openStructSpec(),
         OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
       idx.index(0, Map.of("clicks", 5L));
       assertNotNull(idx.getColumnMetadata("clicks"));
       assertEquals(idx.getColumnMetadata("clicks").getColumnName(), "clicks");
       assertNull(idx.getColumnMetadata("absent"));
+    }
+  }
+
+  /// Both failure meters are keyed on the OPEN_STRUCT column, never on the per-key materialized
+  /// name. These fire on malformed input, so an id-like key would otherwise mint one meter per id,
+  /// and meters are never removed from the registry.
+  @Test
+  public void testFailureMetersAreKeyedOnColumnNotKey()
+      throws IOException {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", openStructSpec(),
+        OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
+      // Unmappable value on a fresh key: falls back to STRING and meters an inference failure.
+      idx.index(0, Map.of("req-42", Map.of("a", 1)));
+      // Unmappable value on a key already typed LONG: dropped by coercion, metered there only.
+      idx.index(1, Map.of("clicks", 5L));
+      idx.index(2, Map.of("clicks", Map.of("a", 1)));
+
+      verify(metrics).addMeteredTableValue("testTable_REALTIME", "metrics",
+          ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 1L);
+      verify(metrics).addMeteredTableValue("testTable_REALTIME", "metrics",
+          ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 1L);
+      verify(metrics, never()).addMeteredTableValue(anyString(), eq("metrics$req-42"), any(), anyLong());
+      verify(metrics, never()).addMeteredTableValue(anyString(), eq("metrics$clicks"), any(), anyLong());
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  /// A later unmappable value on a key whose type fell back to STRING is stored as its serialized
+  /// form, so it is metered every time — not just on the first sighting that established the type.
+  @Test
+  public void testInferenceFailuresMeteredPerValueOnStringFallbackKey()
+      throws IOException {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", openStructSpec(),
+        OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
+      for (int docId = 0; docId < 3; docId++) {
+        idx.index(docId, Map.of("payload", Map.of("a", docId)));
+      }
+      verify(metrics, times(3)).addMeteredTableValue("testTable_REALTIME", "metrics",
+          ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 1L);
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  @Test
+  public void testIgnoredKeyNeverAllocatesColumn()
+      throws Exception {
+    OpenStructIndexConfig config = JsonUtils.stringToObject(
+        "{\"ignoredKeys\": [\"debug\"]}", OpenStructIndexConfig.class);
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex(
+        "metrics", "testTable_REALTIME", openStructSpec(), config, _memMgr, 1000)) {
+      idx.index(0, Map.of("debug", "noise", "clicks", 5L));
+
+      assertNull(idx.getKeyColumn("debug"), "Ignored key must never allocate a column");
+      assertTrue(idx.getKeys().contains("clicks"), "Non-ignored key must still be indexed");
+      assertEquals(idx.getKeys().size(), 1);
+      assertEquals(idx.getMapValue(0), Map.of("clicks", 5L));
+    }
+  }
+
+  @Test
+  public void testIgnoredKeyMeteredOnceOnClose()
+      throws IOException {
+    OpenStructIndexConfig config = JsonUtils.stringToObject(
+        "{\"ignoredKeys\": [\"debug\"]}", OpenStructIndexConfig.class);
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      try (MutableOpenStructIndex idx = new MutableOpenStructIndex(
+          "metrics", "testTable_REALTIME", openStructSpec(), config, _memMgr, 1000)) {
+        idx.index(0, Map.of("debug", "a"));
+        idx.index(1, Map.of("debug", "b", "clicks", 1L));
+
+        verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+            eq(ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS), anyLong());
+      }
+
+      verify(metrics, times(1)).addMeteredTableValue("testTable_REALTIME", "metrics",
+          ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, 2L);
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  @Test
+  public void testIgnoredKeyWithNullValueNotMetered()
+      throws IOException {
+    OpenStructIndexConfig config = JsonUtils.stringToObject(
+        "{\"ignoredKeys\": [\"debug\"]}", OpenStructIndexConfig.class);
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      Map<String, Object> row = new HashMap<>();
+      row.put("debug", null);
+      try (MutableOpenStructIndex idx = new MutableOpenStructIndex(
+          "metrics", "testTable_REALTIME", openStructSpec(), config, _memMgr, 1000)) {
+        idx.index(0, row);
+      }
+
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS), anyLong());
+    } finally {
+      ServerMetrics.deregister();
     }
   }
 }

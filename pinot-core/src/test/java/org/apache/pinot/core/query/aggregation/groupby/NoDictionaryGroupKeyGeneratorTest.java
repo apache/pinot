@@ -45,7 +45,7 @@ import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -82,13 +82,13 @@ public class NoDictionaryGroupKeyGeneratorTest {
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setNoDictionaryColumns(COLUMNS.subList(0, NUM_COLUMNS - 1)).build();
   private static final Schema SCHEMA =
-      new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, FieldSpec.DataType.INT)
-          .addSingleValueDimension(LONG_COLUMN, FieldSpec.DataType.LONG)
-          .addSingleValueDimension(FLOAT_COLUMN, FieldSpec.DataType.FLOAT)
-          .addSingleValueDimension(DOUBLE_COLUMN, FieldSpec.DataType.DOUBLE)
-          .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
-          .addSingleValueDimension(BYTES_COLUMN, FieldSpec.DataType.BYTES)
-          .addSingleValueDimension(BYTES_DICT_COLUMN, FieldSpec.DataType.BYTES).build();
+      new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, DataType.INT)
+          .addSingleValueDimension(LONG_COLUMN, DataType.LONG)
+          .addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
+          .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE)
+          .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
+          .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES)
+          .addSingleValueDimension(BYTES_DICT_COLUMN, DataType.BYTES).build();
 
   private static final int NUM_RECORDS = 1000;
   private static final int NUM_UNIQUE_RECORDS = 100;

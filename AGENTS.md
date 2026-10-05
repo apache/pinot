@@ -113,6 +113,10 @@ repo. It is intentionally short and focused on day-to-day work.
 - Use `./mvnw license:format` to add headers to new files.
 - Preserve backward compatibility across mixed-version broker/server/controller.
 - Prefer imports over fully qualified class names (e.g., use `import com.foo.Bar` and refer to `Bar`, not `com.foo.Bar` inline).
+- In tests, statically import methods from `Assert` and `Mockito`; do not qualify calls with `Assert.` or `Mockito.`.
+- Import `FieldSpec.DataType` and `DataSchema.ColumnDataType` directly and use their simple names at call sites.
+- Keep a ternary expression on one line when it fits. Otherwise, put `? <true-expression>` and
+  `: <false-expression>` on separate lines.
 - Prefer `List.of()`, `Set.of()`, and `Map.of()` for non-null immutable collection literals. Checkstyle blocks
   `Collections.emptyList()`, `Collections.emptySet()`, and `Collections.emptyMap()`; use `List.of()`, `Set.of()`, and
   `Map.of()` instead. Do not add blanket bans for `Collections.singleton*`; use them only when an element/key/value

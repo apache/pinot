@@ -116,7 +116,7 @@ public class OpenStructConsumingSealedParityTest {
     // --- Consuming side ---
     List<Object> consumingValues;
     MutableRoaringBitmap consumingDefaultDocIds;
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex(METRICS, spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex(METRICS, "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, NUM_DOCS)) {
       for (int docId = 0; docId < NUM_DOCS; docId++) {
         idx.index(docId, metricsForDoc(docId));
@@ -196,6 +196,82 @@ public class OpenStructConsumingSealedParityTest {
         }
       }
       assertEquals(consumingDefaultDocIds, expectedDefaultDocIds);
+    } finally {
+      sealed.destroy();
+    }
+  }
+
+  /// A key with no declared child spec whose value is a Map or a List: `OpenStructTypeInference`
+  /// maps neither to a Pinot DataType, so both tiers must fall back to STRING and store the
+  /// serialized form. Before this was aligned, the consuming tier dropped the entry while the
+  /// sealed tier kept it, so the same row read differently either side of the seal boundary (and
+  /// the REALTIME and OFFLINE halves of a hybrid table disagreed).
+  @Test
+  public void testConsumingMatchesSealedForUninferrableValues()
+      throws Exception {
+    String nestedKey = "payload";
+    Map<Integer, Object> raw = new HashMap<>();
+    raw.put(0, Map.of("b", 2, "a", 1));
+    raw.put(1, List.of(1, 2, 3));
+    for (int docId = 2; docId < NUM_DOCS; docId++) {
+      raw.put(docId, "plain-" + docId);
+    }
+
+    // 'payload' is deliberately absent from the child specs so that type inference runs for it.
+    ComplexFieldSpec inferredSpec = new ComplexFieldSpec(METRICS, FieldSpec.DataType.OPEN_STRUCT, true,
+        Map.of("host", new DimensionFieldSpec("host", FieldSpec.DataType.STRING, true)));
+
+    List<Object> consumingValues;
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex(METRICS, "testTable_REALTIME", inferredSpec,
+        OpenStructIndexConfig.DEFAULT, _mm, NUM_DOCS)) {
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        idx.index(docId, Map.of("host", "host-" + docId, nestedKey, raw.get(docId)));
+      }
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(inferredSpec, idx, NUM_DOCS);
+      DataSource payload = ds.getDataSource(nestedKey);
+      assertNotNull(payload, "uninferrable key must still be materialized on the consuming side");
+      consumingValues = readAllValues(payload);
+    }
+
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testOpenStructInferParity")
+        .addField(inferredSpec)
+        .build();
+    OpenStructIndexConfig osConfig =
+        new OpenStructIndexConfig(false, null, -1, Set.of(nestedKey, "host"), 0.5, List.of(), null);
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("open_struct", JsonUtils.objectToJsonNode(osConfig));
+    FieldConfig metricsCfg = new FieldConfig.Builder(METRICS).withIndexes(indexes).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testOpenStructInferParity")
+        .setFieldConfigList(List.of(metricsCfg)).build();
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(TMP_DIR.getAbsolutePath());
+    config.setSegmentName("testSegmentInferParity");
+
+    List<GenericRow> rows = new ArrayList<>(NUM_DOCS);
+    for (int docId = 0; docId < NUM_DOCS; docId++) {
+      GenericRow row = new GenericRow();
+      row.putValue(METRICS, Map.of("host", "host-" + docId, nestedKey, raw.get(docId)));
+      rows.add(row);
+    }
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+
+    ImmutableSegment sealed = ImmutableSegmentLoader.load(driver.getOutputDirectory(), ReadMode.mmap);
+    try {
+      OpenStructDataSource sealedMetrics = (OpenStructDataSource) sealed.getDataSource(METRICS);
+      DataSource sealedPayload = sealedMetrics.getDataSource(nestedKey);
+      assertNotNull(sealedPayload, "uninferrable key must still be materialized on the sealed side");
+      List<Object> sealedValues = readAllValues(sealedPayload);
+
+      assertEquals(consumingValues, sealedValues);
+      // Pin the serialized form so a change in either tier's fallback is caught, not just divergence.
+      // MapUtils.toString sorts by key, so the input order {"b","a"} must come back out as {"a","b"}.
+      assertEquals(consumingValues.get(0), "{\"a\":1,\"b\":2}");
+      assertEquals(consumingValues.get(1), "[1, 2, 3]");
+      assertEquals(consumingValues.get(2), "plain-2");
     } finally {
       sealed.destroy();
     }

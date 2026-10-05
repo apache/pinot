@@ -223,13 +223,6 @@
                 value="Use /// markdown doc comments (JEP 467) instead of /** */ Javadoc."/>
     </module>
 
-    <!-- If you have a Javadoc comment, make sure it is properly formed.
-         NOTE: this only inspects /** */ comments, so it no longer applies to the /// doc
-         comments that the codebase now uses. -->
-    <module name="JavadocStyle">
-      <property name="checkFirstSentence" value="false"/>
-    </module>
-
     <!-- NAMING CONVENTIONS -->
 
     <!-- Generic parameters for a class must be uppercase letters (e.g. <T>, <OLD>) -->

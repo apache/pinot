@@ -27,7 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -82,7 +82,7 @@ class SetResultExtractionStrategy implements ResultExtractionStrategy<DictIdsWra
   private Set convertToValueSet(Dictionary dictionary, RoaringBitmap dictIdBitmap) {
     int numValues = dictIdBitmap.getCardinality();
     PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
-    FieldSpec.DataType storedType = dictionary.getValueType();
+    DataType storedType = dictionary.getValueType();
     switch (storedType) {
       case INT:
         IntOpenHashSet intSet = new IntOpenHashSet(numValues);

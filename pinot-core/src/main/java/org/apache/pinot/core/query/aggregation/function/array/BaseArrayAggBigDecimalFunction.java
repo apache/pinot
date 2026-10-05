@@ -25,13 +25,13 @@ import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public abstract class BaseArrayAggBigDecimalFunction<I extends ObjectCollection<BigDecimal>>
     extends BaseArrayAggFunction<I, ObjectArrayList<BigDecimal>> {
   public BaseArrayAggBigDecimalFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression, FieldSpec.DataType.BIG_DECIMAL, nullHandlingEnabled);
+    super(expression, DataType.BIG_DECIMAL, nullHandlingEnabled);
   }
 
   abstract void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, BigDecimal value);

@@ -17,8 +17,6 @@
  * under the License.
  */
 package org.apache.pinot.controller.helix.core.rebalance;
-import com.fasterxml.jackson.databind.JsonNode;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,16 +27,13 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
-import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.restlet.resources.RebalancePreCheckerResult;
 import org.apache.pinot.common.restlet.resources.RebalanceSummaryResult;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
-import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.ResourceUtilizationInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -54,7 +49,6 @@ import org.slf4j.LoggerFactory;
 
 
 public class DefaultRebalancePreChecker implements RebalancePreChecker {
-  public static final String NEEDS_RELOAD_STATUS = "needsReloadStatus";
   public static final String IS_MINIMIZE_DATA_MOVEMENT = "isMinimizeDataMovement";
   public static final String DISK_UTILIZATION = "diskUtilization";
   public static final String REBALANCE_CONFIG_OPTIONS = "rebalanceConfigOptions";
@@ -90,8 +84,6 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     // Right now pre-check items are done sequentially. If pre-check items are to be done in parallel, we should not
     // use linked hash map but to sort the result in the end
     Map<String, RebalancePreCheckerResult> preCheckResult = new LinkedHashMap<>();
-    // Check for reload status
-    preCheckResult.put(NEEDS_RELOAD_STATUS, checkReloadNeededOnServers(tableNameWithType, tableRebalanceLogger));
     // Check whether minimizeDataMovement is set in TableConfig
     preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT,
         checkIsMinimizeDataMovement(tableConfig, rebalanceConfig, tableRebalanceLogger));
@@ -118,42 +110,6 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
     tableRebalanceLogger.info("End pre-checks");
     return preCheckResult;
-  }
-
-  /// Checks if the current segments on any servers needs a reload (table config or schema change that hasn't been
-  /// applied yet). This check does not guarantee that the segments in deep store are up to date.
-  /// TODO: Add an API to check for whether segments in deep store are up to date with the table configs and schema
-  ///       and add a pre-check here to call that API.
-  private RebalancePreCheckerResult checkReloadNeededOnServers(String tableNameWithType, Logger tableRebalanceLogger) {
-    tableRebalanceLogger.info("Fetching whether reload is needed");
-    Boolean needsReload = null;
-    if (_executorService == null) {
-      tableRebalanceLogger.warn("Executor service is null, skipping needsReload check");
-      return RebalancePreCheckerResult.error("Could not determine needReload status, run needReload API manually");
-    }
-    try (PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager()) {
-      TableMetadataReader metadataReader = new TableMetadataReader(_executorService, connectionManager,
-          _pinotHelixResourceManager);
-      TableMetadataReader.TableReloadJsonResponse needsReloadMetadataPair =
-          metadataReader.getServerCheckSegmentsReloadMetadata(tableNameWithType, 30_000);
-      Map<String, JsonNode> needsReloadMetadata = needsReloadMetadataPair.getServerReloadJsonResponses();
-      int failedResponses = needsReloadMetadataPair.getNumFailedResponses();
-      tableRebalanceLogger.info("Received {} needs reload responses and {} failed responses from servers assigned "
-          + "to table", needsReloadMetadata.size(), failedResponses);
-      needsReload = needsReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
-      if (!needsReload && failedResponses > 0) {
-        tableRebalanceLogger.warn("Received {} failed responses from servers and needsReload is false from returned "
-            + "responses, check needsReload status manually", failedResponses);
-        needsReload = null;
-      }
-    } catch (InvalidConfigException | IOException e) {
-      tableRebalanceLogger.warn("Caught exception while trying to fetch reload status from servers", e);
-    }
-
-    return needsReload == null
-        ? RebalancePreCheckerResult.error("Could not determine needReload status, run needReload API manually")
-        : !needsReload ? RebalancePreCheckerResult.pass("No need to reload")
-            : RebalancePreCheckerResult.warn("Reload needed prior to running rebalance");
   }
 
   /// Checks if minimize data movement is set for the given table in the TableConfig

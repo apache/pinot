@@ -88,7 +88,8 @@ public class MailboxSendOperator extends MultiStageOperator {
   ///
   /// 1. One inner exchange is created for each receiver stage, using the method mentioned above and keeping the
   ///    distribution type specified in the [MailboxSendNode].
-  /// 2. Then, a single outer broadcast exchange is created to fan out the data to all the inner exchanges.
+  /// 2. Then, a single outer broadcast exchange is created to fan out the data to all the inner exchanges. It copies
+  ///    blocks that carry aggregation intermediate results so that no two receiver stages share them.
   ///
   /// @see BlockExchange#asSendingMailbox(String)
   private static BlockExchange getBlockExchange(OpChainExecutionContext ctx, MailboxSendNode node,
@@ -247,6 +248,10 @@ public class MailboxSendOperator extends MultiStageOperator {
     MultiStageQueryStats stats = null;
     List<DataBuffer> serializedStats;
     if (_context.isSendStats()) {
+      // The stats are serialized into the block this method is about to send, so what this operator has spent in
+      // the getNextBlock() call it is running has to be accounted before they are collected. Otherwise this
+      // operator reports less than the input whose call it contains, and the stage renders a negative self time.
+      registerExecutionSoFar();
       stats = calculateStats();
       try {
         serializedStats = stats.serialize();
@@ -266,9 +271,27 @@ public class MailboxSendOperator extends MultiStageOperator {
     }
   }
 
+  /// Returns a copy of this operator's stats, extended with the stats describing this single worker.
+  ///
+  /// These cannot be accumulated in [#registerExecution] like the others, because they are not per-block
+  /// quantities: merging [StatKey#MAX_EMITTED_ROWS] once per block would report the largest block rather than the
+  /// busiest worker, and merging [StatKey#NON_ACTIVE_WORKERS] once per block would count the blocks. They are
+  /// computed once, here, from the totals the operator ends up with.
+  ///
+  /// They describe a single worker, but every stat is merged across all the workers of the stage before being
+  /// reported, which is what turns them into a description of how the work was spread.
   @Override
   public StatMap<StatKey> copyStatMaps() {
-    return new StatMap<>(_statMap);
+    StatMap<StatKey> statMap = new StatMap<>(_statMap);
+    long emittedRows = statMap.getLong(StatKey.EMITTED_ROWS);
+    if (emittedRows > 0) {
+      statMap.merge(StatKey.MAX_EMITTED_ROWS, emittedRows);
+    } else {
+      statMap.merge(StatKey.NON_ACTIVE_WORKERS, 1);
+    }
+    // Reported by every worker, idle ones included: a worker that sent nothing still spent time deciding that.
+    statMap.merge(StatKey.MAX_CLOCK_TIME_MS, statMap.getLong(StatKey.EXECUTION_TIME_MS));
+    return statMap;
   }
 
   private void sendMseBlock(MseBlock.Data block) {
@@ -315,6 +338,13 @@ public class MailboxSendOperator extends MultiStageOperator {
     }
   }
 
+  /// The stats reported by this operator.
+  ///
+  /// As the root operator of its stage, this operator is also where the stage-wide stats live, like [#PARALLELISM]
+  /// and [#NON_ACTIVE_WORKERS].
+  ///
+  /// New keys must be appended at the end of this enum: [StatMap] identifies keys by their ordinal on the wire, so
+  /// inserting, reordering or removing a constant breaks the compatibility with other versions.
   public enum StatKey implements StatMap.Key {
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
@@ -377,7 +407,40 @@ public class MailboxSendOperator extends MultiStageOperator {
     /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
     /// Time spent on GC while this operator or its children in the same stage were running.
-    GC_TIME_MS(StatMap.Type.LONG);
+    GC_TIME_MS(StatMap.Type.LONG),
+    /// How many workers of this stage sent no row at all.
+    ///
+    /// Reported as the count of idle workers rather than active ones so that it is absent from the stats of a
+    /// stage where every worker produced something, which is the common case.
+    ///
+    /// Each operator reports which of the stage's workers it was idle on, applying its own notion of activity:
+    /// this one sent no row, a mailbox receive operator received none, a leaf operator had no segment assigned to
+    /// it. Comparing this against `parallelism` on the same node detects distribution bias, and comparing it
+    /// against the operators below shows where the stage narrowed: a leaf idle on no worker under a send idle on
+    /// nine means the work was spread but the output was not.
+    NON_ACTIVE_WORKERS(StatMap.Type.INT),
+    /// The highest number of rows sent by a single worker of this stage.
+    ///
+    /// [#EMITTED_ROWS] is the sum across all workers, so `maxEmittedRows` greatly exceeding the average number of
+    /// rows per worker means the rows were not evenly distributed.
+    MAX_EMITTED_ROWS(StatMap.Type.LONG) {
+      @Override
+      public long merge(long value1, long value2) {
+        return Math.max(value1, value2);
+      }
+    },
+    /// How long the slowest worker of this stage took.
+    ///
+    /// The `clockTimeMs` reported for a stage is its [#EXECUTION_TIME_MS] divided by its [#PARALLELISM], which
+    /// assumes the work was spread evenly across the workers. This is the same measure taken on the worker that
+    /// took longest, so `maxClockTimeMs` greatly exceeding `clockTimeMs` means that assumption does not hold and
+    /// the average understates how long the stage actually took.
+    MAX_CLOCK_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public long merge(long value1, long value2) {
+        return Math.max(value1, value2);
+      }
+    };
 
     private final StatMap.Type _type;
 

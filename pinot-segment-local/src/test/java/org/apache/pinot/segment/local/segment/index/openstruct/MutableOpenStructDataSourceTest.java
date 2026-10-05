@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.openstruct;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.segment.index.datasource.NullDataSource;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
@@ -36,12 +37,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertSame;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class MutableOpenStructDataSourceTest {
@@ -66,7 +62,7 @@ public class MutableOpenStructDataSourceTest {
   @Test
   public void testGetDataSourcePerKey()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       idx.index(0, Map.of("clicks", 5L));
       MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 1);
@@ -80,18 +76,36 @@ public class MutableOpenStructDataSourceTest {
   @Test
   public void testGetDataSourceForUnknownKey()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 0);
-      assertNull(ds.getDataSource("missing"));
+      assertTrue(ds.getDataSource("missing") instanceof NullDataSource);
       assertFalse(ds.isMaterialized("missing"));
+    }
+  }
+
+  /// A key absent from the consuming segment is described by its declared child field spec, including a custom
+  /// default null value.
+  @Test
+  public void testAbsentDeclaredKeyReadsDeclaredDefault()
+      throws Exception {
+    ComplexFieldSpec spec = new ComplexFieldSpec("metrics", DataType.OPEN_STRUCT, true,
+        Map.of("score", new DimensionFieldSpec("score", DataType.STRING, true, "N/A")));
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec,
+        OpenStructIndexConfig.DEFAULT, _mm, 100)) {
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec, idx, 3);
+      DataSource scoreDs = ds.getDataSource("score");
+      assertTrue(scoreDs instanceof NullDataSource);
+      assertEquals(scoreDs.getDataSourceMetadata().getDataType(), DataType.STRING);
+      assertEquals(scoreDs.getDataSourceMetadata().getNumDocs(), 3);
+      assertEquals(scoreDs.getDictionary().get(0), "N/A");
     }
   }
 
   @Test
   public void testGetDataSourcesReturnsAllKeys()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       idx.index(0, Map.of("clicks", 5L, "country", "US"));
       MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 1);
@@ -103,7 +117,7 @@ public class MutableOpenStructDataSourceTest {
   @Test
   public void testGetDataSourceIsMemoisedPerKey()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       idx.index(0, Map.of("clicks", 5L));
       MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 1);
@@ -117,7 +131,7 @@ public class MutableOpenStructDataSourceTest {
   @Test
   public void testMemoisedDataSourceStaysCorrectAsIngestionContinues()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       idx.index(0, Map.of("clicks", 5L));
       MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 1);
@@ -137,7 +151,7 @@ public class MutableOpenStructDataSourceTest {
   @Test
   public void testMemoisedNullBitmapReportsAbsentDocs()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       idx.index(0, Map.of("country", "US"));
       idx.index(1, Map.of("clicks", 5L));
@@ -152,19 +166,19 @@ public class MutableOpenStructDataSourceTest {
   @Test
   public void testKeyCreatedAfterFirstLookupIsPickedUp()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 1);
-      assertNull(ds.getDataSource("clicks"));
+      assertTrue(ds.getDataSource("clicks") instanceof NullDataSource);
       idx.index(0, Map.of("clicks", 5L));
-      assertNotNull(ds.getDataSource("clicks"));
+      assertFalse(ds.getDataSource("clicks") instanceof NullDataSource);
     }
   }
 
   @Test
   public void testDictionaryReservesDefaultNullValueAtDictIdZero()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       idx.index(0, Map.of("clicks", 5L));
       MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 1);
@@ -186,7 +200,7 @@ public class MutableOpenStructDataSourceTest {
   @Test
   public void testLastIndexedDocIdWatermark()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       idx.index(0, Map.of("clicks", 5L));
       idx.index(1, Map.of("other", 1L));
@@ -201,7 +215,7 @@ public class MutableOpenStructDataSourceTest {
   @Test
   public void testForwardIndexSafeForAbsentTailDocs()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 3000)) {
       idx.index(0, Map.of("clicks", 5L));
       idx.index(3, Map.of("clicks", 9L));
@@ -245,7 +259,7 @@ public class MutableOpenStructDataSourceTest {
   @Test
   public void testInvertedIndexFoldsAbsentDocsIntoDefaultPostings()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       // Present in docs 0 (5L) and 3 (9L) of 6; docs 1,2,4,5 never see the key.
       idx.index(0, Map.of("clicks", 5L));
@@ -266,7 +280,7 @@ public class MutableOpenStructDataSourceTest {
   @Test
   public void testInvertedIndexFoldsAbsentDocsWithExplicitDefaultWrite()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       // doc 0 writes a real value; doc 3 explicitly writes the LONG default itself.
       idx.index(0, Map.of("clicks", 5L));
@@ -284,7 +298,7 @@ public class MutableOpenStructDataSourceTest {
   @Test
   public void testKeyDictionaryExactWhenPartiallyPresent()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       idx.index(0, Map.of("clicks", 5L));
       MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 3);
@@ -297,7 +311,7 @@ public class MutableOpenStructDataSourceTest {
   @Test
   public void testKeyDictionaryNotExactWhenFullyPresentAndDefaultUnobserved()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       idx.index(0, Map.of("clicks", 5L));
       idx.index(1, Map.of("clicks", 7L));
@@ -310,7 +324,7 @@ public class MutableOpenStructDataSourceTest {
   @Test
   public void testKeyDictionaryExactWhenFullyPresentAndDefaultObserved()
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       idx.index(0, Map.of("clicks", 5L));
       idx.index(1, Map.of("clicks", Long.MIN_VALUE));
@@ -332,7 +346,7 @@ public class MutableOpenStructDataSourceTest {
     children.put("clicks", new DimensionFieldSpec("clicks", DataType.LONG, true, 0L));
     ComplexFieldSpec specWithCustomDefault =
         new ComplexFieldSpec("metrics", DataType.OPEN_STRUCT, true, children);
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", specWithCustomDefault,
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", specWithCustomDefault,
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       idx.index(0, Map.of("clicks", 5L));
       MutableKeyColumn col = idx.getKeyColumn("clicks");
@@ -357,7 +371,7 @@ public class MutableOpenStructDataSourceTest {
   @Test(dataProvider = "storedTypes")
   public void testDefaultReservationPerStoredType(DataType storedType, Object value)
       throws Exception {
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", spec(),
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       idx.index(0, Map.of("k", value));
       MutableKeyColumn col = idx.getKeyColumn("k");

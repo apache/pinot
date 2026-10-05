@@ -23,6 +23,9 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /// DataSource for an OPEN_STRUCT column. Provides per-key DataSources that can be used for
@@ -33,20 +36,22 @@ public interface OpenStructDataSource extends DataSource {
   /// Returns the OPEN_STRUCT ComplexFieldSpec.
   ComplexFieldSpec getFieldSpec();
 
-  /// Returns the DataSource for the given key's values. The DataSource's value type is the
-  /// per-key declared type (from `childFieldSpecs`) when present, otherwise STRING.
-  ///
-  /// Three possible outcomes:
+  /// Returns the DataSource for the given key's values, typed per [#getValueFieldSpec(String)]. Never `null`:
   /// - **Materialized key** → the dense per-key DataSource (has dictionary / inverted index).
-  /// - **Sparse key** → a virtual blob-backed DataSource that parses the sparse JSON column
-  ///   per doc and coerces values to the resolved stored type. Returned when the key is inside
-  ///   the sparse manifest, or when there is no manifest (pre-manifest segments treat every
-  ///   unmaterialized key as potentially sparse).
-  /// - **Definitively absent** → `null`. Returned when the segment is fully materialized (no
-  ///   sparse column), or when the sparse manifest exists and does not list this key. Callers
-  ///   should synthesize a typed all-null source (see `OpenStructNullDataSource.forAbsentKey`).
-  @Nullable
+  /// - **Sparse key** → a virtual blob-backed DataSource that parses the sparse JSON column per doc and coerces
+  ///   values to the resolved stored type. Returned when the key is inside the sparse manifest, or when there is no
+  ///   manifest (pre-manifest segments treat every unmaterialized key as potentially sparse).
+  /// - **Definitively absent** → an all-null DataSource built like a default column: every document is null, and
+  ///   reads as the key's default null value with null handling off. Returned when the segment is fully materialized
+  ///   (no sparse column), or when the sparse manifest exists and does not list this key.
   DataSource getDataSource(String key);
+
+  /// Returns the field spec describing the given key's values: the declared child field spec when present, otherwise a
+  /// single-value STRING dimension named after the key.
+  default FieldSpec getValueFieldSpec(String key) {
+    FieldSpec childFieldSpec = getFieldSpec().getChildFieldSpec(key);
+    return childFieldSpec != null ? childFieldSpec : new DimensionFieldSpec(key, DataType.STRING, true);
+  }
 
   /// Returns whether the given key has a materialized per-key index in this segment. Exact,
   /// O(1) lookup into the materialized key set. Virtual sparse-backed sources do not count as
@@ -57,32 +62,27 @@ public interface OpenStructDataSource extends DataSource {
   /// a non-materialized key resolves to a typed all-null source, so the scan sees NULL at every
   /// document.
   ///
-  /// A `false` return combined with a non-null [#getDataSource(String)] means the key exists
-  /// in the sparse tier. A `false` return with a null getDataSource means the key is definitively
-  /// absent.
+  /// A `false` return means the key is either in the sparse tier or definitively absent; [#getDataSource(String)]
+  /// returns the matching source either way.
   boolean isMaterialized(String key);
 
   /// Returns whether every key in this segment is materialized — i.e., there is no sparse
   /// blob and the materialized key set is exhaustive.
   ///
-  /// When `true`, a `false` return from [#isMaterialized(String)] is a definitive "absent"
-  /// and callers can treat the key as present-but-all-null — e.g. evaluate predicates against a
-  /// typed all-null DataSource, which yields the correct answer under both null-handling modes
-  /// (an absent key reads as its type default with null handling off, and as NULL with it on).
+  /// When `true`, a `false` return from [#isMaterialized(String)] is a definitive "absent", and
+  /// [#getDataSource(String)] returns an all-null DataSource for the key, which yields the correct answer under both
+  /// null-handling modes (an absent key reads as its type default with null handling off, and as NULL with it on).
   boolean isFullyMaterialized();
 
   /// Returns DataSources for all keys present in this segment.
   Map<String, DataSource> getDataSources();
 
-  /// Returns the DataSourceMetadata for the given key, or `null` when [#getDataSource(String)]
-  /// returns null for this key. Includes metadata from virtual sparse-backed sources.
-  @Nullable
+  /// Returns the DataSourceMetadata for the given key, i.e. that of [#getDataSource(String)].
   DataSourceMetadata getDataSourceMetadata(String key);
 
-  /// Returns the ColumnIndexContainer for the given key, or `null` when the key has no
-  /// materialized DataSource. Virtual sparse-backed sources do not expose a ColumnIndexContainer
-  /// (they use BaseDataSource, not ImmutableDataSource), so this returns null for sparse keys
-  /// even when [#getDataSource(String)] is non-null.
+  /// Returns the ColumnIndexContainer for the given key, or `null` for a sparse key: virtual sparse-backed sources do
+  /// not expose a ColumnIndexContainer (they use BaseDataSource, not ImmutableDataSource). A key absent from the
+  /// segment resolves to an all-null DataSource and returns its container.
   @Nullable
   ColumnIndexContainer getIndexContainer(String key);
 

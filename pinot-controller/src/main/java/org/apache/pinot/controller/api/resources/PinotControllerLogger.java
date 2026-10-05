@@ -141,7 +141,7 @@ public class PinotControllerLogger {
   @Path("/loggers/download")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
-  @Authenticate(AccessType.DELETE)
+  @Authenticate(AccessType.READ)
   @ApiOperation(value = "Download a log file")
   public Response downloadLogFile(
       @ApiParam(value = "Log file path", required = true) @QueryParam("filePath") String filePath) {
@@ -207,7 +207,7 @@ public class PinotControllerLogger {
   @Path("/loggers/instances/{instanceName}/download")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
-  @Authenticate(AccessType.DELETE)
+  @Authenticate(AccessType.READ)
   @ApiOperation(value = "Download a log file from a given instance")
   public Response downloadLogFileFromInstance(
       @HeaderParam(HttpHeaders.AUTHORIZATION) String authorization,

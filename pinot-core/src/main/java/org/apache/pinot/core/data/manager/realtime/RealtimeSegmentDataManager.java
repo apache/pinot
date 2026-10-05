@@ -462,13 +462,20 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _consecutiveErrorCount, e);
       throw e;
     } else {
-      if (_shouldStop && (e instanceof InterruptedException || e.getCause() instanceof InterruptedException)) {
-        _segmentLogger.debug("Interrupted to stop consumption", e);
-      } else {
+      if (!_shouldStop) {
         _segmentLogger.warn("Stream transient exception when fetching messages, retrying (count={})",
             _consecutiveErrorCount, e);
+        Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
       }
-      Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
+      // Consumption being stopped is checked both before and after the uninterruptible retry backoff: the transient
+      // exception is usually the interrupt from the stop, and stop() can also interrupt the backoff itself. Either
+      // way the consume loop exits on the next check, so skip the stream consumer recreation. Closing the current
+      // consumer from the interrupted consumer thread would just fail with another interrupt; it is closed by the
+      // regular shutdown path instead.
+      if (_shouldStop) {
+        _segmentLogger.debug("Interrupted to stop consumption, skipping stream consumer recreation", e);
+        return;
+      }
       recreateStreamConsumer("Too many transient errors");
     }
   }
@@ -1191,7 +1198,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit)
       throws SegmentBuildFailureException {
     if (_parallelSegmentConsumptionPolicy.isAllowedDuringBuild()) {
-      closeStreamConsumer();
+      closeStreamConsumerAndReleaseSemaphore();
     }
     // Do not allow building segment when table data manager is already shut down
     if (_realtimeTableDataManager.isShutDown()) {
@@ -1257,7 +1264,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       FileUtils.deleteQuietly(indexDir);
 
       File[] tempFiles = tempSegmentFolder.listFiles();
-      assert tempFiles != null;
+      if (tempFiles == null || tempFiles.length == 0) {
+        String errorMessage = "Temp segment folder is empty or unreadable: " + tempSegmentFolder;
+        reportSegmentBuildFailure(errorMessage, null);
+        throw new SegmentBuildFailureException(errorMessage);
+      }
       File tempIndexDir = tempFiles[0];
       try {
         FileUtils.moveDirectory(tempIndexDir, indexDir);
@@ -1434,13 +1445,23 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
+  /// Closes the stream consumer so that no more data can be consumed into this segment. Does NOT release the consumer
+  /// semaphore, see [#closeStreamConsumerAndReleaseSemaphore()] and [#doOffload()].
   private void closeStreamConsumer() {
     if (_streamConsumerClosed.compareAndSet(false, true)) {
       closePartitionGroupConsumer();
       closePartitionMetadataProvider();
-      releaseConsumerSemaphore();
       _transformPipeline.reportStats();
     }
+  }
+
+  /// Closes the stream consumer and releases the consumer semaphore so that the next consuming segment of the
+  /// partition can start consuming in parallel with the build or download of this segment. Only called when the
+  /// [ParallelSegmentConsumptionPolicy] allows it.
+  @VisibleForTesting
+  void closeStreamConsumerAndReleaseSemaphore() {
+    closeStreamConsumer();
+    releaseConsumerSemaphore();
   }
 
   private void closePartitionGroupConsumer() {
@@ -1711,7 +1732,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata)
       throws Exception {
     if (_parallelSegmentConsumptionPolicy.isAllowedDuringDownload()) {
-      closeStreamConsumer();
+      closeStreamConsumerAndReleaseSemaphore();
     }
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
   }
@@ -1753,9 +1774,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     } catch (Exception e) {
       _segmentLogger.error("Caught exception while stopping the consumer thread", e);
     }
+    // Close the stream consumer first so that nothing can consume into the segment once it is offloaded.
     closeStreamConsumer();
-    cleanupMetrics();
-    _realtimeSegment.offload();
+    // Remove this segment's upsert/dedup metadata BEFORE releasing the consumer semaphore. For partial upsert in
+    // PROTECTED consistency mode, offload() reverts the primary keys owned by this consuming segment to their previous
+    // record locations. If the semaphore were released first, the next consuming segment of the partition could start
+    // replaying while primary keys still point to this mutable segment, and merge against the un-reverted state.
+    // When the parallel consumption policy allowed the next segment to start during build or download, the semaphore
+    // was already released there and the release below is a no-op.
+    // The semaphore is released in a finally block so that a failure in metadata removal cannot stall the partition.
+    try {
+      _realtimeSegment.offload();
+    } finally {
+      releaseConsumerSemaphore();
+      cleanupMetrics();
+    }
   }
 
   @Override

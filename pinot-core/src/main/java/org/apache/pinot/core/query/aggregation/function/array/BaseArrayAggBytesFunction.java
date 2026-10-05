@@ -24,17 +24,18 @@ import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/// Shared base for BYTES ARRAY_AGG variants. Both non-distinct (`ObjectArrayList<ByteArray>`) and distinct
-/// (`ObjectOpenHashSet<ByteArray>`) subclasses store `ByteArray` so content-based equality works for the
-/// distinct case and the element type stays consistent with the DataTable/wire layer.
+/// Shared base for ARRAY_AGG variants on types stored as BYTES (`BYTES` and the `UUID` logical type). Both
+/// non-distinct (`ObjectArrayList<ByteArray>`) and distinct (`ObjectOpenHashSet<ByteArray>`) subclasses store
+/// `ByteArray` so content-based equality works for the distinct case and the element type stays consistent with
+/// the DataTable/wire layer.
 public abstract class BaseArrayAggBytesFunction<I extends ObjectCollection<ByteArray>>
     extends BaseArrayAggFunction<I, ObjectArrayList<ByteArray>> {
-  public BaseArrayAggBytesFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression, FieldSpec.DataType.BYTES, nullHandlingEnabled);
+  public BaseArrayAggBytesFunction(ExpressionContext expression, DataType dataType, boolean nullHandlingEnabled) {
+    super(expression, dataType, nullHandlingEnabled);
   }
 
   abstract void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, byte[] value);

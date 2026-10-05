@@ -19,10 +19,13 @@
 package org.apache.pinot.spi.query;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
@@ -84,6 +87,27 @@ public class QueryExecutionContext {
 
   /// Guards single-emission of the scan-based killing dry-run log line and metric for this query
   private final AtomicBoolean _scanKillingDryRunEmitted = new AtomicBoolean(false);
+
+  /// Generic, product-agnostic response metadata registered during query handling — a free-form
+  /// string-to-[JsonNode] map that any component can populate to surface an informational note about
+  /// how the query was handled (for example that it was executed with an alternate/degraded
+  /// strategy). Values are arbitrary JSON, so a note can be a scalar, an object, or an array. The
+  /// broker copies these entries into the query response it sends back to the client.
+  ///
+  /// This context instance is shared by reference across the query's [QueryThreadContext]-aware
+  /// executors (e.g. the broker's async compile/plan threads re-open the context with the same
+  /// instance), so a writer on any of those threads is visible to the response-assembly thread.
+  /// Concurrent because those writes and the final read can happen on different threads.
+  ///
+  /// This sink is **broker-local**: it is not part of the context state serialized to workers, and
+  /// nothing propagates it back from a worker, so only entries registered while running on the
+  /// broker reach the response. An entry registered on a server's copy of the execution context is
+  /// silently dropped. This is a limitation of the current implementation rather than a design
+  /// decision — the plumbing may later be extended so workers can contribute entries as well. The
+  /// registration API records the restriction where it matters ([QueryThreadContext] exposes it as
+  /// `addResponseBrokerMetadata`); this sink and the response field it feeds stay generic, so worker
+  /// entries can later be merged into the very same map.
+  private final Map<String, JsonNode> _responseMetadata = new ConcurrentHashMap<>();
 
   public QueryExecutionContext(QueryType queryType, long requestId, String cid, String workloadName, long startTimeMs,
       long activeDeadlineMs, long passiveDeadlineMs, String brokerId, String instanceId, String queryHash) {
@@ -212,6 +236,26 @@ public class QueryExecutionContext {
   @Nullable
   public TerminationException getTerminateException() {
     return _terminateException;
+  }
+
+  /// Registers a generic response-metadata entry (arbitrary JSON value) to be surfaced in the query
+  /// response. See [#getResponseMetadata()] — in particular, only entries registered on the broker
+  /// currently reach the response, which is why the [QueryThreadContext] entry point is named
+  /// [QueryThreadContext#addResponseBrokerMetadata]. Prefer that one from code that does not already
+  /// hold this context.
+  public void addResponseMetadata(String key, JsonNode value) {
+    _responseMetadata.put(key, value);
+  }
+
+  /// String convenience for [#addResponseMetadata(String, JsonNode)] — the common case — wrapping the
+  /// value in a JSON string node.
+  public void addResponseMetadata(String key, String value) {
+    _responseMetadata.put(key, TextNode.valueOf(value));
+  }
+
+  /// Returns the generic response metadata registered for this query (never null; possibly empty).
+  public Map<String, JsonNode> getResponseMetadata() {
+    return _responseMetadata;
   }
 
   @Nullable

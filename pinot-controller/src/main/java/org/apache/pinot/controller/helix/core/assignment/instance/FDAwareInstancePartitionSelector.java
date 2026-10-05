@@ -286,7 +286,6 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
     int _mapDimInstancePerReplicaGroup;
     HashMap<String, Integer> _usedInstances = new HashMap<>();
     int _numFaultDomains;
-    int[][] _fdCounter;
 
     ReplicaGroupBasedAssignmentState(int numReplicaGroups, int numInstancesPerReplicaGroup,
         int numExistingReplicaGroups, int numExistingInstancesPerReplicaGroup, int numFaultDomains) {
@@ -300,7 +299,6 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
       _mapDimInstancePerReplicaGroup = Math.max(numExistingInstancesPerReplicaGroup, numInstancesPerReplicaGroup);
 
       _replicaGroupIdToInstancesMap = new Instance[_mapDimReplicaGroup][_mapDimInstancePerReplicaGroup];
-      _fdCounter = new int[_mapDimInstancePerReplicaGroup][_numFaultDomains];
     }
 
     ReplicaGroupBasedAssignmentState(int numReplicaGroups, int numInstancesPerReplicaGroup, int numFaultDomains) {
@@ -324,20 +322,16 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
       Preconditions.checkState(instance.getExistingReplicaGroupId() == Instance.NEW_INSTANCE);
       _replicaGroupIdToInstancesMap[replicaGroupId][instanceIndex] = instance;
       _usedInstances.put(instance.getInstanceName(), instance.getFaultDomainId());
-      _fdCounter[instanceIndex][instance.getFaultDomainId()] += 1;
     }
 
     private void setExistingInstance(int replicaGroupId, int instanceIndex, String instance, int fdId) {
       _replicaGroupIdToInstancesMap[replicaGroupId][instanceIndex] = new Instance(instance, fdId, replicaGroupId);
       _usedInstances.put(instance, fdId);
-      _fdCounter[instanceIndex][fdId] += 1;
     }
 
     private void unSetInstance(int replicaGroupId, int instanceIndex) {
-      int fdId = _replicaGroupIdToInstancesMap[replicaGroupId][instanceIndex].getFaultDomainId();
       _usedInstances.remove(_replicaGroupIdToInstancesMap[replicaGroupId][instanceIndex].getInstanceName());
       _replicaGroupIdToInstancesMap[replicaGroupId][instanceIndex] = null;
-      _fdCounter[instanceIndex][fdId] -= 1;
     }
 
     /// From an exising replica group, remove the instances that are gone and set them in \_replicaGroupIdToInstancesMap

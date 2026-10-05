@@ -74,6 +74,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.ManualAuthorization;
@@ -199,6 +200,7 @@ public class PinotQueryResource {
 
   @POST
   @Path("validateMultiStageQuery")
+  @Authenticate(AccessType.READ)
   public List<MultiStageQueryValidationResponse> validateMultiStageQuery(MultiStageQueryValidationRequest request,
       @Context HttpHeaders httpHeaders) {
 
@@ -255,6 +257,7 @@ public class PinotQueryResource {
   @Path("query/tableNames")
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
+  @Authenticate(AccessType.READ)
   @ApiOperation(value = "Extract table names from SQL queries")
   public Set<String> extractTableNames(List<String> sqlQueries, @Context HttpHeaders httpHeaders) {
 

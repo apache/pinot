@@ -9,6 +9,13 @@ Severity definitions:
 
 Priority order: Production Safety > Backward Compatibility > Correctness > State Management > Performance > Architecture > Testing > Naming > Process
 
+## Review Delivery
+
+- Prefer actionable findings as inline comments anchored to the narrowest relevant changed lines. When inline comments
+  are unavailable, include exact file and line references.
+- Always include a concise review summary covering the scope, overall assessment, and finding counts by severity.
+- Keep the summary synthetic; do not repeat the full text of every inline finding.
+
 ---
 
 ## 1. Configuration & Backward Compatibility
@@ -909,10 +916,6 @@ If tests pass with invalid credentials, the test suite has a gap.
 Add round-trip tests for Jackson-annotated classes.
 - Trigger: Any PR modifying JSON-serialized config or metadata classes
 
-**C6.7 — Performance-sensitive changes require benchmark comparisons**
-Share perf numbers comparing old vs new. Demand evidence before accepting degrading changes.
-- Trigger: Any PR claiming performance improvement without benchmarks
-
 **C6.8 — New tests must be verified as stable before merge**
 Investigate CI failures in newly added tests before approval.
 - Trigger: Any PR adding new tests that show intermittent failures
@@ -944,6 +947,13 @@ public class JsonFunctionTest extends CustomDataQueryClusterIntegrationTest { ..
 
 ### MINOR
 
+**C6.7 — Prefer benchmark evidence for performance-sensitive changes**
+Prefer before-and-after results with enough methodology to reproduce the comparison. A one-off benchmark class does
+not need to be checked in unless it provides durable regression coverage or reusable benchmark value. Do not require
+a disposable harness in the repository when representative results and methodology are available.
+- Trigger: Any PR making a performance-sensitive change without representative before-and-after results and
+  reproducible methodology
+
 **C6.11 — Core concurrent data structures require dedicated concurrent tests**
 - Trigger: Any PR adding or modifying concurrent data structures
 
@@ -966,9 +976,11 @@ Don't change @BeforeClass to @BeforeMethod without justification.
 Not latest master, to avoid false positives.
 - Trigger: Any PR modifying backward compatibility test configuration
 
-**C6.17 — Place tests in the correct test file**
-Tests for ClassB don't belong in ClassA's test file.
-- Trigger: Any PR adding tests to an unrelated test class
+**C6.17 — Keep related tests concise and together**
+Add cases to the existing test class for the production class or module when practical. Keep each test focused and
+concise. Avoid creating one test class per functionality; use a separate class only when setup, lifecycle, or scope is
+materially distinct. Tests for ClassB don't belong in ClassA's test file.
+- Trigger: Any PR adding a new test class or tests to an unrelated test class
 
 **C6.18 — Maintain test scale unless explicitly justified**
 Smaller tests may miss issues. Use assertions, not logging.
@@ -1009,8 +1021,10 @@ Annotate accurately on BOTH parameters and return values. Do not annotate params
 - Trigger: Any PR adding or modifying method signatures
 
 **C7.3 — Precise naming**
-Method names must match scope and use precise prepositions (`for` not `of`). Variables reflect contents (`tablesUpdated` not `tablesToUpdate`).
-- Trigger: Any PR introducing new methods or variables with ambiguous names
+Method names must match scope and use precise prepositions (`for` not `of`). Variables reflect contents
+(`tablesUpdated` not `tablesToUpdate`). Use consistent terminology and role suffixes across related classes, methods,
+and implementations.
+- Trigger: Any PR introducing or renaming related classes, methods, or variables
 
 **C7.4 — Method signatures reflect actual behavior**
 Void for in-place mutation. Primitive types over wrappers when null has no distinct meaning.
@@ -1097,6 +1111,27 @@ State transition logs should capture both previous and new values.
 "oldest/latest" for temporal ordering, not "smallest/largest". Plural names for collections.
 - Trigger: Any PR with temporal or collection variable names
 
+**C7.21 — Use static imports for Assert and Mockito in tests**
+Statically import the assertion and mocking methods used from `Assert` and `Mockito`. Call `assertEquals(...)`,
+`mock(...)`, and `when(...)` directly instead of qualifying them with `Assert.` or `Mockito.`.
+- Trigger: Any PR adding or modifying test code with qualified `Assert` or `Mockito` method calls
+
+**C7.22 — Import Pinot data-type enums directly**
+Import `FieldSpec.DataType` and `DataSchema.ColumnDataType` directly. Use `DataType` and `ColumnDataType` at call sites
+instead of the enclosing-class-qualified names.
+- Trigger: Any PR using `FieldSpec.DataType` or `DataSchema.ColumnDataType` outside import declarations
+
+**C7.23 — Put multiline ternary branches on separate lines**
+Keep a ternary expression on one line when it fits. Otherwise, put the true and false branches on separate lines:
+
+```java
+condition
+    ? trueExpression
+    : falseExpression;
+```
+
+- Trigger: Any PR adding or modifying a multiline ternary expression
+
 ---
 
 ## 8. Process & Scope
@@ -1142,7 +1177,9 @@ Reference how `segment.fetcher`, `ForwardIndexConfig`, etc. are handled. New var
 - Trigger: Any PR adding new implementations of existing patterns
 
 **C8.4 — Minimize PR scope**
-Do not include unrelated changes. No accidental whitespace/formatting changes.
+Keep the change lean. Include only the code, tests, and documentation needed for the stated purpose. Exclude unrelated
+refactors, drive-by cleanup, generated churn, and accidental whitespace or formatting changes; move worthwhile cleanup
+to a separate PR.
 - Trigger: Any PR with changes outside its stated scope
 
 **C8.5 — Separate reverts from improvements**
@@ -1162,7 +1199,9 @@ Dependency version overrides require explicit justification.
 - Trigger: Any PR adding new dependencies or overriding versions in pom.xml
 
 **C8.9 — Split large PRs into focused, independently reviewable units**
-Critical path changes must be isolated. PRs must be complete — no interfaces without implementations.
+PRs must remain practical for a human to review. Split huge changes and remove unnecessary mechanical churn before
+review. Isolate critical-path changes and keep each PR complete — no interfaces without implementations. Size may be
+justified, but unrelated change is not.
 - Trigger: Any PR exceeding ~500 lines or touching 3+ subsystems
 
 **C8.10 — Default behavior changes require release notes and documentation updates**
@@ -1221,7 +1260,7 @@ Approve the immediate fix while deferring broader design to separate threads.
 | 3. Code Architecture & Module Design | 5 | 11 | 8 | 24 |
 | 4. Performance & Efficiency | 2 | 16 | 4 | 22 |
 | 5. Correctness & Safety | 9 | 16 | 3 | 28 |
-| 6. Testing Strategies | 2 | 8 | 8 | 18 |
-| 7. Naming & API Design | 1 | 9 | 10 | 20 |
+| 6. Testing Strategies | 2 | 7 | 9 | 18 |
+| 7. Naming & API Design | 1 | 9 | 13 | 23 |
 | 8. Process & Scope | 2 | 10 | 8 | 20 |
-| **Total** | **32** | **84** | **48** | **164** |
+| **Total** | **32** | **83** | **52** | **167** |

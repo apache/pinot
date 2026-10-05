@@ -73,7 +73,11 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactoryProvider;
 /// ```
 /// timeReferencePointInSeconds = firstBucketValue - bucketSizeInSeconds
 /// ```
-public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTimeSeriesBuilder, DoubleArrayList> {
+///
+/// Both the value and the timestamp gate a row when null handling is on. A null value has nothing to add to its
+/// bucket, and a null timestamp leaves the point with no bucket to land in, so either one makes the row
+/// uncountable rather than merely incomplete.
+public class TimeSeriesAggregationFunction extends BaseAggregationFunction<BaseTimeSeriesBuilder, DoubleArrayList> {
   private final TimeSeriesBuilderFactory _factory;
   private final AggInfo _aggInfo;
   private final ExpressionContext _valueExpression;
@@ -89,7 +93,8 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
   /// timeSeriesAggregate("m3ql", "MIN", valueExpr, timeExpr, timeUnit, offsetSeconds, firstBucketValue,
   ///     bucketLenSeconds, numBuckets, "aggParam1=value1")
   /// ```
-  public TimeSeriesAggregationFunction(List<ExpressionContext> arguments) {
+  public TimeSeriesAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(nullHandlingEnabled);
     // Initialize temporary variables.
     Preconditions.checkArgument(arguments.size() == 10, "Expected 10 arguments for time-series agg");
     String language = arguments.get(0).getLiteral().getStringValue();
@@ -142,16 +147,18 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    final long[] timeValues = blockValSetMap.get(_timeExpression).getLongValuesSV();
+    BlockValSet timeBlockValSet = blockValSetMap.get(_timeExpression);
     BlockValSet valueBlockValSet = blockValSetMap.get(_valueExpression);
-    switch (valueBlockValSet.getValueType()) {
-      case DOUBLE:
-      case LONG:
+    switch (valueBlockValSet.getValueType().getStoredType()) {
       case INT:
-        aggregateNumericValues(length, timeValues, aggregationResultHolder, valueBlockValSet);
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+      case BIG_DECIMAL:
+        aggregateNumericValues(length, timeBlockValSet, aggregationResultHolder, valueBlockValSet);
         break;
       case STRING:
-        aggregateStringValues(length, timeValues, aggregationResultHolder, valueBlockValSet);
+        aggregateStringValues(length, timeBlockValSet, aggregationResultHolder, valueBlockValSet);
         break;
       default:
         throw new UnsupportedOperationException(String.format("Unsupported type: %s in aggregate",
@@ -162,16 +169,18 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    final long[] timeValues = blockValSetMap.get(_timeExpression).getLongValuesSV();
+    BlockValSet timeBlockValSet = blockValSetMap.get(_timeExpression);
     BlockValSet valueBlockValSet = blockValSetMap.get(_valueExpression);
-    switch (valueBlockValSet.getValueType()) {
-      case DOUBLE:
-      case LONG:
+    switch (valueBlockValSet.getValueType().getStoredType()) {
       case INT:
-        aggregateGroupByNumericValues(length, groupKeyArray, timeValues, groupByResultHolder, valueBlockValSet);
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+      case BIG_DECIMAL:
+        aggregateGroupByNumericValues(length, groupKeyArray, timeBlockValSet, groupByResultHolder, valueBlockValSet);
         break;
       case STRING:
-        aggregateGroupByStringValues(length, groupKeyArray, timeValues, groupByResultHolder, valueBlockValSet);
+        aggregateGroupByStringValues(length, groupKeyArray, timeBlockValSet, groupByResultHolder, valueBlockValSet);
         break;
       default:
         throw new UnsupportedOperationException(String.format("Unsupported type: %s in aggregate",
@@ -229,70 +238,84 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
     return "TIME_SERIES";
   }
 
-  private void aggregateNumericValues(int length, long[] timeValues, AggregationResultHolder resultHolder,
+  /// Returns the holder's series builder, creating and storing one on first use.
+  ///
+  /// Called from inside a non-null range rather than before the loop, so that a block whose rows are all null leaves
+  /// the holder untouched and [#extractFinalResult] sees the `null` that means nothing was aggregated.
+  private BaseTimeSeriesBuilder getOrCreateSeriesBuilder(AggregationResultHolder resultHolder) {
+    BaseTimeSeriesBuilder seriesBuilder = resultHolder.getResult();
+    if (seriesBuilder == null) {
+      seriesBuilder = newSeriesBuilder();
+      resultHolder.setValue(seriesBuilder);
+    }
+    return seriesBuilder;
+  }
+
+  private BaseTimeSeriesBuilder newSeriesBuilder() {
+    return _factory.newTimeSeriesBuilder(_aggInfo, "TO_BE_REMOVED", _timeBuckets,
+        BaseTimeSeriesBuilder.UNINITIALISED_TAG_NAMES, BaseTimeSeriesBuilder.UNINITIALISED_TAG_VALUES);
+  }
+
+  private int timeIndex(long timeValue) {
+    return (int) (((timeValue + _timeOffset) - _timeReferencePoint - 1) / _timeBucketDivisor);
+  }
+
+  private void aggregateNumericValues(int length, BlockValSet timeBlockValSet, AggregationResultHolder resultHolder,
       BlockValSet blockValSet) {
+    long[] timeValues = timeBlockValSet.getLongValuesSV();
     double[] values = blockValSet.getDoubleValuesSV();
-    BaseTimeSeriesBuilder currentSeriesBuilder = resultHolder.getResult();
-    if (currentSeriesBuilder == null) {
-      currentSeriesBuilder = _factory.newTimeSeriesBuilder(_aggInfo, "TO_BE_REMOVED", _timeBuckets,
-          BaseTimeSeriesBuilder.UNINITIALISED_TAG_NAMES, BaseTimeSeriesBuilder.UNINITIALISED_TAG_VALUES);
-      resultHolder.setValue(currentSeriesBuilder);
-    }
-    int timeIndex;
-    for (int docIndex = 0; docIndex < length; docIndex++) {
-      timeIndex = (int) (((timeValues[docIndex] + _timeOffset) - _timeReferencePoint - 1) / _timeBucketDivisor);
-      currentSeriesBuilder.addValueAtIndex(timeIndex, values[docIndex], timeValues[docIndex]);
-    }
+    forEachNotNull(length, blockValSet, timeBlockValSet, (from, to) -> {
+      BaseTimeSeriesBuilder currentSeriesBuilder = getOrCreateSeriesBuilder(resultHolder);
+      for (int docIndex = from; docIndex < to; docIndex++) {
+        currentSeriesBuilder.addValueAtIndex(timeIndex(timeValues[docIndex]), values[docIndex], timeValues[docIndex]);
+      }
+    });
   }
 
-  private void aggregateStringValues(int length, long[] timeValues, AggregationResultHolder resultHolder,
+  private void aggregateStringValues(int length, BlockValSet timeBlockValSet, AggregationResultHolder resultHolder,
       BlockValSet blockValSet) {
+    long[] timeValues = timeBlockValSet.getLongValuesSV();
     String[] values = blockValSet.getStringValuesSV();
-    BaseTimeSeriesBuilder currentSeriesBuilder = resultHolder.getResult();
-    if (currentSeriesBuilder == null) {
-      currentSeriesBuilder = _factory.newTimeSeriesBuilder(_aggInfo, "TO_BE_REMOVED", _timeBuckets,
-          BaseTimeSeriesBuilder.UNINITIALISED_TAG_NAMES, BaseTimeSeriesBuilder.UNINITIALISED_TAG_VALUES);
-      resultHolder.setValue(currentSeriesBuilder);
-    }
-    int timeIndex;
-    for (int docIndex = 0; docIndex < length; docIndex++) {
-      timeIndex = (int) (((timeValues[docIndex] + _timeOffset) - _timeReferencePoint - 1) / _timeBucketDivisor);
-      currentSeriesBuilder.addValueAtIndex(timeIndex, values[docIndex], timeValues[docIndex]);
-    }
+    forEachNotNull(length, blockValSet, timeBlockValSet, (from, to) -> {
+      BaseTimeSeriesBuilder currentSeriesBuilder = getOrCreateSeriesBuilder(resultHolder);
+      for (int docIndex = from; docIndex < to; docIndex++) {
+        currentSeriesBuilder.addValueAtIndex(timeIndex(timeValues[docIndex]), values[docIndex], timeValues[docIndex]);
+      }
+    });
   }
 
-  private void aggregateGroupByNumericValues(int length, int[] groupKeyArray, long[] timeValues,
+  private void aggregateGroupByNumericValues(int length, int[] groupKeyArray, BlockValSet timeBlockValSet,
       GroupByResultHolder resultHolder, BlockValSet blockValSet) {
+    long[] timeValues = timeBlockValSet.getLongValuesSV();
     final double[] values = blockValSet.getDoubleValuesSV();
-    int timeIndex;
-    for (int docIndex = 0; docIndex < length; docIndex++) {
-      int groupId = groupKeyArray[docIndex];
-      BaseTimeSeriesBuilder currentSeriesBuilder = resultHolder.getResult(groupId);
-      if (currentSeriesBuilder == null) {
-        currentSeriesBuilder = _factory.newTimeSeriesBuilder(_aggInfo, "TO_BE_REMOVED", _timeBuckets,
-            BaseTimeSeriesBuilder.UNINITIALISED_TAG_NAMES, BaseTimeSeriesBuilder.UNINITIALISED_TAG_VALUES);
-        resultHolder.setValueForKey(groupId, currentSeriesBuilder);
+    forEachNotNull(length, blockValSet, timeBlockValSet, (from, to) -> {
+      for (int docIndex = from; docIndex < to; docIndex++) {
+        int groupId = groupKeyArray[docIndex];
+        BaseTimeSeriesBuilder currentSeriesBuilder = resultHolder.getResult(groupId);
+        if (currentSeriesBuilder == null) {
+          currentSeriesBuilder = newSeriesBuilder();
+          resultHolder.setValueForKey(groupId, currentSeriesBuilder);
+        }
+        currentSeriesBuilder.addValueAtIndex(timeIndex(timeValues[docIndex]), values[docIndex], timeValues[docIndex]);
       }
-      timeIndex = (int) (((timeValues[docIndex] + _timeOffset) - _timeReferencePoint - 1) / _timeBucketDivisor);
-      currentSeriesBuilder.addValueAtIndex(timeIndex, values[docIndex], timeValues[docIndex]);
-    }
+    });
   }
 
-  private void aggregateGroupByStringValues(int length, int[] groupKeyArray, long[] timeValues,
+  private void aggregateGroupByStringValues(int length, int[] groupKeyArray, BlockValSet timeBlockValSet,
       GroupByResultHolder resultHolder, BlockValSet blockValSet) {
+    long[] timeValues = timeBlockValSet.getLongValuesSV();
     final String[] values = blockValSet.getStringValuesSV();
-    int timeIndex;
-    for (int docIndex = 0; docIndex < length; docIndex++) {
-      int groupId = groupKeyArray[docIndex];
-      BaseTimeSeriesBuilder currentSeriesBuilder = resultHolder.getResult(groupId);
-      if (currentSeriesBuilder == null) {
-        currentSeriesBuilder = _factory.newTimeSeriesBuilder(_aggInfo, "TO_BE_REMOVED", _timeBuckets,
-            BaseTimeSeriesBuilder.UNINITIALISED_TAG_NAMES, BaseTimeSeriesBuilder.UNINITIALISED_TAG_VALUES);
-        resultHolder.setValueForKey(groupId, currentSeriesBuilder);
+    forEachNotNull(length, blockValSet, timeBlockValSet, (from, to) -> {
+      for (int docIndex = from; docIndex < to; docIndex++) {
+        int groupId = groupKeyArray[docIndex];
+        BaseTimeSeriesBuilder currentSeriesBuilder = resultHolder.getResult(groupId);
+        if (currentSeriesBuilder == null) {
+          currentSeriesBuilder = newSeriesBuilder();
+          resultHolder.setValueForKey(groupId, currentSeriesBuilder);
+        }
+        currentSeriesBuilder.addValueAtIndex(timeIndex(timeValues[docIndex]), values[docIndex], timeValues[docIndex]);
       }
-      timeIndex = (int) (((timeValues[docIndex] + _timeOffset) - _timeReferencePoint - 1) / _timeBucketDivisor);
-      currentSeriesBuilder.addValueAtIndex(timeIndex, values[docIndex], timeValues[docIndex]);
-    }
+    });
   }
 
   public static ExpressionContext create(String language, String valueExpressionStr, ExpressionContext timeExpression,

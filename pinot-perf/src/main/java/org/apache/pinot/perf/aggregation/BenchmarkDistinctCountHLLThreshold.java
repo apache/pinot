@@ -20,6 +20,7 @@ package org.apache.pinot.perf.aggregation;
 
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -78,10 +79,9 @@ public class BenchmarkDistinctCountHLLThreshold {
   private int _numBatches;
   private int[][] _batchedDictIds;
 
-  public static void main(String[] args) throws RunnerException {
-    Options opt = new OptionsBuilder()
-        .include(BenchmarkDistinctCountHLLThreshold.class.getSimpleName())
-        .build();
+  public static void main(String[] args)
+      throws RunnerException {
+    Options opt = new OptionsBuilder().include(BenchmarkDistinctCountHLLThreshold.class.getSimpleName()).build();
     new Runner(opt).run();
   }
 
@@ -102,8 +102,7 @@ public class BenchmarkDistinctCountHLLThreshold {
 
     for (int i = 0; i < _numBatches; i++) {
       int[] dictIds = _batchedDictIds[i];
-      Map<ExpressionContext, BlockValSet> blockValSetMap =
-          Map.of(EXPR, new TestBlockValSet(_dictionary, dictIds));
+      Map<ExpressionContext, BlockValSet> blockValSetMap = Map.of(EXPR, new TestBlockValSet(_dictionary, dictIds));
       _aggregationFunction.aggregate(dictIds.length, resultHolder, blockValSetMap);
     }
 
@@ -137,10 +136,8 @@ public class BenchmarkDistinctCountHLLThreshold {
 
   private static class TestDistinctCountSmartHLLAggregationFunction extends DistinctCountSmartHLLAggregationFunction {
     public TestDistinctCountSmartHLLAggregationFunction(int dictThreshold) {
-      super(java.util.Arrays.asList(
-          EXPR,
-          ExpressionContext.forLiteral(DataType.STRING, String.format("dictThreshold=%d", dictThreshold))
-      ));
+      super(List.of(EXPR,
+          ExpressionContext.forLiteral(DataType.STRING, String.format("dictThreshold=%d", dictThreshold))), false);
     }
   }
 

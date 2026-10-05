@@ -35,7 +35,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
-public class MaxAggregationFunction extends NullableSingleInputAggregationFunction<Double, Double> {
+public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<Double, Double> {
   protected static final double DEFAULT_INITIAL_VALUE = Double.NEGATIVE_INFINITY;
 
   public MaxAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {

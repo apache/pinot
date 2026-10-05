@@ -22,6 +22,9 @@ package org.apache.pinot.spi.data;
 /// Naming convention for OPEN_STRUCT materialized columns. Each dense OPEN_STRUCT key is stored as
 /// a column named `<openStructColumn>$<key>`. Sparse keys share a single synthetic JSON column
 /// named `<openStructColumn>$__sparse__`.
+///
+/// [#metricKey] builds a superficially similar `<openStructColumn>$<key>` string for per-key metric
+/// names, but escapes the key for JMX export and is not a column name -- see its docs.
 public final class OpenStructNaming {
   public static final String SEPARATOR = "$";
   public static final String SPARSE_SUFFIX = "__sparse__";
@@ -31,6 +34,23 @@ public final class OpenStructNaming {
 
   public static String materializedColumnName(String openStructColumn, String key) {
     return openStructColumn + SEPARATOR + key;
+  }
+
+  /// Builds the `<openStructColumn>$<key>` identifier used as the key segment of a per-key OPEN_STRUCT
+  /// metric name; the scrape rule splits it back into `column` and `key` labels. Not a column name --
+  /// the key need not have one on disk, and the escaped output must not be fed to [#parseKey] or
+  /// [#parseParentColumn].
+  ///
+  /// Percent-escapes the four characters `javax.management.ObjectName.quote` backslash-escapes on the
+  /// way to JMX (`"`, `\`, `*`, `?`), plus `%` itself so the mapping stays reversible. An escaped `"`
+  /// stops the name matching the per-key rule in
+  /// `docker/images/pinot/etc/jmx_prometheus_javaagent/configs/server.yml` at all; the other three
+  /// leave a stray backslash in the label value. Nothing else is touched, so `user.id`, `user-id` and
+  /// `user_id` stay distinct series.
+  public static String metricKey(String openStructColumn, String key) {
+    // '%' first so the escapes introduced below are not themselves re-escaped.
+    return openStructColumn + SEPARATOR + key.replace("%", "%25").replace("\"", "%22").replace("\\", "%5C")
+        .replace("*", "%2A").replace("?", "%3F");
   }
 
   public static String sparseColumnName(String openStructColumn) {

@@ -71,6 +71,21 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(Double.valueOf(deserializedSketch.getEstimate()).longValue(), distinctCount);
     assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(2).asLong() > 0);
     assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(3).asLong() > 0);
+
+    String parameterizedQuery =
+        String.format(
+            "SELECT DISTINCT_COUNT_TUPLE_SKETCH(%s, 'nominalEntries=16384;accumulatorThreshold=10'), "
+                + "DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(%s, 'nominalEntries=16384;accumulatorThreshold=10'), "
+                + "SUM_VALUES_INTEGER_SUM_TUPLE_SKETCH(%s, 'nominalEntries=16384;accumulatorThreshold=10'), "
+                + "AVG_VALUE_INTEGER_SUM_TUPLE_SKETCH(%s, 'nominalEntries=16384;accumulatorThreshold=10') FROM %s",
+            MET_TUPLE_SKETCH_BYTES, MET_TUPLE_SKETCH_BYTES, MET_TUPLE_SKETCH_BYTES, MET_TUPLE_SKETCH_BYTES,
+            getTableName());
+    jsonNode = postQuery(parameterizedQuery);
+    assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong() > 0);
+    assertTrue(ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(
+        Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText())).getEstimate() > 0);
+    assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(2).asLong() > 0);
+    assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(3).asLong() > 0);
   }
 
   @Test(dataProvider = "useV2QueryEngine")

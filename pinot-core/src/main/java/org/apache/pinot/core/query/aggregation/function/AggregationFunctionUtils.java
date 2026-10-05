@@ -69,9 +69,10 @@ import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -610,23 +611,23 @@ public class AggregationFunctionUtils {
         break;
       case DISTINCTCOUNTHLL:
       case DISTINCTCOUNTHLLMV:
-        result = getDistinctCountHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
+        result = getDistinctCountHLLResult(dataSource,
             (DistinctCountHLLAggregationFunction) aggregationFunction, explainPlanName);
         break;
       case DISTINCTCOUNTRAWHLL:
       case DISTINCTCOUNTRAWHLLMV:
-        result = getDistinctCountHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
+        result = getDistinctCountHLLResult(dataSource,
             ((DistinctCountRawHLLAggregationFunction) aggregationFunction).getDistinctCountHLLAggregationFunction(),
             explainPlanName);
         break;
       case DISTINCTCOUNTHLLPLUS:
       case DISTINCTCOUNTHLLPLUSMV:
-        result = getDistinctCountHLLPlusResult(Objects.requireNonNull(dataSource.getDictionary()),
+        result = getDistinctCountHLLPlusResult(dataSource,
             (DistinctCountHLLPlusAggregationFunction) aggregationFunction, explainPlanName);
         break;
       case DISTINCTCOUNTRAWHLLPLUS:
       case DISTINCTCOUNTRAWHLLPLUSMV:
-        result = getDistinctCountHLLPlusResult(Objects.requireNonNull(dataSource.getDictionary()),
+        result = getDistinctCountHLLPlusResult(dataSource,
             ((DistinctCountRawHLLPlusAggregationFunction) aggregationFunction)
                 .getDistinctCountHLLPlusAggregationFunction(), explainPlanName);
         break;
@@ -642,7 +643,7 @@ public class AggregationFunctionUtils {
             (DistinctCountSmartHLLPlusAggregationFunction) aggregationFunction, explainPlanName);
         break;
       case DISTINCTCOUNTULL:
-        result = getDistinctCountULLResult(Objects.requireNonNull(dataSource.getDictionary()),
+        result = getDistinctCountULLResult(dataSource,
             (DistinctCountULLAggregationFunction) aggregationFunction, explainPlanName);
         break;
       case DISTINCTCOUNTSMARTULL:
@@ -650,7 +651,7 @@ public class AggregationFunctionUtils {
             (DistinctCountSmartULLAggregationFunction) aggregationFunction, explainPlanName);
         break;
       case DISTINCTCOUNTRAWULL:
-        result = getDistinctCountULLResult(Objects.requireNonNull(dataSource.getDictionary()),
+        result = getDistinctCountULLResult(dataSource,
             (DistinctCountULLAggregationFunction) aggregationFunction, explainPlanName);
         break;
       default:
@@ -670,9 +671,9 @@ public class AggregationFunctionUtils {
   }
 
   private static Long getMinValueLong(DataSource dataSource) {
-    FieldSpec.DataType dataType = dataSource.getDataSourceMetadata().getDataType().getStoredType();
+    DataType dataType = dataSource.getDataSourceMetadata().getDataType().getStoredType();
     Preconditions.checkArgument(
-        dataType == FieldSpec.DataType.LONG || dataType == FieldSpec.DataType.INT,
+        dataType == DataType.LONG || dataType == DataType.INT,
         "MINLONG aggregation function can only be applied to columns of integer types");
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary != null) {
@@ -690,9 +691,9 @@ public class AggregationFunctionUtils {
   }
 
   private static Long getMaxValueLong(DataSource dataSource) {
-    FieldSpec.DataType dataType = dataSource.getDataSourceMetadata().getDataType().getStoredType();
+    DataType dataType = dataSource.getDataSourceMetadata().getDataType().getStoredType();
     Preconditions.checkArgument(
-        dataType == FieldSpec.DataType.LONG || dataType == FieldSpec.DataType.INT,
+        dataType == DataType.LONG || dataType == DataType.INT,
         "MAXLONG aggregation function can only be applied to columns of integer types");
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary != null) {
@@ -799,10 +800,13 @@ public class AggregationFunctionUtils {
     return hllPlus;
   }
 
-  private static HyperLogLog getDistinctCountHLLResult(Dictionary dictionary,
+  private static HyperLogLog getDistinctCountHLLResult(DataSource dataSource,
       DistinctCountHLLAggregationFunction function, String explainPlanName) {
-    if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
-      // Treat BYTES value as serialized HyperLogLog
+    Dictionary dictionary = dataSource.getDictionary();
+    assert dictionary != null;
+    DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
+    if (metadata.getDataType() == DataType.BYTES) {
+      // Logical BYTES dictionary entries are serialized HyperLogLog objects.
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
         HyperLogLog hll = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(0));
@@ -820,10 +824,13 @@ public class AggregationFunctionUtils {
     }
   }
 
-  private static HyperLogLogPlus getDistinctCountHLLPlusResult(Dictionary dictionary,
+  private static HyperLogLogPlus getDistinctCountHLLPlusResult(DataSource dataSource,
       DistinctCountHLLPlusAggregationFunction function, String explainPlanName) {
-    if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
-      // Treat BYTES value as serialized HyperLogLogPlus
+    Dictionary dictionary = dataSource.getDictionary();
+    assert dictionary != null;
+    DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
+    if (metadata.getDataType() == DataType.BYTES) {
+      // Logical BYTES dictionary entries are serialized HyperLogLogPlus objects.
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
         HyperLogLogPlus hllplus = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(dictionary.getBytesValue(0));
@@ -861,10 +868,13 @@ public class AggregationFunctionUtils {
     }
   }
 
-  private static UltraLogLog getDistinctCountULLResult(Dictionary dictionary,
+  private static UltraLogLog getDistinctCountULLResult(DataSource dataSource,
       DistinctCountULLAggregationFunction function, String explainPlanName) {
-    if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
-      // Treat BYTES value as serialized UltraLogLog and merge
+    Dictionary dictionary = dataSource.getDictionary();
+    assert dictionary != null;
+    DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
+    if (metadata.getDataType() == DataType.BYTES) {
+      // Logical BYTES dictionary entries are serialized UltraLogLog objects.
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
         UltraLogLog ull = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(dictionary.getBytesValue(0));

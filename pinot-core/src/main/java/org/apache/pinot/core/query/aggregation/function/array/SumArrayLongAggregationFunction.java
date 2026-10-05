@@ -35,10 +35,11 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class SumArrayLongAggregationFunction extends BaseSingleInputAggregationFunction<LongArrayList, LongArrayList> {
+public class SumArrayLongAggregationFunction
+    extends BaseSingleInputAggregationFunction<LongArrayList, LongArrayList> {
 
-  public SumArrayLongAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "SUM_ARRAY"));
+  public SumArrayLongAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "SUM_ARRAY"), nullHandlingEnabled);
   }
 
   @Override
@@ -59,39 +60,47 @@ public class SumArrayLongAggregationFunction extends BaseSingleInputAggregationF
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    long[][] values = blockValSetMap.get(_expression).getLongValuesMV();
-    if (aggregationResultHolder.getResult() == null) {
-      aggregationResultHolder.setValue(new LongArrayList());
-    }
-    LongArrayList result = aggregationResultHolder.getResult();
-    for (int i = 0; i < length; i++) {
-      long[] value = values[i];
-      aggregateMerge(value, result);
-    }
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    long[][] values = blockValSet.getLongValuesMV();
+    // The accumulator is created inside the range, so a block with no non-null row leaves the holder untouched and
+    // extractFinalResult sees the null that means nothing was aggregated
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      LongArrayList result = aggregationResultHolder.getResult();
+      if (result == null) {
+        result = new LongArrayList();
+        aggregationResultHolder.setValue(result);
+      }
+      for (int i = from; i < to; i++) {
+        aggregateMerge(values[i], result);
+      }
+    });
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    long[][] valuesArray = blockValSetMap.get(_expression).getLongValuesMV();
-    for (int i = 0; i < length; i++) {
-      long[] values = valuesArray[i];
-      int groupKey = groupKeyArray[i];
-      setGroupByResult(groupByResultHolder, values, groupKey);
-    }
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    long[][] valuesArray = blockValSet.getLongValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        setGroupByResult(groupByResultHolder, valuesArray[i], groupKeyArray[i]);
+      }
+    });
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    long[][] valuesArray = blockValSetMap.get(_expression).getLongValuesMV();
-    for (int i = 0; i < length; i++) {
-      long[] values = valuesArray[i];
-      int[] groupKeys = groupKeysArray[i];
-      for (int groupKey : groupKeys) {
-        setGroupByResult(groupByResultHolder, values, groupKey);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    long[][] valuesArray = blockValSet.getLongValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        long[] values = valuesArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          setGroupByResult(groupByResultHolder, values, groupKey);
+        }
       }
-    }
+    });
   }
 
   private void setGroupByResult(GroupByResultHolder groupByResultHolder, long[] values, int groupKey) {

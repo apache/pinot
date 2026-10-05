@@ -72,9 +72,6 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   private static final Logger LOGGER = LoggerFactory.getLogger(ForwardIndexType.class);
 
   public static final String INDEX_DISPLAY_NAME = "forward";
-  // For multi-valued column, forward-index.
-  // Maximum number of multi-values per row. We assert on this.
-  public static final int MAX_MULTI_VALUES_PER_ROW = 1000;
   private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT = 100;
   private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT = 100_000;
   //@formatter:off
@@ -409,7 +406,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
             IndexUtil.buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
                 V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
         // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
-        return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),
+        return new FixedByteMVMutableForwardIndex(context.getMaxNumMultiValues(), context.getAvgNumMultiValues(),
             context.getCapacity(), dataType.size(), context.getMemoryManager(), allocationContext, false, storedType,
             dataType);
       }
@@ -423,7 +420,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
         String allocationContext = IndexUtil.buildAllocationContext(segmentName, column,
             V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
         // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
-        return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),
+        return new FixedByteMVMutableForwardIndex(context.getMaxNumMultiValues(), context.getAvgNumMultiValues(),
             context.getCapacity(), Integer.BYTES, context.getMemoryManager(), allocationContext, true,
             FieldSpec.DataType.INT);
       }

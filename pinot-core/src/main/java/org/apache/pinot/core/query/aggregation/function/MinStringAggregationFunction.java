@@ -32,7 +32,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
-public class MinStringAggregationFunction extends NullableSingleInputAggregationFunction<String, String> {
+public class MinStringAggregationFunction extends BaseSingleInputAggregationFunction<String, String> {
 
   public MinStringAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(verifySingleArgument(arguments, "MINSTRING"), nullHandlingEnabled);

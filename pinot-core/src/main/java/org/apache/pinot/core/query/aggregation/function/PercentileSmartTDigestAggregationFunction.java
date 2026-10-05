@@ -52,7 +52,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 ///              means never convert.
 /// - compression: Compression for the converted TDigest, 100 by default.
 /// Example of third argument: 'threshold=10000;compression=50'
-public class PercentileSmartTDigestAggregationFunction extends NullableSingleInputAggregationFunction<Object, Double> {
+public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAggregationFunction<Object, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   private final double _percentile;

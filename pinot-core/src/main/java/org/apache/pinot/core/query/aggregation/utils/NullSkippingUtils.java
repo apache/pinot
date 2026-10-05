@@ -16,57 +16,70 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.aggregation.function;
+package org.apache.pinot.core.query.aggregation.utils;
 
 import java.util.NoSuchElementException;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.common.utils.RoaringBitmapUtils.BatchConsumer;
+import org.apache.pinot.common.utils.RoaringBitmapUtils.Reducer;
 import org.apache.pinot.core.common.BlockValSet;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public abstract class NullableSingleInputAggregationFunction<I, F extends Comparable>
-    extends BaseSingleInputAggregationFunction<I, F> {
-  protected final boolean _nullHandlingEnabled;
-
-  public NullableSingleInputAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression);
-    _nullHandlingEnabled = nullHandlingEnabled;
-  }
-
-  /// A reducer that is being used to fold over consecutive indexes.
-  /// @param <A>
-  @FunctionalInterface
-  public interface Reducer<A> {
-    /// Applies the reducer to the range of indexes.
-    /// @param acum the initial value of the accumulator
-    /// @param fromInclusive the start index (inclusive)
-    /// @param toExclusive the end index (exclusive)
-    /// @return the next value of the accumulator (maybe the same as the input)
-    A apply(A acum, int fromInclusive, int toExclusive);
+/// Iterates the rows of a block that are not null, so that a caller can aggregate only those.
+///
+/// This is the reading half of null handling and nothing more. What a `null` *means* for a given aggregation - what
+/// the empty multiset answers, how a `null` intermediate result merges - is decided by the function itself, and is
+/// documented on [org.apache.pinot.core.query.aggregation.function.AggregationFunction].
+///
+/// Every method takes `nullHandlingEnabled` explicitly. With it disabled there are no null rows to skip, so the
+/// whole block is one range and the null bitmap is never consulted.
+///
+/// **A range handed to a consumer or reducer is never empty.** Callers therefore do not need to guard against
+/// `from == to`, and an accumulator created inside a range is created only when there is something to aggregate.
+public class NullSkippingUtils {
+  private NullSkippingUtils() {
   }
 
   /// Iterates over the non-null ranges of the blockValSet and calls the consumer for each range.
   /// @param blockValSet the blockValSet to iterate over
   /// @param consumer the consumer to call for each non-null range
-  public void forEachNotNull(int length, BlockValSet blockValSet, RoaringBitmapUtils.BatchConsumer consumer) {
-    if (!_nullHandlingEnabled) {
-      consumer.consume(0, length);
+  public static void forEachNotNull(boolean nullHandlingEnabled, int length, BlockValSet blockValSet,
+      BatchConsumer consumer) {
+    forEachNotNull(nullHandlingEnabled, length, nullHandlingEnabled ? blockValSet.getNullBitmap() : null, consumer);
+  }
+
+  /// Iterates over the ranges of rows the bitmap does not mark null, for a caller that derived the bitmap itself
+  /// rather than reading a single block - a composite key spanning several columns, for instance.
+  public static void forEachNotNull(boolean nullHandlingEnabled, int length, @Nullable RoaringBitmap nullBitmap,
+      BatchConsumer consumer) {
+    // A zero-length block has no range to hand over. The multi-stage engine reaches this with a filtered
+    // aggregation whose filter matched no row in the block, and a consumer that creates its accumulator inside the
+    // range would otherwise mark the holder as aggregated for a block it never read. Skipping is only sound while
+    // that stays the sole zero-length caller, because it always enables null handling: with null handling disabled a
+    // never-created accumulator surfaces as a null intermediate result, which that mode does not allow.
+    if (length == 0) {
       return;
     }
 
-    RoaringBitmap roaringBitmap = blockValSet.getNullBitmap();
-    if (roaringBitmap == null) {
+    if (!nullHandlingEnabled || nullBitmap == null) {
       consumer.consume(0, length);
       return;
     }
 
     // Skip if entire block is null
-    if (!roaringBitmap.contains(0, length)) {
-      RoaringBitmapUtils.forEachUnset(length, roaringBitmap.getIntIterator(), consumer);
+    if (!nullBitmap.contains(0, length)) {
+      RoaringBitmapUtils.forEachUnset(length, nullBitmap.getIntIterator(), consumer);
     }
+  }
+
+  /// Iterates over the ranges of rows where neither block is null, for functions that pair a value from each of
+  /// two columns and so must skip a row when either side is null.
+  public static void forEachNotNull(boolean nullHandlingEnabled, int length, BlockValSet blockValSet1,
+      BlockValSet blockValSet2, BatchConsumer consumer) {
+    RoaringBitmapUtils.forEachUnset(length, orNullIterator(nullHandlingEnabled, blockValSet1, blockValSet2), consumer);
   }
 
   /// Folds over the non-null ranges of the blockValSet using the reducer. Returns `initialAcum` if the entire
@@ -74,22 +87,25 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
   ///
   /// @param initialAcum the initial value of the accumulator
   /// @param <A> The type of the accumulator
-  public <A> A foldNotNull(int length, BlockValSet blockValSet, A initialAcum, Reducer<A> reducer) {
-    return foldNotNull(length, _nullHandlingEnabled ? blockValSet.getNullBitmap() : null, initialAcum, reducer);
+  public static <A> A foldNotNull(boolean nullHandlingEnabled, int length, BlockValSet blockValSet, A initialAcum,
+      Reducer<A> reducer) {
+    return foldNotNull(nullHandlingEnabled, length, nullHandlingEnabled ? blockValSet.getNullBitmap() : null,
+        initialAcum, reducer);
   }
 
   /// Folds over the non-null ranges of the blockValSet using the reducer. Returns `initialAcum` if the entire
   /// block is null.
   /// @param initialAcum the initial value of the accumulator
   /// @param <A> The type of the accumulator
-  public <A> A foldNotNull(int length, @Nullable RoaringBitmap roaringBitmap, A initialAcum, Reducer<A> reducer) {
+  public static <A> A foldNotNull(boolean nullHandlingEnabled, int length, @Nullable RoaringBitmap roaringBitmap,
+      A initialAcum, Reducer<A> reducer) {
     // Exit early if entire block is null
-    if (_nullHandlingEnabled && roaringBitmap != null && roaringBitmap.contains(0, length)) {
+    if (nullHandlingEnabled && roaringBitmap != null && roaringBitmap.contains(0, length)) {
       return initialAcum;
     }
 
     IntIterator intIterator = roaringBitmap == null ? null : roaringBitmap.getIntIterator();
-    return foldNotNull(length, intIterator, initialAcum, reducer);
+    return foldNotNull(nullHandlingEnabled, length, intIterator, initialAcum, reducer);
   }
 
   /// Folds over the non-null ranges of the nullIndexIterator using the reducer.
@@ -97,33 +113,19 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
   ///                          Rows are considered null if and only if their index is emitted.
   /// @param initialAcum the initial value of the accumulator
   /// @param <A> The type of the accumulator
-  public <A> A foldNotNull(int length, @Nullable IntIterator nullIndexIterator, A initialAcum, Reducer<A> reducer) {
+  public static <A> A foldNotNull(boolean nullHandlingEnabled, int length,
+      @Nullable IntIterator nullIndexIterator, A initialAcum, Reducer<A> reducer) {
     A acum = initialAcum;
 
     if (length == 0) {
       return acum;
     }
 
-    if (!_nullHandlingEnabled || nullIndexIterator == null || !nullIndexIterator.hasNext()) {
+    if (!nullHandlingEnabled || nullIndexIterator == null || !nullIndexIterator.hasNext()) {
       return reducer.apply(initialAcum, 0, length);
     }
 
-    int prev = 0;
-    while (nullIndexIterator.hasNext() && prev < length) {
-      int nextNull = Math.min(nullIndexIterator.next(), length);
-      if (nextNull > prev) {
-        acum = reducer.apply(acum, prev, nextNull);
-      }
-      prev = nextNull + 1;
-    }
-    if (prev < length) {
-      acum = reducer.apply(acum, prev, length);
-    }
-    return acum;
-  }
-
-  public IntIterator orNullIterator(BlockValSet valSet1, BlockValSet valSet2) {
-    return orNullIterator(_nullHandlingEnabled, valSet1, valSet2);
+    return RoaringBitmapUtils.foldUnset(length, nullIndexIterator, acum, reducer);
   }
 
   /// Merges the null positions of two blocks without materializing a bitmap, for functions that pair a value from

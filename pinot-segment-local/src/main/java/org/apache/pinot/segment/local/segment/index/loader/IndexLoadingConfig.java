@@ -87,6 +87,7 @@ public class IndexLoadingConfig {
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
   private Map<String, FieldIndexConfigs> _indexConfigsByColName = new HashMap<>();
+  private boolean _skipSegmentPreprocess;
 
   private boolean _dirty = true;
 
@@ -216,6 +217,7 @@ public class IndexLoadingConfig {
     _starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
     _enableDefaultStarTree = indexingConfig.isEnableDefaultStarTree();
     _multiColTextIndexConfig = indexingConfig.getMultiColumnTextIndexConfig();
+    _skipSegmentPreprocess = indexingConfig.isSkipSegmentPreprocess();
     _dirty = false;
   }
 
@@ -350,7 +352,10 @@ public class IndexLoadingConfig {
   }
 
   public boolean isSkipSegmentPreprocess() {
-    return _tableConfig != null && _tableConfig.getIndexingConfig().isSkipSegmentPreprocess();
+    if (_dirty) {
+      refreshIndexConfigs();
+    }
+    return _skipSegmentPreprocess;
   }
 
   @Nullable
