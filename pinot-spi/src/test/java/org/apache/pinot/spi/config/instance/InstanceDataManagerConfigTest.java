@@ -19,12 +19,14 @@
 package org.apache.pinot.spi.config.instance;
 
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 
 
+/// Tests the default methods on [InstanceDataManagerConfig]. Stateless; each test method constructs its own mock.
 public class InstanceDataManagerConfigTest {
 
   /// Simulates an [InstanceDataManagerConfig] implementation compiled before [#getMaxMmapPrefetchBytes()] was
@@ -32,7 +34,7 @@ public class InstanceDataManagerConfigTest {
   /// `AbstractMethodError`.
   @Test
   public void testGetMaxMmapPrefetchBytesDefaultsForPreexistingImplementations() {
-    InstanceDataManagerConfig config = Mockito.mock(InstanceDataManagerConfig.class, Mockito.CALLS_REAL_METHODS);
+    InstanceDataManagerConfig config = mock(InstanceDataManagerConfig.class, CALLS_REAL_METHODS);
 
     assertEquals(config.getMaxMmapPrefetchBytes(), CommonConstants.Server.DEFAULT_MMAP_PREFETCH_MAX_SIZE_BYTES);
   }
