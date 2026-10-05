@@ -308,7 +308,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
         }
         _logger.warn("Found {} primary keys not replaced for segment: {}",
             validDocIdsForOldSegment.getCardinality(), segmentName);
-        updateInconsistentRowsMetric(segmentName, validDocIdsForOldSegment.getCardinality());
+        updateInconsistentRowsMetric(validDocIdsForOldSegment.getCardinality());
       }
       // we want to always remove a segment in case of enableDeletedKeysCompactionConsistency = true
       // this is to account for the removal of primary-key in the to-be-removed segment and reduce
