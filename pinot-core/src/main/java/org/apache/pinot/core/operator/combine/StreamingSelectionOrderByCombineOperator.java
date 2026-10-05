@@ -42,6 +42,7 @@ import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
+import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
@@ -74,6 +75,8 @@ import org.slf4j.LoggerFactory;
 /// block read) when the merge frontier reaches its min/max, so once `limit + offset` rows are emitted the
 /// remaining segments are never acquired or read. See [#activateEligibleCursors(SegmentCursor)] for the
 /// correctness argument.
+/// A consuming ([MutableSegment]) segment is always given no min/max and activates up front: its bounds are a snapshot
+/// that rows ingested before activation can outgrow, since its plan (and doc count) is only built at activation.
 /// With null handling on, a segment whose leading column is not flagged non-null by
 /// [SelectionPlanNode#isColumnFlaggedNonNull] (it has nulls, the segment predates the flag, or it is a consuming
 /// segment) is given no min/max and always activates. Flagged segments keep their min/max. With
@@ -191,6 +194,14 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
               .getDataSourceMetadata();
       Comparable minValue = metadata.getMinValue();
       Comparable maxValue = metadata.getMaxValue();
+      // A consuming segment's min/max is a snapshot copied when getDataSource() builds the MutableDataSource, but under
+      // prefetch (AcquireReleaseColumnsSegmentOperator) the child plan, and with it the doc count, is only built at
+      // activation. Rows indexed in between can fall outside these bounds and be emitted out of order, so treat the
+      // bounds as unknown and let activateEligibleCursors force-activate this cursor.
+      if (operator.getIndexSegment() instanceof MutableSegment) {
+        minValue = null;
+        maxValue = null;
+      }
       // isNonNull is loaded with the segment, the same class of access as min/max. False means nulls or unknown, so
       // drop the bounds and let activateEligibleCursors force-activate this cursor. Do not read the null vector here.
       if (queryContext.isNullHandlingEnabled()
