@@ -32,17 +32,13 @@ public interface SegmentUploader {
   /// wait for the specified timeout.
   URI uploadSegment(File segmentFile, LLCSegmentName segmentName, int timeoutInMillis);
 
-  /**
-   * Returns true if {@link #uploadMetadataTar} actually uploads; callers skip building the tar otherwise.
-   */
+  /// Returns true if [#uploadMetadataTar] actually uploads; callers skip building the tar otherwise.
   default boolean isMetadataTarUploadSupported() {
     return false;
   }
 
-  /**
-   * Best-effort upload of the segment metadata tar (metadata.properties + creation.meta) to the segment store, next
-   * to the committed segment. Returns the URI it was uploaded to, or null if unsupported or on failure.
-   */
+  /// Best-effort upload of the segment metadata tar (metadata.properties + creation.meta) to the segment store, next
+  /// to the committed segment. Returns the URI it was uploaded to, or null if unsupported or on failure.
   default URI uploadMetadataTar(File metadataTarFile, LLCSegmentName segmentName, int timeoutInMillis) {
     return null;
   }

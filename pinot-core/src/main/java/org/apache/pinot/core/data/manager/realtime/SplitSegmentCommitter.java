@@ -48,16 +48,18 @@ public class SplitSegmentCommitter implements SegmentCommitter {
   protected final ServerSegmentCompletionProtocolHandler _protocolHandler;
   protected final SegmentUploader _segmentUploader;
   protected final String _peerDownloadScheme;
+  private final boolean _uploadMetadataTar;
   protected final Logger _segmentLogger;
 
   public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
       SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader,
-      @Nullable String peerDownloadScheme) {
+      @Nullable String peerDownloadScheme, boolean uploadMetadataTar) {
     _segmentLogger = segmentLogger;
     _protocolHandler = protocolHandler;
     _params = new SegmentCompletionProtocol.Request.Params(params);
     _segmentUploader = segmentUploader;
     _peerDownloadScheme = peerDownloadScheme;
+    _uploadMetadataTar = uploadMetadataTar;
   }
 
   @VisibleForTesting
@@ -67,7 +69,7 @@ public class SplitSegmentCommitter implements SegmentCommitter {
 
   public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
       SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader) {
-    this(segmentLogger, protocolHandler, params, segmentUploader, null);
+    this(segmentLogger, protocolHandler, params, segmentUploader, null, false);
   }
 
   @Override
@@ -88,8 +90,8 @@ public class SplitSegmentCommitter implements SegmentCommitter {
     }
     _params.withSegmentLocation(segmentLocation);
 
-    // TODO: put the metadata tar upload behind a server config flag. It is always on for now.
-    if (_segmentUploader.isMetadataTarUploadSupported() && !isPeerSegmentLocation(segmentLocation)) {
+    if (_uploadMetadataTar && _segmentUploader.isMetadataTarUploadSupported()
+        && !isPeerSegmentLocation(segmentLocation)) {
       uploadMetadataTarQuietly(segmentBuildDescriptor.getMetadataFiles(), _params.getSegmentName());
     }
 
@@ -124,10 +126,8 @@ public class SplitSegmentCommitter implements SegmentCommitter {
         CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME.length());
   }
 
-  /**
-   * Best-effort: builds a tar containing one directory with metadata.properties and creation.meta, and uploads it next
-   * to the segment. Never fails or throws; a sidecar problem must not affect the segment commit.
-   */
+  /// Best-effort: builds a tar containing one directory with metadata.properties and creation.meta, and uploads it next
+  /// to the segment. Never fails or throws; a sidecar problem must not affect the segment commit.
   private void uploadMetadataTarQuietly(@Nullable Map<String, File> metadataFiles, String segmentName) {
     if (metadataFiles == null || metadataFiles.isEmpty()) {
       return;

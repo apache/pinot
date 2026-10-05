@@ -124,9 +124,14 @@ public class SplitSegmentCommitterTest {
 
   private SplitSegmentCommitter newCommitter(ServerSegmentCompletionProtocolHandler handler, SegmentUploader uploader,
       String peerDownloadScheme) {
+    return newCommitter(handler, uploader, peerDownloadScheme, true);
+  }
+
+  private SplitSegmentCommitter newCommitter(ServerSegmentCompletionProtocolHandler handler, SegmentUploader uploader,
+      String peerDownloadScheme, boolean uploadMetadataTar) {
     SegmentCompletionProtocol.Request.Params params =
         new SegmentCompletionProtocol.Request.Params().withSegmentName(_segmentName);
-    return new SplitSegmentCommitter(LOGGER, handler, params, uploader, peerDownloadScheme);
+    return new SplitSegmentCommitter(LOGGER, handler, params, uploader, peerDownloadScheme, uploadMetadataTar);
   }
 
   private SegmentUploader mockUploader(String segmentLocation)
@@ -147,6 +152,17 @@ public class SplitSegmentCommitterTest {
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
     Mockito.verify(uploader).uploadMetadataTar(any(), any(LLCSegmentName.class),
         Mockito.eq(PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS));
+  }
+
+  @Test
+  public void testMetadataTarNotUploadedWhenFlagOff()
+      throws Exception {
+    SegmentUploader uploader = mockUploader("hdfs://root/" + RAW_TABLE_NAME + "/" + _segmentName);
+    ServerSegmentCompletionProtocolHandler handler = mockProtocolHandler();
+    SegmentCompletionProtocol.Response response =
+        newCommitter(handler, uploader, null, false).commit(mockBuildDescriptor());
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
+    Mockito.verify(uploader, Mockito.never()).uploadMetadataTar(any(), any(), anyInt());
   }
 
   @Test

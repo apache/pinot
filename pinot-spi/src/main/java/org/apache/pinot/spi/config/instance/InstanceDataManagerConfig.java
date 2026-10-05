@@ -92,4 +92,6 @@ public interface InstanceDataManagerConfig {
   boolean shouldCheckCRCOnSegmentLoad();
 
   boolean isDimensionTablePreloadDisabled();
+
+  boolean isUploadSegmentMetadataTar();
 }

@@ -81,6 +81,7 @@ public class SegmentCommitterFactory {
       return new PauselessSegmentCommitter(_logger, _protocolHandler, params, segmentUploader,
           peerSegmentDownloadScheme);
     }
-    return new SplitSegmentCommitter(_logger, _protocolHandler, params, segmentUploader, peerSegmentDownloadScheme);
+    return new SplitSegmentCommitter(_logger, _protocolHandler, params, segmentUploader, peerSegmentDownloadScheme,
+        instanceDataManagerConfig.isUploadSegmentMetadataTar());
   }
 }
