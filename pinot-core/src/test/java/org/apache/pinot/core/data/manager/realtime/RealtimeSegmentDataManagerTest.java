@@ -40,6 +40,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -75,6 +76,7 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.mockito.InOrder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -88,6 +90,7 @@ import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -233,6 +236,14 @@ public class RealtimeSegmentDataManagerTest {
   private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
       @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig)
       throws Exception {
+    return createFakeSegmentManager(noUpsert, timeSupplier, maxRows, maxDuration, tableConfig,
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+  }
+
+  private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
+      @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig,
+      ServerMetrics serverMetrics)
+      throws Exception {
     SegmentZKMetadata segmentZKMetadata = createZkMetadata();
     if (tableConfig == null) {
       tableConfig = createTableConfig();
@@ -257,7 +268,6 @@ public class RealtimeSegmentDataManagerTest {
     _partitionGroupIdToConsumerCoordinatorMap.putIfAbsent(PARTITION_GROUP_ID,
         new ConsumerCoordinator(false, tableDataManager));
     Schema schema = Fixtures.createSchema();
-    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     return new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager,
         new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), schema, llcSegmentName,
         _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, timeSupplier);
@@ -698,6 +708,113 @@ public class RealtimeSegmentDataManagerTest {
       segmentDataManager.goOnlineFromConsuming(metadata);
       Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+    }
+  }
+
+  @Test
+  public void testEndOfPartitionGroupRemovesConsumingGauge()
+      throws Exception {
+    // A retired partition (e.g. a Kinesis shard that was split/merged and fully consumed -> end of partition
+    // group) never gets a successor consuming segment. The LLC_PARTITION_CONSUMING gauge must be REMOVED, not
+    // left at 0, otherwise it lingers at 0 forever and raises a false-positive RealtimeIngestionStopped alert.
+    ServerMetrics serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+    metadata.setEndOffset(new LongMsgOffset(START_OFFSET_VALUE + 600).toString());
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, serverMetrics)) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.COMMITTED);
+      segmentDataManager.setEndOfPartitionGroup(true);
+      segmentDataManager.setCurrentOffset(START_OFFSET_VALUE + 600);
+
+      segmentDataManager.goOnlineFromConsuming(metadata);
+
+      // On a successful ONLINE transition the gauge is set to 0 in the finally and then removed.
+      InOrder inOrder = inOrder(serverMetrics);
+      inOrder.verify(serverMetrics, atLeast(1)).setValueOfTableGauge(anyString(),
+          eq(ServerGauge.LLC_PARTITION_CONSUMING), eq(0L));
+      inOrder.verify(serverMetrics).removeTableGauge(anyString(), eq(ServerGauge.LLC_PARTITION_CONSUMING));
+      inOrder.verify(serverMetrics, never()).setValueOfTableGauge(anyString(),
+          eq(ServerGauge.LLC_PARTITION_CONSUMING), eq(0L));
+    }
+  }
+
+  @Test
+  public void testEndOfPartitionGroupKeepsGaugeWhenCommittedAtEarlierOffset()
+      throws Exception {
+    // This replica read to the end of the partition group, but another replica won the commit at an earlier
+    // offset. A successor segment consumes the rest, so the gauge must stay at 0 and not be removed.
+    ServerMetrics serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+    metadata.setEndOffset(new LongMsgOffset(START_OFFSET_VALUE + 600).toString());
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, serverMetrics)) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.DISCARDED);
+      segmentDataManager.setEndOfPartitionGroup(true);
+      segmentDataManager.setCurrentOffset(START_OFFSET_VALUE + 650);
+
+      segmentDataManager.goOnlineFromConsuming(metadata);
+
+      Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      verify(serverMetrics, atLeast(1)).setValueOfTableGauge(anyString(),
+          eq(ServerGauge.LLC_PARTITION_CONSUMING), eq(0L));
+      verify(serverMetrics, never()).removeTableGauge(anyString(), eq(ServerGauge.LLC_PARTITION_CONSUMING));
+    }
+  }
+
+  @Test
+  public void testEndOfPartitionGroupKeepsGaugeWhenOnlineTransitionFails()
+      throws Exception {
+    // If the ONLINE transition fails after end of partition group (e.g. build/download fails and we enter
+    // ERROR), the gauge must stay at 0 -- it must NOT be removed -- so a genuine ingestion stall stays visible.
+    ServerMetrics serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+    metadata.setEndOffset(new LongMsgOffset(START_OFFSET_VALUE + 600).toString());
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, serverMetrics)) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      // ERROR state makes goOnlineFromConsuming download-and-replace, which we force to fail.
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.ERROR);
+      segmentDataManager.setEndOfPartitionGroup(true);
+      // Match the committed end offset so only the failed transition blocks the removal.
+      segmentDataManager.setCurrentOffset(START_OFFSET_VALUE + 600);
+      segmentDataManager._throwOnReplace = true;
+
+      Assert.assertThrows(RuntimeException.class, () -> segmentDataManager.goOnlineFromConsuming(metadata));
+
+      // Transition failed -> gauge left at 0, never removed.
+      verify(serverMetrics, atLeast(1)).setValueOfTableGauge(anyString(),
+          eq(ServerGauge.LLC_PARTITION_CONSUMING), eq(0L));
+      verify(serverMetrics, never()).removeTableGauge(anyString(), eq(ServerGauge.LLC_PARTITION_CONSUMING));
+    }
+  }
+
+  @Test
+  public void testNormalCommitKeepsConsumingGaugeAtZero()
+      throws Exception {
+    // A normal commit (not end of partition group) gets a successor consuming segment, so the gauge is set to
+    // 0 (and flipped back to 1 by the next consuming segment). It must NOT be removed.
+    ServerMetrics serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+    metadata.setEndOffset(new LongMsgOffset(START_OFFSET_VALUE + 600).toString());
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, serverMetrics)) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.COMMITTED);
+      // _endOfPartitionGroup defaults to false -> normal commit. Match the committed end offset so only the
+      // missing end of partition group blocks the removal.
+      segmentDataManager.setCurrentOffset(START_OFFSET_VALUE + 600);
+
+      segmentDataManager.goOnlineFromConsuming(metadata);
+
+      verify(serverMetrics, atLeast(1)).setValueOfTableGauge(anyString(),
+          eq(ServerGauge.LLC_PARTITION_CONSUMING), eq(0L));
+      verify(serverMetrics, never()).removeTableGauge(anyString(), eq(ServerGauge.LLC_PARTITION_CONSUMING));
     }
   }
 
@@ -1509,6 +1626,8 @@ public class RealtimeSegmentDataManagerTest {
     public boolean _buildAndReplaceCalled = false;
     public int _stopWaitTimeMs = 100;
     private boolean _downloadAndReplaceCalled = false;
+    // When set, downloadSegmentAndReplace throws to simulate a failed ONLINE transition.
+    public boolean _throwOnReplace = false;
     private boolean _notifySegmentBuildFailedWithDeterministicErrorCalled = false;
     public boolean _throwExceptionFromConsume = false;
     public boolean _postConsumeStoppedCalled = false;
@@ -1748,6 +1867,9 @@ public class RealtimeSegmentDataManagerTest {
     protected void downloadSegmentAndReplace(SegmentZKMetadata metadata) {
       terminateLoopIfNecessary();
       _downloadAndReplaceCalled = true;
+      if (_throwOnReplace) {
+        throw new RuntimeException("Simulated failed segment replace");
+      }
     }
 
     @Override
