@@ -129,6 +129,24 @@ public abstract class AbstractMetricsTest {
   }
 
   @Test
+  public void testSetValueOfTableGaugeWithKey() {
+    ControllerMetrics controllerMetrics = buildTestMetrics();
+    // Composed as gauge.<table>.<key>, mirroring composeTableGaugeName(tableName, key, gauge).
+    String composedName = ControllerGauge.VERSION.getGaugeName() + ".test_table.myKey";
+
+    controllerMetrics.setValueOfTableGauge("test_table", "myKey", ControllerGauge.VERSION, 1L);
+    Assert.assertEquals(getGaugeValue(controllerMetrics, composedName), 1);
+
+    // Re-setting through the cached path updates the same registry entry in place rather than registering a new gauge.
+    controllerMetrics.setValueOfTableGauge("test_table", "myKey", ControllerGauge.VERSION, 5L);
+    Assert.assertEquals(getGaugeValue(controllerMetrics, composedName), 5);
+    Assert.assertEquals(controllerMetrics.getMetricsRegistry().allMetrics().size(), 1);
+
+    controllerMetrics.removeTableGauge("test_table", "myKey", ControllerGauge.VERSION);
+    Assert.assertTrue(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
+  }
+
+  @Test
   public void testQueryPhases() {
     ControllerMetrics testMetrics = buildTestMetrics();
     MetricsInspector inspector = createInspector(testMetrics.getMetricsRegistry());
