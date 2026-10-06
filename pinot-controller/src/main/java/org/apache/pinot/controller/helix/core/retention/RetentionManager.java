@@ -21,8 +21,11 @@ package org.apache.pinot.controller.helix.core.retention;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +66,7 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -122,6 +126,123 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
     // Delete segments based on segment lineage and clean up segment lineage metadata.
     manageSegmentLineageCleanupForTable(tableConfig);
+
+    // Re-read active segments after time and lineage cleanup so already-deleted bytes do not cause extra eviction.
+    manageSizeBasedRetention(tableConfig);
+  }
+
+  /// Enforces the optional compressed-segment size limit independently of time retention. The limit counts one
+  /// copy of every active completed segment, including segments protected by lineage or realtime recovery. Unknown
+  /// sizes or missing metadata disable this pass; consuming segments are excluded from both accounting and eviction.
+  @VisibleForTesting
+  protected void manageSizeBasedRetention(TableConfig tableConfig) {
+    String retentionSize = tableConfig.getValidationConfig().getRetentionSize();
+    if (retentionSize == null) {
+      return;
+    }
+    String tableNameWithType = tableConfig.getTableName();
+    if (tableConfig.getTableType() == TableType.OFFLINE
+        && !"APPEND".equalsIgnoreCase(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig))) {
+      return;
+    }
+    long retentionSizeBytes;
+    try {
+      retentionSizeBytes = DataSizeUtils.toBytes(retentionSize);
+      Preconditions.checkArgument(retentionSizeBytes > 0, "Retention size must be positive");
+    } catch (Exception e) {
+      LOGGER.warn("Invalid retention size: {} for table: {}, skip size retention", retentionSize, tableNameWithType);
+      return;
+    }
+
+    Set<String> activeSegments = new HashSet<>(_pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false));
+    if (activeSegments.isEmpty()) {
+      return;
+    }
+    List<SegmentZKMetadata> metadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType);
+    Set<String> segmentsWithMetadata = new HashSet<>();
+    List<SegmentZKMetadata> completedSegments = new ArrayList<>();
+    Map<String, Long> completedSegmentSizes = new HashMap<>();
+    boolean realtime = tableConfig.getTableType() == TableType.REALTIME;
+    BigInteger retainedBytes = BigInteger.ZERO;
+    for (SegmentZKMetadata metadata : metadataList) {
+      String segmentName = metadata.getSegmentName();
+      if (!activeSegments.contains(segmentName)) {
+        continue;
+      }
+      segmentsWithMetadata.add(segmentName);
+      if (realtime && !metadata.getStatus().isCompleted()) {
+        continue;
+      }
+      long size = getSizeRetentionSegmentSize(tableNameWithType, metadata);
+      if (size < 0) {
+        LOGGER.warn("Unknown size for segment: {} in table: {}, skip size retention", segmentName, tableNameWithType);
+        return;
+      }
+      // Avoid overflowing the table total even if individual segment sizes are valid longs.
+      retainedBytes = retainedBytes.add(BigInteger.valueOf(size));
+      completedSegments.add(metadata);
+      completedSegmentSizes.put(segmentName, size);
+    }
+    if (!segmentsWithMetadata.containsAll(activeSegments)) {
+      LOGGER.warn("Missing active segment metadata for table: {}, skip size retention", tableNameWithType);
+      return;
+    }
+    BigInteger limit = BigInteger.valueOf(retentionSizeBytes);
+    if (retainedBytes.compareTo(limit) <= 0) {
+      return;
+    }
+
+    List<String> candidateNames = completedSegments.stream()
+        .filter(metadata -> getSizeRetentionTimestamp(metadata) >= 0)
+        .map(SegmentZKMetadata::getSegmentName)
+        .collect(Collectors.toCollection(ArrayList::new));
+    if (realtime) {
+      candidateNames.removeAll(_pinotHelixResourceManager.getLastLLCCompletedSegments(metadataList));
+    }
+    // Protect lineage before selecting victims: protected bytes still count toward the limit.
+    removeLineageLockedSegments(tableNameWithType, candidateNames);
+    Set<String> candidates = new HashSet<>(candidateNames);
+    completedSegments.removeIf(metadata -> !candidates.contains(metadata.getSegmentName()));
+    completedSegments.sort(Comparator.comparingLong(RetentionManager::getSizeRetentionTimestamp)
+        .thenComparing(SegmentZKMetadata::getSegmentName));
+
+    List<String> segmentsToDelete = new ArrayList<>();
+    for (SegmentZKMetadata metadata : completedSegments) {
+      if (retainedBytes.compareTo(limit) <= 0) {
+        break;
+      }
+      long size = completedSegmentSizes.get(metadata.getSegmentName());
+      if (size == 0) {
+        continue;
+      }
+      segmentsToDelete.add(metadata.getSegmentName());
+      retainedBytes = retainedBytes.subtract(BigInteger.valueOf(size));
+    }
+    if (!segmentsToDelete.isEmpty()) {
+      LOGGER.info("Deleting {} oldest segments from table: {} for retention size: {}", segmentsToDelete.size(),
+          tableNameWithType, retentionSize);
+      // The public deletion path rechecks live lineage in case it changed after candidate selection.
+      _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
+    }
+    if (retainedBytes.compareTo(limit) > 0) {
+      LOGGER.warn("Table: {} remains above retention size: {} due to protected or undated segments",
+          tableNameWithType, retentionSize);
+    }
+  }
+
+  /// Returns the compressed bytes used by size retention, or a negative value when the size is unknown.
+  /// Subclasses can supply authoritative sizes for logical segments that aggregate multiple physical segments.
+  protected long getSizeRetentionSegmentSize(String tableNameWithType, SegmentZKMetadata metadata) {
+    return metadata.getSizeInBytes();
+  }
+
+  private static long getSizeRetentionTimestamp(SegmentZKMetadata metadata) {
+    long endTime = metadata.getEndTimeMs();
+    if (endTime >= 0) {
+      return endTime;
+    }
+    long creationTime = metadata.getCreationTime();
+    return creationTime >= 0 ? creationTime : metadata.getPushTime();
   }
 
   @Override

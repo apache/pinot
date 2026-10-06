@@ -74,6 +74,7 @@ public class TableConfigBuilder {
   private String _timeType;
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
+  private String _retentionSize;
   private String _deletedSegmentsRetentionPeriod = DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD;
   private String _replacedSegmentsRetentionPeriod;
   private String _lineageEntryCleanupRetentionPeriod;
@@ -200,6 +201,13 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setRetentionTimeValue(String retentionTimeValue) {
     _retentionTimeValue = retentionTimeValue;
+    return this;
+  }
+
+  /// Sets the compressed segment archive size retention limit described by
+  /// [SegmentsValidationAndRetentionConfig#getRetentionSize()].
+  public TableConfigBuilder setRetentionSize(String retentionSize) {
+    _retentionSize = retentionSize;
     return this;
   }
 
@@ -522,6 +530,7 @@ public class TableConfigBuilder {
     validationConfig.setTimeType(_timeType);
     validationConfig.setRetentionTimeUnit(_retentionTimeUnit);
     validationConfig.setRetentionTimeValue(_retentionTimeValue);
+    validationConfig.setRetentionSize(_retentionSize);
     validationConfig.setDeletedSegmentsRetentionPeriod(_deletedSegmentsRetentionPeriod);
     validationConfig.setReplacedSegmentsRetentionPeriod(_replacedSegmentsRetentionPeriod);
     validationConfig.setLineageEntryCleanupRetentionPeriod(_lineageEntryCleanupRetentionPeriod);

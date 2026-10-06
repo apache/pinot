@@ -37,6 +37,9 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.lineage.LineageEntry;
+import org.apache.pinot.common.lineage.LineageEntryState;
+import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -59,8 +62,10 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -914,5 +919,288 @@ public class RetentionManagerTest {
     // Verify deleteSegments is called — setupPinotHelixResourceManager's doAnswer
     // already asserts the correct segments via TestNG assertions
     verify(pinotHelixResourceManager, times(1)).deleteSegments(eq(OFFLINE_TABLE_NAME), anyList());
+  }
+
+  @Test
+  public void testSizeOnlyRetentionDeletesOldestSegmentsUntilWithinLimit() {
+    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "100B");
+    long now = System.currentTimeMillis();
+    List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("newest", 60, now),
+        createSizeRetentionSegment("oldest", 60, now - 2),
+        createSizeRetentionSegment("middle", 60, now - 1));
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager);
+
+    // Exercise the complete table pass: a time-retention configuration is deliberately absent.
+    retentionManager.processTable(OFFLINE_TABLE_NAME);
+
+    verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest", "middle"));
+  }
+
+  @Test
+  public void testSizeRetentionKeepsSegmentsAtOrBelowLimit() {
+    for (String limit : List.of("100B", "101B")) {
+      TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, limit);
+      tableConfig.getValidationConfig().setReplication("3");
+      long now = System.currentTimeMillis();
+      List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", 40, now - 1),
+          createSizeRetentionSegment("newest", 60, now));
+      PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+      RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager);
+
+      retentionManager.manageSizeBasedRetention(tableConfig);
+
+      // Stored archive sizes count once, regardless of table replication.
+      verify(resourceManager, never()).deleteSegments(anyString(), anyList());
+    }
+  }
+
+  @Test
+  public void testSizeRetentionDeletesNewestSegmentWhenItAloneExceedsLimit() {
+    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "100B");
+    long now = System.currentTimeMillis();
+    List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("newest", 120, now),
+        createSizeRetentionSegment("oldest", 40, now - 1));
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager);
+
+    retentionManager.manageSizeBasedRetention(tableConfig);
+
+    verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest", "newest"));
+  }
+
+  @Test
+  public void testSizeRetentionOrderingWithCreationAndPushTimeFallbacks() {
+    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "20B");
+    long now = System.currentTimeMillis();
+    SegmentZKMetadata creationFallback = createSizeRetentionSegment("creationFallback", 10, -1);
+    creationFallback.setCreationTime(now - 1);
+    SegmentZKMetadata pushFallback = createSizeRetentionSegment("pushFallback", 10, -1);
+    pushFallback.setCreationTime(-1);
+    pushFallback.setPushTime(now - 4);
+    List<SegmentZKMetadata> segments = List.of(creationFallback,
+        createSizeRetentionSegment("b", 10, now - 3), pushFallback,
+        createSizeRetentionSegment("oldest", 10, now - 5), createSizeRetentionSegment("a", 10, now - 3));
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager);
+
+    retentionManager.manageSizeBasedRetention(tableConfig);
+
+    verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest", "pushFallback", "a"));
+  }
+
+  @Test
+  public void testSizeRetentionProtectsIncompleteAndLastCompletedRealtimeSegments() {
+    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.REALTIME, "50B");
+    long now = System.currentTimeMillis();
+    SegmentZKMetadata oldest = createSizeRetentionSegment(
+        new LLCSegmentName(TEST_TABLE_NAME, 0, 4, now - 3).getSegmentName(), 20, now - 3);
+    oldest.setStatus(Status.DONE);
+    SegmentZKMetadata lastCompleted = createSizeRetentionSegment(
+        new LLCSegmentName(TEST_TABLE_NAME, 0, 5, now - 1).getSegmentName(), 40, now - 1);
+    lastCompleted.setStatus(Status.DONE);
+    SegmentZKMetadata consuming = createSizeRetentionSegment("consuming", -1, now - 5);
+    consuming.setStatus(Status.IN_PROGRESS);
+    SegmentZKMetadata committing = createSizeRetentionSegment("committing", 999, now - 4);
+    committing.setStatus(Status.COMMITTING);
+    SegmentZKMetadata uploaded = createSizeRetentionSegment("uploaded", 60, now - 2);
+    List<SegmentZKMetadata> segments = List.of(lastCompleted, committing, uploaded, consuming, oldest);
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager);
+
+    retentionManager.manageSizeBasedRetention(tableConfig);
+
+    verify(resourceManager).deleteSegments(REALTIME_TABLE_NAME, List.of(oldest.getSegmentName(), "uploaded"));
+  }
+
+  @Test
+  public void testSizeRetentionSkipsTableWhenCompletedSegmentSizeIsUnknown() {
+    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "50B");
+    long now = System.currentTimeMillis();
+    List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", 60, now - 2),
+        createSizeRetentionSegment("unknown", -1, now - 1), createSizeRetentionSegment("newest", 60, now));
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager);
+
+    retentionManager.manageSizeBasedRetention(tableConfig);
+
+    verify(resourceManager, never()).deleteSegments(anyString(), anyList());
+  }
+
+  @Test
+  public void testSizeRetentionIgnoresMetadataOutsideIdealState() {
+    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "100B");
+    long now = System.currentTimeMillis();
+    List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", 40, now - 2),
+        createSizeRetentionSegment("orphan", -1, now - 1), createSizeRetentionSegment("newest", 40, now));
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager);
+    when(resourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false)).thenReturn(List.of("oldest", "newest"));
+
+    retentionManager.manageSizeBasedRetention(tableConfig);
+
+    verify(resourceManager, never()).deleteSegments(anyString(), anyList());
+  }
+
+  @Test
+  public void testSizeRetentionProtectsBothSidesOfInProgressLineage() {
+    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "50B");
+    long now = System.currentTimeMillis();
+    List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("source", 80, now - 2),
+        createSizeRetentionSegment("destination", 80, now - 1), createSizeRetentionSegment("unlocked", 60, now));
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager);
+    SegmentLineage lineage = new SegmentLineage(OFFLINE_TABLE_NAME);
+    lineage.addLineageEntry("replacement",
+        new LineageEntry(List.of("source"), List.of("destination"), LineageEntryState.IN_PROGRESS, now));
+    when(resourceManager.getPropertyStore().get(anyString(), any(Stat.class), eq(AccessOption.PERSISTENT)))
+        .thenReturn(lineage.toZNRecord());
+
+    retentionManager.manageSizeBasedRetention(tableConfig);
+
+    // Protected bytes still count, so the unlocked segment must be removed even though the cap is unattainable.
+    verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("unlocked"));
+    verify(resourceManager, never()).deleteSegmentsForLineageCleanup(anyString(), anyList());
+  }
+
+  @Test
+  public void testSizeRetentionSkipsRefreshTablesAndUnconfiguredTables() {
+    for (boolean refreshTable : List.of(true, false)) {
+      TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "50B");
+      if (refreshTable) {
+        IngestionConfig ingestionConfig = new IngestionConfig();
+        ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "REFRESH", null));
+        tableConfig.setIngestionConfig(ingestionConfig);
+      } else {
+        tableConfig.getValidationConfig().setRetentionSize(null);
+      }
+      List<SegmentZKMetadata> segments =
+          List.of(createSizeRetentionSegment("oversized", 100, System.currentTimeMillis()));
+      PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+      RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager);
+
+      retentionManager.manageSizeBasedRetention(tableConfig);
+
+      verify(resourceManager, never()).deleteSegments(anyString(), anyList());
+    }
+  }
+
+  @Test
+  public void testSizeRetentionRechecksMetadataAfterTimeRetention() {
+    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "70B");
+    tableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
+    tableConfig.getValidationConfig().setRetentionTimeValue("365");
+    long now = System.currentTimeMillis();
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(
+        createSizeRetentionSegment("expired", 80, now - TimeUnit.DAYS.toMillis(400)),
+        createSizeRetentionSegment("recent", 60, now - 1), createSizeRetentionSegment("newest", 30, now)));
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager);
+    when(resourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false)).thenAnswer(
+        invocation -> segments.stream().map(SegmentZKMetadata::getSegmentName).toList());
+    doAnswer(invocation -> {
+      List<String> deletedSegments = invocation.getArgument(1);
+      segments.removeIf(segment -> deletedSegments.contains(segment.getSegmentName()));
+      return null;
+    }).when(resourceManager).deleteSegments(eq(OFFLINE_TABLE_NAME), anyList());
+
+    retentionManager.processTable(OFFLINE_TABLE_NAME);
+
+    var deletionOrder = inOrder(resourceManager);
+    deletionOrder.verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("expired"));
+    deletionOrder.verify(resourceManager).getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+    deletionOrder.verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("recent"));
+    assertEquals(segments.stream().map(SegmentZKMetadata::getSegmentName).toList(), List.of("newest"));
+  }
+
+  @Test
+  public void testSizeRetentionAccountsForTotalAboveLongMaximum() {
+    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "100B");
+    long now = System.currentTimeMillis();
+    List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", Long.MAX_VALUE, now - 1),
+        createSizeRetentionSegment("newest", 1, now));
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager);
+
+    retentionManager.manageSizeBasedRetention(tableConfig);
+
+    verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest"));
+  }
+
+  @Test
+  public void testSizeRetentionSkipsTableWhenActiveMetadataIsMissing() {
+    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "50B");
+    List<SegmentZKMetadata> segments =
+        List.of(createSizeRetentionSegment("oversized", 100, System.currentTimeMillis()));
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager);
+    when(resourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false)).thenReturn(List.of("oversized", "missing"));
+
+    retentionManager.manageSizeBasedRetention(tableConfig);
+
+    verify(resourceManager, never()).deleteSegments(anyString(), anyList());
+  }
+
+  @Test
+  public void testSizeRetentionKeepsUndatedAndEmptySegments() {
+    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "50B");
+    long now = System.currentTimeMillis();
+    SegmentZKMetadata undated = createSizeRetentionSegment("undated", 80, -1);
+    undated.setCreationTime(-1);
+    List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("empty", 0, now - 1), undated,
+        createSizeRetentionSegment("dated", 60, now));
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager);
+
+    retentionManager.manageSizeBasedRetention(tableConfig);
+
+    verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("dated"));
+  }
+
+  @Test
+  public void testSizeRetentionSkipsMalformedStoredConfiguration() {
+    for (String retentionSize : List.of("invalid", "0B", "-1B", "")) {
+      TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, retentionSize);
+      List<SegmentZKMetadata> segments =
+          List.of(createSizeRetentionSegment("oversized", 100, System.currentTimeMillis()));
+      PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+      RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager);
+
+      retentionManager.manageSizeBasedRetention(tableConfig);
+
+      verify(resourceManager, never()).deleteSegments(anyString(), anyList());
+    }
+  }
+
+  private TableConfig createSizeRetentionTableConfig(TableType tableType, String retentionSize) {
+    TableConfig tableConfig = new TableConfigBuilder(tableType).setTableName(TEST_TABLE_NAME).build();
+    tableConfig.getValidationConfig().setRetentionSize(retentionSize);
+    return tableConfig;
+  }
+
+  private SegmentZKMetadata createSizeRetentionSegment(String segmentName, long sizeInBytes, long endTimeMs) {
+    SegmentZKMetadata metadata = new SegmentZKMetadata(segmentName);
+    metadata.setSizeInBytes(sizeInBytes);
+    metadata.setTimeUnit(TimeUnit.MILLISECONDS);
+    metadata.setEndTime(endTimeMs);
+    metadata.setCreationTime(System.currentTimeMillis());
+    return metadata;
+  }
+
+  private RetentionManager createSizeRetentionManager(TableConfig tableConfig, List<SegmentZKMetadata> segments,
+      PinotHelixResourceManager resourceManager) {
+    String tableName = tableConfig.getTableName();
+    when(resourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
+    when(resourceManager.getSegmentsZKMetadata(tableName)).thenReturn(segments);
+    when(resourceManager.getSegmentsFor(tableName, false))
+        .thenReturn(segments.stream().map(SegmentZKMetadata::getSegmentName).toList());
+    when(resourceManager.getPropertyStore()).thenReturn(mock(ZkHelixPropertyStore.class));
+    when(resourceManager.getLineageUpdaterLock(tableName)).thenReturn(new Object());
+    when(resourceManager.getLastLLCCompletedSegments(anyList())).thenCallRealMethod();
+    when(resourceManager.getLastLLCCompletedSegments(tableName)).thenCallRealMethod();
+    ControllerConf conf = new ControllerConf();
+    conf.setUntrackedSegmentDeletionEnabled(false);
+    return createRetentionManager(resourceManager, mock(LeadControllerManager.class), conf,
+        mock(ControllerMetrics.class), mock(BrokerServiceHelper.class));
   }
 }

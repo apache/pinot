@@ -27,6 +27,7 @@ import org.apache.pinot.spi.utils.TimeUtils;
 public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
+  private String _retentionSize;
   private String _deletedSegmentsRetentionPeriod;
   private String _replacedSegmentsRetentionPeriod;
   private String _lineageEntryCleanupRetentionPeriod;
@@ -86,6 +87,24 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setRetentionTimeValue(String retentionTimeValue) {
     _retentionTimeValue = retentionTimeValue;
+  }
+
+  /// Returns the size retention limit, expressed as a positive size understood by
+  /// [DataSizeUtils#toBytes(String)], for example `"100G"`.
+  ///
+  /// The limit applies to the sum of compressed segment archive bytes for one replica of this table. OFFLINE and
+  /// REALTIME tables enforce their limits independently, including the two types of a hybrid table. When time retention
+  /// is also configured, a segment can be deleted by either retention criterion. Consuming segments and segments
+  /// protected by segment lineage are not removed to enforce the limit, so it may be exceeded. This is an asynchronous
+  /// retention policy, not a limit on server disk usage or an ingestion quota. A null value disables size retention.
+  public String getRetentionSize() {
+    return _retentionSize;
+  }
+
+  /// Sets the compressed segment archive size retention limit described by [#getRetentionSize()].
+  /// Set to null to disable size retention.
+  public void setRetentionSize(String retentionSize) {
+    _retentionSize = retentionSize;
   }
 
   public String getDeletedSegmentsRetentionPeriod() {
