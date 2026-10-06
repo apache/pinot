@@ -31,6 +31,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 /// Pins the invariant behind the `count(*)` short-circuit: [LuceneTextIndexReader#getNumMatchingDocs] must
@@ -43,15 +44,17 @@ public class LuceneTextIndexCountTest {
   private static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory(), LuceneTextIndexCountTest.class.getSimpleName());
   private static final String COLUMN = "body";
+  /// Every document carries `sentinelall` so there is a term matching all documents. `to` cannot serve that
+  /// role: it is in Pinot's default English stop-word set and matches nothing.
   private static final String[] DOCS = {
-      "failed to place order for user alice",
-      "failed to charge card for user bob",
-      "connection refused by payment service",
-      "connection established to cache service",
-      "order confirmation email sent to carol",
-      "cache miss while loading order details",
-      "payment accepted for order 4815",
-      "unrelated housekeeping log line"
+      "failed to place order for user alice sentinelall",
+      "failed to charge card for user bob sentinelall",
+      "connection refused by payment service sentinelall",
+      "connection established to cache service sentinelall",
+      "order confirmation email sent to carol sentinelall",
+      "cache miss while loading order details sentinelall",
+      "payment accepted for order 4815 sentinelall",
+      "unrelated housekeeping log line sentinelall"
   };
 
   @BeforeClass
@@ -84,6 +87,8 @@ public class LuceneTextIndexCountTest {
         {"housekeeping", null},
         // No match, and a term in every document: the boundary cases.
         {"nonexistentterm", null},
+        {"sentinelall", null},
+        // A stop word, which the default analyzer drops entirely.
         {"to", null},
         // Boolean, phrase and multi-term shapes, which generally take the fallback.
         {"failed AND order", null},
@@ -112,11 +117,47 @@ public class LuceneTextIndexCountTest {
     }
   }
 
+  /// The equality test above is necessarily a tautology for any query Lucene cannot count from metadata,
+  /// because `getNumMatchingDocs` then evaluates the very expression it is compared against. This pins the
+  /// contract the optimization exists for: a single term is counted without visiting documents. If that stops
+  /// holding -- a Lucene upgrade, or a rewrite that wraps queries differently -- the feature silently becomes
+  /// pure overhead, and this fails instead.
+  @Test
+  public void testShortCircuitFiresForSingleTerms()
+      throws Exception {
+    try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, new HashMap<>())) {
+      assertEquals(reader.countWithoutMaterializing(reader.buildQuery("order", null)), 4);
+      assertEquals(reader.countWithoutMaterializing(reader.buildQuery("connection", null)), 2);
+      // Boundaries: a term in every document, and one in none.
+      assertEquals(reader.countWithoutMaterializing(reader.buildQuery("sentinelall", null)), DOCS.length);
+      assertEquals(reader.countWithoutMaterializing(reader.buildQuery("nonexistentterm", null)), 0);
+    }
+  }
+
+  /// Keeps the fallback branch covered. Deliberately does not pin which shapes fall back: that depends on how
+  /// Lucene rewrites a given query against a given vocabulary, and a future version counting more shapes
+  /// cheaply is an improvement that should not fail here. Only that at least one shape still takes the
+  /// fallback, so [#testCountMatchesMaterializedDocIds] is never silently reduced to the fast path alone.
+  @Test
+  public void testFallbackPathIsExercised()
+      throws Exception {
+    try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, new HashMap<>())) {
+      int fellBack = 0;
+      for (Object[] row : queries()) {
+        if (reader.countWithoutMaterializing(reader.buildQuery((String) row[0], (String) row[1])) == -1) {
+          fellBack++;
+        }
+      }
+      assertTrue(fellBack > 0, "no query shape exercised the fallback path");
+    }
+  }
+
   @Test
   public void testCountIsExactForKnownQueries()
       throws IOException {
     try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, new HashMap<>())) {
       assertEquals(reader.getNumMatchingDocs("order", null), 4);
+      assertEquals(reader.getNumMatchingDocs("sentinelall", null), DOCS.length);
       assertEquals(reader.getNumMatchingDocs("connection", null), 2);
       assertEquals(reader.getNumMatchingDocs("housekeeping", null), 1);
       assertEquals(reader.getNumMatchingDocs("nonexistentterm", null), 0);

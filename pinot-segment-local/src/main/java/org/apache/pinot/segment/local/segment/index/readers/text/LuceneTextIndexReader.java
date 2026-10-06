@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.text;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -71,6 +72,11 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final IndexReader _indexReader;
   private final Directory _indexDirectory;
   private final IndexSearcher _indexSearcher;
+  /// Used only by [#getNumMatchingDocs]. Deliberately never query-cached: the caching policy counts
+  /// every Weight created, so probing on the shared searcher and then falling back to a search would
+  /// register two uses for one query and promote entries into [org.apache.lucene.search.LRUQueryCache]
+  /// at twice the intended rate -- the heap behaviour the query cache is disabled by default to avoid.
+  private final IndexSearcher _countSearcher;
   private final String _column;
   private final DocIdTranslator _docIdTranslator;
   private final Analyzer _analyzer;
@@ -86,6 +92,8 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
+      _countSearcher = new IndexSearcher(_indexReader);
+      _countSearcher.setQueryCache(null);
       if (!config.isEnableQueryCache()) {
         // Disable Lucene query result cache. While it helps a lot with performance for
         // repeated queries, on the downside it can cause heap issues.
@@ -155,6 +163,8 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _indexDirectory = indexDirectory;
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
+      _countSearcher = new IndexSearcher(_indexReader);
+      _countSearcher.setQueryCache(null);
 
       if (!config.isEnableQueryCache()) {
         // Disable Lucene query result cache. While it helps a lot with performance for
@@ -271,37 +281,59 @@ public class LuceneTextIndexReader implements TextIndexReader {
   @Override
   public int getNumMatchingDocs(String searchQuery, @Nullable String optionsString) {
     try {
-      Query query;
-      if (optionsString != null && !optionsString.trim().isEmpty()) {
-        LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
-        query = options.getOptions().isEmpty() ? buildQuery(searchQuery)
-            : LuceneTextIndexUtils.createQueryParserWithOptions(searchQuery, options, _column, _analyzer);
-      } else {
-        query = buildQuery(searchQuery);
+      Query query = buildQuery(searchQuery, optionsString);
+      int count = countWithoutMaterializing(query);
+      if (count >= 0) {
+        return count;
       }
-      // Lucene can answer some queries -- a single term in particular -- from index metadata alone, without
-      // visiting any document. Where it can, this skips materializing a bitmap of every match, which is most
-      // of the cost of counting a high-frequency term over a large segment.
-      Weight weight =
-          _indexSearcher.createWeight(_indexSearcher.rewrite(new ConstantScoreQuery(query)),
-              ScoreMode.COMPLETE_NO_SCORES, 1f);
-      int total = 0;
-      for (LeafReaderContext leaf : _indexSearcher.getIndexReader().leaves()) {
-        int leafCount = weight.count(leaf);
-        if (leafCount == -1) {
-          // Lucene cannot count this leaf cheaply. Fall back to the existing path rather than letting Lucene
-          // iterate internally: the collector below carries the query-termination check, so a slow count stays
-          // interruptible and honours the query timeout.
-          return getDocIds(searchQuery, optionsString).getCardinality();
-        }
-        total += leafCount;
-      }
-      return total;
+      // Lucene cannot count this query from metadata. Collect instead, reusing the query already built and the
+      // collector that carries the query-termination check, so a slow count still honours the query timeout.
+      MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+      _indexSearcher.search(query, new LuceneDocIdCollector(docIds, _docIdTranslator));
+      return docIds.getCardinality();
     } catch (Exception e) {
       throw new RuntimeException(
           "Caught exception while counting matches in the text index for column:" + _column + " search query:"
               + searchQuery, e);
     }
+  }
+
+  /// Counts matches from index metadata alone, without visiting any document.
+  ///
+  /// Lucene can do this for some queries -- a single term in particular -- and reports that it cannot by
+  /// returning -1 for a leaf, in which case this returns -1 and the caller collects instead.
+  ///
+  /// @return the match count, or -1 if any leaf cannot be counted without materializing matches
+  @VisibleForTesting
+  int countWithoutMaterializing(Query query)
+      throws IOException {
+    Weight weight = _countSearcher.createWeight(_countSearcher.rewrite(new ConstantScoreQuery(query)),
+        ScoreMode.COMPLETE_NO_SCORES, 1f);
+    int total = 0;
+    for (LeafReaderContext leaf : _indexReader.leaves()) {
+      int leafCount = weight.count(leaf);
+      if (leafCount == -1) {
+        return -1;
+      }
+      total += leafCount;
+    }
+    return total;
+  }
+
+  /// Parses a search string into a Lucene query, honouring the options string when one is given.
+  ///
+  /// Shared by the doc-id and the count paths so that a `count(*)` and the filter it counts can never
+  /// interpret the same query differently.
+  @VisibleForTesting
+  Query buildQuery(String searchQuery, @Nullable String optionsString)
+      throws Exception {
+    if (optionsString != null && !optionsString.trim().isEmpty()) {
+      LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
+      if (!options.getOptions().isEmpty()) {
+        return LuceneTextIndexUtils.createQueryParserWithOptions(searchQuery, options, _column, _analyzer);
+      }
+    }
+    return buildQuery(searchQuery);
   }
 
   // TODO: Consider creating a base class (e.g., BaseLuceneTextIndexReader) to avoid code duplication
