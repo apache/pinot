@@ -45,9 +45,9 @@ import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.BasicAuthAccessFactory;
 import org.apache.pinot.server.access.GrpcRequesterIdentity;
 import org.apache.pinot.server.access.HttpRequesterIdentity;
+import org.apache.pinot.server.api.resources.ReingestionConsumptionTimeout;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.auth.server.RequesterIdentity;
-import org.apache.pinot.spi.config.provider.PinotClusterConfigProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -119,7 +119,7 @@ public class AccessControlTest {
     ServiceStatus.setServiceStatusCallback(_instanceId, serviceStatusCallback);
 
     _adminApiApplication = new AdminApiApplication(serverInstance, basicAuthAccessFactory,
-        mock(ServerReloadJobStatusCache.class), mock(PinotClusterConfigProvider.class),
+        mock(ServerReloadJobStatusCache.class), new ReingestionConsumptionTimeout(serverConf),
         serverConf);
 
     int adminApiApplicationPort = getAvailablePort();

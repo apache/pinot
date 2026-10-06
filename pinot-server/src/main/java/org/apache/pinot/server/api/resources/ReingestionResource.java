@@ -21,9 +21,7 @@ package org.apache.pinot.server.api.resources;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.math.LongMath;
-import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -43,8 +41,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -52,8 +52,6 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Application;
-import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -64,19 +62,14 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.realtime.writer.StatelessRealtimeSegmentWriter;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
-import org.apache.pinot.spi.config.provider.PinotClusterConfigProvider;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
-import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_REINGESTION_CONSUMPTION_TIMEOUT_MS;
-import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_REINGESTION_CONSUMPTION_TIMEOUT_MS;
 
 
 @Api(tags = "Reingestion", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
@@ -89,6 +82,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_REINGEST
         description = "Database context passed through http header. If no context is provided 'default' database "
             + "context will be considered.")}))
 @Path("/")
+@Singleton
 public class ReingestionResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReingestionResource.class);
 
@@ -110,10 +104,7 @@ public class ReingestionResource {
   private ServerInstance _serverInstance;
 
   @Inject
-  private PinotClusterConfigProvider _clusterConfigProvider;
-
-  @Context
-  private Application _application;
+  private ReingestionConsumptionTimeout _consumptionTimeout;
 
   /// Simple data class to hold job details.
   public static class ReingestionJob {
@@ -204,8 +195,6 @@ public class ReingestionResource {
     }
 
     IndexLoadingConfig indexLoadingConfig = tableDataManager.fetchIndexLoadingConfig();
-    long consumptionTimeoutMs = getConsumptionTimeoutMs(_clusterConfigProvider,
-        (PinotConfiguration) _application.getProperties().get(AdminApiApplication.PINOT_CONFIGURATION));
 
     // Check if this segment is already being re-ingested
     AtomicBoolean isIngesting = _reingestingSegments.computeIfAbsent(segmentName, k -> new AtomicBoolean(false));
@@ -224,7 +213,7 @@ public class ReingestionResource {
       try {
         _runningJobs.put(jobId, job);
         doReingestSegment(realtimeTableName, segmentZKMetadata, indexLoadingConfig,
-            tableDataManager.getSegmentBuildSemaphore(), consumptionTimeoutMs);
+            tableDataManager.getSegmentBuildSemaphore());
       } catch (Exception e) {
         LOGGER.error("Error during async re-ingestion for job {} (segment={})", jobId, segmentName, e);
         _serverInstance.getServerMetrics()
@@ -241,15 +230,17 @@ public class ReingestionResource {
   /// The actual re-ingestion logic, moved into a separate method for clarity.
   /// This is essentially the old synchronous logic you had in reingestSegment.
   private void doReingestSegment(String realtimeTableName, SegmentZKMetadata segmentZKMetadata,
-      IndexLoadingConfig indexLoadingConfig, @Nullable Semaphore segmentBuildSemaphore, long consumptionTimeoutMs)
+      IndexLoadingConfig indexLoadingConfig, @Nullable Semaphore segmentBuildSemaphore)
       throws Exception {
     String segmentName = segmentZKMetadata.getSegmentName();
     try (StatelessRealtimeSegmentWriter writer = new StatelessRealtimeSegmentWriter(segmentZKMetadata,
         indexLoadingConfig, segmentBuildSemaphore)) {
+      // Read when the consumption starts, so that a job waiting for a re-ingestion thread uses the latest timeout
+      long consumptionTimeoutMs = _consumptionTimeout.getTimeoutMs();
       LOGGER.info("Starting consumption to re-ingest segment: {} with timeout: {}ms", segmentName,
           consumptionTimeoutMs);
       writer.startConsumption();
-      waitForCondition((Void) -> writer.isDoneConsuming(), CHECK_INTERVAL_MS, consumptionTimeoutMs, 0);
+      waitForCondition(writer::isDoneConsuming, CHECK_INTERVAL_MS, consumptionTimeoutMs);
       writer.stopConsumption();
 
       if (!writer.isSuccess()) {
@@ -266,52 +257,14 @@ public class ReingestionResource {
     }
   }
 
-  /// Resolves the consumption timeout for a re-ingestion job: the cluster config takes precedence over the server
-  /// config, which takes precedence over the default. A non-numeric or non-positive value is ignored with a warning.
   @VisibleForTesting
-  static long getConsumptionTimeoutMs(PinotClusterConfigProvider clusterConfigProvider,
-      PinotConfiguration serverConf) {
-    Long timeoutMs = parseTimeoutMs(
-        clusterConfigProvider.getClusterConfigs().get(CONFIG_OF_REINGESTION_CONSUMPTION_TIMEOUT_MS), "cluster");
-    if (timeoutMs == null) {
-      timeoutMs = parseTimeoutMs(serverConf.getProperty(CONFIG_OF_REINGESTION_CONSUMPTION_TIMEOUT_MS), "server");
-    }
-    return timeoutMs != null ? timeoutMs : DEFAULT_REINGESTION_CONSUMPTION_TIMEOUT_MS;
-  }
-
-  @Nullable
-  private static Long parseTimeoutMs(@Nullable String value, String configSource) {
-    if (value == null) {
-      return null;
-    }
-    Long timeoutMs = Longs.tryParse(value.trim());
-    if (timeoutMs == null || timeoutMs <= 0) {
-      LOGGER.warn("Ignoring invalid {} config: {}={}, expecting a positive number of milliseconds", configSource,
-          CONFIG_OF_REINGESTION_CONSUMPTION_TIMEOUT_MS, value);
-      return null;
-    }
-    return timeoutMs;
-  }
-
-  @VisibleForTesting
-  static void waitForCondition(
-      Function<Void, Boolean> condition, long checkIntervalMs, long timeoutMs, long gracePeriodMs) {
+  static void waitForCondition(BooleanSupplier condition, long checkIntervalMs, long timeoutMs) {
     // Saturate to avoid overflow, since the timeout is configurable
     long endTime = LongMath.saturatedAdd(System.currentTimeMillis(), timeoutMs);
 
-    // Adding grace period before starting the condition checks
-    if (gracePeriodMs > 0) {
-      LOGGER.info("Waiting for a grace period of {} ms before starting condition checks", gracePeriodMs);
-      try {
-        Thread.sleep(gracePeriodMs);
-      } catch (InterruptedException e) {
-        throw new RuntimeException("Interrupted during grace period wait", e);
-      }
-    }
-
     while (true) {
       try {
-        if (Boolean.TRUE.equals(condition.apply(null))) {
+        if (condition.getAsBoolean()) {
           LOGGER.info("Condition satisfied: {}", condition);
           return;
         }
@@ -321,6 +274,10 @@ public class ReingestionResource {
         }
         // Do not sleep past the deadline, so that the condition is checked once more at the deadline before timing out
         Thread.sleep(Math.min(checkIntervalMs, remainingMs));
+      } catch (InterruptedException e) {
+        // Do not restore the interrupt flag. The caller closes the segment writer next, which must wait for the
+        // consumer thread to stop before destroying the segment, and the interrupt is preserved as the cause.
+        throw new RuntimeException("Interrupted while waiting for condition: " + condition, e);
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while checking the condition", e);
       }

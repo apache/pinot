@@ -1755,10 +1755,13 @@ public class CommonConstants {
     public static final long DEFAULT_SERVER_INGESTION_OOM_PROTECTION_GC_INTERVAL_MS = 30_000L;
 
     /// Max time a pauseless segment re-ingestion job (server API `POST /reingestSegment/{segmentName}`) waits for
-    /// consumption to reach the segment end offset before failing. Can also be set via cluster config, which takes
-    /// precedence over the server config and is picked up without a restart. Read when each re-ingestion request is
-    /// accepted. Note that cluster configs present at server startup are also copied into the server config, so to
-    /// change the timeout, update the cluster config value instead of removing it.
+    /// consumption to reach the segment end offset before failing. Read when each job starts consuming.
+    ///
+    /// Can also be set via cluster config, which is applied without a restart and takes precedence over the server
+    /// config, so that operators can change the timeout of all servers at runtime. Notes on the cluster config:
+    /// - Only this exact key is applied without a restart, e.g. not a `pinot.all.` prefixed or differently cased key.
+    /// - When it is removed or invalid, the server config is used, which includes the cluster configs copied into it at
+    ///   server startup. So to change the timeout, set a new valid value instead of removing it.
     public static final String CONFIG_OF_REINGESTION_CONSUMPTION_TIMEOUT_MS =
         "pinot.server.reingestion.consumption.timeoutMs";
     public static final long DEFAULT_REINGESTION_CONSUMPTION_TIMEOUT_MS = 1_800_000L; // 30 minutes
