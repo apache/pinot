@@ -34,6 +34,7 @@ on:
   pull_request:
     branches:
       - master
+      - 'xiangfu0/codex1/sorted-exchange-core'
     paths-ignore:
       - "contrib/**"
       - "docs/**"
