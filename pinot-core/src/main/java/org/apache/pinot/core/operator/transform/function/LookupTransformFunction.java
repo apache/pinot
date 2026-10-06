@@ -375,7 +375,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
   }
 
   private void setBytesSV(int index, Object value) {
-    if(value instanceof ByteArray){
+    if (value instanceof ByteArray) {
       _bytesValuesSV[index] = ((ByteArray) value).getBytes();
     } else if (value instanceof byte[]) {
       _bytesValuesSV[index] = (byte[]) value;

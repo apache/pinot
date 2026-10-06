@@ -23,7 +23,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Maps;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -342,18 +345,18 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     });
     when(mockDimManager.lookupValues(ArgumentMatchers.any(PrimaryKey.class),
         ArgumentMatchers.any(String[].class))).thenAnswer(invocation -> {
-      PrimaryKey pk = invocation.getArgument(0);
-      String[] lookupColumns = invocation.getArgument(1);
-      Map<String, Object> row = lookupMap.get(pk);
-      if (row == null) {
-        return null;
-      }
-      Object[] values = new Object[lookupColumns.length];
-      for (int i = 0; i < lookupColumns.length; i++) {
-        values[i] = row.get(lookupColumns[i]);
-      }
-      return values;
-    });
+          PrimaryKey pk = invocation.getArgument(0);
+          String[] lookupColumns = invocation.getArgument(1);
+          Map<String, Object> row = lookupMap.get(pk);
+          if (row == null) {
+            return null;
+          }
+          Object[] values = new Object[lookupColumns.length];
+          for (int i = 0; i < lookupColumns.length; i++) {
+            values[i] = row.get(lookupColumns[i]);
+          }
+          return values;
+        });
     DimensionTableDataManager.registerDimensionTable(offlineTableName, mockDimManager);
   }
 
@@ -690,14 +693,13 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     ClassLoader classLoader = ResourceBasedQueriesTest.class.getClassLoader();
     // Get all test files.
     List<String> testFilenames = new ArrayList<>();
-   /* try (InputStream in = classLoader.getResourceAsStream(QUERY_TEST_RESOURCE_FOLDER);
+    try (InputStream in = classLoader.getResourceAsStream(QUERY_TEST_RESOURCE_FOLDER);
         BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
       String resource;
       while ((resource = br.readLine()) != null) {
         testFilenames.add(resource);
       }
-    }*/
-    testFilenames.add("LookupJoin.json");
+    }
 
     // get filter if set
     String fileFilterProp = System.getProperty(FILE_FILTER_PROPERTY);
