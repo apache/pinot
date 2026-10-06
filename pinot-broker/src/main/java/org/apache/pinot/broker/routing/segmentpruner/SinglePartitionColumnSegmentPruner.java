@@ -239,9 +239,9 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
     private PreparedPredicate[] _children;
     private boolean _isPartitionPredicate;
     private Integer _singlePartitionId;
+    // IN holds visited values; OR holds the complete union after a miss.
     private IntSet _partitionIds;
-    private IntSet _orPartitionIds;
-    private boolean _cannotPrepareOrIds;
+    // IN counts visited values; OR uses -1 when its children cannot be collapsed.
     private int _numEvaluatedValues;
 
     private PreparedPredicate(Expression expression, PartitionFunction partitionFunction) {
@@ -273,41 +273,7 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
           }
           return true;
         case OR:
-          if (_orPartitionIds != null) {
-            for (int partition : partitions) {
-              if (_orPartitionIds.contains(partition)) {
-                return true;
-              }
-            }
-            return false;
-          }
-          for (PreparedPredicate child : _children) {
-            if (child.matches(partitions)) {
-              return true;
-            }
-          }
-          if (_cannotPrepareOrIds) {
-            return false;
-          }
-          // Only a miss visits every value. Once all direct partition predicates have been visited, their union
-          // can answer subsequent OR checks without traversing the expression tree.
-          IntSet ids = new IntOpenHashSet();
-          for (PreparedPredicate child : _children) {
-            if (!child._isPartitionPredicate) {
-              _cannotPrepareOrIds = true;
-              return false;
-            }
-            if (child._kind == FilterKind.EQUALS || child._operands.size() == 2) {
-              ids.add(child._singlePartitionId);
-            } else if (child._numEvaluatedValues == child._operands.size() - 1) {
-              ids.addAll(child._partitionIds);
-            } else {
-              _cannotPrepareOrIds = true;
-              return false;
-            }
-          }
-          _orPartitionIds = ids;
-          return false;
+          return matchesOr(partitions);
         case EQUALS:
         case IN:
           if (_isPartitionPredicate) {
@@ -360,6 +326,44 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
         default:
           return true;
       }
+    }
+
+    private boolean matchesOr(Set<Integer> partitions) {
+      if (_partitionIds != null) {
+        for (int partition : partitions) {
+          if (_partitionIds.contains(partition)) {
+            return true;
+          }
+        }
+        return false;
+      }
+      for (PreparedPredicate child : _children) {
+        if (child.matches(partitions)) {
+          return true;
+        }
+      }
+      if (_numEvaluatedValues < 0) {
+        return false;
+      }
+      // Only a miss visits every value. Once all direct partition predicates have been visited, their union
+      // can answer subsequent OR checks without traversing the expression tree.
+      IntSet ids = new IntOpenHashSet();
+      for (PreparedPredicate child : _children) {
+        if (!child._isPartitionPredicate) {
+          _numEvaluatedValues = -1;
+          return false;
+        }
+        if (child._kind == FilterKind.EQUALS || child._operands.size() == 2) {
+          ids.add(child._singlePartitionId);
+        } else if (child._numEvaluatedValues == child._operands.size() - 1) {
+          ids.addAll(child._partitionIds);
+        } else {
+          _numEvaluatedValues = -1;
+          return false;
+        }
+      }
+      _partitionIds = ids;
+      return false;
     }
   }
 }
