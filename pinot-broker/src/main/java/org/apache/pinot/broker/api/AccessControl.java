@@ -115,8 +115,15 @@ public interface AccessControl extends FineGrainedAccessControl {
 
 
   /// Verifies that the requester can delete rows from the table with a SQL `DELETE` statement. The broker calls it
-  /// once the requester passed the checks of a query on the table (the WHERE clause of the statement reads it) and
-  /// the fine-grained `Actions.Table#DELETE_ROWS` action, before checking for row-level security filters.
+  /// once the requester passed, in this order: [#authorize(RequesterIdentity)], [#authorize(RequesterIdentity, Set)]
+  /// with the table as its only element (the WHERE clause of the statement reads it), the fine-grained
+  /// `Actions.Table#QUERY` and `Actions.Table#DELETE_ROWS` actions on the table name, and `Actions.Table#DELETE_ROWS`
+  /// on its raw name when the name has a type suffix. After this method allows it, the broker checks that no
+  /// row-level security filter applies to the table.
+  ///
+  /// [#authorize(RequesterIdentity, BrokerRequest)] is not called, since a `DELETE` is not a broker request: table
+  /// restrictions that an implementation only applies in that overload are not consulted, and must be applied again
+  /// here.
   ///
   /// Denied by default, so that an access control written before `DELETE` existed does not let everyone who can query
   /// a table delete its rows: the fine-grained checks allow every action by default, so they cannot tell such an

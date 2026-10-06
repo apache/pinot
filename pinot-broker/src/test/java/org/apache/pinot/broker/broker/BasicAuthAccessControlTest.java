@@ -45,6 +45,11 @@ public class BasicAuthAccessControlTest {
   private static final String TOKEN_DELETER = "Basic ZGVsZXRlcjpkZWxzZWNyZXQ="; // deleter:delsecret
   private static final String TOKEN_READER = "Basic cmVhZGVyOnJlYWRzZWNyZXQ="; // reader:readsecret
   private static final String TOKEN_EXCLUDER = "Basic ZXhjbHVkZXI6ZXhjbHNlY3JldA=="; // excluder:exclsecret
+  // typedDeleter:typedsecret
+  private static final String TOKEN_TYPED_DELETER = "Basic dHlwZWREZWxldGVyOnR5cGVkc2VjcmV0";
+  private static final String TOKEN_STAR = "Basic c3RhcjpzdGFyc2VjcmV0"; // star:starsecret
+  // upperDeleter:uppersecret
+  private static final String TOKEN_UPPER_DELETER = "Basic dXBwZXJEZWxldGVyOnVwcGVyc2VjcmV0";
 
   private static final String HEADER_AUTHORIZATION = "authorization";
 
@@ -55,7 +60,7 @@ public class BasicAuthAccessControlTest {
   @BeforeClass
   public void setup() {
     Map<String, Object> config = new HashMap<>();
-    config.put("principals", "admin,user,deleter,reader,excluder");
+    config.put("principals", "admin,user,deleter,reader,excluder,typedDeleter,star,upperDeleter");
     config.put("principals.admin.password", "verysecret");
     config.put("principals.user.password", "secret");
     config.put("principals.user.tables", "lessImportantStuff,lesserImportantStuff,leastImportantStuff");
@@ -68,6 +73,14 @@ public class BasicAuthAccessControlTest {
     config.put("principals.excluder.password", "exclsecret");
     config.put("principals.excluder.excludeTables", "billing");
     config.put("principals.excluder.permissions", "read,delete");
+    config.put("principals.typedDeleter.password", "typedsecret");
+    config.put("principals.typedDeleter.tables", "lessImportantStuff_OFFLINE");
+    config.put("principals.typedDeleter.permissions", "read,delete");
+    config.put("principals.star.password", "starsecret");
+    config.put("principals.star.permissions", "*");
+    config.put("principals.upperDeleter.password", "uppersecret");
+    config.put("principals.upperDeleter.tables", "lessImportantStuff");
+    config.put("principals.upperDeleter.permissions", "read,DELETE");
 
     _tableNames = new HashSet<>();
     _tableNames.add("lessImportantStuff");
@@ -225,6 +238,10 @@ public class BasicAuthAccessControlTest {
     // Principals configured without permissions query their tables, but only delete rows when granted the permission
     assertDeleteRows(TOKEN_USER, "lessImportantStuff", false, "Principal: user is not granted the DELETE permission");
     assertDeleteRows(TOKEN_ADMIN, "lessImportantStuff", false, "Principal: admin is not granted the DELETE permission");
+    // `*` grants no permission explicitly: the principal queries every table, but does not delete rows
+    assertDeleteRows(TOKEN_STAR, "lessImportantStuff", false, "Principal: star is not granted the DELETE permission");
+    // Permissions are matched case-insensitively
+    assertDeleteRows(TOKEN_UPPER_DELETER, "lessImportantStuff", true, "");
     assertDeleteRows(null, "lessImportantStuff", false, "Missing or invalid credentials");
     assertDeleteRows("Basic d3Jvbmc6Y3JlZGVudGlhbHM=", "lessImportantStuff", false, "Missing or invalid credentials");
   }
@@ -241,6 +258,13 @@ public class BasicAuthAccessControlTest {
     // A principal listing its tables by raw name deletes from them by raw name, as it queries them
     assertDeleteRows(TOKEN_DELETER, "lessImportantStuff_OFFLINE", false,
         "Principal: deleter does not have access to table: lessImportantStuff_OFFLINE");
+    // A principal listing a table with its type suffix deletes from it by that name, as it queries it: the raw name
+    // is only checked against excludeTables
+    assertDeleteRows(TOKEN_TYPED_DELETER, "lessImportantStuff_OFFLINE", true, "");
+    for (String tableName : List.of("lessImportantStuff", "lessImportantStuff_REALTIME")) {
+      assertDeleteRows(TOKEN_TYPED_DELETER, tableName, false,
+          "Principal: typedDeleter does not have access to table: " + tableName);
+    }
   }
 
   private void assertDeleteRows(String token, String tableName, boolean expectedAccess, String expectedMessage) {

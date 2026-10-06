@@ -152,9 +152,10 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
         return new BasicAuthorizationResultImpl(false, "Missing or invalid credentials");
       }
       BasicAuthPrincipal principal = principalOpt.get();
-      // The table checks match the name as given, while `excludeTables` lists raw names: check both, so that a name
-      // with a type suffix cannot bypass an excluded table
-      if (!principal.hasTable(tableName) || !principal.hasTable(TableNameBuilder.extractRawTableName(tableName))) {
+      // `tables` matches the name as given, as for queries, while `excludeTables` lists raw names: also check the
+      // exclusion list on the raw name, so that a name with a type suffix cannot bypass an excluded table
+      if (!principal.hasTable(tableName)
+          || principal.isTableExcluded(TableNameBuilder.extractRawTableName(tableName))) {
         return new BasicAuthorizationResultImpl(false,
             "Principal: " + principal.getName() + " does not have access to table: " + tableName);
       }

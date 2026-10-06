@@ -68,7 +68,7 @@ public class DeleteStatementTest {
     assertEquals(statement.getOptions(),
         Map.of("taskName", "gdpr-42", "dryRun", "true", "purge.query.max-segments", "500", "timeoutMs", "1000",
             "useMultistageEngine", "true"));
-    assertEquals(statement.getExecutionType(), DataManipulationStatement.ExecutionType.HTTP);
+    assertEquals(statement.getExecutionType(), DataManipulationStatement.ExecutionType.EXECUTOR);
   }
 
   @Test
@@ -99,6 +99,8 @@ public class DeleteStatementTest {
     // The database header, else the database option, qualifies an unqualified table name
     assertEquals(resolve("DELETE FROM myTable WHERE a = 1", null, tableCache), "myTable");
     assertEquals(resolve("DELETE FROM myTable WHERE a = 1", "db1", tableCache), "db1.myTable");
+    // The database option is honored as by the multi-stage engine and the controller, intentionally: the broker's
+    // single-stage engine ignores it and resolves the table from the header only
     assertEquals(resolve("SET database = 'db1'; DELETE FROM myTable WHERE a = 1", null, tableCache), "db1.myTable");
     assertEquals(resolve("SET database = 'db1'; DELETE FROM myTable WHERE a = 1", "db1", tableCache), "db1.myTable");
     assertEquals(resolve("DELETE FROM myTable_OFFLINE WHERE a = 1", "db1", tableCache), "db1.myTable_OFFLINE");
@@ -143,7 +145,24 @@ public class DeleteStatementTest {
   public void testIsResolved() {
     DeleteStatement statement = parse("DELETE FROM myTable WHERE a = 1");
     assertFalse(statement.isResolved());
+    assertFalse(statement.tableExists());
     assertTrue(statement.resolveTableName(null, mock(TableCache.class)).isResolved());
+  }
+
+  @Test
+  public void testTableExists() {
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getActualTableName("myTable")).thenReturn("myTable");
+    when(tableCache.getActualTableName("db1.myTable")).thenReturn("db1.myTable");
+
+    assertTrue(resolveStatement("DELETE FROM myTable WHERE a = 1", null, tableCache).tableExists());
+    assertTrue(resolveStatement("DELETE FROM myTable WHERE a = 1", "db1", tableCache).tableExists());
+    // A table the cache does not know is resolved, so that the caller is authorized for it, but does not exist: the
+    // broker and the controller fail after the authorization rather than hand it to the executor
+    DeleteStatement statement = resolveStatement("DELETE FROM otherTable WHERE a = 1", null, tableCache);
+    assertTrue(statement.isResolved());
+    assertFalse(statement.tableExists());
+    assertEquals(statement.getTableName(), "otherTable");
   }
 
   @Test
@@ -162,11 +181,20 @@ public class DeleteStatementTest {
       return null;
     });
 
-    assertEquals(resolve("DELETE FROM MYTABLE WHERE a = 1", "DB1", tableCache), "db1.MyTable");
-    assertEquals(resolve("DELETE FROM db1.mytable_offline WHERE a = 1", "DB1", tableCache), "db1.MyTable_OFFLINE");
-    assertEquals(resolve("SET database = 'db1'; DELETE FROM mytable WHERE a = 1", null, tableCache), "db1.MyTable");
-    // A table the cluster does not have keeps the case of the statement
-    assertEquals(resolve("DELETE FROM OtherTable WHERE a = 1", "db1", tableCache), "db1.OtherTable");
+    for (DeleteStatement statement : List.of(
+        resolveStatement("DELETE FROM MYTABLE WHERE a = 1", "DB1", tableCache),
+        resolveStatement("SET database = 'db1'; DELETE FROM mytable WHERE a = 1", null, tableCache))) {
+      assertEquals(statement.getTableName(), "db1.MyTable");
+      assertTrue(statement.tableExists());
+    }
+    DeleteStatement statement = resolveStatement("DELETE FROM db1.mytable_offline WHERE a = 1", "DB1", tableCache);
+    assertEquals(statement.getTableName(), "db1.MyTable_OFFLINE");
+    assertTrue(statement.tableExists());
+    // A table the cluster does not have keeps the case of the statement, and is resolved but does not exist
+    statement = resolveStatement("DELETE FROM OtherTable WHERE a = 1", "db1", tableCache);
+    assertEquals(statement.getTableName(), "db1.OtherTable");
+    assertTrue(statement.isResolved());
+    assertFalse(statement.tableExists());
   }
 
   @Test
@@ -185,7 +213,7 @@ public class DeleteStatementTest {
 
   @Test
   public void testParseRejectsUnsupportedStatements() {
-    assertInvalid("DELETE FROM myTable", "requires a WHERE clause");
+    assertInvalid("DELETE FROM myTable", "requires a WHERE clause to prevent an accidental full-table delete");
     assertInvalid("DELETE FROM myTable t WHERE t.userId = 'u1'", "does not support a table alias");
     assertInvalid("DELETE FROM a.b.c WHERE userId = 'u1'", "expected [database.]table");
     assertInvalid("DELETE FROM \"db1\".\"a.b\" WHERE userId = 'u1'", "expected [database.]table");
@@ -200,6 +228,15 @@ public class DeleteStatementTest {
         () -> parse("DELETE FROM myTable WHERE userId IN (SELECT userId FROM other)"));
     assertTrue(e.getMessage().startsWith("Unsupported WHERE clause in DELETE: "), e.getMessage());
     assertNotNull(e.getCause());
+    // A WHERE clause that Calcite cannot serialize back into SQL (AT TIME ZONE has no unparse support): the error is
+    // still an IllegalArgumentException, which the DML parser maps to SQL_PARSING, rather than the Calcite exception
+    e = expectThrows(IllegalArgumentException.class,
+        () -> parse("DELETE FROM myTable WHERE ts AT TIME ZONE 'pst' > 123"));
+    assertTrue(e.getMessage().startsWith("Unsupported WHERE clause in DELETE: "), e.getMessage());
+    assertNotNull(e.getCause());
+    QueryException queryException = expectThrows(QueryException.class, () -> DataManipulationStatementParser.parse(
+        CalciteSqlParser.compileToSqlNodeAndOptions("DELETE FROM myTable WHERE ts AT TIME ZONE 'pst' > 123")));
+    assertEquals(queryException.getErrorCode(), QueryErrorCode.SQL_PARSING);
     // Functions that read another table, which the caller is not authorized for
     for (String predicate : List.of(
         "lookUp('dimTable', 'name', 'id', userId) = 'x'",
@@ -207,6 +244,14 @@ public class DeleteStatementTest {
         "IN_SUBQUERY(userId, 'SELECT ID_SET(userId) FROM other') = 1",
         "inPartitionedSubquery(userId, 'SELECT ID_SET(userId) FROM other') = 1")) {
       assertInvalid("DELETE FROM myTable WHERE " + predicate, "reads another table");
+    }
+    // Scripts, as the broker's groovy policy is not applied to a DELETE, whether at the top level or nested
+    String groovy = "groovy('{\"returnType\":\"BOOLEAN\",\"isSingleValue\":true}', 'arg0 == \"u1\"', userId)";
+    for (String predicate : List.of(
+        groovy,
+        "userId = 'u1' AND " + groovy,
+        "lower(groovy('{\"returnType\":\"STRING\",\"isSingleValue\":true}', 'arg0', userId)) = 'x'")) {
+      assertInvalid("DELETE FROM myTable WHERE " + predicate, "groovy is not supported in a DELETE predicate");
     }
     // Queries only read the exact `database` option, so a DELETE must not read another spelling of it
     assertInvalid("SET DATABASE = 'db1'; DELETE FROM myTable WHERE userId = 'u1'", "Unsupported option: DATABASE");
@@ -238,11 +283,12 @@ public class DeleteStatementTest {
 
     assertTrue(statement instanceof DeleteStatement);
     assertEquals(((DeleteStatement) statement).getPredicate(), "userId = 'u1'");
-    // Only an executor that implements DELETE runs it
+    // Only an executor that implements DELETE runs it: the generic execution methods do not apply
+    assertEquals(statement.getExecutionType(), DataManipulationStatement.ExecutionType.EXECUTOR);
     for (Runnable call : List.<Runnable>of(statement::execute, statement::generateAdhocTaskConfig,
         statement::getResultSchema)) {
       UnsupportedOperationException e = expectThrows(UnsupportedOperationException.class, call::run);
-      assertEquals(e.getMessage(), DeleteStatement.NOT_SUPPORTED_MESSAGE);
+      assertTrue(e.getMessage().contains("does not apply to DELETE"), e.getMessage());
     }
   }
 
@@ -267,6 +313,10 @@ public class DeleteStatementTest {
         {"TEXT_MATCH(body, 'foo AND bar')"},
         {"ts >= TIMESTAMP '2024-01-01 00:00:00'"},
         {"CASE WHEN a = 1 THEN b ELSE c END = 2"},
+        // Constant predicates are accepted: the WHERE clause guards against an accidental full-table delete only
+        {"1 = 1"},
+        // A PostgreSQL bytea constant, normalized into a binary literal
+        {"bytesCol = '\\x0102'::bytea"},
         // Columns named like SQL functions without arguments, which Calcite unparses as keywords
         {"user = 'u1' AND pi > 0 AND current_date = 1 AND CURRENT_USER = 'x'"},
         {"lower(User) = 'x' OR datetrunc('DAY', current_timestamp) = 1"}
@@ -283,6 +333,13 @@ public class DeleteStatementTest {
         "\"userId\" = 'u1' AND userName = 'x'");
   }
 
+  @Test
+  public void testPredicateNormalizesByteaConstants() {
+    // A PostgreSQL bytea constant is serialized as the binary literal it is normalized to
+    assertEquals(parse("DELETE FROM myTable WHERE bytesCol = '\\x0102'::bytea").getPredicate(),
+        "bytesCol = X'0102'");
+  }
+
   @Test(dataProvider = "predicates")
   public void testPredicateRoundTrip(String predicate) {
     DeleteStatement statement = parse("DELETE FROM myTable WHERE " + predicate);
@@ -297,11 +354,17 @@ public class DeleteStatementTest {
   }
 
   private static String resolve(String sql, @Nullable String databaseHeader, TableCache tableCache) {
+    return resolveStatement(sql, databaseHeader, tableCache).getTableName();
+  }
+
+  private static DeleteStatement resolveStatement(String sql, @Nullable String databaseHeader,
+      TableCache tableCache) {
     DeleteStatement statement = parse(sql);
     DeleteStatement resolvedStatement = statement.resolveTableName(databaseHeader, tableCache);
+    assertTrue(resolvedStatement.isResolved());
     assertEquals(resolvedStatement.getPredicate(), statement.getPredicate());
     assertEquals(resolvedStatement.getOptions(), statement.getOptions());
-    return resolvedStatement.getTableName();
+    return resolvedStatement;
   }
 
   private static void assertInvalid(String sql, String expectedMessage) {

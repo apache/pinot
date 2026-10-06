@@ -70,6 +70,13 @@ public class BasicAuthPrincipal {
     return !_excludeTables.contains(tableName);
   }
 
+  /// Returns whether the table is listed in the `excludeTables` of this principal, regardless of its `tables`. The
+  /// exclusion list holds raw table names, so a caller checking a name with a type suffix passes the raw name here,
+  /// while [#hasTable(String)] also applies the `tables` inclusion list, which may list the name with its type suffix.
+  public boolean isTableExcluded(String tableName) {
+    return _excludeTables.contains(tableName);
+  }
+
   public boolean hasPermission(String permission) {
     return _permissions.isEmpty() || _permissions.contains(permission.toLowerCase());
   }

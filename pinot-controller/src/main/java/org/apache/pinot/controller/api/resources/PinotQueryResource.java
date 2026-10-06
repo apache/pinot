@@ -65,6 +65,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.provider.StaticTableCache;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -157,7 +158,8 @@ public class PinotQueryResource {
   @ManualAuthorization
   public StreamingOutput handleGetSql(@QueryParam("sql") String sqlQuery, @QueryParam("trace") String traceEnabled,
       @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
-    // Do not allow a browser holding credentials to follow a link that deletes rows
+    // Only queries, as on the broker: a browser holding credentials must not follow a link that runs a DML statement
+    // (e.g. deletes rows)
     return executeSqlQueryCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions, true);
   }
 
@@ -405,22 +407,23 @@ public class PinotQueryResource {
       throw QueryErrorCode.QUERY_VALIDATION.asException(
           "DDL statements are not supported on /sql; use POST /sql/ddl instead.");
     }
-    if (isGet && sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
-      throw QueryErrorCode.QUERY_VALIDATION.asException(
-          "DELETE is not supported on GET /sql; use POST /sql instead.");
-    }
-
-    // Determine which engine to used based on query options.
-    boolean isMse = Boolean.parseBoolean(options.get(QueryOptionKey.USE_MULTISTAGE_ENGINE));
-    boolean isMseEnabled = _controllerConf.getProperty(
-        CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED,
-        CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED);
-    if (isMse && !isMseEnabled) {
-      throw QueryErrorCode.INTERNAL.asException("V2 Multi-Stage query engine not enabled.");
+    // GET only runs queries, as on the broker (which rejects every other type with the same error code)
+    if (isGet && sqlType != PinotSqlType.DQL) {
+      throw QueryErrorCode.SQL_PARSING.asException(
+          "Unsupported SQL type - " + sqlType + ", GET /sql only supports DQL; use POST /sql instead.");
     }
 
     switch (sqlType) {
       case DQL:
+        // Determine which engine to used based on query options. Only queries choose an engine: a DML statement
+        // passes its options through to the executor.
+        boolean isMse = Boolean.parseBoolean(options.get(QueryOptionKey.USE_MULTISTAGE_ENGINE));
+        boolean isMseEnabled = _controllerConf.getProperty(
+            CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED,
+            CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED);
+        if (isMse && !isMseEnabled) {
+          throw QueryErrorCode.INTERNAL.asException("V2 Multi-Stage query engine not enabled.");
+        }
         return isMse
             ? getMultiStageQueryResponse(sqlQuery, sqlNodeAndOptions, requestJson, httpHeaders)
             : getQueryResponse(sqlQuery, sqlNodeAndOptions, requestJson, httpHeaders);
@@ -439,35 +442,69 @@ public class PinotQueryResource {
     }
   }
 
-  /// Executes a `DELETE` once the caller is authorized to delete rows from its table, see [#authorizeDelete]. The
-  /// table is resolved first, with the database of the request and in the case it is defined with, and the executor
-  /// deletes rows from that exact table.
+  /// Executes a `DELETE` once the caller is authorized to delete rows from its table, see [#authorizeDelete].
+  ///
+  /// The caller is first checked without a table (the `READ` access type with the `/sql` endpoint, as for a
+  /// multi-stage query), before the statement is parsed and its table looked up: with basic auth, an unauthenticated
+  /// caller gets HTTP 401 here, before the table cache is consulted. The table is then resolved, with the database of
+  /// the request and in the case it is defined with, the caller authorized to delete rows from it, and only then is
+  /// the table checked to exist, so that the existence of a table is not leaked to a caller who is not authorized for
+  /// it. The executor deletes rows from that exact table.
+  ///
+  /// The executor runs before the response streams, so that an exception it lets escape is mapped to an error
+  /// response by [#executeSqlQueryCatching] rather than failing the request with HTTP 500.
+  ///
+  /// @throws QueryException with [QueryErrorCode#ACCESS_DENIED] if the caller is not authorized, with
+  ///                        [QueryErrorCode#TABLE_DOES_NOT_EXIST] if the table does not exist, and with the errors of
+  ///                        [DataManipulationStatementParser#parse] and [DeleteStatement#resolveTableName]
   private StreamingOutput executeDelete(SqlNodeAndOptions sqlNodeAndOptions, HttpHeaders httpHeaders) {
+    AccessControl accessControl = _accessControlFactory.create();
+    if (!accessControl.hasAccess(AccessType.READ, httpHeaders, SQL_ENDPOINT)) {
+      throw QueryErrorCode.ACCESS_DENIED.asException("Permission denied to delete rows");
+    }
     DeleteStatement statement = ((DeleteStatement) DataManipulationStatementParser.parse(sqlNodeAndOptions))
         .resolveTableName(httpHeaders.getHeaderString(CommonConstants.DATABASE),
             _pinotHelixResourceManager.getTableCache());
-    // Before the response streams, so that a denied statement fails the request and is not executed
-    authorizeDelete(statement.getTableName(), httpHeaders);
-    Map<String, String> headers = extractHeaders(httpHeaders);
+    authorizeDelete(accessControl, statement.getTableName(), httpHeaders);
+    if (!statement.tableExists()) {
+      throw QueryErrorCode.TABLE_DOES_NOT_EXIST.asException("Table does not exist: " + statement.getTableName());
+    }
+    LOGGER.info("Executing DELETE on table: {}, predicate: {}, options: {}, client: {}", statement.getTableName(),
+        statement.getPredicate(), statement.getOptions().keySet(), getClientIp(httpHeaders));
+    BrokerResponse response = _sqlQueryExecutor.executeStatement(statement, extractHeaders(httpHeaders));
     return output -> {
       try (OutputStream os = output) {
-        _sqlQueryExecutor.executeStatement(statement, headers).toOutputStream(os);
+        response.toOutputStream(os);
       }
     };
   }
 
-  /// Authorizes the caller to delete rows from the table: the checks of a query on the table, since the WHERE clause
-  /// reads it (the `READ` access type and the [Actions.Table#QUERY] action), and those of the other deletions of the
-  /// controller, e.g. of segments (the `DELETE` access type and the [Actions.Table#DELETE_ROWS] action). Like them, it
-  /// checks the raw table name, and does not apply the row-level security of the brokers. Unlike the broker, which
-  /// has no access type to tell a deletion from a query and denies it by default, an access control that does not
-  /// tell access types apart and allows every fine-grained action lets every reader of the table delete rows, as it
-  /// lets them delete segments.
+  /// Client of the request for the log, from the proxy headers as `HttpRequesterIdentity#getClientIp` reads them.
+  private static String getClientIp(HttpHeaders httpHeaders) {
+    String forwardedFor = httpHeaders.getHeaderString("X-Forwarded-For");
+    if (forwardedFor != null) {
+      return forwardedFor;
+    }
+    String realIp = httpHeaders.getHeaderString("X-Real-IP");
+    return realIp != null ? realIp : CommonConstants.UNKNOWN;
+  }
+
+  /// Authorizes the caller, who passed the caller-level check of [#executeDelete], to delete rows from the table.
+  ///
+  /// It checks, on the raw table name and in this order, the `READ` access type with the `/sql` endpoint (the request
+  /// path, as the authentication filter passes for the other endpoints), the fine-grained [Actions.Table#QUERY]
+  /// action, the `DELETE` access type with the `/sql` endpoint and the fine-grained [Actions.Table#DELETE_ROWS]
+  /// action. The `READ` and `QUERY` checks are there because the WHERE clause reads the table, the `DELETE` and
+  /// `DELETE_ROWS` ones because rows are deleted, as the other deletions of the controller (e.g. of segments) check
+  /// `DELETE` on the raw table name. This is stricter than the controller's query path, which only checks the `READ`
+  /// access type with `"Query"` as the endpoint and no fine-grained action, and it does not apply the row-level
+  /// security of the brokers. Unlike the broker, which has no access type to tell a deletion from a query and denies
+  /// it by default, an access control that does not tell access types apart and allows every fine-grained action
+  /// lets every reader of the table delete rows, as it lets them delete segments.
   ///
   /// @throws QueryException with [QueryErrorCode#ACCESS_DENIED] if the caller is not authorized, as for queries
-  private void authorizeDelete(String tableName, HttpHeaders httpHeaders) {
+  private void authorizeDelete(AccessControl accessControl, String tableName, HttpHeaders httpHeaders) {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    AccessControl accessControl = _accessControlFactory.create();
     if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, SQL_ENDPOINT)
         || !accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.QUERY)
         || !accessControl.hasAccess(rawTableName, AccessType.DELETE, httpHeaders, SQL_ENDPOINT)
