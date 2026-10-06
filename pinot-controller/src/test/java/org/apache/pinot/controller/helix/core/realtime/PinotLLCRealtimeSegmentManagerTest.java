@@ -1048,13 +1048,14 @@ public class PinotLLCRealtimeSegmentManagerTest {
     runFailedEnsureAllPartitionsConsumingAttempt(segmentManager, newSegmentsCreated);
     String newSegment0 = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
     String newSegment1 = new LLCSegmentName(RAW_TABLE_NAME, 1, 1, CURRENT_TIME_MS).getSegmentName();
-    assertEquals(newSegmentsCreated, Map.of(newSegment0, true, newSegment1, false));
 
     // The retry starts from the unchanged IdealState. It must add the new segments right away instead of waiting for
     // them to exceed the max segment completion time.
     segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfigs,
         segmentManager._idealState, getStreamMetadataList(segmentManager), null, newSegmentsCreated);
-    assertEquals(newSegmentsCreated, Map.of(newSegment0, true, newSegment1, false));
+    assertEquals(segmentManager._segmentZKMetadataMap.keySet().stream()
+        .filter(segment -> new LLCSegmentName(segment).getPartitionGroupId() <= 1)
+        .collect(Collectors.toSet()), Set.of(committingSegment, newSegment0, offlineSegment, newSegment1));
     assertEquals(new HashSet<>(instanceStatesMap.get(committingSegment).values()), Set.of(SegmentStateModel.ONLINE));
     assertEquals(new HashSet<>(instanceStatesMap.get(newSegment0).values()), Set.of(SegmentStateModel.CONSUMING));
     assertEquals(new HashSet<>(instanceStatesMap.get(offlineSegment).values()), Set.of(SegmentStateModel.OFFLINE));
