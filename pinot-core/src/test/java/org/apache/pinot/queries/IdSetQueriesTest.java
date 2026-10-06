@@ -50,6 +50,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -60,6 +61,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Queries test for ID_SET queries.
@@ -94,6 +96,7 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
 
   private final int[] _values = new int[NUM_RECORDS];
+  private final List<GenericRow> _records = new ArrayList<>(NUM_RECORDS);
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
@@ -141,6 +144,7 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       record.putValue(STRING_MV_COLUMN, new String[]{stringValue, stringValue + MAX_VALUE});
       records.add(record);
     }
+    _records.addAll(records);
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
@@ -561,6 +565,120 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       assertEquals(aggregationResult.size(), 1);
       assertEquals((long) aggregationResult.get(0), NUM_RECORDS - expectedNumMatchingRecords);
     }
+  }
+
+  @Test
+  public void testInIdSetOnEveryValueType()
+      throws IOException {
+    testInIdSet(INT_COLUMN, IdSets.create(DataType.INT));
+    testInIdSet(LONG_COLUMN, IdSets.create(DataType.LONG));
+    // Bloom filters sized for the records, to keep the literals small
+    testInIdSet(FLOAT_COLUMN, createBloomFilterIdSet(DataType.FLOAT));
+    testInIdSet(DOUBLE_COLUMN, createBloomFilterIdSet(DataType.DOUBLE));
+    testInIdSet(STRING_COLUMN, createBloomFilterIdSet(DataType.STRING));
+    testInIdSet(BYTES_COLUMN, createBloomFilterIdSet(DataType.BYTES));
+  }
+
+  private static IdSet createBloomFilterIdSet(DataType dataType) {
+    return IdSets.create(dataType, IdSets.DEFAULT_SIZE_THRESHOLD_IN_BYTES, NUM_RECORDS, IdSets.DEFAULT_FPP);
+  }
+
+  /// Fills the IdSet with the column values of the first half of the records, then checks that IN_ID_SET matches
+  /// the records the IdSet contains, including any Bloom filter false positives.
+  private void testInIdSet(String column, IdSet idSet)
+      throws IOException {
+    for (int i = 0; i < NUM_RECORDS / 2; i++) {
+      Object value = _records.get(i).getValue(column);
+      if (value instanceof Integer) {
+        idSet.add((int) value);
+      } else if (value instanceof Long) {
+        idSet.add((long) value);
+      } else if (value instanceof Float) {
+        idSet.add((float) value);
+      } else if (value instanceof Double) {
+        idSet.add((double) value);
+      } else if (value instanceof String) {
+        idSet.add((String) value);
+      } else {
+        idSet.add((byte[]) value);
+      }
+    }
+    long expectedNumMatchingRecords = 0;
+    for (GenericRow record : _records) {
+      Object value = record.getValue(column);
+      boolean contains;
+      if (value instanceof Integer) {
+        contains = idSet.contains((int) value);
+      } else if (value instanceof Long) {
+        contains = idSet.contains((long) value);
+      } else if (value instanceof Float) {
+        contains = idSet.contains((float) value);
+      } else if (value instanceof Double) {
+        contains = idSet.contains((double) value);
+      } else if (value instanceof String) {
+        contains = idSet.contains((String) value);
+      } else {
+        contains = idSet.contains((byte[]) value);
+      }
+      if (contains) {
+        expectedNumMatchingRecords++;
+      }
+    }
+    String query =
+        "SELECT COUNT(*) FROM testTable WHERE IN_ID_SET(" + column + ", '" + idSet.toBase64String() + "') = 1";
+    AggregationOperator aggregationOperator = getOperator(query);
+    List<Object> aggregationResult = aggregationOperator.nextBlock().getResults();
+    assertNotNull(aggregationResult);
+    assertEquals((long) aggregationResult.get(0), expectedNumMatchingRecords, column);
+  }
+
+  @Test
+  public void testInIdSetInHaving()
+      throws IOException {
+    // IdSets of the int and long values of the first half of the records
+    IdSet intIdSet = IdSets.create(DataType.INT);
+    IdSet longIdSet = IdSets.create(DataType.LONG);
+    for (int i = 0; i < NUM_RECORDS / 2; i++) {
+      intIdSet.add(_values[i]);
+      longIdSet.add(_values[i] + (long) Integer.MAX_VALUE);
+    }
+    long expectedNumGroups = Arrays.stream(_values).distinct().filter(intIdSet::contains).count();
+
+    // HAVING on a group key
+    BrokerResponseNative brokerResponse = getBrokerResponse(
+        "SELECT intColumn, COUNT(*) FROM testTable GROUP BY intColumn HAVING IN_ID_SET(intColumn, '"
+            + intIdSet.toBase64String() + "') = 1 LIMIT " + NUM_RECORDS);
+    assertTrue(brokerResponse.getExceptions().isEmpty(), brokerResponse.getExceptions().toString());
+    assertEquals(brokerResponse.getResultTable().getRows().size(), expectedNumGroups);
+
+    // HAVING on an aggregation, which returns DOUBLE here, so it is cast to the type of the IdSet. Every group holds a
+    // single int value, so its maximum long value is in the IdSet when its int value is.
+    brokerResponse = getBrokerResponse(
+        "SELECT stringColumn, MAX(longColumn) FROM testTable GROUP BY stringColumn HAVING IN_ID_SET(CAST(MAX("
+            + "longColumn) AS LONG), '" + longIdSet.toBase64String() + "') = 1 LIMIT " + NUM_RECORDS);
+    assertTrue(brokerResponse.getExceptions().isEmpty(), brokerResponse.getExceptions().toString());
+    assertEquals(brokerResponse.getResultTable().getRows().size(), expectedNumGroups);
+
+    // Without the cast, this RoaringBitmap-backed LONG IdSet rejects the DOUBLE values. A LONG IdSet large enough to be
+    // a Bloom filter would accept them and hash their raw bits, missing every group, because LONG and DOUBLE values
+    // share a funnel.
+    brokerResponse = getBrokerResponse(
+        "SELECT stringColumn, MAX(longColumn) FROM testTable GROUP BY stringColumn HAVING IN_ID_SET(MAX(longColumn), '"
+            + longIdSet.toBase64String() + "') = 1 LIMIT " + NUM_RECORDS);
+    assertTrue(brokerResponse.getExceptions().toString()
+            .contains("Cannot look up DOUBLE values in an IdSet built from LONG values"),
+        brokerResponse.getExceptions().toString());
+  }
+
+  @Test
+  public void testInIdSetRejectsMismatchedValueType()
+      throws IOException {
+    IdSet idSet = IdSets.create(DataType.INT);
+    idSet.add(_values[0]);
+    String query = "SELECT COUNT(*) FROM testTable WHERE IN_ID_SET(longColumn, '" + idSet.toBase64String() + "') = 1";
+    BadQueryRequestException exception = expectThrows(BadQueryRequestException.class, () -> getOperator(query));
+    assertTrue(exception.getMessage().contains("Cannot look up LONG values in an IdSet built from INT values"),
+        exception.getMessage());
   }
 
   @AfterClass

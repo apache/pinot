@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.query.utils.idset;
 
-import com.google.common.base.Preconditions;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -77,18 +75,14 @@ public class Roaring64NavigableMapIdSet implements IdSet {
     return byteArrayOutputStream.toByteArray();
   }
 
-  /// Deserializes the Roaring64NavigableMapIdSet from a ByteBuffer.
+  /// Deserializes the Roaring64NavigableMapIdSet from a ByteBuffer, which may be read-only or direct.
   ///
   /// NOTE: The ByteBuffer does not include the IdSet.Type byte.
   static Roaring64NavigableMapIdSet fromByteBuffer(ByteBuffer byteBuffer)
       throws IOException {
-    Preconditions.checkArgument(byteBuffer.hasArray(),
-        "Cannot deserialize Roaring64NavigableMap from ByteBuffer not backed by an accessible byte array");
     Roaring64NavigableMap roaring64NavigableMap = new Roaring64NavigableMap();
     // NOTE: No need to close these streams.
-    roaring64NavigableMap.deserialize(new DataInputStream(
-        new ByteArrayInputStream(byteBuffer.array(), byteBuffer.arrayOffset() + byteBuffer.position(),
-            byteBuffer.remaining())));
+    roaring64NavigableMap.deserialize(new DataInputStream(IdSets.toInputStream(byteBuffer)));
     return new Roaring64NavigableMapIdSet(roaring64NavigableMap);
   }
 
