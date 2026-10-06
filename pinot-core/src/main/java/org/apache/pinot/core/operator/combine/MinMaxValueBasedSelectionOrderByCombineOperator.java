@@ -90,12 +90,13 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
     OrderByExpressionContext firstOrderByExpression = orderByExpressions.get(0);
     assert firstOrderByExpression.getExpression().getType() == ExpressionContext.Type.IDENTIFIER;
     String firstOrderByColumn = firstOrderByExpression.getExpression().getIdentifier();
-    boolean nullsFirst = queryContext.isNullHandlingEnabled() && !firstOrderByExpression.isNullsLast();
+    // isNullsLast() is false for DESC even when null handling is disabled, so the null handling check is required
+    boolean nullsRankFirst = queryContext.isNullHandlingEnabled() && !firstOrderByExpression.isNullsLast();
 
     _minMaxValueContexts = new ArrayList<>(_numOperators);
     for (Operator<BaseResultsBlock> operator : _operators) {
       _minMaxValueContexts.add(
-          new MinMaxValueContext(operator, firstOrderByColumn, queryContext.getSchema(), nullsFirst));
+          new MinMaxValueContext(operator, firstOrderByColumn, queryContext.getSchema(), nullsRankFirst));
     }
     if (firstOrderByExpression.isAsc()) {
       // For ascending order, sort on column min value in ascending order
@@ -321,14 +322,15 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
     final Comparable _minValue;
     final Comparable _maxValue;
 
-    MinMaxValueContext(Operator<BaseResultsBlock> operator, String column, Schema schema, boolean nullsFirst) {
+    MinMaxValueContext(Operator<BaseResultsBlock> operator, String column, Schema schema,
+        boolean nullsRankFirst) {
       _operator = operator;
       DataSource dataSource = operator.getIndexSegment().getDataSource(column, schema);
       // When nulls sort first, min/max value cannot bound a segment that may hold null rows. Leave them unset so that
       // the segment is processed first and never skipped.
       // NOTE: Immutable segments only have a null value vector when they contain nulls. Mutable segments always have
       //       one when null handling is enabled for the column, so they are conservatively never skipped.
-      if (nullsFirst && dataSource.getNullValueVector() != null) {
+      if (nullsRankFirst && dataSource.getNullValueVector() != null) {
         _minValue = null;
         _maxValue = null;
       } else {

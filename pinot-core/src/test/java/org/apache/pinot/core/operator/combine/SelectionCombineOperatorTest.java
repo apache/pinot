@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
@@ -36,6 +37,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImplTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -381,6 +384,30 @@ public class SelectionCombineOperatorTest {
     assertEquals(getIntColumnValues(combineResult), Arrays.asList(null, null, 102));
     assertEquals(combineResult.getNumSegmentsProcessed(), 2);
     assertEquals(combineResult.getNumSegmentsMatched(), 2);
+  }
+
+  /// A consuming segment always has a null value vector for a nullable column, so it is never skipped when nulls sort
+  /// first, even if it currently holds no null rows.
+  @Test
+  public void selectionOrderByMinMaxProcessesMutableSegmentWhenNullsSortFirst()
+      throws IOException {
+    MutableSegmentImpl mutableSegment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA, Set.of(), Set.of(), Set.of(), false, true);
+    try {
+      for (Integer value : new Integer[]{5, 6, 7}) {
+        GenericRow row = new GenericRow();
+        row.putValue(INT_COLUMN, value);
+        mutableSegment.index(row, null);
+      }
+      SelectionResultsBlock combineResult = getSingleThreadCombineResult(
+          NULL_HANDLING_OPTIONS + "SELECT * FROM testTable ORDER BY intColumn DESC LIMIT 3",
+          List.of(_highSegment, mutableSegment));
+      assertEquals(getIntColumnValues(combineResult), Arrays.asList(102, 101, 100));
+      assertEquals(combineResult.getNumSegmentsProcessed(), 2);
+      assertEquals(combineResult.getNumSegmentsMatched(), 2);
+    } finally {
+      mutableSegment.destroy();
+    }
   }
 
   /// With column-based null handling, a non-nullable column has no nulls, so segment skipping still applies.

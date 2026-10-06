@@ -148,29 +148,32 @@ public class NullQueriesFluentTest {
   @Test
   public void testMinMaxCombineOrderByDescKeepsNullsFirst() {
     givenHighAndLowWithNullsSegments(INT_SCHEMA, NULL_HANDLING_TABLE_CONFIG)
-        // Combine result: [null, null, 102]; the two copies hold 4 nulls, so LIMIT 3 keeps only nulls
-        .whenQuery("select intCol from testTable order by intCol desc limit 3")
-        .thenResultIs(new Object[]{null}, new Object[]{null}, new Object[]{null})
-        // Combine result: [null, null, 102]
-        .whenQuery("select intCol from testTable order by intCol desc nulls first limit 3")
-        .thenResultIs(new Object[]{null}, new Object[]{null}, new Object[]{null});
+        // Combine result: [null, null, 104, 103, 102]; the two copies hold 4 nulls, so LIMIT 5 keeps one 104
+        .whenQuery("select intCol from testTable order by intCol desc limit 5")
+        .thenResultIs(new Object[]{null}, new Object[]{null}, new Object[]{null}, new Object[]{null},
+            new Object[]{104})
+        // Combine result: [null, null, 104, 103, 102]
+        .whenQuery("select intCol from testTable order by intCol desc nulls first limit 5")
+        .thenResultIs(new Object[]{null}, new Object[]{null}, new Object[]{null}, new Object[]{null},
+            new Object[]{104});
   }
 
   @Test
   public void testMinMaxCombineOrderByDescKeepsNullsFirstColumnBasedNullHandling() {
     givenHighAndLowWithNullsSegments(INT_COLUMN_BASED_SCHEMA, PLAIN_TABLE_CONFIG)
-        // Combine result: [null, null, 102]
-        .whenQuery("select intCol from testTable order by intCol desc limit 3")
-        .thenResultIs(new Object[]{null}, new Object[]{null}, new Object[]{null});
+        // Combine result: [null, null, 104, 103, 102]
+        .whenQuery("select intCol from testTable order by intCol desc limit 5")
+        .thenResultIs(new Object[]{null}, new Object[]{null}, new Object[]{null}, new Object[]{null},
+            new Object[]{104});
   }
 
   /// Orders where nulls sort last are not affected by the segment skip.
   @Test
   public void testMinMaxCombineNullsLast() {
     givenHighAndLowWithNullsSegments(INT_SCHEMA, NULL_HANDLING_TABLE_CONFIG)
-        // Combine result: [102, 101, 100]
+        // Combine result: [104, 103, 102]
         .whenQuery("select intCol from testTable order by intCol desc nulls last limit 3")
-        .thenResultIs(new Object[]{102}, new Object[]{102}, new Object[]{101})
+        .thenResultIs(new Object[]{104}, new Object[]{104}, new Object[]{103})
         // Combine result: [5, 100, 101]
         .whenQuery("select intCol from testTable order by intCol limit 3")
         .thenResultIs(new Object[]{5}, new Object[]{5}, new Object[]{100})
@@ -234,7 +237,9 @@ public class NullQueriesFluentTest {
         .onFirstInstance(
             new Object[]{100},
             new Object[]{101},
-            new Object[]{102}
+            new Object[]{102},
+            new Object[]{103},
+            new Object[]{104}
         ).andSegment(
             new Object[]{5},
             new Object[]{null},
