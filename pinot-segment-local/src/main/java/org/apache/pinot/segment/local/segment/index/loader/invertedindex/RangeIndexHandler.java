@@ -311,13 +311,9 @@ public class RangeIndexHandler extends BaseIndexHandler {
   /// index before building the creator. This is a deliberate extra pass over the column: {@code RangeBitmap.appender}
   /// requires the max at construction, so it cannot be folded into the add-loop that follows.
   ///
-  /// Note: the recovered domain goes into the range index header, which is what the reader uses for the subtract-min,
-  /// not into the column metadata. Under the default {@code columnMinMaxValueGeneratorMode} the metadata is populated
-  /// anyway, because {@code ColumnMinMaxValueGenerator} runs later in the same preprocess and scans the column itself
-  /// -- which also means such a column is read twice per preprocess, once here and once there. Only when that mode is
-  /// NONE does the metadata stay empty, leaving the reader to fall back to {@code Long.MAX_VALUE} for the column max;
-  /// results are still correct there (the RangeBitmap domain is self-contained), but segment-level max pruning is
-  /// weaker.
+  /// Note: the recovered domain goes into the range index header, not the column metadata. The metadata may stay
+  /// absent when the configured {@code columnMinMaxValueGeneratorMode} excludes the column; the reader's conservative
+  /// fallback remains correct in that case.
   ///
   /// Segments sealed with the recovery in {@code MutableNoDictColumnStatistics} carry proper metadata min/max and do
   /// not reach the scan here.
