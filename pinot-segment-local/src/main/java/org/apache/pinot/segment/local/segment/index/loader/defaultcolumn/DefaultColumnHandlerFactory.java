@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.loader.defaultcolumn;
 
 import java.io.File;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -31,10 +32,20 @@ public class DefaultColumnHandlerFactory {
 
   public static DefaultColumnHandler getDefaultColumnHandler(File indexDir, SegmentMetadataImpl segmentMetadata,
       IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter) {
+    return getDefaultColumnHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter, null);
+  }
+
+  /// `segmentDirectory` lets the handler regenerate the forward index of a forward-index-disabled source column so a
+  /// derived column can read it; pass null when there is none to work with.
+  public static DefaultColumnHandler getDefaultColumnHandler(File indexDir, SegmentMetadataImpl segmentMetadata,
+      IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter,
+      @Nullable SegmentDirectory segmentDirectory) {
     if (segmentMetadata.getVersion() == SegmentVersion.v3) {
-      return new V3DefaultColumnHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter);
+      return new V3DefaultColumnHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter,
+          segmentDirectory);
     } else {
-      return new V1DefaultColumnHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter);
+      return new V1DefaultColumnHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter,
+          segmentDirectory);
     }
   }
 }
