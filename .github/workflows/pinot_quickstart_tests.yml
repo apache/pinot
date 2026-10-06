@@ -36,6 +36,7 @@ on:
       - master
       - 'xiangfu0/codex1/sorted-exchange-core'
       - 'xiangfu0/codex1/sorted-exchange-ordering'
+      - 'xiangfu0/codex1/sorted-exchange-leaf'
     paths-ignore:
       - "contrib/**"
       - "docs/**"
