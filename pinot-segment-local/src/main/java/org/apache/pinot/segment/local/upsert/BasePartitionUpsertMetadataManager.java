@@ -705,7 +705,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
       _logger.warn("Found {} primary keys not replaced for segment: {}",
           validDocIdsForOldSegment.getCardinality(), segmentName);
-      updateInconsistentRowsMetric(segmentName, validDocIdsForOldSegment.getCardinality());
+      updateInconsistentRowsMetric(validDocIdsForOldSegment.getCardinality());
       removeSegment(oldSegment, validDocIdsForOldSegment);
     }
   }
@@ -749,18 +749,21 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (numKeysStillNotReplaced > 0) {
       _logger.warn("Found {} primary keys not replaced for segment: {} after revert attempt",
           numKeysStillNotReplaced, segmentName);
-      updateInconsistentRowsMetric(segmentName, numKeysStillNotReplaced);
+      updateInconsistentRowsMetric(numKeysStillNotReplaced);
       // Clear the map when inconsistencies still exist for the consuming segments
       clearPrevKeyToRecordLocation();
     }
   }
 
-  protected void updateInconsistentRowsMetric(String segmentName, int numKeysStillNotReplaced) {
+  protected void updateInconsistentRowsMetric(int numKeysStillNotReplaced) {
     if (_partialUpsertHandler != null) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED,
           numKeysStillNotReplaced);
-    } else {
+    } else if (_context.isDropOutOfOrderRecord() || _context.getOutOfOrderRecordColumn() != null) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
+          numKeysStillNotReplaced);
+    } else {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.FULL_UPSERT_KEYS_NOT_REPLACED,
           numKeysStillNotReplaced);
     }
   }

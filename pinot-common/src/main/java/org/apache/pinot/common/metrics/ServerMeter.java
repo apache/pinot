@@ -64,6 +64,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   UPSERT_KEYS_IN_WRONG_SEGMENT("rows", false),
   PARTIAL_UPSERT_OUT_OF_ORDER("rows", false),
   PARTIAL_UPSERT_KEYS_NOT_REPLACED("rows", false),
+  FULL_UPSERT_KEYS_NOT_REPLACED("rows", false),
   UPSERT_OUT_OF_ORDER("rows", false),
   DELETED_KEYS_TTL_PRIMARY_KEYS_REMOVED("rows", false),
   TOTAL_KEYS_MARKED_FOR_DELETION("rows", false),
