@@ -614,6 +614,8 @@ public class MapFilterOperatorOpenStructTest {
     postings.add(0);
     postings.add(4);
     when(jsonIndex.getMatchingDocIds(any(FilterContext.class))).thenReturn(postings);
+    // Mockito answers false for an unstubbed boolean, including an interface default that returns true.
+    when(jsonIndex.isPathIndexed(anyString())).thenReturn(true);
 
     OpenStructDataSource osDs = withSparseJsonIndex(mockSparseSegmentSource(List.of("region"), Map.of()), jsonIndex);
     MapFilterOperator op = new MapFilterOperator(mockSegment(osDs),
@@ -629,6 +631,8 @@ public class MapFilterOperatorOpenStructTest {
     MutableRoaringBitmap postings = new MutableRoaringBitmap();
     postings.add(0);
     when(jsonIndex.getMatchingDocIds(any(FilterContext.class))).thenReturn(postings);
+    // Mockito answers false for an unstubbed boolean, including an interface default that returns true.
+    when(jsonIndex.isPathIndexed(anyString())).thenReturn(true);
 
     OpenStructDataSource osDs = withSparseJsonIndex(mockSparseSegmentSource(List.of("region"), Map.of()), jsonIndex);
     MapFilterOperator op = new MapFilterOperator(mockSegment(osDs),
@@ -636,6 +640,24 @@ public class MapFilterOperatorOpenStructTest {
 
     assertTrue(op.toExplainString().contains("delegateTo:json_match"));
     assertEquals(countMatches(op), NUM_DOCS - 1);
+  }
+
+  /// An index that holds postings for only some paths answers an unindexed one with an empty bitmap, which reads
+  /// exactly like "nothing matched". Taking that answer would return zero rows and report no reason, so the key
+  /// has to fall back to the scan instead.
+  @Test
+  public void testSparseJsonIndexIsRefusedForAnUnindexedKey() {
+    JsonIndexReader jsonIndex = mock(JsonIndexReader.class);
+    when(jsonIndex.getMatchingDocIds(any(FilterContext.class))).thenReturn(new MutableRoaringBitmap());
+    when(jsonIndex.isPathIndexed(anyString())).thenReturn(false);
+
+    OpenStructDataSource osDs =
+        withSparseJsonIndex(mockSparseSegmentSource(List.of("region"), Map.of()), jsonIndex);
+    MapFilterOperator op = new MapFilterOperator(mockSegment(osDs),
+        makeEqPredicate(COLUMN, "region", "us"), mockQueryContext(), NUM_DOCS);
+
+    assertFalse(op.toExplainString().contains("delegateTo:json_match"),
+        "an index without postings for this key must not be asked");
   }
 
   @Test
