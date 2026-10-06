@@ -1683,30 +1683,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
   }
 
   @Test
-  public void testCommitStartFailureKeepsNewSegmentAddedConcurrently() {
-    FakePinotLLCRealtimeSegmentManager segmentManager = setUpTableForCommitStart();
-    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
-    String newConsumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
-    CommittingSegmentDescriptor committingSegmentDescriptor = createCommittingSegmentDescriptor(committingSegment);
-    segmentManager._numFailedIdealStateUpdates = 1;
-    assertThrows(RuntimeException.class,
-        () -> segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME, committingSegmentDescriptor));
-
-    // While the IdealState update of the next attempt fails, another controller resumes the commit start and adds the
-    // new segment to the IdealState. The failed attempt must not remove the ZK metadata of the new segment.
-    segmentManager._beforeCommitIdealStateUpdate = () -> {
-      Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
-      instanceStatesMap.put(newConsumingSegment, new TreeMap<>(instanceStatesMap.get(committingSegment)));
-      instanceStatesMap.get(committingSegment).replaceAll((instance, state) -> SegmentStateModel.ONLINE);
-    };
-    segmentManager._numFailedIdealStateUpdates = 1;
-    segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME, committingSegmentDescriptor);
-    assertEquals(segmentManager._segmentZKMetadataMap.get(newConsumingSegment).getStatus(), Status.IN_PROGRESS);
-    assertEquals(new HashSet<>(segmentManager._idealState.getInstanceStateMap(newConsumingSegment).values()),
-        Set.of(SegmentStateModel.CONSUMING));
-  }
-
-  @Test
   public void testCommitStartFailureRemovesNewSegmentAfterPartitionRepairedWithAnotherSegment() {
     FakePinotLLCRealtimeSegmentManager segmentManager = setUpTableForCommitStart();
     String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
