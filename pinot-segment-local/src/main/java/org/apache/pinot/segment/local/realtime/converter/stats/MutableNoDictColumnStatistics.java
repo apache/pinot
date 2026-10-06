@@ -45,24 +45,17 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
   protected final boolean _isSortedColumn;
   protected final MutableForwardIndex _forwardIndex;
 
+  @Nullable
+  private final Comparable<?> _minValue;
+  @Nullable
+  private final Comparable<?> _maxValue;
+
   // Lazily computed because it may require a full scan of the forward index, and it is queried multiple times per
   // column during segment creation. Left unsynchronized: an instance describes a single column and is reached only
   // through the per-column stats map, so it is confined to whichever thread creates that column. Even if that ever
   // changes, the segment no longer accepts documents by the time stats are collected, so a race can only recompute
   // the same value.
   private Boolean _sorted;
-
-  // Lazily-computed min/max for columns whose mutable segment does not track them (ingestion-aggregated metric
-  // columns). Populated on first access by scanning the sealed forward index; see computeMinMaxIfNeeded().
-  private boolean _minMaxComputed;
-  @Nullable
-  private Comparable<?> _computedMinValue;
-  @Nullable
-  private Comparable<?> _computedMaxValue;
-  // Sortedness observed by that same scan, since it walks the same docs in the same order computeSorted() would.
-  // Null when no scan ran (min/max were tracked, or the type is not recovered), in which case computeSorted() scans.
-  @Nullable
-  private Boolean _scanSorted;
 
   public MutableNoDictColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn) {
     _dataSourceMetadata = dataSource.getDataSourceMetadata();
@@ -74,59 +67,14 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
     _forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();
     Preconditions.checkState(_forwardIndex != null, "Failed to find forward index for column: %s",
         _fieldSpec.getName());
-  }
 
-  @Override
-  public FieldSpec getFieldSpec() {
-    return _fieldSpec;
-  }
-
-  @Override
-  public int getTotalDocs() {
-    return _dataSourceMetadata.getNumDocs();
-  }
-
-  @Override
-  public Comparable<?> getMinValue() {
+    // Ingestion-aggregated metric columns mutate in place during consumption, so the mutable segment does not track
+    // min/max for them. Recover the bounds for single-value INT/LONG columns, the only types whose BitSliced range
+    // index needs them, and record sortedness in the same scan. Other types keep null bounds (unchanged behavior).
     Comparable<?> minValue = (Comparable<?>) _dataSourceMetadata.getMinValue();
-    if (minValue != null) {
-      return minValue;
-    }
-    computeMinMaxIfNeeded();
-    return _computedMinValue;
-  }
-
-  @Override
-  public Comparable<?> getMaxValue() {
     Comparable<?> maxValue = (Comparable<?>) _dataSourceMetadata.getMaxValue();
-    if (maxValue != null) {
-      return maxValue;
-    }
-    computeMinMaxIfNeeded();
-    return _computedMaxValue;
-  }
-
-  /// Computes min/max by scanning the sealed forward index once, caching the result. Only invoked when the mutable
-  /// segment reports null min/max, which happens for ingestion-aggregated metric columns: their values mutate in
-  /// place during consumption, so `MutableSegmentImpl` deliberately skips min/max tracking for them. Without a value
-  /// domain the BitSliced range index creator cannot subtract the min for INT/LONG columns, so we recover it here.
-  ///
-  /// This is the same pass {@link #isSorted()} already performs at seal time for these columns, not an extra one: it
-  /// walks the docs in that method's order and records sortedness alongside min/max, and {@link #computeSorted()}
-  /// reuses the result. So a segment commit still reads such a column exactly once.
-  ///
-  /// Scoped to single-value INT/LONG columns because those are the only types whose BitSliced range index reads
-  /// min/max: FLOAT/DOUBLE use the full floating-point ordinal domain, and other stored types do not support the
-  /// BitSliced range index. For every other case min/max remain null (unchanged behavior), so aggregated
-  /// FLOAT/DOUBLE and sketch columns are never scanned here.
-  ///
-  /// Not thread-safe: like the rest of this class it is only exercised on the single-threaded segment-seal path.
-  private void computeMinMaxIfNeeded() {
-    if (_minMaxComputed) {
-      return;
-    }
-    int numDocs = _dataSourceMetadata.getNumDocs();
-    if (isSingleValue() && numDocs > 0) {
+    if ((minValue == null || maxValue == null) && isSingleValue()) {
+      int numDocs = _dataSourceMetadata.getNumDocs();
       switch (getStoredType()) {
         case INT: {
           int min = _forwardIndex.getInt(docId(0));
@@ -140,9 +88,9 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
             sorted &= curr >= prev;
             prev = curr;
           }
-          _computedMinValue = min;
-          _computedMaxValue = max;
-          _scanSorted = sorted;
+          minValue = min;
+          maxValue = max;
+          _sorted = _isSortedColumn || sorted;
           break;
         }
         case LONG: {
@@ -157,23 +105,39 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
             sorted &= curr >= prev;
             prev = curr;
           }
-          _computedMinValue = min;
-          _computedMaxValue = max;
-          _scanSorted = sorted;
+          minValue = min;
+          maxValue = max;
+          _sorted = _isSortedColumn || sorted;
           break;
         }
         default:
-          // Other stored types either do not need min/max for their range index (FLOAT/DOUBLE) or do not support a
-          // BitSliced range index at all: leave min/max null (unchanged behavior).
           break;
       }
     }
-    // Set last so a re-entrant call cannot observe the flag as computed while the values are still being populated.
-    _minMaxComputed = true;
+    _minValue = minValue;
+    _maxValue = maxValue;
   }
 
-  /// Maps an iteration position to the docId to read, mirroring the order {@link #computeSorted()} walks so that a
-  /// single pass can answer both the value domain and sortedness.
+  @Override
+  public FieldSpec getFieldSpec() {
+    return _fieldSpec;
+  }
+
+  @Override
+  public int getTotalDocs() {
+    return _dataSourceMetadata.getNumDocs();
+  }
+
+  @Override
+  public Comparable<?> getMinValue() {
+    return _minValue;
+  }
+
+  @Override
+  public Comparable<?> getMaxValue() {
+    return _maxValue;
+  }
+
   private int docId(int index) {
     return _sortedDocIds != null ? _sortedDocIds[index] : index;
   }
@@ -224,14 +188,8 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
     }
 
     // A single distinct value is always sorted — no scan needed. Min and max are tracked per raw value during
-    // ingestion, but are left null when aggregated metrics are enabled; for those this call recovers them by
-    // scanning, which also settles sortedness.
+    // ingestion, but are left null when aggregated metrics are enabled, so fall back to the scan when unavailable.
     Comparable<?> minValue = getMinValue();
-    if (_scanSorted != null) {
-      // Min/max were untracked and recovered by computeMinMaxIfNeeded() above. That scan walked the same docs in the
-      // same order this method would, so it already answered sortedness: reuse it rather than scanning twice.
-      return _scanSorted;
-    }
     if (minValue != null && minValue.equals(getMaxValue())) {
       return true;
     }
