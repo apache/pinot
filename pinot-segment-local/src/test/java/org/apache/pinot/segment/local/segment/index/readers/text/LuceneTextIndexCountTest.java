@@ -20,10 +20,29 @@ package org.apache.pinot.segment.local.segment.index.readers.text;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.ConstantScoreQuery;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreMode;
+import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.Weight;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
+import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -34,18 +53,22 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/// Pins the invariant behind the `count(*)` short-circuit: [LuceneTextIndexReader#getNumMatchingDocs] must
-/// return exactly what counting the materialized doc ids would return, for every query shape.
+/// Covers the `count(*)` short-circuit: [LuceneTextIndexReader#getNumMatchingDocs] and the
+/// [LuceneTextIndexUtils#countWithoutMaterializing] it delegates to.
 ///
-/// The short-circuit reads a count from Lucene's index metadata where it can and falls back to materializing
-/// doc ids where it cannot, so the two paths have to agree or a `count(*)` would silently disagree with the
-/// rows its own filter returns.
+/// Not thread-safe: the fixtures write to per-instance temp directories and are shared across the test
+/// methods of one instance, which TestNG runs single-threaded by default.
 public class LuceneTextIndexCountTest {
-  private static final File INDEX_DIR =
-      new File(FileUtils.getTempDirectory(), LuceneTextIndexCountTest.class.getSimpleName());
+  // Unique per run: a fixed path under the shared temp dir races other executors/surefire forks, whose
+  // @BeforeClass cleanup would delete a live mmapped index out from under this one.
+  private static final File TEMP_DIR =
+      new File(FileUtils.getTempDirectory(), LuceneTextIndexCountTest.class.getSimpleName() + "-" + UUID.randomUUID());
+  private static final File INDEX_DIR = new File(TEMP_DIR, "single-leaf");
+  private static final File MULTI_LEAF_DIR = new File(TEMP_DIR, "multi-leaf");
   private static final String COLUMN = "body";
+
   /// Every document carries `sentinelall` so there is a term matching all documents. `to` cannot serve that
-  /// role: it is in Pinot's default English stop-word set and matches nothing.
+  /// role: it is in the default English stop-word set and matches nothing.
   private static final String[] DOCS = {
       "failed to place order for user alice sentinelall",
       "failed to charge card for user bob sentinelall",
@@ -60,7 +83,6 @@ public class LuceneTextIndexCountTest {
   @BeforeClass
   public void setUp()
       throws IOException {
-    FileUtils.deleteDirectory(INDEX_DIR);
     FileUtils.forceMkdir(INDEX_DIR);
     TextIndexConfig config = new TextIndexConfigBuilder().build();
     try (LuceneTextIndexCreator creator = new LuceneTextIndexCreator(COLUMN, INDEX_DIR, true, false, null, null,
@@ -70,97 +92,108 @@ public class LuceneTextIndexCountTest {
       }
       creator.seal();
     }
+
+    // LuceneTextIndexCreator.seal() force-merges to one segment, so the fixture above can never exercise
+    // cross-leaf accumulation. Build a second index by hand, committing between batches and never merging,
+    // so leaves() > 1.
+    FileUtils.forceMkdir(MULTI_LEAF_DIR);
+    try (Directory directory = FSDirectory.open(MULTI_LEAF_DIR.toPath());
+        IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(new StandardAnalyzer()))) {
+      for (String doc : DOCS) {
+        Document document = new Document();
+        document.add(new TextField(COLUMN, doc, Field.Store.NO));
+        writer.addDocument(document);
+        writer.commit();
+      }
+    }
   }
 
   @AfterClass
   public void tearDown()
       throws IOException {
-    FileUtils.deleteDirectory(INDEX_DIR);
+    FileUtils.deleteDirectory(TEMP_DIR);
   }
 
   @DataProvider(name = "queries")
   public Object[][] queries() {
     return new Object[][]{
-        // Single terms: the shape Lucene can count from metadata alone, i.e. the case the optimization targets.
         {"order", null},
         {"connection", null},
         {"housekeeping", null},
-        // No match, and a term in every document: the boundary cases.
         {"nonexistentterm", null},
         {"sentinelall", null},
-        // A stop word, which the default analyzer drops entirely.
         {"to", null},
-        // Boolean, phrase and multi-term shapes, which generally take the fallback.
         {"failed AND order", null},
         {"failed OR connection", null},
         {"order AND NOT failed", null},
         {"\"place order\"", null},
         {"\"failed to place order\"", null},
-        // Prefix, wildcard, fuzzy and regexp.
         {"conn*", null},
         {"c?che", null},
         {"connection~1", null},
         {"/conn.*/", null},
-        // Option-driven parsing must agree too.
         {"failed order connection", "parser=MATCH,minimumShouldMatch=2"},
         {"*tion", "allowLeadingWildcard=true"}
     };
   }
 
+  /// The count must equal what materializing the doc ids would produce, for every query shape -- both the
+  /// shapes Lucene counts from metadata and the ones it has to iterate.
   @Test(dataProvider = "queries")
   public void testCountMatchesMaterializedDocIds(String query, String options)
       throws IOException {
-    try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, new HashMap<>())) {
+    try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, Map.of())) {
       int expected = reader.getDocIds(query, options).getCardinality();
-      int actual = reader.getNumMatchingDocs(query, options);
-      assertEquals(actual, expected, "count disagreed with materialized doc ids for query: " + query);
-    }
-  }
-
-  /// The equality test above is necessarily a tautology for any query Lucene cannot count from metadata,
-  /// because `getNumMatchingDocs` then evaluates the very expression it is compared against. This pins the
-  /// contract the optimization exists for: a single term is counted without visiting documents. If that stops
-  /// holding -- a Lucene upgrade, or a rewrite that wraps queries differently -- the feature silently becomes
-  /// pure overhead, and this fails instead.
-  @Test
-  public void testShortCircuitFiresForSingleTerms()
-      throws Exception {
-    try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, new HashMap<>())) {
-      assertEquals(reader.countWithoutMaterializing(reader.buildQuery("order", null)), 4);
-      assertEquals(reader.countWithoutMaterializing(reader.buildQuery("connection", null)), 2);
-      // Boundaries: a term in every document, and one in none.
-      assertEquals(reader.countWithoutMaterializing(reader.buildQuery("sentinelall", null)), DOCS.length);
-      assertEquals(reader.countWithoutMaterializing(reader.buildQuery("nonexistentterm", null)), 0);
-    }
-  }
-
-  /// Keeps the fallback branch covered. Deliberately does not pin which shapes fall back: that depends on how
-  /// Lucene rewrites a given query against a given vocabulary, and a future version counting more shapes
-  /// cheaply is an improvement that should not fail here. Only that at least one shape still takes the
-  /// fallback, so [#testCountMatchesMaterializedDocIds] is never silently reduced to the fast path alone.
-  @Test
-  public void testFallbackPathIsExercised()
-      throws Exception {
-    try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, new HashMap<>())) {
-      int fellBack = 0;
-      for (Object[] row : queries()) {
-        if (reader.countWithoutMaterializing(reader.buildQuery((String) row[0], (String) row[1])) == -1) {
-          fellBack++;
-        }
-      }
-      assertTrue(fellBack > 0, "no query shape exercised the fallback path");
+      assertEquals(reader.getNumMatchingDocs(query, options), expected,
+          "count disagreed with materialized doc ids for query: " + query);
     }
   }
 
   @Test
   public void testCountIsExactForKnownQueries()
       throws IOException {
-    try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, new HashMap<>())) {
+    try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, Map.of())) {
       assertEquals(reader.getNumMatchingDocs("order", null), 4);
-      assertEquals(reader.getNumMatchingDocs("sentinelall", null), DOCS.length);
       assertEquals(reader.getNumMatchingDocs("connection", null), 2);
-      assertEquals(reader.getNumMatchingDocs("housekeeping", null), 1);
+      assertEquals(reader.getNumMatchingDocs("sentinelall", null), DOCS.length);
       assertEquals(reader.getNumMatchingDocs("nonexistentterm", null), 0);
+    }
+  }
+
+  /// Pins the precondition the optimization rests on: for a single term Lucene answers from index metadata,
+  /// so no document is visited. If this stops holding, counting silently degrades to full iteration and the
+  /// feature becomes pure overhead while every other test still passes.
+  @Test
+  public void testSingleTermIsCountedFromMetadata()
+      throws IOException {
+    // Uses the hand-built index: LuceneTextIndexCreator nests its Lucene index under a versioned
+    // subdirectory, which is a convention this assertion should not depend on.
+    try (Directory directory = FSDirectory.open(MULTI_LEAF_DIR.toPath());
+        DirectoryReader indexReader = DirectoryReader.open(directory)) {
+      IndexSearcher searcher = new IndexSearcher(indexReader);
+      Query query = new ConstantScoreQuery(new TermQuery(new Term(COLUMN, "order")));
+      Weight weight = searcher.createWeight(searcher.rewrite(query), ScoreMode.COMPLETE_NO_SCORES, 1f);
+      for (LeafReaderContext leaf : indexReader.leaves()) {
+        assertTrue(weight.count(leaf) >= 0, "Lucene no longer counts a single term from metadata");
+      }
+    }
+  }
+
+  /// Cross-leaf accumulation is the only non-trivial logic in the counting loop, and the force-merged fixture
+  /// cannot reach it. A regression that dropped accumulation, or bailed out of the loop instead of continuing,
+  /// would return a short count on any multi-leaf index.
+  @Test(dataProvider = "queries")
+  public void testMultiLeafCountMatchesCollectedCount(String query, String options)
+      throws Exception {
+    try (Directory directory = FSDirectory.open(MULTI_LEAF_DIR.toPath());
+        DirectoryReader indexReader = DirectoryReader.open(directory)) {
+      assertTrue(indexReader.leaves().size() > 1, "fixture is not multi-leaf");
+      IndexSearcher searcher = new IndexSearcher(indexReader);
+      try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, Map.of())) {
+        Query parsed = reader.buildQuery(query, options);
+        assertEquals(LuceneTextIndexUtils.countWithoutMaterializing(searcher, parsed), searcher.count(parsed),
+            "multi-leaf count disagreed with IndexSearcher#count for query: " + query);
+      }
     }
   }
 }

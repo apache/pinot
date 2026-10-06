@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.queries.spans.SpanMultiTermQueryWrapper;
 import org.apache.lucene.queries.spans.SpanNearQuery;
 import org.apache.lucene.queries.spans.SpanQuery;
@@ -31,10 +33,18 @@ import org.apache.lucene.queries.spans.SpanTermQuery;
 import org.apache.lucene.search.AutomatonQuery;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.ConstantScoreQuery;
+import org.apache.lucene.search.DocIdSetIterator;
+import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreMode;
+import org.apache.lucene.search.Scorer;
 import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.Weight;
 import org.apache.lucene.search.WildcardQuery;
+import org.apache.lucene.util.Bits;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -360,5 +370,56 @@ public class LuceneTextIndexUtils {
   /// @return The LuceneTextIndexOptions wrapper
   public static LuceneTextIndexOptions createOptions(String optionsString) {
     return new LuceneTextIndexOptions(optionsString);
+  }
+
+  /// Counts the documents matching `query` without materializing their ids.
+  ///
+  /// A `count(*)` over a text filter only needs the size of the match set. Collecting every matching doc id
+  /// into a bitmap first costs time proportional to the number of matches, which on a frequent term over a
+  /// large segment is most of the query.
+  ///
+  /// Follows the recipe in Lucene's [org.apache.lucene.search.IndexSearcher#count(Query)]: one rewrite and one
+  /// [Weight], then per leaf take [Weight#count] when the leaf can answer from index metadata and iterate that
+  /// leaf only when it cannot. Probing per leaf rather than bailing out wholesale means a query that is
+  /// countable on some leaves still pays iteration on the rest only.
+  ///
+  /// Wrapping in [ConstantScoreQuery] before the rewrite is NOT redundant with [ScoreMode#COMPLETE_NO_SCORES]:
+  /// it is what makes several rewritten shapes produce count-friendly weights, and mirrors `IndexSearcher#count`.
+  /// Removing it silently degrades those shapes to full iteration.
+  ///
+  /// The iterating branch keeps [QueryThreadContext#checkTerminationAndSampleUsagePeriodically] so a slow count
+  /// still honours the query timeout. The metadata probe itself is not interruptible, matching the rewrite that
+  /// already happens inside `IndexSearcher#search`.
+  ///
+  /// Counts are invariant under Pinot's Lucene-to-Pinot doc id translation, which is 1:1, so no translator is
+  /// needed here. Callers that cannot guarantee that mapping must not use this method.
+  ///
+  /// @return the number of matching documents
+  public static int countWithoutMaterializing(IndexSearcher searcher, Query query)
+      throws IOException {
+    Query rewritten = searcher.rewrite(new ConstantScoreQuery(query));
+    Weight weight = searcher.createWeight(rewritten, ScoreMode.COMPLETE_NO_SCORES, 1f);
+    int total = 0;
+    for (LeafReaderContext leaf : searcher.getIndexReader().leaves()) {
+      int leafCount = weight.count(leaf);
+      if (leafCount != -1) {
+        total += leafCount;
+        continue;
+      }
+      Scorer scorer = weight.scorer(leaf);
+      if (scorer == null) {
+        continue;
+      }
+      DocIdSetIterator iterator = scorer.iterator();
+      Bits liveDocs = leaf.reader().getLiveDocs();
+      int numCollected = 0;
+      for (int doc = iterator.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = iterator.nextDoc()) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numCollected++, "LuceneCount");
+        if (liveDocs == null || liveDocs.get(doc)) {
+          total++;
+        }
+      }
+    }
+    return total;
   }
 }

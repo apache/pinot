@@ -35,16 +35,12 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexableField;
-import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.Collector;
-import org.apache.lucene.search.ConstantScoreQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.ScoreMode;
-import org.apache.lucene.search.Weight;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
@@ -72,11 +68,9 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final IndexReader _indexReader;
   private final Directory _indexDirectory;
   private final IndexSearcher _indexSearcher;
-  /// Used only by [#getNumMatchingDocs]. Deliberately never query-cached: the caching policy counts
-  /// every Weight created, so probing on the shared searcher and then falling back to a search would
-  /// register two uses for one query and promote entries into [org.apache.lucene.search.LRUQueryCache]
-  /// at twice the intended rate -- the heap behaviour the query cache is disabled by default to avoid.
-  private final IndexSearcher _countSearcher;
+  /// Number of documents in the Pinot segment. A Lucene index holding more than this means a corrupted or
+  /// partially converted segment; see [#getNumMatchingDocs].
+  private final int _numDocs;
   private final String _column;
   private final DocIdTranslator _docIdTranslator;
   private final Analyzer _analyzer;
@@ -92,8 +86,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
-      _countSearcher = new IndexSearcher(_indexReader);
-      _countSearcher.setQueryCache(null);
+      _numDocs = numDocs;
       if (!config.isEnableQueryCache()) {
         // Disable Lucene query result cache. While it helps a lot with performance for
         // repeated queries, on the downside it can cause heap issues.
@@ -163,8 +156,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _indexDirectory = indexDirectory;
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
-      _countSearcher = new IndexSearcher(_indexReader);
-      _countSearcher.setQueryCache(null);
+      _numDocs = numDocs;
 
       if (!config.isEnableQueryCache()) {
         // Disable Lucene query result cache. While it helps a lot with performance for
@@ -232,13 +224,15 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString) {
-    if (optionsString != null && !optionsString.trim().isEmpty()) {
-      LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
-      if (!options.getOptions().isEmpty()) {
-        return getDocIdsWithOptions(searchQuery, options);
-      }
+    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+    Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
+    try {
+      _indexSearcher.search(buildQuery(searchQuery, optionsString), docIDCollector);
+      return docIds;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while searching the text index for column:" + _column + " search query:" + searchQuery, e);
     }
-    return getDocIdsWithoutOptions(searchQuery);
   }
 
   /// Parses a search string into a Lucene query, applying the configured parser and options.
@@ -265,32 +259,18 @@ public class LuceneTextIndexReader implements TextIndexReader {
     return query;
   }
 
-  private MutableRoaringBitmap getDocIdsWithoutOptions(String searchQuery) {
-    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
-    Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
-    try {
-      _indexSearcher.search(buildQuery(searchQuery), docIDCollector);
-      return docIds;
-    } catch (Exception e) {
-      String msg =
-          "Caught exception while searching the text index for column:" + _column + " search query:" + searchQuery;
-      throw new RuntimeException(msg, e);
-    }
-  }
-
   @Override
   public int getNumMatchingDocs(String searchQuery, @Nullable String optionsString) {
     try {
-      Query query = buildQuery(searchQuery, optionsString);
-      int count = countWithoutMaterializing(query);
-      if (count >= 0) {
-        return count;
+      // A Lucene index with more documents than the segment means the doc-id mapping is broken -- a state
+      // getDocIds surfaces as an IndexOutOfBoundsException from the translator. Counting does not consult the
+      // translator, so without this guard the corruption would become a silently inflated count instead.
+      // Fall back so that it keeps failing loudly.
+      if (_indexReader.numDocs() > _numDocs) {
+        return getDocIds(searchQuery, optionsString).getCardinality();
       }
-      // Lucene cannot count this query from metadata. Collect instead, reusing the query already built and the
-      // collector that carries the query-termination check, so a slow count still honours the query timeout.
-      MutableRoaringBitmap docIds = new MutableRoaringBitmap();
-      _indexSearcher.search(query, new LuceneDocIdCollector(docIds, _docIdTranslator));
-      return docIds.getCardinality();
+      return LuceneTextIndexUtils.countWithoutMaterializing(_indexSearcher,
+          buildQuery(searchQuery, optionsString));
     } catch (Exception e) {
       throw new RuntimeException(
           "Caught exception while counting matches in the text index for column:" + _column + " search query:"
@@ -298,32 +278,11 @@ public class LuceneTextIndexReader implements TextIndexReader {
     }
   }
 
-  /// Counts matches from index metadata alone, without visiting any document.
-  ///
-  /// Lucene can do this for some queries -- a single term in particular -- and reports that it cannot by
-  /// returning -1 for a leaf, in which case this returns -1 and the caller collects instead.
-  ///
-  /// @return the match count, or -1 if any leaf cannot be counted without materializing matches
-  @VisibleForTesting
-  int countWithoutMaterializing(Query query)
-      throws IOException {
-    Weight weight = _countSearcher.createWeight(_countSearcher.rewrite(new ConstantScoreQuery(query)),
-        ScoreMode.COMPLETE_NO_SCORES, 1f);
-    int total = 0;
-    for (LeafReaderContext leaf : _indexReader.leaves()) {
-      int leafCount = weight.count(leaf);
-      if (leafCount == -1) {
-        return -1;
-      }
-      total += leafCount;
-    }
-    return total;
-  }
-
   /// Parses a search string into a Lucene query, honouring the options string when one is given.
   ///
-  /// Shared by the doc-id and the count paths so that a `count(*)` and the filter it counts can never
-  /// interpret the same query differently.
+  /// Both [#getDocIds(String, String)] and [#getNumMatchingDocs] go through this method, so a `count(*)` and
+  /// the filter it counts cannot interpret the same query differently. Keep it that way: any new entry point
+  /// that parses a search string itself reintroduces that divergence.
   @VisibleForTesting
   Query buildQuery(String searchQuery, @Nullable String optionsString)
       throws Exception {
@@ -336,22 +295,6 @@ public class LuceneTextIndexReader implements TextIndexReader {
     return buildQuery(searchQuery);
   }
 
-  // TODO: Consider creating a base class (e.g., BaseLuceneTextIndexReader) to avoid code duplication
-  // for getDocIdsWithOptions method across LuceneTextIndexReader, MultiColumnLuceneTextIndexReader,
-  // RealtimeLuceneTextIndex, and MultiColumnRealtimeLuceneTextIndex
-  private MutableRoaringBitmap getDocIdsWithOptions(String actualQuery,
-      LuceneTextIndexUtils.LuceneTextIndexOptions options) {
-    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
-    Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
-    try {
-      Query query = LuceneTextIndexUtils.createQueryParserWithOptions(actualQuery, options, _column, _analyzer);
-      _indexSearcher.search(query, docIDCollector);
-      return docIds;
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Failed while searching the text index for column " + _column + " with search query: " + actualQuery, e);
-    }
-  }
 
   /// When we destroy the loaded ImmutableSegment, all the indexes
   /// (for each column) are destroyed and as part of that

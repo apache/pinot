@@ -79,9 +79,8 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
   @Override
   public int getNumMatchingDocs() {
     if (_textIndexReader.isMultiColumn()) {
-      // TODO: give MultiColumnTextIndexReader the same count short-circuit.
-      return ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue(),
-          _predicate.getOptions()).getCardinality();
+      return ((MultiColumnTextIndexReader) _textIndexReader).getNumMatchingDocs(_column, _predicate.getValue(),
+          _predicate.getOptions());
     } else {
       // Ask the index for the size of the match set rather than for the match set itself: building a bitmap of
       // every matching doc just to read its cardinality is the dominant cost of a count over a frequent term.
