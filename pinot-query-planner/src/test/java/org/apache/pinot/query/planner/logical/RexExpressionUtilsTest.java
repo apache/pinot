@@ -28,6 +28,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUnknownAs;
 import org.apache.calcite.sql.SqlCollation;
 import org.apache.calcite.sql.SqlKind;
@@ -90,6 +91,18 @@ public class RexExpressionUtilsTest {
     RexExpression.FunctionCall sum0 =
         new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.SUM0.name(), List.of(input));
     assertSame(RexExpressionUtils.getAggFunction(sum0), SqlStdOperatorTable.SUM0);
+  }
+
+  @Test
+  public void testCastRoundTrip() {
+    // Plan nodes hold the target type of CAST as a STRING literal operand. Field "a" is a nullable INTEGER.
+    RelBuilder relBuilder =
+        RelBuilder.create(Frameworks.newConfigBuilder().build()).values(new String[]{"a"}, 1, null);
+    RexExpression castCall = new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.CAST.name(),
+        List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.STRING, "DOUBLE")));
+    RexNode rexNode = RexExpressionUtils.toRexNode(relBuilder, castCall);
+    Assert.assertTrue(rexNode.getType().isNullable());
+    Assert.assertEquals(RexExpressionUtils.fromRexNode(rexNode), castCall);
   }
 
   @Test

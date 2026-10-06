@@ -34,6 +34,8 @@ import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.ByteString;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
@@ -105,6 +107,14 @@ public class RexExpressionUtils {
     if (operator.kind == SqlKind.IN) {
       // Calcite creates IN as SEARCH
       return builder.in(operands.get(0), operands.subList(1, operands.size()));
+    }
+    if (operator.kind == SqlKind.CAST) {
+      // The second operand only holds the target type name (see handleCast). Calcite would use its type as the result.
+      RexNode operand = operands.get(0);
+      RelDataTypeFactory typeFactory = builder.getTypeFactory();
+      RelDataType type = typeFactory.createTypeWithNullability(rexExpression.getDataType().toType(typeFactory),
+          operand.getType().isNullable());
+      return builder.getRexBuilder().makeCast(type, operand);
     }
 
     return builder.call(operator, operands);
