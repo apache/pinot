@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.utils.idset;
 
 import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -81,8 +80,8 @@ public class Roaring64NavigableMapIdSet implements IdSet {
   static Roaring64NavigableMapIdSet fromByteBuffer(ByteBuffer byteBuffer)
       throws IOException {
     Roaring64NavigableMap roaring64NavigableMap = new Roaring64NavigableMap();
-    // NOTE: No need to close these streams.
-    roaring64NavigableMap.deserialize(new DataInputStream(IdSets.toInputStream(byteBuffer)));
+    // NOTE: No need to close the stream.
+    roaring64NavigableMap.deserialize(IdSets.toInputStream(byteBuffer));
     return new Roaring64NavigableMapIdSet(roaring64NavigableMap);
   }
 

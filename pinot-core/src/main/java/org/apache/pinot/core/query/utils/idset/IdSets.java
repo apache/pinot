@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.core.query.utils.idset;
 
-import com.fasterxml.jackson.databind.util.ByteBufferBackedInputStream;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.pinot.segment.spi.memory.DataBufferPinotInputStream;
+import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
+import org.apache.pinot.segment.spi.memory.PinotInputStream;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.longlong.LongIterator;
@@ -256,14 +256,9 @@ public class IdSets {
     return fromBytes(Base64.getDecoder().decode(base64String));
   }
 
-  /// Returns an [InputStream] over the remaining bytes of the given buffer, without moving its position. Reads the
-  /// backing array when the buffer exposes one; read-only and direct buffers do not, so they are read through a
-  /// duplicate.
-  static InputStream toInputStream(ByteBuffer byteBuffer) {
-    if (byteBuffer.hasArray()) {
-      return new ByteArrayInputStream(byteBuffer.array(), byteBuffer.arrayOffset() + byteBuffer.position(),
-          byteBuffer.remaining());
-    }
-    return new ByteBufferBackedInputStream(byteBuffer.duplicate());
+  /// Returns a [PinotInputStream] over the remaining bytes of the given buffer, without moving its position. It reads
+  /// heap, direct and read-only buffers the same way, and its `DataInput` methods read big-endian values.
+  static PinotInputStream toInputStream(ByteBuffer byteBuffer) {
+    return new DataBufferPinotInputStream(PinotByteBuffer.slice(byteBuffer));
   }
 }

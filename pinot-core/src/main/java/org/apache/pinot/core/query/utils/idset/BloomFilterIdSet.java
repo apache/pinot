@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.utils.idset;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnel;
 import com.google.common.hash.Funnels;
+import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -214,7 +215,8 @@ public class BloomFilterIdSet implements IdSet {
         throw new IllegalStateException("Unsupported BloomFilter funnel type id: " + funnelTypeId);
     }
     // NOTE: No need to close the stream.
-    BloomFilter bloomFilter = BloomFilter.readFrom(IdSets.toInputStream(byteBuffer), funnel);
+    // Guava reads the filter 8 bytes at a time, which the Pinot buffer stream copies byte by byte, so buffer the reads.
+    BloomFilter bloomFilter = BloomFilter.readFrom(new BufferedInputStream(IdSets.toInputStream(byteBuffer)), funnel);
     return new BloomFilterIdSet(funnelType, bloomFilter, serializedSizeInBytes);
   }
 

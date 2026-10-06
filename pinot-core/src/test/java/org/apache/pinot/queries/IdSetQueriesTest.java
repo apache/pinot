@@ -85,15 +85,19 @@ public class IdSetQueriesTest extends BaseQueriesTest {
   private static final String FLOAT_MV_COLUMN = "floatMVColumn";
   private static final String DOUBLE_MV_COLUMN = "doubleMVColumn";
   private static final String STRING_MV_COLUMN = "stringMVColumn";
+  // Holds the INT value, except for every 4th record, which holds NULL
+  private static final String NULLABLE_INT_COLUMN = "nullableIntColumn";
+  private static final int NUM_NULL_RECORDS = NUM_RECORDS / 4;
   private static final Schema SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, DataType.INT)
       .addSingleValueDimension(LONG_COLUMN, DataType.LONG).addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
       .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE).addSingleValueDimension(STRING_COLUMN, DataType.STRING)
       .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES).addMultiValueDimension(INT_MV_COLUMN, DataType.INT)
       .addMultiValueDimension(LONG_MV_COLUMN, DataType.LONG).addMultiValueDimension(FLOAT_MV_COLUMN, DataType.FLOAT)
       .addMultiValueDimension(DOUBLE_MV_COLUMN, DataType.DOUBLE)
-      .addMultiValueDimension(STRING_MV_COLUMN, DataType.STRING).build();
+      .addMultiValueDimension(STRING_MV_COLUMN, DataType.STRING)
+      .addSingleValueDimension(NULLABLE_INT_COLUMN, DataType.INT).build();
   private static final TableConfig TABLE_CONFIG =
-      new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+      new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNullHandlingEnabled(true).build();
 
   private final int[] _values = new int[NUM_RECORDS];
   private final List<GenericRow> _records = new ArrayList<>(NUM_RECORDS);
@@ -142,6 +146,7 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       record.putValue(FLOAT_MV_COLUMN, new Float[]{floatValue, floatValue + MAX_VALUE});
       record.putValue(DOUBLE_MV_COLUMN, new Double[]{doubleValue, doubleValue + MAX_VALUE});
       record.putValue(STRING_MV_COLUMN, new String[]{stringValue, stringValue + MAX_VALUE});
+      record.putValue(NULLABLE_INT_COLUMN, i % 4 == 0 ? null : intValue);
       records.add(record);
     }
     _records.addAll(records);
@@ -679,6 +684,36 @@ public class IdSetQueriesTest extends BaseQueriesTest {
     BadQueryRequestException exception = expectThrows(BadQueryRequestException.class, () -> getOperator(query));
     assertTrue(exception.getMessage().contains("Cannot look up LONG values in an IdSet built from INT values"),
         exception.getMessage());
+  }
+
+  /// As with an `IN` subquery, no value is in an empty IdSet, not even NULL. With null handling enabled, `IN_ID_SET` is
+  /// FALSE for a NULL value when the IdSet is empty, and NULL when it is not.
+  @Test
+  public void testInIdSetNullHandling()
+      throws IOException {
+    IdSet idSet = IdSets.create(DataType.INT);
+    for (int value : _values) {
+      idSet.add(value);
+    }
+    // 2 instances with 2 segments each
+    int numRecords = 4 * NUM_RECORDS;
+    int numNullRecords = 4 * NUM_NULL_RECORDS;
+
+    String emptyIdSet = IdSets.emptyIdSet().toBase64String();
+    assertCount(NULLABLE_INT_COLUMN, emptyIdSet, 1, 0);
+    assertCount(NULLABLE_INT_COLUMN, emptyIdSet, 0, numRecords);
+    // Whether a NULL value is in a non-empty IdSet is unknown, so neither filter keeps the NULL records
+    assertCount(NULLABLE_INT_COLUMN, idSet.toBase64String(), 1, numRecords - numNullRecords);
+    assertCount(NULLABLE_INT_COLUMN, idSet.toBase64String(), 0, 0);
+  }
+
+  private void assertCount(String column, String serializedIdSet, int inIdSet, long expectedCount) {
+    BrokerResponseNative brokerResponse = getBrokerResponse(
+        "SET enableNullHandling = true; SELECT COUNT(*) FROM testTable WHERE IN_ID_SET(" + column + ", '"
+            + serializedIdSet + "') = " + inIdSet);
+    assertTrue(brokerResponse.getExceptions().isEmpty(), brokerResponse.getExceptions().toString());
+    assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], expectedCount,
+        "IN_ID_SET = " + inIdSet + " with IdSet " + serializedIdSet);
   }
 
   @AfterClass

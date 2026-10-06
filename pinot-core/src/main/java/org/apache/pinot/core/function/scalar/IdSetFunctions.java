@@ -66,6 +66,13 @@ public class IdSetFunctions {
   /// types the lookup cannot map to a value type (e.g. BigDecimal for an INT literal). The runtime evaluates them
   /// instead, as before this function existed. The flag also marks the function VOLATILE, so ingestion transforms
   /// cannot use it.
+  ///
+  /// The flag does not stop the multi-stage planner from pushing `IN_ID_SET` below a join into a leaf stage, because
+  /// the planner uses the operator of the `IN_ID_SET` transform function, which is deterministic. The operator table
+  /// registers transform functions before scalar functions, and skips this function because its name is taken. If
+  /// the transform function's operator is removed, this function's volatile operator takes its place, and
+  /// `PinotRuleUtils.isRelocatable` then keeps `IN_ID_SET` above joins. Tests in `JoinPlans.json` and
+  /// `PhysicalOptimizerPlans.json` pin the push-down.
   @Nullable
   @ScalarFunction(nullableParameters = true, isDeterministic = false)
   public Boolean inIdSet(@Nullable Object value, @Nullable String serializedIdSet) {
