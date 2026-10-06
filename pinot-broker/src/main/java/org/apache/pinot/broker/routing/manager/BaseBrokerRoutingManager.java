@@ -139,8 +139,6 @@ public abstract class BaseBrokerRoutingManager
   private final Set<String> _excludedServers = new HashSet<>();
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final PinotConfiguration _pinotConfig;
-  private volatile int _partitionPruningPreparationThreshold =
-      CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD;
   private final boolean _enablePartitionMetadataManager;
   private final long _newSegmentExpirationMs;
   private final ExecutorService _executorService;
@@ -173,6 +171,9 @@ public abstract class BaseBrokerRoutingManager
   private String _idealStatePathPrefix;
   private String _instanceConfigsPath;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
+
+  private volatile int _partitionPruningPreparationThreshold =
+      CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD;
 
   /// Snapshot of `_enabledServerInstanceMap` restricted to enabled-minus-excluded servers. Replaced atomically under
   /// `_globalLock.writeLock()` whenever routing membership changes. Serves as the single source of truth for routable

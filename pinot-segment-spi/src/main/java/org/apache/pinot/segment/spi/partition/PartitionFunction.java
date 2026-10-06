@@ -32,6 +32,8 @@ import javax.annotation.Nullable;
 /// result. Implementations must also be safe for concurrent invocation by multiple threads.
 /// Functions with equal identity may reuse partition ids during broker pruning. Implementations that override
 /// `equals` and `hashCode` must include every setting that affects partition ids, including subclass state.
+/// The raw function-config map need not be compared when parsed fields already capture all partition-ID-affecting
+/// settings; unrelated config entries should not prevent reuse.
 public interface PartitionFunction extends Serializable {
 
   /// Method to compute and return partition id for the given value.
@@ -59,6 +61,12 @@ public interface PartitionFunction extends Serializable {
   ///
   /// @return Number of possible partitions.
   int getNumPartitions();
+
+  /// Whether query-local predicate preparation is useful for this function. Functions whose instances cannot be
+  /// compared cheaply across segments can return false to use the original per-segment pruning path.
+  default boolean supportsPartitionIdPreparation() {
+    return true;
+  }
 
   /// Returns the configuration used to construct this function, or null if none is exposed.
   @Nullable

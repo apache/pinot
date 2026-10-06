@@ -144,6 +144,12 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
         continue;
       }
       PartitionFunction function = partitionInfo.getPartitionFunction();
+      if (!function.supportsPartitionIdPreparation()) {
+        if (isPartitionMatch(filterExpression, partitionInfo)) {
+          selectedSegments.add(segment);
+        }
+        continue;
+      }
       PreparedPredicate predicate = null;
       if (predicateMap == null) {
         for (PreparedPredicate candidate : predicates) {
