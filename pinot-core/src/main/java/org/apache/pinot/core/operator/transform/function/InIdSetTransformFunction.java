@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
@@ -27,6 +28,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -44,10 +46,21 @@ import org.roaringbitmap.RoaringBitmap;
 public class InIdSetTransformFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
   private IdSet _idSet;
+  // The query the function is initialized for, if any. The segments of a query share one deserialized IdSet, which can
+  // hold millions of ids.
+  @Nullable
+  private QueryContext _queryContext;
 
   @Override
   public String getName() {
     return TransformFunctionType.IN_ID_SET.getName();
+  }
+
+  @Override
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
+      QueryContext queryContext) {
+    _queryContext = queryContext;
+    init(arguments, columnContextMap, queryContext.isNullHandlingEnabled());
   }
 
   @Override
@@ -61,12 +74,25 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
         "Second argument for IN_ID_SET transform function must be a literal string of the base64 encoded IdSet");
 
     _transformFunction = arguments.get(0);
+    String serializedIdSet = ((LiteralTransformFunction) arguments.get(1)).getStringLiteral();
+    // The IdSet is only read after this, which is safe from the threads of several segments
+    _idSet = _queryContext != null
+        ? _queryContext.getOrComputeSharedValue(IdSet.class, serializedIdSet, InIdSetTransformFunction::deserialize)
+        : deserialize(serializedIdSet);
+    IdSets.validateValueType(_idSet, _transformFunction.getResultMetadata().getDataType().getStoredType());
+  }
+
+  private static IdSet deserialize(String serializedIdSet) {
     try {
-      _idSet = IdSets.fromBase64String(((LiteralTransformFunction) arguments.get(1)).getStringLiteral());
+      return IdSets.fromBase64String(serializedIdSet);
     } catch (IOException | RuntimeException e) {
       throw new IllegalArgumentException("Caught exception while deserializing IdSet: " + e, e);
     }
-    IdSets.validateValueType(_idSet, _transformFunction.getResultMetadata().getDataType().getStoredType());
+  }
+
+  @VisibleForTesting
+  IdSet getIdSet() {
+    return _idSet;
   }
 
   @Override

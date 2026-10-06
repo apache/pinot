@@ -20,6 +20,7 @@ package org.apache.pinot.broker.grpc;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import io.grpc.Attributes;
 import io.grpc.Grpc;
@@ -131,6 +132,12 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
       return;
     }
 
+    int maxInboundMessageSizeBytes = brokerConf.getProperty(
+        CommonConstants.Broker.Grpc.KEY_OF_GRPC_MAX_INBOUND_MESSAGE_SIZE_BYTES,
+        CommonConstants.Broker.Grpc.DEFAULT_GRPC_MAX_INBOUND_MESSAGE_SIZE_BYTES);
+    Preconditions.checkArgument(maxInboundMessageSizeBytes > 0, "%s must be positive, got: %s",
+        CommonConstants.Broker.Grpc.KEY_OF_GRPC_MAX_INBOUND_MESSAGE_SIZE_BYTES, maxInboundMessageSizeBytes);
+
     try {
       // Create buffer allocator and register metrics
       PooledByteBufAllocator bufAllocator = new PooledByteBufAllocator(true);
@@ -141,7 +148,8 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
           .addService(this)
           .addTransportFilter(new BrokerGrpcTransportFilter())
           .withChildOption(ChannelOption.ALLOCATOR, bufAllocator)
-          .withOption(ChannelOption.ALLOCATOR, bufAllocator);
+          .withOption(ChannelOption.ALLOCATOR, bufAllocator)
+          .maxInboundMessageSize(maxInboundMessageSizeBytes);
 
       // Add SSL context only for secure connection
       if (isSecure) {
