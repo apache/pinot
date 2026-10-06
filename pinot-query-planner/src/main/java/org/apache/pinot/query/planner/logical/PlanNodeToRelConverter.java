@@ -108,8 +108,18 @@ public final class PlanNodeToRelConverter {
       visitChildren(node);
 
       try {
-        int[] groupKeyArr = node.getGroupKeys().stream().mapToInt(Integer::intValue).toArray();
-        RelBuilder.GroupKey groupKey = _builder.groupKey(groupKeyArr);
+        List<Integer> groupKeys = node.getGroupKeys();
+        RelBuilder.GroupKey groupKey;
+        if (node.isGroupingSets()) {
+          // Each grouping set holds indexes into the group keys, not input field indexes
+          List<ImmutableBitSet> groupSets = new ArrayList<>(node.getGroupingSets().size());
+          for (List<Integer> groupingSet : node.getGroupingSets()) {
+            groupSets.add(ImmutableBitSet.of(groupingSet.stream().map(groupKeys::get).collect(Collectors.toList())));
+          }
+          groupKey = _builder.groupKey(ImmutableBitSet.of(groupKeys), groupSets);
+        } else {
+          groupKey = _builder.groupKey(groupKeys.stream().mapToInt(Integer::intValue).toArray());
+        }
 
         List<RexExpression.FunctionCall> functionCalls = node.getAggCalls();
         List<Integer> filterArgs = node.getFilterArgs();
