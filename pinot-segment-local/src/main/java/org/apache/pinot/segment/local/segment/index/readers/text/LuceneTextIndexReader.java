@@ -230,8 +230,10 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _indexSearcher.search(buildQuery(searchQuery, optionsString), docIDCollector);
       return docIds;
     } catch (Exception e) {
+      // Wording matches what the options path threw before the two paths were merged; it is asserted on in
+      // TextSearchQueriesTest#testTextFilterOptimizerWithWildcardsDifferentOptions.
       throw new RuntimeException(
-          "Caught exception while searching the text index for column:" + _column + " search query:" + searchQuery, e);
+          "Failed while searching the text index for column " + _column + " with search query: " + searchQuery, e);
     }
   }
 
