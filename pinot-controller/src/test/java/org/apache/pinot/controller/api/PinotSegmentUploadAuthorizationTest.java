@@ -405,7 +405,12 @@ public class PinotSegmentUploadAuthorizationTest extends ControllerTest {
         @Override
         public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders,
             String endpointUrl) {
-          return tableName == null || _allowedTables.contains(tableName);
+          // A null table name means the request named no table, so it is cluster-wide and must be decided by the
+          // cluster policy below rather than allowed by default.
+          if (tableName == null) {
+            return hasAccess(accessType, httpHeaders, endpointUrl);
+          }
+          return _allowedTables.contains(tableName);
         }
 
         @Override

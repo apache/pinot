@@ -1294,11 +1294,12 @@ public class PinotHelixTaskResourceManager {
         String taskIdForPartition = jobContext.getTaskIdForPartition(partition);
         TaskPartitionState partitionState = jobContext.getPartitionState(partition);
         TaskConfig helixTaskConfig = jobConfig.getTaskConfig(taskIdForPartition);
-        PinotTaskConfig pinotTaskConfig = null;
-        if (helixTaskConfig != null) {
-          pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig);
-          if ((tableNameWithType != null) && (!tableNameWithType.equals(pinotTaskConfig.getTableName()))) {
-            // Filter task configs that match this table name
+        PinotTaskConfig pinotTaskConfig =
+            helixTaskConfig != null ? PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig) : null;
+        if (tableNameWithType != null) {
+          // A table filter was requested, so keep only subtasks confirmably belonging to that table. A missing Helix
+          // task config leaves the subtask's table unknown, so drop it rather than report it under the filter.
+          if (pinotTaskConfig == null || !tableNameWithType.equals(pinotTaskConfig.getTableName())) {
             continue;
           }
         }
