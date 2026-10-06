@@ -192,7 +192,7 @@ public class SinglePartitionColumnSegmentPrunerTest {
   }
 
   @Test
-  public void testDuplicateInPartitionsAndIncrementalEvaluation() throws Exception {
+  public void testDuplicateInPartitionsArePreparedOnce() throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
     records.put("first", metadata("first", "PrunerCounting", 8, Set.of(1), null));
     records.put("configured", metadata("configured", "PrunerCounting", 8, Set.of(3), Map.of("offset", "1")));
@@ -207,10 +207,14 @@ public class SinglePartitionColumnSegmentPrunerTest {
     }
     SinglePartitionColumnSegmentPruner pruner = pruner(records);
     CountingPartitionFunction.CALLS.set(0);
-    // The configured segment must not consume or extend the prefix cached by the first segment.
+    // Every literal is prepared once for each function, even when several literals map to the same partition.
     assertEquals(pruner.prune(request(predicate("IN", "1", "9", "17", "2")), records.keySet()),
         expected);
     assertEquals(CountingPartitionFunction.CALLS.get(), 8);
+    Set<String> firstHits = Set.of("first", "repeat");
+    CountingPartitionFunction.CALLS.set(0);
+    assertEquals(pruner(records, 1).prune(request(predicate("IN", "1", "9", "17", "2")), firstHits), firstHits);
+    assertEquals(CountingPartitionFunction.CALLS.get(), 4, "Preparation must include values after the first hit");
     // A configured first segment must not seed IDs for later default-config segments.
     records.put("first", metadata("first", "PrunerCounting", 8, Set.of(2), Map.of("offset", "1")));
     assertEquals(pruner(records).prune(request(predicate("IN", "1", "9", "17", "2")), records.keySet()), expected);
@@ -287,11 +291,11 @@ public class SinglePartitionColumnSegmentPrunerTest {
   }
 
   @Test
-  public void testNestedOrAfterMissWithMultipleSegmentPartitions() throws Exception {
+  public void testPreparedAndOrWithMultipleSegmentPartitions() throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
     records.put("miss", metadata("miss", "Modulo", 8, Set.of(7), null));
     records.put("multiple", metadata("multiple", "Modulo", 8, Set.of(1, 2), null));
-    for (int i = 2; i < 512; i++) {
+    for (int i = 2; i < Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD; i++) {
       String segment = "segment_" + i;
       records.put(segment, metadata(segment, "Modulo", 8, Set.of(i % 8), null));
     }
@@ -305,8 +309,15 @@ public class SinglePartitionColumnSegmentPrunerTest {
     Set<String> expected = pruner.prune(legacy, records.keySet());
     assertTrue(expected.contains("multiple"));
     assertEquals(pruner.prune(prepared, records.keySet()), expected);
-    assertTrue(pruner.prune(request(function("AND", predicate("EQUALS", "1"), predicate("EQUALS", "2"))),
-        records.keySet()).contains("multiple"));
+    assertEquals(pruner.prune(request(function("AND", predicate("EQUALS", "1"), predicate("EQUALS", "2"))),
+        records.keySet()), Set.of(), "Different rows cannot satisfy an impossible single-valued conjunction");
+    Expression intersection = function("AND", predicate("IN", "1", "2"), predicate("IN", "2", "3"));
+    assertEquals(pruner.prune(request(intersection), records.keySet()),
+        pruner.prune(request(predicate("EQUALS", "2")), records.keySet()));
+    assertEquals(pruner.prune(request(function("OR", intersection, predicate("EQUALS", "4"))), records.keySet()),
+        pruner.prune(request(predicate("IN", "2", "4")), records.keySet()));
+    expectThrows(NumberFormatException.class, () -> pruner.prune(request(function("AND", predicate("EQUALS", "1"),
+        predicate("EQUALS", "2"), predicate("EQUALS", "invalid-number"))), records.keySet()));
   }
 
   @DataProvider
@@ -316,7 +327,7 @@ public class SinglePartitionColumnSegmentPrunerTest {
   }
 
   @Test(dataProvider = "candidateCounts")
-  public void testAndOrUnsupportedPredicatesAndLazyInValues(int numSegments, @Nullable Integer queryMinSegments)
+  public void testAndOrUnsupportedPredicatesAndShortCircuitErrors(int numSegments, @Nullable Integer queryMinSegments)
       throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
     for (int i = 0; i < numSegments; i++) {

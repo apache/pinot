@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.segmentpruner;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.ints.IntSets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -135,8 +136,8 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
 
   private Set<String> pruneWithPreparedPredicate(Expression filterExpression, Set<String> segments) {
     Set<String> selectedSegments = new HashSet<>();
-    List<PreparedPredicate> predicates = new ArrayList<>(2);
-    Map<PartitionFunction, PreparedPredicate> predicateMap = null;
+    List<PreparedPartitionIds> predicates = new ArrayList<>(2);
+    Map<PartitionFunction, PreparedPartitionIds> predicateMap = null;
     for (String segment : segments) {
       SegmentPartitionInfo partitionInfo = _partitionInfoMap.get(segment);
       if (partitionInfo == null || partitionInfo == SegmentPartitionUtils.INVALID_PARTITION_INFO) {
@@ -150,9 +151,9 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
         }
         continue;
       }
-      PreparedPredicate predicate = null;
+      PreparedPartitionIds predicate = null;
       if (predicateMap == null) {
-        for (PreparedPredicate candidate : predicates) {
+        for (PreparedPartitionIds candidate : predicates) {
           if (function.equals(candidate._partitionFunction)) {
             predicate = candidate;
             break;
@@ -162,20 +163,27 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
         predicate = predicateMap.get(function);
       }
       if (predicate == null) {
-        predicate = new PreparedPredicate(filterExpression, function);
+        try {
+          predicate = new PreparedPartitionIds(function, preparePartitionIds(filterExpression, function), false);
+        } catch (RuntimeException e) {
+          // Preparation can reach a value or branch that per-segment short-circuiting would skip. Defer errors
+          // to the original evaluator, and remember the fallback so this function is not prepared again.
+          predicate = new PreparedPartitionIds(function, null, true);
+        }
         if (predicateMap == null && predicates.size() < MAX_LINEAR_FUNCTIONS) {
           predicates.add(predicate);
         } else {
           if (predicateMap == null) {
             predicateMap = new HashMap<>();
-            for (PreparedPredicate candidate : predicates) {
+            for (PreparedPartitionIds candidate : predicates) {
               predicateMap.put(candidate._partitionFunction, candidate);
             }
           }
           predicateMap.put(function, predicate);
         }
       }
-      if (predicate.matches(partitionInfo.getPartitions())) {
+      if (predicate._preparationFailed ? isPartitionMatch(filterExpression, partitionInfo)
+          : predicate.matches(partitionInfo.getPartitions())) {
         selectedSegments.add(segment);
       }
     }
@@ -230,139 +238,105 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
     }
   }
 
-  /// Lazily prepares only visited expressions and values. Instances belong to one prune call, never shared by queries.
-  private final class PreparedPredicate {
-    private final Expression _expression;
-    private final PartitionFunction _partitionFunction;
-    private FilterKind _kind;
-    private List<Expression> _operands;
-    private PreparedPredicate[] _children;
-    private boolean _isPartitionPredicate;
-    private Integer _singlePartitionId;
-    // IN holds visited values; OR holds the complete union after a miss.
-    private IntSet _partitionIds;
-    // IN counts visited values; OR uses -1 when its children cannot be collapsed.
-    private int _numEvaluatedValues;
+  /// Computes conservative candidate IDs for the whole predicate. Null represents every partition.
+  /// Partition columns are single-valued, so a row satisfying AND must belong to every child's candidate set.
+  @Nullable
+  private IntSet preparePartitionIds(Expression expression, PartitionFunction partitionFunction) {
+    Function function = expression.getFunctionCall();
+    FilterKind kind = FilterKind.valueOf(function.getOperator());
+    List<Expression> operands = function.getOperands();
+    switch (kind) {
+      case AND: {
+        IntSet ids = null;
+        for (Expression child : operands) {
+          IntSet childIds = preparePartitionIds(child, partitionFunction);
+          if (childIds != null) {
+            if (ids == null) {
+              ids = childIds;
+            } else {
+              // Singleton leaves are immutable; composite and IN sets can be intersected in place.
+              if (!(ids instanceof IntOpenHashSet)) {
+                ids = new IntOpenHashSet(ids);
+              }
+              ids.retainAll(childIds);
+            }
+          }
+        }
+        return ids;
+      }
+      case OR: {
+        IntSet ids = new IntOpenHashSet();
+        boolean matchesAll = false;
+        for (Expression child : operands) {
+          IntSet childIds = preparePartitionIds(child, partitionFunction);
+          if (childIds == null) {
+            matchesAll = true;
+          } else {
+            ids.addAll(childIds);
+          }
+        }
+        return matchesAll ? null : ids;
+      }
+      case EQUALS:
+      case IN: {
+        Identifier identifier = operands.get(0).getIdentifier();
+        if (identifier == null || !identifier.getName().equals(_partitionColumn)) {
+          return null;
+        }
+        int numValues = kind == FilterKind.EQUALS ? 1 : operands.size() - 1;
+        if (numValues == 1) {
+          return IntSets.singleton(partitionFunction.getPartition(RequestContextUtils.getStringValue(operands.get(1))));
+        }
+        IntSet ids = new IntOpenHashSet(Math.min(numValues, partitionFunction.getNumPartitions()));
+        for (int i = 1; i <= numValues; i++) {
+          ids.add(partitionFunction.getPartition(RequestContextUtils.getStringValue(operands.get(i))));
+        }
+        return ids;
+      }
+      default:
+        return null;
+    }
+  }
 
-    private PreparedPredicate(Expression expression, PartitionFunction partitionFunction) {
-      _expression = expression;
+  /// Prepared IDs belong to one prune call. Their sets are read-only after construction and never shared by queries.
+  private static final class PreparedPartitionIds {
+    private final PartitionFunction _partitionFunction;
+    @Nullable
+    private final IntSet _partitionIds;
+    @Nullable
+    private final Integer _singlePartitionId;
+    private final boolean _preparationFailed;
+
+    private PreparedPartitionIds(PartitionFunction partitionFunction, @Nullable IntSet partitionIds,
+        boolean preparationFailed) {
       _partitionFunction = partitionFunction;
+      _partitionIds = partitionIds;
+      _singlePartitionId = partitionIds != null && partitionIds.size() == 1 ? partitionIds.iterator().nextInt() : null;
+      _preparationFailed = preparationFailed;
     }
 
     private boolean matches(Set<Integer> partitions) {
-      if (_kind == null) {
-        Function function = _expression.getFunctionCall();
-        _kind = FilterKind.valueOf(function.getOperator());
-        _operands = function.getOperands();
-        if (_kind == FilterKind.AND || _kind == FilterKind.OR) {
-          _children = new PreparedPredicate[_operands.size()];
-          for (int i = 0; i < _children.length; i++) {
-            _children[i] = new PreparedPredicate(_operands.get(i), _partitionFunction);
+      if (_partitionIds == null) {
+        return true;
+      }
+      if (_singlePartitionId != null) {
+        return partitions.contains(_singlePartitionId);
+      }
+      // Probe the smaller set; a segment can itself contain many partitions.
+      if (_partitionIds.size() <= partitions.size()) {
+        IntIterator iterator = _partitionIds.iterator();
+        while (iterator.hasNext()) {
+          if (partitions.contains(iterator.nextInt())) {
+            return true;
           }
-        } else if (_kind == FilterKind.EQUALS || _kind == FilterKind.IN) {
-          Identifier identifier = _operands.get(0).getIdentifier();
-          _isPartitionPredicate = identifier != null && identifier.getName().equals(_partitionColumn);
         }
-      }
-      switch (_kind) {
-        case AND:
-          for (PreparedPredicate child : _children) {
-            if (!child.matches(partitions)) {
-              return false;
-            }
-          }
-          return true;
-        case OR:
-          return matchesOr(partitions);
-        case EQUALS:
-        case IN:
-          if (_isPartitionPredicate) {
-            int numValues = _kind == FilterKind.EQUALS ? 1 : _operands.size() - 1;
-            if (numValues == 1) {
-              if (_singlePartitionId == null) {
-                _singlePartitionId =
-                    _partitionFunction.getPartition(RequestContextUtils.getStringValue(_operands.get(1)));
-              }
-              return partitions.contains(_singlePartitionId);
-            }
-            if (_partitionIds == null) {
-              // Grow only as literals are visited: a long IN can match its first value on every segment.
-              _partitionIds = new IntOpenHashSet(1);
-            }
-            // Probe the smaller set; a segment can itself contain many partitions.
-            if (_partitionIds.size() == 1) {
-              if (partitions.contains(_singlePartitionId)) {
-                return true;
-              }
-            } else if (_partitionIds.size() <= partitions.size()) {
-              IntIterator iterator = _partitionIds.iterator();
-              while (iterator.hasNext()) {
-                if (partitions.contains(iterator.nextInt())) {
-                  return true;
-                }
-              }
-            } else {
-              for (int partition : partitions) {
-                if (_partitionIds.contains(partition)) {
-                  return true;
-                }
-              }
-            }
-            while (_numEvaluatedValues < numValues) {
-              int partitionId = _partitionFunction.getPartition(
-                  RequestContextUtils.getStringValue(_operands.get(_numEvaluatedValues + 1)));
-              if (_numEvaluatedValues == 0) {
-                _singlePartitionId = partitionId;
-              }
-              _numEvaluatedValues++;
-              _partitionIds.add(partitionId);
-              if (partitions.contains(partitionId)) {
-                return true;
-              }
-            }
-            return false;
-          }
-          return true;
-        default:
-          return true;
-      }
-    }
-
-    private boolean matchesOr(Set<Integer> partitions) {
-      if (_partitionIds != null) {
+      } else {
         for (int partition : partitions) {
           if (_partitionIds.contains(partition)) {
             return true;
           }
         }
-        return false;
       }
-      for (PreparedPredicate child : _children) {
-        if (child.matches(partitions)) {
-          return true;
-        }
-      }
-      if (_numEvaluatedValues < 0) {
-        return false;
-      }
-      // Only a miss visits every value. Once all direct partition predicates have been visited, their union
-      // can answer subsequent OR checks without traversing the expression tree.
-      IntSet ids = new IntOpenHashSet();
-      for (PreparedPredicate child : _children) {
-        if (!child._isPartitionPredicate) {
-          _numEvaluatedValues = -1;
-          return false;
-        }
-        if (child._kind == FilterKind.EQUALS || child._operands.size() == 2) {
-          ids.add(child._singlePartitionId);
-        } else if (child._numEvaluatedValues == child._operands.size() - 1) {
-          ids.addAll(child._partitionIds);
-        } else {
-          _numEvaluatedValues = -1;
-          return false;
-        }
-      }
-      _partitionIds = ids;
       return false;
     }
   }
