@@ -92,11 +92,22 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   /// Returns the size retention limit, expressed as a positive size understood by
   /// [DataSizeUtils#toBytes(String)], for example `"100G"`.
   ///
-  /// The limit applies to the sum of compressed segment archive bytes for one replica of this table. OFFLINE and
-  /// REALTIME tables enforce their limits independently, including the two types of a hybrid table. When time retention
-  /// is also configured, a segment can be deleted by either retention criterion. Consuming segments and segments
-  /// protected by segment lineage are not removed to enforce the limit, so it may be exceeded. This is an asynchronous
-  /// retention policy, not a limit on server disk usage or an ingestion quota. A null value disables size retention.
+  /// The limit applies to the sum of compressed archive bytes for active, live segments, counted once regardless of
+  /// replication. Segments replaced by COMPLETED lineage entries are excluded. An IN_PROGRESS lineage entry, missing
+  /// segment metadata, or an unknown completed segment size causes the entire size retention pass to be skipped.
+  /// OFFLINE and REALTIME tables enforce their limits independently, including the two types of a hybrid table.
+  ///
+  /// Size retention removes the oldest eligible segments first, preserving the newest OFFLINE segment and the
+  /// highest-sequence DONE LLC segment in each REALTIME partition group. Consuming segments are never removed by this
+  /// policy. With lineage-exclusive deletion enabled, lineage-locked segments are also protected. The IN_PROGRESS
+  /// lineage skip applies regardless of that setting. When hybrid retention is enabled and an OFFLINE counterpart
+  /// exists, REALTIME size retention only removes segments whose end time is strictly below the OFFLINE time boundary;
+  /// an unavailable boundary prevents REALTIME size retention. These protections can leave the table above the
+  /// configured limit.
+  ///
+  /// This is an asynchronous, best-effort retention policy, not a limit on decompressed server disk usage,
+  /// memory usage, or ingestion. When time retention is also configured, a segment can be deleted by either criterion.
+  /// A null value disables size retention.
   public String getRetentionSize() {
     return _retentionSize;
   }

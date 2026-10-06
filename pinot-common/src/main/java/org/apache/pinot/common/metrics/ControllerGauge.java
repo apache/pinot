@@ -208,6 +208,10 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Metric used to track errors during the periodic table retention management
   RETENTION_MANAGER_ERROR("retentionManagerError", false),
 
+  /// Table size retention status: 1 when a configured policy cannot run safely, deletion fails, or protected data keeps
+  /// the table above its cap; 0 when the policy is disabled or the latest pass succeeds within the cap.
+  SIZE_RETENTION_BLOCKED("sizeRetentionBlocked", false),
+
   // Gauge to reflect whether pauseless is enabled or not
   PAUSELESS_CONSUMPTION_ENABLED("pauselessConsumptionEnabled", false),
 

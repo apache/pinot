@@ -38,6 +38,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.logging.log4j.util.Strings;
+import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
@@ -50,6 +51,7 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
@@ -131,20 +133,21 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     manageSizeBasedRetention(tableConfig);
   }
 
-  /// Enforces the optional compressed-segment size limit independently of time retention. The limit counts one
-  /// copy of every active completed segment, including segments protected by lineage or realtime recovery. Unknown
-  /// sizes or missing metadata disable this pass; consuming segments are excluded from both accounting and eviction.
+  /// Enforces the optional compressed-segment size limit on live data independently of time retention. Replaced
+  /// segments are excluded from accounting, and an in-progress replacement postpones the entire pass. The newest
+  /// OFFLINE segment and realtime recovery segments are preserved; hybrid realtime eviction requires offline coverage.
+  /// Unknown sizes or missing metadata disable this pass; consuming segments are excluded from accounting and eviction.
   @VisibleForTesting
   protected void manageSizeBasedRetention(TableConfig tableConfig) {
-    String retentionSize = tableConfig.getValidationConfig().getRetentionSize();
-    if (retentionSize == null) {
-      return;
-    }
     String tableNameWithType = tableConfig.getTableName();
-    if (tableConfig.getTableType() == TableType.OFFLINE
-        && !"APPEND".equalsIgnoreCase(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig))) {
+    String retentionSize = tableConfig.getValidationConfig().getRetentionSize();
+    if (retentionSize == null || (tableConfig.getTableType() == TableType.OFFLINE
+        && !"APPEND".equalsIgnoreCase(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig)))) {
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.SIZE_RETENTION_BLOCKED, 0);
       return;
     }
+    // Leave the gauge blocked on unsafe early returns or exceptions, and clear it only after a successful pass.
+    _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.SIZE_RETENTION_BLOCKED, 1);
     long retentionSizeBytes;
     try {
       retentionSizeBytes = DataSizeUtils.toBytes(retentionSize);
@@ -154,8 +157,17 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       return;
     }
 
-    Set<String> activeSegments = new HashSet<>(_pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false));
+    SegmentLineage segmentLineage =
+        SegmentLineageAccessHelper.getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
+    if (segmentLineage != null && segmentLineage.getLineageEntries().values().stream()
+        .anyMatch(entry -> entry.getState() == LineageEntryState.IN_PROGRESS)) {
+      LOGGER.warn("In-progress segment lineage for table: {}, skip size retention", tableNameWithType);
+      return;
+    }
+    // Replaced segments awaiting lineage cleanup are no longer queryable and must not trigger live-data eviction.
+    Set<String> activeSegments = new HashSet<>(_pinotHelixResourceManager.getSegmentsFor(tableNameWithType, true));
     if (activeSegments.isEmpty()) {
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.SIZE_RETENTION_BLOCKED, 0);
       return;
     }
     List<SegmentZKMetadata> metadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType);
@@ -189,26 +201,50 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
     BigInteger limit = BigInteger.valueOf(retentionSizeBytes);
     if (retainedBytes.compareTo(limit) <= 0) {
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.SIZE_RETENTION_BLOCKED, 0);
       return;
     }
 
+    Comparator<SegmentZKMetadata> evictionOrder = Comparator.comparingLong(RetentionManager::getSizeRetentionTimestamp)
+        .thenComparing(SegmentZKMetadata::getSegmentName);
     List<String> candidateNames = completedSegments.stream()
         .filter(metadata -> getSizeRetentionTimestamp(metadata) >= 0)
         .map(SegmentZKMetadata::getSegmentName)
         .collect(Collectors.toCollection(ArrayList::new));
     if (realtime) {
       candidateNames.removeAll(_pinotHelixResourceManager.getLastLLCCompletedSegments(metadataList));
+      if (_isHybridTableRetentionStrategyEnabled) {
+        TableConfig offlineTableConfig =
+            _pinotHelixResourceManager.getOfflineTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType));
+        if (offlineTableConfig != null) {
+          long timeBoundaryMs;
+          try {
+            timeBoundaryMs = getHybridTimeBoundaryMs(offlineTableConfig);
+          } catch (Exception e) {
+            LOGGER.warn("Cannot determine offline coverage for table: {}, skip size retention", tableNameWithType, e);
+            return;
+          }
+          Set<String> coveredSegments = completedSegments.stream()
+              .filter(metadata -> metadata.getEndTimeMs() >= 0 && metadata.getEndTimeMs() < timeBoundaryMs)
+              .map(SegmentZKMetadata::getSegmentName).collect(Collectors.toSet());
+          candidateNames.retainAll(coveredSegments);
+        }
+      }
+    } else {
+      // A size typo must not remove the entire OFFLINE table, even if its newest segment exceeds the cap alone.
+      completedSegments.stream().filter(metadata -> getSizeRetentionTimestamp(metadata) >= 0)
+          .max(evictionOrder).map(SegmentZKMetadata::getSegmentName).ifPresent(candidateNames::remove);
     }
     // Protect lineage before selecting victims: protected bytes still count toward the limit.
     removeLineageLockedSegments(tableNameWithType, candidateNames);
     Set<String> candidates = new HashSet<>(candidateNames);
     completedSegments.removeIf(metadata -> !candidates.contains(metadata.getSegmentName()));
-    completedSegments.sort(Comparator.comparingLong(RetentionManager::getSizeRetentionTimestamp)
-        .thenComparing(SegmentZKMetadata::getSegmentName));
+    completedSegments.sort(evictionOrder);
 
     List<String> segmentsToDelete = new ArrayList<>();
+    BigInteger projectedRetainedBytes = retainedBytes;
     for (SegmentZKMetadata metadata : completedSegments) {
-      if (retainedBytes.compareTo(limit) <= 0) {
+      if (projectedRetainedBytes.compareTo(limit) <= 0) {
         break;
       }
       long size = completedSegmentSizes.get(metadata.getSegmentName());
@@ -216,17 +252,33 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         continue;
       }
       segmentsToDelete.add(metadata.getSegmentName());
-      retainedBytes = retainedBytes.subtract(BigInteger.valueOf(size));
+      projectedRetainedBytes = projectedRetainedBytes.subtract(BigInteger.valueOf(size));
     }
     if (!segmentsToDelete.isEmpty()) {
-      LOGGER.info("Deleting {} oldest segments from table: {} for retention size: {}", segmentsToDelete.size(),
-          tableNameWithType, retentionSize);
       // The public deletion path rechecks live lineage in case it changed after candidate selection.
-      _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
+      PinotResourceManagerResponse response =
+          _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
+      if (response == null || !response.isSuccessful()) {
+        LOGGER.warn("Size retention deletion failed for table: {}, bytes retained: {}, cap: {}, response: {}",
+            tableNameWithType, retainedBytes, retentionSize, response);
+        return;
+      }
+      retainedBytes = projectedRetainedBytes;
+      LOGGER.info("Deleted {} oldest segments from table: {} for retention size: {}", segmentsToDelete.size(),
+          tableNameWithType, retentionSize);
     }
     if (retainedBytes.compareTo(limit) > 0) {
       LOGGER.warn("Table: {} remains above retention size: {} due to protected or undated segments",
           tableNameWithType, retentionSize);
+    } else {
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.SIZE_RETENTION_BLOCKED, 0);
+    }
+  }
+
+  @Override
+  protected void nonLeaderCleanup(List<String> tableNamesWithType) {
+    for (String tableNameWithType : tableNamesWithType) {
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SIZE_RETENTION_BLOCKED);
     }
   }
 
@@ -360,29 +412,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     LOGGER.info("Managing retention for hybrid table: {}", realtimeTableConfig.getTableName());
     List<String> segmentsToDelete = new ArrayList<>();
     String realtimeTableName = realtimeTableConfig.getTableName();
-    String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     try {
-      ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-      Schema schema = ZKMetadataProvider.getTableSchema(propertyStore, offlineTableName);
-      Preconditions.checkState(schema != null, "Failed to get schema for table: " + offlineTableName);
-      String timeColumn = null;
-      SegmentsValidationAndRetentionConfig validationConfig = offlineTableConfig.getValidationConfig();
-      if (validationConfig != null) {
-        timeColumn = validationConfig.getTimeColumnName();
-      }
-      Preconditions.checkState(StringUtils.isNotEmpty(timeColumn),
-          "TimeColumn is null or empty for table: " + offlineTableName);
-      DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(timeColumn);
-      Preconditions.checkState(dateTimeSpec != null, String.format(
-          "Failed to get DateTimeFieldSpec for time column: %s of table: %s", timeColumn, offlineTableName));
-      DateTimeFormatSpec timeFormatSpec = dateTimeSpec.getFormatSpec();
-      TimeBoundaryInfo timeBoundaryInfo = _brokerServiceHelper.getTimeBoundaryInfo(offlineTableConfig);
-      Preconditions.checkState(timeBoundaryInfo != null,
-          "Failed to get time boundary info for table: " + offlineTableName);
-      long timeBoundaryMs = timeFormatSpec.fromFormatToMillis(timeBoundaryInfo.getTimeValue());
-      Preconditions.checkState(timeBoundaryMs > 0,
-          "Failed to determine a valid time boundary for table: " + offlineTableName);
+      long timeBoundaryMs = getHybridTimeBoundaryMs(offlineTableConfig);
 
       // Iterate over all COMPLETED segments of the REALTIME table and check if they are eligible for deletion.
       for (SegmentZKMetadata segmentZKMetadata : _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName)) {
@@ -406,6 +437,31 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       LOGGER.error("Exception while managing retention for hybrid table: {}", realtimeTableConfig.getTableName(), e);
       _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.RETENTION_MANAGER_ERROR, 1);
     }
+  }
+
+  private long getHybridTimeBoundaryMs(TableConfig offlineTableConfig) {
+    String offlineTableName = offlineTableConfig.getTableName();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+    Schema schema = ZKMetadataProvider.getTableSchema(propertyStore, offlineTableName);
+    Preconditions.checkState(schema != null, "Failed to get schema for table: " + offlineTableName);
+    String timeColumn = null;
+    SegmentsValidationAndRetentionConfig validationConfig = offlineTableConfig.getValidationConfig();
+    if (validationConfig != null) {
+      timeColumn = validationConfig.getTimeColumnName();
+    }
+    Preconditions.checkState(StringUtils.isNotEmpty(timeColumn),
+        "TimeColumn is null or empty for table: " + offlineTableName);
+    DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(timeColumn);
+    Preconditions.checkState(dateTimeSpec != null, String.format(
+        "Failed to get DateTimeFieldSpec for time column: %s of table: %s", timeColumn, offlineTableName));
+    DateTimeFormatSpec timeFormatSpec = dateTimeSpec.getFormatSpec();
+    TimeBoundaryInfo timeBoundaryInfo = _brokerServiceHelper.getTimeBoundaryInfo(offlineTableConfig);
+    Preconditions.checkState(timeBoundaryInfo != null,
+        "Failed to get time boundary info for table: " + offlineTableName);
+    long timeBoundaryMs = timeFormatSpec.fromFormatToMillis(timeBoundaryInfo.getTimeValue());
+    Preconditions.checkState(timeBoundaryMs > 0,
+        "Failed to determine a valid time boundary for table: " + offlineTableName);
+    return timeBoundaryMs;
   }
 
   private boolean shouldDeleteInProgressLLCSegment(String segmentName, IdealState idealState,
