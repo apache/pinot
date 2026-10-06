@@ -45,6 +45,9 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
+
 
 /// Tests for RexExpressionUtils, focusing on the handleSearch method and null handling.
 public class RexExpressionUtilsTest {
@@ -82,11 +85,11 @@ public class RexExpressionUtilsTest {
         new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.DIVIDE.name(), List.of(input, input)),
         new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(), inOperands),
         new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(), inOperands))) {
-      Assert.assertEquals(RexExpressionUtils.fromRexNode(RexExpressionUtils.toRexNode(relBuilder, call)), call);
+      assertEquals(RexExpressionUtils.fromRexNode(RexExpressionUtils.toRexNode(relBuilder, call)), call);
     }
     RexExpression.FunctionCall sum0 =
         new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.SUM0.name(), List.of(input));
-    Assert.assertSame(RexExpressionUtils.getAggFunction(sum0), SqlStdOperatorTable.SUM0);
+    assertSame(RexExpressionUtils.getAggFunction(sum0), SqlStdOperatorTable.SUM0);
   }
 
   @Test
