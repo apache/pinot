@@ -58,6 +58,13 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
   private Boolean _sorted;
 
   public MutableNoDictColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn) {
+    this(dataSource, sortedDocIds, isSortedColumn, true);
+  }
+
+  /// @param recoverMinMax whether to scan for min/max missing from the metadata. Subclasses that compute their own
+  ///                      bounds over a subset of docs pass false to skip the scan.
+  protected MutableNoDictColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn,
+      boolean recoverMinMax) {
     _dataSourceMetadata = dataSource.getDataSourceMetadata();
     _fieldSpec = _dataSourceMetadata.getFieldSpec();
     Preconditions.checkState(_dataSourceMetadata.getNumDocs() > 0,
@@ -73,7 +80,7 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
     // index needs them, and record sortedness in the same scan. Other types keep null bounds (unchanged behavior).
     Comparable<?> minValue = (Comparable<?>) _dataSourceMetadata.getMinValue();
     Comparable<?> maxValue = (Comparable<?>) _dataSourceMetadata.getMaxValue();
-    if ((minValue == null || maxValue == null) && isSingleValue()) {
+    if (recoverMinMax && (minValue == null || maxValue == null) && isSingleValue()) {
       int numDocs = _dataSourceMetadata.getNumDocs();
       switch (getStoredType()) {
         case INT: {
