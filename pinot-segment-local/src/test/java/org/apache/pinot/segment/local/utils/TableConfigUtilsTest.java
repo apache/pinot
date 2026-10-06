@@ -2705,14 +2705,21 @@ public class TableConfigUtilsTest {
           ParallelSegmentConsumptionPolicy.ALLOW_DURING_DOWNLOAD_ONLY, true);
       checkConsumptionDuringUpsertRevert(dropOutOfOrderConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, true);
       checkConsumptionDuringUpsertRevert(allowDuringCommitConfig, null, true);
+      // A local build that fails or mismatches the committed CRC falls back to a download after releasing the semaphore
       checkConsumptionDuringUpsertRevert(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY,
-          false);
+          true);
       checkConsumptionDuringUpsertRevert(partialUpsertConfig, ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS, false);
       checkConsumptionDuringUpsertRevert(partialUpsertConfig, null, false);
       // An explicit policy wins over the deprecated flag, and full upsert without out-of-order handling never reverts
       checkConsumptionDuringUpsertRevert(allowDuringCommitConfig, ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS,
           false);
       checkConsumptionDuringUpsertRevert(fullUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, false);
+      // Pauseless tables consume during build by design, so they keep ALLOW_DURING_BUILD_ONLY but not download overlap
+      TableConfigUtils.validateConsumptionDuringUpsertRevert(createTableConfigWithConsumptionPolicy(partialUpsertConfig,
+          ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY, true));
+      expectThrows(IllegalStateException.class, () -> TableConfigUtils.validateConsumptionDuringUpsertRevert(
+          createTableConfigWithConsumptionPolicy(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS,
+              true)));
 
       // The check is part of the upsert validation
       Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
@@ -2723,7 +2730,7 @@ public class TableConfigUtilsTest {
           createTableConfigWithConsumptionPolicy(dropOutOfOrderConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
       IllegalStateException e = expectThrows(IllegalStateException.class,
           () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema));
-      assertTrue(e.getMessage().contains("DISALLOW_ALWAYS or ALLOW_DURING_BUILD_ONLY"), e.getMessage());
+      assertTrue(e.getMessage().endsWith("Set parallelSegmentConsumptionPolicy to DISALLOW_ALWAYS"), e.getMessage());
     } finally {
       consistencyModeListener.reset();
     }
@@ -2735,7 +2742,7 @@ public class TableConfigUtilsTest {
     if (expectRejected) {
       IllegalStateException e = expectThrows(IllegalStateException.class,
           () -> TableConfigUtils.validateConsumptionDuringUpsertRevert(tableConfig));
-      assertTrue(e.getMessage().contains("DISALLOW_ALWAYS or ALLOW_DURING_BUILD_ONLY"), e.getMessage());
+      assertTrue(e.getMessage().endsWith("Set parallelSegmentConsumptionPolicy to DISALLOW_ALWAYS"), e.getMessage());
       assertTrue(e.getMessage().startsWith(
           policy != null ? "parallelSegmentConsumptionPolicy " + policy : "allowPartialUpsertConsumptionDuringCommit"),
           e.getMessage());
@@ -2746,8 +2753,14 @@ public class TableConfigUtilsTest {
 
   private TableConfig createTableConfigWithConsumptionPolicy(UpsertConfig upsertConfig,
       ParallelSegmentConsumptionPolicy policy) {
+    return createTableConfigWithConsumptionPolicy(upsertConfig, policy, false);
+  }
+
+  private TableConfig createTableConfigWithConsumptionPolicy(UpsertConfig upsertConfig,
+      ParallelSegmentConsumptionPolicy policy, boolean pauseless) {
     StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(getStreamConfigs()));
     streamIngestionConfig.setParallelSegmentConsumptionPolicy(policy);
+    streamIngestionConfig.setPauselessConsumptionEnabled(pauseless);
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
     return new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)

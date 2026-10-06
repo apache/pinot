@@ -40,6 +40,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -56,6 +57,7 @@ import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -63,6 +65,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -81,6 +84,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
@@ -233,6 +237,14 @@ public class RealtimeSegmentDataManagerTest {
   private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
       @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig)
       throws Exception {
+    return createFakeSegmentManager(noUpsert, timeSupplier, maxRows, maxDuration, tableConfig,
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+  }
+
+  private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
+      @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig,
+      ServerMetrics serverMetrics)
+      throws Exception {
     SegmentZKMetadata segmentZKMetadata = createZkMetadata();
     if (tableConfig == null) {
       tableConfig = createTableConfig();
@@ -257,7 +269,6 @@ public class RealtimeSegmentDataManagerTest {
     _partitionGroupIdToConsumerCoordinatorMap.putIfAbsent(PARTITION_GROUP_ID,
         new ConsumerCoordinator(false, tableDataManager));
     Schema schema = Fixtures.createSchema();
-    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     return new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager,
         new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), schema, llcSegmentName,
         _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, timeSupplier);
@@ -879,12 +890,77 @@ public class RealtimeSegmentDataManagerTest {
     return metadata;
   }
 
+  @Test
+  public void testDownloadAfterLocalBuildFlagsUpsertRevertWhenConsumingDuringBuild()
+      throws Exception {
+    long finalOffsetValue = START_OFFSET_VALUE + 600;
+
+    // ALLOW_DURING_BUILD_ONLY: the local build releases the consumer semaphore, its CRC mismatches the committed copy,
+    // and the download that follows reverts upsert metadata while the next consuming segment can already be running.
+    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    ServerMetrics serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManagerForUpsertRevert(
+        ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY, serverMetrics)) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segmentDataManager._releaseSemaphoreOnBuild = true;
+      runGoOnlineForCrcGuard(segmentDataManager, crcMetadata(finalOffsetValue, 12345L), false, finalOffsetValue);
+      Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      Assert.assertEquals(semaphore.availablePermits(), 1);
+      verify(serverMetrics).addMeteredTableValue(anyString(),
+          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), eq(1L));
+    }
+
+    // ALLOW_DURING_BUILD_ONLY without a local build: the download still holds the semaphore, so nothing is flagged.
+    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManagerForUpsertRevert(
+        ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY, serverMetrics)) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager.downloadSegmentAndReplace(crcMetadata(finalOffsetValue, 12345L));
+      Assert.assertEquals(semaphore.availablePermits(), 0);
+      verify(serverMetrics, never()).addMeteredTableValue(anyString(),
+          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), anyLong());
+    }
+
+    // DISALLOW_ALWAYS never lets the next segment consume during the replace, even when this segment never acquired the
+    // semaphore.
+    serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManagerForUpsertRevert(
+        ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS, serverMetrics)) {
+      segmentDataManager.downloadSegmentAndReplace(crcMetadata(finalOffsetValue, 12345L));
+      verify(serverMetrics, never()).addMeteredTableValue(anyString(),
+          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), anyLong());
+    }
+  }
+
+  private FakeRealtimeSegmentDataManager createFakeSegmentManagerForUpsertRevert(
+      ParallelSegmentConsumptionPolicy policy, ServerMetrics serverMetrics)
+      throws Exception {
+    FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null, null,
+        createTableConfigWithStreamIngestion(false, policy), serverMetrics);
+    PartitionUpsertMetadataManager upsertMetadataManager = mock(PartitionUpsertMetadataManager.class);
+    when(upsertMetadataManager.shouldRevertMetadataOnInconsistency(any())).thenReturn(true);
+    segmentDataManager.setPartitionUpsertMetadataManager(upsertMetadataManager);
+    segmentDataManager._useRealDownloadAndReplace = true;
+    return segmentDataManager;
+  }
+
   private TableConfig createPauselessTableConfig()
+      throws Exception {
+    return createTableConfigWithStreamIngestion(true, null);
+  }
+
+  private TableConfig createTableConfigWithStreamIngestion(boolean pauseless,
+      @Nullable ParallelSegmentConsumptionPolicy policy)
       throws Exception {
     TableConfig tableConfig = createTableConfig();
     StreamIngestionConfig streamIngestionConfig =
         new StreamIngestionConfig(List.of(tableConfig.getIndexingConfig().getStreamConfigs()));
-    streamIngestionConfig.setPauselessConsumptionEnabled(true);
+    streamIngestionConfig.setPauselessConsumptionEnabled(pauseless);
+    streamIngestionConfig.setParallelSegmentConsumptionPolicy(policy);
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig == null) {
       ingestionConfig = new IngestionConfig();
@@ -1500,6 +1576,11 @@ public class RealtimeSegmentDataManagerTest {
     public boolean _localSegmentCrcMatchesZk = true;
     // When set, isLocalSegmentCrcMatchingZk runs the real on-disk metadata read + CRC comparison.
     public boolean _useRealCrcCheck = false;
+    // When set, buildSegmentInternal releases the consumer semaphore like the real build does when the parallel
+    // consumption policy allows consuming during build.
+    public boolean _releaseSemaphoreOnBuild = false;
+    // When set, downloadSegmentAndReplace runs the real implementation against the mocked table data manager.
+    public boolean _useRealDownloadAndReplace = false;
     private Field _streamMsgOffsetFactory;
     public LinkedList<LongMsgOffset> _consumeOffsets = new LinkedList<>();
     public LinkedList<SegmentCompletionProtocol.Response> _responses = new LinkedList<>();
@@ -1567,6 +1648,15 @@ public class RealtimeSegmentDataManagerTest {
       Field realtimeSegmentField = RealtimeSegmentDataManager.class.getDeclaredField("_realtimeSegment");
       realtimeSegmentField.setAccessible(true);
       realtimeSegmentField.set(this, realtimeSegment);
+    }
+
+    /// Replaces the upsert metadata manager, which the constructor always leaves null.
+    public void setPartitionUpsertMetadataManager(PartitionUpsertMetadataManager partitionUpsertMetadataManager)
+        throws Exception {
+      Field partitionUpsertMetadataManagerField =
+          RealtimeSegmentDataManager.class.getDeclaredField("_partitionUpsertMetadataManager");
+      partitionUpsertMetadataManagerField.setAccessible(true);
+      partitionUpsertMetadataManagerField.set(this, partitionUpsertMetadataManager);
     }
 
     public boolean isStreamConsumerClosed()
@@ -1715,6 +1805,9 @@ public class RealtimeSegmentDataManagerTest {
     protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
       terminateLoopIfNecessary();
       _buildSegmentCalled = true;
+      if (_releaseSemaphoreOnBuild) {
+        closeStreamConsumerAndReleaseSemaphore();
+      }
       if (_failSegmentBuild) {
         try {
           _segmentBuildFailedWithDeterministicError.set(this, true);
@@ -1743,9 +1836,13 @@ public class RealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected void downloadSegmentAndReplace(SegmentZKMetadata metadata) {
+    protected void downloadSegmentAndReplace(SegmentZKMetadata metadata)
+        throws Exception {
       terminateLoopIfNecessary();
       _downloadAndReplaceCalled = true;
+      if (_useRealDownloadAndReplace) {
+        super.downloadSegmentAndReplace(metadata);
+      }
     }
 
     @Override

@@ -1242,13 +1242,18 @@ public final class TableConfigUtils {
         ingestionConfig != null ? ingestionConfig.getStreamIngestionConfig() : null;
     ParallelSegmentConsumptionPolicy policy =
         streamIngestionConfig != null ? streamIngestionConfig.getParallelSegmentConsumptionPolicy() : null;
-    // ALLOW_ALWAYS and ALLOW_DURING_DOWNLOAD_ONLY both allow it, and so does the deprecated flag when no policy is set
-    boolean consumesDuringDownload = policy != null ? policy.isAllowedDuringDownload()
+    boolean pauseless = streamIngestionConfig != null && streamIngestionConfig.isPauselessConsumptionEnabled();
+    // ALLOW_ALWAYS and ALLOW_DURING_DOWNLOAD_ONLY both allow it, and so does the deprecated flag when no policy is set.
+    // ALLOW_DURING_BUILD_ONLY allows it too, because a local build that fails or mismatches the committed CRC falls
+    // back to a download after the semaphore is released. Pauseless tables consume during build by design and skip
+    // the CRC check, so they keep it.
+    boolean consumesDuringDownload = policy != null
+        ? policy.isAllowedDuringDownload() || (policy.isAllowedDuringBuild() && !pauseless)
         : tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit();
     Preconditions.checkState(!consumesDuringDownload,
         "%s lets the next segment consume during a segment download, but tables with partial upsert, "
             + "dropOutOfOrderRecord or outOfOrderRecordColumn revert upsert metadata in PROTECTED consistency mode. "
-            + "Set parallelSegmentConsumptionPolicy to DISALLOW_ALWAYS or ALLOW_DURING_BUILD_ONLY",
+            + "Set parallelSegmentConsumptionPolicy to DISALLOW_ALWAYS",
         policy != null ? "parallelSegmentConsumptionPolicy " + policy : "allowPartialUpsertConsumptionDuringCommit");
   }
 
