@@ -35,6 +35,7 @@ on:
     branches:
       - master
       - 'xiangfu0/codex1/sorted-exchange-core'
+      - 'xiangfu0/codex1/sorted-exchange-ordering'
     paths-ignore:
       - "contrib/**"
       - "docs/**"
