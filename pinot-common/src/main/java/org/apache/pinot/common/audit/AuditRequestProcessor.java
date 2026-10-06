@@ -266,13 +266,18 @@ public class AuditRequestProcessor {
 
       if (capturedBytes.length > 0) {
         String requestBody = new String(capturedBytes, StandardCharsets.UTF_8);
-        if (isMostlyReplacementChars(requestBody)) {
+        boolean truncated = capturedBytes.length >= maxPayloadSize;
+        // A capture cut mid-character ends in one U+FFFD for the partial sequence. That is the cut,
+        // not binary data, so leave it out of the check.
+        String checked = truncated && requestBody.endsWith("\uFFFD")
+            ? requestBody.substring(0, requestBody.length() - 1) : requestBody;
+        if (isMostlyReplacementChars(checked)) {
           // Decoding non-UTF-8 bytes yields one U+FFFD per bad byte, and each of those is three
           // bytes again once the record is written out -- so binary bodies inflate rather than
           // truncate. Record the size instead of the soup.
           return String.format(BINARY_BODY_MARKER, capturedBytes.length);
         }
-        if (capturedBytes.length >= maxPayloadSize) {
+        if (truncated) {
           requestBody += TRUNCATION_MARKER;
           _auditMetrics.addMeteredGlobalValue(AuditMetrics.AuditMeter.AUDIT_REQUEST_PAYLOAD_TRUNCATED, 1L);
         }
