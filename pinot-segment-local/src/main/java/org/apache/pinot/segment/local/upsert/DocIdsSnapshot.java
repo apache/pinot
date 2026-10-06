@@ -43,8 +43,8 @@ public record DocIdsSnapshot(MutableRoaringBitmap docIds, @Nullable Metadata met
   private static final int MAGIC = 0x5044534D; // PDSM: Pinot doc ids snapshot metadata
   private static final int VERSION = 1;
 
-  /// The consumer startup that triggered a snapshot. consumedUpToOffset is exclusive, the first offset that consumer
-  /// reads, and is not a partition consistency watermark.
+  /// The consumer startup that triggered a snapshot. consumedUpToOffset is exclusive and per replica: the consumer's
+  /// start offset, or where the previous segment stopped if it was still unsealed. It is not a consistency watermark.
   public record Trigger(String consumingSegmentName, String consumedUpToOffset) {
   }
 
