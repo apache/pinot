@@ -42,23 +42,20 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// This class can be used to serialize/deserialize the broker response.
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
-    "numGroupsWarningLimitReached", "maxRowsInDistinctReached",
-    "maxRowsWithoutChangeInDistinctReached",
-    "maxExecutionTimeInDistinctReached", "timeUsedMs",
-    "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs",
-    "numEntriesScannedInFilter",
-    "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded", "numSegmentsQueried",
-    "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
-    "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker",
-    "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue",
-    "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
-    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "numGroupsWarningLimitReached", "maxRowsInDistinctReached", "maxRowsWithoutChangeInDistinctReached",
+    "maxExecutionTimeInDistinctReached", "timeUsedMs", "requestId", "clientRequestId", "brokerId", "numDocsScanned",
+    "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried",
+    "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
+    "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched",
+    "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer",
+    "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue", "numRemoteAccesses",
+    "remoteAccessBytes", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
+    "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
-    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "rlsFiltersApplied", "approximateFunctionApplied", "groupsTrimmed", "materializedViewQueried",
-    "serverStats"
+    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes", "pools",
+    "rlsFiltersApplied", "approximateFunctionApplied", "groupsTrimmed", "materializedViewQueried", "serverStats"
 })
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BrokerResponseNative implements BrokerResponse {
@@ -102,6 +99,8 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _numSegmentsPrunedInvalid = 0L;
   private long _numSegmentsPrunedByLimit = 0L;
   private long _numSegmentsPrunedByValue = 0L;
+  private long _numRemoteAccesses = 0L;
+  private long _remoteAccessBytes = 0L;
   private long _brokerReduceTimeMs = 0L;
   private long _offlineThreadCpuTimeNs = 0L;
   private long _realtimeThreadCpuTimeNs = 0L;
@@ -479,6 +478,24 @@ public class BrokerResponseNative implements BrokerResponse {
 
   public void setNumSegmentsPrunedByValue(long numSegmentsPrunedByValue) {
     _numSegmentsPrunedByValue = numSegmentsPrunedByValue;
+  }
+
+  @Override
+  public long getNumRemoteAccesses() {
+    return _numRemoteAccesses;
+  }
+
+  public void setNumRemoteAccesses(long numRemoteAccesses) {
+    _numRemoteAccesses = numRemoteAccesses;
+  }
+
+  @Override
+  public long getRemoteAccessBytes() {
+    return _remoteAccessBytes;
+  }
+
+  public void setRemoteAccessBytes(long remoteAccessBytes) {
+    _remoteAccessBytes = remoteAccessBytes;
   }
 
   @Override
