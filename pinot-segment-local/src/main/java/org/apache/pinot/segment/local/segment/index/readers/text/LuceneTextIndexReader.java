@@ -34,12 +34,16 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.Collector;
+import org.apache.lucene.search.ConstantScoreQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreMode;
+import org.apache.lucene.search.Weight;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
@@ -227,31 +231,76 @@ public class LuceneTextIndexReader implements TextIndexReader {
     return getDocIdsWithoutOptions(searchQuery);
   }
 
+  /// Parses a search string into a Lucene query, applying the configured parser and options.
+  ///
+  /// Shared by the doc-id and the count paths so that a `count(*)` and the filter it counts can never
+  /// interpret the same query differently.
+  private Query buildQuery(String searchQuery)
+      throws Exception {
+    // Lucene query parsers are generally stateful and a new instance must be created per query.
+    QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
+    // Phrase search with prefix/suffix matching may have leading *. E.g., `*pache pinot` which can be stripped by
+    // the query parser. To support the feature, we need to explicitly set the config to be true.
+    if (_enablePrefixSuffixMatchingInPhraseQueries) {
+      parser.setAllowLeadingWildcard(true);
+    }
+    if (_useANDForMultiTermQueries) {
+      parser.setDefaultOperator(QueryParser.Operator.AND);
+    }
+    Query query = parser.parse(searchQuery);
+    if (_queryParserClass.equals("org.apache.lucene.queryparser.classic.QueryParser")
+            && _enablePrefixSuffixMatchingInPhraseQueries) {
+      query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
+    }
+    return query;
+  }
+
   private MutableRoaringBitmap getDocIdsWithoutOptions(String searchQuery) {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
-      // Lucene query parsers are generally stateful and a new instance must be created per query.
-      QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
-      // Phrase search with prefix/suffix matching may have leading *. E.g., `*pache pinot` which can be stripped by
-      // the query parser. To support the feature, we need to explicitly set the config to be true.
-      if (_enablePrefixSuffixMatchingInPhraseQueries) {
-        parser.setAllowLeadingWildcard(true);
-      }
-      if (_useANDForMultiTermQueries) {
-        parser.setDefaultOperator(QueryParser.Operator.AND);
-      }
-      Query query = parser.parse(searchQuery);
-      if (_queryParserClass.equals("org.apache.lucene.queryparser.classic.QueryParser")
-              && _enablePrefixSuffixMatchingInPhraseQueries) {
-        query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
-      }
-      _indexSearcher.search(query, docIDCollector);
+      _indexSearcher.search(buildQuery(searchQuery), docIDCollector);
       return docIds;
     } catch (Exception e) {
       String msg =
           "Caught exception while searching the text index for column:" + _column + " search query:" + searchQuery;
       throw new RuntimeException(msg, e);
+    }
+  }
+
+  @Override
+  public int getNumMatchingDocs(String searchQuery, @Nullable String optionsString) {
+    try {
+      Query query;
+      if (optionsString != null && !optionsString.trim().isEmpty()) {
+        LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
+        query = options.getOptions().isEmpty() ? buildQuery(searchQuery)
+            : LuceneTextIndexUtils.createQueryParserWithOptions(searchQuery, options, _column, _analyzer);
+      } else {
+        query = buildQuery(searchQuery);
+      }
+      // Lucene can answer some queries -- a single term in particular -- from index metadata alone, without
+      // visiting any document. Where it can, this skips materializing a bitmap of every match, which is most
+      // of the cost of counting a high-frequency term over a large segment.
+      Weight weight =
+          _indexSearcher.createWeight(_indexSearcher.rewrite(new ConstantScoreQuery(query)),
+              ScoreMode.COMPLETE_NO_SCORES, 1f);
+      int total = 0;
+      for (LeafReaderContext leaf : _indexSearcher.getIndexReader().leaves()) {
+        int leafCount = weight.count(leaf);
+        if (leafCount == -1) {
+          // Lucene cannot count this leaf cheaply. Fall back to the existing path rather than letting Lucene
+          // iterate internally: the collector below carries the query-termination check, so a slow count stays
+          // interruptible and honours the query timeout.
+          return getDocIds(searchQuery, optionsString).getCardinality();
+        }
+        total += leafCount;
+      }
+      return total;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while counting matches in the text index for column:" + _column + " search query:"
+              + searchQuery, e);
     }
   }
 
