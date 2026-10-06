@@ -238,6 +238,8 @@
     <plexus-classworlds.version>2.12.1</plexus-classworlds.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
+    <jsr305.version>3.0.2</jsr305.version>
+    <jspecify.version>1.0.1</jspecify.version>
     <checker-qual.version>4.3.0</checker-qual.version>
     <groovy.version>3.0.25</groovy.version>
     <xml-apis.version>2.0.2</xml-apis.version>
@@ -301,13 +303,14 @@
     <!-- Google Libraries -->
     <protobuf.version>4.36.2</protobuf.version>
     <grpc.version>1.84.0</grpc.version>
-    <google.cloud.libraries.version>26.89.0</google.cloud.libraries.version>
-    <opentelemetry.gcp.resources.version>1.60.0-alpha</opentelemetry.gcp.resources.version>
+    <guava.version>33.7.2-jre</guava.version>
+    <google.cloud.libraries.version>26.90.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
+    <google.cloud.opentelemetry.version>0.36.0</google.cloud.opentelemetry.version>
+    <opentelemetry.gcp.resources.version>1.60.0-alpha</opentelemetry.gcp.resources.version>
     <google.errorprone.version>2.50.0</google.errorprone.version>
     <google.j2objc.version>3.1</google.j2objc.version>
-    <google.jsr305.version>3.0.2</google.jsr305.version>
 
     <!-- Configuration for Scala -->
     <scala-2.12.version>2.12.20</scala-2.12.version>
@@ -692,11 +695,23 @@
         <version>${arrow.version}</version>
       </dependency>
 
+      <!-- Nullness annotations -->
+      <dependency>
+        <groupId>com.google.code.findbugs</groupId>
+        <artifactId>jsr305</artifactId>
+        <version>${jsr305.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jspecify</groupId>
+        <artifactId>jspecify</artifactId>
+        <version>${jspecify.version}</version>
+      </dependency>
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
         <version>${checker-qual.version}</version>
       </dependency>
+
       <!-- Groovy 3.x publishes groovy-all as a POM aggregator that pulls in every sub-module.
            We exclude groovy-testng/groovy-test-junit5/groovy-test because their transitive TestNG and
            JUnit jars collide with Surefire's TestNG fork classpath and cause NoClassDefFoundError on
@@ -1139,34 +1154,21 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
-      <!-- libraries-bom should be imported after protobuf-bom and grpc-bom to honor their versions -->
+      <!-- guava-bom -->
+      <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava-bom</artifactId>
+        <version>${guava.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- libraries-bom should be imported after protobuf-bom, grpc-bom and guava-bom to honor their versions -->
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
         <version>${google.cloud.libraries.version}</version>
         <type>pom</type>
         <scope>import</scope>
-      </dependency>
-      <!-- Explicit pins: libraries-bom transitively imports protobuf-bom:4.33.2, conflicting with our 4.34.0 -->
-      <dependency>
-        <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-java</artifactId>
-        <version>${protobuf.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-java-util</artifactId>
-        <version>${protobuf.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-kotlin</artifactId>
-        <version>${protobuf.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.opentelemetry.contrib</groupId>
-        <artifactId>opentelemetry-gcp-resources</artifactId>
-        <version>${opentelemetry.gcp.resources.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.auto.service</groupId>
@@ -1179,6 +1181,17 @@
         <artifactId>re2j</artifactId>
         <version>${google.re2j.version}</version>
       </dependency>
+      <!-- Solve the dependency converge issue between google-cloud-storage and google-cloud-nio -->
+      <dependency>
+        <groupId>com.google.cloud.opentelemetry</groupId>
+        <artifactId>detector-resources-support</artifactId>
+        <version>${google.cloud.opentelemetry.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.opentelemetry.contrib</groupId>
+        <artifactId>opentelemetry-gcp-resources</artifactId>
+        <version>${opentelemetry.gcp.resources.version}</version>
+      </dependency>
       <!-- Solve the dependency converge issue between guava and calcite-core -->
       <dependency>
         <groupId>com.google.errorprone</groupId>
@@ -1190,12 +1203,6 @@
         <groupId>com.google.j2objc</groupId>
         <artifactId>j2objc-annotations</artifactId>
         <version>${google.j2objc.version}</version>
-      </dependency>
-      <!-- Solve the dependency converge issue between google and flink libraries -->
-      <dependency>
-        <groupId>com.google.code.findbugs</groupId>
-        <artifactId>jsr305</artifactId>
-        <version>${google.jsr305.version}</version>
       </dependency>
 
       <!-- Hadoop -->
