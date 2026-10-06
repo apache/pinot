@@ -27,10 +27,12 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.dml.DataManipulationStatement;
 import org.apache.pinot.sql.parsers.dml.DeleteStatement;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
@@ -125,6 +127,52 @@ public class SqlQueryExecutorTest {
     assertEquals(executedHeaders.get(), Map.of("Authorization", "Basic abc"));
     // The controller an overriding executor can send the statement to
     assertEquals(sqlQueryExecutor.getControllerBaseUrl(), CONTROLLER_URL);
+  }
+
+  @Test
+  public void testDeleteQueryExceptionIsReturnedWithItsErrorCode() {
+    // An overriding executor reports a validation or execution failure by throwing a QueryException, which is
+    // returned in the response with its error code, as the other branches of executeStatement return theirs
+    SqlQueryExecutor sqlQueryExecutor = new SqlQueryExecutor(CONTROLLER_URL) {
+      @Override
+      protected BrokerResponse executeDelete(DeleteStatement statement, @Nullable Map<String, String> headers) {
+        throw QueryErrorCode.QUERY_VALIDATION.asException(
+            "Column col1 does not exist in table " + statement.getTableName());
+      }
+    };
+
+    BrokerResponse response =
+        sqlQueryExecutor.executeStatement(resolvedDelete("DELETE FROM myTable WHERE col1 = 'a'"), null);
+
+    assertError(response, QueryErrorCode.QUERY_VALIDATION, "Column col1 does not exist in table myTable");
+  }
+
+  @Test
+  public void testDeleteExceptionIsReturnedAsExecutionError() {
+    SqlQueryExecutor sqlQueryExecutor = new SqlQueryExecutor(CONTROLLER_URL) {
+      @Override
+      protected BrokerResponse executeDelete(DeleteStatement statement, @Nullable Map<String, String> headers) {
+        throw new IllegalStateException("Unable to reach the controller");
+      }
+    };
+
+    BrokerResponse response =
+        sqlQueryExecutor.executeStatement(resolvedDelete("DELETE FROM myTable WHERE col1 = 'a'"), null);
+
+    assertError(response, QueryErrorCode.QUERY_EXECUTION, "Unable to reach the controller");
+  }
+
+  @Test
+  public void testUnknownExecutorStatementIsNotSupported() {
+    // A DELETE is dispatched by its EXECUTOR execution type: any other statement of that type has no hook to execute
+    // it
+    DataManipulationStatement statement = mock(DataManipulationStatement.class);
+    when(statement.getExecutionType()).thenReturn(DataManipulationStatement.ExecutionType.EXECUTOR);
+    when(statement.toString()).thenReturn("UPSERT INTO myTable");
+
+    BrokerResponse response = new SqlQueryExecutor(CONTROLLER_URL).executeStatement(statement, null);
+
+    assertError(response, QueryErrorCode.QUERY_EXECUTION, "Unsupported statement: UPSERT INTO myTable");
   }
 
   /// A DELETE with its table resolved, as the broker and the controller hand it to the executor once they authorized

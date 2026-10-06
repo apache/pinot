@@ -683,8 +683,14 @@ public class CalciteSqlParser {
   }
 
   /// Compiles an expression that is already parsed, e.g. the condition of a parsed statement, into [Expression].
+  ///
+  /// The node is normalized like the String expression of [#compileToExpression(String)] (PostgreSQL `::` casts are
+  /// rewritten in place, see `PostgreSqlCastRewriter`), so both overloads compile the same SQL into the same
+  /// [Expression]. The rewrite is idempotent, so a node from [#compileToSqlNodeAndOptions] is left unchanged.
+  ///
+  /// @throws SqlCompilationException if the node is not a supported expression.
   public static Expression compileToExpression(SqlNode sqlNode) {
-    return toExpression(sqlNode);
+    return toExpression(PostgreSqlCastRewriter.rewrite(sqlNode));
   }
 
   @VisibleForTesting

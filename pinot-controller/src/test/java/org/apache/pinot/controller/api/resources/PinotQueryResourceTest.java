@@ -29,6 +29,8 @@ import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils.SqlOptionsMode;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -120,30 +122,42 @@ public class PinotQueryResourceTest {
   }
 
   @Test
-  public void testDeleteOnGetQueryEndpointReturnsValidationError() {
+  public void testDeleteOnGetQueryEndpointReturnsParsingError() {
     String response = streamingOutputToString(
         _pinotQueryResource.handleGetSql("DELETE FROM t WHERE a = 1", null, null, null));
-    assertTrue(response.contains(String.valueOf(QueryErrorCode.QUERY_VALIDATION.getId())), response);
-    assertTrue(response.contains("use POST /sql instead"), response);
+    // The error code of the broker for a statement that is not a query on its GET endpoint
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.SQL_PARSING.getId())), response);
+    assertTrue(response.contains("GET /sql only supports DQL; use POST /sql instead"), response);
+    verify(_sqlQueryExecutor, never()).executeDMLStatement(any(), any());
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+    verify(_accessControlFactory, never()).create();
+  }
+
+  @Test
+  public void testInsertOnGetQueryEndpointReturnsParsingError() {
+    String response = streamingOutputToString(
+        _pinotQueryResource.handleGetSql("INSERT INTO t FROM FILE 'file:///tmp/data'", null, null, null));
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.SQL_PARSING.getId())), response);
+    assertTrue(response.contains("GET /sql only supports DQL; use POST /sql instead"), response);
     verify(_sqlQueryExecutor, never()).executeDMLStatement(any(), any());
     verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
   }
 
   @Test
   public void testDeleteIsExecutedOnTheAuthorizedTable() {
-    RecordingAccessControl accessControl = new RecordingAccessControl(null);
-    when(_accessControlFactory.create()).thenReturn(accessControl);
+    RecordingAccessControl accessControl = allowEveryCheck();
     // Table names are case-insensitive: the DELETE is authorized and executed on the table as it is defined
     when(_tableCache.isIgnoreCase()).thenReturn(true);
     when(_tableCache.getActualTableName("db1.T")).thenReturn("db1.t");
-    when(_sqlQueryExecutor.executeStatement(any(), any())).thenReturn(new BrokerResponseNative());
 
     String response = postSql("DELETE FROM T WHERE a = 1", "db1");
 
     assertFalse(response.contains("errorCode"), response);
-    // The checks of a query on the table, then those of the other deletions of the controller
-    assertEquals(accessControl._checks, List.of("READ db1.t", Actions.Table.QUERY + " TABLE db1.t", "DELETE db1.t",
-        Actions.Table.DELETE_ROWS + " TABLE db1.t"));
+    // The caller-level check before the table is looked up, then READ and QUERY on the table because the WHERE clause
+    // reads it, then DELETE and DELETE_ROWS on it: stricter than the query path of the controller, which only checks
+    // READ
+    assertEquals(accessControl._checks, List.of("READ null", "READ db1.t", Actions.Table.QUERY + " TABLE db1.t",
+        "DELETE db1.t", Actions.Table.DELETE_ROWS + " TABLE db1.t"));
     DeleteStatement statement = executedDelete();
     assertEquals(statement.getTableName(), "db1.t");
     assertEquals(statement.getPredicate(), "a = 1");
@@ -152,41 +166,160 @@ public class PinotQueryResourceTest {
 
   @Test
   public void testDeleteFromATableWithATypeIsAuthorizedOnItsRawName() {
-    RecordingAccessControl accessControl = new RecordingAccessControl(null);
-    when(_accessControlFactory.create()).thenReturn(accessControl);
-    when(_sqlQueryExecutor.executeStatement(any(), any())).thenReturn(new BrokerResponseNative());
+    RecordingAccessControl accessControl = allowEveryCheck();
 
     postSql("DELETE FROM t_OFFLINE WHERE a = 1", null);
 
     // Like the table APIs of the controller, while the executor deletes from the table named by the statement
-    assertEquals(accessControl._checks, List.of("READ t", Actions.Table.QUERY + " TABLE t", "DELETE t",
+    assertEquals(accessControl._checks, List.of("READ null", "READ t", Actions.Table.QUERY + " TABLE t", "DELETE t",
         Actions.Table.DELETE_ROWS + " TABLE t"));
     assertEquals(executedDelete().getTableName(), "t_OFFLINE");
   }
 
   @DataProvider
   public Object[][] deleteChecks() {
-    List<String> checks = List.of("READ t", Actions.Table.QUERY + " TABLE t", "DELETE t",
+    List<String> checks = List.of("READ null", "READ t", Actions.Table.QUERY + " TABLE t", "DELETE t",
         Actions.Table.DELETE_ROWS + " TABLE t");
+    String deniedOnTable = "Permission denied to delete rows from table: t";
     return new Object[][]{
-        {"READ", checks.subList(0, 1)},
-        {Actions.Table.QUERY, checks.subList(0, 2)},
-        {"DELETE", checks.subList(0, 3)},
-        {Actions.Table.DELETE_ROWS, checks}
+        {"READ null", checks.subList(0, 1), "Permission denied to delete rows"},
+        {"READ t", checks.subList(0, 2), deniedOnTable},
+        {Actions.Table.QUERY + " TABLE t", checks.subList(0, 3), deniedOnTable},
+        {"DELETE t", checks.subList(0, 4), deniedOnTable},
+        {Actions.Table.DELETE_ROWS + " TABLE t", checks, deniedOnTable}
     };
   }
 
   @Test(dataProvider = "deleteChecks")
-  public void testDeleteIsDeniedByEachCheck(String deniedCheck, List<String> expectedChecks) {
+  public void testDeleteIsDeniedByEachCheck(String deniedCheck, List<String> expectedChecks, String expectedMessage) {
     RecordingAccessControl accessControl = new RecordingAccessControl(deniedCheck);
     when(_accessControlFactory.create()).thenReturn(accessControl);
 
     String response = postSql("DELETE FROM t WHERE a = 1", null);
 
     assertTrue(response.contains(String.valueOf(QueryErrorCode.ACCESS_DENIED.getId())), response);
-    assertTrue(response.contains("Permission denied to delete rows from table: t"), response);
+    assertTrue(response.contains(expectedMessage), response);
     assertEquals(accessControl._checks, expectedChecks);
     verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  @Test
+  public void testDeleteWithoutWhereClauseIsAParsingError() {
+    allowEveryCheck();
+
+    String response = postSql("DELETE FROM t", null);
+
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.SQL_PARSING.getId())), response);
+    assertTrue(response.contains("requires a WHERE clause"), response);
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+    verify(_sqlQueryExecutor, never()).executeDMLStatement(any(), any());
+  }
+
+  @Test
+  public void testDeleteWithAConflictingDatabaseHeaderIsAValidationError() {
+    allowEveryCheck();
+
+    String response = postSql("DELETE FROM db1.t WHERE a = 1", "db2");
+
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.QUERY_VALIDATION.getId())), response);
+    assertTrue(response.contains("does not match database name 'db2'"), response);
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  @Test
+  public void testDeleteFromALogicalTableIsAValidationError() {
+    RecordingAccessControl accessControl = allowEveryCheck();
+    when(_tableCache.getActualTableName("lt")).thenReturn(null);
+    when(_tableCache.getActualLogicalTableName("lt")).thenReturn("lt");
+
+    String response = postSql("DELETE FROM lt WHERE a = 1", null);
+
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.QUERY_VALIDATION.getId())), response);
+    assertTrue(response.contains("does not support logical tables"), response);
+    // Rejected while resolving the table, before the table-level authorization: a logical table has no single
+    // physical table to authorize
+    assertEquals(accessControl._checks, List.of("READ null"));
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  @Test(dataProvider = "legacyOptionModes")
+  public void testDeleteWithLegacyOptionsFollowsTheClusterLegacySyntaxMode(SqlOptionsMode mode, String expectedError) {
+    // The controller registers the query option config listener, so the cluster mode applies to the DML it executes
+    allowEveryCheck();
+    SqlOptionsMode previousMode = QueryOptionsUtils.getLegacyOptionSyntaxMode();
+    QueryOptionsUtils.setLegacyOptionSyntaxMode(mode);
+    try {
+      String response = postSql("DELETE FROM t WHERE a = 1 OPTION(dryRun=false)", null);
+      assertTrue(response.contains(expectedError), response);
+      verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+    } finally {
+      QueryOptionsUtils.setLegacyOptionSyntaxMode(previousMode);
+    }
+  }
+
+  @DataProvider(name = "legacyOptionModes")
+  public Object[][] legacyOptionModes() {
+    return new Object[][]{
+        {SqlOptionsMode.REJECT, "Legacy OPTION(...) query options are not allowed on this cluster"},
+        {SqlOptionsMode.IGNORE, "Legacy OPTION(...) options are ignored on this cluster"}
+    };
+  }
+
+  @Test
+  public void testDeleteFromAnUnknownTableFailsAfterAuthorization() {
+    RecordingAccessControl accessControl = allowEveryCheck();
+    when(_tableCache.getActualTableName("unknown")).thenReturn(null);
+
+    String response = postSql("DELETE FROM unknown WHERE a = 1", null);
+
+    // Fails closed as the query path does, rather than handing a table the cluster does not know to the executor
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.TABLE_DOES_NOT_EXIST.getId())), response);
+    assertTrue(response.contains("Table does not exist: unknown"), response);
+    // Authorized first, with the name as written since the cache does not know its case
+    assertEquals(accessControl._checks, List.of("READ null", "READ unknown", Actions.Table.QUERY + " TABLE unknown",
+        "DELETE unknown", Actions.Table.DELETE_ROWS + " TABLE unknown"));
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  @Test
+  public void testDeleteFromAnUnknownTableDoesNotLeakItsExistenceToAnUnauthorizedCaller() {
+    RecordingAccessControl accessControl = new RecordingAccessControl(Actions.Table.DELETE_ROWS + " TABLE unknown");
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+    when(_tableCache.getActualTableName("unknown")).thenReturn(null);
+
+    String response = postSql("DELETE FROM unknown WHERE a = 1", null);
+
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.ACCESS_DENIED.getId())), response);
+    assertFalse(response.contains("does not exist"), response);
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  @Test
+  public void testDeleteWithTheMseOptionReachesTheExecutor() {
+    allowEveryCheck();
+
+    // The mocked controller conf reports the multi-stage engine as disabled, which only queries care about: a DELETE
+    // passes its options through to the executor
+    String response = postSql("SET useMultistageEngine = 'true'; DELETE FROM t WHERE a = 1", null);
+
+    assertFalse(response.contains("errorCode"), response);
+    DeleteStatement statement = executedDelete();
+    assertEquals(statement.getTableName(), "t");
+    assertEquals(statement.getOptions().get(CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE),
+        "true");
+  }
+
+  @Test
+  public void testDeleteExecutorExceptionIsMappedToAnErrorResponse() {
+    allowEveryCheck();
+    when(_sqlQueryExecutor.executeStatement(any(), any())).thenThrow(new RuntimeException("executor failed"));
+
+    // The executor runs before the response streams, so the exception is mapped like the other query errors rather
+    // than escaping from the StreamingOutput as an HTTP 500
+    String response = postSql("DELETE FROM t WHERE a = 1", null);
+
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.INTERNAL.getId())), response);
+    assertTrue(response.contains("executor failed"), response);
   }
 
   @Test
@@ -203,14 +336,44 @@ public class PinotQueryResourceTest {
 
   @Test
   public void testUnauthenticatedDeleteIsUnauthorized() {
-    AccessControl accessControl = mock(AccessControl.class);
-    when(accessControl.hasAccess(any(), any(AccessType.class), any(), any()))
-        .thenThrow(new NotAuthorizedException("Basic"));
-    when(_accessControlFactory.create()).thenReturn(accessControl);
+    unauthenticatedAccessControl();
 
     // Not turned into an error response, so that the caller gets HTTP 401 as for the other APIs
     expectThrows(NotAuthorizedException.class, () -> postSql("DELETE FROM t WHERE a = 1", null));
     verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  @Test
+  public void testUnauthenticatedDeleteDoesNotLookUpTheTable() {
+    unauthenticatedAccessControl();
+    when(_tableCache.getActualTableName("lt")).thenReturn(null);
+    when(_tableCache.getActualLogicalTableName("lt")).thenReturn("lt");
+
+    // The caller is checked before the table cache is consulted, so that the logical-table rejection (a validation
+    // error) does not tell an unauthenticated caller which names are logical tables
+    expectThrows(NotAuthorizedException.class, () -> postSql("DELETE FROM lt WHERE a = 1", null));
+    verify(_tableCache, never()).getActualTableName(any());
+    verify(_tableCache, never()).getActualLogicalTableName(any());
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  /// Stubs an access control that allows every check, and an executor that answers every DELETE, as a deployment
+  /// that implements row deletion does.
+  private RecordingAccessControl allowEveryCheck() {
+    RecordingAccessControl accessControl = new RecordingAccessControl(null);
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+    when(_sqlQueryExecutor.executeStatement(any(), any())).thenReturn(new BrokerResponseNative());
+    return accessControl;
+  }
+
+  /// Stubs an access control that rejects every caller as unauthenticated, as basic auth does, whichever `hasAccess`
+  /// overload is called.
+  private void unauthenticatedAccessControl() {
+    AccessControl accessControl = mock(AccessControl.class);
+    when(accessControl.hasAccess(any(AccessType.class), any(), any())).thenThrow(new NotAuthorizedException("Basic"));
+    when(accessControl.hasAccess(any(), any(AccessType.class), any(), any()))
+        .thenThrow(new NotAuthorizedException("Basic"));
+    when(_accessControlFactory.create()).thenReturn(accessControl);
   }
 
   private String postSql(String sql, @Nullable String database) {
@@ -231,7 +394,8 @@ public class PinotQueryResourceTest {
     return statement;
   }
 
-  /// Access control that records its checks, and denies the access type or the action it is given.
+  /// Access control that records its checks as `<access type> <table name>` (the table name being `null` for the
+  /// caller-level check) and `<action> <target type> <target id>`, and denies the check it is given.
   private static class RecordingAccessControl implements AccessControl {
     private final List<String> _checks = new ArrayList<>();
     @Nullable
@@ -244,14 +408,17 @@ public class PinotQueryResourceTest {
     @Override
     public boolean hasAccess(@Nullable String tableName, AccessType accessType, HttpHeaders httpHeaders,
         String endpointUrl) {
-      _checks.add(accessType + " " + tableName);
-      return !accessType.name().equals(_deniedCheck);
+      return check(accessType + " " + tableName);
     }
 
     @Override
     public boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
-      _checks.add(action + " " + targetType + " " + targetId);
-      return !action.equals(_deniedCheck);
+      return check(action + " " + targetType + " " + targetId);
+    }
+
+    private boolean check(String check) {
+      _checks.add(check);
+      return !check.equals(_deniedCheck);
     }
   }
 

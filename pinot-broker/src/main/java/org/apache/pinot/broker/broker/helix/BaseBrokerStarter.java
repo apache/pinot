@@ -1265,6 +1265,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
   /// Creates the executor of the DML statements sent to the broker. Override it to execute the statements that Pinot
   /// parses but does not execute itself, e.g. `DELETE` (see `SqlQueryExecutor#executeDelete`).
+  ///
+  /// The controller `/sql` endpoint executes these statements in-process with its own executor, created by
+  /// `BaseControllerStarter#createSqlQueryExecutor`: override both for consistent behavior across the broker and
+  /// controller SQL endpoints, e.g. so that a `DELETE` typed into the query console of the controller UI is executed
+  /// like one sent to the broker.
   protected SqlQueryExecutor createSqlQueryExecutor() {
     String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
     return controllerUrl != null ? new SqlQueryExecutor(controllerUrl) : new SqlQueryExecutor(_spectatorHelixManager);

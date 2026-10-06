@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.sql.parsers;
 
+import java.io.StringReader;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.calcite.sql.SqlDelete;
 import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlNode;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -3396,6 +3398,30 @@ public class CalciteSqlCompilerTest {
     SqlCompilationException e = Assert.expectThrows(SqlCompilationException.class,
         () -> CalciteSqlParser.compileToSqlNodeAndOptions("DELETE FROM tbl WHERE col1 = 1; SELECT * FROM tbl"));
     Assert.assertTrue(e.getMessage().contains("executable statement already exist with type: DML"), e.getMessage());
+  }
+
+  @Test
+  public void testCompileToExpressionFromSqlNodeNormalizesLikeFromString()
+      throws Exception {
+    // Both overloads apply the PostgreSQL cast rewrite, so a node parsed by the caller compiles like its SQL text
+    String expression = "bytesCol = '\\x0102'::bytea";
+    SqlNode sqlNode;
+    try (StringReader reader = new StringReader(expression)) {
+      sqlNode = CalciteSqlParser.newSqlParser(reader).parseSqlExpressionEof();
+    }
+    Expression fromSqlNode = CalciteSqlParser.compileToExpression(sqlNode);
+    Assert.assertEquals(fromSqlNode, CalciteSqlParser.compileToExpression(expression));
+    Assert.assertEquals(fromSqlNode.getFunctionCall().getOperands().get(1).getLiteral().getBinaryValue(),
+        new byte[]{1, 2});
+    // Applied a second time, on the rewritten node, it is a no-op
+    Assert.assertEquals(CalciteSqlParser.compileToExpression(sqlNode), fromSqlNode);
+    // Every other :: cast is rejected by both overloads
+    try (StringReader reader = new StringReader("intCol::double > 1")) {
+      SqlNode castNode = CalciteSqlParser.newSqlParser(reader).parseSqlExpressionEof();
+      Assert.expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToExpression(castNode));
+    }
+    Assert.expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToExpression("intCol::double > 1"));
   }
 
   @Test

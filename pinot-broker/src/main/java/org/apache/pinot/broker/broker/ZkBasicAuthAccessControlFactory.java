@@ -24,7 +24,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.ws.rs.NotAuthorizedException;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -37,8 +39,10 @@ import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.config.user.AccessType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -49,6 +53,10 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 /// number of tables/password etc.) or add/delete user without restarting your Pinot clusters,
 /// and these changes happen immediately.
 /// Users Configuration store in Helix Zookeeper and encrypted user password via Bcrypt Encryption Algorithm.
+///
+/// Users query the tables they have access to, matched by raw table name. Deleting rows with a SQL `DELETE` also
+/// requires the `DELETE` permission, granted explicitly: unlike on the controller, where a user without permissions
+/// has them all, a user without permissions does not delete rows through the broker.
 public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
 
   private AccessControl _accessControl;
@@ -113,6 +121,26 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
         return TableAuthorizationResult.success();
       }
       return new TableAuthorizationResult(failedTables);
+    }
+
+    @Override
+    public AuthorizationResult authorizeDeleteRows(RequesterIdentity requesterIdentity,
+        @Nullable HttpHeaders httpHeaders, String tableName) {
+      Optional<ZkBasicAuthPrincipal> principalOpt = getPrincipalAuth(requesterIdentity);
+      if (principalOpt.isEmpty()) {
+        return new BasicAuthorizationResultImpl(false, "Missing or invalid credentials");
+      }
+      ZkBasicAuthPrincipal principal = principalOpt.get();
+      // Tables are matched by raw name, as for queries
+      if (!principal.hasTable(TableNameBuilder.extractRawTableName(tableName))) {
+        return new BasicAuthorizationResultImpl(false,
+            "Principal: " + principal.getName() + " does not have access to table: " + tableName);
+      }
+      if (!principal.hasExplicitPermission(AccessType.DELETE.name())) {
+        return new BasicAuthorizationResultImpl(false,
+            "Principal: " + principal.getName() + " is not granted the DELETE permission");
+      }
+      return BasicAuthorizationResultImpl.success();
     }
 
     private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {

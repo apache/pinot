@@ -107,26 +107,42 @@ public class SqlQueryExecutor {
     return executeStatement(statement, headers);
   }
 
-  /// Executes a parsed DML statement, e.g. from [DataManipulationStatementParser#parse].
+  /// Executes a parsed DML statement, e.g. from [DataManipulationStatementParser#parse], as its
+  /// [DataManipulationStatement#getExecutionType()] tells: in-process, as a minion task, or through the hook of this
+  /// executor for the statement ([DataManipulationStatement.ExecutionType#EXECUTOR]), e.g. [#executeDelete] for a
+  /// [DeleteStatement].
   ///
   /// It does not authorize the caller. The table of a [DeleteStatement] must be resolved with
   /// [DeleteStatement#resolveTableName] and the caller authorized to delete rows from it before it is executed, as the
   /// query endpoints of the broker and the controller do: an unresolved `DELETE` is refused with a
   /// [QueryErrorCode#ACCESS_DENIED] error.
   ///
+  /// Execution failures are returned in the response, never thrown: a [QueryException] thrown by the executing hook
+  /// is returned with its error code and message, any other exception as a [QueryErrorCode#QUERY_EXECUTION] error.
+  ///
   /// @param statement parsed statement
   /// @param headers headers of the original request, e.g. for minion task submission
   /// @return the response of the statement
   public BrokerResponse executeStatement(DataManipulationStatement statement, @Nullable Map<String, String> headers) {
-    if (statement instanceof DeleteStatement) {
-      DeleteStatement deleteStatement = (DeleteStatement) statement;
-      if (!deleteStatement.isResolved()) {
-        return new BrokerResponseNative(QueryErrorCode.ACCESS_DENIED, UNAUTHORIZED_DELETE_MESSAGE);
-      }
-      return executeDelete(deleteStatement, headers);
-    }
     BrokerResponseNative result = new BrokerResponseNative();
     switch (statement.getExecutionType()) {
+      case EXECUTOR:
+        if (statement instanceof DeleteStatement) {
+          DeleteStatement deleteStatement = (DeleteStatement) statement;
+          if (!deleteStatement.isResolved()) {
+            return new BrokerResponseNative(QueryErrorCode.ACCESS_DENIED, UNAUTHORIZED_DELETE_MESSAGE);
+          }
+          try {
+            return executeDelete(deleteStatement, headers);
+          } catch (QueryException e) {
+            return new BrokerResponseNative(e.getErrorCode(), e.getMessage());
+          } catch (Exception e) {
+            return new BrokerResponseNative(QueryErrorCode.QUERY_EXECUTION, e.getMessage());
+          }
+        }
+        result.addException(
+            new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, "Unsupported statement: " + statement));
+        break;
       case MINION:
         AdhocTaskConfig taskConf = statement.generateAdhocTaskConfig();
         try {
@@ -156,6 +172,11 @@ public class SqlQueryExecutor {
   /// Executes a `DELETE` statement. Pinot does not delete rows itself, so this implementation answers with a
   /// [QueryErrorCode#QUERY_VALIDATION] error: executors that implement row deletion override it.
   ///
+  /// The broker and the controller each create their executor through their own hook,
+  /// `BaseBrokerStarter#createSqlQueryExecutor` and `BaseControllerStarter#createSqlQueryExecutor`: both must be
+  /// overridden for a `DELETE` to behave the same on the two SQL endpoints, since the role that receives the statement
+  /// executes it with its own executor.
+  ///
   /// The query endpoints of the broker and the controller (`PinotClientRequest`, `PinotQueryResource`) resolve the
   /// table of the statement with [DeleteStatement#resolveTableName] and authorize the caller to delete rows from it
   /// before calling it (through [#executeStatement]): implementations delete rows from that exact table,
@@ -163,11 +184,14 @@ public class SqlQueryExecutor {
   ///
   /// Implementations validate the predicate (see [DeleteStatement#getPredicate()]) and the options they read (see
   /// [DeleteStatement#getOptions()]) before deleting rows, and forward the request headers to the APIs they call, which
-  /// authorize the caller again.
+  /// authorize the caller again. They report a validation or execution failure either in the response they return or
+  /// by throwing a [QueryException] with the [QueryErrorCode] to surface, which [#executeStatement] returns as the
+  /// error of the response; any other exception is returned as a [QueryErrorCode#QUERY_EXECUTION] error.
   ///
   /// @param statement parsed statement, with its table resolved
   /// @param headers headers of the original request, e.g. to authorize the caller
   /// @return the response of the statement
+  /// @throws QueryException to report a failure with its error code, see above
   protected BrokerResponse executeDelete(DeleteStatement statement, @Nullable Map<String, String> headers) {
     return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, DeleteStatement.NOT_SUPPORTED_MESSAGE);
   }

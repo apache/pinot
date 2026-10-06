@@ -90,6 +90,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
+import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -740,14 +741,23 @@ public class PinotClientRequest {
 
   /// Executes a `DELETE` once the caller is authorized to delete rows from its table.
   ///
-  /// The first-step access control runs first, as for queries. The table is then resolved with the database of the
+  /// The first-step access control runs first, as for queries, followed by the table check without a table, so that
+  /// an access control that only authenticates the caller in that check rejects an unauthenticated caller before the
+  /// table is looked up. The table is then resolved with the database of the
   /// request and in the case it is defined with, the caller is authorized to delete rows from it (see
-  /// [#authorizeDelete]), and the executor deletes rows from that exact table.
+  /// [#authorizeDelete]), and the executor deletes rows from that exact table. A table the table cache does not know
+  /// fails with [QueryErrorCode#TABLE_DOES_NOT_EXIST], as a query does, but only once the caller is authorized for
+  /// it, so that the existence of a table is not leaked to a caller who is not authorized for it.
   private BrokerResponse executeDelete(SqlNodeAndOptions sqlNodeAndOptions, Map<String, String> headers,
       HttpRequesterIdentity requesterIdentity, @Nullable HttpHeaders httpHeaders) {
     AccessControl accessControl = _accessControlFactory.create();
     // The first-step access control runs before the table is looked up, as for queries
     AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);
+    if (authorizationResult.hasAccess()) {
+      // Access controls that authenticate the caller in their table check rather than in the first step (e.g. the
+      // ZooKeeper basic auth) reject an unauthenticated caller here, before the table is looked up
+      authorizationResult = accessControl.authorize(requesterIdentity, Set.of());
+    }
     if (!authorizationResult.hasAccess()) {
       throw deleteAccessDenied(null, authorizationResult);
     }
@@ -765,18 +775,29 @@ public class PinotClientRequest {
       return new BrokerResponseNative(e.getErrorCode(), e.getMessage());
     }
     authorizeDelete(accessControl, statement.getTableName(), requesterIdentity, httpHeaders);
+    if (!statement.tableExists()) {
+      return new BrokerResponseNative(QueryErrorCode.TABLE_DOES_NOT_EXIST,
+          "Table does not exist: " + statement.getTableName());
+    }
+    LOGGER.info("Executing DELETE on table: {}, predicate: {}, options: {}, client: {}", statement.getTableName(),
+        statement.getPredicate(), statement.getOptions().keySet(), requesterIdentity.getClientIp());
     return _sqlQueryExecutor.executeStatement(statement, headers);
   }
 
   /// Authorizes the caller, who passed the first-step access control, to delete rows from the table.
   ///
-  /// The caller must pass the checks of a query on the table, since the WHERE clause reads it: access to the table and
-  /// the [Actions.Table#QUERY] action. Then the fine-grained [Actions.Table#DELETE_ROWS] action is checked on the table
-  /// name, like the query action, and on its raw name, which the controller checks, so that a type suffix cannot
-  /// bypass a rule on the raw name. The access control must allow deleting rows, see
-  /// [AccessControl#authorizeDeleteRows], which denies by default: the fine-grained checks allow every action by
-  /// default, so they cannot tell an access control written before `DELETE` existed from one that allows it. No
-  /// row-level security filter may apply to the table, since it would not restrict the rows the statement deletes.
+  /// The checks run in this order, and the first one that denies answers HTTP 403:
+  /// 1. [AccessControl#authorize(RequesterIdentity, Set)] with the table as its only element, since the WHERE clause
+  ///    reads it. [AccessControl#authorize(RequesterIdentity, BrokerRequest)] is not called, since a `DELETE` is not a
+  ///    broker request: table restrictions that an access control only applies in that overload are not consulted,
+  ///    and must be applied again in [AccessControl#authorizeDeleteRows].
+  /// 2. The fine-grained [Actions.Table#QUERY] action on the table name, as for a query.
+  /// 3. The fine-grained [Actions.Table#DELETE_ROWS] action on the table name, then on its raw name when the name has
+  ///    a type suffix, which the controller checks, so that a type suffix cannot bypass a rule on the raw name.
+  /// 4. [AccessControl#authorizeDeleteRows], which denies by default: the fine-grained checks allow every action by
+  ///    default, so they cannot tell an access control written before `DELETE` existed from one that allows it.
+  /// 5. No row-level security filter applies to the table (see [AccessControl#getRowColFilters], when the broker
+  ///    enables row-level security), since it would not restrict the rows the statement deletes.
   ///
   /// @throws WebApplicationException with status 403 if the caller is not authorized
   private void authorizeDelete(AccessControl accessControl, String tableName, HttpRequesterIdentity requesterIdentity,
@@ -826,21 +847,26 @@ public class PinotClientRequest {
   }
 
   /// Returns whether row-level security filters apply to the table for the caller, when the broker enables row-level
-  /// security.
+  /// security. The filters of the table name as given are checked first, since the caller is authorized for it and
+  /// every access control answers for it, then those of its raw name, where filters are usually configured, when it
+  /// differs and the caller is authorized for it: an access control may refuse to answer for a table the caller
+  /// cannot access, e.g. a basic auth principal whose `tables` list the name with its type only.
   private boolean hasRowFilters(AccessControl accessControl, RequesterIdentity requesterIdentity, String tableName) {
     if (!_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
         CommonConstants.Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH)) {
       return false;
     }
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    List<String> rowFilters =
-        accessControl.getRowColFilters(requesterIdentity, rawTableName).getRLSFilters().orElse(null);
-    if (rowFilters != null && !rowFilters.isEmpty()) {
+    if (hasRowFilters(accessControl.getRowColFilters(requesterIdentity, tableName))) {
       return true;
     }
-    if (!rawTableName.equals(tableName)) {
-      rowFilters = accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters().orElse(null);
-    }
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    return !rawTableName.equals(tableName)
+        && accessControl.authorize(requesterIdentity, Set.of(rawTableName)).hasAccess()
+        && hasRowFilters(accessControl.getRowColFilters(requesterIdentity, rawTableName));
+  }
+
+  private static boolean hasRowFilters(TableRowColAccessResult rowColFilters) {
+    List<String> rowFilters = rowColFilters.getRLSFilters().orElse(null);
     return rowFilters != null && !rowFilters.isEmpty();
   }
 
