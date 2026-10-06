@@ -56,6 +56,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
@@ -283,6 +284,29 @@ public class SinglePartitionColumnSegmentPrunerTest {
     lookupRecords.put("modulo", metadata("modulo", "Modulo", 3, Set.of(2), null));
     assertEquals(pruner(lookupRecords).prune(request(predicate("EQUALS", "11")), lookupRecords.keySet()),
         lookupRecords.keySet());
+  }
+
+  @Test
+  public void testNestedOrAfterMissWithMultipleSegmentPartitions() throws Exception {
+    Map<String, ZNRecord> records = new LinkedHashMap<>();
+    records.put("miss", metadata("miss", "Modulo", 8, Set.of(7), null));
+    records.put("multiple", metadata("multiple", "Modulo", 8, Set.of(1, 2), null));
+    for (int i = 2; i < 512; i++) {
+      String segment = "segment_" + i;
+      records.put(segment, metadata(segment, "Modulo", 8, Set.of(i % 8), null));
+    }
+    Expression filter = function("AND", function("OR", predicate("EQUALS", "1"), predicate("IN", "2", "3")),
+        function("EQUALS", RequestUtils.getIdentifierExpression("other"),
+            RequestUtils.getLiteralExpression("value")));
+    SinglePartitionColumnSegmentPruner pruner = pruner(records);
+    BrokerRequest prepared = request(filter);
+    BrokerRequest legacy = request(filter);
+    legacy.getPinotQuery().setQueryOptions(Map.of(QueryOptionKey.PARTITION_PRUNING_PREPARATION_THRESHOLD, "-1"));
+    Set<String> expected = pruner.prune(legacy, records.keySet());
+    assertTrue(expected.contains("multiple"));
+    assertEquals(pruner.prune(prepared, records.keySet()), expected);
+    assertTrue(pruner.prune(request(function("AND", predicate("EQUALS", "1"), predicate("EQUALS", "2"))),
+        records.keySet()).contains("multiple"));
   }
 
   @DataProvider
