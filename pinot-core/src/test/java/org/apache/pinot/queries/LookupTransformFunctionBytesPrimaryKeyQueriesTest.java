@@ -132,9 +132,6 @@ public class LookupTransformFunctionBytesPrimaryKeyQueriesTest extends BaseQueri
     ImmutableSegment factSegment = buildFactSegment();
     _indexSegment = factSegment;
     _indexSegments = Arrays.asList(factSegment);
-
-    ImmutableSegment dimSegment = buildDimSegment();
-    registerRealDimensionTable(dimSegment);
   }
 
   @AfterClass
@@ -202,7 +199,7 @@ public class LookupTransformFunctionBytesPrimaryKeyQueriesTest extends BaseQueri
     return ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName), ReadMode.mmap);
   }
 
-  private void registerRealDimensionTable(ImmutableSegment dimSegment)
+  private void registerRealDimensionTable(ImmutableSegment dimSegment, boolean disablePreload)
       throws Exception {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(DIM_RAW_TABLE_NAME)
         .addSingleValueDimension(DIM_BYTES_PK_COLUMN, DataType.BYTES)
@@ -210,7 +207,7 @@ public class LookupTransformFunctionBytesPrimaryKeyQueriesTest extends BaseQueri
         .setPrimaryKeyColumns(List.of(DIM_BYTES_PK_COLUMN))
         .build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(DIM_RAW_TABLE_NAME)
-        .setDimensionTableConfig(new DimensionTableConfig(false /* disablePreload */, false))
+        .setDimensionTableConfig(new DimensionTableConfig(disablePreload, false))
         .build();
 
     ZkHelixPropertyStore<ZNRecord> propertyStoreMock = mock(ZkHelixPropertyStore.class);
@@ -235,7 +232,10 @@ public class LookupTransformFunctionBytesPrimaryKeyQueriesTest extends BaseQueri
   }
 
   @Test
-  public void testLookupReturnsPrimaryKeyBytesColumnUnwrapped() {
+  public void testLookupReturnsPrimaryKeyBytesColumnUnwrappedWithFastLookupDimensionTable()
+      throws Exception {
+    ImmutableSegment dimSegment = buildDimSegment();
+    registerRealDimensionTable(dimSegment, false);
     String query = "SELECT id, lookUp('" + DIM_RAW_TABLE_NAME + "', '" + DIM_BYTES_PK_COLUMN + "', '"
         + DIM_BYTES_PK_COLUMN + "', " + FACT_BYTES_KEY_COLUMN + ") FROM " + FACT_RAW_TABLE_NAME + " ORDER BY id";
     List<Object[]> rows = getBrokerResponse(query).getResultTable().getRows();
@@ -250,7 +250,47 @@ public class LookupTransformFunctionBytesPrimaryKeyQueriesTest extends BaseQueri
   }
 
   @Test
-  public void testLookupReturnsNonPrimaryKeyValueColumn() {
+  public void testLookupReturnsNonPrimaryKeyValueColumnFastLookupDimensionTable()
+      throws Exception {
+    ImmutableSegment dimSegment = buildDimSegment();
+    registerRealDimensionTable(dimSegment, false);
+    String query = "SELECT id, lookUp('" + DIM_RAW_TABLE_NAME + "', '" + DIM_LABEL_COLUMN + "', '"
+        + DIM_BYTES_PK_COLUMN + "', " + FACT_BYTES_KEY_COLUMN + ") FROM " + FACT_RAW_TABLE_NAME + " ORDER BY id";
+    List<Object[]> rows = getBrokerResponse(query).getResultTable().getRows();
+    assertEquals(rows.size(), 6); // see comment in testLookupReturnsPrimaryKeyBytesColumnUnwrapped
+    for (Object[] row : rows) {
+      int id = (Integer) row[0];
+      if (id == 1) {
+        assertEquals(row[1], "alpha");
+      } else if (id == 2) {
+        assertEquals(row[1], "beta");
+      }
+    }
+  }
+
+  @Test
+  public void testLookupReturnsPrimaryKeyBytesColumnUnwrappedWithMemOptimisedDimensionTable()
+      throws Exception {
+    ImmutableSegment dimSegment = buildDimSegment();
+    registerRealDimensionTable(dimSegment, true);
+    String query = "SELECT id, lookUp('" + DIM_RAW_TABLE_NAME + "', '" + DIM_BYTES_PK_COLUMN + "', '"
+        + DIM_BYTES_PK_COLUMN + "', " + FACT_BYTES_KEY_COLUMN + ") FROM " + FACT_RAW_TABLE_NAME + " ORDER BY id";
+    List<Object[]> rows = getBrokerResponse(query).getResultTable().getRows();
+    // BaseQueriesTest#getBrokerResponse always simulates one OFFLINE and one REALTIME server response from the
+    // same underlying segment(s) (see its dataTableMap construction), so with a single fact segment each logical
+    // row appears twice -- 3 fact rows -> 6 returned rows. This is expected harness behavior, not a bug in the
+    // query or the lookup logic, so assert per-id rather than on fixed row indices.
+    assertEquals(rows.size(), 6);
+    assertAllRowsForId(rows, 1, BYTES_ALPHA, "matching row (id=1) must return its own primary key bytes");
+    assertAllRowsForId(rows, 2, BYTES_BETA, "matching row (id=2) must return its own primary key bytes");
+    assertAllRowsForId(rows, 3, new byte[0], "non-matching row (id=3) has no dimension row to return");
+  }
+
+  @Test
+  public void testLookupReturnsNonPrimaryKeyValueColumnMemOptimisedDimensionTable()
+      throws Exception {
+    ImmutableSegment dimSegment = buildDimSegment();
+    registerRealDimensionTable(dimSegment, true);
     String query = "SELECT id, lookUp('" + DIM_RAW_TABLE_NAME + "', '" + DIM_LABEL_COLUMN + "', '"
         + DIM_BYTES_PK_COLUMN + "', " + FACT_BYTES_KEY_COLUMN + ") FROM " + FACT_RAW_TABLE_NAME + " ORDER BY id";
     List<Object[]> rows = getBrokerResponse(query).getResultTable().getRows();

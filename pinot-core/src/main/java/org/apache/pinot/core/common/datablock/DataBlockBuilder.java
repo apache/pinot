@@ -149,7 +149,8 @@ public class DataBlockBuilder {
               fixedSize.putInt(dictId);
               break;
             case BYTES:
-              setColumn(fixedSize, varSize, (ByteArray) value);
+              value = value instanceof ByteArray ? value : new ByteArray((byte[])value);
+              setColumn(fixedSize, varSize, (ByteArray)value);
               break;
             case MAP:
               setColumn(fixedSize, varSize, (Map) value);

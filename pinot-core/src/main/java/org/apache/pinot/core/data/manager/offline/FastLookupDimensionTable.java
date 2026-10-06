@@ -115,11 +115,7 @@ public class FastLookupDimensionTable implements DimensionTable {
       return null;
     }
 
-    Object o = getValue(pk, columnName, value);
-    if (o instanceof ByteArray) {
-      return ((ByteArray) o).getBytes();
-    }
-    return o;
+    return getValue(pk, columnName, value);
   }
 
   private Object getValue(PrimaryKey pk, String columnName, Object[] values) {
