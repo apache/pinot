@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
@@ -39,10 +40,15 @@ import org.apache.calcite.rel.logical.LogicalIntersect;
 import org.apache.calcite.rel.logical.LogicalMinus;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalUnion;
+import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.logical.LogicalWindow;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexCorrelVariable;
+import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.rex.RexWindowBound;
 import org.apache.calcite.rex.RexWindowBounds;
 import org.apache.calcite.rex.RexWindowExclusion;
@@ -502,6 +508,13 @@ public final class PlanNodeToRelConverter {
         if (arrayProjects.isEmpty()) {
           arrayProjects.add(_builder.field(0));
         }
+        // CROSS JOIN UNNEST also outputs the input columns, which parent nodes may reference
+        int numPassthrough =
+            node.getDataSchema().size() - arrayProjects.size() - (node.isWithOrdinality() ? 1 : 0);
+        if (numPassthrough > 0) {
+          pushCorrelatedUncollect(node, input, arrayProjects);
+          return null;
+        }
         _builder.project(arrayProjects);
         RelNode project = _builder.build();
 
@@ -515,6 +528,40 @@ public final class PlanNodeToRelConverter {
             node.getDataSchema(), inputs));
       }
       return null;
+    }
+
+    /// Replaces the input on top of the builder stack with the logical plan shape of CROSS JOIN UNNEST: a Correlate of
+    /// the input with an Uncollect that reads the arrays through the correlation variable. Like the [UnnestNode], it
+    /// outputs the input columns followed by the element (and ordinality) columns.
+    private void pushCorrelatedUncollect(UnnestNode node, RelNode input, List<RexNode> arrayProjects) {
+      RexBuilder rexBuilder = _builder.getRexBuilder();
+      RexCorrelVariable correlVariable =
+          (RexCorrelVariable) rexBuilder.makeCorrel(input.getRowType(), _builder.getCluster().createCorrel());
+      RexShuttle toCorrelated = new RexShuttle() {
+        @Override
+        public RexNode visitInputRef(RexInputRef inputRef) {
+          return rexBuilder.makeFieldAccess(correlVariable, inputRef.getIndex());
+        }
+      };
+      List<String> inputNames = input.getRowType().getFieldNames();
+      List<String> arrayNames = new ArrayList<>(arrayProjects.size());
+      for (RexNode arrayProject : arrayProjects) {
+        arrayNames.add(
+            arrayProject instanceof RexInputRef ? inputNames.get(((RexInputRef) arrayProject).getIndex()) : null);
+      }
+      List<RexNode> requiredColumns = _builder.fields(RelOptUtil.InputFinder.bits(arrayProjects, null));
+      _builder.push(LogicalValues.createOneRow(_builder.getCluster()))
+          .project(toCorrelated.apply(arrayProjects), arrayNames)
+          .uncollect(List.of(), node.isWithOrdinality())
+          .correlate(JoinRelType.INNER, correlVariable.id, requiredColumns);
+
+      if (node.isPrunedPassthrough()) {
+        // Keep only the passthrough input columns, followed by the element (and ordinality) columns
+        List<RexNode> fields = _builder.fields();
+        List<RexNode> projects = new ArrayList<>(_builder.fields(node.getPassthroughInputIndexes()));
+        projects.addAll(fields.subList(inputNames.size(), fields.size()));
+        _builder.project(projects);
+      }
     }
 
     @Override
