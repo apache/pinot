@@ -72,6 +72,24 @@ public class RexExpressionUtilsTest {
   }
 
   @Test
+  public void testSqlKindFunctionNames() {
+    // Plan nodes name most standard operators by SqlKind, e.g. DIVIDE for "/" and SUM0 for "$SUM0"
+    RelBuilder relBuilder = RelBuilder.create(Frameworks.newConfigBuilder().build()).values(new String[]{"a"}, 1.0);
+    RexExpression input = new RexExpression.InputRef(0);
+    List<RexExpression> inOperands = List.of(input, new RexExpression.Literal(ColumnDataType.DOUBLE, 1.0),
+        new RexExpression.Literal(ColumnDataType.DOUBLE, 2.0));
+    for (RexExpression call : List.of(
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.DIVIDE.name(), List.of(input, input)),
+        new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(), inOperands),
+        new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(), inOperands))) {
+      Assert.assertEquals(RexExpressionUtils.fromRexNode(RexExpressionUtils.toRexNode(relBuilder, call)), call);
+    }
+    RexExpression.FunctionCall sum0 =
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.SUM0.name(), List.of(input));
+    Assert.assertSame(RexExpressionUtils.getAggFunction(sum0), SqlStdOperatorTable.SUM0);
+  }
+
+  @Test
   public void testHandleSearchNullLiteralInWithNullAsUnknown() {
     // Test: NULL IN (1, 2, 3) (when nullAs = UNKNOWN)
     RexLiteral literal = _rexBuilder.makeNullLiteral(_typeFactory.createSqlType(SqlTypeName.INTEGER));
