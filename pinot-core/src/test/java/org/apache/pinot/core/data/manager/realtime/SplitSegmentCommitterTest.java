@@ -52,6 +52,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -71,6 +72,7 @@ public class SplitSegmentCommitterTest {
   private File _indexDir;
   private File _segmentTarFile;
   private Map<String, File> _metadataFiles;
+  private ServerMetrics _serverMetrics;
 
   @BeforeClass
   public void setUp()
@@ -107,6 +109,11 @@ public class SplitSegmentCommitterTest {
     FileUtils.deleteQuietly(TEMP_DIR);
   }
 
+  @BeforeMethod
+  public void resetServerMetrics() {
+    _serverMetrics = Mockito.mock(ServerMetrics.class);
+  }
+
   private ServerSegmentCompletionProtocolHandler mockProtocolHandler() {
     ServerSegmentCompletionProtocolHandler handler = Mockito.mock(ServerSegmentCompletionProtocolHandler.class);
     Mockito.when(handler.segmentCommitStart(any())).thenReturn(SegmentCompletionProtocol.RESP_COMMIT_CONTINUE);
@@ -132,7 +139,8 @@ public class SplitSegmentCommitterTest {
       String peerDownloadScheme, boolean uploadMetadataTar) {
     SegmentCompletionProtocol.Request.Params params =
         new SegmentCompletionProtocol.Request.Params().withSegmentName(_segmentName);
-    return new SplitSegmentCommitter(LOGGER, handler, params, uploader, peerDownloadScheme, uploadMetadataTar);
+    return new SplitSegmentCommitter(LOGGER, handler, params, uploader, peerDownloadScheme, uploadMetadataTar,
+        _serverMetrics);
   }
 
   private SegmentUploader mockUploader(String segmentLocation)
@@ -230,55 +238,40 @@ public class SplitSegmentCommitterTest {
   @Test
   public void testStagingFailureEmitsFailureMeterAndCommitSucceeds()
       throws Exception {
-    ServerMetrics serverMetrics = Mockito.mock(ServerMetrics.class);
-    ServerMetrics.deregister();
-    Assert.assertTrue(ServerMetrics.register(serverMetrics));
-    try {
-      Map<String, File> brokenFiles = new HashMap<>(_metadataFiles);
-      brokenFiles.put(V1Constants.SEGMENT_CREATION_META, new File(TEMP_DIR, "does-not-exist"));
-      RealtimeSegmentDataManager.SegmentBuildDescriptor descriptor = mockBuildDescriptor();
-      Mockito.when(descriptor.getMetadataFiles()).thenReturn(brokenFiles);
-      SegmentUploader uploader = mockUploader("hdfs://root/" + RAW_TABLE_NAME + "/" + _segmentName);
-      ServerSegmentCompletionProtocolHandler handler = mockProtocolHandler();
+    Map<String, File> brokenFiles = new HashMap<>(_metadataFiles);
+    brokenFiles.put(V1Constants.SEGMENT_CREATION_META, new File(TEMP_DIR, "does-not-exist"));
+    RealtimeSegmentDataManager.SegmentBuildDescriptor descriptor = mockBuildDescriptor();
+    Mockito.when(descriptor.getMetadataFiles()).thenReturn(brokenFiles);
+    SegmentUploader uploader = mockUploader("hdfs://root/" + RAW_TABLE_NAME + "/" + _segmentName);
+    ServerSegmentCompletionProtocolHandler handler = mockProtocolHandler();
 
-      SegmentCompletionProtocol.Response response = newCommitter(handler, uploader, null).commit(descriptor);
+    SegmentCompletionProtocol.Response response = newCommitter(handler, uploader, null).commit(descriptor);
 
-      Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
-      Mockito.verify(handler).segmentCommitEndWithMetadata(any(), any());
-      Mockito.verify(uploader, Mockito.never()).uploadMetadataTar(any(), any(), anyInt());
-      Mockito.verify(serverMetrics)
-          .addMeteredTableValue(RAW_TABLE_NAME, ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1L);
-      assertNoTempLeak();
-    } finally {
-      ServerMetrics.deregister();
-    }
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
+    Mockito.verify(handler).segmentCommitEndWithMetadata(any(), any());
+    Mockito.verify(uploader, Mockito.never()).uploadMetadataTar(any(), any(), anyInt());
+    Mockito.verify(_serverMetrics).addMeteredTableValue(RAW_TABLE_NAME, ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1L);
+    assertNoTempLeak();
   }
 
   @Test
   public void testMetadataTarSkippedWhenUploaderDoesNotSupportIt()
       throws Exception {
-    ServerMetrics serverMetrics = Mockito.mock(ServerMetrics.class);
-    ServerMetrics.deregister();
-    Assert.assertTrue(ServerMetrics.register(serverMetrics));
-    try {
-      Map<String, File> brokenFiles = new HashMap<>(_metadataFiles);
-      brokenFiles.put(V1Constants.SEGMENT_CREATION_META, new File(TEMP_DIR, "does-not-exist"));
-      RealtimeSegmentDataManager.SegmentBuildDescriptor descriptor = mockBuildDescriptor();
-      Mockito.when(descriptor.getMetadataFiles()).thenReturn(brokenFiles);
-      SegmentUploader uploader = Mockito.mock(SegmentUploader.class);
-      Mockito.when(uploader.uploadSegment(any(), any(LLCSegmentName.class)))
-          .thenReturn(new URI("http://controller/" + _segmentName));
-      ServerSegmentCompletionProtocolHandler handler = mockProtocolHandler();
+    Map<String, File> brokenFiles = new HashMap<>(_metadataFiles);
+    brokenFiles.put(V1Constants.SEGMENT_CREATION_META, new File(TEMP_DIR, "does-not-exist"));
+    RealtimeSegmentDataManager.SegmentBuildDescriptor descriptor = mockBuildDescriptor();
+    Mockito.when(descriptor.getMetadataFiles()).thenReturn(brokenFiles);
+    SegmentUploader uploader = Mockito.mock(SegmentUploader.class);
+    Mockito.when(uploader.uploadSegment(any(), any(LLCSegmentName.class)))
+        .thenReturn(new URI("http://controller/" + _segmentName));
+    ServerSegmentCompletionProtocolHandler handler = mockProtocolHandler();
 
-      SegmentCompletionProtocol.Response response = newCommitter(handler, uploader, null).commit(descriptor);
+    SegmentCompletionProtocol.Response response = newCommitter(handler, uploader, null).commit(descriptor);
 
-      Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
-      Mockito.verify(uploader, Mockito.never()).uploadMetadataTar(any(), any(), anyInt());
-      Mockito.verifyNoInteractions(serverMetrics);
-      assertNoTempLeak();
-    } finally {
-      ServerMetrics.deregister();
-    }
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
+    Mockito.verify(uploader, Mockito.never()).uploadMetadataTar(any(), any(), anyInt());
+    Mockito.verifyNoInteractions(_serverMetrics);
+    assertNoTempLeak();
   }
 
   private void assertNoTempLeak() {

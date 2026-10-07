@@ -49,17 +49,19 @@ public class SplitSegmentCommitter implements SegmentCommitter {
   protected final SegmentUploader _segmentUploader;
   protected final String _peerDownloadScheme;
   private final boolean _uploadMetadataTar;
+  private final ServerMetrics _serverMetrics;
   protected final Logger _segmentLogger;
 
   public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
       SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader,
-      @Nullable String peerDownloadScheme, boolean uploadMetadataTar) {
+      @Nullable String peerDownloadScheme, boolean uploadMetadataTar, ServerMetrics serverMetrics) {
     _segmentLogger = segmentLogger;
     _protocolHandler = protocolHandler;
     _params = new SegmentCompletionProtocol.Request.Params(params);
     _segmentUploader = segmentUploader;
     _peerDownloadScheme = peerDownloadScheme;
     _uploadMetadataTar = uploadMetadataTar;
+    _serverMetrics = serverMetrics;
   }
 
   @VisibleForTesting
@@ -69,7 +71,7 @@ public class SplitSegmentCommitter implements SegmentCommitter {
 
   public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
       SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader) {
-    this(segmentLogger, protocolHandler, params, segmentUploader, null, false);
+    this(segmentLogger, protocolHandler, params, segmentUploader, null, false, ServerMetrics.get());
   }
 
   @Override
@@ -158,7 +160,7 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       return metadataTarLocation == null ? null : metadataTarLocation.toString();
     } catch (Exception e) {
       _segmentLogger.warn("Failed to upload metadata tar for segment: {}; continuing with commit", segmentName, e);
-      ServerMetrics.get().addMeteredTableValue(rawTableName, ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
+      _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
       return null;
     } finally {
       FileUtils.deleteQuietly(stagingDir);
