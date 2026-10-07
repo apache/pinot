@@ -32,7 +32,6 @@ import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.ByteString;
-import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rex.RexBuilder;
@@ -54,6 +53,7 @@ import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
 import org.apache.calcite.util.TimestampString;
 import org.apache.pinot.calcite.rex.PinotSealedSearchOperator;
+import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.common.function.scalar.arithmetic.NegateScalarFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
@@ -93,10 +93,7 @@ public class RexExpressionUtils {
       operands.add(toRexNode(builder, functionOperand));
     }
     String functionName = rexExpression.getFunctionName();
-    SqlIdentifier sqlIdentifier = new SqlIdentifier(functionName, SqlParserPos.ZERO);
-    ArrayList<SqlOperator> operators = new ArrayList<>();
-    builder.getCluster().getRexBuilder().getOpTab()
-        .lookupOperatorOverloads(sqlIdentifier, null, SqlSyntax.FUNCTION, operators, SqlNameMatchers.liberal());
+    List<SqlOperator> operators = lookupOperators(functionName);
 
     if (operators.isEmpty()) {
       throw new IllegalArgumentException("No operator found for function: " + functionName);
@@ -105,6 +102,10 @@ public class RexExpressionUtils {
       LOGGER.info("Multiple operators found for function: {}, using the first one", functionName);
     }
     SqlOperator operator = operators.get(0);
+    if (operator.kind == SqlKind.IN) {
+      // Calcite creates IN as SEARCH
+      return builder.in(operands.get(0), operands.subList(1, operands.size()));
+    }
 
     return builder.call(operator, operands);
   }
@@ -169,18 +170,14 @@ public class RexExpressionUtils {
     for (RexExpression functionOperand : functionOperands) {
       operands.add(toRexNode(builder, functionOperand));
     }
-    SqlAggFunction sqlAggFunction = getAggFunction(functionCall, builder.getCluster());
+    SqlAggFunction sqlAggFunction = getAggFunction(functionCall);
 
     return builder.aggregateCall(sqlAggFunction, operands);
   }
 
-  public static SqlAggFunction getAggFunction(RexExpression.FunctionCall functionCall, RelOptCluster cluster) {
-    // TODO: This needs to be improved.
+  public static SqlAggFunction getAggFunction(RexExpression.FunctionCall functionCall) {
     String functionName = functionCall.getFunctionName();
-    SqlIdentifier sqlIdentifier = new SqlIdentifier(functionName, SqlParserPos.ZERO);
-    ArrayList<SqlOperator> operators = new ArrayList<>();
-    cluster.getRexBuilder().getOpTab()
-        .lookupOperatorOverloads(sqlIdentifier, null, SqlSyntax.FUNCTION, operators, SqlNameMatchers.liberal());
+    List<SqlOperator> operators = lookupOperators(functionName);
 
     ArrayList<SqlAggFunction> aggFunctions = new ArrayList<>(operators.size());
     for (SqlOperator operator : operators) {
@@ -195,6 +192,23 @@ public class RexExpressionUtils {
       LOGGER.info("Multiple agg operators found for function: {}, using the first one", functionName);
     }
     return aggFunctions.get(0);
+  }
+
+  /// Looks up the operators for a function name from [#getFunctionName], which uses the [SqlKind] name for most
+  /// standard operators, e.g. `SUM0` for `$SUM0`. Null handling does not change how these names resolve.
+  private static List<SqlOperator> lookupOperators(String functionName) {
+    PinotOperatorTable operatorTable = PinotOperatorTable.instance(true);
+    List<SqlOperator> operators = new ArrayList<>();
+    operatorTable.lookupOperatorOverloads(new SqlIdentifier(functionName, SqlParserPos.ZERO), null,
+        SqlSyntax.FUNCTION, operators, SqlNameMatchers.liberal());
+    if (operators.isEmpty()) {
+      for (SqlOperator operator : operatorTable.getOperatorList()) {
+        if (operator.kind.name().equals(functionName)) {
+          operators.add(operator);
+        }
+      }
+    }
+    return operators;
   }
 
   public static RexExpression fromRexNode(RexNode rexNode) {

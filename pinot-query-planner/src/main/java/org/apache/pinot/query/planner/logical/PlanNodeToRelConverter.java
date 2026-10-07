@@ -360,7 +360,7 @@ public final class PlanNodeToRelConverter {
 
         List<Window.RexWinAggCall> aggCalls = new ArrayList<>();
         for (RexExpression.FunctionCall funCall : node.getAggCalls()) {
-          SqlAggFunction aggFunction = RexExpressionUtils.getAggFunction(funCall, _builder.getCluster());
+          SqlAggFunction aggFunction = RexExpressionUtils.getAggFunction(funCall);
           List<RexExpression> functionOperands = funCall.getFunctionOperands();
           List<RexNode> operands = new ArrayList<>(functionOperands.size());
           for (RexExpression functionOperand : functionOperands) {
