@@ -111,9 +111,17 @@ public final class PlanNodeToRelConverter {
         int[] groupKeyArr = node.getGroupKeys().stream().mapToInt(Integer::intValue).toArray();
         RelBuilder.GroupKey groupKey = _builder.groupKey(groupKeyArr);
 
-        List<RelBuilder.AggCall> aggCalls =
-            node.getAggCalls().stream().map(functionCall -> RexExpressionUtils.toAggCall(_builder, functionCall))
-                .collect(Collectors.toList());
+        List<RexExpression.FunctionCall> functionCalls = node.getAggCalls();
+        List<Integer> filterArgs = node.getFilterArgs();
+        List<RelBuilder.AggCall> aggCalls = new ArrayList<>(functionCalls.size());
+        for (int i = 0; i < functionCalls.size(); i++) {
+          RelBuilder.AggCall aggCall = RexExpressionUtils.toAggCall(_builder, functionCalls.get(i));
+          int filterArg = filterArgs.get(i);
+          if (filterArg >= 0) {
+            aggCall = aggCall.filter(_builder.field(filterArg));
+          }
+          aggCalls.add(aggCall);
+        }
 
         _builder.aggregate(groupKey, aggCalls);
       } catch (RuntimeException e) {
