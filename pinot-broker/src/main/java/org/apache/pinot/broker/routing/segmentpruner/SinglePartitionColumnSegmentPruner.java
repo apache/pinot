@@ -266,16 +266,14 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
       }
       case OR: {
         IntSet ids = new IntOpenHashSet();
-        boolean matchesAll = false;
         for (Expression child : operands) {
           IntSet childIds = preparePartitionIds(child, partitionFunction);
           if (childIds == null) {
-            matchesAll = true;
-          } else {
-            ids.addAll(childIds);
+            return null;
           }
+          ids.addAll(childIds);
         }
-        return matchesAll ? null : ids;
+        return ids;
       }
       case EQUALS:
       case IN: {

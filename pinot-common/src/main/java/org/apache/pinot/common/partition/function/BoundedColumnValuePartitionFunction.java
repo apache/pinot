@@ -97,12 +97,6 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public boolean supportsPartitionIdPreparation() {
-    // Comparing the configured value arrays across segments can cost more than computing a partition id.
-    return false;
-  }
-
-  @Override
   public Map<String, String> getFunctionConfig() {
     return _functionConfig;
   }

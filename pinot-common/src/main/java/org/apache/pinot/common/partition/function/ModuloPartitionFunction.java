@@ -61,6 +61,11 @@ public class ModuloPartitionFunction implements PartitionFunction {
   }
 
   @Override
+  public boolean supportsPartitionIdPreparation() {
+    return getClass() == ModuloPartitionFunction.class;
+  }
+
+  @Override
   public boolean equals(Object other) {
     if (this == other) {
       return true;

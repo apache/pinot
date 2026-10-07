@@ -62,6 +62,11 @@ public class HashCodePartitionFunction implements PartitionFunction {
   }
 
   @Override
+  public boolean supportsPartitionIdPreparation() {
+    return getClass() == HashCodePartitionFunction.class;
+  }
+
+  @Override
   public boolean equals(Object other) {
     if (this == other) {
       return true;

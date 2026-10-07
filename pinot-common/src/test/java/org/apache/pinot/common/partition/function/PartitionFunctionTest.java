@@ -94,6 +94,7 @@ public class PartitionFunctionTest {
   public void testComplexFunctionsAndSubclasses() {
     Map<String, String> config = Map.of("columnValues", "a|b", "columnValuesDelimiter", "|");
     PartitionFunction bounded = new BoundedColumnValuePartitionFunction(3, config);
+    assertFalse(bounded.supportsPartitionIdPreparation());
     assertTrue(bounded.equals(bounded));
     assertFalse(bounded.equals(new BoundedColumnValuePartitionFunction(3, config)));
     class CustomMurmur extends MurmurPartitionFunction {
@@ -102,6 +103,7 @@ public class PartitionFunctionTest {
       }
     }
     PartitionFunction subclass = new CustomMurmur();
+    assertFalse(subclass.supportsPartitionIdPreparation());
     PartitionFunction another = new CustomMurmur();
     assertTrue(subclass.equals(subclass));
     assertTrue(subclass.equals(another));
@@ -124,6 +126,7 @@ public class PartitionFunctionTest {
       Map<String, String> equivalentConfig, Map<String, String> differentConfig) {
     Map<String, String> mutableConfig = new HashMap<>(config);
     PartitionFunction first = PartitionFunctionFactory.getPartitionFunction(name, 8, mutableConfig);
+    assertTrue(first.supportsPartitionIdPreparation());
     PartitionFunction second = PartitionFunctionFactory.getPartitionFunction(name, 8, equivalentConfig);
     PartitionFunction third = PartitionFunctionFactory.getPartitionFunction(name, 8, new HashMap<>(equivalentConfig));
     assertTrue(first.equals(first));

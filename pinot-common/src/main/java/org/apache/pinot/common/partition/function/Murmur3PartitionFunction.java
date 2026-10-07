@@ -115,6 +115,11 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   }
 
   @Override
+  public boolean supportsPartitionIdPreparation() {
+    return getClass() == Murmur3PartitionFunction.class;
+  }
+
+  @Override
   public boolean equals(Object other) {
     if (this == other) {
       return true;

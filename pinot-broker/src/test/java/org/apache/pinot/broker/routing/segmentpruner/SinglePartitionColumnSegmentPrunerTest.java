@@ -54,6 +54,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
@@ -189,6 +190,45 @@ public class SinglePartitionColumnSegmentPrunerTest {
     CountingPartitionFunction.CALLS.set(0);
     assertEquals(pruner.prune(request(predicate("EQUALS", "3")), records.keySet()), expected);
     assertEquals(CountingPartitionFunction.CALLS.get(), 2, "A changed config must not reuse the first function's ID");
+  }
+
+  @Test
+  public void testLegacyFunctionKeepsFirstHitShortCircuit() throws Exception {
+    Map<String, ZNRecord> records = new LinkedHashMap<>();
+    for (int i = 0; i < Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD; i++) {
+      String segment = "segment_" + i;
+      records.put(segment, metadata(segment, "PrunerLegacy", 8, Set.of(0), null));
+    }
+    PartitionFunction first = PartitionFunctionFactory.getPartitionFunction("PrunerLegacy", 8, null);
+    assertFalse(first.supportsPartitionIdPreparation());
+    assertNotEquals(first, PartitionFunctionFactory.getPartitionFunction("PrunerLegacy", 8, null));
+    String[] values = new String[128];
+    Arrays.setAll(values, i -> Integer.toString(i));
+    SinglePartitionColumnSegmentPruner pruner = pruner(records);
+    CountingPartitionFunction.CALLS.set(0);
+    assertEquals(pruner.prune(request(predicate("IN", values)), records.keySet()), records.keySet());
+    assertEquals(CountingPartitionFunction.CALLS.get(), records.size(),
+        "Identity-only plugins should evaluate only the first matching value per segment");
+  }
+
+  @Test
+  public void testUnrestrictedOrSkipsLaterPartitionValues() throws Exception {
+    Map<String, ZNRecord> records = new LinkedHashMap<>();
+    for (int i = 0; i < Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD; i++) {
+      String segment = "segment_" + i;
+      records.put(segment, metadata(segment, "PrunerCounting", 8, Set.of(0), null));
+    }
+    String[] values = new String[128];
+    Arrays.setAll(values, i -> Integer.toString(i));
+    values[127] = "invalid-number";
+    Expression filter = function("OR",
+        function("EQUALS", RequestUtils.getIdentifierExpression("other"), RequestUtils.getLiteralExpression("x")),
+        predicate("IN", values));
+    SinglePartitionColumnSegmentPruner pruner = pruner(records);
+    CountingPartitionFunction.CALLS.set(0);
+    assertEquals(pruner.prune(request(filter), records.keySet()), records.keySet());
+    assertEquals(CountingPartitionFunction.CALLS.get(), 0,
+        "An unrestricted OR child should skip all later values, including invalid ones");
   }
 
   @Test
@@ -495,6 +535,37 @@ public class SinglePartitionColumnSegmentPrunerTest {
     return brokerRequest;
   }
 
+  /// Legacy plugin with identity equality and the default preparation capability, registered by the factory scan.
+  public static class LegacyPartitionFunction implements PartitionFunction {
+    private static final long serialVersionUID = 1L;
+    private final int _numPartitions;
+
+    public LegacyPartitionFunction(int numPartitions, @Nullable Map<String, String> config) {
+      _numPartitions = numPartitions;
+    }
+
+    @Override
+    public int getPartition(String value) {
+      CountingPartitionFunction.CALLS.incrementAndGet();
+      return Math.floorMod(Integer.parseInt(value), _numPartitions);
+    }
+
+    @Override
+    public String getName() {
+      return "PrunerLegacy";
+    }
+
+    @Override
+    public int getNumPartitions() {
+      return _numPartitions;
+    }
+
+    @Override
+    public PartitionIdNormalizer getPartitionIdNormalizer() {
+      return PartitionIdNormalizer.POSITIVE_MODULO;
+    }
+  }
+
   /// Stateless partition function registered by the factory scan with observable hash calls. Exact-count tests require
   /// sequential test methods; the concurrent-query fixture deliberately uses Modulo instead.
   public static class CountingPartitionFunction implements PartitionFunction {
@@ -534,6 +605,11 @@ public class SinglePartitionColumnSegmentPrunerTest {
     @Override
     public PartitionIdNormalizer getPartitionIdNormalizer() {
       return PartitionIdNormalizer.POSITIVE_MODULO;
+    }
+
+    @Override
+    public boolean supportsPartitionIdPreparation() {
+      return true;
     }
 
     @Override

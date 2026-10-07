@@ -87,6 +87,11 @@ public class MurmurPartitionFunction implements PartitionFunction {
   }
 
   @Override
+  public boolean supportsPartitionIdPreparation() {
+    return getClass() == MurmurPartitionFunction.class;
+  }
+
+  @Override
   public boolean equals(Object other) {
     if (this == other) {
       return true;

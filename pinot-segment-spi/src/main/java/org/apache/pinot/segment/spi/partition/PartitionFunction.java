@@ -62,10 +62,10 @@ public interface PartitionFunction extends Serializable {
   /// @return Number of possible partitions.
   int getNumPartitions();
 
-  /// Whether query-local predicate preparation is useful for this function. Functions whose instances cannot be
-  /// compared cheaply across segments can return false to use the original per-segment pruning path.
+  /// Whether query-local predicate preparation is useful for this function. Implementations must opt in only when
+  /// they provide cheap value equality across segments. The default preserves per-segment pruning for legacy plugins.
   default boolean supportsPartitionIdPreparation() {
-    return true;
+    return false;
   }
 
   /// Returns the configuration used to construct this function, or null if none is exposed.

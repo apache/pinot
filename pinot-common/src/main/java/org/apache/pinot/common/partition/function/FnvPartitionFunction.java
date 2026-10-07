@@ -103,6 +103,11 @@ public class FnvPartitionFunction implements PartitionFunction {
   }
 
   @Override
+  public boolean supportsPartitionIdPreparation() {
+    return getClass() == FnvPartitionFunction.class;
+  }
+
+  @Override
   public boolean equals(Object other) {
     if (this == other) {
       return true;
