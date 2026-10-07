@@ -44,6 +44,10 @@ import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexC
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -176,6 +180,92 @@ public class LuceneTextIndexCountTest {
       for (LeafReaderContext leaf : indexReader.leaves()) {
         assertTrue(weight.count(leaf) >= 0, "Lucene no longer counts a single term from metadata");
       }
+    }
+  }
+
+  /// The counting path skips the doc-id translator, on the grounds that a count is invariant under a 1:1
+  /// mapping. The creator fixture stores `DocID == i`, so `TryOptimize` collapses to a no-op translator and
+  /// that invariant is never actually exercised. Build a translator over a genuine permutation and assert the
+  /// count is unchanged by it.
+  @Test
+  public void testCountIsInvariantUnderDocIdPermutation()
+      throws Exception {
+    File permutedDir = new File(TEMP_DIR, "permuted");
+    FileUtils.forceMkdir(permutedDir);
+    TextIndexConfig config = new TextIndexConfigBuilder().build();
+    // Reverse order: Lucene doc i maps to Pinot doc (n-1-i), so the mapping is a permutation, not identity.
+    int[] luceneToPinot = new int[DOCS.length];
+    try (LuceneTextIndexCreator creator = new LuceneTextIndexCreator(COLUMN, permutedDir, true, false, null, null,
+        config)) {
+      for (int i = 0; i < DOCS.length; i++) {
+        creator.add(DOCS[DOCS.length - 1 - i]);
+        luceneToPinot[i] = DOCS.length - 1 - i;
+      }
+      creator.seal();
+    }
+    try (LuceneTextIndexReader permuted = new LuceneTextIndexReader(COLUMN, permutedDir, DOCS.length, Map.of());
+        LuceneTextIndexReader identity = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, Map.of())) {
+      for (Object[] row : queries()) {
+        String q = (String) row[0];
+        String o = (String) row[1];
+        assertEquals(permuted.getNumMatchingDocs(q, o), permuted.getDocIds(q, o).getCardinality(),
+            "count disagreed with doc ids under a permuted mapping for query: " + q);
+        assertEquals(permuted.getNumMatchingDocs(q, o), identity.getNumMatchingDocs(q, o),
+            "count changed with doc id order for query: " + q);
+      }
+    }
+  }
+
+  /// A Lucene index larger than the segment means a broken doc-id mapping. Counting does not consult the
+  /// translator, so it must refuse the fast path and fall back to the doc-id path, which fails loudly rather
+  /// than returning an inflated count.
+  @Test
+  public void testOversizedIndexFallsBackInsteadOfCountingWrong()
+      throws Exception {
+    int understatedNumDocs = DOCS.length - 4;
+    try (LuceneTextIndexReader reader =
+        new LuceneTextIndexReader(COLUMN, INDEX_DIR, understatedNumDocs, Map.of())) {
+      try {
+        int count = reader.getNumMatchingDocs("sentinelall", null);
+        assertTrue(count <= understatedNumDocs,
+            "returned a count larger than the segment (" + count + " > " + understatedNumDocs + ")");
+      } catch (RuntimeException e) {
+        // Falling back and failing loudly is the intended behaviour for a broken mapping. The fallback runs
+        // getDocIds, whose translator throws, and getNumMatchingDocs rewraps it with its own wording.
+        assertTrue(e.getMessage().contains("text index"), "unexpected failure: " + e.getMessage());
+      }
+    }
+  }
+
+  /// The iterating branch claims to honour the query timeout. Every query shape above completes, so nothing
+  /// ever enters that branch and gets interrupted, leaving the claim untested.
+  ///
+  /// Asserts parity with the doc-id path rather than a specific mechanism: on a plain deadline expiry
+  /// `checkTerminationInternal` throws but does not record a termination exception (only an accountant kill
+  /// does), so both paths convert to `CollectionTerminatedException` and return a truncated result. What
+  /// matters is that counting is interrupted exactly like collecting, not that it reports differently.
+  @Test
+  public void testIteratingBranchIsInterruptedLikeTheDocIdPath()
+      throws Exception {
+    String phrase = "\"place order\"";
+    int fullCount;
+    try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, Map.of())) {
+      fullCount = reader.getNumMatchingDocs(phrase, null);
+      assertTrue(fullCount > 0, "phrase should match without a deadline");
+    }
+
+    long expired = System.currentTimeMillis() - 60_000L;
+    QueryExecutionContext expiredContext =
+        new QueryExecutionContext(QueryExecutionContext.QueryType.SSE, 1L, "cid", Accounting.DEFAULT_WORKLOAD_NAME,
+            expired, expired, expired, "brokerId", "instanceId", "");
+    try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, Map.of());
+        QueryThreadContext ignored =
+            QueryThreadContext.open(expiredContext, ThreadAccountantUtils.getNoOpAccountant())) {
+      // A phrase cannot be counted from index metadata, so this reaches the collecting branch.
+      int counted = reader.getNumMatchingDocs(phrase, null);
+      int collected = reader.getDocIds(phrase, null).getCardinality();
+      assertTrue(counted < fullCount, "counting ignored the expired deadline: " + counted + " of " + fullCount);
+      assertEquals(counted, collected, "counting and collecting disagreed under an expired deadline");
     }
   }
 

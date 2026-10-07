@@ -33,17 +33,17 @@ import org.apache.lucene.queries.spans.SpanTermQuery;
 import org.apache.lucene.search.AutomatonQuery;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
-import org.apache.lucene.search.ConstantScoreQuery;
-import org.apache.lucene.search.DocIdSetIterator;
+import org.apache.lucene.search.CollectionTerminatedException;
+import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.LeafCollector;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.Scorable;
 import org.apache.lucene.search.ScoreMode;
-import org.apache.lucene.search.Scorer;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.Weight;
 import org.apache.lucene.search.WildcardQuery;
-import org.apache.lucene.util.Bits;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -378,18 +378,13 @@ public class LuceneTextIndexUtils {
   /// into a bitmap first costs time proportional to the number of matches, which on a frequent term over a
   /// large segment is most of the query.
   ///
-  /// Follows the recipe in Lucene's [org.apache.lucene.search.IndexSearcher#count(Query)]: one rewrite and one
-  /// [Weight], then per leaf take [Weight#count] when the leaf can answer from index metadata and iterate that
-  /// leaf only when it cannot. Probing per leaf rather than bailing out wholesale means a query that is
-  /// countable on some leaves still pays iteration on the rest only.
+  /// Runs as an ordinary search with a counting collector, so the `BulkScorer` path is preserved for the
+  /// shapes that need to iterate -- conjunctions, disjunctions and phrases, which are most of them. Per leaf,
+  /// [Weight#count] is tried first and the leaf is skipped entirely when it can answer from index metadata,
+  /// the same shortcut [org.apache.lucene.search.TotalHitCountCollector] uses.
   ///
-  /// Wrapping in [ConstantScoreQuery] before the rewrite is NOT redundant with [ScoreMode#COMPLETE_NO_SCORES]:
-  /// it is what makes several rewritten shapes produce count-friendly weights, and mirrors `IndexSearcher#count`.
-  /// Removing it silently degrades those shapes to full iteration.
-  ///
-  /// The iterating branch keeps [QueryThreadContext#checkTerminationAndSampleUsagePeriodically] so a slow count
-  /// still honours the query timeout. The metadata probe itself is not interruptible, matching the rewrite that
-  /// already happens inside `IndexSearcher#search`.
+  /// The query is passed through unwrapped so that it produces the same cache key as the doc-id path, rather
+  /// than a second [org.apache.lucene.search.LRUQueryCache] entry for the same predicate.
   ///
   /// Counts are invariant under Pinot's Lucene-to-Pinot doc id translation, which is 1:1, so no translator is
   /// needed here. Callers that cannot guarantee that mapping must not use this method.
@@ -397,29 +392,62 @@ public class LuceneTextIndexUtils {
   /// @return the number of matching documents
   public static int countWithoutMaterializing(IndexSearcher searcher, Query query)
       throws IOException {
-    Query rewritten = searcher.rewrite(new ConstantScoreQuery(query));
-    Weight weight = searcher.createWeight(rewritten, ScoreMode.COMPLETE_NO_SCORES, 1f);
-    int total = 0;
-    for (LeafReaderContext leaf : searcher.getIndexReader().leaves()) {
-      int leafCount = weight.count(leaf);
-      if (leafCount != -1) {
-        total += leafCount;
-        continue;
-      }
-      Scorer scorer = weight.scorer(leaf);
-      if (scorer == null) {
-        continue;
-      }
-      DocIdSetIterator iterator = scorer.iterator();
-      Bits liveDocs = leaf.reader().getLiveDocs();
-      int numCollected = 0;
-      for (int doc = iterator.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = iterator.nextDoc()) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numCollected++, "LuceneCount");
-        if (liveDocs == null || liveDocs.get(doc)) {
-          total++;
-        }
-      }
+    CountingCollector collector = new CountingCollector();
+    searcher.search(query, collector);
+    return collector.getTotalHits();
+  }
+
+  /// Counts matches without recording them, taking [Weight#count] where a leaf can answer from index
+  /// metadata and collecting otherwise.
+  ///
+  /// Mirrors [LuceneDocIdCollector]'s termination handling: a termination is converted to
+  /// [CollectionTerminatedException] so Lucene unwinds cleanly, and the real reason is read back later from
+  /// [QueryThreadContext#getTerminateException].
+  private static final class CountingCollector implements Collector {
+    private Weight _weight;
+    private int _totalHits;
+
+    @Override
+    public void setWeight(Weight weight) {
+      _weight = weight;
     }
-    return total;
+
+    @Override
+    public ScoreMode scoreMode() {
+      return ScoreMode.COMPLETE_NO_SCORES;
+    }
+
+    int getTotalHits() {
+      return _totalHits;
+    }
+
+    @Override
+    public LeafCollector getLeafCollector(LeafReaderContext context)
+        throws IOException {
+      int leafCount = _weight == null ? -1 : _weight.count(context);
+      if (leafCount != -1) {
+        _totalHits += leafCount;
+        // Nothing to visit in this leaf; Lucene treats this as a clean stop for this leaf only.
+        throw new CollectionTerminatedException();
+      }
+      return new LeafCollector() {
+        private int _numCollected;
+
+        @Override
+        public void setScorer(Scorable scorer) {
+          // Not scoring.
+        }
+
+        @Override
+        public void collect(int doc) {
+          try {
+            QueryThreadContext.checkTerminationAndSampleUsagePeriodically(_numCollected++, "LuceneCountCollector");
+          } catch (RuntimeException e) {
+            throw new CollectionTerminatedException();
+          }
+          _totalHits++;
+        }
+      };
+    }
   }
 }

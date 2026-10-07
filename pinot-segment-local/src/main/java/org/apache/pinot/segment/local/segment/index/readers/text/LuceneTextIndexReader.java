@@ -54,6 +54,7 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.exception.QueryException;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
@@ -229,11 +230,16 @@ public class LuceneTextIndexReader implements TextIndexReader {
     try {
       _indexSearcher.search(buildQuery(searchQuery, optionsString), docIDCollector);
       return docIds;
+    } catch (QueryException e) {
+      throw e;
     } catch (Exception e) {
-      // Wording matches what the options path threw before the two paths were merged; it is asserted on in
-      // TextSearchQueriesTest#testTextFilterOptimizerWithWildcardsDifferentOptions.
-      throw new RuntimeException(
-          "Failed while searching the text index for column " + _column + " with search query: " + searchQuery, e);
+      // Both wordings are preserved verbatim from before the two paths were merged: the options path's text is
+      // asserted on in TextSearchQueriesTest#testTextFilterOptimizerWithWildcardsDifferentOptions, and the
+      // no-options path is the common one whose text operators may already alert on.
+      throw new RuntimeException(hasOptions(optionsString)
+          ? "Failed while searching the text index for column " + _column + " with search query: " + searchQuery
+          : "Caught exception while searching the text index for column:" + _column + " search query:" + searchQuery,
+          e);
     }
   }
 
@@ -264,15 +270,21 @@ public class LuceneTextIndexReader implements TextIndexReader {
   @Override
   public int getNumMatchingDocs(String searchQuery, @Nullable String optionsString) {
     try {
-      // A Lucene index with more documents than the segment means the doc-id mapping is broken -- a state
-      // getDocIds surfaces as an IndexOutOfBoundsException from the translator. Counting does not consult the
+      // A Lucene index larger than the segment means the doc-id mapping is broken -- a state getDocIds
+      // surfaces as an IndexOutOfBoundsException from the translator. Counting does not consult the
       // translator, so without this guard the corruption would become a silently inflated count instead.
-      // Fall back so that it keeps failing loudly.
-      if (_indexReader.numDocs() > _numDocs) {
+      // Compared against maxDoc(), not numDocs(): LuceneDocIdCollector indexes the translator by
+      // `context.docBase + doc`, which is maxDoc() space, and with deletions numDocs() < maxDoc() would let a
+      // broken index slip through. Fall back so that it keeps failing loudly.
+      if (_indexReader.maxDoc() > _numDocs) {
         return getDocIds(searchQuery, optionsString).getCardinality();
       }
       return LuceneTextIndexUtils.countWithoutMaterializing(_indexSearcher,
           buildQuery(searchQuery, optionsString));
+    } catch (QueryException e) {
+      // A timeout or accountant kill arrives as a QueryException; wrapping it would erase its error code,
+      // since only QueryException keeps its code through BaseSingleBlockCombineOperator.
+      throw e;
     } catch (Exception e) {
       throw new RuntimeException(
           "Caught exception while counting matches in the text index for column:" + _column + " search query:"
@@ -288,13 +300,18 @@ public class LuceneTextIndexReader implements TextIndexReader {
   @VisibleForTesting
   Query buildQuery(String searchQuery, @Nullable String optionsString)
       throws Exception {
-    if (optionsString != null && !optionsString.trim().isEmpty()) {
+    if (hasOptions(optionsString)) {
       LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
-      if (!options.getOptions().isEmpty()) {
-        return LuceneTextIndexUtils.createQueryParserWithOptions(searchQuery, options, _column, _analyzer);
-      }
+      return LuceneTextIndexUtils.createQueryParserWithOptions(searchQuery, options, _column, _analyzer);
     }
     return buildQuery(searchQuery);
+  }
+
+  /// Whether `optionsString` selects the options-driven parser, i.e. it is non-blank and parses to at least
+  /// one option. Shared so the query built and the error reported cannot disagree about which path ran.
+  private static boolean hasOptions(@Nullable String optionsString) {
+    return optionsString != null && !optionsString.trim().isEmpty()
+        && !LuceneTextIndexUtils.createOptions(optionsString).getOptions().isEmpty();
   }
 
 
