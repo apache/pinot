@@ -105,6 +105,9 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   /// an unavailable boundary prevents REALTIME size retention. These protections can leave the table above the
   /// configured limit.
   ///
+  /// With lineage-exclusive deletion disabled, a concurrent replacement that starts after the initial lineage
+  /// snapshot can race with size eviction because the legacy deletion path does not recheck lineage before deletion.
+  ///
   /// This is an asynchronous, best-effort retention policy, not a limit on decompressed server disk usage,
   /// memory usage, or ingestion. When time retention is also configured, a segment can be deleted by either criterion.
   /// A null value disables size retention.

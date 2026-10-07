@@ -143,32 +143,45 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     String retentionSize = tableConfig.getValidationConfig().getRetentionSize();
     if (retentionSize == null || (tableConfig.getTableType() == TableType.OFFLINE
         && !"APPEND".equalsIgnoreCase(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig)))) {
-      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.SIZE_RETENTION_BLOCKED, 0);
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SIZE_RETENTION_BLOCKED);
       return;
     }
-    // Leave the gauge blocked on unsafe early returns or exceptions, and clear it only after a successful pass.
-    _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.SIZE_RETENTION_BLOCKED, 1);
+    boolean blocked = true;
+    try {
+      blocked = !enforceSizeBasedRetention(tableConfig, retentionSize);
+    } finally {
+      // Publish only the completed pass's result, including a blocked result if an exception interrupted it.
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.SIZE_RETENTION_BLOCKED,
+          blocked ? 1 : 0);
+    }
+  }
+
+  /// Returns whether the table is within its size cap after this pass; unsafe skips and failed evictions return false.
+  private boolean enforceSizeBasedRetention(TableConfig tableConfig, String retentionSize) {
+    String tableNameWithType = tableConfig.getTableName();
     long retentionSizeBytes;
     try {
       retentionSizeBytes = DataSizeUtils.toBytes(retentionSize);
       Preconditions.checkArgument(retentionSizeBytes > 0, "Retention size must be positive");
     } catch (Exception e) {
       LOGGER.warn("Invalid retention size: {} for table: {}, skip size retention", retentionSize, tableNameWithType);
-      return;
+      return false;
     }
 
+    // Read IdealState before lineage, matching the existing live-segment filtering order. A replacement starting
+    // after this snapshot cannot add both its source and destination to the bytes counted by this pass.
+    Set<String> activeSegments = new HashSet<>(_pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false));
     SegmentLineage segmentLineage =
         SegmentLineageAccessHelper.getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
     if (segmentLineage != null && segmentLineage.getLineageEntries().values().stream()
         .anyMatch(entry -> entry.getState() == LineageEntryState.IN_PROGRESS)) {
       LOGGER.warn("In-progress segment lineage for table: {}, skip size retention", tableNameWithType);
-      return;
+      return false;
     }
     // Replaced segments awaiting lineage cleanup are no longer queryable and must not trigger live-data eviction.
-    Set<String> activeSegments = new HashSet<>(_pinotHelixResourceManager.getSegmentsFor(tableNameWithType, true));
+    SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(activeSegments, segmentLineage);
     if (activeSegments.isEmpty()) {
-      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.SIZE_RETENTION_BLOCKED, 0);
-      return;
+      return true;
     }
     List<SegmentZKMetadata> metadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType);
     Set<String> segmentsWithMetadata = new HashSet<>();
@@ -188,7 +201,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       long size = getSizeRetentionSegmentSize(tableNameWithType, metadata);
       if (size < 0) {
         LOGGER.warn("Unknown size for segment: {} in table: {}, skip size retention", segmentName, tableNameWithType);
-        return;
+        return false;
       }
       // Avoid overflowing the table total even if individual segment sizes are valid longs.
       retainedBytes = retainedBytes.add(BigInteger.valueOf(size));
@@ -197,12 +210,11 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
     if (!segmentsWithMetadata.containsAll(activeSegments)) {
       LOGGER.warn("Missing active segment metadata for table: {}, skip size retention", tableNameWithType);
-      return;
+      return false;
     }
     BigInteger limit = BigInteger.valueOf(retentionSizeBytes);
     if (retainedBytes.compareTo(limit) <= 0) {
-      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.SIZE_RETENTION_BLOCKED, 0);
-      return;
+      return true;
     }
 
     Comparator<SegmentZKMetadata> evictionOrder = Comparator.comparingLong(RetentionManager::getSizeRetentionTimestamp)
@@ -222,7 +234,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
             timeBoundaryMs = getHybridTimeBoundaryMs(offlineTableConfig);
           } catch (Exception e) {
             LOGGER.warn("Cannot determine offline coverage for table: {}, skip size retention", tableNameWithType, e);
-            return;
+            return false;
           }
           Set<String> coveredSegments = completedSegments.stream()
               .filter(metadata -> metadata.getEndTimeMs() >= 0 && metadata.getEndTimeMs() < timeBoundaryMs)
@@ -235,8 +247,10 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       completedSegments.stream().filter(metadata -> getSizeRetentionTimestamp(metadata) >= 0)
           .max(evictionOrder).map(SegmentZKMetadata::getSegmentName).ifPresent(candidateNames::remove);
     }
-    // Protect lineage before selecting victims: protected bytes still count toward the limit.
-    removeLineageLockedSegments(tableNameWithType, candidateNames);
+    // Use the same lineage snapshot for accounting and candidate protection; deletion still performs a fresh check.
+    if (_controllerConf.isLineageExclusiveDeleteEnabled() && segmentLineage != null) {
+      candidateNames.removeAll(SegmentLineageUtils.getDeleteBlockedSegments(segmentLineage));
+    }
     Set<String> candidates = new HashSet<>(candidateNames);
     completedSegments.removeIf(metadata -> !candidates.contains(metadata.getSegmentName()));
     completedSegments.sort(evictionOrder);
@@ -261,7 +275,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       if (response == null || !response.isSuccessful()) {
         LOGGER.warn("Size retention deletion failed for table: {}, bytes retained: {}, cap: {}, response: {}",
             tableNameWithType, retainedBytes, retentionSize, response);
-        return;
+        return false;
       }
       retainedBytes = projectedRetainedBytes;
       LOGGER.info("Deleted {} oldest segments from table: {} for retention size: {}", segmentsToDelete.size(),
@@ -270,9 +284,9 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     if (retainedBytes.compareTo(limit) > 0) {
       LOGGER.warn("Table: {} remains above retention size: {} due to protected or undated segments",
           tableNameWithType, retentionSize);
-    } else {
-      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.SIZE_RETENTION_BLOCKED, 0);
+      return false;
     }
+    return true;
   }
 
   @Override
