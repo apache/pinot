@@ -27,13 +27,11 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
-import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.ByteString;
 import org.apache.calcite.avatica.util.DateTimeUtils;
-import org.apache.calcite.avatica.util.TimeUnitRange;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.logical.LogicalFilter;
@@ -50,18 +48,22 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.DateString;
-import org.apache.calcite.util.NlsString;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
+import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
 /// PinotEvaluateLiteralRule that matches the literal only function calls and evaluates them.
+///
+/// The function gets each literal as the Java value that the runtime passes for it, so that the result is the same as
+/// the result of the call at runtime.
 public class PinotEvaluateLiteralRule {
 
   public static class Project extends RelOptRule {
@@ -164,18 +166,13 @@ public class PinotEvaluateLiteralRule {
 
     int numArguments = operands.size();
     ColumnDataType[] argumentTypes = new ColumnDataType[numArguments];
-    Object[] arguments = new Object[numArguments];
     for (int i = 0; i < numArguments; i++) {
       RexNode rexNode = operands.get(i);
-      RexLiteral rexLiteral;
-      if (rexNode instanceof RexLiteral) {
-        rexLiteral = (RexLiteral) rexNode;
-      } else {
+      if (!(rexNode instanceof RexLiteral)) {
         // Function operands cannot be evaluated, skip
         return rexCall;
       }
-      argumentTypes[i] = RelToPlanNodeConverter.convertToColumnDataType(rexLiteral.getType());
-      arguments[i] = getLiteralValue(rexLiteral);
+      argumentTypes[i] = RelToPlanNodeConverter.convertToColumnDataType(rexNode.getType());
     }
 
     if (isDatetimeIntervalArithmetic(rexCall)) {
@@ -184,6 +181,7 @@ public class PinotEvaluateLiteralRule {
     if (isIntervalArithmetic(rexCall)) {
       return evaluateIntervalArithmetic(rexCall, rexBuilder);
     }
+    String castTargetType = null;
     if (rexCall.getKind() == SqlKind.CAST) {
       // Handle separately because the CAST operator only has one operand (the value to be cast) and the type to be cast
       // to is determined by the operator's return type. Pinot's CAST function implementation requires two arguments:
@@ -194,13 +192,22 @@ public class PinotEvaluateLiteralRule {
       ColumnDataType castType =
           RelToPlanNodeConverter.isCastThroughLong(rexCall.getType(), operands.get(0).getType()) ? ColumnDataType.LONG
               : RelToPlanNodeConverter.convertToColumnDataType(rexCall.getType());
-      arguments = new Object[]{arguments[0], castType.name()};
+      castTargetType = castType.name();
     }
     String canonicalName = FunctionRegistry.canonicalize(PinotRuleUtils.extractFunctionName(rexCall));
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
     if (functionInfo == null || !functionInfo.isDeterministic()) {
       // Function cannot be evaluated
       return rexCall;
+    }
+    // Convert the literals only for a function that can be evaluated, because some operators take literals that are
+    // not values, for example the Sarg of a SEARCH
+    Object[] arguments = new Object[argumentTypes.length];
+    for (int i = 0; i < numArguments; i++) {
+      arguments[i] = getArgumentValue((RexLiteral) operands.get(i), argumentTypes[i]);
+    }
+    if (castTargetType != null) {
+      arguments[1] = castTargetType;
     }
     RelDataType rexNodeType = rexCall.getType();
     if (rexNodeType.getSqlTypeName() == SqlTypeName.DECIMAL) {
@@ -391,23 +398,18 @@ public class PinotEvaluateLiteralRule {
     }
   }
 
+  /// Returns the value that the runtime passes to a function for the literal (see `FunctionOperand`): the value from
+  /// [RexExpressionUtils#fromRexLiteral], converted with [ColumnDataType#toExternal]. For example, an INTEGER literal
+  /// becomes an `Integer` (Calcite stores a `BigDecimal`), and a TIMESTAMP literal becomes a `Timestamp`.
   @Nullable
-  private static Object getLiteralValue(RexLiteral rexLiteral) {
-    Object value = rexLiteral.getValue();
-    if (value instanceof NlsString) {
-      // STRING
-      return ((NlsString) value).getValue();
-    } else if (value instanceof GregorianCalendar) {
-      // TIMESTAMP
-      return ((GregorianCalendar) value).getTimeInMillis();
-    } else if (value instanceof ByteString) {
-      // BYTES
-      return ((ByteString) value).getBytes();
-    } else if (value instanceof TimeUnitRange) {
-      return ((TimeUnitRange) value).name();
-    } else {
-      return value;
+  private static Object getArgumentValue(RexLiteral rexLiteral, ColumnDataType argumentType) {
+    if (argumentType == ColumnDataType.OBJECT && rexLiteral.getTypeName() != SqlTypeName.SYMBOL) {
+      // The runtime cannot represent this literal (for example an INTERVAL), so keep the value that Calcite stores
+      return rexLiteral.getValue();
     }
+    RexExpression.Literal literal = RexExpressionUtils.fromRexLiteral(rexLiteral);
+    Object value = literal.getValue();
+    return value != null ? literal.getDataType().toExternal(value) : null;
   }
 
   @Nullable
