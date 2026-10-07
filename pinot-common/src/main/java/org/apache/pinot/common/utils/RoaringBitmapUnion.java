@@ -26,8 +26,8 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 /// Interim stand-in for `org.roaringbitmap.RoaringBitmapUnion`, which is proposed to RoaringBitmap for
-/// apache/pinot#19587 and not released yet. It has the same name and the same methods, so that once a RoaringBitmap
-/// release ships the class the swap is mechanical:
+/// apache/pinot#19587 and not released yet. It exposes only the proposed methods used by Pinot, so that once a
+/// RoaringBitmap release ships the class the swap is mechanical:
 ///
 /// - change the import at the call sites to `org.roaringbitmap.RoaringBitmapUnion`,
 /// - make [RoaringBitmapUtils#deserializeToUnion] call `RoaringBitmapUnion.takeOwnership(deserialize(bytes))`,
@@ -46,18 +46,13 @@ import org.roaringbitmap.RoaringBitmap;
 ///   still intend to use the union.
 /// - [#take()] transfers ownership of the accumulated bitmap and leaves the union empty.
 ///
-/// Callers should code against the library contract, which is stricter than this class in two places: a bitmap
-/// passed to [#takeOwnership(RoaringBitmap)] is relinquished for good, and it must be a plain [RoaringBitmap], not an
-/// instance of a subclass.
-///
 /// Differences from the library class:
 ///
 /// - The lazy primitives of [RoaringBitmap] are `protected`, so the accumulated state is a private subclass that
 ///   reaches them through inheritance. The bitmaps handed out by [#get()] and [#take()] are instances of that
 ///   subclass; it adds no state and overrides nothing.
-/// - [#takeOwnership(RoaringBitmap)] adopts without copying only a bitmap that a union handed out; any other bitmap
-///   is copied. Pinot never needs more: bitmaps are deserialized straight into a union with
-///   [RoaringBitmapUtils#deserializeToUnion], and copies are made by adding to an empty union.
+/// - Bitmaps are deserialized straight into a union with [RoaringBitmapUtils#deserializeToUnion], and copies are
+///   made by adding to an empty union.
 /// - [#add(int)] repairs pending lazy state before inserting, because inserting into a lazy container needs the
 ///   library's internals, and it does not re-encode a run container that received the value. A given accumulator
 ///   receives either bitmaps or single values in Pinot, never both.
@@ -104,18 +99,6 @@ public final class RoaringBitmapUnion {
     _dirty = true;
     _numValuesAdded = adopted.getLongCardinality();
     _lastKnownCardinality = _numValuesAdded;
-  }
-
-  /// Creates a union whose initial state is the given bitmap. The caller relinquishes the instance: it must not be
-  /// used again except through the union.
-  public static RoaringBitmapUnion takeOwnership(RoaringBitmap bitmap) {
-    Objects.requireNonNull(bitmap, "bitmap");
-    if (bitmap instanceof LazyBitmap) {
-      return new RoaringBitmapUnion((LazyBitmap) bitmap);
-    }
-    LazyBitmap copy = new LazyBitmap();
-    copy.lazyOr(bitmap);
-    return new RoaringBitmapUnion(copy);
   }
 
   /// Deserializes a bitmap straight into a union that owns it. Not part of the library class: callers go through

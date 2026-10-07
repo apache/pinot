@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.Random;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -130,11 +131,9 @@ public class MutableRoaringBitmapUnionTest {
     for (int i = 10; i < 20; i++) {
       union.add(present(inputs[i], i));
     }
-    union.add(42);
     assertValid(published, snapshot);
 
     MutableRoaringBitmap expected = eagerUnion(inputs, 20);
-    expected.add(42);
     MutableRoaringBitmap taken = union.take();
     assertNotSame(taken, published);
     assertValid(taken, expected);
@@ -189,24 +188,32 @@ public class MutableRoaringBitmapUnionTest {
     assertValid(union.take(), expected);
   }
 
+  // Inspect container identity without get(), whose publication would legitimately trigger a copy on the next add.
+  private static MutableRoaringBitmap accumulatedBitmap(MutableRoaringBitmapUnion union)
+      throws ReflectiveOperationException {
+    Field field = MutableRoaringBitmapUnion.class.getDeclaredField("_bitmap");
+    field.setAccessible(true);
+    return (MutableRoaringBitmap) field.get(union);
+  }
+
   @Test
-  public void testRepeatedSparseMappedInputsStayInPlace() {
+  public void testRepeatedSparseMappedInputsStayInPlace()
+      throws ReflectiveOperationException {
     MutableRoaringBitmap input = new MutableRoaringBitmap();
     for (int key = 0; key < 24; key++) {
       input.add(key << 16);
     }
     for (int presentation = 1; presentation <= 2; presentation++) {
       ImmutableRoaringBitmap mapped = present(input, presentation);
-      MutableRoaringBitmapUnion seed = new MutableRoaringBitmapUnion();
-      seed.add(mapped);
-      MutableRoaringBitmap owned = seed.take();
+      MutableRoaringBitmapUnion union = new MutableRoaringBitmapUnion();
+      union.add(mapped);
+      MutableRoaringBitmap owned = accumulatedBitmap(union);
       MappeableContainer[] containers = new MappeableContainer[owned.getContainerCount()];
       MappeableContainerPointer pointer = owned.getContainerPointer();
       for (int i = 0; i < containers.length; i++) {
         containers[i] = pointer.getContainer();
         pointer.advance();
       }
-      MutableRoaringBitmapUnion union = MutableRoaringBitmapUnion.takeOwnership(owned);
       // Exercise read-only heap and direct buffers without publishing intermediate accumulator state.
       for (int i = 0; i < 2048; i++) {
         union.add(mapped);
@@ -223,7 +230,8 @@ public class MutableRoaringBitmapUnionTest {
   }
 
   @Test
-  public void testSparseMappedContainersStayInPlaceWithSkewedDensity() {
+  public void testSparseMappedContainersStayInPlaceWithSkewedDensity()
+      throws ReflectiveOperationException {
     for (int numSparseKeys : new int[]{1, 50}) {
       MutableRoaringBitmap initial = new MutableRoaringBitmap();
       initial.add(0L, 1L << 16);
@@ -231,9 +239,9 @@ public class MutableRoaringBitmapUnionTest {
         initial.add(key << 16);
       }
       for (int presentation = 1; presentation <= 2; presentation++) {
-        MutableRoaringBitmapUnion seed = new MutableRoaringBitmapUnion();
-        seed.add(present(initial, presentation));
-        MutableRoaringBitmap owned = seed.take();
+        MutableRoaringBitmapUnion union = new MutableRoaringBitmapUnion();
+        union.add(present(initial, presentation));
+        MutableRoaringBitmap owned = accumulatedBitmap(union);
         MappeableContainerPointer pointer = owned.getContainerPointer();
         pointer.advance();
         MappeableContainer[] sparseContainers = new MappeableContainer[numSparseKeys];
@@ -241,7 +249,6 @@ public class MutableRoaringBitmapUnionTest {
           sparseContainers[i] = pointer.getContainer();
           pointer.advance();
         }
-        MutableRoaringBitmapUnion union = MutableRoaringBitmapUnion.takeOwnership(owned);
         MutableRoaringBitmap expected = initial.clone();
         // The full first container masks the sparse arrays in the average density.
         for (int i = 1; i <= 500; i++) {
@@ -267,16 +274,16 @@ public class MutableRoaringBitmapUnionTest {
   }
 
   @Test
-  public void testDenseMappedInputsStillUseLazyUnion() {
+  public void testDenseMappedInputsStillUseLazyUnion()
+      throws ReflectiveOperationException {
     MutableRoaringBitmap input = new MutableRoaringBitmap();
     for (int value = 0; value < 1024; value++) {
       input.add(value);
     }
-    MutableRoaringBitmapUnion seed = new MutableRoaringBitmapUnion();
-    seed.add(input);
-    MutableRoaringBitmap owned = seed.take();
+    MutableRoaringBitmapUnion union = new MutableRoaringBitmapUnion();
+    union.add(input);
+    MutableRoaringBitmap owned = accumulatedBitmap(union);
     MappeableContainer container = owned.getContainerPointer().getContainer();
-    MutableRoaringBitmapUnion union = MutableRoaringBitmapUnion.takeOwnership(owned);
     MutableRoaringBitmap duplicate = new MutableRoaringBitmap();
     duplicate.add(0);
     union.add(present(duplicate, 2));
@@ -286,22 +293,7 @@ public class MutableRoaringBitmapUnionTest {
   }
 
   @Test
-  public void testTakeOwnershipAndNullArguments() {
-    Random random = new Random(SEED + 2);
-    MutableRoaringBitmap[] inputs = inputs(random, 3);
-    MutableRoaringBitmapUnion union = new MutableRoaringBitmapUnion();
-    union.add(inputs[0]);
-    MutableRoaringBitmap result = union.take();
-    // A bitmap handed out by a union is adopted as is. Any other bitmap is relinquished by the caller, so only the
-    // values of the result are checked
-    assertSame(MutableRoaringBitmapUnion.takeOwnership(result).take(), result);
-    MutableRoaringBitmapUnion adopting = MutableRoaringBitmapUnion.takeOwnership(inputs[1].clone());
-    adopting.add(inputs[2]);
-    MutableRoaringBitmap expected = inputs[1].clone();
-    expected.or(inputs[2]);
-    assertValid(adopting.take(), expected);
-
+  public void testNullArguments() {
     assertThrows(NullPointerException.class, () -> new MutableRoaringBitmapUnion().add(null));
-    assertThrows(NullPointerException.class, () -> MutableRoaringBitmapUnion.takeOwnership(null));
   }
 }

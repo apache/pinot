@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.lang.reflect.Field;
 import java.util.Random;
 import org.roaringbitmap.Container;
 import org.roaringbitmap.ContainerPointer;
@@ -33,8 +34,7 @@ import static org.testng.Assert.fail;
 
 
 /// Covers the interim [RoaringBitmapUnion]: folds are compared with eager unions, and the ownership rules of
-/// `get()`, `take()` and `takeOwnership()` are pinned so that the swap to the library class cannot change behavior
-/// unnoticed.
+/// `get()` and `take()` are pinned so that the swap to the library class cannot change behavior unnoticed.
 public class RoaringBitmapUnionTest {
   private static final long SEED = 20260929L;
 
@@ -173,7 +173,7 @@ public class RoaringBitmapUnionTest {
   }
 
   @Test
-  public void testDeserializeToUnionAdoptsWithoutCopyAndKeepsAccumulating() {
+  public void testDeserializeToUnionKeepsAccumulating() {
     Random random = new Random(SEED + 3);
     RoaringBitmap[] inputs = inputs(random, 12);
     RoaringBitmapUnion union = RoaringBitmapUtils.deserializeToUnion(RoaringBitmapUtils.serialize(inputs[0]));
@@ -183,15 +183,6 @@ public class RoaringBitmapUnionTest {
     }
     RoaringBitmap result = union.take();
     assertValid(result, eagerUnion(inputs, inputs.length));
-
-    // A bitmap handed out by a union is adopted as is. Any other bitmap is relinquished by the caller, so only the
-    // values of the result are checked
-    assertSame(RoaringBitmapUnion.takeOwnership(result).take(), result);
-    RoaringBitmapUnion adopting = RoaringBitmapUnion.takeOwnership(inputs[1].clone());
-    adopting.add(inputs[2]);
-    RoaringBitmap expected = inputs[1].clone();
-    expected.or(inputs[2]);
-    assertValid(adopting.take(), expected);
   }
 
   @Test
@@ -285,22 +276,30 @@ public class RoaringBitmapUnionTest {
     assertValid(union.get(), expected);
   }
 
+  // Inspect container identity without get(), whose publication would legitimately trigger a copy on the next add.
+  private static RoaringBitmap accumulatedBitmap(RoaringBitmapUnion union)
+      throws ReflectiveOperationException {
+    Field field = RoaringBitmapUnion.class.getDeclaredField("_bitmap");
+    field.setAccessible(true);
+    return (RoaringBitmap) field.get(union);
+  }
+
   @Test
-  public void testRepeatedSparseInputsStayInPlace() {
+  public void testRepeatedSparseInputsStayInPlace()
+      throws ReflectiveOperationException {
     RoaringBitmap input = new RoaringBitmap();
     for (int key = 0; key < 24; key++) {
       input.add(key << 16);
     }
-    RoaringBitmapUnion seed = new RoaringBitmapUnion();
-    seed.add(input);
-    RoaringBitmap owned = seed.take();
+    RoaringBitmapUnion union = new RoaringBitmapUnion();
+    union.add(input);
+    RoaringBitmap owned = accumulatedBitmap(union);
     Container[] containers = new Container[owned.getContainerCount()];
     ContainerPointer pointer = owned.getContainerPointer();
     for (int i = 0; i < containers.length; i++) {
       containers[i] = pointer.getContainer();
       pointer.advance();
     }
-    RoaringBitmapUnion union = RoaringBitmapUnion.takeOwnership(owned);
     // Duplicate counts exceed the lazy threshold, but the result remains one value per container.
     for (int i = 0; i < 2048; i++) {
       union.add(input);
@@ -316,16 +315,17 @@ public class RoaringBitmapUnionTest {
   }
 
   @Test
-  public void testSparseContainersStayInPlaceWithSkewedDensity() {
+  public void testSparseContainersStayInPlaceWithSkewedDensity()
+      throws ReflectiveOperationException {
     for (int numSparseKeys : new int[]{1, 50}) {
       RoaringBitmap initial = new RoaringBitmap();
       initial.add(0L, 1L << 16);
       for (int key = 1; key <= numSparseKeys; key++) {
         initial.add(key << 16);
       }
-      RoaringBitmapUnion seed = new RoaringBitmapUnion();
-      seed.add(initial);
-      RoaringBitmap owned = seed.take();
+      RoaringBitmapUnion union = new RoaringBitmapUnion();
+      union.add(initial);
+      RoaringBitmap owned = accumulatedBitmap(union);
       ContainerPointer pointer = owned.getContainerPointer();
       pointer.advance();
       Container[] sparseContainers = new Container[numSparseKeys];
@@ -333,7 +333,6 @@ public class RoaringBitmapUnionTest {
         sparseContainers[i] = pointer.getContainer();
         pointer.advance();
       }
-      RoaringBitmapUnion union = RoaringBitmapUnion.takeOwnership(owned);
       RoaringBitmap expected = initial.clone();
       // The full first container masks the sparse arrays in the average density, even with 50 sparse keys.
       for (int i = 1; i <= 500; i++) {
@@ -357,16 +356,16 @@ public class RoaringBitmapUnionTest {
   }
 
   @Test
-  public void testDenseInputsStillUseLazyUnion() {
+  public void testDenseInputsStillUseLazyUnion()
+      throws ReflectiveOperationException {
     RoaringBitmap input = new RoaringBitmap();
     for (int value = 0; value < 1024; value++) {
       input.add(value);
     }
-    RoaringBitmapUnion seed = new RoaringBitmapUnion();
-    seed.add(input);
-    RoaringBitmap owned = seed.take();
+    RoaringBitmapUnion union = new RoaringBitmapUnion();
+    union.add(input);
+    RoaringBitmap owned = accumulatedBitmap(union);
     Container container = owned.getContainerPointer().getContainer();
-    RoaringBitmapUnion union = RoaringBitmapUnion.takeOwnership(owned);
     union.add(RoaringBitmap.bitmapOf(0));
     RoaringBitmap result = union.take();
     assertValid(result, input);
@@ -377,7 +376,6 @@ public class RoaringBitmapUnionTest {
   @Test
   public void testNullArguments() {
     assertThrows(NullPointerException.class, () -> new RoaringBitmapUnion().add((RoaringBitmap) null));
-    assertThrows(NullPointerException.class, () -> RoaringBitmapUnion.takeOwnership(null));
   }
 
   /// Fails once the RoaringBitmap library on the classpath ships the classes these interim ones stand in for, with

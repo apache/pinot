@@ -25,9 +25,9 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /// Interim stand-in for `org.roaringbitmap.buffer.MutableRoaringBitmapUnion`, the buffer counterpart of
-/// [RoaringBitmapUnion]: same name and methods as the class proposed to RoaringBitmap, so that the swap is an import
-/// change plus deleting this class. It is internal to Pinot and goes away with the swap. See [RoaringBitmapUnion] for
-/// the contract and the swap steps.
+/// [RoaringBitmapUnion]. It exposes only the proposed methods used by Pinot, so that the swap is an import change
+/// plus deleting this class. It is internal to Pinot and goes away with the swap. See [RoaringBitmapUnion] for the
+/// contract and the swap steps.
 ///
 /// Inputs may be read-only bitmaps over memory-mapped buffers; they are only read.
 ///
@@ -35,10 +35,6 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 ///
 /// - The accumulated state is a private subclass of [MutableRoaringBitmap] that reaches the protected lazy primitives
 ///   through inheritance; [#get()] and [#take()] hand out instances of it.
-/// - [#takeOwnership(MutableRoaringBitmap)] adopts without copying only a bitmap that a union handed out; any other
-///   bitmap is copied. Callers should still treat the argument as relinquished, and should not pass subclasses.
-/// - [#add(int)] repairs pending lazy state before inserting and does not re-encode a run container that received
-///   the value.
 /// - An input is unioned eagerly while the accumulator holds few values per container, when overlapping arrays would
 ///   stay small, or when it would insert many container keys that are new to the accumulator, because the released
 ///   lazy union only pays off for dense containers and inserts new keys one at a time.
@@ -67,26 +63,6 @@ public final class MutableRoaringBitmapUnion {
     _bitmap = new LazyBitmap();
   }
 
-  private MutableRoaringBitmapUnion(LazyBitmap adopted) {
-    _bitmap = adopted;
-    // Adopted state is normalized on the first read, like the library class does
-    _dirty = true;
-    _numValuesAdded = adopted.getLongCardinality();
-    _lastKnownCardinality = _numValuesAdded;
-  }
-
-  /// Creates a union whose initial state is the given bitmap. The caller relinquishes the instance: it must not be
-  /// used again except through the union.
-  public static MutableRoaringBitmapUnion takeOwnership(MutableRoaringBitmap bitmap) {
-    Objects.requireNonNull(bitmap, "bitmap");
-    if (bitmap instanceof LazyBitmap) {
-      return new MutableRoaringBitmapUnion((LazyBitmap) bitmap);
-    }
-    LazyBitmap copy = new LazyBitmap();
-    copy.lazyOr(bitmap);
-    return new MutableRoaringBitmapUnion(copy);
-  }
-
   /// Unions the input into the accumulated state. The input is neither modified nor retained. Adding this union's own
   /// [#get()] result, or an empty bitmap, is a no-op.
   public void add(ImmutableRoaringBitmap input) {
@@ -104,14 +80,6 @@ public final class MutableRoaringBitmapUnion {
       repairIfDirty();
       _bitmap.or(input);
     }
-  }
-
-  /// Unions a single value, treated as unsigned, into the accumulated state.
-  public void add(int value) {
-    beforeMutation();
-    repairIfDirty();
-    _bitmap.add(value);
-    _numValuesAdded++;
   }
 
   /// Returns the accumulated bitmap with all pending lazy state repaired. The returned instance is the union's
