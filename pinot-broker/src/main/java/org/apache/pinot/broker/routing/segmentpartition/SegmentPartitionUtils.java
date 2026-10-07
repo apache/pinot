@@ -18,12 +18,16 @@
  */
 package org.apache.pinot.broker.routing.segmentpartition;
 
+import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.ints.IntSets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -39,6 +43,26 @@ public class SegmentPartitionUtils {
   public static final Map<String, SegmentPartitionInfo> INVALID_COLUMN_PARTITION_INFO_MAP = Map.of();
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPartitionUtils.class);
+
+  // Shared partition functions, keyed by the metadata they are built from. Every segment of a table usually carries the
+  // same partition function metadata, so sharing one instance avoids creating one per segment on every routing
+  // rebuild. Sharing is safe because PartitionFunction implementations must be stateless and thread-safe (see the
+  // PartitionFunction contract). The cache stops growing at MAX_CACHED_PARTITION_FUNCTIONS distinct entries, after
+  // which new functions are created without being cached.
+  private static final int MAX_CACHED_PARTITION_FUNCTIONS = 1024;
+  private static final Map<PartitionFunctionKey, PartitionFunction> PARTITION_FUNCTION_CACHE =
+      new ConcurrentHashMap<>();
+
+  // Shared immutable one-element partition sets. Most segments hold a single partition, so sharing them avoids one set
+  // per segment.
+  private static final int NUM_CACHED_SINGLE_PARTITION_SETS = 1024;
+  private static final IntSet[] SINGLE_PARTITION_SETS = new IntSet[NUM_CACHED_SINGLE_PARTITION_SETS];
+
+  static {
+    for (int i = 0; i < NUM_CACHED_SINGLE_PARTITION_SETS; i++) {
+      SINGLE_PARTITION_SETS[i] = IntSets.singleton(i);
+    }
+  }
 
   /// Returns the partition info for a given segment with single partition column.
   ///
@@ -76,9 +100,42 @@ public class SegmentPartitionUtils {
       return INVALID_PARTITION_INFO;
     }
 
-    return new SegmentPartitionInfo(partitionColumn,
-        PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata),
-        columnPartitionMetadata.getPartitions());
+    return new SegmentPartitionInfo(partitionColumn, getPartitionFunction(columnPartitionMetadata),
+        getPartitions(columnPartitionMetadata));
+  }
+
+  /// Returns a partition function for the given metadata, shared with the other segments with equal metadata.
+  private static PartitionFunction getPartitionFunction(ColumnPartitionMetadata columnPartitionMetadata) {
+    PartitionFunctionKey key = new PartitionFunctionKey(columnPartitionMetadata.getFunctionName(),
+        columnPartitionMetadata.getNumPartitions(), columnPartitionMetadata.getFunctionConfig());
+    PartitionFunction partitionFunction = PARTITION_FUNCTION_CACHE.get(key);
+    if (partitionFunction != null) {
+      return partitionFunction;
+    }
+    partitionFunction = PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata);
+    if (PARTITION_FUNCTION_CACHE.size() < MAX_CACHED_PARTITION_FUNCTIONS) {
+      PartitionFunction existing = PARTITION_FUNCTION_CACHE.putIfAbsent(key, partitionFunction);
+      if (existing != null) {
+        return existing;
+      }
+    }
+    return partitionFunction;
+  }
+
+  /// Returns the partitions of the given metadata, replacing a one-element set with a shared immutable one.
+  private static Set<Integer> getPartitions(ColumnPartitionMetadata columnPartitionMetadata) {
+    Set<Integer> partitions = columnPartitionMetadata.getPartitions();
+    if (partitions.size() == 1) {
+      int partition = partitions.iterator().next();
+      if (partition >= 0 && partition < NUM_CACHED_SINGLE_PARTITION_SETS) {
+        return SINGLE_PARTITION_SETS[partition];
+      }
+    }
+    return partitions;
+  }
+
+  private record PartitionFunctionKey(String functionName, int numPartitions,
+                                      @Nullable Map<String, String> functionConfig) {
   }
 
   /// Returns a map from partition column name to partition info for a given segment with multiple partition columns.
@@ -119,8 +176,7 @@ public class SegmentPartitionUtils {
         continue;
       }
       SegmentPartitionInfo segmentPartitionInfo = new SegmentPartitionInfo(partitionColumn,
-          PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata),
-          columnPartitionMetadata.getPartitions());
+          getPartitionFunction(columnPartitionMetadata), getPartitions(columnPartitionMetadata));
       columnSegmentPartitionInfoMap.put(partitionColumn, segmentPartitionInfo);
     }
     if (columnSegmentPartitionInfoMap.size() == 1) {
