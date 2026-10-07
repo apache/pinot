@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.realtime.writer;
 
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.Closeable;
 import java.io.File;
 import java.time.Duration;
@@ -308,11 +309,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
   public void stopConsumption() {
     if (_consumerThread.isAlive()) {
       _consumerThread.interrupt();
-      try {
-        _consumerThread.join();
-      } catch (InterruptedException e) {
-        _logger.warn("Interrupted while waiting for consumer thread to finish");
-      }
+      // Wait even if interrupted, so that the segment is not destroyed while the consumer thread is still indexing
+      Uninterruptibles.joinUninterruptibly(_consumerThread);
     }
   }
 

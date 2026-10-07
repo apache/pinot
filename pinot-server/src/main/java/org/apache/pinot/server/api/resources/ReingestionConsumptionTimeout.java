@@ -64,8 +64,11 @@ public class ReingestionConsumptionTimeout implements PinotClusterConfigChangeLi
       return;
     }
     Long clusterTimeoutMs = parseTimeoutMs(clusterConfigs.get(CONFIG_OF_REINGESTION_CONSUMPTION_TIMEOUT_MS), "cluster");
+    long oldTimeoutMs = _timeoutMs;
     _timeoutMs = clusterTimeoutMs != null ? clusterTimeoutMs : _serverTimeoutMs;
-    LOGGER.info("Updated re-ingestion consumption timeout to: {}ms", _timeoutMs);
+    if (_timeoutMs != oldTimeoutMs) {
+      LOGGER.info("Updated re-ingestion consumption timeout from: {}ms to: {}ms", oldTimeoutMs, _timeoutMs);
+    }
   }
 
   @Nullable

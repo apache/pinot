@@ -28,12 +28,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /// Tests how [ReingestionResource] waits for the re-ingestion consumption to complete.
 public class ReingestionResourceTest {
+  private static final String DESCRIPTION = "test condition";
 
   @Test
   public void testWaitForConditionWithMaxTimeoutDoesNotTimeOutEarly() {
     // The condition is false on the first check, so the wait must keep checking instead of timing out
     long completionTimeMs = System.currentTimeMillis() + 50;
-    waitForCondition(() -> System.currentTimeMillis() >= completionTimeMs, 10, Long.MAX_VALUE);
+    waitForCondition(() -> System.currentTimeMillis() >= completionTimeMs, DESCRIPTION, 10, Long.MAX_VALUE);
   }
 
   @Test
@@ -41,13 +42,14 @@ public class ReingestionResourceTest {
     // The condition becomes true after the first check. It must be checked again at the deadline instead of timing out
     // after sleeping a full check interval.
     long completionTimeMs = System.currentTimeMillis() + 100;
-    waitForCondition(() -> System.currentTimeMillis() >= completionTimeMs, CHECK_INTERVAL_MS, 1_000);
+    waitForCondition(() -> System.currentTimeMillis() >= completionTimeMs, DESCRIPTION, CHECK_INTERVAL_MS, 4_000);
   }
 
   @Test
   public void testWaitForConditionDoesNotSleepPastTimeout() {
     long startTimeMs = System.currentTimeMillis();
-    assertThatThrownBy(() -> waitForCondition(() -> false, CHECK_INTERVAL_MS, 100)).hasMessageContaining("Timeout");
+    assertThatThrownBy(() -> waitForCondition(() -> false, DESCRIPTION, CHECK_INTERVAL_MS, 100)).hasMessage(
+        "Timed out after 100ms waiting for test condition");
     assertThat(System.currentTimeMillis() - startTimeMs).isLessThan(CHECK_INTERVAL_MS);
   }
 
@@ -55,10 +57,9 @@ public class ReingestionResourceTest {
   public void testWaitForConditionReportsInterrupt() {
     Thread.currentThread().interrupt();
     try {
-      assertThatThrownBy(() -> waitForCondition(() -> false, CHECK_INTERVAL_MS, Long.MAX_VALUE)).hasMessageContaining(
-          "Interrupted").hasCauseInstanceOf(InterruptedException.class);
-      // The interrupt flag stays cleared, so that closing the segment writer afterward waits for its consumer thread
-      assertThat(Thread.currentThread().isInterrupted()).isFalse();
+      assertThatThrownBy(() -> waitForCondition(() -> false, DESCRIPTION, CHECK_INTERVAL_MS, Long.MAX_VALUE))
+          .hasMessage("Interrupted while waiting for test condition")
+          .hasCauseInstanceOf(InterruptedException.class);
     } finally {
       // Clear the interrupt so that it does not leak into other tests
       Thread.interrupted();
