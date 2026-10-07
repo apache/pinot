@@ -49,6 +49,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager.SnapshotPass;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -417,12 +418,25 @@ public class TablesResourceTest extends BaseResourceTest {
         ((ImmutableSegmentImpl) segment).getSegmentSizeBytes());
     assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
     assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
+    JsonNode snapshotPass = validDocIdsMetadata.get("snapshotPass");
+    assertEquals(snapshotPass.get("segmentsCrc").asLong(), 1234L);
+    assertEquals(snapshotPass.get("numSegments").asInt(), 2);
+    assertTrue(snapshotPass.get("consistent").asBoolean());
+    assertEquals(snapshotPass.get("finishedAtMs").asLong(), 5678L);
 
     // Verify server status information
     assertTrue(validDocIdsMetadata.has("serverStatus"), "Server status should be included in response");
     String serverStatus = validDocIdsMetadata.get("serverStatus").asText();
     assertNotNull(serverStatus, "Server status should not be null");
     assertEquals(serverStatus, "NOT_STARTED", serverStatus);
+
+    // In-memory bitmaps keep changing, so they carry no snapshot pass
+    String inMemoryResponse = _webTarget.path(validDocIdsMetadataPath)
+        .queryParam("segmentNames", segment.getSegmentName())
+        .queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY.toString())
+        .request()
+        .post(Entity.json(tableSegments), String.class);
+    assertFalse(JsonUtils.stringToJsonNode(inMemoryResponse).get(0).has("snapshotPass"));
   }
 
   @Test
@@ -494,6 +508,7 @@ public class TablesResourceTest extends BaseResourceTest {
     String snapshotPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName() + "/validDocIdsBitmap";
 
     PartitionUpsertMetadataManager upsertMetadataManager = mock(PartitionUpsertMetadataManager.class);
+    when(upsertMetadataManager.getLastSnapshotPass()).thenReturn(new SnapshotPass(1234L, 2, true, 5678L));
     ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
     ThreadSafeMutableRoaringBitmap queryableDocIds = new ThreadSafeMutableRoaringBitmap();
     ThreadSafeMutableRoaringBitmap validDocIdsSnapshot = new ThreadSafeMutableRoaringBitmap();

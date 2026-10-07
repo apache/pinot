@@ -23,18 +23,23 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.AtomicDouble;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
+import java.util.zip.CRC32;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
@@ -146,6 +151,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // for a configurable period, to wait for brokers to add the segment in routing tables.
   private final Map<String, Long> _newlyAddedSegments = new ConcurrentHashMap<>();
   private final long _newSegmentTrackingTimeMs;
+
+  // Segment adds, preloads, replaces and removes run on Helix threads and can overlap a snapshot pass. A pass is a
+  // consistent cut only if none was in progress when it started and none started before it finished.
+  private final AtomicInteger _numSegmentOperationsInProgress = new AtomicInteger();
+  private final AtomicLong _numSegmentOperationsStarted = new AtomicLong();
+  private volatile SnapshotPass _lastSnapshotPass;
 
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     _tableNameWithType = tableNameWithType;
@@ -303,11 +314,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+    startSegmentOperation();
     try {
       doAddSegment(immutableSegment);
       _trackedSegments.add(immutableSegment);
       trackSegmentForSnapshot(immutableSegment);
     } finally {
+      finishSegmentOperation();
       finishOperation();
     }
   }
@@ -431,11 +444,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+    startSegmentOperation();
     try {
       doPreloadSegment(immutableSegment);
       _trackedSegments.add(immutableSegment);
       trackSegmentForSnapshot(immutableSegment);
     } finally {
+      finishSegmentOperation();
       finishOperation();
     }
   }
@@ -585,6 +600,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip replacing segment: {} because metadata manager is already stopped", segment.getSegmentName());
       return;
     }
+    startSegmentOperation();
     try {
       doReplaceSegment(segment, oldSegment);
       if (segment instanceof ImmutableSegmentImpl immutableSegment) {
@@ -595,6 +611,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
       untrackSegment(oldSegment);
     } finally {
+      finishSegmentOperation();
       finishOperation();
     }
   }
@@ -791,6 +808,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip removing segment: {} because metadata manager is already stopped", segmentName);
       return;
     }
+    startSegmentOperation();
     try {
       // Skip removing the upsert metadata of segment that is out of metadata TTL. The expired metadata is removed
       // while creating new consuming segment in batches.
@@ -801,6 +819,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
       untrackSegment(segment);
     } finally {
+      finishSegmentOperation();
       finishOperation();
     }
   }
@@ -918,17 +937,64 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip taking snapshot because metadata manager is already stopped");
       return;
     }
+    // Read the started count before the in-progress count, the reverse of the order startSegmentOperation() bumps them
+    // in, so an operation that overlaps the pass always shows up in one of the two
+    long numSegmentOperationsStarted = _numSegmentOperationsStarted.get();
+    boolean noSegmentOperationInProgress = _numSegmentOperationsInProgress.get() == 0;
+    boolean consistent = false;
     try {
       long startTime = System.currentTimeMillis();
       doTakeSnapshot();
+      consistent = noSegmentOperationInProgress && _numSegmentOperationsStarted.get() == numSegmentOperationsStarted;
       long duration = System.currentTimeMillis() - startTime;
       _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_SNAPSHOT_TIME_MS, duration,
           TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       _logger.warn("Caught exception while taking snapshot", e);
     } finally {
+      recordSnapshotPass(consistent);
       finishOperation();
     }
+  }
+
+  @Nullable
+  @Override
+  public SnapshotPass getLastSnapshotPass() {
+    return _lastSnapshotPass;
+  }
+
+  private void startSegmentOperation() {
+    _numSegmentOperationsInProgress.incrementAndGet();
+    _numSegmentOperationsStarted.incrementAndGet();
+  }
+
+  private void finishSegmentOperation() {
+    _numSegmentOperationsInProgress.decrementAndGet();
+  }
+
+  private void recordSnapshotPass(boolean consistent) {
+    // Name alone is not enough, because minion tasks such as upsert compaction upload a new copy of a segment under the
+    // same name. It uses the data CRC rather than the full CRC, so a local build kept on a data CRC match, e.g. with a
+    // Lucene text index, still matches the committed copy.
+    TreeMap<String, Long> segmentVersions = new TreeMap<>();
+    for (IndexSegment segment : _trackedSegments) {
+      if (segment instanceof ImmutableSegmentImpl) {
+        SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+        long dataCrc = segmentMetadata.getDataCrc();
+        segmentVersions.put(segment.getSegmentName(), dataCrc >= 0 ? dataCrc : segmentMetadata.getCrc());
+      } else {
+        // The pass runs before the new consuming segment takes its first record, so a tracked mutable segment is an
+        // earlier one still waiting to be sealed. Its rows may not match the committed copy yet.
+        consistent = false;
+      }
+    }
+    CRC32 crc = new CRC32();
+    for (Map.Entry<String, Long> entry : segmentVersions.entrySet()) {
+      crc.update((entry.getKey() + ':' + entry.getValue() + '\n').getBytes(StandardCharsets.UTF_8));
+    }
+    // A changed segment the pass skipped, e.g. on segmentLock contention, keeps a stale snapshot file
+    _lastSnapshotPass = new SnapshotPass(crc.getValue(), segmentVersions.size(),
+        consistent && _updatedSegmentsSinceLastSnapshot.isEmpty(), System.currentTimeMillis());
   }
 
   protected void doTakeSnapshot() {
