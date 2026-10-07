@@ -48,6 +48,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 
 
 /// Tests for RexExpressionUtils, focusing on the handleSearch method and null handling.
@@ -101,8 +102,8 @@ public class RexExpressionUtilsTest {
     RexExpression castCall = new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.CAST.name(),
         List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.STRING, "DOUBLE")));
     RexNode rexNode = RexExpressionUtils.toRexNode(relBuilder, castCall);
-    Assert.assertTrue(rexNode.getType().isNullable());
-    Assert.assertEquals(RexExpressionUtils.fromRexNode(rexNode), castCall);
+    assertTrue(rexNode.getType().isNullable());
+    assertEquals(RexExpressionUtils.fromRexNode(rexNode), castCall);
   }
 
   @Test
