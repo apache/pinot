@@ -64,13 +64,23 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
       return expression;
     }
     Function function = expression.getFunctionCall();
+    String canonicalName = FunctionRegistry.canonicalize(function.getOperator());
+    boolean isArrayConstructor = canonicalName.equals("arrayvalueconstructor") || canonicalName.equals("array");
+
     List<Expression> operands = function.getOperands();
     int numOperands = operands.size();
     boolean compilable = true;
     ColumnDataType[] argumentTypes = new ColumnDataType[numOperands];
     Object[] arguments = new Object[numOperands];
     for (int i = 0; i < numOperands; i++) {
-      Expression operand = invokeCompileTimeFunctionExpression(operands.get(i));
+      Expression operand = operands.get(i);
+      // For array constructors, avoid folding CAST to TIMESTAMP or UUID to prevent lowering to LONG or BYTES literal
+      if (isArrayConstructor && isCastToTimestampOrUuid(operand)) {
+        operands.set(i, compileCastOperand(operand));
+        compilable = false;
+        continue;
+      }
+      operand = invokeCompileTimeFunctionExpression(operand);
       operands.set(i, operand);
       Literal literal = operand.getLiteral();
       if (compilable && literal != null) {
@@ -86,7 +96,13 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
     if (!compilable) {
       return expression;
     }
-    String canonicalName = FunctionRegistry.canonicalize(function.getOperator());
+    if (isArrayConstructor) {
+      for (ColumnDataType argumentType : argumentTypes) {
+        if (!canFoldArrayType(argumentType)) {
+          return expression;
+        }
+      }
+    }
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
     if (functionInfo == null || !functionInfo.isDeterministic()) {
       return expression;
@@ -105,6 +121,47 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
       throw new SqlCompilationException(
           "Caught exception while invoking method: " + functionInfo.getMethod().getName() + " with arguments: "
               + Arrays.toString(arguments) + ": " + e.getMessage(), e);
+    }
+  }
+
+  private static boolean isCastToTimestampOrUuid(Expression expression) {
+    if (expression.getFunctionCall() == null) {
+      return false;
+    }
+    Function function = expression.getFunctionCall();
+    if (!FunctionRegistry.canonicalize(function.getOperator()).equals("cast")) {
+      return false;
+    }
+    List<Expression> operands = function.getOperands();
+    if (operands == null || operands.size() != 2) {
+      return false;
+    }
+    Literal targetTypeLiteral = operands.get(1).getLiteral();
+    if (targetTypeLiteral == null || !targetTypeLiteral.isSetStringValue()) {
+      return false;
+    }
+    String targetType = targetTypeLiteral.getStringValue().toUpperCase();
+    return targetType.equals("TIMESTAMP") || targetType.equals("UUID");
+  }
+
+  private static Expression compileCastOperand(Expression castExpression) {
+    Function function = castExpression.getFunctionCall();
+    List<Expression> operands = function.getOperands();
+    operands.set(0, invokeCompileTimeFunctionExpression(operands.get(0)));
+    return castExpression;
+  }
+
+  private static boolean canFoldArrayType(ColumnDataType type) {
+    switch (type) {
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+      case STRING:
+      case BYTES:
+        return true;
+      default:
+        return false;
     }
   }
 }

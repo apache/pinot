@@ -26,6 +26,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -281,5 +284,58 @@ public class TransformQueriesTest extends BaseQueriesTest {
 
   private void runAndVerifyInterSegmentQuery(String query, double expectedResult) {
     assertEquals(getBrokerResponse(query).getResultTable().getRows().get(0)[0], expectedResult);
+  }
+
+  @Test
+  public void testArrayLiteralQueries() {
+    String query = "SELECT ARRAY[1, 2], ARRAY['a', 'b'], ARRAY[TRUE, FALSE], ARRAY[1.5, 2.5] FROM testTable LIMIT 1";
+    ResultTable resultTable = getBrokerResponse(query).getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    Object[] row = resultTable.getRows().get(0);
+    DataSchema dataSchema = resultTable.getDataSchema();
+
+    assertEquals(dataSchema.getColumnDataType(0), ColumnDataType.INT_ARRAY);
+    assertEquals(row[0], new int[]{1, 2});
+
+    assertEquals(dataSchema.getColumnDataType(1), ColumnDataType.STRING_ARRAY);
+    assertEquals(row[1], new String[]{"a", "b"});
+
+    assertEquals(dataSchema.getColumnDataType(2), ColumnDataType.BOOLEAN_ARRAY);
+    assertEquals(row[2], new boolean[]{true, false});
+
+    assertEquals(dataSchema.getColumnDataType(3), ColumnDataType.DOUBLE_ARRAY);
+    assertEquals(row[3], new double[]{1.5, 2.5});
+
+    // Regression test for array alias
+    query = "SELECT array(1, 2) FROM testTable LIMIT 1";
+    resultTable = getBrokerResponse(query).getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    row = resultTable.getRows().get(0);
+    dataSchema = resultTable.getDataSchema();
+
+    assertEquals(dataSchema.getColumnDataType(0), ColumnDataType.INT_ARRAY);
+    assertEquals(row[0], new int[]{1, 2});
+
+    // Logical array types with CAST (TIMESTAMP, UUID)
+    query = "SELECT ARRAY[CAST('2020-01-01 00:00:00' AS TIMESTAMP), CAST('2020-01-02 00:00:00' AS TIMESTAMP)], "
+        + "ARRAY[CAST('550e8400-e29b-41d4-a716-446655440000' AS UUID)], "
+        + "array(CAST('2020-01-01 00:00:00' AS TIMESTAMP)), "
+        + "array(CAST('550e8400-e29b-41d4-a716-446655440000' AS UUID)) FROM testTable LIMIT 1";
+    resultTable = getBrokerResponse(query).getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    row = resultTable.getRows().get(0);
+    dataSchema = resultTable.getDataSchema();
+
+    assertEquals(dataSchema.getColumnDataType(0), ColumnDataType.TIMESTAMP_ARRAY);
+    assertEquals(row[0], new String[]{"2020-01-01 00:00:00.0", "2020-01-02 00:00:00.0"});
+
+    assertEquals(dataSchema.getColumnDataType(1), ColumnDataType.UUID_ARRAY);
+    assertEquals(row[1], new String[]{"550e8400-e29b-41d4-a716-446655440000"});
+
+    assertEquals(dataSchema.getColumnDataType(2), ColumnDataType.TIMESTAMP_ARRAY);
+    assertEquals(row[2], new String[]{"2020-01-01 00:00:00.0"});
+
+    assertEquals(dataSchema.getColumnDataType(3), ColumnDataType.UUID_ARRAY);
+    assertEquals(row[3], new String[]{"550e8400-e29b-41d4-a716-446655440000"});
   }
 }
