@@ -600,6 +600,28 @@ public class BrokerRoutingManagerTest {
         eq(TimeUnit.NANOSECONDS));
     verify(_brokerMetrics).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATES, 1L);
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.ROUTING_TABLE_SEGMENTS, 2L);
+    verify(_brokerMetrics, never()).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURES, 1L);
+  }
+
+  @Test
+  public void testFailedAssignmentChangeReportsFailureMetric()
+      throws Exception {
+    // A failed update is counted as a failure, not as an update, and is not timed, so that a table whose update
+    // keeps failing does not look like a table with many assignment changes
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    doThrow(new RuntimeException("test")).when(instanceSelector).onAssignmentChange(any(), any(), any());
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    IdealState idealState = createIdealState(true);
+    idealState.getRecord().setMapField("seg0", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
+    stubSegmentAssignmentChange(idealState);
+
+    _routingManager.processSegmentAssignmentChangeInternal();
+
+    verify(_brokerMetrics).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURES, 1L);
+    verify(_brokerMetrics, never()).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATES, 1L);
+    verify(_brokerMetrics, never()).addTimedTableValue(eq(TEST_TABLE), eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME),
+        anyLong(), any());
+    verify(_brokerMetrics, never()).addTimedValue(eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME), anyLong(), any());
   }
 
   @Test

@@ -201,10 +201,19 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter SERVER_MISSING_FOR_ROUTING = create(
       "SERVER_MISSING_FOR_ROUTING", "badResponses", false);
 
-  /// Number of times the broker rebuilt the routing of a table after a change to its ideal state or external view.
+  /// Number of times the broker updated the routing of a table after a change to its ideal state or external view.
+  /// Failed updates are counted in [#ROUTING_TABLE_UPDATE_FAILURES] instead.
   ///
   /// This metric is not global and is attached to a particular table.
   public static final BrokerMeter ROUTING_TABLE_UPDATES = create("ROUTING_TABLE_UPDATES", "updates", false);
+
+  /// Number of times the broker failed to update the routing of a table after a change to its ideal state or external
+  /// view. The broker retries the update on the next change. Failed updates are not counted in
+  /// [#ROUTING_TABLE_UPDATES].
+  ///
+  /// This metric is not global and is attached to a particular table.
+  public static final BrokerMeter ROUTING_TABLE_UPDATE_FAILURES =
+      create("ROUTING_TABLE_UPDATE_FAILURES", "failures", false);
 
   // Netty connection metrics
   public static final BrokerMeter NETTY_CONNECTION_REQUESTS_SENT = create(

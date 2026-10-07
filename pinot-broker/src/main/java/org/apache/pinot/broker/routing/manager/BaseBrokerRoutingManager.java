@@ -405,15 +405,18 @@ public abstract class BaseBrokerRoutingManager
           return true;
         }
         routingEntry.onAssignmentChange(idealState, externalView);
+        // Only successful updates are timed and counted, so that a table whose update keeps failing does not look
+        // like a table with many assignment changes
+        long updateTimeNs = System.nanoTime() - startTimeNs;
+        _brokerMetrics.addTimedTableValue(tableNameWithType, BrokerTimer.ROUTING_TABLE_UPDATE_TIME, updateTimeNs,
+            TimeUnit.NANOSECONDS);
+        _brokerMetrics.addTimedValue(BrokerTimer.ROUTING_TABLE_UPDATE_TIME, updateTimeNs, TimeUnit.NANOSECONDS);
+        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.ROUTING_TABLE_UPDATES, 1L);
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry on segment assignment change for "
             + "table: {}", tableNameWithType, e);
+        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURES, 1L);
       }
-      long updateTimeNs = System.nanoTime() - startTimeNs;
-      _brokerMetrics.addTimedTableValue(tableNameWithType, BrokerTimer.ROUTING_TABLE_UPDATE_TIME, updateTimeNs,
-          TimeUnit.NANOSECONDS);
-      _brokerMetrics.addTimedValue(BrokerTimer.ROUTING_TABLE_UPDATE_TIME, updateTimeNs, TimeUnit.NANOSECONDS);
-      _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.ROUTING_TABLE_UPDATES, 1L);
       updateRoutingSegmentsMetric(routingEntry);
       updateReplicaHealthMetrics(routingEntry);
       return true;
