@@ -29,12 +29,14 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
@@ -81,7 +83,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -2405,5 +2409,177 @@ public class InstanceSelectorTest {
     verifyNoMoreInteractions(_brokerMetrics);
     assertEquals(first.getSegmentToInstanceMap(), expectedInstances);
     assertEquals(first.getOptionalSegmentToInstanceMap(), Map.of("optional", "instance128"));
+  }
+
+  @Test
+  public void testSortByKeyIfNeeded() {
+    Map<String, String> sorted = new LinkedHashMap<>();
+    sorted.put("a", ONLINE);
+    sorted.put("b", ONLINE);
+    sorted.put("c", ONLINE);
+    assertSame(BaseInstanceSelector.sortByKeyIfNeeded(sorted), sorted);
+
+    Map<String, String> treeMap = new TreeMap<>(sorted);
+    assertSame(BaseInstanceSelector.sortByKeyIfNeeded(treeMap), treeMap);
+
+    Map<String, String> unsorted = new LinkedHashMap<>();
+    unsorted.put("c", ONLINE);
+    unsorted.put("a", ONLINE);
+    unsorted.put("b", ONLINE);
+    Map<String, String> sortedCopy = BaseInstanceSelector.sortByKeyIfNeeded(unsorted);
+    assertNotSame(sortedCopy, unsorted);
+    assertEquals(new ArrayList<>(sortedCopy.keySet()), List.of("a", "b", "c"));
+    assertEquals(sortedCopy, unsorted);
+  }
+
+  /// Segments with equal ideal state and external view instance state maps share one candidate list within a
+  /// rebuild. Checks that the sharing does not change any routing outcome, by comparing a selector that shares with
+  /// one that builds a list per segment, and that the candidates keep the sorted instance order when the instance
+  /// state maps are not in sorted order.
+  @Test(dataProvider = "selectorType")
+  public void testSharedCandidateListsMatchPerSegmentLists(String selectorType) {
+    // Partition 0: the ideal state lists the instances out of order. One of its old segments has a replica OFFLINE in
+    // the external view.
+    // Partition 1: one of its instances is disabled.
+    String[] partition0Instances = {"instance_c", "instance_a", "instance_b"};
+    String[] partition1Instances = {"instance_d", "instance_e", "instance_f"};
+    Set<String> enabledInstances =
+        Set.of("instance_a", "instance_b", "instance_c", "instance_d", "instance_e", "instance_g");
+
+    Map<String, Map<String, String>> idealStateMaps = new LinkedHashMap<>();
+    Map<String, Map<String, String>> externalViewMaps = new LinkedHashMap<>();
+    for (int i = 0; i < 4; i++) {
+      idealStateMaps.put("p0_" + i, instanceStateMap(partition0Instances, ONLINE, ONLINE, ONLINE));
+      externalViewMaps.put("p0_" + i, i == 3 ? instanceStateMap(partition0Instances, ONLINE, ONLINE, OFFLINE)
+          : instanceStateMap(partition0Instances, ONLINE, ONLINE, ONLINE));
+    }
+    for (int i = 0; i < 3; i++) {
+      String state = i == 2 ? CONSUMING : ONLINE;
+      idealStateMaps.put("p1_" + i, instanceStateMap(partition1Instances, state, state, state));
+      externalViewMaps.put("p1_" + i, instanceStateMap(partition1Instances, state, state, state));
+    }
+    // Old segment missing from the external view: unavailable
+    idealStateMaps.put("p2_0", instanceStateMap(new String[]{"instance_g"}, ONLINE));
+    IdealState initialIdealState = createInsertionOrderedIdealState(idealStateMaps);
+    ExternalView initialExternalView = createInsertionOrderedExternalView(externalViewMaps);
+    Set<String> initialOnlineSegments = new HashSet<>(idealStateMaps.keySet());
+
+    // New segments, first seen by the assignment change: one missing from the external view, one partially online
+    idealStateMaps.put("new_0", instanceStateMap(partition0Instances, ONLINE, ONLINE, ONLINE));
+    idealStateMaps.put("new_1", instanceStateMap(partition0Instances, ONLINE, ONLINE, ONLINE));
+    externalViewMaps.put("new_1", Map.of("instance_a", ONLINE));
+    IdealState idealState = createInsertionOrderedIdealState(idealStateMaps);
+    ExternalView externalView = createInsertionOrderedExternalView(externalViewMaps);
+    Set<String> onlineSegments = new HashSet<>(idealStateMaps.keySet());
+
+    BaseInstanceSelector sharingSelector = (BaseInstanceSelector) createTestInstanceSelector(selectorType,
+        enabledInstances, initialIdealState, initialExternalView, initialOnlineSegments);
+    sharingSelector.onAssignmentChange(idealState, externalView, onlineSegments);
+    BaseInstanceSelector perSegmentSelector = (BaseInstanceSelector) createTestInstanceSelector(selectorType,
+        enabledInstances, initialIdealState, initialExternalView, initialOnlineSegments);
+    perSegmentSelector._maxSharedCandidateLists = 0;
+    perSegmentSelector.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    // Same candidates for every segment
+    SegmentStates sharedStates = sharingSelector._segmentStates;
+    SegmentStates perSegmentStates = perSegmentSelector._segmentStates;
+    for (String segment : onlineSegments) {
+      assertEquals(describe(sharedStates.getCandidates(segment)), describe(perSegmentStates.getCandidates(segment)),
+          segment);
+    }
+    assertEquals(sharedStates.getUnavailableSegments(), Set.of("p2_0"));
+    assertEquals(sharedStates.getUnavailableSegments(), perSegmentStates.getUnavailableSegments());
+    assertEquals(sharedStates.getServingInstances(), perSegmentStates.getServingInstances());
+    TableReplicaHealth sharedHealth = sharingSelector.getReplicaHealth();
+    TableReplicaHealth perSegmentHealth = perSegmentSelector.getReplicaHealth();
+    assertEquals(sharedHealth.getMinPercentOfReplicas(), perSegmentHealth.getMinPercentOfReplicas());
+    assertEquals(sharedHealth.getNumSegmentsAtMinPercentOfReplicas(),
+        perSegmentHealth.getNumSegmentsAtMinPercentOfReplicas());
+    assertEquals(sharedHealth.getNumUnavailableSegments(), perSegmentHealth.getNumUnavailableSegments());
+
+    // Candidates are in sorted instance order, with the replica id of the sorted ideal state, whatever the order of
+    // the instance state maps
+    boolean strict = selectorType.equals(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
+    // Strict replica-group takes instance_b out of service for the whole partition, because it is OFFLINE for p0_3
+    assertEquals(describe(sharedStates.getCandidates("p0_0")),
+        strict ? List.of("instance_a/0/true", "instance_c/2/true")
+            : List.of("instance_a/0/true", "instance_b/1/true", "instance_c/2/true"));
+    assertEquals(describe(sharedStates.getCandidates("p0_3")), List.of("instance_a/0/true", "instance_c/2/true"));
+    // instance_f is disabled
+    assertEquals(describe(sharedStates.getCandidates("p1_0")), List.of("instance_d/0/true", "instance_e/1/true"));
+    assertEquals(describe(sharedStates.getCandidates("new_0")),
+        strict ? List.of("instance_a/0/false", "instance_c/2/false")
+            : List.of("instance_a/0/false", "instance_b/1/false", "instance_c/2/false"));
+    assertEquals(describe(sharedStates.getCandidates("new_1")),
+        strict ? List.of("instance_a/0/true", "instance_c/2/false")
+            : List.of("instance_a/0/true", "instance_b/1/false", "instance_c/2/false"));
+
+    // The sharing selector shares the lists of segments with equal instance state maps, the other one does not
+    assertSame(sharedStates.getCandidates("p0_0"), sharedStates.getCandidates("p0_1"));
+    assertSame(sharedStates.getCandidates("p0_0"), sharedStates.getCandidates("p0_2"));
+    assertNotSame(perSegmentStates.getCandidates("p0_0"), perSegmentStates.getCandidates("p0_1"));
+
+    // Same selection for every request
+    List<String> segments = new ArrayList<>(idealStateMaps.keySet());
+    for (long requestId = 0; requestId < 6; requestId++) {
+      InstanceSelector.SelectionResult shared = sharingSelector.select(_brokerRequest, segments, requestId);
+      InstanceSelector.SelectionResult perSegment = perSegmentSelector.select(_brokerRequest, segments, requestId);
+      assertEquals(shared.getSegmentToInstanceMap(), perSegment.getSegmentToInstanceMap());
+      assertEquals(shared.getOptionalSegmentToInstanceMap(), perSegment.getOptionalSegmentToInstanceMap());
+      assertEquals(shared.getUnavailableSegments(), perSegment.getUnavailableSegments());
+      assertEquals(shared.getUnavailableSegments(), List.of("p2_0"));
+    }
+
+    // Enabling the disabled instance keeps both selectors in step
+    Set<String> allInstances = new HashSet<>(enabledInstances);
+    allInstances.add("instance_f");
+    sharingSelector.onInstancesChange(allInstances, List.of("instance_f"));
+    perSegmentSelector.onInstancesChange(allInstances, List.of("instance_f"));
+    assertEquals(describe(sharingSelector._segmentStates.getCandidates("p1_0")),
+        List.of("instance_d/0/true", "instance_e/1/true", "instance_f/2/true"));
+    assertSame(sharingSelector._segmentStates.getCandidates("p1_0"),
+        sharingSelector._segmentStates.getCandidates("p1_1"));
+    for (long requestId = 0; requestId < 6; requestId++) {
+      InstanceSelector.SelectionResult shared = sharingSelector.select(_brokerRequest, segments, requestId);
+      InstanceSelector.SelectionResult perSegment = perSegmentSelector.select(_brokerRequest, segments, requestId);
+      assertEquals(shared.getSegmentToInstanceMap(), perSegment.getSegmentToInstanceMap());
+      assertEquals(shared.getOptionalSegmentToInstanceMap(), perSegment.getOptionalSegmentToInstanceMap());
+    }
+  }
+
+  /// Returns an insertion-ordered instance state map, keeping the order of the given instances.
+  private static Map<String, String> instanceStateMap(String[] instances, String... states) {
+    Map<String, String> instanceStateMap = new LinkedHashMap<>();
+    for (int i = 0; i < instances.length; i++) {
+      instanceStateMap.put(instances[i], states[i]);
+    }
+    return instanceStateMap;
+  }
+
+  private static IdealState createInsertionOrderedIdealState(Map<String, Map<String, String>> instanceStateMaps) {
+    IdealState idealState = new IdealState(TABLE_NAME);
+    for (Map.Entry<String, Map<String, String>> entry : instanceStateMaps.entrySet()) {
+      idealState.getRecord().setMapField(entry.getKey(), new LinkedHashMap<>(entry.getValue()));
+    }
+    return idealState;
+  }
+
+  private static ExternalView createInsertionOrderedExternalView(Map<String, Map<String, String>> instanceStateMaps) {
+    ExternalView externalView = new ExternalView(TABLE_NAME);
+    for (Map.Entry<String, Map<String, String>> entry : instanceStateMaps.entrySet()) {
+      externalView.getRecord().setMapField(entry.getKey(), new LinkedHashMap<>(entry.getValue()));
+    }
+    return externalView;
+  }
+
+  private static List<String> describe(@Nullable List<SegmentInstanceCandidate> candidates) {
+    if (candidates == null) {
+      return null;
+    }
+    List<String> descriptions = new ArrayList<>(candidates.size());
+    for (SegmentInstanceCandidate candidate : candidates) {
+      descriptions.add(candidate.getInstance() + "/" + candidate.getIdealStateReplicaId() + "/" + candidate.isOnline());
+    }
+    return descriptions;
   }
 }
