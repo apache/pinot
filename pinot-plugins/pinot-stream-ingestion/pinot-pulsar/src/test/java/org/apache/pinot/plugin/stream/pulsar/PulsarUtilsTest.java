@@ -92,4 +92,21 @@ public class PulsarUtilsTest {
     assertEquals(streamMessage.getKey(), key.getBytes(StandardCharsets.UTF_8));
     assertEquals(streamMessage.getValue(), stitchedValueBytes);
   }
+
+  @Test
+  public void testGetNextMessageId()
+      throws Exception {
+    // Non-batched message
+    testGetNextMessageId(new PulsarMessageId(5, 10, 1), new PulsarMessageId(5, 11, 1));
+    // Batched message in the middle of the batch
+    testGetNextMessageId(new PulsarMessageId(5, 10, 1, 3, 10), new PulsarMessageId(5, 10, 1, 4, 10));
+    // Last message of the batch
+    testGetNextMessageId(new PulsarMessageId(5, 10, 1, 9, 10), new PulsarMessageId(5, 11, 1, 0, 10));
+  }
+
+  private static void testGetNextMessageId(PulsarMessageId messageId, PulsarMessageId expectedNextMessageId)
+      throws Exception {
+    MessageId builtInMessageId = MessageId.fromByteArray(messageId.toByteArray());
+    assertEquals(PulsarUtils.getNextMessageId(builtInMessageId).toByteArray(), expectedNextMessageId.toByteArray());
+  }
 }

@@ -191,6 +191,7 @@
     <helix.version>2.0.1</helix.version>
     <zkclient.version>0.11</zkclient.version>
     <jackson.version>2.22.3</jackson.version>
+    <opentelemetry.version>1.66.0</opentelemetry.version>
     <fory.version>1.7.6</fory.version>
     <zookeeper.version>3.9.6</zookeeper.version>
     <async-http-client.version>3.0.13</async-http-client.version>
@@ -261,7 +262,7 @@
     <kafka3.version>3.9.2</kafka3.version>
     <kafka4.version>4.2.0</kafka4.version>
     <confluent.version>8.2.0</confluent.version>
-    <pulsar.version>4.0.13</pulsar.version>
+    <pulsar.version>5.0.0</pulsar.version>
     <flink.version>2.3.0</flink.version>
 
     <!-- Apache Commons Libraries -->
@@ -973,6 +974,17 @@
         <scope>import</scope>
       </dependency>
 
+      <!-- OpenTelemetry -->
+      <!-- opentelemetry-bom aligns the OpenTelemetry API and SDK, which Google libraries and Pulsar request at
+           different versions -->
+      <dependency>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-bom</artifactId>
+        <version>${opentelemetry.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
       <!-- Apache Commons Libraries -->
       <dependency>
         <groupId>org.apache.commons</groupId>
@@ -1162,7 +1174,8 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
-      <!-- libraries-bom should be imported after protobuf-bom, grpc-bom and guava-bom to honor their versions -->
+      <!-- libraries-bom should be imported after protobuf-bom, grpc-bom, guava-bom and opentelemetry-bom to honor their
+           versions -->
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
@@ -1531,12 +1544,6 @@
         <artifactId>swagger-jersey2-jaxrs</artifactId>
         <version>${swagger.version}</version>
       </dependency>
-      <!-- Also used by pulsar-common -->
-      <dependency>
-        <groupId>io.swagger</groupId>
-        <artifactId>swagger-annotations</artifactId>
-        <version>${swagger.version}</version>
-      </dependency>
       <dependency>
         <groupId>org.webjars</groupId>
         <artifactId>swagger-ui</artifactId>
@@ -1841,7 +1848,7 @@
         <artifactId>dnsjava</artifactId>
         <version>${dnsjava.version}</version>
       </dependency>
-      <!-- Eclipse jetty dependencies in Hadoop/Spark/Pulsar -->
+      <!-- Eclipse jetty dependencies in Hadoop/Spark -->
       <dependency>
         <groupId>org.eclipse.jetty.websocket</groupId>
         <artifactId>websocket-client</artifactId>
@@ -1912,7 +1919,7 @@
         <artifactId>bcutil-jdk18on</artifactId>
         <version>${bouncycastle.version}</version>
       </dependency>
-      <!-- Used by ORC, Parquet and Pulsar -->
+      <!-- Used by ORC and Parquet -->
       <dependency>
         <groupId>io.airlift</groupId>
         <artifactId>aircompressor</artifactId>
