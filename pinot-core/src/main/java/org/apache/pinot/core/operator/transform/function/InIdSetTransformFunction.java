@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -29,6 +30,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /// The IN_ID_SET transform function takes 2 arguments:
@@ -61,14 +63,22 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
     _transformFunction = arguments.get(0);
     try {
       _idSet = IdSets.fromBase64String(((LiteralTransformFunction) arguments.get(1)).getStringLiteral());
-    } catch (IOException e) {
-      throw new IllegalArgumentException("Caught exception while deserializing IdSet", e);
+    } catch (IOException | RuntimeException e) {
+      throw new IllegalArgumentException("Caught exception while deserializing IdSet: " + e, e);
     }
+    IdSets.validateValueType(_idSet, _transformFunction.getResultMetadata().getDataType().getStoredType());
   }
 
   @Override
   public TransformResultMetadata getResultMetadata() {
     return BOOLEAN_SV_NO_DICTIONARY_METADATA;
+  }
+
+  /// As with an `IN` subquery, a NULL value is in no empty IdSet, so the result is never NULL for an empty IdSet.
+  @Nullable
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    return _idSet.getType() == IdSet.Type.EMPTY ? null : super.getNullBitmap(valueBlock);
   }
 
   @Override
