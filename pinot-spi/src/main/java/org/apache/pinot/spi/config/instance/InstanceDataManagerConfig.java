@@ -93,5 +93,7 @@ public interface InstanceDataManagerConfig {
 
   boolean isDimensionTablePreloadDisabled();
 
-  boolean isUploadSegmentMetadataTar();
+  default boolean isUploadSegmentMetadataTar() {
+    return false;
+  }
 }
