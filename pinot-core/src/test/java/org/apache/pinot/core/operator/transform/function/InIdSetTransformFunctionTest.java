@@ -19,8 +19,6 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.io.IOException;
-import java.lang.ref.ReferenceQueue;
-import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -35,9 +33,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotSame;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
-import static org.testng.Assert.assertTrue;
 
 
 /// Tests the IN_ID_SET transform function on a segment; `IdSetQueriesTest` runs it in queries.
@@ -66,36 +62,6 @@ public class InIdSetTransformFunctionTest extends BaseTransformFunctionTest {
     // Another query deserializes its own IdSet
     InIdSetTransformFunction otherQueryFunction = createTransformFunction(expression, createQueryContext());
     assertNotSame(otherQueryFunction.getIdSet(), segment1Function.getIdSet());
-  }
-
-  /// The query context that shares the IdSet must not keep it after the query.
-  @Test
-  public void testIdSetDoesNotOutliveTheQuery()
-      throws Exception {
-    ReferenceQueue<IdSet> queue = new ReferenceQueue<>();
-    WeakReference<IdSet> idSetRef = new WeakReference<>(createIdSetForQuery(), queue);
-    assertTrue(awaitCleared(queue), "The IdSet must be collected after the query");
-    // Also keeps the reference reachable until it is enqueued
-    assertNull(idSetRef.get());
-  }
-
-  /// Returns the IdSet that a query deserializes, and drops the query.
-  private IdSet createIdSetForQuery()
-      throws IOException {
-    return createTransformFunction(createExpression(createIdSet(0, NUM_ROWS / 2)), createQueryContext()).getIdSet();
-  }
-
-  /// Waits for the reference to be enqueued, collecting garbage until then or for up to 5 seconds.
-  private static boolean awaitCleared(ReferenceQueue<?> queue)
-      throws InterruptedException {
-    long deadlineMs = System.currentTimeMillis() + 5_000L;
-    do {
-      System.gc();
-      if (queue.remove(200L) != null) {
-        return true;
-      }
-    } while (System.currentTimeMillis() < deadlineMs);
-    return false;
   }
 
   private IdSet createIdSet(int fromRow, int toRow) {

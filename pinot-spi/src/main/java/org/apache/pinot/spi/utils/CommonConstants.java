@@ -1434,11 +1434,6 @@ public class CommonConstants {
       public static final String KEY_OF_GRPC_TLS_ENABLED = "pinot.broker.grpc.tls.enabled";
       public static final String KEY_OF_GRPC_TLS_PORT = "pinot.broker.grpc.tls.port";
       public static final String KEY_OF_GRPC_TLS_PREFIX = "pinot.broker.grpctls";
-      /// Maximum size, in bytes, of a request the broker's gRPC query endpoint accepts. Must be positive. The default
-      /// is gRPC's default. Queries with large literals (e.g. an `IN_ID_SET` IdSet of millions of ids) can need more.
-      public static final String KEY_OF_GRPC_MAX_INBOUND_MESSAGE_SIZE_BYTES =
-          "pinot.broker.grpc.max.inbound.message.size.bytes";
-      public static final int DEFAULT_GRPC_MAX_INBOUND_MESSAGE_SIZE_BYTES = 4 * 1024 * 1024;
 
       public static final String BLOCK_ROW_SIZE = "blockRowSize";
       public static final int DEFAULT_BLOCK_ROW_SIZE = 10_000;

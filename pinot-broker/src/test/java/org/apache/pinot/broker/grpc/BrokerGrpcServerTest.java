@@ -18,23 +18,15 @@
  */
 package org.apache.pinot.broker.grpc;
 
-import io.grpc.Deadline;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Broker;
-import org.apache.pinot.common.proto.PinotQueryBrokerGrpc;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -114,71 +106,6 @@ public class BrokerGrpcServerTest {
     assertEquals(sizeCaptor.getValue().longValue(), expectedSize,
         "GRPC_BYTES_SENT should record the actual response size");
     assertTrue(expectedSize > 0, "Response size should be greater than 0");
-  }
-
-  @Test
-  public void testMaxInboundMessageSize()
-      throws Exception {
-    when(_brokerRequestHandler.handleRequest(any(), any(), any(), any(), any())).thenReturn(new BrokerResponseNative());
-    // Larger than the 4 MB gRPC accepts by default, e.g. a query with a large IdSet literal
-    Broker.BrokerRequest request = createRequest(6 * 1024 * 1024);
-
-    PinotConfiguration config = new PinotConfiguration();
-    assertEquals(submit(config, request), Status.Code.RESOURCE_EXHAUSTED);
-    verify(_brokerRequestHandler, never()).handleRequest(any(), any(), any(), any(), any());
-
-    config.setProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_MAX_INBOUND_MESSAGE_SIZE_BYTES, 8 * 1024 * 1024);
-    assertEquals(submit(config, request), Status.Code.OK);
-    verify(_brokerRequestHandler).handleRequest(any(), any(), any(), any(), any());
-    assertEquals(submit(config, createRequest(10 * 1024 * 1024)), Status.Code.RESOURCE_EXHAUSTED);
-  }
-
-  @Test
-  public void testRejectsNonPositiveMaxInboundMessageSize() {
-    for (int maxInboundMessageSizeBytes : new int[]{0, -1}) {
-      PinotConfiguration config = new PinotConfiguration();
-      config.setProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_PORT, _grpcPort);
-      config.setProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_MAX_INBOUND_MESSAGE_SIZE_BYTES,
-          maxInboundMessageSizeBytes);
-      IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
-          () -> new BrokerGrpcServer(config, "testBroker", _brokerMetrics, _brokerRequestHandler));
-      assertTrue(
-          exception.getMessage().contains(CommonConstants.Broker.Grpc.KEY_OF_GRPC_MAX_INBOUND_MESSAGE_SIZE_BYTES));
-    }
-  }
-
-  private static Broker.BrokerRequest createRequest(int literalLength) {
-    return Broker.BrokerRequest.newBuilder()
-        .setSql("SELECT COUNT(*) FROM testTable WHERE col = '" + "A".repeat(literalLength) + "'")
-        .build();
-  }
-
-  /// Submits the request to a broker gRPC server started with the config, and returns the status of the call.
-  private Status.Code submit(PinotConfiguration config, Broker.BrokerRequest request)
-      throws IOException {
-    int port;
-    try (ServerSocket socket = new ServerSocket(0)) {
-      port = socket.getLocalPort();
-    }
-    config.setProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_PORT, port);
-    BrokerGrpcServer brokerGrpcServer =
-        new BrokerGrpcServer(config, "testBroker", _brokerMetrics, _brokerRequestHandler);
-    brokerGrpcServer.start();
-    ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", port).usePlaintext().build();
-    try {
-      Iterator<Broker.BrokerResponse> responses = PinotQueryBrokerGrpc.newBlockingStub(channel)
-          .withDeadline(Deadline.after(10, TimeUnit.SECONDS))
-          .submit(request);
-      while (responses.hasNext()) {
-        responses.next();
-      }
-      return Status.Code.OK;
-    } catch (StatusRuntimeException e) {
-      return e.getStatus().getCode();
-    } finally {
-      channel.shutdownNow();
-      brokerGrpcServer.shutdown();
-    }
   }
 
   @Test

@@ -46,10 +46,6 @@ import org.roaringbitmap.RoaringBitmap;
 public class InIdSetTransformFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
   private IdSet _idSet;
-  // The query the function is initialized for, if any. The segments of a query share one deserialized IdSet, which can
-  // hold millions of ids.
-  @Nullable
-  private QueryContext _queryContext;
 
   @Override
   public String getName() {
@@ -59,12 +55,22 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
       QueryContext queryContext) {
-    _queryContext = queryContext;
-    init(arguments, columnContextMap, queryContext.isNullHandlingEnabled());
+    doInit(arguments, columnContextMap, queryContext);
+    // Sets the flag like init(arguments, columnContextMap, nullHandlingEnabled), which would call the 2-argument init
+    // and deserialize an IdSet that the segments do not share
+    _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
   }
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    doInit(arguments, columnContextMap, null);
+  }
+
+  /// Initializes the function: checks the arguments and deserializes the IdSet. Without a query context, every instance
+  /// deserializes its own IdSet. With one, the segments that the query context covers share one deserialized IdSet,
+  /// which can hold millions of ids.
+  private void doInit(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
+      @Nullable QueryContext queryContext) {
     super.init(arguments, columnContextMap);
     Preconditions.checkArgument(arguments.size() == 2,
         "2 arguments are required for IN_ID_SET transform function: expression, base64 encoded IdSet");
@@ -76,8 +82,8 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
     _transformFunction = arguments.get(0);
     String serializedIdSet = ((LiteralTransformFunction) arguments.get(1)).getStringLiteral();
     // The IdSet is only read after this, which is safe from the threads of several segments
-    _idSet = _queryContext != null
-        ? _queryContext.getOrComputeSharedValue(IdSet.class, serializedIdSet, InIdSetTransformFunction::deserialize)
+    _idSet = queryContext != null
+        ? queryContext.getOrComputeSharedValue(IdSet.class, serializedIdSet, InIdSetTransformFunction::deserialize)
         : deserialize(serializedIdSet);
     IdSets.validateValueType(_idSet, _transformFunction.getResultMetadata().getDataType().getStoredType());
   }

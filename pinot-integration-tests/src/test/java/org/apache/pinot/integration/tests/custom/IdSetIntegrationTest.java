@@ -120,7 +120,7 @@ public class IdSetIntegrationTest extends CustomDataQueryClusterIntegrationTest 
     assertTrue(idSet.length() > 15_000_000, "IdSet length: " + idSet.length());
     String inQuery =
         "SELECT COUNT(*) FROM " + getTableName() + " WHERE IN_ID_SET(" + STR_COL + ", '" + idSet + "') = 1";
-    // Over HTTP, because the broker's gRPC endpoint accepts requests of up to 4 MB by default
+    // Over HTTP, because the broker's gRPC endpoint accepts requests of up to 4 MB
     assertEquals(getSingleValue(queryBrokerHttpEndpoint(inQuery)).asLong(),
         getExpectedCount(STR_COL, IdSets.fromBase64String(idSet)));
   }
