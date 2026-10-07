@@ -19,6 +19,7 @@
 package org.apache.pinot.common.function.scalar;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
@@ -37,7 +38,8 @@ public class ObjectFunctions {
     return !isNull(obj);
   }
 
-  /// Numbers are compared by value, so `5` and `5L` are not distinct. Other values are compared with [Object#equals].
+  /// Numbers are compared by value, so `5` and `5L` are not distinct. Arrays (e.g. `BYTES` values, which are `byte[]`)
+  /// are compared by content. Other values are compared with [Object#equals].
   @ScalarFunction(nullableParameters = true)
   public static boolean isDistinctFrom(@Nullable Object obj1, @Nullable Object obj2) {
     if (obj1 == null && obj2 == null) {
@@ -49,7 +51,7 @@ public class ObjectFunctions {
     if (isNumber(obj1) && isNumber(obj2)) {
       return !numberEquals((Number) obj1, (Number) obj2);
     }
-    return !obj1.equals(obj2);
+    return !Objects.deepEquals(obj1, obj2);
   }
 
   @ScalarFunction(nullableParameters = true)

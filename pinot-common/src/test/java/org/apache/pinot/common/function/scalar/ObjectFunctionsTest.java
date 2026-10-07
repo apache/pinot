@@ -94,7 +94,13 @@ public class ObjectFunctionsTest {
         {Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, true},
         {Double.POSITIVE_INFINITY, Long.MAX_VALUE, true},
         {Double.POSITIVE_INFINITY, new BigDecimal("1E+400"), true},
-        // Non-numeric values are compared with equals()
+        // Arrays are compared by content
+        {new byte[]{1, 2}, new byte[]{1, 2}, false},
+        {new byte[]{1, 2}, new byte[]{1, 3}, true},
+        {new int[]{1, 2}, new int[]{1, 2}, false},
+        {new String[]{"a"}, new String[]{"a"}, false},
+        {new String[]{"a"}, new String[]{"b"}, true},
+        // Other values are compared with equals()
         {"5", 5, true},
         {true, 1, true},
         {new Timestamp(1000L), 1000L, true}

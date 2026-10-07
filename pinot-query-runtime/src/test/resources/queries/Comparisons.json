@@ -588,5 +588,26 @@
         "h2Sql": "SELECT 5 IS DISTINCT FROM CAST(5 AS BIGINT), 5 IS DISTINCT FROM 5.0, 1.5 IS DISTINCT FROM 1.50, CAST(5 AS BIGINT) IS NOT DISTINCT FROM 5.0 FROM {tbl}"
       }
     ]
+  },
+  "distinct_from_function_bytes": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "bytesCol1", "type": "BYTES"},
+          {"name": "bytesCol2", "type": "BYTES"}
+        ],
+        "inputs": [
+          ["deadbeef", "deadbeef"],
+          ["00", "01"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "BYTES values are compared by content above the leaf stage",
+        "sql": "SELECT isDistinctFrom(t.bytesCol1, t.bytesCol2), isNotDistinctFrom(t.bytesCol1, t.bytesCol2) FROM (SELECT bytesCol1, bytesCol2 FROM {tbl} GROUP BY bytesCol1, bytesCol2) t",
+        "h2Sql": "SELECT t.bytesCol1 IS DISTINCT FROM t.bytesCol2, t.bytesCol1 IS NOT DISTINCT FROM t.bytesCol2 FROM (SELECT bytesCol1, bytesCol2 FROM {tbl} GROUP BY bytesCol1, bytesCol2) t"
+      }
+    ]
   }
 }
