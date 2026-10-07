@@ -22,6 +22,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixAdmin;
@@ -36,11 +38,16 @@ import org.apache.helix.zookeeper.api.client.RealmAwareZkClient;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
+import org.apache.helix.zookeeper.zkclient.ZkConnection;
+import org.apache.helix.zookeeper.zkclient.serialize.PathBasedZkSerializer;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.helix.ImmutableSortedArrayMap;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.util.TestUtils;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.ZooKeeper;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -141,6 +148,50 @@ public class CompactAssignmentZkHelixManagerTest {
       assertReads(manager);
     } finally {
       manager.disconnect();
+    }
+  }
+
+  @Test
+  public void testSerializerSurvivesSessionExpiry()
+      throws Exception {
+    CompactAssignmentZkHelixManager manager =
+        new CompactAssignmentZkHelixManager(CLUSTER_NAME, "Broker_localhost_3", InstanceType.SPECTATOR,
+            _zookeeperInstance.getZkUrl());
+    manager.connect();
+    try {
+      assertReads(manager);
+      RealmAwareZkClient zkClient = manager.getZkClient();
+      PathBasedZkSerializer serializer = manager.getInstalledZkSerializer();
+      long oldSessionId = ((ZkClient) zkClient).getSessionId();
+      expireSession((ZkClient) zkClient);
+      TestUtils.waitForCondition(aVoid -> {
+        long sessionId = ((ZkClient) zkClient).getSessionId();
+        return sessionId != 0 && sessionId != oldSessionId && zkClient.waitUntilConnected(1, TimeUnit.SECONDS);
+      }, 30_000L, "Failed to get a new ZooKeeper session");
+      // Helix keeps the client (and so the serializer) across a session expiry
+      assertSame(manager.getZkClient(), zkClient);
+      assertSame(manager.getInstalledZkSerializer(), serializer);
+      assertReads(manager);
+    } finally {
+      manager.disconnect();
+    }
+  }
+
+  /// Expires the session of the given client: opens a second connection with the same session id and password, then
+  /// closes it. The server then expires the session, and the client gets a new one.
+  private void expireSession(ZkClient zkClient)
+      throws Exception {
+    ZooKeeper zooKeeper = ((ZkConnection) zkClient.getConnection()).getZookeeper();
+    CountDownLatch connected = new CountDownLatch(1);
+    ZooKeeper duplicate = new ZooKeeper(_zookeeperInstance.getZkUrl(), 10_000, event -> {
+      if (event.getState() == Watcher.Event.KeeperState.SyncConnected) {
+        connected.countDown();
+      }
+    }, zooKeeper.getSessionId(), zooKeeper.getSessionPasswd());
+    try {
+      assertTrue(connected.await(30, TimeUnit.SECONDS), "Failed to connect with the duplicate session");
+    } finally {
+      duplicate.close();
     }
   }
 

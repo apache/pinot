@@ -51,6 +51,12 @@ import org.slf4j.LoggerFactory;
 /// property store (no path match) and the Helix callback handlers. All of them only read the records under those
 /// paths. Writes still go through [ZNRecordSerializer].
 ///
+/// The map fields of a compact record are immutable, and the `IdealState` and `ExternalView` constructors share the
+/// inner instance-state maps. So every table ideal state or external view read through this manager, by any
+/// reader, has immutable instance-state maps. A read-modify-write of a table ideal state through this manager (for
+/// example `HelixHelper.updateIdealState`) fails with [UnsupportedOperationException]. No broker code does that; the
+/// participant manager of the broker keeps its own client and the default serializer.
+///
 /// Thread-safety: same as [ZKHelixManager]. The serializer is installed from the thread that calls [#connect],
 /// before the caller registers any listener.
 public class CompactAssignmentZkHelixManager extends ZKHelixManager {
@@ -92,6 +98,12 @@ public class CompactAssignmentZkHelixManager extends ZKHelixManager {
   @VisibleForTesting
   PathBasedZkSerializer getInstalledZkSerializer() {
     return _zkclient.getZkSerializer();
+  }
+
+  /// Returns the ZooKeeper client created by [#connect], for tests.
+  @VisibleForTesting
+  RealmAwareZkClient getZkClient() {
+    return _zkclient;
   }
 
   /// Returns a serializer that reads the table ideal states and external views of the given cluster with

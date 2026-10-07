@@ -244,6 +244,23 @@ public class CompactZNRecordSerializerTest {
     assertNull(COMPACT_SERIALIZER.deserialize(null));
   }
 
+  @Test
+  public void testCorruptGzipTrailerFallsBack()
+      throws IOException {
+    byte[] bytes = bytes(sampleIdealState(), true);
+    assertNotNull(CompactZNRecordSerializer.deserializeCompact(bytes));
+    // The gzip trailer is the CRC-32 (4 bytes) and the uncompressed size (4 bytes). The deflate data stays valid.
+    byte[] badCrc = bytes.clone();
+    badCrc[badCrc.length - 8] ^= 0x01;
+    assertThrows(IOException.class, () -> CompactZNRecordSerializer.deserializeCompact(badCrc));
+    assertNull(DEFAULT_SERIALIZER.deserialize(badCrc));
+    assertNull(COMPACT_SERIALIZER.deserialize(badCrc));
+    byte[] badSize = bytes.clone();
+    badSize[badSize.length - 1] ^= 0x01;
+    assertThrows(IOException.class, () -> CompactZNRecordSerializer.deserializeCompact(badSize));
+    assertNull(COMPACT_SERIALIZER.deserialize(badSize));
+  }
+
   @Test(dataProvider = "compression")
   public void testOnlyGzipUsesCompactParser(boolean compressed)
       throws IOException {
