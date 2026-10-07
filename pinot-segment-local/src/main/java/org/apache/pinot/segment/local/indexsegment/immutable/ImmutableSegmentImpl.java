@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.indexsegment.immutable;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.io.File;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -98,6 +100,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private ThreadSafeMutableRoaringBitmap _validDocIds;
   private ThreadSafeMutableRoaringBitmap _queryableDocIds;
   private volatile boolean _hasDeletedDocIds;
+  // Readers hold the read lock while reading columns through a cached reference; destroy() takes the write lock to
+  // set _destroyed before closing the indexes
+  private final ReentrantReadWriteLock _destroyLock = new ReentrantReadWriteLock();
+  // Monotonic: destroy() is the only writer and never clears it
+  private volatile boolean _destroyed;
 
   public ImmutableSegmentImpl(
       SegmentDirectory segmentDirectory,
@@ -374,6 +381,13 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     if (_partitionUpsertMetadataManager != null) {
       _partitionUpsertMetadataManager.untrackSegmentForUpsertView(this);
     }
+    // Wait for in-flight column reads (see tryAcquireReadLock) and make later ones skip this segment
+    _destroyLock.writeLock().lock();
+    try {
+      _destroyed = true;
+    } finally {
+      _destroyLock.writeLock().unlock();
+    }
     // StarTreeIndexContainer refers to other column index containers, so close it firstly.
     if (_starTreeIndexContainer != null) {
       try {
@@ -402,6 +416,31 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     } catch (Exception e) {
       LOGGER.error("Failed to close segment directory: {}. Continuing with error.", _segmentDirectory, e);
     }
+  }
+
+  /// True once [#destroy()] has set the flag: the index buffers may be closed and must not be read.
+  @VisibleForTesting
+  boolean isDestroyed() {
+    return _destroyed;
+  }
+
+  /// Blocks [#destroy()] while the caller reads this segment's columns through a cached reference. Returns false,
+  /// without holding the lock, once the segment is destroyed. A true return must be paired with [#releaseReadLock()].
+  public boolean tryAcquireReadLock() {
+    // Fast path: the flag is monotonic, so a true reading is definitive. A false one is re-checked under the lock.
+    if (_destroyed) {
+      return false;
+    }
+    _destroyLock.readLock().lock();
+    if (_destroyed) {
+      _destroyLock.readLock().unlock();
+      return false;
+    }
+    return true;
+  }
+
+  public void releaseReadLock() {
+    _destroyLock.readLock().unlock();
   }
 
   @Nullable
