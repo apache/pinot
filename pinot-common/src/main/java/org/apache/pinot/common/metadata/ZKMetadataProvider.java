@@ -81,6 +81,12 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_USER_CONFIGS_PREFIX = "/CONFIGS/USER";
   private static final String PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX = "/CONFIGS/CLUSTER";
   private static final String PROPERTYSTORE_SEGMENT_LINEAGE = "/SEGMENT_LINEAGE";
+  /// Table-scoped column-deletion ledger. One znode per table name with type.
+  /// Path: /COLUMN_DELETION_METADATA/<tableNameWithType>
+  ///
+  /// Completion is controller-owned, so this prefix is a sibling of /SEGMENT_LINEAGE and is not
+  /// under /MINION_TASK_METADATA.
+  private static final String PROPERTYSTORE_COLUMN_DELETION_METADATA = "/COLUMN_DELETION_METADATA";
   private static final String PROPERTYSTORE_MINION_TASK_METADATA_PREFIX = "/MINION_TASK_METADATA";
   private static final String PROPERTYSTORE_MATERIALIZED_VIEW_DEFINITION_PREFIX =
       "/CONFIGS/MATERIALIZED_VIEW/DEFINITION";
@@ -246,6 +252,18 @@ public class ZKMetadataProvider {
 
   public static String constructPropertyStorePathForSegmentLineage(String tableNameWithType) {
     return StringUtil.join("/", PROPERTYSTORE_SEGMENT_LINEAGE, tableNameWithType);
+  }
+
+  /// PropertyStore prefix for per-table column-deletion ledger znodes.
+  public static String getPropertyStorePathForColumnDeletionMetadataPrefix() {
+    return PROPERTYSTORE_COLUMN_DELETION_METADATA;
+  }
+
+  /// PropertyStore path for the column-deletion ledger of one table.
+  ///
+  /// @param tableNameWithType table name including type suffix, e.g. {@code foo_OFFLINE}
+  public static String constructPropertyStorePathForColumnDeletionMetadata(String tableNameWithType) {
+    return StringUtil.join("/", PROPERTYSTORE_COLUMN_DELETION_METADATA, tableNameWithType);
   }
 
   public static String getPropertyStorePathForMinionTaskMetadataPrefix() {
