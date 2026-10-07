@@ -221,6 +221,14 @@ public interface BrokerResponse {
   /// This value is always lower or equal than [#getNumSegmentsPrunedByServer()]
   long getNumSegmentsPrunedByValue();
 
+  /// Returns the number of remote accesses (local cache misses) made to read segment data from a remote storage tier.
+  ///
+  /// This value is always `0` when the segments are not backed by a remote storage tier.
+  long getNumRemoteAccesses();
+
+  /// Returns the number of bytes read by the remote accesses (see [#getNumRemoteAccesses()]).
+  long getRemoteAccessBytes();
+
   /// Returns the time used to reduce the server responses into the final response in milliseconds.
   long getBrokerReduceTimeMs();
 
