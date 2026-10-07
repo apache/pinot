@@ -24,6 +24,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -70,9 +71,11 @@ import org.slf4j.LoggerFactory;
 /// When the compact parser fails, the serializer logs a warning and falls back to [ZNRecordSerializer]. [#serialize]
 /// always delegates to [ZNRecordSerializer].
 ///
-/// [HelixHelper#toIdealState] and [HelixHelper#toExternalView] wrap a record from the compact parser without the deep
-/// copy that `new IdealState(record)` and `new ExternalView(record)` make. A record from [ZNRecordSerializer]
-/// (a plain znode or the fallback) still goes through those constructors.
+/// [HelixHelper#toIdealState] and [HelixHelper#toExternalView] wrap a record from the compact parser without the copy
+/// of the outer segment map that `new IdealState(record)` and `new ExternalView(record)` make. Those constructors
+/// share the inner instance-state maps, so an [org.apache.helix.model.IdealState] or
+/// [org.apache.helix.model.ExternalView] built from a compact record has immutable instance-state maps either way.
+/// A record from [ZNRecordSerializer] (a plain znode or the fallback) still goes through those constructors.
 ///
 /// Thread-safety: the serializer is stateless apart from the shared [JsonFactory], which is thread-safe. Each call
 /// uses its own parser and dictionaries, so concurrent calls are safe.
@@ -137,14 +140,19 @@ public class CompactZNRecordSerializer implements ZkSerializer {
   /// call it with plain content.
   static ZNRecord deserializeCompact(byte[] bytes)
       throws IOException {
-    JsonParser parser;
-    if (GZipCompressionUtil.isCompressed(bytes)) {
-      parser = JSON_FACTORY.createParser(new GZIPInputStream(new ByteArrayInputStream(bytes), GZIP_BUFFER_SIZE));
-    } else {
-      parser = JSON_FACTORY.createParser(bytes);
+    if (!GZipCompressionUtil.isCompressed(bytes)) {
+      try (JsonParser parser = JSON_FACTORY.createParser(bytes)) {
+        return new Reader(parser).readRecord();
+      }
     }
-    try (JsonParser p = parser) {
-      return new Reader(p).readRecord();
+    GZIPInputStream gzipInputStream = new GZIPInputStream(new ByteArrayInputStream(bytes), GZIP_BUFFER_SIZE);
+    try (JsonParser parser = JSON_FACTORY.createParser(gzipInputStream)) {
+      ZNRecord record = new Reader(parser).readRecord();
+      // The parser stops at the end of the record. GZIPInputStream verifies the CRC-32 and the size in the gzip
+      // trailer only when it reaches the end of the stream, so read the rest of the stream (as
+      // GZipCompressionUtil.uncompress does). A bad trailer throws, and deserialize falls back.
+      gzipInputStream.transferTo(OutputStream.nullOutputStream());
+      return record;
     }
   }
 

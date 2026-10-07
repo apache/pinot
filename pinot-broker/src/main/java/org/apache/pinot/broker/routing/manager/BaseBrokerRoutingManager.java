@@ -366,7 +366,7 @@ public abstract class BaseBrokerRoutingManager
     ZNRecord znRecord = _zkDataAccessor.get(idealStatePath, stat, AccessOption.PERSISTENT);
     if (znRecord != null) {
       znRecord.setVersion(stat.getVersion());
-      // Skips the deep copy of the map fields when the record comes from the compact reader
+      // Skips the copy of the outer segment map when the record comes from the compact reader
       return HelixHelper.toIdealState(znRecord);
     } else {
       return null;

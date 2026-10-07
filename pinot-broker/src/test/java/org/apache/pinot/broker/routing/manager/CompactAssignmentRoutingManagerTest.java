@@ -122,7 +122,6 @@ public class CompactAssignmentRoutingManagerTest {
         InstanceConfig instanceConfig = new InstanceConfig(server(i));
         instanceConfig.setHostName("host" + i);
         instanceConfig.setPort(Integer.toString(8000 + i));
-        instanceConfig.setInstanceEnabled(true);
         helixAdmin.addInstance(CLUSTER_NAME, instanceConfig);
       }
     } finally {
