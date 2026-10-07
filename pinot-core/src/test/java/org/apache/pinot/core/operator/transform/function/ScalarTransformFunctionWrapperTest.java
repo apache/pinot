@@ -49,6 +49,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -1709,6 +1710,52 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
       }
       expectedValues[i] = sum;
     }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  // Test-only scalar function with an `Object` parameter, registered the same way as the ones above. It returns the
+  // Java class of the argument, so the test below can check which class an `Object` parameter receives per type.
+
+  @ScalarFunction
+  public static String objectArgumentClass(Object value) {
+    return value.getClass().getSimpleName();
+  }
+
+  @DataProvider
+  public static Object[][] objectArgumentClassDataProvider() {
+    // The argument should be the external Java value, the same as ColumnDataType.toExternal() in the multi-stage
+    // engine FunctionOperand.
+    return new Object[][]{
+        {INT_SV_COLUMN, "Integer"},
+        {LONG_SV_COLUMN, "Long"},
+        {FLOAT_SV_COLUMN, "Float"},
+        {DOUBLE_SV_COLUMN, "Double"},
+        {BIG_DECIMAL_SV_COLUMN, "BigDecimal"},
+        {String.format("CAST(%s AS BOOLEAN)", INT_SV_COLUMN), "Boolean"},
+        {TIMESTAMP_COLUMN, "Timestamp"},
+        {STRING_SV_COLUMN, "String"},
+        {JSON_COLUMN, "String"},
+        {BYTES_SV_COLUMN, "byte[]"},
+        {UUID_SV_COLUMN, "UUID"},
+        {INT_MV_COLUMN, "int[]"},
+        {LONG_MV_COLUMN, "long[]"},
+        {FLOAT_MV_COLUMN, "float[]"},
+        {DOUBLE_MV_COLUMN, "double[]"},
+        {String.format("CAST(%s AS BIG_DECIMAL)", INT_MV_COLUMN), "BigDecimal[]"},
+        {String.format("CAST(%s AS BOOLEAN)", INT_MV_COLUMN), "boolean[]"},
+        {String.format("CAST(%s AS TIMESTAMP)", LONG_MV_COLUMN), "Timestamp[]"},
+        {STRING_MV_COLUMN, "String[]"}
+    };
+  }
+
+  @Test(dataProvider = "objectArgumentClassDataProvider")
+  public void testObjectParameter(String argument, String expectedClass) {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("objectArgumentClass(%s)", argument));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    String[] expectedValues = new String[NUM_ROWS];
+    Arrays.fill(expectedValues, expectedClass);
     testTransformFunction(transformFunction, expectedValues);
   }
 
