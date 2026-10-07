@@ -174,6 +174,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   public static final String COMMITTING_SEGMENTS = "committingSegments";
   private static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
+  // Not imported: the controller's own Constants class is already imported here.
+  private static final String METADATA_TAR_GZ_FILE_EXT =
+      org.apache.pinot.spi.ingestion.batch.spec.Constants.METADATA_TAR_GZ_FILE_EXT;
 
   // Max time to wait for all LLC segments to complete committing their metadata while stopping the controller.
   private static final long MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS = 30_000L;
@@ -605,11 +608,10 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         committingSegmentDescriptor.getMetadataTarLocation(), pinotFS);
 
     if (!isTmpSegmentAsyncDeletionEnabled()) {
-      String sidecarExt = org.apache.pinot.spi.ingestion.batch.spec.Constants.METADATA_TAR_GZ_FILE_EXT;
       try {
         for (String uri : pinotFS.listFiles(tableDirURI, false)) {
           if (uri.contains(SegmentCompletionUtils.getTmpSegmentNamePrefix(segmentName))
-              || uri.contains(SegmentCompletionUtils.getTmpSegmentNamePrefix(segmentName + sidecarExt))) {
+              || uri.contains(SegmentCompletionUtils.getTmpSegmentNamePrefix(segmentName + METADATA_TAR_GZ_FILE_EXT))) {
             LOGGER.warn("Deleting temporary segment file: {}", uri);
             Preconditions.checkState(pinotFS.delete(new URI(uri), true), "Failed to delete file: %s", uri);
           }
@@ -634,8 +636,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     if (metadataTarLocation == null) {
       return;
     }
-    URI uriToMoveTo = createSegmentPath(rawTableName,
-        segmentName + org.apache.pinot.spi.ingestion.batch.spec.Constants.METADATA_TAR_GZ_FILE_EXT);
+    URI uriToMoveTo = createSegmentPath(rawTableName, segmentName + METADATA_TAR_GZ_FILE_EXT);
     try {
       if (pinotFS.move(URIUtils.getUri(metadataTarLocation), uriToMoveTo, true)) {
         LOGGER.info("Moved metadata tar of segment: {} from: {} to: {}", segmentName, metadataTarLocation,
