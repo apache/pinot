@@ -138,7 +138,8 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   // computed alongside.
   protected volatile TableReplicaHealth _replicaHealth;
   protected Map<String, ServerInstance> _enabledServerStore;
-  // Only read by the rebuild thread. Not final so that tests can disable the sharing.
+  // Only read by the rebuild thread. Not final so that tests can disable or bound the sharing.
+  @VisibleForTesting
   int _maxSharedCandidateLists = MAX_SHARED_CANDIDATE_LISTS;
 
   @Override
@@ -477,8 +478,8 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   /// Returns the enabled candidates, and adds their instances to the serving instances.
   ///
   /// When every candidate is enabled, returns the given list itself rather than a copy. That publishes the list to
-  /// the query path, which is safe because candidate lists are never modified once built, and it keeps the lists
-  /// shared between segments by [#updateSegmentMaps] shared in the published [SegmentStates].
+  /// the query path, which is safe because candidate lists are never modified once built. It also keeps the lists
+  /// that [#updateSegmentMaps] shares between segments shared in the published [SegmentStates].
   private List<SegmentInstanceCandidate> getEnabledCandidatesAndAddToServingInstances(
       List<SegmentInstanceCandidate> candidates, Set<String> servingInstances) {
     int numCandidates = candidates.size();

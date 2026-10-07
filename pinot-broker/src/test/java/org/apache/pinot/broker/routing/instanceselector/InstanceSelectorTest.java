@@ -2479,14 +2479,24 @@ public class InstanceSelectorTest {
         enabledInstances, initialIdealState, initialExternalView, initialOnlineSegments);
     perSegmentSelector._maxSharedCandidateLists = 0;
     perSegmentSelector.onAssignmentChange(idealState, externalView, onlineSegments);
+    // Shares the lists of one pair of instance state maps only, so that one rebuild mixes shared and own lists
+    BaseInstanceSelector boundedSelector = (BaseInstanceSelector) createTestInstanceSelector(selectorType,
+        enabledInstances, initialIdealState, initialExternalView, initialOnlineSegments);
+    boundedSelector._maxSharedCandidateLists = 1;
+    boundedSelector.onAssignmentChange(idealState, externalView, onlineSegments);
 
     // Same candidates for every segment
     SegmentStates sharedStates = sharingSelector._segmentStates;
     SegmentStates perSegmentStates = perSegmentSelector._segmentStates;
+    SegmentStates boundedStates = boundedSelector._segmentStates;
     for (String segment : onlineSegments) {
       assertEquals(describe(sharedStates.getCandidates(segment)), describe(perSegmentStates.getCandidates(segment)),
           segment);
+      assertEquals(describe(boundedStates.getCandidates(segment)), describe(perSegmentStates.getCandidates(segment)),
+          segment);
     }
+    assertEquals(boundedStates.getUnavailableSegments(), perSegmentStates.getUnavailableSegments());
+    assertEquals(boundedStates.getServingInstances(), perSegmentStates.getServingInstances());
     assertEquals(sharedStates.getUnavailableSegments(), Set.of("p2_0"));
     assertEquals(sharedStates.getUnavailableSegments(), perSegmentStates.getUnavailableSegments());
     assertEquals(sharedStates.getServingInstances(), perSegmentStates.getServingInstances());
@@ -2524,10 +2534,13 @@ public class InstanceSelectorTest {
     for (long requestId = 0; requestId < 6; requestId++) {
       InstanceSelector.SelectionResult shared = sharingSelector.select(_brokerRequest, segments, requestId);
       InstanceSelector.SelectionResult perSegment = perSegmentSelector.select(_brokerRequest, segments, requestId);
+      InstanceSelector.SelectionResult bounded = boundedSelector.select(_brokerRequest, segments, requestId);
       assertEquals(shared.getSegmentToInstanceMap(), perSegment.getSegmentToInstanceMap());
       assertEquals(shared.getOptionalSegmentToInstanceMap(), perSegment.getOptionalSegmentToInstanceMap());
       assertEquals(shared.getUnavailableSegments(), perSegment.getUnavailableSegments());
       assertEquals(shared.getUnavailableSegments(), List.of("p2_0"));
+      assertEquals(bounded.getSegmentToInstanceMap(), perSegment.getSegmentToInstanceMap());
+      assertEquals(bounded.getOptionalSegmentToInstanceMap(), perSegment.getOptionalSegmentToInstanceMap());
     }
 
     // Enabling the disabled instance keeps both selectors in step
