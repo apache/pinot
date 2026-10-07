@@ -61,4 +61,24 @@ public class PlanNodeToRelConverterTest {
             + "  LogicalProject(a=[$0], c=[$2])\n"
             + "    Leaf\n");
   }
+
+  @Test
+  public void testAggregateGroupingSets() {
+    // MAX(d) ... GROUP BY ROLLUP(b, c), where the grouping sets hold indexes into the group keys [1, 2]
+    DataSchema leafSchema = new DataSchema(new String[]{"a", "b", "c", "d"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT});
+    PlanNode leaf = new ExplainedNode(0, leafSchema, null, List.of(), "Leaf", Map.of());
+    DataSchema aggregateSchema = new DataSchema(new String[]{"b", "c", "$groupingId", "max"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT});
+    RexExpression.FunctionCall max =
+        new RexExpression.FunctionCall(ColumnDataType.INT, "MAX", List.of(new RexExpression.InputRef(3)));
+    PlanNode aggregate = new AggregateNode(0, aggregateSchema, null, List.of(leaf), List.of(max), List.of(-1),
+        List.of(1, 2), AggregateNode.AggType.LEAF, false, null, 0, List.of(List.of(0, 1), List.of(0), List.of()));
+
+    RelBuilder relBuilder = RelBuilder.create(Frameworks.newConfigBuilder().build());
+    RelNode relNode = PlanNodeToRelConverter.convert(relBuilder, aggregate);
+    assertEquals(RelOptUtil.toString(relNode),
+        "LogicalAggregate(group=[{1, 2}], groups=[[{1, 2}, {1}, {}]], agg#0=[MAX($3)])\n"
+            + "  Leaf\n");
+  }
 }
