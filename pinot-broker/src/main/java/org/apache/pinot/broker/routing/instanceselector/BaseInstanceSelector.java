@@ -51,6 +51,8 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID;
 
@@ -91,6 +93,10 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID
 /// which one owns the table's gauges.
 public abstract class BaseInstanceSelector implements InstanceSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseInstanceSelector.class);
+  /// Tags the INFO logs that print the whole new-segment map on every rebuild ("Got N new segments: ..."). To drop
+  /// them without code changes, add to the log4j2 config:
+  /// `<MarkerFilter marker="ROUTING_NEW_SEGMENTS" onMatch="DENY" onMismatch="NEUTRAL"/>`
+  public static final Marker NEW_SEGMENTS_MARKER = MarkerFactory.getMarker("ROUTING_NEW_SEGMENTS");
   // To prevent int overflow, reset the request id once it reaches this value
   protected static final long MAX_REQUEST_ID = 1_000_000_000;
   /// Maximum number of distinct (ideal state, external view) instance state map pairs whose candidate lists one
@@ -243,7 +249,8 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
         newSegmentCreationTimeMap.put(segmentZKMetadata.getSegmentName(), creationTimeMs);
       }
     }
-    LOGGER.info("Got {} new segments: {} for table: {} by reading ZK metadata, current time: {}",
+    LOGGER.info(NEW_SEGMENTS_MARKER,
+        "Got {} new segments: {} for table: {} by reading ZK metadata, current time: {}",
         newSegmentCreationTimeMap.size(), newSegmentCreationTimeMap, _tableNameWithType, currentTimeMs);
     return newSegmentCreationTimeMap;
   }
@@ -550,7 +557,8 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
         }
       }
     }
-    LOGGER.info("Got {} new segments: {} for table: {} by processing existing states, current time: {}",
+    LOGGER.info(NEW_SEGMENTS_MARKER,
+        "Got {} new segments: {} for table: {} by processing existing states, current time: {}",
         newSegmentCreationTimeMap.size(), newSegmentCreationTimeMap, _tableNameWithType, currentTimeMs);
     return newSegmentCreationTimeMap;
   }
