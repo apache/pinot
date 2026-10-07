@@ -284,9 +284,204 @@
         ]
       },
       {
+        "description": "timestamp plus year interval",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + INTERVAL '1' YEAR FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2020-01-01 00:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "timestamp plus month interval",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + INTERVAL '1' MONTH FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2019-02-01 00:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "timestamp plus month interval at end of month",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-31 10:00:00' + INTERVAL '1' MONTH FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2019-02-28 10:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "timestamp plus year to month interval",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + INTERVAL '1-2' YEAR TO MONTH FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2020-03-01 00:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "month interval plus timestamp",
+        "sql": "EXPLAIN PLAN FOR SELECT INTERVAL '1' MONTH + TIMESTAMP '2019-01-01 00:00:00' FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2019-02-01 00:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "timestamp minus month interval",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-03-31 00:00:00' - INTERVAL '1' MONTH FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2019-02-28 00:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "timestamp plus negative month interval",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-03-01 00:00:00' + INTERVAL '-1' MONTH FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2019-02-01 00:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "timestamp plus sum of year and month intervals",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + (INTERVAL '1' YEAR + INTERVAL '2' MONTH) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2020-03-01 00:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "timestamp plus multiplied month interval",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + INTERVAL '1' MONTH * 2 FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2019-03-01 00:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "timestamp plus day interval",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + INTERVAL '1' DAY FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2019-01-02 00:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "timestamp plus hour interval",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + INTERVAL '1' HOUR FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2019-01-01 01:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "timestamp minus day to second interval",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-02 00:00:00' - INTERVAL '1 01:30:15' DAY TO SECOND FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2018-12-31 22:29:45])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "timestamp plus multiplied day interval",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + INTERVAL '1' DAY * 2 FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2019-01-03 00:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "filter with timestamp minus month interval",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a WHERE ts_timestamp > TIMESTAMP '2019-03-01 00:00:00' - INTERVAL '1' MONTH",
+        "output": [
+          "Execution Plan",
+          "\nLogicalFilter(condition=[>($8, 2019-02-01 00:00:00)])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "filter with timestamp minus day interval",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a WHERE ts_timestamp > TIMESTAMP '2019-03-01 00:00:00' - INTERVAL '1' DAY",
+        "output": [
+          "Execution Plan",
+          "\nLogicalFilter(condition=[>($8, 2019-02-28 00:00:00)])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "date plus day interval",
+        "sql": "EXPLAIN PLAN FOR SELECT DATE '2019-01-01' + INTERVAL '1' DAY FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2019-01-02])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "date plus month interval",
+        "sql": "EXPLAIN PLAN FOR SELECT DATE '2019-01-31' + INTERVAL '1' MONTH FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2019-02-28])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "date minus year interval",
+        "sql": "EXPLAIN PLAN FOR SELECT DATE '2020-02-29' - INTERVAL '1' YEAR FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2019-02-28])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "date minus hour interval adds only whole days",
+        "sql": "EXPLAIN PLAN FOR SELECT DATE '2019-01-01' - INTERVAL '25' HOUR FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2018-12-31])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "select non-exist literal function",
         "sql": "EXPLAIN PLAN FOR Select nonExistFun(1,2) FROM a",
         "expectedException": ".*No match found for function signature nonExistFun.*"
+      },
+      {
+        "description": "timestamp plus fraction of a month interval",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + INTERVAL '1' MONTH / 2 FROM a",
+        "expectedException": ".*Year-month interval must be a whole number of months, got: 0.5.*"
       }
     ]
   },
