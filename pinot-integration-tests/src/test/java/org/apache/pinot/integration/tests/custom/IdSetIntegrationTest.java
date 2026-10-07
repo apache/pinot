@@ -53,6 +53,8 @@ public class IdSetIntegrationTest extends CustomDataQueryClusterIntegrationTest 
   private static final String SET_FILTER = ID + " < " + NUM_SET_VALUES;
   // STRING and BYTES sets are Bloom filters; these params keep their literals short
   private static final String BLOOM_FILTER_PARAMS = "expectedInsertions=1000;fpp=0.0001";
+  // A Bloom filter sized for 10M ids, which serializes to a literal of about 16 MB
+  private static final String LARGE_BLOOM_FILTER_PARAMS = "expectedInsertions=10000000;fpp=0.01";
 
   @Override
   protected long getCountStarResult() {
@@ -106,6 +108,21 @@ public class IdSetIntegrationTest extends CustomDataQueryClusterIntegrationTest 
       IdSet idSet = IdSets.fromBase64String(getSingleValue(postQuery(idSetQuery)).asText());
       assertEquals(getSingleValue(postQuery(query)).asLong(), getExpectedCount(column, idSet), column);
     }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testLargeIdSet(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String idSet = getSingleValue(postQuery(
+        "SELECT IDSET(" + STR_COL + ", '" + LARGE_BLOOM_FILTER_PARAMS + "') FROM " + getTableName() + " WHERE "
+            + SET_FILTER)).asText();
+    assertTrue(idSet.length() > 15_000_000, "IdSet length: " + idSet.length());
+    String inQuery =
+        "SELECT COUNT(*) FROM " + getTableName() + " WHERE IN_ID_SET(" + STR_COL + ", '" + idSet + "') = 1";
+    // Over HTTP, because the broker's gRPC endpoint accepts requests of up to 4 MB
+    assertEquals(getSingleValue(queryBrokerHttpEndpoint(inQuery)).asLong(),
+        getExpectedCount(STR_COL, IdSets.fromBase64String(idSet)));
   }
 
   @Test(dataProvider = "useBothQueryEngines")

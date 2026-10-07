@@ -2963,6 +2963,20 @@ public class CommonConstants {
     public static final String KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS =
         "pinot.query.multistage.query.server.permit.keep.alive.without.calls";
     public static final boolean DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS = false;
+
+    /// Maximum size, in bytes, of a gRPC message the MSE [org.apache.pinot.query.service.server.QueryServer] accepts.
+    /// Must be positive. A message carries the stage plans a broker dispatches to the server, literals included, so
+    /// queries with large literals (e.g. an `IN_ID_SET` IdSet of millions of ids) can need more than the default.
+    public static final String KEY_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES =
+        "pinot.query.multistage.query.server.max.inbound.message.size.bytes";
+    public static final int DEFAULT_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES = 64 * 1024 * 1024;
+
+    /// Maximum size, in bytes, of a gRPC message the broker dispatch channels accept from the MSE query servers, such
+    /// as query stats, or the plans the servers return for `EXPLAIN`, which carry the query's literals. Must be
+    /// positive. See [#KEY_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES] for the messages the servers accept.
+    public static final String KEY_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES =
+        "pinot.query.multistage.dispatch.channel.max.inbound.message.size.bytes";
+    public static final int DEFAULT_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES = 64 * 1024 * 1024;
   }
 
   public static class NullValuePlaceHolder {
