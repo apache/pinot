@@ -816,7 +816,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
   protected void initSpectatorHelixManager() throws Exception {
     _spectatorHelixManager =
-      HelixManagerFactory.getZKHelixManager(_clusterName, _instanceId, InstanceType.SPECTATOR, _zkServers);
+        CompactAssignmentZkHelixManager.createSpectatorHelixManager(_brokerConf, _clusterName, _instanceId,
+            _zkServers);
     _spectatorHelixManager.connect();
     _helixAdmin = _spectatorHelixManager.getClusterManagmentTool();
     _propertyStore = _spectatorHelixManager.getHelixPropertyStore();

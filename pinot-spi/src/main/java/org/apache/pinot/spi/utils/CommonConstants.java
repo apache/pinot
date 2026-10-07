@@ -610,6 +610,14 @@ public class CommonConstants {
     public static final int DEFAULT_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM =
         Runtime.getRuntime().availableProcessors();
 
+    /// When enabled, the broker's spectator Helix managers read table ideal states and external views with a
+    /// compact streaming deserializer. It decompresses and parses the znode in one pass, interns instance and
+    /// segment names, and shares identical instance-state maps. The broker resource keeps the default Helix
+    /// deserializer. Takes effect on broker start.
+    public static final String CONFIG_OF_ROUTING_COMPACT_ASSIGNMENT_READER_ENABLED =
+        "pinot.broker.routing.compact.assignment.reader.enabled";
+    public static final boolean DEFAULT_ROUTING_COMPACT_ASSIGNMENT_READER_ENABLED = false;
+
     // When enabled, the broker will set a query option to ignore SERVER_SEGMENT_MISSING errors from servers.
     // This is useful to tolerate short windows where routing has not yet reflected recently deleted segments.
     public static final String CONFIG_OF_IGNORE_MISSING_SEGMENTS =

@@ -27,8 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixManager;
-import org.apache.helix.HelixManagerFactory;
-import org.apache.helix.InstanceType;
 import org.apache.pinot.broker.routing.manager.MultiClusterRoutingManager;
 import org.apache.pinot.broker.routing.manager.RemoteClusterBrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -137,8 +135,9 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
       String clusterName = entry.getKey();
       String zkServers = entry.getValue();
       try {
-        HelixManager helixManager = HelixManagerFactory.getZKHelixManager(
-            clusterName, _instanceId, InstanceType.SPECTATOR, zkServers);
+        HelixManager helixManager =
+            CompactAssignmentZkHelixManager.createSpectatorHelixManager(_brokerConf, clusterName, _instanceId,
+                zkServers);
         helixManager.connect();
         _remoteSpectatorHelixManager.put(clusterName, helixManager);
         LOGGER.info("[multi-cluster] Connected to remote cluster '{}' at ZK: {}", clusterName, zkServers);
