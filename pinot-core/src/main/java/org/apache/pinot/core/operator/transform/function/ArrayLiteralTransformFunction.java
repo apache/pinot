@@ -21,11 +21,13 @@ package org.apache.pinot.core.operator.transform.function;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -33,6 +35,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -224,16 +227,16 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       _bytesArrayLiteral = new byte[0][];
       return;
     }
+    List<LiteralContext> contexts = new ArrayList<>(literalContexts.size());
     for (ExpressionContext literalContext : literalContexts) {
-      Preconditions.checkState(literalContext.getType() == ExpressionContext.Type.LITERAL,
-          "ArrayLiteralTransformFunction only takes literals as arguments, found: %s", literalContext);
+      contexts.add(toLiteralContext(literalContext));
     }
-    _dataType = literalContexts.get(0).getLiteral().getType();
+    _dataType = contexts.get(0).getType();
     switch (_dataType) {
       case INT:
-        _intArrayLiteral = new int[literalContexts.size()];
+        _intArrayLiteral = new int[contexts.size()];
         for (int i = 0; i < _intArrayLiteral.length; i++) {
-          _intArrayLiteral[i] = literalContexts.get(i).getLiteral().getIntValue();
+          _intArrayLiteral[i] = contexts.get(i).getIntValue();
         }
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
@@ -243,9 +246,9 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _bytesArrayLiteral = null;
         break;
       case LONG:
-        _longArrayLiteral = new long[literalContexts.size()];
+        _longArrayLiteral = new long[contexts.size()];
         for (int i = 0; i < _longArrayLiteral.length; i++) {
-          _longArrayLiteral[i] = literalContexts.get(i).getLiteral().getLongValue();
+          _longArrayLiteral[i] = contexts.get(i).getLongValue();
         }
         _intArrayLiteral = null;
         _floatArrayLiteral = null;
@@ -255,9 +258,9 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _bytesArrayLiteral = null;
         break;
       case FLOAT:
-        _floatArrayLiteral = new float[literalContexts.size()];
+        _floatArrayLiteral = new float[contexts.size()];
         for (int i = 0; i < _floatArrayLiteral.length; i++) {
-          _floatArrayLiteral[i] = literalContexts.get(i).getLiteral().getFloatValue();
+          _floatArrayLiteral[i] = contexts.get(i).getFloatValue();
         }
         _intArrayLiteral = null;
         _longArrayLiteral = null;
@@ -267,9 +270,9 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _bytesArrayLiteral = null;
         break;
       case DOUBLE:
-        _doubleArrayLiteral = new double[literalContexts.size()];
+        _doubleArrayLiteral = new double[contexts.size()];
         for (int i = 0; i < _doubleArrayLiteral.length; i++) {
-          _doubleArrayLiteral[i] = literalContexts.get(i).getLiteral().getDoubleValue();
+          _doubleArrayLiteral[i] = contexts.get(i).getDoubleValue();
         }
         _intArrayLiteral = null;
         _longArrayLiteral = null;
@@ -279,9 +282,9 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _bytesArrayLiteral = null;
         break;
       case BIG_DECIMAL:
-        _bigDecimalArrayLiteral = new BigDecimal[literalContexts.size()];
+        _bigDecimalArrayLiteral = new BigDecimal[contexts.size()];
         for (int i = 0; i < _bigDecimalArrayLiteral.length; i++) {
-          _bigDecimalArrayLiteral[i] = literalContexts.get(i).getLiteral().getBigDecimalValue();
+          _bigDecimalArrayLiteral[i] = contexts.get(i).getBigDecimalValue();
         }
         _intArrayLiteral = null;
         _longArrayLiteral = null;
@@ -291,9 +294,9 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _bytesArrayLiteral = null;
         break;
       case BOOLEAN:
-        _intArrayLiteral = new int[literalContexts.size()];
+        _intArrayLiteral = new int[contexts.size()];
         for (int i = 0; i < _intArrayLiteral.length; i++) {
-          _intArrayLiteral[i] = literalContexts.get(i).getLiteral().getBooleanValue() ? 1 : 0;
+          _intArrayLiteral[i] = contexts.get(i).getBooleanValue() ? 1 : 0;
         }
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
@@ -303,9 +306,9 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _bytesArrayLiteral = null;
         break;
       case TIMESTAMP:
-        _longArrayLiteral = new long[literalContexts.size()];
+        _longArrayLiteral = new long[contexts.size()];
         for (int i = 0; i < _longArrayLiteral.length; i++) {
-          _longArrayLiteral[i] = literalContexts.get(i).getLiteral().getLongValue();
+          _longArrayLiteral[i] = contexts.get(i).getLongValue();
         }
         _intArrayLiteral = null;
         _floatArrayLiteral = null;
@@ -315,9 +318,9 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _bytesArrayLiteral = null;
         break;
       case STRING:
-        _stringArrayLiteral = new String[literalContexts.size()];
+        _stringArrayLiteral = new String[contexts.size()];
         for (int i = 0; i < _stringArrayLiteral.length; i++) {
-          _stringArrayLiteral[i] = literalContexts.get(i).getLiteral().getStringValue();
+          _stringArrayLiteral[i] = contexts.get(i).getStringValue();
         }
         _intArrayLiteral = null;
         _longArrayLiteral = null;
@@ -328,9 +331,9 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         break;
       case BYTES:
       case UUID:
-        _bytesArrayLiteral = new byte[literalContexts.size()][];
+        _bytesArrayLiteral = new byte[contexts.size()][];
         for (int i = 0; i < _bytesArrayLiteral.length; i++) {
-          _bytesArrayLiteral[i] = literalContexts.get(i).getLiteral().getBytesValue();
+          _bytesArrayLiteral[i] = contexts.get(i).getBytesValue();
         }
         _intArrayLiteral = null;
         _longArrayLiteral = null;
@@ -342,7 +345,103 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       default:
         throw new IllegalStateException(
             "Illegal data type for ArrayLiteralTransformFunction: " + _dataType + ", literal contexts: "
-                + Arrays.toString(literalContexts.toArray()));
+                + Arrays.toString(contexts.toArray()));
+    }
+  }
+
+  private static LiteralContext toLiteralContext(ExpressionContext context) {
+    if (context.getType() == ExpressionContext.Type.LITERAL) {
+      return context.getLiteral();
+    }
+    if (context.getType() == ExpressionContext.Type.FUNCTION) {
+      FunctionContext function = context.getFunction();
+      if (function.getFunctionName().equalsIgnoreCase("cast")) {
+        List<ExpressionContext> arguments = function.getArguments();
+        Preconditions.checkArgument(arguments.size() == 2,
+            "CAST function inside array literal constructor expects 2 arguments, got: %s", arguments.size());
+        LiteralContext sourceLiteral = toLiteralContext(arguments.get(0));
+        ExpressionContext targetTypeExpr = arguments.get(1);
+        Preconditions.checkArgument(targetTypeExpr.getType() == ExpressionContext.Type.LITERAL,
+            "CAST target type must be a literal string, got: %s", targetTypeExpr);
+        String targetType = targetTypeExpr.getLiteral().getStringValue().toUpperCase();
+        return castLiteralContext(sourceLiteral, targetType);
+      }
+    }
+    throw new IllegalStateException(
+        "ArrayLiteralTransformFunction only takes literals or cast functions as arguments, found: " + context);
+  }
+
+  private static LiteralContext castLiteralContext(LiteralContext source, String targetType) {
+    switch (targetType) {
+      case "TIMESTAMP":
+        if (source.isNull()) {
+          return new LiteralContext(DataType.TIMESTAMP, null);
+        }
+        if (source.getType() == DataType.TIMESTAMP) {
+          return source;
+        }
+        if (source.getType() == DataType.STRING) {
+          return new LiteralContext(DataType.TIMESTAMP, TimestampUtils.toTimestamp(source.getStringValue()));
+        }
+        return new LiteralContext(DataType.TIMESTAMP, new Timestamp(source.getLongValue()));
+      case "UUID":
+        if (source.isNull()) {
+          return new LiteralContext(DataType.UUID, null);
+        }
+        if (source.getType() == DataType.UUID) {
+          return source;
+        }
+        if (source.getType() == DataType.STRING) {
+          return new LiteralContext(DataType.UUID, UuidUtils.toUUID(source.getStringValue()));
+        }
+        if (source.getType() == DataType.BYTES) {
+          return new LiteralContext(DataType.UUID, UuidUtils.toUUID(source.getBytesValue()));
+        }
+        throw new IllegalArgumentException("Cannot cast type: " + source.getType() + " to UUID");
+      case "BIG_DECIMAL":
+      case "DECIMAL":
+      case "NUMERIC":
+        if (source.isNull()) {
+          return new LiteralContext(DataType.BIG_DECIMAL, null);
+        }
+        if (source.getType() == DataType.BIG_DECIMAL) {
+          return source;
+        }
+        return new LiteralContext(DataType.BIG_DECIMAL, source.getBigDecimalValue());
+      case "BOOLEAN":
+      case "BOOL":
+        if (source.isNull()) {
+          return new LiteralContext(DataType.BOOLEAN, null);
+        }
+        if (source.getType() == DataType.BOOLEAN) {
+          return source;
+        }
+        return new LiteralContext(DataType.BOOLEAN, source.getBooleanValue());
+      case "INT":
+      case "INTEGER":
+        return source.isNull() ? new LiteralContext(DataType.INT, null)
+            : new LiteralContext(DataType.INT, source.getIntValue());
+      case "LONG":
+      case "BIGINT":
+        return source.isNull() ? new LiteralContext(DataType.LONG, null)
+            : new LiteralContext(DataType.LONG, source.getLongValue());
+      case "FLOAT":
+        return source.isNull() ? new LiteralContext(DataType.FLOAT, null)
+            : new LiteralContext(DataType.FLOAT, source.getFloatValue());
+      case "DOUBLE":
+        return source.isNull() ? new LiteralContext(DataType.DOUBLE, null)
+            : new LiteralContext(DataType.DOUBLE, source.getDoubleValue());
+      case "STRING":
+      case "VARCHAR":
+        return source.isNull() ? new LiteralContext(DataType.STRING, null)
+            : new LiteralContext(DataType.STRING, source.getStringValue());
+      case "BYTES":
+      case "BINARY":
+      case "VARBINARY":
+        return source.isNull() ? new LiteralContext(DataType.BYTES, null)
+            : new LiteralContext(DataType.BYTES, source.getBytesValue());
+      default:
+        throw new IllegalArgumentException("Unsupported cast target type: " + targetType);
     }
   }
 

@@ -3611,4 +3611,50 @@ public class CalciteSqlCompilerTest {
   public void testInEqualFilterWithNullFails() {
     compileToPinotQuery("SELECT * FROM testTable WHERE column1 != null");
   }
+
+  @Test
+  public void testArrayLiteralCompileTimeFolding() {
+    // array(1, 2) folds to INT_ARRAY literal
+    PinotQuery pinotQuery = compileToPinotQuery("SELECT array(1, 2) FROM testTable");
+    Expression selectExpr = pinotQuery.getSelectList().get(0);
+    Assert.assertEquals(selectExpr.getType(), ExpressionType.LITERAL);
+    Assert.assertEquals(selectExpr.getLiteral().getIntArrayValue(), List.of(1, 2));
+
+    // ARRAY[1, 2] folds to INT_ARRAY literal
+    pinotQuery = compileToPinotQuery("SELECT ARRAY[1, 2] FROM testTable");
+    selectExpr = pinotQuery.getSelectList().get(0);
+    Assert.assertEquals(selectExpr.getType(), ExpressionType.LITERAL);
+    Assert.assertEquals(selectExpr.getLiteral().getIntArrayValue(), List.of(1, 2));
+
+    // ARRAY[CAST('2020-01-01 00:00:00' AS TIMESTAMP)] preserves cast function
+    pinotQuery = compileToPinotQuery("SELECT ARRAY[CAST('2020-01-01 00:00:00' AS TIMESTAMP)] FROM testTable");
+    selectExpr = pinotQuery.getSelectList().get(0);
+    Assert.assertEquals(selectExpr.getType(), ExpressionType.FUNCTION);
+    Assert.assertEquals(selectExpr.getFunctionCall().getOperator(), "arrayvalueconstructor");
+    Expression child = selectExpr.getFunctionCall().getOperands().get(0);
+    Assert.assertEquals(child.getType(), ExpressionType.FUNCTION);
+    Assert.assertEquals(child.getFunctionCall().getOperator(), "cast");
+    Assert.assertEquals(child.getFunctionCall().getOperands().get(1).getLiteral().getStringValue(), "TIMESTAMP");
+
+    // ARRAY[CAST('550e8400-e29b-41d4-a716-446655440000' AS UUID)] preserves cast function
+    pinotQuery = compileToPinotQuery(
+        "SELECT ARRAY[CAST('550e8400-e29b-41d4-a716-446655440000' AS UUID)] FROM testTable");
+    selectExpr = pinotQuery.getSelectList().get(0);
+    Assert.assertEquals(selectExpr.getType(), ExpressionType.FUNCTION);
+    Assert.assertEquals(selectExpr.getFunctionCall().getOperator(), "arrayvalueconstructor");
+    child = selectExpr.getFunctionCall().getOperands().get(0);
+    Assert.assertEquals(child.getType(), ExpressionType.FUNCTION);
+    Assert.assertEquals(child.getFunctionCall().getOperator(), "cast");
+    Assert.assertEquals(child.getFunctionCall().getOperands().get(1).getLiteral().getStringValue(), "UUID");
+
+    // array(CAST('2020-01-01 00:00:00' AS TIMESTAMP)) preserves cast function
+    pinotQuery = compileToPinotQuery("SELECT array(CAST('2020-01-01 00:00:00' AS TIMESTAMP)) FROM testTable");
+    selectExpr = pinotQuery.getSelectList().get(0);
+    Assert.assertEquals(selectExpr.getType(), ExpressionType.FUNCTION);
+    Assert.assertEquals(selectExpr.getFunctionCall().getOperator(), "array");
+    child = selectExpr.getFunctionCall().getOperands().get(0);
+    Assert.assertEquals(child.getType(), ExpressionType.FUNCTION);
+    Assert.assertEquals(child.getFunctionCall().getOperator(), "cast");
+    Assert.assertEquals(child.getFunctionCall().getOperands().get(1).getLiteral().getStringValue(), "TIMESTAMP");
+  }
 }

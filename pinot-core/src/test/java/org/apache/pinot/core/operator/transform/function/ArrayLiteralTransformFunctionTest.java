@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -186,9 +187,19 @@ public class ArrayLiteralTransformFunctionTest {
     List<ExpressionContext> arrayExpressions = List.of(
         ExpressionContext.forLiteral(DataType.TIMESTAMP, timestamps[0]),
         ExpressionContext.forLiteral(DataType.TIMESTAMP, timestamps[1]));
+    FunctionContext castTimestamp1 = new FunctionContext(FunctionContext.Type.TRANSFORM, "cast",
+        List.of(ExpressionContext.forLiteral(DataType.STRING, timestamps[0].toString()),
+            ExpressionContext.forLiteral(DataType.STRING, "TIMESTAMP")));
+    FunctionContext castTimestamp2 = new FunctionContext(FunctionContext.Type.TRANSFORM, "cast",
+        List.of(ExpressionContext.forLiteral(DataType.STRING, timestamps[1].toString()),
+            ExpressionContext.forLiteral(DataType.STRING, "TIMESTAMP")));
+    List<ExpressionContext> castExpressions = List.of(
+        ExpressionContext.forFunction(castTimestamp1),
+        ExpressionContext.forFunction(castTimestamp2));
 
     List<ArrayLiteralTransformFunction> timestampArrays = List.of(
         new ArrayLiteralTransformFunction(arrayExpressions),
+        new ArrayLiteralTransformFunction(castExpressions),
         new ArrayLiteralTransformFunction(new LiteralContext(DataType.TIMESTAMP, timestamps)),
         new ArrayLiteralTransformFunction(new LiteralContext(DataType.TIMESTAMP, new Long[]{1000L, 2000L})),
         new ArrayLiteralTransformFunction(new LiteralContext(DataType.TIMESTAMP, new long[]{1000L, 2000L})));
@@ -257,9 +268,19 @@ public class ArrayLiteralTransformFunctionTest {
     List<ExpressionContext> arrayExpressions = List.of(
         ExpressionContext.forLiteral(DataType.UUID, uuids[0]),
         ExpressionContext.forLiteral(DataType.UUID, uuids[1]));
+    FunctionContext castUuid1 = new FunctionContext(FunctionContext.Type.TRANSFORM, "cast",
+        List.of(ExpressionContext.forLiteral(DataType.STRING, uuids[0].toString()),
+            ExpressionContext.forLiteral(DataType.STRING, "UUID")));
+    FunctionContext castUuid2 = new FunctionContext(FunctionContext.Type.TRANSFORM, "cast",
+        List.of(ExpressionContext.forLiteral(DataType.STRING, uuids[1].toString()),
+            ExpressionContext.forLiteral(DataType.STRING, "UUID")));
+    List<ExpressionContext> castUuidExpressions = List.of(
+        ExpressionContext.forFunction(castUuid1),
+        ExpressionContext.forFunction(castUuid2));
 
     List<ArrayLiteralTransformFunction> uuidArrays = List.of(
         new ArrayLiteralTransformFunction(arrayExpressions),
+        new ArrayLiteralTransformFunction(castUuidExpressions),
         new ArrayLiteralTransformFunction(new LiteralContext(DataType.UUID, uuids)),
         new ArrayLiteralTransformFunction(new LiteralContext(DataType.UUID, expectedBytes)));
     for (ArrayLiteralTransformFunction uuidArray : uuidArrays) {
