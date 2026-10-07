@@ -30,6 +30,7 @@ public class CommittingSegmentDescriptor {
   private final long _segmentSizeBytes;
 
   private String _segmentLocation;
+  private String _metadataTarLocation;
   private SegmentMetadataImpl _segmentMetadata;
   private String _stopReason;
   private int _preCommitRowCount;
@@ -40,6 +41,7 @@ public class CommittingSegmentDescriptor {
         new CommittingSegmentDescriptor(reqParams.getSegmentName(), reqParams.getStreamPartitionMsgOffset(),
             reqParams.getSegmentSizeBytes());
     committingSegmentDescriptor.setSegmentLocation(reqParams.getSegmentLocation());
+    committingSegmentDescriptor.setMetadataTarLocation(reqParams.getMetadataTarLocation());
     committingSegmentDescriptor.setStopReason(reqParams.getReason());
     // Capture pre-commit row count from the request (for commit time compaction awareness)
     committingSegmentDescriptor.setPreCommitRowCount(reqParams.getNumRows());
@@ -85,6 +87,15 @@ public class CommittingSegmentDescriptor {
 
   public void setSegmentLocation(String segmentLocation) {
     _segmentLocation = segmentLocation;
+  }
+
+  @Nullable
+  public String getMetadataTarLocation() {
+    return _metadataTarLocation;
+  }
+
+  public void setMetadataTarLocation(String metadataTarLocation) {
+    _metadataTarLocation = metadataTarLocation;
   }
 
   @Nullable

@@ -92,7 +92,11 @@ public class SplitSegmentCommitter implements SegmentCommitter {
 
     if (_uploadMetadataTar && _segmentUploader.isMetadataTarUploadSupported()
         && !isPeerSegmentLocation(segmentLocation)) {
-      uploadMetadataTarQuietly(segmentBuildDescriptor.getMetadataFiles(), _params.getSegmentName());
+      String metadataTarLocation =
+          uploadMetadataTarQuietly(segmentBuildDescriptor.getMetadataFiles(), _params.getSegmentName());
+      if (metadataTarLocation != null) {
+        _params.withMetadataTarLocation(metadataTarLocation);
+      }
     }
 
     SegmentCompletionProtocol.Response commitEndResponse =
@@ -126,11 +130,13 @@ public class SplitSegmentCommitter implements SegmentCommitter {
         CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME.length());
   }
 
-  /// Best-effort: builds a tar containing one directory with metadata.properties and creation.meta, and uploads it next
-  /// to the segment. Never fails or throws; a sidecar problem must not affect the segment commit.
-  private void uploadMetadataTarQuietly(@Nullable Map<String, File> metadataFiles, String segmentName) {
+  /// Best-effort: builds a tar containing one directory with metadata.properties and creation.meta, and uploads it
+  /// under a tmp name next to the segment. Returns the tmp location for the controller to move at commit end, or
+  /// null on any problem. Never fails or throws; a sidecar problem must not affect the segment commit.
+  @Nullable
+  private String uploadMetadataTarQuietly(@Nullable Map<String, File> metadataFiles, String segmentName) {
     if (metadataFiles == null || metadataFiles.isEmpty()) {
-      return;
+      return null;
     }
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
     String rawTableName = TableNameBuilder.extractRawTableName(llcSegmentName.getTableName());
@@ -147,10 +153,13 @@ public class SplitSegmentCommitter implements SegmentCommitter {
           segmentName + "_" + UUID.randomUUID() + Constants.METADATA_TAR_GZ_FILE_EXT);
       // Tar the DIRECTORY so that the first archive entry is a directory, as DefaultMetadataExtractor expects.
       TarCompressionUtils.createCompressedTarFile(stagingDir, metadataTarFile);
-      _segmentUploader.uploadMetadataTar(metadataTarFile, llcSegmentName, METADATA_TAR_UPLOAD_TIMEOUT_MS);
+      URI metadataTarLocation =
+          _segmentUploader.uploadMetadataTar(metadataTarFile, llcSegmentName, METADATA_TAR_UPLOAD_TIMEOUT_MS);
+      return metadataTarLocation == null ? null : metadataTarLocation.toString();
     } catch (Exception e) {
       _segmentLogger.warn("Failed to upload metadata tar for segment: {}; continuing with commit", segmentName, e);
       ServerMetrics.get().addMeteredTableValue(rawTableName, ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
+      return null;
     } finally {
       FileUtils.deleteQuietly(stagingDir);
       FileUtils.deleteQuietly(metadataTarFile);

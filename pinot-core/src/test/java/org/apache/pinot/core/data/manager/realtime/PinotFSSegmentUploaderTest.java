@@ -39,9 +39,11 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
@@ -63,10 +65,17 @@ public class PinotFSSegmentUploaderTest {
         "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysExistPinotFS");
     properties.put("class.recording",
         "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$RecordingPinotFS");
+    properties.put("class.failingcopy",
+        "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$FailingCopyPinotFS");
     PinotFSFactory.init(new PinotConfiguration(properties));
     _file = FileUtils.getFile(FileUtils.getTempDirectory(), UUID.randomUUID().toString());
     _file.deleteOnExit();
     _llcSegmentName = new LLCSegmentName("test_REALTIME", 1, 0, System.currentTimeMillis());
+  }
+
+  @BeforeMethod
+  public void resetMetrics() {
+    Mockito.reset(_serverMetrics);
   }
 
   @Test
@@ -106,27 +115,45 @@ public class PinotFSSegmentUploaderTest {
   }
 
   @Test
-  public void testMetadataTarUploadUsesFinalName() {
+  public void testMetadataTarUploadUsesTmpName() {
     RecordingPinotFS.reset();
     SegmentUploader segmentUploader = new PinotFSSegmentUploader("recording://root", TIMEOUT_IN_MS, _serverMetrics);
     URI uri = segmentUploader.uploadMetadataTar(_file, _llcSegmentName, TIMEOUT_IN_MS);
-    String expected = StringUtil.join(File.separator, "recording://root", _llcSegmentName.getTableName(),
-        _llcSegmentName.getSegmentName() + Constants.METADATA_TAR_GZ_FILE_EXT);
-    Assert.assertEquals(uri.toString(), expected);
+    String tmpPrefix = StringUtil.join(File.separator, "recording://root", _llcSegmentName.getTableName(),
+        _llcSegmentName.getSegmentName() + Constants.METADATA_TAR_GZ_FILE_EXT + ".tmp.");
+    Assert.assertTrue(uri.toString().startsWith(tmpPrefix), uri.toString());
+    // The tmp name must be swept by the controller's tmp file cleanup if a commit never completes.
+    Assert.assertTrue(SegmentCompletionUtils.isTmpFile(uri.toString()));
     Assert.assertEquals(RecordingPinotFS.COPIED, List.of(uri));
+    // The unique tmp name makes a pre-delete unnecessary, and the final object is never touched.
+    Assert.assertTrue(RecordingPinotFS.DELETED.isEmpty());
     Mockito.verify(_serverMetrics, Mockito.atLeastOnce()).addMeteredTableValue(
         TableNameBuilder.extractRawTableName(_llcSegmentName.getTableName()),
         ServerMeter.METADATA_TAR_UPLOAD_SUCCESS, 1);
   }
 
   @Test
-  public void testMetadataTarUploadOverwritesExistingObject() {
+  public void testMetadataTarUploadFailureDeletesOnlyTmpObject() {
     RecordingPinotFS.reset();
-    SegmentUploader segmentUploader = new PinotFSSegmentUploader("recording://root", TIMEOUT_IN_MS, _serverMetrics);
-    URI uri = segmentUploader.uploadMetadataTar(_file, _llcSegmentName, TIMEOUT_IN_MS);
-    // RecordingPinotFS.exists() is always true, so the existing object must be deleted before the copy.
-    Assert.assertEquals(RecordingPinotFS.DELETED, List.of(uri));
-    Assert.assertEquals(RecordingPinotFS.COPIED, List.of(uri));
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("failingcopy://root", TIMEOUT_IN_MS, _serverMetrics);
+    Assert.assertNull(segmentUploader.uploadMetadataTar(_file, _llcSegmentName, TIMEOUT_IN_MS));
+    TestUtils.waitForCondition(aVoid -> RecordingPinotFS.DELETED.size() == 1, 10L, 5_000L,
+        "Timed out waiting for the tmp object to be deleted");
+    String deleted = RecordingPinotFS.DELETED.get(0).toString();
+    Assert.assertTrue(SegmentCompletionUtils.isTmpFile(deleted), deleted);
+    Assert.assertFalse(deleted.endsWith(Constants.METADATA_TAR_GZ_FILE_EXT), deleted);
+    Mockito.verify(_serverMetrics, Mockito.atLeastOnce()).addMeteredTableValue(
+        TableNameBuilder.extractRawTableName(_llcSegmentName.getTableName()),
+        ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
+  }
+
+  @Test
+  public void testMetadataTarUploadInvalidSegmentStoreUri() {
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("hdfs://ro ot", TIMEOUT_IN_MS, _serverMetrics);
+    Assert.assertNull(segmentUploader.uploadMetadataTar(_file, _llcSegmentName, TIMEOUT_IN_MS));
+    Mockito.verify(_serverMetrics, Mockito.times(1)).addMeteredTableValue(
+        TableNameBuilder.extractRawTableName(_llcSegmentName.getTableName()),
+        ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
   }
 
   @Test
@@ -236,6 +263,13 @@ public class PinotFSSegmentUploaderTest {
         throws Exception {
       // Make sure the sleep time > the timeout threshold of uploader.
       Thread.sleep(TIMEOUT_IN_MS * 1000);
+    }
+  }
+
+  public static class FailingCopyPinotFS extends RecordingPinotFS {
+    @Override
+    public void copyFromLocalFile(File srcFile, URI dstUri) {
+      throw new RuntimeException("simulated copy failure");
     }
   }
 

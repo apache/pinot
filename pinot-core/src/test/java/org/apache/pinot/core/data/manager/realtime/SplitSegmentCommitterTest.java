@@ -45,6 +45,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -141,6 +142,43 @@ public class SplitSegmentCommitterTest {
     Mockito.when(uploader.uploadSegment(any(), any(LLCSegmentName.class)))
         .thenReturn(segmentLocation == null ? null : new URI(segmentLocation));
     return uploader;
+  }
+
+  private SegmentCompletionProtocol.Request.Params commitAndCaptureParams(SegmentUploader uploader,
+      boolean uploadMetadataTar)
+      throws Exception {
+    ServerSegmentCompletionProtocolHandler handler = mockProtocolHandler();
+    newCommitter(handler, uploader, null, uploadMetadataTar).commit(mockBuildDescriptor());
+    ArgumentCaptor<SegmentCompletionProtocol.Request.Params> captor =
+        ArgumentCaptor.forClass(SegmentCompletionProtocol.Request.Params.class);
+    Mockito.verify(handler).segmentCommitEndWithMetadata(captor.capture(), any());
+    return captor.getValue();
+  }
+
+  @Test
+  public void testCommitEndCarriesMetadataTarLocationOnUploadSuccess()
+      throws Exception {
+    SegmentUploader uploader = mockUploader("hdfs://root/" + RAW_TABLE_NAME + "/" + _segmentName);
+    URI tmpLocation =
+        new URI("hdfs://root/" + RAW_TABLE_NAME + "/" + _segmentName + ".metadata.tar.gz.tmp.123");
+    Mockito.when(uploader.uploadMetadataTar(any(), any(LLCSegmentName.class), Mockito.anyInt()))
+        .thenReturn(tmpLocation);
+    Assert.assertEquals(commitAndCaptureParams(uploader, true).getMetadataTarLocation(), tmpLocation.toString());
+  }
+
+  @Test
+  public void testCommitEndHasNoMetadataTarLocationWhenUploadFails()
+      throws Exception {
+    // mockUploader does not stub uploadMetadataTar, so it returns null like a failed upload.
+    SegmentUploader uploader = mockUploader("hdfs://root/" + RAW_TABLE_NAME + "/" + _segmentName);
+    Assert.assertNull(commitAndCaptureParams(uploader, true).getMetadataTarLocation());
+  }
+
+  @Test
+  public void testCommitEndHasNoMetadataTarLocationWhenFlagOff()
+      throws Exception {
+    SegmentUploader uploader = mockUploader("hdfs://root/" + RAW_TABLE_NAME + "/" + _segmentName);
+    Assert.assertNull(commitAndCaptureParams(uploader, false).getMetadataTarLocation());
   }
 
   @Test

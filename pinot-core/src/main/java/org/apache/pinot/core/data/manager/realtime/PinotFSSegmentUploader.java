@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -128,17 +129,23 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       return null;
     }
     final String rawTableName = TableNameBuilder.extractRawTableName(segmentName.getTableName());
+    // Like the segment file, upload to a unique tmp name. The controller moves it to <segment>.metadata.tar.gz at
+    // commit end. The final object is never written or deleted here, so a failed or timed-out upload cannot destroy a
+    // sidecar left by a previous attempt.
+    final URI destUri;
+    try {
+      destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, segmentName.getTableName(),
+          SegmentCompletionUtils.generateTmpSegmentFileName(
+              segmentName.getSegmentName() + Constants.METADATA_TAR_GZ_FILE_EXT)));
+    } catch (URISyntaxException e) {
+      LOGGER.warn("Invalid segment store uri {} for metadata tar of segment {}", _segmentStoreUriStr, segmentName, e);
+      _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
+      return null;
+    }
     Callable<URI> uploadTask = () -> {
-      // Final object name (not a tmp name): the controller does not rename the sidecar.
-      URI destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, segmentName.getTableName(),
-          segmentName.getSegmentName() + Constants.METADATA_TAR_GZ_FILE_EXT));
       long startTime = System.currentTimeMillis();
       try {
         PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
-        // Delete any existing object so that retries are idempotent.
-        if (pinotFS.exists(destUri)) {
-          pinotFS.delete(destUri, true);
-        }
         pinotFS.copyFromLocalFile(metadataTarFile, destUri);
         return destUri;
       } catch (Exception e) {
@@ -160,8 +167,10 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       }
     } catch (InterruptedException e) {
       LOGGER.info("Interrupted while waiting for metadata tar upload of {} to {}.", segmentName, _segmentStoreUriStr);
+      future.cancel(true);
       Thread.currentThread().interrupt();
     } catch (TimeoutException e) {
+      future.cancel(true);
       _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.METADATA_TAR_UPLOAD_TIMEOUT, 1);
       LOGGER.warn("Timed out waiting to upload metadata tar of segment: {} for table: {}",
           segmentName.getSegmentName(), rawTableName);
@@ -169,7 +178,18 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       LOGGER.warn("Failed to upload metadata tar {} of segment {} for table {}", metadataTarFile.getAbsolutePath(),
           segmentName, rawTableName, e);
     }
+    // Fire and forget: the store may be slow or hung (that is why we got here) and the commit must not wait for it.
+    // A copy that outlives the timeout can still leave a tmp object; the controller's tmp file cleanup removes it.
+    _executorService.submit(() -> deleteTmpQuietly(destUri));
     _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
     return null;
+  }
+
+  private void deleteTmpQuietly(URI tmpUri) {
+    try {
+      PinotFSFactory.create(tmpUri.getScheme()).delete(tmpUri, true);
+    } catch (Exception e) {
+      LOGGER.warn("Could not delete temporary metadata tar {}", tmpUri, e);
+    }
   }
 }
