@@ -1072,7 +1072,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       creationTimeMs = System.currentTimeMillis();
     }
     ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
-    when(segment.tryAcquireReadLock()).thenReturn(true);
     when(segment.getSegmentName()).thenReturn(getUploadedRealtimeSegmentName(creationTimeMs, suffix));
     when(segment.getValidDocIds()).thenReturn(validDocIds);
     when(segment.getQueryableDocIds()).thenReturn(queryableDocIds);
@@ -1468,7 +1467,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
 
     ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
-    when(segment.tryAcquireReadLock()).thenReturn(true);
     when(segment.getSegmentName()).thenReturn("emptyValidDocIdsSegment");
     when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(
         new MutableRoaringBitmap());
@@ -1497,7 +1495,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
 
     ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
-    when(segment.tryAcquireReadLock()).thenReturn(true);
     when(segment.getSegmentName()).thenReturn("emptyValidDocIdsSegment");
     when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(
         new MutableRoaringBitmap());
@@ -2506,6 +2503,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       MutableSegment segment = mockMutableSegmentWithDataSource(1, validDocIds, null, new int[]{10});
       ImmutableSegmentImpl previousSegment = mock(ImmutableSegmentImpl.class);
       when(previousSegment.getSegmentName()).thenReturn(getSegmentName(0));
+      // A live segment: the revert reads its columns, so the destroy guard must let it through
+      when(previousSegment.tryAcquireReadLock()).thenReturn(true);
       when(previousSegment.getValidDocIds()).thenReturn(
           failure.equals("bitmap") ? null : new ThreadSafeMutableRoaringBitmap());
       PrimaryKey key = makePrimaryKey(10);
@@ -2604,28 +2603,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   @Test
-  public void testShouldRevertMetadataOnlyForConsumingSegmentsInProtectedMode()
-      throws IOException {
-    PartitionUpsertMetadataManager upsertMetadataManager = new ConcurrentMapPartitionUpsertMetadataManager(
-        REALTIME_TABLE_NAME, 0,
-        _contextBuilder.setConsistencyMode(UpsertConfig.ConsistencyMode.NONE).setDropOutOfOrderRecord(true).build());
-    MutableSegment mutableSegment = mock(MutableSegment.class);
-    ImmutableSegmentImpl immutableSegment = mock(ImmutableSegmentImpl.class);
-    ConsumingSegmentConsistencyModeListener consistencyModeListener =
-        ConsumingSegmentConsistencyModeListener.getInstance();
-    try {
-      assertFalse(upsertMetadataManager.shouldRevertMetadataOnInconsistency(mutableSegment));
-      consistencyModeListener.setMode(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED);
-      assertTrue(upsertMetadataManager.shouldRevertMetadataOnInconsistency(mutableSegment));
-      assertFalse(upsertMetadataManager.shouldRevertMetadataOnInconsistency(immutableSegment));
-    } finally {
-      consistencyModeListener.reset();
-      upsertMetadataManager.stop();
-      upsertMetadataManager.close();
-    }
-  }
-
-  @Test
   public void testRevertDropsKeyWhenPreviousSegmentIsDestroyed()
       throws IOException {
     // dropOutOfOrderRecord turns on _previousKeyToRecordLocationMap tracking
@@ -2701,6 +2678,28 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     upsertMetadataManager.stop();
     upsertMetadataManager.close();
+  }
+
+  @Test
+  public void testShouldRevertMetadataOnlyForConsumingSegmentsInProtectedMode()
+      throws IOException {
+    PartitionUpsertMetadataManager upsertMetadataManager = new ConcurrentMapPartitionUpsertMetadataManager(
+        REALTIME_TABLE_NAME, 0,
+        _contextBuilder.setConsistencyMode(UpsertConfig.ConsistencyMode.NONE).setDropOutOfOrderRecord(true).build());
+    MutableSegment mutableSegment = mock(MutableSegment.class);
+    ImmutableSegmentImpl immutableSegment = mock(ImmutableSegmentImpl.class);
+    ConsumingSegmentConsistencyModeListener consistencyModeListener =
+        ConsumingSegmentConsistencyModeListener.getInstance();
+    try {
+      assertFalse(upsertMetadataManager.shouldRevertMetadataOnInconsistency(mutableSegment));
+      consistencyModeListener.setMode(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED);
+      assertTrue(upsertMetadataManager.shouldRevertMetadataOnInconsistency(mutableSegment));
+      assertFalse(upsertMetadataManager.shouldRevertMetadataOnInconsistency(immutableSegment));
+    } finally {
+      consistencyModeListener.reset();
+      upsertMetadataManager.stop();
+      upsertMetadataManager.close();
+    }
   }
 
   @Test

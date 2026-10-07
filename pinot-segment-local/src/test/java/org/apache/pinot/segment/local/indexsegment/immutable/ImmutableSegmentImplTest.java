@@ -120,12 +120,16 @@ public class ImmutableSegmentImplTest {
     ExecutorService executor = Executors.newSingleThreadExecutor();
     try {
       Future<?> destroyer = executor.submit(segment::destroy);
-      // A reader holds the read lock: destroy must not close anything
-      assertThrows(TimeoutException.class, () -> destroyer.get(500, TimeUnit.MILLISECONDS));
-      assertFalse(segment.isDestroyed());
-      verify(indexContainer, never()).close();
-
-      segment.releaseReadLock();
+      try {
+        // A reader holds the read lock: destroy must not close anything
+        assertThrows(TimeoutException.class, () -> destroyer.get(500, TimeUnit.MILLISECONDS));
+        assertFalse(segment.isDestroyed());
+        verify(indexContainer, never()).close();
+      } finally {
+        // destroy() blocks in a non-interruptible write lock, so shutdownNow() cannot free it: a failed assertion
+        // above would strand the executor thread without this release.
+        segment.releaseReadLock();
+      }
       destroyer.get(10, TimeUnit.SECONDS);
       assertTrue(segment.isDestroyed());
       assertFalse(segment.tryAcquireReadLock());

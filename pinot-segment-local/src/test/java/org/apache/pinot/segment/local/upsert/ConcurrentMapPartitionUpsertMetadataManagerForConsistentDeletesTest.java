@@ -138,7 +138,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
       creationTimeMs = System.currentTimeMillis();
     }
     ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
-    when(segment.tryAcquireReadLock()).thenReturn(true);
     when(segment.getSegmentName()).thenReturn(getUploadedRealtimeSegmentName(creationTimeMs, suffix));
     when(segment.getValidDocIds()).thenReturn(validDocIds);
     when(segment.getQueryableDocIds()).thenReturn(queryableDocIds);
@@ -1377,6 +1376,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
       MutableSegment segment = mockMutableSegmentWithDataSource(1, validDocIds, null, new int[]{10});
       ImmutableSegmentImpl previousSegment = mock(ImmutableSegmentImpl.class);
       when(previousSegment.getSegmentName()).thenReturn(getSegmentName(0));
+      // A live segment: the revert reads its columns, so the destroy guard must let it through
+      when(previousSegment.tryAcquireReadLock()).thenReturn(true);
       ThreadSafeMutableRoaringBitmap previousValidDocIds = new ThreadSafeMutableRoaringBitmap();
       when(previousSegment.getValidDocIds()).thenReturn(failure.equals("bitmap") ? null : previousValidDocIds);
       PrimaryKey key = makePrimaryKey(10);

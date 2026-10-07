@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.indexsegment.immutable;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.io.File;
@@ -418,7 +419,8 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   /// True once [#destroy()] has set the flag: the index buffers may be closed and must not be read.
-  public boolean isDestroyed() {
+  @VisibleForTesting
+  boolean isDestroyed() {
     return _destroyed;
   }
 

@@ -258,17 +258,16 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                         prevDocId, recordInfo);
                     return prevLocation;
                   } catch (Exception e) {
-                    _logger.error("UPSERT_METADATA_REVERT_FAILED: segment={}. Failed to revert to previous "
-                        + "segment: {}, removing key", segment.getSegmentName(), prevSegment.getSegmentName(), e);
+                    _logger.error("UPSERT_METADATA_REVERT_FAILED: segment={}. Failed to revert to previous segment: "
+                        + "{}, removing key", segment.getSegmentName(), prevSegment.getSegmentName(), e);
                     _serverMetrics.addMeteredTableValue(_tableNameWithType,
                         ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
                     return null;
                   }
                 } else {
                   // Should not happen
-                  _logger.error("UPSERT_METADATA_REVERT_FAILED: segment={}. Failed to find valid doc ids in "
-                      + "previous segment: {}, removing key", segment.getSegmentName(),
-                      prevSegment.getSegmentName());
+                  _logger.error("UPSERT_METADATA_REVERT_FAILED: segment={}. Failed to find valid doc ids in previous "
+                      + "segment: {}, removing key", segment.getSegmentName(), prevSegment.getSegmentName());
                   _serverMetrics.addMeteredTableValue(_tableNameWithType,
                       ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
                   return null;
@@ -442,37 +441,31 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               && recordInfo.getComparisonValue().compareTo(recordLocation.getComparisonValue()) >= 0) {
             IndexSegment currentSegment = recordLocation.getSegment();
             int currentDocId = recordLocation.getDocId();
-            // Read lock: currentSegment cannot be destroyed while LazyRow reads its columns. A consuming segment needs
-            // no lock: it is destroyed only after replaceSegment()/removeSegment() has moved or dropped every location
-            // pointing at it, and those run under the same per-key compute as this read.
-            if (tryAcquireSegmentReadLock(currentSegment)) {
-              try {
-                mergeWithPreviousRecord(currentSegment, currentDocId, record);
-              } finally {
-                releaseSegmentReadLock(currentSegment);
+            // queryableDocIds is heap backed and outlives destroy(), so a deleted predecessor needs no lock at all.
+            ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
+            if (currentQueryableDocIds == null || currentQueryableDocIds.contains(currentDocId)) {
+              // Read lock: currentSegment cannot be destroyed while LazyRow reads its columns. A consuming segment
+              // needs no lock while the table runs: it is destroyed only after replaceSegment()/removeSegment() has
+              // moved or dropped every location pointing at it, and those run under the same per-key compute as this
+              // read. Shutdown is the exception, since removeSegment() skips that cleanup once the manager is stopped.
+              if (tryAcquireSegmentReadLock(currentSegment)) {
+                try {
+                  _reusePreviousRow.init(currentSegment, currentDocId);
+                  _partialUpsertHandler.merge(_reusePreviousRow, record, _reuseMergeResultHolder);
+                } finally {
+                  _reuseMergeResultHolder.clear();
+                  _reusePreviousRow.clear();
+                  releaseSegmentReadLock(currentSegment);
+                }
+              } else {
+                _logger.debug("Current segment: {} is destroyed, storing record without merging the previous row",
+                    currentSegment.getSegmentName());
               }
-            } else {
-              _logger.debug("Current segment: {} is destroyed, storing record without merging the previous row",
-                  currentSegment.getSegmentName());
             }
           }
           return recordLocation;
         });
     return record;
-  }
-
-  /// Merges the previous record into `record` unless the previous record is marked deleted.
-  private void mergeWithPreviousRecord(IndexSegment currentSegment, int currentDocId, GenericRow record) {
-    ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
-    if (currentQueryableDocIds == null || currentQueryableDocIds.contains(currentDocId)) {
-      try {
-        _reusePreviousRow.init(currentSegment, currentDocId);
-        _partialUpsertHandler.merge(_reusePreviousRow, record, _reuseMergeResultHolder);
-      } finally {
-        _reuseMergeResultHolder.clear();
-        _reusePreviousRow.clear();
-      }
-    }
   }
 
   @VisibleForTesting
