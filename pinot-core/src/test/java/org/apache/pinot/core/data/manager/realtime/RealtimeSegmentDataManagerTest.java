@@ -83,6 +83,7 @@ import org.mockito.InOrder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -316,21 +317,36 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
-  @Test
-  public void testSnapshotTriggerUsesWhereUnsealedPreviousSegmentStopped()
+  @DataProvider
+  public Object[][] unsealedReleases() {
+    long ahead = START_OFFSET_VALUE + 50;
+    long behind = START_OFFSET_VALUE - 50;
+    return new Object[][]{
+        // The previous segment discarded its copy after consuming past this segment's start offset.
+        {SEQUENCE_ID - 1, ahead, ahead},
+        // The previous segment could not catch up and is downloading, so its rows end before this segment's start.
+        {SEQUENCE_ID - 1, behind, behind},
+        // An older segment was never offloaded, but this replica consumed the segments after it.
+        {SEQUENCE_ID - 2, behind, START_OFFSET_VALUE}
+    };
+  }
+
+  @Test(dataProvider = "unsealedReleases")
+  public void testSnapshotTriggerUsesWhereUnsealedPreviousSegmentStopped(int releasedSequence, long stoppedAt,
+      long expectedConsumedUpTo)
       throws Exception {
     _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
-      // A replica that discarded its copy of the previous segment released the partition while that copy, consumed
-      // past this segment's start offset, was still mutable in the upsert metadata.
+      // The released segment is still mutable in the upsert metadata when this segment starts consuming.
       ConsumerCoordinator consumerCoordinator = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID);
       Assert.assertTrue(consumerCoordinator.getSemaphore().tryAcquire());
-      LongMsgOffset previousStoppedAt = new LongMsgOffset(START_OFFSET_VALUE + 50);
-      consumerCoordinator.releaseUnsealed("previousSegment", previousStoppedAt);
+      String releasedSegment =
+          new LLCSegmentName(RAW_TABLE_NAME, PARTITION_GROUP_ID, releasedSequence, SEG_TIME_MS).getSegmentName();
+      consumerCoordinator.releaseUnsealed(releasedSegment, new LongMsgOffset(stoppedAt));
       PartitionUpsertMetadataManager manager = mockUpsertMetadataManager(segmentDataManager, 0);
       segmentDataManager._consumeOffsets.add(new LongMsgOffset(START_OFFSET_VALUE + 1));
       segmentDataManager.createPartitionConsumer().run();
-      verify(manager).takeSnapshot(SEGMENT_NAME_STR, previousStoppedAt.toString());
+      verify(manager).takeSnapshot(SEGMENT_NAME_STR, Long.toString(expectedConsumedUpTo));
     } finally {
       _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
     }

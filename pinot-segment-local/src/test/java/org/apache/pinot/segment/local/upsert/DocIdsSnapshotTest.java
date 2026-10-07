@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.upsert;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -43,8 +44,7 @@ public class DocIdsSnapshotTest {
       throws Exception {
     ThreadSafeMutableRoaringBitmap bitmap = bitmap(1, 4, 6, 10, 15, 17, 18, 20);
     long before = System.currentTimeMillis();
-    byte[] bytes = DocIdsSnapshot.capture(bitmap, DocIdsType.VALID_DOC_IDS,
-        new DocIdsSnapshot.Trigger("table__0__2__0", "123")).getBytes();
+    byte[] bytes = fileBytes(bitmap, new DocIdsSnapshot.Trigger("table__0__2__0", "123"));
     long after = System.currentTimeMillis();
     DocIdsSnapshot snapshot = DocIdsSnapshot.fromBytes(bytes);
     assertEquals(snapshot.docIds(), bitmap.getMutableRoaringBitmap());
@@ -82,7 +82,7 @@ public class DocIdsSnapshotTest {
     ThreadSafeMutableRoaringBitmap bitmap = bitmap(1, 2, 3);
     byte[] legacy = bitmap.getBytes();
     assertNull(DocIdsSnapshot.fromBytes(legacy).metadata());
-    byte[] bytes = DocIdsSnapshot.capture(bitmap, DocIdsType.VALID_DOC_IDS, null).getBytes();
+    byte[] bytes = fileBytes(bitmap, null);
     byte[] truncated = Arrays.copyOf(bytes, bytes.length - 1);
     assertNull(DocIdsSnapshot.fromBytes(truncated).metadata());
     assertEquals(DocIdsSnapshot.fromBytes(truncated).docIds(), bitmap.getMutableRoaringBitmap());
@@ -94,7 +94,7 @@ public class DocIdsSnapshotTest {
   @Test
   public void testUnknownDiagnosticsFieldsAreIgnored()
       throws Exception {
-    byte[] bytes = DocIdsSnapshot.capture(bitmap(1, 2, 3), DocIdsType.VALID_DOC_IDS, null).getBytes();
+    byte[] bytes = fileBytes(bitmap(1, 2, 3), null);
     // A newer server may add a field to the trailer. Insert one before the closing brace.
     byte[] extra = ",\"futureField\":1}".getBytes(StandardCharsets.UTF_8);
     byte[] newer = Arrays.copyOf(bytes, bytes.length - 1 + extra.length);
@@ -115,8 +115,15 @@ public class DocIdsSnapshotTest {
 
   private static long crc(ThreadSafeMutableRoaringBitmap bitmap)
       throws Exception {
-    return DocIdsSnapshot.fromBytes(DocIdsSnapshot.capture(bitmap, DocIdsType.VALID_DOC_IDS, null).getBytes())
-        .metadata().docIdsCrc();
+    return DocIdsSnapshot.fromBytes(fileBytes(bitmap, null)).metadata().docIdsCrc();
+  }
+
+  private static byte[] fileBytes(ThreadSafeMutableRoaringBitmap bitmap, DocIdsSnapshot.Trigger trigger)
+      throws Exception {
+    ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIds = bitmap.getBytesAndCardinality();
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    DocIdsSnapshot.write(out, docIds.getBytes(), DocIdsSnapshot.metadata(docIds, DocIdsType.VALID_DOC_IDS, trigger));
+    return out.toByteArray();
   }
 
   private static ThreadSafeMutableRoaringBitmap bitmap(int... ids) {

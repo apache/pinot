@@ -224,8 +224,9 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     return null;
   }
 
-  /// Persists the doc ids bitmap snapshot into the given file.
-  public void persistDocIdsSnapshot(String fileName, ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIdsSnapshot)
+  /// Persists the doc ids bitmap snapshot into the given file, followed by its diagnostics when given.
+  public void persistDocIdsSnapshot(String fileName, ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIdsSnapshot,
+      @Nullable DocIdsSnapshot.Metadata metadata)
       throws IOException {
     File tmpFile =
         new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()), fileName + "_tmp");
@@ -234,7 +235,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       FileUtils.deleteQuietly(tmpFile);
     }
     try (FileOutputStream fos = new FileOutputStream(tmpFile)) {
-      fos.write(docIdsSnapshot.getBytes());
+      DocIdsSnapshot.write(fos, docIdsSnapshot.getBytes(), metadata);
     }
     File docIdsSnapshotFile = getSnapshotFile(fileName);
     Preconditions.checkState(tmpFile.renameTo(docIdsSnapshotFile),

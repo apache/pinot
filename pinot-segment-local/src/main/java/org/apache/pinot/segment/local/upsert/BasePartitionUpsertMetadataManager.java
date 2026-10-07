@@ -103,10 +103,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final ServerMetrics _serverMetrics;
   protected final Logger _logger;
 
-  // Scoped to the caller so concurrent snapshot triggers cannot exchange provenance. Preserve the existing virtual
-  // takeSnapshot()/doTakeSnapshot() hooks used by custom managers.
-  private final ThreadLocal<DocIdsSnapshot.Trigger> _snapshotTrigger = new ThreadLocal<>();
-
   // Tracks all the segments managed by this manager, excluding EmptySegment and segments out of metadata TTL.
   // Basically, it's possible that some segments in the table partition are not tracked here, as their upsert metadata
   // is not managed by the manager currently.
@@ -928,22 +924,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   @Override
-  public void takeSnapshot(String consumingSegmentName, String consumedUpToOffset) {
-    DocIdsSnapshot.Trigger previous = _snapshotTrigger.get();
-    _snapshotTrigger.set(new DocIdsSnapshot.Trigger(consumingSegmentName, consumedUpToOffset));
-    try {
-      takeSnapshot();
-    } finally {
-      if (previous == null) {
-        _snapshotTrigger.remove();
-      } else {
-        _snapshotTrigger.set(previous);
-      }
-    }
+  public void takeSnapshot() {
+    takeSnapshot(null);
   }
 
   @Override
-  public void takeSnapshot() {
+  public void takeSnapshot(String consumingSegmentName, String consumedUpToOffset) {
+    takeSnapshot(new DocIdsSnapshot.Trigger(consumingSegmentName, consumedUpToOffset));
+  }
+
+  private void takeSnapshot(@Nullable DocIdsSnapshot.Trigger trigger) {
     if (!_enableSnapshot) {
       return;
     }
@@ -964,7 +954,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     boolean consistent = false;
     try {
       long startTime = System.currentTimeMillis();
-      doTakeSnapshot();
+      doTakeSnapshot(trigger);
       consistent = noSegmentOperationInProgress && _numSegmentOperationsStarted.get() == numSegmentOperationsStarted;
       long duration = System.currentTimeMillis() - startTime;
       _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_SNAPSHOT_TIME_MS, duration,
@@ -1018,6 +1008,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected void doTakeSnapshot() {
+    doTakeSnapshot(null);
+  }
+
+  /// The trigger is the consumer startup that asked for this snapshot, stored with each bitmap written in this round.
+  protected void doTakeSnapshot(@Nullable DocIdsSnapshot.Trigger trigger) {
     int numTrackedSegments = _trackedSegments.size();
     long numPrimaryKeysInSnapshot = 0L;
     long numQueryableDocIdsInSnapshot = 0L;
@@ -1087,17 +1082,18 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
         // NOTE: Segment out of TTL without snapshot might have null validDocIds
         if (validDocIds != null) {
-          ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsSnapshot =
-              DocIdsSnapshot.capture(validDocIds, DocIdsType.VALID_DOC_IDS, _snapshotTrigger.get());
-          segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot);
+          ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsSnapshot = validDocIds.getBytesAndCardinality();
+          segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot,
+              DocIdsSnapshot.metadata(validDocIdsSnapshot, DocIdsType.VALID_DOC_IDS, trigger));
           numPrimaryKeysInSnapshot += validDocIdsSnapshot.getCardinality();
         }
         if (_deleteRecordColumn != null) {
           ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
           if (queryableDocIds != null) {
             ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsSnapshot =
-                DocIdsSnapshot.capture(queryableDocIds, DocIdsType.QUERYABLE_DOC_IDS, _snapshotTrigger.get());
-            segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot);
+                queryableDocIds.getBytesAndCardinality();
+            segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot,
+                DocIdsSnapshot.metadata(queryableDocIdsSnapshot, DocIdsType.QUERYABLE_DOC_IDS, trigger));
             numQueryableDocIdsInSnapshot += queryableDocIdsSnapshot.getCardinality();
           }
         }
@@ -1138,8 +1134,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           // NOTE: Segment out of TTL without snapshot might have null validDocIds
           if (validDocIds != null) {
             ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsSnapshot =
-                DocIdsSnapshot.capture(validDocIds, DocIdsType.VALID_DOC_IDS, _snapshotTrigger.get());
-            segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot);
+                validDocIds.getBytesAndCardinality();
+            segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot,
+                DocIdsSnapshot.metadata(validDocIdsSnapshot, DocIdsType.VALID_DOC_IDS, trigger));
             // The segment has its validDocIds snapshot file on disk now, so handle it as a segment with snapshot
             // from now on, even if persisting the queryableDocIds snapshot below fails.
             _segmentsWithSnapshot.add(segment);
@@ -1149,8 +1146,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
             ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
             if (queryableDocIds != null) {
               ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsSnapshot =
-                  DocIdsSnapshot.capture(queryableDocIds, DocIdsType.QUERYABLE_DOC_IDS, _snapshotTrigger.get());
-              segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot);
+                  queryableDocIds.getBytesAndCardinality();
+              segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot,
+                  DocIdsSnapshot.metadata(queryableDocIdsSnapshot, DocIdsType.QUERYABLE_DOC_IDS, trigger));
               numQueryableDocIdsInSnapshot += queryableDocIdsSnapshot.getCardinality();
             }
           }

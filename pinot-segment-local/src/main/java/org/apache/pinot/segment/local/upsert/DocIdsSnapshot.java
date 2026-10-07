@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -74,17 +75,11 @@ public record DocIdsSnapshot(MutableRoaringBitmap docIds, @Nullable Metadata met
     }
   }
 
-  /// Capture the timestamp with the bitmap under its existing lock, then hash the detached bitmap outside that lock.
-  public static ThreadSafeMutableRoaringBitmap.CardinalityAndBytes capture(ThreadSafeMutableRoaringBitmap bitmap,
-      DocIdsType docIdsType, @Nullable Trigger trigger)
-      throws IOException {
-    ThreadSafeMutableRoaringBitmap.CardinalityAndBytes snapshot;
-    long capturedAtMs;
-    synchronized (bitmap) {
-      snapshot = bitmap.getBytesAndCardinality();
-      capturedAtMs = System.currentTimeMillis();
-    }
-    ImmutableRoaringBitmap captured = new ImmutableRoaringBitmap(ByteBuffer.wrap(snapshot.getBytes()));
+  /// Builds the diagnostics for a bitmap read by [ThreadSafeMutableRoaringBitmap#getBytesAndCardinality()], which
+  /// also took the capture time under the bitmap's lock. Hashes the detached bytes outside that lock.
+  public static Metadata metadata(ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIds, DocIdsType docIdsType,
+      @Nullable Trigger trigger) {
+    ImmutableRoaringBitmap captured = new ImmutableRoaringBitmap(ByteBuffer.wrap(docIds.getBytes()));
     CRC32 crc = new CRC32();
     IntIterator iterator = captured.getIntIterator();
     // Canonical ascending doc IDs, four big-endian bytes per ID: independent of Roaring container layout.
@@ -95,12 +90,19 @@ public record DocIdsSnapshot(MutableRoaringBitmap docIds, @Nullable Metadata met
       crc.update(docId >>> 8);
       crc.update(docId);
     }
-    Metadata metadata = new Metadata(crc.getValue(), docIdsType, capturedAtMs,
+    return new Metadata(crc.getValue(), docIdsType, docIds.getCapturedAtMs(),
         trigger != null ? trigger.consumingSegmentName() : null, trigger != null ? trigger.consumedUpToOffset() : null);
-    byte[] json = JsonUtils.objectToString(metadata).getBytes(StandardCharsets.UTF_8);
-    byte[] bytes = ByteBuffer.allocate(snapshot.getBytes().length + 2 * Integer.BYTES + json.length)
-        .put(snapshot.getBytes()).putInt(MAGIC).putInt(VERSION).put(json).array();
-    return new ThreadSafeMutableRoaringBitmap.CardinalityAndBytes(snapshot.getCardinality(), bytes);
+  }
+
+  /// Writes the bitmap and then its diagnostics trailer, without copying the bitmap bytes. Writes only the bitmap, as
+  /// legacy files do, when metadata is null.
+  public static void write(OutputStream out, byte[] docIdsBytes, @Nullable Metadata metadata)
+      throws IOException {
+    out.write(docIdsBytes);
+    if (metadata != null) {
+      out.write(ByteBuffer.allocate(2 * Integer.BYTES).putInt(MAGIC).putInt(VERSION).array());
+      out.write(JsonUtils.objectToString(metadata).getBytes(StandardCharsets.UTF_8));
+    }
   }
 
   public static DocIdsSnapshot fromBytes(byte[] bytes) {

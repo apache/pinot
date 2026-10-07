@@ -832,10 +832,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         // Take upsert snapshot before starting consuming events
         if (_partitionUpsertMetadataManager != null) {
           // If the previous consuming segment released the semaphore to build or download in parallel, it can still be
-          // mutable in the metadata, so this replica's snapshot covers its rows up to where it stopped.
+          // mutable in the metadata, so this replica's snapshot covers its rows up to where it stopped. Only use a
+          // record left by the segment right before this one. An older segment's offset would make this replica look
+          // far behind, although it consumed every segment since.
           ConsumerCoordinator.UnsealedRelease unsealedRelease = _consumerCoordinator.getUnsealedRelease();
+          LLCSegmentName releasedSegment =
+              unsealedRelease != null ? LLCSegmentName.of(unsealedRelease.segmentName()) : null;
           String consumedUpToOffset =
-              unsealedRelease != null ? unsealedRelease.stoppedAtOffset().toString() : _startOffset.toString();
+              releasedSegment != null && releasedSegment.getSequenceNumber() == _llcSegmentName.getSequenceNumber() - 1
+                  ? unsealedRelease.stoppedAtOffset().toString() : _startOffset.toString();
           if (_partitionUpsertMetadataManager.getContext().getMetadataTTL() > 0) {
             // If upsertMetadataTTL is enabled, we will remove expired primary keys from upsertMetadata
             // AFTER taking a snapshot. Taking the snapshot first is crucial to capture the final

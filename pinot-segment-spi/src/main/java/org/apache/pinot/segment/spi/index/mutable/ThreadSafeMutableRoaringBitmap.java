@@ -80,10 +80,10 @@ public class ThreadSafeMutableRoaringBitmap {
     return serialize();
   }
 
-  /// Returns a consistent point-in-time snapshot containing both cardinality and serialized bytes captured under a
-  /// single lock.
+  /// Returns a consistent point-in-time snapshot containing the cardinality, the serialized bytes and the time they
+  /// were read, all captured under a single lock.
   public synchronized CardinalityAndBytes getBytesAndCardinality() {
-    return new CardinalityAndBytes(_mutableRoaringBitmap.getCardinality(), serialize());
+    return new CardinalityAndBytes(_mutableRoaringBitmap.getCardinality(), serialize(), System.currentTimeMillis());
   }
 
   private byte[] serialize() {
@@ -95,10 +95,12 @@ public class ThreadSafeMutableRoaringBitmap {
   public static final class CardinalityAndBytes {
     private final int _cardinality;
     private final byte[] _bytes;
+    private final long _capturedAtMs;
 
-    public CardinalityAndBytes(int cardinality, byte[] bytes) {
+    public CardinalityAndBytes(int cardinality, byte[] bytes, long capturedAtMs) {
       _cardinality = cardinality;
       _bytes = bytes;
+      _capturedAtMs = capturedAtMs;
     }
 
     public int getCardinality() {
@@ -107,6 +109,10 @@ public class ThreadSafeMutableRoaringBitmap {
 
     public byte[] getBytes() {
       return _bytes;
+    }
+
+    public long getCapturedAtMs() {
+      return _capturedAtMs;
     }
   }
 }

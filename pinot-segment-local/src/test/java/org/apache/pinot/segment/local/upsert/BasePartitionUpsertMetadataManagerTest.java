@@ -1242,8 +1242,9 @@ public class BasePartitionUpsertMetadataManagerTest {
     when(meta.getName()).thenReturn(segName);
     when(meta.getIndexDir()).thenReturn(segDir);
     return new ImmutableSegmentImpl(mock(SegmentDirectory.class), meta, new HashMap<>(), null) {
+      @Override
       public void persistDocIdsSnapshot(String fileName,
-          ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIdsSnapshot)
+          ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIdsSnapshot, @Nullable DocIdsSnapshot.Metadata metadata)
           throws IOException {
         onPersist.run();
         if (V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME.equals(fileName)) {
@@ -1252,7 +1253,7 @@ public class BasePartitionUpsertMetadataManagerTest {
             && queryableDocIdsSegmentsTaken != null) {
           queryableDocIdsSegmentsTaken.add(segName);
         }
-        super.persistDocIdsSnapshot(fileName, docIdsSnapshot);
+        super.persistDocIdsSnapshot(fileName, docIdsSnapshot, metadata);
       }
     };
   }

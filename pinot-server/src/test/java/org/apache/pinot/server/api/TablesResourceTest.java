@@ -497,7 +497,9 @@ public class TablesResourceTest extends BaseResourceTest {
     for (Map.Entry<String, DocIdsSnapshot.DocIdsType> fileType : fileTypes.entrySet()) {
       ThreadSafeMutableRoaringBitmap bitmap =
           new ThreadSafeMutableRoaringBitmap(segment.loadDocIdsFromSnapshot(fileType.getKey()));
-      segment.persistDocIdsSnapshot(fileType.getKey(), DocIdsSnapshot.capture(bitmap, fileType.getValue(), trigger));
+      ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIds = bitmap.getBytesAndCardinality();
+      segment.persistDocIdsSnapshot(fileType.getKey(), docIds,
+          DocIdsSnapshot.metadata(docIds, fileType.getValue(), trigger));
     }
     long beforeRequest = System.currentTimeMillis();
     String response = _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/validDocIdsMetadata")
