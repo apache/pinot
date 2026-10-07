@@ -151,6 +151,28 @@ public class CompactZNRecordSerializerTest {
   }
 
   @Test
+  public void testEscapesAndTrailingContent()
+      throws IOException {
+    // JSON escapes in field names, map keys and values (quote, backslash, control character, unicode)
+    String json = "{\"id\":\"t\\\"1\",\"simpleFields\":{\"k\\\\\":\"v\\n\\u00e9\"},"
+        + "\"mapFields\":{\"seg\\u0041\":{\"Server\\\"1\":\"ONLINE\",\"Server_2\":\"ON\\u004cINE\"}},"
+        + "\"listFields\":{\"l\":[\"Server\\\"1\",\"\\u2603\"]}}";
+    byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
+    ZNRecord record = assertSameAsDefault(bytes);
+    assertSameAsDefault(GZipCompressionUtil.compress(bytes));
+    assertEquals(record.getId(), "t\"1");
+    assertEquals(record.getMapField("segA"), Map.of("Server\"1", "ONLINE", "Server_2", "ONLINE"));
+    // An escaped known state still maps to the shared constant
+    assertSame(record.getMapField("segA").get("Server_2"), SegmentStateModel.ONLINE);
+
+    // Content after the record is ignored, as ObjectMapper.readValue does
+    byte[] trailing = "{\"id\":\"x\",\"mapFields\":{\"s\":{\"a\":\"ONLINE\"}}} {\"id\":\"y\"}"
+        .getBytes(StandardCharsets.UTF_8);
+    assertEquals(assertSameAsDefault(trailing).getId(), "x");
+    assertEquals(assertSameAsDefault(GZipCompressionUtil.compress(trailing)).getId(), "x");
+  }
+
+  @Test
   public void testRoundTripRandomized()
       throws IOException {
     Random random = new Random(42);
