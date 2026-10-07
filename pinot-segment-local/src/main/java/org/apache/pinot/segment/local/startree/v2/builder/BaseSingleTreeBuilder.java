@@ -212,9 +212,8 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   abstract Record getStarTreeRecord(int docId)
       throws IOException;
 
-  /// Serializes the variable-length (`BYTES`) metric values of every star-tree record before the forward indexes are
-  /// sized, so that [ValueAggregator#getMaxAggregatedValueByteSize] can be derived from the serialized values instead
-  /// of being tracked on every apply. Returns, per metric, whether [#getStarTreeRecord] now holds the serialized
+  /// Serializes metrics whose [ValueAggregator#getMaxAggregatedValueByteSize] is derived during serialization before
+  /// the forward indexes are sized. Returns, per metric, whether [#getStarTreeRecord] now holds the serialized
   /// `byte[]` in place of the aggregated value. A builder that already serialized every record when it was appended
   /// (the off-heap builder) has nothing to do and returns all `false`.
   ///
@@ -553,9 +552,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
 
   private void createForwardIndexes()
       throws Exception {
-    // Variable-length metrics are serialized before the creators are sized: the maximum serialized size an
-    // aggregator reports is only complete once every record has been serialized. This runs first, before any creator
-    // is opened.
+    // Finalize sizes for aggregators that track their maximum during serialization before opening any creator.
     boolean[] preSerializedMetrics = preSerializeMetrics();
 
     SingleValueUnsortedForwardIndexCreator[] dimensionIndexCreators =

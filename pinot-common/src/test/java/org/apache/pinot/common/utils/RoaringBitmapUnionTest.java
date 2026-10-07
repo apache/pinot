@@ -316,6 +316,47 @@ public class RoaringBitmapUnionTest {
   }
 
   @Test
+  public void testSparseContainersStayInPlaceWithSkewedDensity() {
+    for (int numSparseKeys : new int[]{1, 50}) {
+      RoaringBitmap initial = new RoaringBitmap();
+      initial.add(0L, 1L << 16);
+      for (int key = 1; key <= numSparseKeys; key++) {
+        initial.add(key << 16);
+      }
+      RoaringBitmapUnion seed = new RoaringBitmapUnion();
+      seed.add(initial);
+      RoaringBitmap owned = seed.take();
+      ContainerPointer pointer = owned.getContainerPointer();
+      pointer.advance();
+      Container[] sparseContainers = new Container[numSparseKeys];
+      for (int i = 0; i < numSparseKeys; i++) {
+        sparseContainers[i] = pointer.getContainer();
+        pointer.advance();
+      }
+      RoaringBitmapUnion union = RoaringBitmapUnion.takeOwnership(owned);
+      RoaringBitmap expected = initial.clone();
+      // The full first container masks the sparse arrays in the average density, even with 50 sparse keys.
+      for (int i = 1; i <= 500; i++) {
+        RoaringBitmap input = new RoaringBitmap();
+        for (int key = 1; key <= numSparseKeys; key++) {
+          input.add((key << 16) | (i * 2));
+        }
+        union.add(input);
+        expected.or(input);
+      }
+      RoaringBitmap result = union.take();
+      assertValid(result, expected);
+      pointer = result.getContainerPointer();
+      pointer.advance();
+      for (Container container : sparseContainers) {
+        // Eager unions grow these arrays in place; lazy unions allocate a replacement on every input.
+        assertSame(pointer.getContainer(), container);
+        pointer.advance();
+      }
+    }
+  }
+
+  @Test
   public void testDenseInputsStillUseLazyUnion() {
     RoaringBitmap input = new RoaringBitmap();
     for (int value = 0; value < 1024; value++) {

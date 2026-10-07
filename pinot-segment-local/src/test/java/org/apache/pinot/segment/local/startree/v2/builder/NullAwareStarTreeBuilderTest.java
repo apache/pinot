@@ -20,8 +20,12 @@ package org.apache.pinot.segment.local.startree.v2.builder;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -29,6 +33,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder.BuildMode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -36,6 +41,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
+import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -122,7 +128,7 @@ public class NullAwareStarTreeBuilderTest {
     }
   }
 
-  /// A variable-length metric is serialized before its forward index is sized, which the on-heap builder does in a
+  /// A bitmap metric is serialized before its forward index is sized, which the on-heap builder does in a
   /// pass of its own. An all-null group has nothing to serialize: it must end up in the null vector while the other
   /// groups keep their values.
   @Test(dataProvider = "buildModes")
@@ -154,6 +160,51 @@ public class NullAwareStarTreeBuilderTest {
         }
       }
       assertTrue(numAggregatedGroups > 0, "Some group must have aggregated a value, or the loop proves nothing");
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  @Test
+  public void onlyBitmapMetricsAreRetainedAsSerializedBytes()
+      throws Exception {
+    File indexDir = createSegment();
+    StarTreeIndexConfig config = new StarTreeIndexConfig(List.of(DIMENSION), null, List.of(BITMAP_COLUMN), List.of(
+        new StarTreeAggregationConfig(DIMENSION, "SUMPRECISION",
+            Map.of(Constants.SUMPRECISION_PRECISION_KEY, 1000), null, null, null, null, null),
+        new StarTreeAggregationConfig(METRIC, "SUMPRECISION")), MAX_LEAF_RECORDS, true);
+    String fixedSumColumn =
+        new AggregationFunctionColumnPair(AggregationFunctionType.SUMPRECISION, DIMENSION).toColumnName();
+    String variableSumColumn =
+        new AggregationFunctionColumnPair(AggregationFunctionType.SUMPRECISION, METRIC).toColumnName();
+    File outputDir = new File(TEMP_DIR, "mixedMetrics");
+    FileUtils.forceMkdir(outputDir);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
+    try (OnHeapSingleTreeBuilder builder = new OnHeapSingleTreeBuilder(
+        StarTreeV2BuilderConfig.fromIndexConfig(config), outputDir, segment, new PropertiesConfiguration())) {
+      // A complete build also exercises writing pre-serialized bitmaps alongside ordinary metric values.
+      builder.build();
+      List<String> metrics = Arrays.asList(builder._metrics);
+      int bitmapId = metrics.indexOf(BITMAP_COLUMN);
+      int fixedSumId = metrics.indexOf(fixedSumColumn);
+      int variableSumId = metrics.indexOf(variableSumColumn);
+      int maxBitmapSize = 0;
+      for (int docId = 0; docId < builder._numDocs; docId++) {
+        Object[] values = builder.getStarTreeRecord(docId)._metrics;
+        if (values[bitmapId] != null) {
+          byte[] bytes = (byte[]) values[bitmapId];
+          maxBitmapSize = Math.max(maxBitmapSize, bytes.length);
+          assertEquals(RoaringBitmapUtils.deserialize(bytes), RoaringBitmap.bitmapOf(10, 20));
+        }
+        assertTrue(values[fixedSumId] instanceof BigDecimal);
+        if (values[variableSumId] != null) {
+          assertEquals(values[variableSumId], BigDecimal.valueOf(30));
+        }
+      }
+      assertTrue(maxBitmapSize > 0);
+      assertEquals(builder._valueAggregators[bitmapId].getMaxAggregatedValueByteSize(), maxBitmapSize);
+      // A shared zero must not be expanded to a precision-1000 byte array on every retained record.
+      assertSame(builder.getStarTreeRecord(0)._metrics[fixedSumId], BigDecimal.ZERO);
     } finally {
       segment.destroy();
     }

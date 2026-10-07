@@ -39,9 +39,9 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 ///   bitmap is copied. Callers should still treat the argument as relinquished, and should not pass subclasses.
 /// - [#add(int)] repairs pending lazy state before inserting and does not re-encode a run container that received
 ///   the value.
-/// - An input is unioned eagerly while the accumulator holds few values per container, or when it would insert many
-///   container keys that are new to the accumulator, because the released lazy union only pays off for dense
-///   containers and inserts new keys one at a time.
+/// - An input is unioned eagerly while the accumulator holds few values per container, when overlapping arrays would
+///   stay small, or when it would insert many container keys that are new to the accumulator, because the released
+///   lazy union only pays off for dense containers and inserts new keys one at a time.
 ///
 /// Instances are not thread-safe.
 public final class MutableRoaringBitmapUnion {
@@ -58,8 +58,8 @@ public final class MutableRoaringBitmapUnion {
   // Number of values added so far, counting duplicates: an upper bound of the cardinality that is known without
   // repairing, used to estimate how dense the containers are
   private long _numValuesAdded;
-  // A cardinality observed on repaired state. Unions never remove values, so this remains a lower bound and proves
-  // density without repairing every lazy union. New container keys can invalidate that density proof.
+  // A cardinality observed on repaired state. Unions never remove values, so this remains a lower bound used to
+  // check average density without repairing every lazy union. Overlapping arrays are checked separately.
   private long _lastKnownCardinality;
 
   /// Creates an empty union.
@@ -97,7 +97,7 @@ public final class MutableRoaringBitmapUnion {
     beforeMutation();
     boolean dense = isDenseForLazyUnion();
     _numValuesAdded += input.getLongCardinality();
-    if (dense && !insertsManyNewKeys(input)) {
+    if (dense && !shouldUnionEagerly(input)) {
       _dirty = true;
       _bitmap.lazyOr(input);
     } else {
@@ -136,10 +136,12 @@ public final class MutableRoaringBitmapUnion {
     return result;
   }
 
-  /// Returns whether the lazy union would insert more than a few of the input's keys between keys the accumulator
-  /// already has. Keys past the accumulator's last key do not count: they are appended in one step.
-  private boolean insertsManyNewKeys(ImmutableRoaringBitmap input) {
-    if (input.getContainerCount() <= MAX_NEW_KEYS_FOR_LAZY_UNION) {
+  /// Returns whether the lazy union would copy small overlapping arrays or insert more than a few new keys between
+  /// existing ones. Keys past the accumulator's last key do not count: they are appended in one step.
+  private boolean shouldUnionEagerly(ImmutableRoaringBitmap input) {
+    // Called after the average density check: an empty or sole dense container has no small-array overlaps.
+    // A small input cannot insert too many keys. Avoid allocating scan pointers for this common case.
+    if (_bitmap.getContainerCount() <= 1 && input.getContainerCount() <= MAX_NEW_KEYS_FOR_LAZY_UNION) {
       return false;
     }
     MappeableContainerPointer own = _bitmap.getContainerPointer();
@@ -153,7 +155,12 @@ public final class MutableRoaringBitmapUnion {
       if (!own.hasContainer()) {
         return false;
       }
-      if (own.key() != key && ++numNewKeys > MAX_NEW_KEYS_FOR_LAZY_UNION) {
+      if (own.key() == key) {
+        if (!own.isBitmapContainer() && !own.isRunContainer() && !other.isBitmapContainer() && !other.isRunContainer()
+            && own.getCardinality() + other.getCardinality() <= MIN_VALUES_PER_CONTAINER_FOR_LAZY_UNION) {
+          return true;
+        }
+      } else if (++numNewKeys > MAX_NEW_KEYS_FOR_LAZY_UNION) {
         return true;
       }
       other.advance();

@@ -24,10 +24,10 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.configuration2.Configuration;
+import org.apache.pinot.segment.local.aggregator.DistinctCountBitmapValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /// The `OnHeapSingleTreeBuilder` class is the single star-tree builder that uses on-heap memory.
@@ -58,13 +58,12 @@ public class OnHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   @Override
   @SuppressWarnings("unchecked")
   boolean[] preSerializeMetrics() {
-    // Records stay on heap until the forward indexes are written, so serialize the variable-length metrics now and
-    // keep the bytes in place of the aggregated values (the bytes are smaller than the objects they replace). This
-    // completes the aggregators' maximum serialized size before it is consumed.
+    // Bitmap distinct count derives its maximum size during serialization. Other aggregators already know their
+    // maximum size and can serialize during the index write without retaining a byte array for every record.
     boolean[] preSerializedMetrics = new boolean[_numMetrics];
     for (int i = 0; i < _numMetrics; i++) {
       ValueAggregator valueAggregator = _valueAggregators[i];
-      if (valueAggregator.getAggregatedValueType() != DataType.BYTES) {
+      if (!(valueAggregator instanceof DistinctCountBitmapValueAggregator)) {
         continue;
       }
       for (Record record : _records) {

@@ -223,6 +223,50 @@ public class MutableRoaringBitmapUnionTest {
   }
 
   @Test
+  public void testSparseMappedContainersStayInPlaceWithSkewedDensity() {
+    for (int numSparseKeys : new int[]{1, 50}) {
+      MutableRoaringBitmap initial = new MutableRoaringBitmap();
+      initial.add(0L, 1L << 16);
+      for (int key = 1; key <= numSparseKeys; key++) {
+        initial.add(key << 16);
+      }
+      for (int presentation = 1; presentation <= 2; presentation++) {
+        MutableRoaringBitmapUnion seed = new MutableRoaringBitmapUnion();
+        seed.add(present(initial, presentation));
+        MutableRoaringBitmap owned = seed.take();
+        MappeableContainerPointer pointer = owned.getContainerPointer();
+        pointer.advance();
+        MappeableContainer[] sparseContainers = new MappeableContainer[numSparseKeys];
+        for (int i = 0; i < numSparseKeys; i++) {
+          sparseContainers[i] = pointer.getContainer();
+          pointer.advance();
+        }
+        MutableRoaringBitmapUnion union = MutableRoaringBitmapUnion.takeOwnership(owned);
+        MutableRoaringBitmap expected = initial.clone();
+        // The full first container masks the sparse arrays in the average density.
+        for (int i = 1; i <= 500; i++) {
+          MutableRoaringBitmap input = new MutableRoaringBitmap();
+          for (int key = 1; key <= numSparseKeys; key++) {
+            input.add((key << 16) | (i * 2));
+          }
+          ImmutableRoaringBitmap mapped = present(input, presentation);
+          union.add(mapped);
+          expected.or(input);
+          assertTrue(mapped.equals(input));
+        }
+        MutableRoaringBitmap result = union.take();
+        assertValid(result, expected);
+        pointer = result.getContainerPointer();
+        pointer.advance();
+        for (MappeableContainer container : sparseContainers) {
+          assertSame(pointer.getContainer(), container);
+          pointer.advance();
+        }
+      }
+    }
+  }
+
+  @Test
   public void testDenseMappedInputsStillUseLazyUnion() {
     MutableRoaringBitmap input = new MutableRoaringBitmap();
     for (int value = 0; value < 1024; value++) {
