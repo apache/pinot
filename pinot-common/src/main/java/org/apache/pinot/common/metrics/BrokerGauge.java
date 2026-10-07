@@ -141,7 +141,11 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   /// Number of the table's measured segments that are replicated as poorly as [#PERCENT_OF_REPLICAS] reports,
   /// i.e. how many segments that percentage speaks for. The same populations are excluded, so this reads `0`
   /// exactly when the table has nothing to measure.
-  SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS("segments", false);
+  SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS("segments", false),
+
+  /// Number of the table's segments that the routing of this broker tracks: the online segments of the ideal state
+  /// that the segment pre-selector keeps. Updated on every routing build and every ideal state or external view change.
+  ROUTING_TABLE_SEGMENTS("segments", false);
 
   private final String _brokerGaugeName;
   private final String _unit;
