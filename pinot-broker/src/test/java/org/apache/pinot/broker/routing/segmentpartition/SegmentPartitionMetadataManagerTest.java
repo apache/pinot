@@ -37,12 +37,15 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.testng.Assert.*;
 
@@ -429,6 +432,133 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     assertTrue(tablePartitionReplicatedServersInfo.getPartitionsWithOnlyDeferredSegments().isEmpty(),
         "Servable partition reported as deferred empty " + context + ": "
             + tablePartitionReplicatedServersInfo.getPartitionsWithOnlyDeferredSegments());
+  }
+
+  /// An assignment change that changes neither the segments, their partitions nor their online servers must keep the
+  /// published objects, while a change of the online servers must only replace the replicated servers info.
+  @Test
+  public void testRecomputeOnlyOnChange() {
+    ExternalView externalView = new ExternalView(OFFLINE_TABLE_NAME);
+    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
+    Set<String> onlineSegments = new HashSet<>();
+    // NOTE: Ideal state is not used in the current implementation.
+    IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
+
+    SegmentPartitionMetadataManager partitionMetadataManager =
+        new SegmentPartitionMetadataManager(OFFLINE_TABLE_NAME, PARTITION_COLUMN, PARTITION_COLUMN_FUNC, NUM_PARTITIONS,
+            TimeUnit.MINUTES.toMillis(5));
+    SegmentZkMetadataFetcher segmentZkMetadataFetcher =
+        new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME, _propertyStore);
+    segmentZkMetadataFetcher.register(partitionMetadataManager);
+
+    String segment0 = "recomputeSegment0";
+    String segment1 = "recomputeSegment1";
+    String segmentWithoutMetadata = "recomputeSegmentWithoutMetadata";
+    onlineSegments.add(segment0);
+    onlineSegments.add(segment1);
+    segmentAssignment.put(segment0, Map.of(SERVER_0, ONLINE, SERVER_1, ONLINE));
+    segmentAssignment.put(segment1, Map.of(SERVER_0, ONLINE, SERVER_1, ONLINE));
+    setSegmentZKMetadata(segment0, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 0, 0L);
+    setSegmentZKMetadata(segment1, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 1, 0L);
+    segmentZkMetadataFetcher.init(idealState, externalView, onlineSegments);
+    // A segment without ZK metadata is pulled again on every change, which alone must not count as a change
+    onlineSegments.add(segmentWithoutMetadata);
+    segmentAssignment.put(segmentWithoutMetadata, Map.of(SERVER_0, ONLINE));
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+    TablePartitionInfo tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
+    TablePartitionReplicatedServersInfo replicatedServersInfo =
+        partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    assertEquals(replicatedServersInfo.getSegmentsWithInvalidPartition(), List.of(segmentWithoutMetadata));
+
+    // No-op change, with a fresh but equal instance state map and an unrelated state change in the external view
+    segmentAssignment.put(segment0, new HashMap<>(Map.of(SERVER_0, ONLINE, SERVER_1, ONLINE)));
+    segmentAssignment.put("segmentNotOnline", Map.of(SERVER_0, ONLINE));
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+    assertSame(partitionMetadataManager.getTablePartitionInfo(), tablePartitionInfo);
+    assertSame(partitionMetadataManager.getTablePartitionReplicatedServersInfo(), replicatedServersInfo);
+
+    // An OFFLINE replica is not an online server
+    segmentAssignment.put(segment1, Map.of(SERVER_0, ONLINE, SERVER_1, OFFLINE));
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+    assertSame(partitionMetadataManager.getTablePartitionInfo(), tablePartitionInfo);
+    replicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    TablePartitionReplicatedServersInfo.PartitionInfo[] partitionInfoMap = replicatedServersInfo.getPartitionInfoMap();
+    assertEquals(partitionInfoMap[0]._fullyReplicatedServers, Set.of(SERVER_0, SERVER_1));
+    assertEquals(partitionInfoMap[1]._fullyReplicatedServers, Set.of(SERVER_0));
+
+    // Same online servers with a different state (CONSUMING instead of ONLINE) is a no-op
+    segmentAssignment.put(segment1, Map.of(SERVER_0, CONSUMING, SERVER_1, OFFLINE));
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+    assertSame(partitionMetadataManager.getTablePartitionInfo(), tablePartitionInfo);
+    assertSame(partitionMetadataManager.getTablePartitionReplicatedServersInfo(), replicatedServersInfo);
+
+    // Removing a segment replaces both objects
+    onlineSegments.remove(segment1);
+    segmentAssignment.remove(segment1);
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+    assertNotSame(partitionMetadataManager.getTablePartitionInfo(), tablePartitionInfo);
+    assertNotSame(partitionMetadataManager.getTablePartitionReplicatedServersInfo(), replicatedServersInfo);
+    assertEquals(partitionMetadataManager.getTablePartitionInfo().getSegmentsByPartition(),
+        List.of(List.of(segment0), List.of()));
+    assertNull(partitionMetadataManager.getTablePartitionReplicatedServersInfo().getPartitionInfoMap()[1]);
+  }
+
+  /// The partition info re-evaluates which segments are new only when it is recomputed, so an assignment change that
+  /// changes nothing else must still recompute once a new segment excluded from the partition info is no longer new.
+  @Test
+  public void testNewSegmentExpiresOnNoOpChange()
+      throws InterruptedException {
+    ExternalView externalView = new ExternalView(OFFLINE_TABLE_NAME);
+    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
+    Set<String> onlineSegments = new HashSet<>();
+    // NOTE: Ideal state is not used in the current implementation.
+    IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
+
+    long newSegmentExpirationMs = TimeUnit.MINUTES.toMillis(5);
+    SegmentPartitionMetadataManager partitionMetadataManager =
+        new SegmentPartitionMetadataManager(OFFLINE_TABLE_NAME, PARTITION_COLUMN, PARTITION_COLUMN_FUNC, NUM_PARTITIONS,
+            newSegmentExpirationMs);
+    SegmentZkMetadataFetcher segmentZkMetadataFetcher =
+        new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME, _propertyStore);
+    segmentZkMetadataFetcher.register(partitionMetadataManager);
+
+    String oldSegment = "expiryOldSegment";
+    onlineSegments.add(oldSegment);
+    segmentAssignment.put(oldSegment, Map.of(SERVER_0, ONLINE, SERVER_1, ONLINE));
+    setSegmentZKMetadata(oldSegment, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 0, 0L);
+    segmentZkMetadataFetcher.init(idealState, externalView, onlineSegments);
+
+    // A new segment missing one replica is excluded from the partition info. It stops being new 1 second from now.
+    String newSegment = "expiryNewSegment";
+    long creationTimeMs = System.currentTimeMillis() - newSegmentExpirationMs + 1000;
+    onlineSegments.add(newSegment);
+    segmentAssignment.put(newSegment, Map.of(SERVER_0, ONLINE));
+    setSegmentZKMetadata(newSegment, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 0, creationTimeMs);
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+    TablePartitionReplicatedServersInfo replicatedServersInfo =
+        partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    TablePartitionReplicatedServersInfo.PartitionInfo partitionInfo = replicatedServersInfo.getPartitionInfoMap()[0];
+    if (System.currentTimeMillis() - creationTimeMs <= newSegmentExpirationMs) {
+      // Only assert the exclusion when the change above was processed while the segment was still new
+      assertEquals(partitionInfo._segments, List.of(oldSegment));
+      assertEquals(partitionInfo._fullyReplicatedServers, Set.of(SERVER_0, SERVER_1));
+    }
+
+    // Wait until the segment is no longer new
+    while (System.currentTimeMillis() - creationTimeMs <= newSegmentExpirationMs) {
+      Thread.sleep(50);
+    }
+
+    // A no-op change must now include the segment, as a regular segment reducing the fully replicated servers
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+    replicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    partitionInfo = replicatedServersInfo.getPartitionInfoMap()[0];
+    assertEqualsNoOrder(partitionInfo._segments.toArray(), new String[]{oldSegment, newSegment});
+    assertEquals(partitionInfo._fullyReplicatedServers, Set.of(SERVER_0));
+
+    // Once no segment is new, a no-op change keeps the published object
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+    assertSame(partitionMetadataManager.getTablePartitionReplicatedServersInfo(), replicatedServersInfo);
   }
 
   private void setSegmentZKMetadata(String segment, String partitionFunction, int numPartitions, int partitionId,
