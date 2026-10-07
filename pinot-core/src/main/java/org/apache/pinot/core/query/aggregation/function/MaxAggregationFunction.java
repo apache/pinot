@@ -74,30 +74,23 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    checkNumericType(blockValSet);
-
-    if (blockValSet.isSingleValue()) {
-      aggregateSV(blockValSet, length, aggregationResultHolder);
-    } else {
-      aggregateMV(blockValSet, length, aggregationResultHolder);
+    try {
+      if (blockValSet.isSingleValue()) {
+        aggregateSV(blockValSet, length, aggregationResultHolder);
+      } else {
+        aggregateMV(blockValSet, length, aggregationResultHolder);
+      }
+    } catch (NumberFormatException e) {
+      throw nonNumericValueException(blockValSet, e);
     }
   }
 
-  /// Throws a descriptive [BadQueryRequestException] if `blockValSet` does not hold a numeric type, instead of
-  /// letting a non-numeric (e.g. STRING) value fail later with an opaque `NumberFormatException` when converted to
-  /// a `double`.
-  private static void checkNumericType(BlockValSet blockValSet) {
-    switch (blockValSet.getValueType().getStoredType()) {
-      case INT:
-      case LONG:
-      case FLOAT:
-      case DOUBLE:
-      case BIG_DECIMAL:
-        return;
-      default:
-        throw new BadQueryRequestException(
-            "Cannot compute max for non-numeric type: " + blockValSet.getValueType() + NON_NUMERIC_TYPE_MESSAGE_SUFFIX);
-    }
+  /// Wraps a failure to convert a non-numeric (e.g. STRING) value to a `double` into a descriptive
+  /// [BadQueryRequestException]. Numeric strings still convert successfully and are not affected.
+  private static BadQueryRequestException nonNumericValueException(BlockValSet blockValSet, NumberFormatException e) {
+    return new BadQueryRequestException(
+        "Cannot compute max for non-numeric value in column of type: " + blockValSet.getValueType()
+            + NON_NUMERIC_TYPE_MESSAGE_SUFFIX + " Cause: " + e.getMessage(), e);
   }
 
   protected void aggregateSV(BlockValSet blockValSet, int length, AggregationResultHolder aggregationResultHolder) {
@@ -213,12 +206,14 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    checkNumericType(blockValSet);
-
-    if (blockValSet.isSingleValue()) {
-      aggregateSVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
-    } else {
-      aggregateMVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+    try {
+      if (blockValSet.isSingleValue()) {
+        aggregateSVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+      } else {
+        aggregateMVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+      }
+    } catch (NumberFormatException e) {
+      throw nonNumericValueException(blockValSet, e);
     }
   }
 
@@ -283,12 +278,14 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    checkNumericType(blockValSet);
-
-    if (blockValSet.isSingleValue()) {
-      aggregateSVGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
-    } else {
-      aggregateMVGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+    try {
+      if (blockValSet.isSingleValue()) {
+        aggregateSVGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+      } else {
+        aggregateMVGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+      }
+    } catch (NumberFormatException e) {
+      throw nonNumericValueException(blockValSet, e);
     }
   }
 
