@@ -225,7 +225,7 @@ public final class TDigestUtils {
 
   /// Reads a fixed-size header, optionally enforcing the declared centroid capacity.
   ///
-  /// Numerical flags and total weight are computed by the subsequent inspection or decoding pass.
+  /// NaN extrema mark legacy degraded state; centroid flags and total weight are computed by the subsequent pass.
   public static SerializedTDigestMetadata readSerializedHeader(ByteBuffer input, boolean checkCapacity) {
     ByteBuffer encoded = input.slice().order(ByteOrder.BIG_ENDIAN);
     int encoding = encoded.getInt();
@@ -265,13 +265,14 @@ public final class TDigestUtils {
     if (checkCapacity && centroidCount > mainCapacity) {
       throw new IllegalArgumentException("TDigest centroid count exceeds capacity: " + centroidCount);
     }
-    if (Double.isNaN(min) || Double.isNaN(max) || (centroidCount > 0 && min > max)) {
+    if (centroidCount > 0 && min > max) {
       throw new IllegalArgumentException("Invalid TDigest extrema: " + min + ", " + max);
     }
     int centroidOffset = encoded.position();
     int encodedLength = centroidOffset + centroidCount * centroidSize;
     return new SerializedTDigestMetadata(encoding, min, max, compression, centroidCount, mainCapacity,
-        bufferCapacity, centroidOffset, centroidSize, encodedLength, Double.NaN, false, false, false, false);
+        bufferCapacity, centroidOffset, centroidSize, encodedLength, Double.NaN, false,
+        Double.isNaN(min) || Double.isNaN(max), false, false);
   }
 
   /// Validates centroids in one pass and optionally decodes their means and weights into reusable arrays.
@@ -289,7 +290,7 @@ public final class TDigestUtils {
     double totalWeight = 0.0;
     double previousMean = Double.NEGATIVE_INFINITY;
     boolean hasNonFiniteMeans = false;
-    boolean needsLegacyFallback = false;
+    boolean needsLegacyFallback = header.needsLegacyFallback();
     boolean unorderedMeans = false;
     boolean fractionalWeights = false;
     boolean withinBounds = true;

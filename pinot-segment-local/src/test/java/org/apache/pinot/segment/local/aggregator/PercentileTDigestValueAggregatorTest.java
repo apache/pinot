@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.aggregator;
 
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.SplittableRandom;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
@@ -53,7 +54,7 @@ public class PercentileTDigestValueAggregatorTest {
       aggregator.applyRawValue(digest, i);
     }
     int registeredBound = aggregator.getMaxAggregatedValueByteSize();
-    assertTrue(registeredBound <= expectedMaxByteSize);
+    assertEquals(registeredBound, expectedMaxByteSize);
     byte[] serialized = aggregator.serializeAggregatedValue(digest);
     assertTrue(serialized.length <= registeredBound);
   }
@@ -63,7 +64,7 @@ public class PercentileTDigestValueAggregatorTest {
     return new Object[][]{
         {10, 30, 512},
         {100, 210, 3_392},
-        {1_000, 2_010, 32_192}
+        {1_000, 2_010, 32_032}
     };
   }
 
@@ -84,20 +85,20 @@ public class PercentileTDigestValueAggregatorTest {
 
   @Test
   public void testPreAggregatedCompressionExpandsRegisteredBound() {
-    TDigest input = TDigestUtils.createMergingDigest(200);
-    input.add(42.0);
-    byte[] inputBytes = CustomSerDeUtils.TDIGEST_SER_DE.serialize(input);
+    byte[] inputBytes = createSmallEncoding(200, 410, 2050, 100);
 
     PercentileTDigestValueAggregator aggregator = newAggregator(10);
     TDigest result = aggregator.getInitialAggregatedValue(inputBytes);
-    for (int i = 0; i < 409; i++) {
+    for (int i = 100; i < 410; i++) {
       aggregator.applyRawValue(result, i);
     }
 
     assertEquals(result.compression(), 200.0);
-    assertTrue(aggregator.getMaxAggregatedValueByteSize() <= 6_592);
     int maxByteSize = aggregator.getMaxAggregatedValueByteSize();
-    assertTrue(aggregator.serializeAggregatedValue(result).length <= maxByteSize);
+    assertEquals(maxByteSize, 6_592);
+    byte[] serialized = aggregator.serializeAggregatedValue(result);
+    assertTrue(serialized.length > 512, "The larger-compression input must exceed a compression-10 buffer");
+    assertTrue(serialized.length <= maxByteSize);
   }
 
   @Test
@@ -153,6 +154,64 @@ public class PercentileTDigestValueAggregatorTest {
     int maxByteSize = aggregator.getMaxAggregatedValueByteSize();
     byte[] serialized = aggregator.serializeAggregatedValue(destination);
     assertTrue(serialized.length <= maxByteSize);
+  }
+
+  @Test
+  public void testCopyAndParentMergeDoNotRecompressSource() {
+    SplittableRandom random = new SplittableRandom(10);
+    PercentileTDigestValueAggregator aggregator = newAggregator(100);
+    TDigest source = aggregator.getInitialAggregatedValue(random.nextDouble() * 10_000);
+    for (int i = 1; i < 94; i++) {
+      aggregator.applyRawValue(source, random.nextDouble() * 10_000);
+    }
+    // Query the working-compression state before any serialization; serializing first hides source recompression.
+    double beforeCopy = source.quantile(0.86);
+    aggregator.cloneAggregatedValue(source);
+    assertEquals(source.quantile(0.86), beforeCopy);
+    TDigest parent = aggregator.getInitialAggregatedValue(0.0);
+    aggregator.applyAggregatedValue(parent, source);
+    assertEquals(source.quantile(0.86), beforeCopy);
+    TDigest queryAccumulator = TDigestUtils.createMergingDigest(100.0);
+    queryAccumulator.add(source);
+    assertEquals(source.quantile(0.86), beforeCopy,
+        "Generic centroid ingestion must not perform the source's final compression");
+  }
+
+  @Test
+  public void testCompactFiniteMeansRestoreBoundsBeforeAddingInfiniteTails() {
+    for (double[] values : new double[][]{
+        {0.1, 0.3, Double.NEGATIVE_INFINITY}, {0.7, 0.9, Double.POSITIVE_INFINITY}
+    }) {
+      double min = values[0];
+      double max = values[1];
+      ByteBuffer compact = ByteBuffer.allocate(46);
+      compact.putInt(TDigestUtils.SMALL_ENCODING).putDouble(min).putDouble(max).putFloat(100.0F);
+      compact.putShort((short) 210).putShort((short) 1050).putShort((short) 2);
+      compact.putFloat(1.0F).putFloat((float) min).putFloat(1.0F).putFloat((float) max);
+      PercentileTDigestValueAggregator aggregator = newAggregator(100);
+      TDigest result = aggregator.getInitialAggregatedValue(compact.array());
+      aggregator.applyRawValue(result, values[2]);
+      int registeredBound = aggregator.getMaxAggregatedValueByteSize();
+      byte[] serialized = aggregator.serializeAggregatedValue(result);
+      assertTrue(serialized.length <= registeredBound);
+      ByteBuffer verbose = ByteBuffer.wrap(serialized);
+      assertEquals(verbose.getInt(), TDigestUtils.VERBOSE_ENCODING);
+      int count = verbose.getInt(28);
+      verbose.position(TDigestUtils.VERBOSE_HEADER_SIZE);
+      int finiteCount = 0;
+      for (int i = 0; i < count; i++) {
+        verbose.getDouble();
+        double mean = verbose.getDouble();
+        if (Double.isFinite(mean)) {
+          double endpoint = finiteCount++ == 0 ? min : max;
+          assertEquals(mean, Math.max(min, Math.min((double) (float) endpoint, max)));
+        }
+      }
+      assertEquals(finiteCount, 2);
+      TDigest roundTripped = aggregator.deserializeAggregatedValue(serialized);
+      assertEquals(roundTripped.getTotalWeight(), 3.0);
+      assertEquals(roundTripped.quantile(values[2] < 0.0 ? 1.0 : 0.0), values[2] < 0.0 ? max : min);
+    }
   }
 
   @Test

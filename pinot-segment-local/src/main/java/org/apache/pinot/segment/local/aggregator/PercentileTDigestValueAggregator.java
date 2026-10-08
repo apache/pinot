@@ -160,6 +160,8 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
         boolean fractionalMass = accumulator.hasFractionalWeights()
             || wrapped._negativeInfinityWeight != Math.rint(wrapped._negativeInfinityWeight)
             || wrapped._positiveInfinityWeight != Math.rint(wrapped._positiveInfinityWeight);
+        // Fractional and degraded mass cannot bound the centroid count. Include buffered inputs without forcing
+        // a hot-path flush; compatibility reduction can make the eventual bytes smaller than this headroom.
         long bufferedBound = accumulator.getCentroidCountUpperBound() + 6L;
         maxCentroids = fractionalMass || !accumulator.hasValidStatistics()
             ? bufferedBound : Math.min(maxCentroids, bufferedBound);
@@ -197,7 +199,6 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
     }
 
     private NonFiniteAwareTDigest copy() {
-      invalidateCaches();
       TDigest finiteDigest = TDigestUtils.createMergingDigest(compression());
       if (!_finiteDigest.isEmpty()) {
         finiteDigest.add(_finiteDigest);
@@ -294,7 +295,6 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
         NonFiniteAwareTDigest wrapped = (NonFiniteAwareTDigest) other;
         double negativeInfinityWeight = wrapped._negativeInfinityWeight;
         double positiveInfinityWeight = wrapped._positiveInfinityWeight;
-        wrapped.invalidateCaches();
         invalidateCaches();
         if (!wrapped._finiteDigest.isEmpty()) {
           _finiteDigest.add(wrapped._finiteDigest);
@@ -477,7 +477,6 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
     private List<Centroid> getFiniteCentroids() {
       if (_finiteCentroids == null) {
-        getFiniteSerializedBytes();
         _finiteCentroids = new ArrayList<>(_finiteDigest.centroids());
       }
       return _finiteCentroids;
@@ -531,7 +530,10 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
             !hasFiniteValues && _positiveInfinityWeight == 0L);
         for (int i = 0; i < finiteCentroidCount; i++) {
           verbose.putDouble(finiteVerbose ? finite.getDouble() : finite.getFloat());
-          verbose.putDouble(finiteVerbose ? finite.getDouble() : finite.getFloat());
+          double mean = finiteVerbose ? finite.getDouble() : finite.getFloat();
+          // Compact endpoints can round outside their double bounds. Restore the finite bounds before adding
+          // infinite tails, whose wider header would otherwise hide that rounding in the verbose payload.
+          verbose.putDouble(Math.max(metadata.min(), Math.min(mean, metadata.max())));
         }
         appendInfinityCentroids(verbose, Double.POSITIVE_INFINITY, _positiveInfinityWeight,
             !hasFiniteValues && _negativeInfinityWeight == 0L, true);

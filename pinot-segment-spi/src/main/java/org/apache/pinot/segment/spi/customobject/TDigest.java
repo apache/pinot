@@ -60,16 +60,19 @@ public abstract class TDigest {
   public abstract double quantile(double quantile);
 
   /// Returns immutable centroid values with their precise double weights.
+  /// Reading this view may flush buffered inputs without applying the final public compression.
   public abstract Collection<Centroid> centroids();
 
   public abstract double compression();
 
   public abstract int byteSize();
 
+  /// Returns space for asSmallBytes; degraded legacy state can retain its original verbose encoding.
   public abstract int smallByteSize();
 
   public abstract void asBytes(ByteBuffer buffer);
 
+  /// Writes compact bytes when possible, retaining verbose bytes for degraded legacy state.
   public abstract void asSmallBytes(ByteBuffer buffer);
 
   public abstract int centroidCount();

@@ -163,6 +163,10 @@ jobs:
         timeout-minutes: 120
         run: |
           .github/workflows/scripts/pr-tests/.pinot_tests_unit.sh
+      - name: Verify legacy t-digest readers
+        if: ${{ matrix.testset == 2 }}
+        timeout-minutes: 5
+        run: bash compatibility-verifier/tdigest-compatibility/run.sh
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         continue-on-error: true

@@ -567,6 +567,39 @@ public class TDigestUtilsTest {
   }
 
   @Test
+  public void testLegacyNaNExtremaRemainReadableAndRetainBytes() {
+    for (int encoding : new int[]{VERBOSE_ENCODING, SMALL_ENCODING}) {
+      byte[] bytes;
+      if (encoding == VERBOSE_ENCODING) {
+        bytes = verboseBytes(100.0, new double[]{1.0, 2.0}, new double[]{1.0, 1.0});
+      } else {
+        ByteBuffer compact = ByteBuffer.allocate(46);
+        compact.putInt(SMALL_ENCODING).putDouble(1.0).putDouble(2.0).putFloat(100.0F);
+        compact.putShort((short) 210).putShort((short) 1050).putShort((short) 2);
+        compact.putFloat(1.0F).putFloat(1.0F).putFloat(1.0F).putFloat(2.0F);
+        bytes = compact.array();
+      }
+      for (int extremaOffset : new int[]{4, 12}) {
+        byte[] poisoned = bytes.clone();
+        ByteBuffer.wrap(poisoned).putLong(extremaOffset, 0x7ff8000000000042L);
+        assertEquals(TDigestUtils.validateSerialized(poisoned), 2.0);
+        TDigest digest = TDigestUtils.deserialize(poisoned);
+        assertFalse(digest.hasValidStatistics());
+        assertEquals(digest.size(), 2L);
+        assertTrue(Double.isNaN(digest.quantile(0.5)));
+        assertTrue(Double.isNaN(digest.cdf(1.5)));
+        assertEquals(TDigestUtils.serialize(digest), poisoned);
+        assertTrue(Double.isNaN(TDigestUtils.deserializeFinite(poisoned).quantile(0.5)));
+        digest.add(42.0);
+        TDigest merged = TDigestUtils.deserialize(TDigestUtils.serialize(digest));
+        assertEquals(merged.size(), 3L);
+        assertFalse(merged.hasValidStatistics());
+        assertTrue(Double.isNaN(merged.quantile(0.5)));
+      }
+    }
+  }
+
+  @Test
   public void testDegradedTotalsRemainPresentAcrossCopyAndMergeOrder() {
     byte[][] poisoned = {
         verboseBytes(100.0, new double[]{10.0}, new double[]{-5.0}),

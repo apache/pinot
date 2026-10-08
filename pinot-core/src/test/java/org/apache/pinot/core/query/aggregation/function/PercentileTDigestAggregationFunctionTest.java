@@ -1327,6 +1327,8 @@ public class PercentileTDigestAggregationFunctionTest {
   }
 
   private static double[] getReducerRankErrors(TDigest result, double[] sortedValues, String caseDescription) {
+    // Compare final public-compression results with the independently generated legacy envelope.
+    result.compress();
     Assert.assertEquals(result.size(), sortedValues.length, "Total weight differs for " + caseDescription);
     long centroidWeight = 0L;
     double previousMean = Double.NEGATIVE_INFINITY;
