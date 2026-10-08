@@ -89,6 +89,9 @@ public class QueryContext {
   private List<Pair<AggregationFunction, FilterContext>> _filteredAggregationFunctions;
   private Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationsIndexMap;
   private boolean _hasFilteredAggregations;
+  // Set by the instance planner after bounding all local BASE and derived grouping-set keys.
+  private boolean _groupingSetsBaseAggregationAllowed = true;
+  private boolean _groupingSetsDerivedGroupsBounded;
   private Set<String> _columns;
 
   // Other properties to be shared across all the segments
@@ -260,8 +263,7 @@ public class QueryContext {
   /// Returns whether grouping-set queries should aggregate the base grouping (union columns) once per segment
   /// and derive the individual grouping-set records from those base groups, instead of expanding every input
   /// row into one group per grouping set. Disabled by default (opt in with `groupingSetsBaseAggregation=true`):
-  /// the derive can be slower than expansion for expensive-to-merge intermediates (sketches). Derived groups
-  /// are capped at `max(numGroupsLimit, numSets)`, retaining coarse sets first. See
+  /// the derive can be slower than expansion for expensive-to-merge intermediates (sketches). See
   /// [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_BASE_AGGREGATION].
   ///
   /// Even when opted in, base aggregation is disabled when:
@@ -275,8 +277,11 @@ public class QueryContext {
   ///   used on MSE leaf stages (`streamingGroupByFlushThreshold > 0`), and the sorted-aggregate combine
   ///   ([#shouldSortAggregateUnderSafeTrim()]). In all these cases the segment expands per row so the emitted
   ///   rows already carry the $groupingId discriminator.
+  /// - the instance planner cannot prove that all local base and derived groups fit within `numGroupsLimit`.
+  ///   The expansion path preserves the normal ordering and group-limit semantics in that case.
   public boolean isGroupingSetsBaseAggregation() {
-    if (_hasFilteredAggregations || _streamingGroupByFlushThreshold > 0 || shouldSortAggregateUnderSafeTrim()) {
+    if (!_groupingSetsBaseAggregationAllowed || _hasFilteredAggregations || _streamingGroupByFlushThreshold > 0
+        || shouldSortAggregateUnderSafeTrim()) {
       return false;
     }
     String option = _queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION);
@@ -291,6 +296,17 @@ public class QueryContext {
       }
     }
     return true;
+  }
+
+  /// Called before building segment operators; a false value makes every local segment use per-row expansion.
+  public void setGroupingSetsBaseAggregationAllowed(boolean allowed) {
+    _groupingSetsBaseAggregationAllowed = allowed;
+    _groupingSetsDerivedGroupsBounded = allowed;
+  }
+
+  /// Whether the instance planner proved the full derived output fits `numGroupsLimit`.
+  public boolean areGroupingSetsDerivedGroupsBounded() {
+    return _groupingSetsDerivedGroupsBounded;
   }
 
   /// Returns the total number of group-by key columns in the server result / reducer row layout: the union
@@ -637,10 +653,9 @@ public class QueryContext {
     return -1;
   }
 
-  /// Returns the maximum estimated base-group count for which base aggregation is used (above it the per-row
-  /// expansion path is used: overflowing base groups would be dropped from every derived set -- corrupting the
-  /// totals -- and the derive would do excessive work). Reads the `groupingSetsBaseAggregationMaxGroups`
-  /// query option, defaulting to `numGroupsLimit` when unset. See
+  /// Returns the secondary per-segment base-group estimate gate. The instance planner separately requires all
+  /// local base and derived grouping-set keys to fit `numGroupsLimit`; raising this option cannot bypass that
+  /// hard bound. Defaults to `numGroupsLimit` when unset. See
   /// [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS].
   public int getGroupingSetsBaseAggregationMaxGroups() {
     Integer maxGroups = QueryOptionsUtils.getGroupingSetsBaseAggregationMaxGroups(_queryOptions);

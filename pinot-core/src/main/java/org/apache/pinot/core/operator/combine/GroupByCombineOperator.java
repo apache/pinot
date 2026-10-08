@@ -217,9 +217,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       synchronized (this) {
         baseIndexedTable = _baseIndexedTable;
         if (baseIndexedTable == null) {
-          // Cap the base table at numGroupsLimit like any combine table, but RETAIN overflowing records so
-          // their contribution to the coarse grouping sets (grand total, subtotals) survives -- the expansion
-          // path keeps those exact under the limit, and the base path must not regress that.
+          // The planner bounds all local BASE and derived keys before choosing base aggregation. Keep the
+          // combine cap as a fail-closed guard against a stale or incorrect bound.
           int resultSize = _queryContext.getNumGroupsLimit();
           int initialCapacity = GroupByUtils.getIndexedTableInitialCapacity(resultSize,
               resultsBlock.getNumGroups(), _queryContext.getMinInitialIndexedTableCapacity());
@@ -290,10 +289,15 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     /// grouping-set key space, so this is a plain aggregate merge.
     GroupingSetsBaseIndexedTable baseIndexedTable = _baseIndexedTable;
     if (baseIndexedTable != null) {
+      // Concurrent inserts can race at the final slot before either observes the cap. Reject that overshoot
+      // after all workers finish, before a bounded-output proof is used for derivation.
+      if (baseIndexedTable.size() > _queryContext.getNumGroupsLimit()) {
+        throw new IllegalStateException("Grouping-set base groups exceeded the planned group limit");
+      }
       IndexedTable derivedTable = GroupByUtils.deriveGroupingSetsFromMergedBaseTable(baseIndexedTable, _queryContext,
           _numTasks, _executorService);
       if (indexedTable != null) {
-        // Merge full-layout (expansion-path) records first so all their groups exist before the overflow fold.
+        // Merge full-layout (expansion-path) records into the derived table.
         int derivedCap = Math.max(_queryContext.getNumGroupsLimit(), _queryContext.getGroupingSets().size());
         int mergedKeys = 0;
         for (Map.Entry<Key, Record> entry : indexedTable.getRecordEntries()) {
@@ -303,18 +307,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           } else if (!derivedTable.upsertExistingIfPresent(entry.getKey(), entry.getValue())) {
             derivedTable.markNumGroupsLimitReached();
           }
-        }
-      }
-      if (baseIndexedTable.isFull()) {
-        // The base table hit numGroupsLimit. Fold the retained overflow records into the EXISTING derived
-        // groups so the grand total and coarse subtotals stay exact (like the expansion path under the limit);
-        // only the overflowing fine-set groups are lost. Surface the limit like the segment-level cap does.
-        _numGroupsLimitReached = true;
-        GroupByUtils.mergeOverflowBaseRecords(derivedTable, baseIndexedTable.getOverflowRecords(), _queryContext);
-        if (baseIndexedTable.isOverflowTruncated()) {
-          // Even the overflow buffer overflowed: some records were dropped entirely, so the totals are
-          // approximate.
-          _groupsTrimmed = true;
         }
       }
       // The per-set server trim (groupingSetsMinServerTrimSize) and the derived-output cap drop groups;

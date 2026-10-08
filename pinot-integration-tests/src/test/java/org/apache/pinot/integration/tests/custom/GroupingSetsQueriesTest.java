@@ -471,9 +471,8 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
   public void testNumGroupsLimitPressureKeepsTotalsExactByDefault()
       throws Exception {
     // Under numGroupsLimit pressure, the expansion path keeps the grand total exact (the coarse groups are
-    // created on the first row and keep aggregating after the limit). With base aggregation off by default --
-    // and, even when opted in, the cardinality gate (default groupingSetsBaseAggregationMaxGroups =
-    // numGroupsLimit) routing limit-pressured queries to expansion -- the default result keeps exact totals.
+    // created on the first row and keep aggregating after the limit). The planner must use expansion even when
+    // the user raises groupingSetsBaseAggregationMaxGroups, since the actual output does not fit numGroupsLimit.
     //
     // The table has 4 distinct (d1, d2) base groups per segment. numGroupsLimit=3 makes both paths hit the
     // limit: expansion creates exactly its first row's 3 groups -- (d1,d2), (d1) and the grand total -- so the
@@ -495,14 +494,16 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
     assertEquals(grandTotal, expectedTotal,
         "grand total must stay exact under numGroupsLimit pressure (cardinality gate must route to expansion)");
 
-    // When the user overrides the gate (accepting the risk), dropped base keys must at least be surfaced via
-    // the numGroupsLimitReached flag instead of failing silently.
-    JsonNode forcedBase = postQuery("SET enableNullHandling=true; SET numGroupsLimit=3; "
-        + "SET groupingSetsBaseAggregation=true; SET groupingSetsBaseAggregationMaxGroups=1000000; SELECT "
-        + D1 + ", " + D2 + ", COUNT(*) FROM " + getTableName() + " GROUP BY ROLLUP(" + D1 + ", " + D2
-        + ") LIMIT 10000");
-    assertTrue(forcedBase.get("numGroupsLimitReached").asBoolean(),
-        "dropping base groups under an overridden gate must surface numGroupsLimitReached");
+    JsonNode optedIn = postQuery("SET groupingSetsBaseAggregation=true; "
+        + "SET groupingSetsBaseAggregationMaxGroups=1000000; " + query);
+    long optedInGrandTotal = -1;
+    for (JsonNode row : optedIn.get("resultTable").get("rows")) {
+      if (row.get(3).asInt() == 1 && row.get(4).asInt() == 1) {
+        optedInGrandTotal = row.get(2).asLong();
+      }
+    }
+    assertEquals(optedInGrandTotal, expectedTotal,
+        "an overridden base-cardinality gate must not corrupt the grand total");
   }
 
   @Test
@@ -518,13 +519,32 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
 
     Map<String, String> unTrimmed = rowsByKey(postQuery(
         "SET enableNullHandling=true; SET groupingSetsBaseAggregation=true; " + query));
+    Map<String, String> expansion = rowsByKey(postQuery(
+        "SET enableNullHandling=true; SET groupingSetsBaseAggregation=false; " + query));
     Map<String, String> aggressiveSegmentTrim = rowsByKey(postQuery(
         "SET enableNullHandling=true; SET groupingSetsBaseAggregation=true; SET minSegmentGroupTrimSize=1; "
             + query));
 
     assertEquals(aggressiveSegmentTrim, unTrimmed,
         "segment trim must be bypassed (not misapplied) on the base-aggregation path");
+    assertEquals(unTrimmed, expansion, "ordered base aggregation must match per-row expansion when every group fits");
     assertFalse(unTrimmed.isEmpty());
+  }
+
+  @Test
+  public void testOrderedBaseAggregationFallsBackWhenDerivedGroupsExceedLimit()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT " + D1 + ", " + D2 + ", COUNT(*), SUM(" + LNG + "), GROUPING(" + D1 + "), "
+        + "GROUPING(" + D2 + ") FROM " + getTableName() + " GROUP BY ROLLUP(" + D1 + ", " + D2
+        + ") ORDER BY COUNT(*) DESC, " + D1 + ", " + D2 + " LIMIT 50";
+    String settings = "SET enableNullHandling=true; SET numGroupsLimit=6; ";
+    Map<String, String> expansion = rowsByKey(postQuery(settings + query));
+    Map<String, String> optedIn = rowsByKey(postQuery(settings + "SET groupingSetsBaseAggregation=true; "
+        + "SET groupingSetsBaseAggregationMaxGroups=1000000; " + query));
+
+    assertEquals(optedIn, expansion, "ordered queries must use expansion when the full derived output cannot fit");
+    assertFalse(expansion.isEmpty());
   }
 
   @Test
