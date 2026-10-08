@@ -26,12 +26,14 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.utils.DataTypeTransformerUtils;
 import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
@@ -49,7 +51,8 @@ public class DataTypeTransformerTest {
   /// the row (so the index can flatten it directly) and still serializes the column value to a string. For a JSON
   /// column without a JSON index, nothing is cached.
   @Test
-  public void testJsonParseOnceCache() {
+  public void testJsonParseOnceCache()
+      throws Exception {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("jsonCol", FieldSpec.DataType.JSON).build();
     Map<String, Object> doc = new HashMap<>();
     doc.put("a", 1);
@@ -64,6 +67,25 @@ public class DataTypeTransformerTest {
     assertTrue(indexed.getValue("jsonCol") instanceof String);
     // ...and the parsed Map is cached for the JSON index to flatten directly.
     assertEquals(indexed.getParsedJsonValue("jsonCol"), doc);
+    // JSON decoders store arrays nested in maps as Object[]. They remain eligible for the parsed path.
+    GenericRow arrays = new GenericRow();
+    arrays.putValue("jsonCol", Map.of("array", new Object[]{Map.of("n", 1), 2}));
+    new DataTypeTransformer(withIndex, schema).transform(arrays);
+    assertEquals(JsonUtils.flattenParsed(arrays.getParsedJsonValue("jsonCol"), new JsonIndexConfig()),
+        JsonUtils.flatten((String) arrays.getValue("jsonCol"), new JsonIndexConfig()));
+
+    // Avro-style leaves must reuse the forward string, without another tree conversion or serialization.
+    for (Object unsafe : new Object[]{0.1f, new byte[]{1, 2, 3}}) {
+      GenericRow fallback = new GenericRow();
+      fallback.putValue("jsonCol", Map.of("value", unsafe));
+      new DataTypeTransformer(withIndex, schema).transform(fallback);
+      assertNull(fallback.getParsedJsonValue("jsonCol"));
+      GenericRow reference = new GenericRow();
+      reference.putValue("jsonCol", Map.of("value", unsafe));
+      new DataTypeTransformer(new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build(), schema)
+          .transform(reference);
+      assertEquals(fallback.getValue("jsonCol"), reference.getValue("jsonCol"));
+    }
 
     // No JSON index on the column -> no caching (the index, if any, would re-parse as before).
     TableConfig noIndex = new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build();

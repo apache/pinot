@@ -29,6 +29,7 @@ import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
+import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
@@ -42,8 +43,9 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 /// already-parsed **Map** (the parse-once cache: the index flattens the Map directly via `valueToTree`).
 ///
 /// - `flattenFromString` - current per-row index cost (`stringToJsonNode` + flatten).
-/// - `flattenFromMap` - parse-once cost (`valueToTree` + flatten), the re-parse avoided.
+/// - `flattenFromMap` - cache preflight plus `valueToTree` + flatten when supported.
 /// - `serializeMap` - the Map to String serialization that stays (the forward index stores it).
+/// Float/binary leaves decline the optimization and use the serialized forward value.
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -67,12 +69,21 @@ public class BenchmarkJsonFlatten {
           + "\"tags\":[\"retail\",\"purchase_order\",\"serialized_inventory\",\"prod\"]}";
 
   private Map<String, Object> _messageMap;
+  private String _forwardValue;
   private JsonIndexConfig _config;
+
+  @Param({"JSON", "FLOAT_BINARY"})
+  public String _inputType;
 
   @Setup
   public void setup()
       throws Exception {
     _messageMap = JsonUtils.stringToObject(MESSAGE_JSON, Map.class);
+    if ("FLOAT_BINARY".equals(_inputType)) {
+      _messageMap.put("ratio", 0.1f);
+      _messageMap.put("payload", new byte[]{1, 2, 3});
+    }
+    _forwardValue = MapUtils.toString(_messageMap);
     _config = new JsonIndexConfig();
     _config.setMaxLevels(2);
   }
@@ -80,13 +91,15 @@ public class BenchmarkJsonFlatten {
   @Benchmark
   public Object flattenFromString()
       throws Exception {
-    return JsonUtils.flatten(MESSAGE_JSON, _config);
+    return JsonUtils.flatten(_forwardValue, _config);
   }
 
   @Benchmark
   public Object flattenFromMap()
       throws Exception {
-    return JsonUtils.flattenParsed(_messageMap, _config);
+    return JsonUtils.canFlattenParsedValue(_messageMap)
+        ? JsonUtils.flattenParsed(_messageMap, _config)
+        : JsonUtils.flatten(_forwardValue, _config);
   }
 
   @Benchmark
