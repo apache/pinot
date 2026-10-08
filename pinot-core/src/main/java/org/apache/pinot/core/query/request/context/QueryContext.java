@@ -260,8 +260,8 @@ public class QueryContext {
   /// Returns whether grouping-set queries should aggregate the base grouping (union columns) once per segment
   /// and derive the individual grouping-set records from those base groups, instead of expanding every input
   /// row into one group per grouping set. Disabled by default (opt in with `groupingSetsBaseAggregation=true`):
-  /// the derive can be slower than expansion for expensive-to-merge intermediates (sketches), and the derived
-  /// output is bounded by the base-group estimate rather than `numGroupsLimit`. See
+  /// the derive can be slower than expansion for expensive-to-merge intermediates (sketches). Derived groups
+  /// are capped at `max(numGroupsLimit, numSets)`, retaining coarse sets first. See
   /// [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_BASE_AGGREGATION].
   ///
   /// Even when opted in, base aggregation is disabled when:
@@ -639,7 +639,7 @@ public class QueryContext {
 
   /// Returns the maximum estimated base-group count for which base aggregation is used (above it the per-row
   /// expansion path is used: overflowing base groups would be dropped from every derived set -- corrupting the
-  /// totals -- and the derived output would grow unbounded). Reads the `groupingSetsBaseAggregationMaxGroups`
+  /// totals -- and the derive would do excessive work). Reads the `groupingSetsBaseAggregationMaxGroups`
   /// query option, defaulting to `numGroupsLimit` when unset. See
   /// [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS].
   public int getGroupingSetsBaseAggregationMaxGroups() {
