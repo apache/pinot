@@ -175,7 +175,7 @@
     </testResources>
     <plugins>
       <!-- Hard-fail early with a clear message under -Pscala-2.12 instead of letting an
-           obscure Maven resolution error leak through. JDK 21+ is already enforced by the
+           obscure Maven resolution error leak through. JDK 25+ is already enforced by the
            root pom's requireJavaVersion rule, so we only need the Scala compat check here. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

@@ -40,7 +40,7 @@
     <module>pinot-batch-ingestion-spark-base</module>
     <!-- pinot-batch-ingestion-spark-3 is deprecated and slated for removal in the next minor
          release; see its README for the migration path to pinot-batch-ingestion-spark-4.
-         Both build by default since Pinot's root pom enforces JDK 21+. -->
+         Both build by default since Pinot's root pom enforces JDK 25+. -->
     <module>pinot-batch-ingestion-spark-3</module>
     <module>pinot-batch-ingestion-spark-4</module>
 
