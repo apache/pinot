@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.sql.parsers;
 
-import java.io.StringReader;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -3405,10 +3404,7 @@ public class CalciteSqlCompilerTest {
       throws Exception {
     // Both overloads apply the PostgreSQL cast rewrite, so a node parsed by the caller compiles like its SQL text
     String expression = "bytesCol = '\\x0102'::bytea";
-    SqlNode sqlNode;
-    try (StringReader reader = new StringReader(expression)) {
-      sqlNode = CalciteSqlParser.newSqlParser(reader).parseSqlExpressionEof();
-    }
+    SqlNode sqlNode = CalciteSqlParser.newSqlParser(expression).parseSqlExpressionEof();
     Expression fromSqlNode = CalciteSqlParser.compileToExpression(sqlNode);
     Assert.assertEquals(fromSqlNode, CalciteSqlParser.compileToExpression(expression));
     Assert.assertEquals(fromSqlNode.getFunctionCall().getOperands().get(1).getLiteral().getBinaryValue(),
@@ -3416,10 +3412,8 @@ public class CalciteSqlCompilerTest {
     // Applied a second time, on the rewritten node, it is a no-op
     Assert.assertEquals(CalciteSqlParser.compileToExpression(sqlNode), fromSqlNode);
     // Every other :: cast is rejected by both overloads
-    try (StringReader reader = new StringReader("intCol::double > 1")) {
-      SqlNode castNode = CalciteSqlParser.newSqlParser(reader).parseSqlExpressionEof();
-      Assert.expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToExpression(castNode));
-    }
+    SqlNode castNode = CalciteSqlParser.newSqlParser("intCol::double > 1").parseSqlExpressionEof();
+    Assert.expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToExpression(castNode));
     Assert.expectThrows(SqlCompilationException.class,
         () -> CalciteSqlParser.compileToExpression("intCol::double > 1"));
   }
