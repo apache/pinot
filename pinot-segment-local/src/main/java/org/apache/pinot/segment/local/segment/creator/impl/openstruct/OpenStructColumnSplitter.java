@@ -562,12 +562,17 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     // below discards any per-key codecSpec, so refuse to silently drop one that slipped past validation.
     ForwardIndexConfig configuredForwardIndex = configsForDecision.getConfig(StandardIndexes.forward());
     Preconditions.checkState(configuredForwardIndex.getCodecSpec() == null,
-        "OPEN_STRUCT column '%s': codecSpec is not supported for key '%s'; materialized keys always use a "
-            + "dictionary-encoded or LZ4 raw forward index", _columnName, key);
+        "OPEN_STRUCT column '%s': codecSpec is not supported for key '%s'; the splitter fixes materialized "
+            + "keys to a dictionary-encoded or LZ4 raw forward index", _columnName, key);
 
     // Reconcile dictionary + forward encoding with the final decision (mirrors BaseSegmentCreator.adaptConfig);
     // ForwardIndexCreatorFactory selects dict-vs-raw from the forward config's EncodingType. A compression codec
-    // applies only to the raw forward format (LZ4 preserves the dense child's current on-disk layout); attaching
+    // applies only to the raw forward format (LZ4 preserves the dense child's current on-disk layout, and is
+    // pinned here regardless of the cluster-wide default compression codec). Note the pin covers this build
+    // path only: a materialized key with no explicit indexes.forward node resolves through
+    // ForwardIndexConfig.getDefault(RAW) with a null codec, so a dictionary-to-raw conversion on reload
+    // writes the reloading component's default instead, and the same key can end up with different codecs
+    // across segments. Attaching
     // one to a dictionary-encoded forward is rejected by ForwardIndexType.validate.
     ForwardIndexConfig.Builder forwardBuilder = new ForwardIndexConfig.Builder(
         useDictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW);

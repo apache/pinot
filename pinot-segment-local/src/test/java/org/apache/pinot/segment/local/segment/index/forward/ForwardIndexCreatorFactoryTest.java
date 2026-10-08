@@ -47,6 +47,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -74,6 +75,40 @@ public class ForwardIndexCreatorFactoryTest {
       creator.putInt(1);
       creator.seal();
     } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /// The producer side of the configurable default: the factory fills a codec-less config from
+  /// [ForwardIndexConfig#getDefaultCompressionType()], so this is what decides the codec a segment is
+  /// actually written with. The test above pins the shipped LZ4; this one proves the fill-in follows the
+  /// configured value rather than a constant.
+  @Test
+  public void testCreatorFollowsTheConfiguredDefaultCompressionType()
+      throws Exception {
+    File indexDir = Files.createTempDirectory("ForwardIndexCreatorFactoryTest").toFile();
+    ForwardIndexConfig.setDefaultCompressionCodec(FieldConfig.CompressionCodec.ZSTANDARD);
+    try (ForwardIndexCreator creator = ForwardIndexCreatorFactory.createIndexCreator(newContext(indexDir, true),
+        new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW).build())) {
+      assertEquals(creator.getRawForwardIndexChunkCompressionType(), ChunkCompressionType.ZSTANDARD);
+    } finally {
+      ForwardIndexConfig.setDefaultCompressionCodec(FieldConfig.CompressionCodec.LZ4);
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /// Metrics are exempt from the configured default, so a metric column keeps PASS_THROUGH even when the
+  /// cluster asks for something else.
+  @Test
+  public void testMetricColumnIgnoresTheConfiguredDefaultCompressionType()
+      throws Exception {
+    File indexDir = Files.createTempDirectory("ForwardIndexCreatorFactoryTest").toFile();
+    ForwardIndexConfig.setDefaultCompressionCodec(FieldConfig.CompressionCodec.ZSTANDARD);
+    try (ForwardIndexCreator creator = ForwardIndexCreatorFactory.createIndexCreator(
+        newMetricContext(indexDir), new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW).build())) {
+      assertEquals(creator.getRawForwardIndexChunkCompressionType(), ChunkCompressionType.PASS_THROUGH);
+    } finally {
+      ForwardIndexConfig.setDefaultCompressionCodec(FieldConfig.CompressionCodec.LZ4);
       FileUtils.deleteQuietly(indexDir);
     }
   }
@@ -554,6 +589,23 @@ public class ForwardIndexCreatorFactoryTest {
         .setLengthOfLongestElement(elementSize)
         .setTotalNumberOfEntries(totalDocs)
         .setMaxNumberOfMultiValues(fieldSpec.isSingleValueField() ? 0 : 1)
+        .build();
+    return new IndexCreationContext.Builder(indexDir, tableConfig, metadata).build();
+  }
+
+  /// A METRIC column, to check the exemption the configurable default must not override.
+  private static IndexCreationContext newMetricContext(File indexDir) {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    FieldSpec fieldSpec = new MetricFieldSpec(COLUMN_NAME, DataType.INT);
+    ColumnMetadataImpl metadata = new ColumnMetadataImpl.Builder()
+        .setFieldSpec(fieldSpec)
+        .setTotalDocs(1)
+        .setCardinality(2)
+        .setHasDictionary(true)
+        .setLengthOfShortestElement(DataType.INT.size())
+        .setLengthOfLongestElement(DataType.INT.size())
+        .setTotalNumberOfEntries(1)
+        .setMaxNumberOfMultiValues(0)
         .build();
     return new IndexCreationContext.Builder(indexDir, tableConfig, metadata).build();
   }
