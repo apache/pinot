@@ -57,6 +57,7 @@ import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.IOException;
 import java.lang.foreign.MemorySegment;
 import java.math.BigDecimal;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
@@ -394,6 +395,17 @@ public class ObjectSerDeUtils {
     }
   };
 
+  /// Checks that `byteBuffer` holds `numValues` values of `width` bytes, before the array for them is allocated. Throws
+  /// the same exceptions as reading the values one by one into a list of capacity `numValues` would.
+  private static void checkRemaining(ByteBuffer byteBuffer, int numValues, int width) {
+    if (numValues < 0) {
+      throw new IllegalArgumentException("Initial capacity (" + numValues + ") is negative");
+    }
+    if (numValues > byteBuffer.remaining() / width) {
+      throw new BufferUnderflowException();
+    }
+  }
+
   public static final ObjectSerDe<IntArrayList> INT_ARRAY_LIST_SER_DE = new ObjectSerDe<IntArrayList>() {
 
     @Override
@@ -417,11 +429,11 @@ public class ObjectSerDeUtils {
     @Override
     public IntArrayList deserialize(ByteBuffer byteBuffer) {
       int numValues = byteBuffer.getInt();
-      IntArrayList intArrayList = new IntArrayList(numValues);
-      for (int i = 0; i < numValues; i++) {
-        intArrayList.add(byteBuffer.getInt());
-      }
-      return intArrayList;
+      checkRemaining(byteBuffer, numValues, Integer.BYTES);
+      int[] values = new int[numValues];
+      byteBuffer.asIntBuffer().get(values);
+      byteBuffer.position(byteBuffer.position() + numValues * Integer.BYTES);
+      return IntArrayList.wrap(values);
     }
   };
 
@@ -448,11 +460,11 @@ public class ObjectSerDeUtils {
     @Override
     public LongArrayList deserialize(ByteBuffer byteBuffer) {
       int numValues = byteBuffer.getInt();
-      LongArrayList longArrayList = new LongArrayList(numValues);
-      for (int i = 0; i < numValues; i++) {
-        longArrayList.add(byteBuffer.getLong());
-      }
-      return longArrayList;
+      checkRemaining(byteBuffer, numValues, Long.BYTES);
+      long[] values = new long[numValues];
+      byteBuffer.asLongBuffer().get(values);
+      byteBuffer.position(byteBuffer.position() + numValues * Long.BYTES);
+      return LongArrayList.wrap(values);
     }
   };
 
@@ -479,11 +491,11 @@ public class ObjectSerDeUtils {
     @Override
     public FloatArrayList deserialize(ByteBuffer byteBuffer) {
       int numValues = byteBuffer.getInt();
-      FloatArrayList floatArrayList = new FloatArrayList(numValues);
-      for (int i = 0; i < numValues; i++) {
-        floatArrayList.add(byteBuffer.getFloat());
-      }
-      return floatArrayList;
+      checkRemaining(byteBuffer, numValues, Float.BYTES);
+      float[] values = new float[numValues];
+      byteBuffer.asFloatBuffer().get(values);
+      byteBuffer.position(byteBuffer.position() + numValues * Float.BYTES);
+      return FloatArrayList.wrap(values);
     }
   };
 
@@ -510,11 +522,11 @@ public class ObjectSerDeUtils {
     @Override
     public DoubleArrayList deserialize(ByteBuffer byteBuffer) {
       int numValues = byteBuffer.getInt();
-      DoubleArrayList doubleArrayList = new DoubleArrayList(numValues);
-      for (int i = 0; i < numValues; i++) {
-        doubleArrayList.add(byteBuffer.getDouble());
-      }
-      return doubleArrayList;
+      checkRemaining(byteBuffer, numValues, Double.BYTES);
+      double[] values = new double[numValues];
+      byteBuffer.asDoubleBuffer().get(values);
+      byteBuffer.position(byteBuffer.position() + numValues * Double.BYTES);
+      return DoubleArrayList.wrap(values);
     }
   };
 
