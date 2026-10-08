@@ -36,7 +36,6 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -222,6 +221,7 @@ public class PlanNodeSerializer {
       return null;
     }
 
+
     @Override
     public Void visitMailboxSend(MailboxSendNode node, Plan.PlanNode.Builder builder) {
       List<Integer> receiverStageIds = new ArrayList<>();
@@ -308,11 +308,6 @@ public class PlanNodeSerializer {
     @Override
     public Void visitExchange(ExchangeNode exchangeNode, Plan.PlanNode.Builder context) {
       throw new IllegalStateException("ExchangeNode should not be visited by SerializationVisitor");
-    }
-
-    @Override
-    public Void visitKWayMergeExchange(KWayMergeExchangeNode node, Plan.PlanNode.Builder context) {
-      throw new UnsupportedOperationException("KWayMergeExchangeNode should not be serialized");
     }
 
     @Override

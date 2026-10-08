@@ -51,9 +51,6 @@ class PipelineBreakerVisitor extends DefaultPostOrderTraversalVisitor<Void, Pipe
   @Override
   public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, PipelineBreakerContext context) {
     process(node, context);
-    if (node.getExchangeType() == PinotRelExchangeType.PIPELINE_BREAKER) {
-      context.addPipelineBreaker(node);
-    }
     return null;
   }
 }

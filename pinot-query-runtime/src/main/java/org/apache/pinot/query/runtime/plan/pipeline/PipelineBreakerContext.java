@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.plan.pipeline;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 
 
@@ -31,7 +32,7 @@ public class PipelineBreakerContext {
 
   private int _currentNodeId = 0;
 
-  public void addPipelineBreaker(PlanNode mailboxReceiveNode) {
+  public void addPipelineBreaker(MailboxReceiveNode mailboxReceiveNode) {
     int nodeId = _planNodeObjectToIdMap.get(mailboxReceiveNode);
     _pipelineBreakerMap.put(nodeId, mailboxReceiveNode);
   }

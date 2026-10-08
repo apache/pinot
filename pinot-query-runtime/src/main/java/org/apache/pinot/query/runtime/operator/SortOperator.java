@@ -110,6 +110,9 @@ public abstract class SortOperator extends MultiStageOperator {
     // TODO: make this default behavior configurable.
     int fetch = node.getFetch();
     int numRowsToKeep = fetch > 0 ? fetch + offset : defaultResponseLimit;
+    if (fetch < 0 && node.isSingleRunRequired()) {
+      numRowsToKeep = Integer.MAX_VALUE;
+    }
     List<RelFieldCollation> collations = node.getCollations();
     DataSchema dataSchema = node.getDataSchema();
     if (collations.isEmpty()) {

@@ -65,8 +65,6 @@ public interface PlanNodeVisitor<T, C> {
 
   T visitExchange(ExchangeNode node, C context);
 
-  T visitKWayMergeExchange(KWayMergeExchangeNode node, C context);
-
   T visitExplained(ExplainedNode node, C context);
 
   T visitUnnest(UnnestNode node, C context);
@@ -93,8 +91,8 @@ public interface PlanNodeVisitor<T, C> {
   /// It is not mandatory to override all methods nor to call [#visitChildren(PlanNode, Object)] when
   /// overriding a visit method.
   ///
-  /// [MailboxReceiveNode] and [MailboxMergeReceiveNode] have no inputs. Instead, they may store the sender node in a
-  /// different field. Whether to visit a receive node's sender is controlled by
+  /// Notice that [MailboxReceiveNode] nodes do not have inputs. Instead, they may store the sender node in a
+  /// different field. Whether to visit the sender node when visiting a [MailboxReceiveNode] is controlled by
   /// [#traverseStageBoundary()].
   ///
   /// @param <T>
@@ -103,7 +101,7 @@ public interface PlanNodeVisitor<T, C> {
 
     /// Visits all children of a node.
     ///
-    /// Receive nodes have no inputs and therefore this method is a no-op for them.
+    /// Notice that [MailboxReceiveNode] nodes do not have inputs and therefore this method is a no-op for them.
     /// The default [#visitMailboxReceive(MailboxReceiveNode, Object)] implementation will visit the sender node
     /// if [#traverseStageBoundary()] returns true, but if it is overridden, it is up to the implementor to decide
     /// whether to visit the sender node or not.
@@ -113,7 +111,7 @@ public interface PlanNodeVisitor<T, C> {
       }
     }
 
-    /// Whether to visit the sender node (going to another stage) when visiting a receive node.
+    /// Whether to visit the sender node (going to another stage) when visiting a [MailboxReceiveNode].
     ///
     /// Defaults to true.
     protected boolean traverseStageBoundary() {
@@ -180,6 +178,7 @@ public interface PlanNodeVisitor<T, C> {
     @Override
     public T visitMailboxMergeReceive(MailboxMergeReceiveNode node, C context) {
       preChildren(node, context);
+      visitChildren(node, context);
       if (traverseStageBoundary()) {
         node.getSender().visit(this, context);
       }
@@ -237,13 +236,6 @@ public interface PlanNodeVisitor<T, C> {
 
     @Override
     public T visitExchange(ExchangeNode node, C context) {
-      preChildren(node, context);
-      visitChildren(node, context);
-      return postChildren(node, context);
-    }
-
-    @Override
-    public T visitKWayMergeExchange(KWayMergeExchangeNode node, C context) {
       preChildren(node, context);
       visitChildren(node, context);
       return postChildren(node, context);
