@@ -928,26 +928,20 @@ public class CommonConstants {
         /// aggregates only the base grouping (the union of all grouping-set columns) using the regular group-by
         /// path and emits the base groups; the combine phase merges them and derives the individual grouping
         /// sets in parallel. This replaces expanding every input row into one group per grouping set, moving the
-        /// per-set fan-out from O(rows) to O(base groups) and onto the multi-threaded combine -- a ~2-3x win
-        /// when rows collapse into few base groups with cheap-to-merge aggregations (COUNT/SUM/MIN/MAX), but a
-        /// possible regression for expensive-to-merge intermediates (sketches), which is why it is off by
-        /// default.
+        /// per-set fan-out from O(rows) to O(base groups) and onto the multi-threaded combine. It can help when
+        /// many rows collapse into few base groups with cheap-to-merge aggregations, but can regress for
+        /// expensive-to-merge intermediates (sketches), which is why it is off by default.
         ///
-        /// Base aggregation is used only when the estimated base-group count (the product of the union columns'
-        /// dictionary cardinalities) does not exceed [#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS]; above that
-        /// estimate the per-row expansion path is used instead. This matters for correctness, not just speed:
-        /// if base groups overflow `numGroupsLimit`, a dropped base key vanishes from EVERY derived set --
-        /// including the grand total -- whereas the expansion path creates coarse groups up front and keeps
-        /// them exact under the limit. The gate keeps base aggregation on the workloads where base groups
-        /// provably fit.
+        /// Base aggregation is used only when the instance planner can bound every local base group and every
+        /// requested grouping-set group within `numGroupsLimit`, and the per-segment base-group estimate does
+        /// not exceed [#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS]. If the bound cannot be proven, the per-row
+        /// expansion path is used to preserve ordering and group-limit semantics.
         public static final String GROUPING_SETS_BASE_AGGREGATION = "groupingSetsBaseAggregation";
 
-        /// Upper bound on the estimated base-group count (product of the union columns' dictionary
-        /// cardinalities) for which [#GROUPING_SETS_BASE_AGGREGATION] is used; above it the per-row expansion
-        /// path is used. Defaults to the query's `numGroupsLimit` when unset: if the base grouping alone could
-        /// approach the group limit, base groups could be dropped -- corrupting the derived totals -- and the
-        /// derive could do excessive work even though its output is capped. Ignored when base
-        /// aggregation is disabled.
+        /// Secondary per-segment bound on the estimated base-group count (product of the union columns'
+        /// dictionary cardinalities) for [#GROUPING_SETS_BASE_AGGREGATION]. Defaults to `numGroupsLimit`.
+        /// Raising this value cannot bypass the instance planner's hard `numGroupsLimit` bound on all local
+        /// base and derived groups. Ignored when base aggregation is disabled.
         public static final String GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS = "groupingSetsBaseAggregationMaxGroups";
 
         /// Number of threads used in the final reduce.

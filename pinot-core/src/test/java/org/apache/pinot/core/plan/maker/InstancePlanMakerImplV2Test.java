@@ -18,15 +18,28 @@
  */
 package org.apache.pinot.core.plan.maker;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
+import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 /// Tests for execution-thread resolution in [InstancePlanMakerImplV2], covering the interplay
@@ -98,5 +111,68 @@ public class InstancePlanMakerImplV2Test {
     config.setProperty(Server.MAX_EXECUTION_THREADS, 4);
     config.setProperty(Server.DEFAULT_EXECUTION_THREADS, 8);
     planMaker.init(config);
+  }
+
+  @Test
+  public void testGroupingSetsBoundIncludesEverySetAndGrandTotal() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT a, b, COUNT(*) FROM t GROUP BY ROLLUP(a, b)");
+    SegmentContext segment = segmentWithTwoColumns(2, 2);
+
+    // Two union columns have at most 4 BASE groups, but ROLLUP can produce 4 + 2 + 1 derived groups.
+    queryContext.setNumGroupsLimit(6);
+    assertFalse(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(List.of(segment), queryContext));
+    queryContext.setNumGroupsLimit(7);
+    assertTrue(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(List.of(segment), queryContext));
+
+    // The bounds add across segments, even when each segment fits by itself.
+    queryContext.setNumGroupsLimit(13);
+    assertFalse(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(List.of(segment, segment), queryContext));
+    queryContext.setNumGroupsLimit(14);
+    assertTrue(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(List.of(segment, segment), queryContext));
+  }
+
+  @Test
+  public void testOrderedGroupingSetsFallbackWhenDerivedGroupsExceedLimit() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT a, b, COUNT(*) FROM t GROUP BY ROLLUP(a, b) ORDER BY COUNT(*) DESC LIMIT 5");
+    queryContext.getQueryOptions().put(QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION, "true");
+    SegmentContext segment = segmentWithTwoColumns(2, 2);
+
+    queryContext.setNumGroupsLimit(7);
+    InstancePlanMakerImplV2.boundGroupingSetsBaseAggregation(List.of(segment), queryContext);
+    assertTrue(queryContext.isGroupingSetsBaseAggregation(), "all seven derived groups fit");
+
+    queryContext.setNumGroupsLimit(6);
+    InstancePlanMakerImplV2.boundGroupingSetsBaseAggregation(List.of(segment), queryContext);
+    assertFalse(queryContext.isGroupingSetsBaseAggregation());
+  }
+
+  private static SegmentContext segmentWithTwoColumns(int aCardinality, int bCardinality) {
+    SegmentContext segmentContext = mock(SegmentContext.class);
+    IndexSegment segment = mock(IndexSegment.class);
+    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    when(segmentContext.getIndexSegment()).thenReturn(segment);
+    when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
+    when(segmentMetadata.getTotalDocs()).thenReturn(10);
+    DataSource a = dataSource(aCardinality);
+    DataSource b = dataSource(bCardinality);
+    when(segment.getDataSourceNullable("a")).thenReturn(a);
+    when(segment.getDataSourceNullable("b")).thenReturn(b);
+    return segmentContext;
+  }
+
+  private static DataSource dataSource(int cardinality) {
+    DataSource dataSource = mock(DataSource.class);
+    DataSourceMetadata metadata = mock(DataSourceMetadata.class);
+    Dictionary dictionary = mock(Dictionary.class);
+    ForwardIndexReader<?> forwardIndex = mock(ForwardIndexReader.class);
+    when(dataSource.getDataSourceMetadata()).thenReturn(metadata);
+    when(metadata.isSingleValue()).thenReturn(true);
+    when(dataSource.getDictionary()).thenReturn(dictionary);
+    when(dictionary.length()).thenReturn(cardinality);
+    doReturn(forwardIndex).when(dataSource).getForwardIndex();
+    when(forwardIndex.isDictionaryEncoded()).thenReturn(true);
+    return dataSource;
   }
 }

@@ -103,10 +103,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     /// sets in parallel. Base aggregation is disabled when:
     ///   - any group-by column is multi-valued (an MV column fans a row across its values in the base grouping,
     ///     so rolling that column up would over-count the row), or
-    ///   - the estimated base-group count (union columns' dictionary cardinality product) exceeds the configured
-    ///     max (default `numGroupsLimit`): if base groups could overflow the group limit, dropped base keys
-    ///     would vanish from EVERY derived set -- corrupting the grand total and coarse subtotals, which the
-    ///     expansion path keeps exact under the limit -- and the derive would do excessive work (see
+    ///   - the instance planner cannot bound all local base and derived groups under `numGroupsLimit`, or the
+    ///     per-segment base-group estimate exceeds the configured max (default `numGroupsLimit`) (see
     ///     [QueryContext#isGroupingSetsBaseAggregation] and
     ///     [QueryContext#getGroupingSetsBaseAggregationMaxGroups]).
     boolean useBaseAggregation = queryContext.isGroupingSets() && queryContext.isGroupingSetsBaseAggregation()
@@ -168,8 +166,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
   /// Estimates the number of BASE groups (distinct value combinations over the union group-by columns) as the
   /// product of the columns' dictionary cardinalities, saturating at [Long#MAX_VALUE] on overflow. This is an
-  /// upper bound used to decide base-aggregation vs. expansion: keeping it under the group limit both avoids
-  /// dropped base keys (which would corrupt every derived set's totals) and bounds the derived output size.
+  /// secondary per-segment gate for base aggregation. The instance planner separately bounds all local base and
+  /// derived groups under `numGroupsLimit`; a per-segment base estimate alone cannot bound the merged output.
   ///
   /// Returns [Long#MAX_VALUE] (i.e. "assume too large", disabling base aggregation) if any union column is not
   /// dictionary-encoded, since its cardinality -- and therefore whether base groups fit under the limit -- is

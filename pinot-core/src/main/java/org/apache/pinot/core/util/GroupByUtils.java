@@ -129,11 +129,10 @@ public final class GroupByUtils {
   /// O(base groups) and runs it here -- after the row-collapsing base merge -- across the combine's threads,
   /// rather than expanding every scanned row.
   ///
-  /// When the worst-case derived output fits `numGroupsLimit`, the grouping sets are partitioned round-robin
-  /// across up to `numTasks` workers, each with task-local maps that are unioned without contention. Otherwise,
-  /// the derive processes sets coarsest-first into one capped map, so it never materializes base groups times
-  /// the number of sets. Profiling showed the previous shared-concurrent-table derive spent most of its time in
-  /// ConcurrentHashMap machinery rather than in the projection itself.
+  /// When the instance planner proved the derived output fits `numGroupsLimit`, the grouping sets are partitioned
+  /// round-robin across up to `numTasks` workers, each with task-local maps that are unioned without contention.
+  /// Direct callers without that proof still use the conservative base-size-times-set-count bound and cap the
+  /// output when needed.
   ///
   /// Clone discipline: a base group's intermediate flows into every grouping set (and is read concurrently by
   /// other tasks), while [AggregationFunction#merge] mutates/returns its arguments. Each derived group's stored
@@ -168,7 +167,8 @@ public final class GroupByUtils {
         queryContext.getMinInitialIndexedTableCapacity());
 
     List<Map.Entry<Key, Record>> baseEntries = new ArrayList<>(baseTable.getRecordEntries());
-    if (derivedUpperBound > derivedCap && useDeterministicIndexedTable(queryContext)) {
+    boolean outputFits = queryContext.areGroupingSetsDerivedGroupsBounded() || derivedUpperBound <= derivedCap;
+    if (!outputFits && useDeterministicIndexedTable(queryContext)) {
       baseEntries.sort(Map.Entry.comparingByKey());
     }
     // A full-union set (one that contains every union column, i.e. the identity grouping) maps base groups to
@@ -193,10 +193,9 @@ public final class GroupByUtils {
         preSerializeObjectIntermediates(baseEntries, aggregationFunctions, numUnionColumns, numTasks,
             queryContext, executorService);
 
-    // Keep the contention-free parallel path when even the worst-case fan-out fits the group limit. Otherwise,
-    // derive coarsest-first into one capped map; building every per-set map before trimming can use
-    // baseTable.size() * numSets records of heap even though only derivedCap groups can be returned.
-    if (derivedUpperBound > derivedCap) {
+    // The planner's per-set bound is tighter than baseTable.size() * numSets, which can be much larger even
+    // when no groups can be dropped. Use the parallel path whenever either bound proves the output fits.
+    if (!outputFits) {
       IndexedTable derivedTable = deriveCappedGroupingSets(baseEntries, serializedIntermediates, setContains,
           isFullUnionSet, groupingSets, groupingSetsSchema, numUnionColumns, numAggregationFunctions,
           aggregationFunctions, derivedCap, initialCapacity, queryContext, executorService);
@@ -529,56 +528,6 @@ public final class GroupByUtils {
       }
     }
     return setMaps;
-  }
-
-  /// Merges base records that OVERFLOWED the combine base table (their base key arrived after the table hit
-  /// `numGroupsLimit` and was dropped) into the ALREADY EXISTING derived groups, mirroring the expansion path's
-  /// behavior under the group limit: the grand total and the coarse subtotals -- whose groups exist -- stay
-  /// exact, and only the overflowing fine-set groups are lost. Runs single-threaded on the merge thread; each
-  /// OBJECT intermediate is serialized once here (single owner) and a private copy is deserialized per set.
-  public static void mergeOverflowBaseRecords(IndexedTable derivedTable, List<Record> overflowRecords,
-      QueryContext queryContext) {
-    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
-    assert aggregationFunctions != null;
-    int numAggregationFunctions = aggregationFunctions.length;
-    List<int[]> groupingSets = queryContext.getGroupingSets();
-    int numSets = groupingSets.size();
-    int numUnionColumns = queryContext.getGroupByExpressions().size();
-    boolean[][] setContains = new boolean[numSets][numUnionColumns];
-    for (int s = 0; s < numSets; s++) {
-      for (int columnIndex : groupingSets.get(s)) {
-        setContains[s][columnIndex] = true;
-      }
-    }
-    int numMerged = 0;
-    for (Record overflowRecord : overflowRecords) {
-      Object[] baseValues = overflowRecord.getValues();
-      SerializedIntermediateResult[] serializedRow = new SerializedIntermediateResult[numAggregationFunctions];
-      for (int i = 0; i < numAggregationFunctions; i++) {
-        Object intermediate = baseValues[numUnionColumns + i];
-        if (intermediate != null
-            && aggregationFunctions[i].getIntermediateResultColumnType() == ColumnDataType.OBJECT) {
-          serializedRow[i] = aggregationFunctions[i].serializeIntermediateResult(intermediate);
-        }
-      }
-      for (int s = 0; s < numSets; s++) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numMerged++,
-            "GroupByUtils#mergeOverflowBaseRecords");
-        boolean[] contains = setContains[s];
-        Object[] keyValues = new Object[numUnionColumns + 1];
-        for (int col = 0; col < numUnionColumns; col++) {
-          keyValues[col] = contains[col] ? baseValues[col] : null;
-        }
-        keyValues[numUnionColumns] = s;
-        Object[] values = new Object[numUnionColumns + 1 + numAggregationFunctions];
-        System.arraycopy(keyValues, 0, values, 0, numUnionColumns + 1);
-        for (int i = 0; i < numAggregationFunctions; i++) {
-          values[numUnionColumns + 1 + i] =
-              cloneIntermediate(aggregationFunctions[i], baseValues, serializedRow, numUnionColumns, i);
-        }
-        derivedTable.upsertExisting(new Key(keyValues), new Record(values));
-      }
-    }
   }
 
   /// Waits for all futures, bounded by the query deadline when one is set, cancelling the whole batch on
