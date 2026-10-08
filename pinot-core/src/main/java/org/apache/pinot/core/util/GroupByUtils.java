@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -49,6 +50,7 @@ import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedIntermediateResult;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -106,12 +108,18 @@ public final class GroupByUtils {
   /// O(base groups) and runs it here -- after the row-collapsing base merge -- across the combine's threads,
   /// rather than expanding every scanned row.
   ///
-  /// The base entries are partitioned across `numTasks` worker threads (by base-group ranges); each thread
-  /// derives its slice into a shared concurrent grouping-set table whose `upsert`/`merge` accumulates
-  /// cross-thread. Because a base group's intermediate flows into every grouping set (and across threads) and
-  /// [AggregationFunction#merge] mutates/returns its argument, each base intermediate is cloned per derived
-  /// record (see [#cloneIntermediate]), keeping object-backed accumulators (AVG, DISTINCTCOUNT, percentiles,
-  /// ...) exact.
+  /// The grouping sets are partitioned round-robin across up to `numTasks` worker tasks; each task derives its
+  /// owned sets over all base entries into a task-local plain HashMap. Task key spaces are disjoint (every
+  /// derived key carries its set ordinal), so the heavy merge work runs contention-free -- no concurrent table,
+  /// no bin locks, no shared size counters -- and the task maps are then unioned single-threaded into the result
+  /// table with plain stores (never merges). Profiling showed the previous shared-concurrent-table derive spent
+  /// most of its time in ConcurrentHashMap machinery rather than in the projection itself.
+  ///
+  /// Clone discipline: a base group's intermediate flows into every grouping set (and is read concurrently by
+  /// other tasks), while [AggregationFunction#merge] mutates/returns its arguments. Each derived group's stored
+  /// accumulator is therefore a clone (see [#cloneIntermediate]), and OBJECT intermediates are re-cloned per
+  /// merge so a merge can never mutate the shared base accumulator another task is still reading. Scalar
+  /// intermediates are immutable and clone-free.
   public static IndexedTable deriveGroupingSetsFromMergedBaseTable(IndexedTable baseTable, QueryContext queryContext,
       int numTasks, ExecutorService executorService) {
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
@@ -140,39 +148,43 @@ public final class GroupByUtils {
     int derivedUpperBound = (int) Math.min((long) baseTable.size() * numSets, Integer.MAX_VALUE);
     int initialCapacity = getIndexedTableInitialCapacity(derivedUpperBound, derivedUpperBound,
         queryContext.getMinInitialIndexedTableCapacity());
-    IndexedTable derivedTable = getTrimDisabledIndexedTable(groupingSetsSchema, false, queryContext,
-        Integer.MAX_VALUE, initialCapacity, numTasks, executorService);
 
     List<Map.Entry<Key, Record>> baseEntries = new ArrayList<>(baseTable.getRecordEntries());
-    int numEntries = baseEntries.size();
-    int numChunks = Math.max(1, Math.min(numTasks, numEntries));
-    if (numChunks <= 1) {
-      deriveChunk(baseEntries, 0, numEntries, setContains, numUnionColumns, numAggregationFunctions,
-          aggregationFunctions, derivedTable);
+    int numTaskSlots = Math.max(1, Math.min(numTasks, numSets));
+    List<Map<Key, Record>> taskMaps;
+    if (numTaskSlots == 1) {
+      taskMaps = List.of(deriveSets(baseEntries, setContains, 0, 1, numUnionColumns, numAggregationFunctions,
+          aggregationFunctions));
     } else {
-      int chunkSize = (numEntries + numChunks - 1) / numChunks;
-      List<Future<?>> futures = new ArrayList<>(numChunks);
-      for (int c = 0; c < numChunks; c++) {
-        int from = c * chunkSize;
-        int to = Math.min(from + chunkSize, numEntries);
-        if (from >= to) {
-          break;
-        }
-        futures.add(executorService.submit(() -> deriveChunk(baseEntries, from, to, setContains, numUnionColumns,
-            numAggregationFunctions, aggregationFunctions, derivedTable)));
+      List<Future<Map<Key, Record>>> futures = new ArrayList<>(numTaskSlots);
+      for (int t = 0; t < numTaskSlots; t++) {
+        int taskIndex = t;
+        futures.add(executorService.submit(() -> deriveSets(baseEntries, setContains, taskIndex, numTaskSlots,
+            numUnionColumns, numAggregationFunctions, aggregationFunctions)));
       }
+      taskMaps = new ArrayList<>(numTaskSlots);
       try {
-        for (Future<?> future : futures) {
-          future.get();
+        for (Future<Map<Key, Record>> future : futures) {
+          taskMaps.add(future.get());
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new RuntimeException("Interrupted while deriving grouping sets", e);
       } catch (ExecutionException e) {
-        for (Future<?> future : futures) {
+        for (Future<Map<Key, Record>> future : futures) {
           future.cancel(true);
         }
         throw new RuntimeException("Caught exception while deriving grouping sets", e.getCause());
+      }
+    }
+
+    // Union the disjoint task maps into the result table. This is single-threaded, so pass numThreads = 1 to
+    // get a plain-HashMap-backed table; every upsert is a pure store because the task key spaces are disjoint.
+    IndexedTable derivedTable = getTrimDisabledIndexedTable(groupingSetsSchema, false, queryContext,
+        Integer.MAX_VALUE, initialCapacity, 1, executorService);
+    for (Map<Key, Record> taskMap : taskMaps) {
+      for (Map.Entry<Key, Record> entry : taskMap.entrySet()) {
+        derivedTable.upsert(entry.getKey(), entry.getValue());
       }
     }
 
@@ -187,7 +199,7 @@ public final class GroupByUtils {
       List<IntermediateRecord> kept = tableResizer.trimTableByGroupingSet(derivedTable, serverTrimSize,
           numUnionColumns);
       ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
-      return buildIndexedTableFromRecords(groupingSetsSchema, queryContext, kept, numTasks, executorService);
+      return buildIndexedTableFromRecords(groupingSetsSchema, queryContext, kept, executorService);
     }
     return derivedTable;
   }
@@ -195,46 +207,64 @@ public final class GroupByUtils {
   /// Builds a trim-disabled grouping-set [IndexedTable] pre-populated with the given (already unique) records.
   /// Used to materialize the per-set-trim survivors back into the table the combine returns.
   private static IndexedTable buildIndexedTableFromRecords(DataSchema dataSchema, QueryContext queryContext,
-      List<IntermediateRecord> records, int numTasks, ExecutorService executorService) {
+      List<IntermediateRecord> records, ExecutorService executorService) {
     int numRecords = records.size();
     int initialCapacity =
         getIndexedTableInitialCapacity(numRecords, numRecords, queryContext.getMinInitialIndexedTableCapacity());
+    // Populated single-threaded, so use a plain-HashMap-backed table (numThreads = 1).
     IndexedTable table = getTrimDisabledIndexedTable(dataSchema, false, queryContext, Integer.MAX_VALUE,
-        initialCapacity, numTasks, executorService);
+        initialCapacity, 1, executorService);
     for (IntermediateRecord record : records) {
       table.upsert(record._key, record._record);
     }
     return table;
   }
 
-  /// Derives grouping-set records for base entries `[from, to)` into the shared concurrent `derivedTable`.
-  /// Each base group is projected into every grouping set and merged via the table's thread-safe upsert.
-  private static void deriveChunk(List<Map.Entry<Key, Record>> baseEntries, int from, int to,
-      boolean[][] setContains, int numUnionColumns, int numAggregationFunctions,
-      AggregationFunction[] aggregationFunctions, IndexedTable derivedTable) {
+  /// One derive task: projects every base group into the grouping sets owned by `taskIndex` (set `s` is owned
+  /// when `s % numTaskSlots == taskIndex`) and aggregates the derived groups into a task-local map. Each task
+  /// runs single-threaded over its own map, so a plain HashMap suffices; task key spaces are disjoint because
+  /// every derived key ends with its set ordinal.
+  ///
+  /// The first record stored for a derived key holds cloned intermediates (it becomes the group's accumulator,
+  /// mutated by later merges); on merge, OBJECT intermediates from the shared base group are cloned again so the
+  /// merge can never mutate a base accumulator that other tasks are still reading. Scalar intermediates are
+  /// immutable and pass through uncloned.
+  private static Map<Key, Record> deriveSets(List<Map.Entry<Key, Record>> baseEntries, boolean[][] setContains,
+      int taskIndex, int numTaskSlots, int numUnionColumns, int numAggregationFunctions,
+      AggregationFunction[] aggregationFunctions) {
     int numSets = setContains.length;
-    for (int e = from; e < to; e++) {
-      Map.Entry<Key, Record> baseEntry = baseEntries.get(e);
+    Map<Key, Record> taskMap = new HashMap<>();
+    for (Map.Entry<Key, Record> baseEntry : baseEntries) {
       Object[] baseKeys = baseEntry.getKey().getValues();
       Object[] baseValues = baseEntry.getValue().getValues();
-      for (int s = 0; s < numSets; s++) {
+      for (int s = taskIndex; s < numSets; s += numTaskSlots) {
         boolean[] contains = setContains[s];
         Object[] keyValues = new Object[numUnionColumns + 1];
         for (int col = 0; col < numUnionColumns; col++) {
           keyValues[col] = contains[col] ? baseKeys[col] : null;
         }
         keyValues[numUnionColumns] = s;
-        Object[] values = new Object[numUnionColumns + 1 + numAggregationFunctions];
-        System.arraycopy(keyValues, 0, values, 0, numUnionColumns + 1);
-        for (int i = 0; i < numAggregationFunctions; i++) {
-          // Clone so the merge into the shared derived table cannot mutate this base group's intermediate, which
-          // is also fed into every other grouping set (and concurrently by other threads).
-          values[numUnionColumns + 1 + i] =
-              cloneIntermediate(aggregationFunctions[i], baseValues[numUnionColumns + i]);
+        Key key = new Key(keyValues);
+        Record existing = taskMap.get(key);
+        if (existing == null) {
+          Object[] values = new Object[numUnionColumns + 1 + numAggregationFunctions];
+          System.arraycopy(keyValues, 0, values, 0, numUnionColumns + 1);
+          for (int i = 0; i < numAggregationFunctions; i++) {
+            values[numUnionColumns + 1 + i] =
+                cloneIntermediate(aggregationFunctions[i], baseValues[numUnionColumns + i]);
+          }
+          taskMap.put(key, new Record(values));
+        } else {
+          Object[] values = existing.getValues();
+          for (int i = 0; i < numAggregationFunctions; i++) {
+            int valueIndex = numUnionColumns + 1 + i;
+            values[valueIndex] = AggregationFunctionUtils.merge(aggregationFunctions[i], values[valueIndex],
+                cloneIntermediate(aggregationFunctions[i], baseValues[numUnionColumns + i]));
+          }
         }
-        derivedTable.upsert(new Key(keyValues), new Record(values));
       }
     }
+    return taskMap;
   }
 
   /// Returns `schema` with a synthetic `$groupingId` INT column inserted at `index` (after the union group-by
