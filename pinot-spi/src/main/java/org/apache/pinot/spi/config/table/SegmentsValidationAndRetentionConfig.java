@@ -94,8 +94,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   ///
   /// The limit sums compressed archive bytes for active, live completed segments, counted once regardless of
   /// replication. Live-segment lineage filtering excludes sources of COMPLETED entries and destinations of other
-  /// entries to avoid counting shadow copies. OFFLINE and REALTIME limits are enforced independently, including hybrid
-  /// tables.
+  /// entries to avoid counting shadow copies. OFFLINE APPEND and REALTIME limits are enforced independently, including
+  /// hybrid tables.
   ///
   /// Segments are ordered ascending by the first nonnegative end time, creation time, or push time, in that priority,
   /// then by segment name. Eviction removes only an old prefix before the first active segment listed as a source or
@@ -104,6 +104,14 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   /// positions even when their bytes are excluded. Missing live metadata or unknown live completed-segment sizes cause
   /// the pass to skip safely. Missing metadata or timestamps for an active lineage stop prevent eviction when over cap.
   ///
+  /// With the default lineage manager, COMPLETED sources wait for [#getReplacedSegmentsRetentionPeriod()] (4h for
+  /// APPEND, 24h for REFRESH) before deletion. The entry is removed on a subsequent cleanup pass after sources leave
+  /// IdealState. The retention schedule (6h by default) also delays release of the boundary. Stale IN_PROGRESS entries
+  /// use [#getLineageEntryCleanupRetentionPeriod()] (1d by default); REVERTED entries are eligible immediately.
+  /// These are cleanup eligibility windows, not deadlines for meeting the size cap. Continuous merge or rollup
+  /// activity can keep a lineage boundary present and leave an over-cap table at `sizeRetentionBlocked=1` for hours
+  /// or longer.
+  ///
   /// The newest OFFLINE segment, highest-sequence DONE LLC segment per REALTIME partition group, and undated segments
   /// are preserved. Consuming segments are neither counted nor removed. When hybrid retention is enabled and an
   /// OFFLINE counterpart exists, REALTIME eviction requires an end time strictly below the OFFLINE time boundary;
@@ -111,6 +119,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   ///
   /// Size retention rechecks the complete lineage entry snapshot under the local updater lock before deletion,
   /// regardless of the lineage-exclusive deletion setting. A changed snapshot aborts the batch for retry next cycle.
+  /// This deliberately includes timestamp-only changes and entries wholly newer than the boundary, even when the
+  /// selected prefix is unaffected.
   /// The check and deletion are not a global transaction across controllers.
   ///
   /// This is an asynchronous, best-effort retention policy, not a limit on decompressed server disk usage,
@@ -136,12 +146,12 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _deletedSegmentsRetentionPeriod = deletedSegmentsRetentionPeriod;
   }
 
-  /// Returns the retention period for segments replaced by a REFRESH ingestion job. Only applies to tables with
-  /// REFRESH ingestion type; for APPEND tables this setting is ignored and replaced segments are deleted immediately.
+  /// Returns the retention period for source segments replaced by a COMPLETED lineage entry. Applies to all ingestion
+  /// types, including APPEND and REFRESH.
   ///
   /// When a lineage entry transitions to COMPLETED state, source segments are preserved for this duration before
-  /// being scheduled for deletion, providing a rollback window. Consumers of this config (e.g. the lineage manager)
-  /// treat a null or unparseable value as a 1 day default.
+  /// being scheduled for deletion. The default lineage manager uses 4 hours for APPEND and other ingestion types,
+  /// and 24 hours for REFRESH, when the value is unset, empty, or unparseable.
   ///
   /// Accepts a human-readable period string (e.g. `"7d"`, `"12h"`) as understood by
   /// `TimeUtils.convertPeriodToMillis`. Setting this value too low (e.g. `"0d"`) eliminates the rollback
@@ -154,9 +164,10 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _replacedSegmentsRetentionPeriod = replacedSegmentsRetentionPeriod;
   }
 
-  /// Returns the retention period before stale IN_PROGRESS or REVERTED lineage entries and their destination segments
-  /// are cleaned up. Consumers of this config (e.g. the lineage manager) treat a null or unparseable value as a
-  /// 1 day default.
+  /// Returns the retention period before stale IN_PROGRESS lineage entries and their destination segments become
+  /// eligible for cleanup. The default lineage manager uses 1 day when the value is unset, empty, or unparseable.
+  /// REVERTED entries are eligible immediately. This period does not apply to COMPLETED entries: those are removed
+  /// on a cleanup pass after their source segments leave IdealState.
   ///
   /// Accepts a human-readable period string (e.g. `"7d"`, `"12h"`) as understood by
   /// `TimeUtils.convertPeriodToMillis`.
