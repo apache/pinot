@@ -715,7 +715,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultPreferSelectAliasInGroupBy(preferSelectAliasInGroupBy)
         .meterGroupByAliasShadowedByColumn(true)
         .defaultWindowKWayMerge(windowKWayMerge)
-        .isKWayMergeSupported(QueryOptionsUtils.isWindowKWayMerge(queryOptions, windowKWayMerge)
+        .isKWayMergeSupported((QueryOptionsUtils.isWindowKWayMerge(queryOptions, windowKWayMerge)
+            || QueryOptionsUtils.isStreamingSortedMailboxReceiveEnabled(queryOptions))
             && !QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
             && _kWayMergeSupported.getAsBoolean())
         .build();
