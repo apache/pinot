@@ -49,6 +49,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -139,12 +140,26 @@ public class ImmutableSegmentImplTest {
     verify(segmentDirectory).close();
   }
 
-  @Test
-  public void testDestroyWaitsForReadLock()
+  @DataProvider
+  public Object[][] materializationModes() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "materializationModes")
+  public void testDestroyWaitsForReadLock(boolean lazy)
       throws Exception {
     SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
     ColumnIndexContainer indexContainer = mock(ColumnIndexContainer.class);
-    ImmutableSegmentImpl segment = createSegment(segmentDirectory, Map.of("col", indexContainer));
+    ImmutableSegmentImpl segment;
+    if (lazy) {
+      ColumnMetadataImpl col = columnMetadata(intColumn("col"), null);
+      ColumnMaterializer materializer = mock(ColumnMaterializer.class);
+      when(materializer.createIndexContainer(col)).thenReturn(indexContainer);
+      segment = lazySegment(segmentDirectory, schema(col), materializer, col);
+      assertNotNull(segment.getDataSourceNullable("col"));
+    } else {
+      segment = createSegment(segmentDirectory, Map.of("col", indexContainer));
+    }
     assertTrue(segment.tryAcquireReadLock());
 
     ExecutorService executor = Executors.newSingleThreadExecutor();
