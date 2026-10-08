@@ -2109,8 +2109,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       return parallelSegmentConsumptionPolicy;
     }
     // When the policy is not set:
-    // - Without dedup or partial upsert, allow consumption during build and download
-    // - With dedup or partial upsert, in order to get consistent behavior we need to ensure the metadata contains all
+    // - Without dedup or upsert, allow consumption during build and download
+    // - With dedup or upsert, in order to get consistent behavior we need to ensure the metadata contains all
     //   previous records before starting consumption:
     //   - If the table config allows consumption during commit, allow consumption during build and download
     //   - For pauseless tables, allow consumption during build, but disallow consumption during download
@@ -2118,8 +2118,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     //     TODO: Revisit the non-pauseless handling
     if (_partitionUpsertMetadataManager != null) {
       UpsertContext upsertContext = _partitionUpsertMetadataManager.getContext();
-      if (upsertContext.isAllowPartialUpsertConsumptionDuringCommit()
-          || !upsertContext.isTableTypeInconsistentDuringConsumption()) {
+      if (upsertContext.isAllowPartialUpsertConsumptionDuringCommit()) {
         return ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS;
       }
       return pauseless ? ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY
