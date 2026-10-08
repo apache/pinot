@@ -29,12 +29,12 @@ import java.util.stream.Stream;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -151,11 +151,6 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
   }
 
   @Override
-  public StringBuilder visitKWayMergeExchange(KWayMergeExchangeNode node, Context context) {
-    throw new UnsupportedOperationException("KWayMergeExchangeNode should not be visited");
-  }
-
-  @Override
   public StringBuilder visitFilter(FilterNode node, Context context) {
     return visitSimpleNode(node, context);
   }
@@ -179,16 +174,19 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
 
   @Override
   public StringBuilder visitMailboxReceive(MailboxReceiveNode node, Context context) {
-    return visitReceive(node, node.getSender(), node.getSenderStageId(), context);
+    return visitReceive(node, context);
   }
 
   @Override
   public StringBuilder visitMailboxMergeReceive(MailboxMergeReceiveNode node, Context context) {
-    return visitReceive(node, node.getSender(), node.getSenderStageId(), context);
+    return visitReceive(node, context);
   }
 
-  private StringBuilder visitReceive(PlanNode node, MailboxSendNode sender, int senderStageId, Context context) {
+  private StringBuilder visitReceive(BaseMailboxReceiveNode node, Context context) {
     appendInfo(node, context).append('\n');
+
+    MailboxSendNode sender = node.getSender();
+    int senderStageId = node.getSenderStageId();
     DispatchablePlanFragment dispatchablePlanFragment = _dispatchableSubPlan.getQueryStageMap().get(senderStageId);
 
     Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =

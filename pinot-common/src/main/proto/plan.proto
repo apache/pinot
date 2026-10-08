@@ -210,7 +210,6 @@ message MailboxMergeReceiveNode {
   DistributionType distributionType = 3;
   repeated int32 keys = 4;
   repeated Collation collations = 5;
-  reserved 6, 7;
 }
 
 message MailboxSendNode {

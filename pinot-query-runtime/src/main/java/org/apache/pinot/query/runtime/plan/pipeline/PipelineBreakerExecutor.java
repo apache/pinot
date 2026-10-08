@@ -25,7 +25,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.StagePlan;
@@ -107,9 +106,8 @@ public class PipelineBreakerExecutor {
     for (Map.Entry<Integer, PlanNode> e : pipelineBreakerContext.getPipelineBreakerMap().entrySet()) {
       int key = e.getKey();
       PlanNode planNode = e.getValue();
-      if (!(planNode instanceof MailboxReceiveNode) && !(planNode instanceof MailboxMergeReceiveNode)) {
-        throw new UnsupportedOperationException("Only mailbox receive nodes are supported as pipeline breakers: "
-            + planNode.getClass().getSimpleName());
+      if (!(planNode instanceof MailboxReceiveNode)) {
+        throw new UnsupportedOperationException("Only MailboxReceiveNode is supported to run as pipeline breaker now");
       }
       OpChain opChain = OpChainConverterDispatcher.convert(planNode, opChainExecutionContext);
       pipelineWorkerMap.put(key, opChain.getRoot());
