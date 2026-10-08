@@ -31,7 +31,6 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -95,7 +94,7 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
 
   @Override
   public PlanNode visitMailboxMergeReceive(MailboxMergeReceiveNode node, Context context) {
-    throw new UnsupportedOperationException("MailboxMergeReceiveNode should not be visited by StageFragmenter");
+    throw new UnsupportedOperationException("MailboxReceiveNode should not be visited by StageFragmenter");
   }
 
   @Override
@@ -157,11 +156,6 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
         new SubPlanMetadata(node.getTableNames(), ImmutablePairList.of()));
     PlanNode literalValueNode = new LiteralValueNode(nextStageRoot.getDataSchema());
     return literalValueNode;
-  }
-
-  @Override
-  public PlanNode visitKWayMergeExchange(KWayMergeExchangeNode node, Context context) {
-    return process(node, context);
   }
 
   @Override

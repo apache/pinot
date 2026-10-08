@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -83,7 +84,7 @@ public class EquivalentStagesReplacer {
     private final boolean _guarded;
     private final List<SpoolSubstitution> _substitutions = new ArrayList<>();
     /// A stage can be visited more than once (for example the leader of a group), so a receive is decided only once.
-    private final Set<MailboxReceiveNode> _visitedReceives = Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Set<BaseMailboxReceiveNode> _visitedReceives = Collections.newSetFromMap(new IdentityHashMap<>());
 
     public Replacer(PlanNode root, OnSubstitution listener, boolean guarded) {
       _root = root;
@@ -93,6 +94,15 @@ public class EquivalentStagesReplacer {
 
     @Override
     public Void visitMailboxReceive(MailboxReceiveNode node, GroupedStages equivalenceGroups) {
+      return visitReceive(node, equivalenceGroups);
+    }
+
+    @Override
+    public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, GroupedStages equivalenceGroups) {
+      return visitReceive(node, equivalenceGroups);
+    }
+
+    private Void visitReceive(BaseMailboxReceiveNode node, GroupedStages equivalenceGroups) {
       if (!_visitedReceives.add(node)) {
         return null;
       }
@@ -130,28 +140,6 @@ public class EquivalentStagesReplacer {
       _substitutions.add(new SpoolSubstitution(node.getStageId(), sender.getStageId(), leader.getStageId(),
           SpoolSubstitution.Outcome.APPLIED, null));
       return null;
-    }
-
-    @Override
-    public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, GroupedStages equivalenceGroups) {
-      MailboxSendNode sender = node.getSender();
-      MailboxSendNode leader = equivalenceGroups.getGroup(sender).first();
-      if (canSubstitute(sender, leader)) {
-        node.setSender(leader);
-        leader.addReceiver(node.getStageId());
-        _listener.onSubstitution(node.getStageId(), sender.getStageId(), leader.getStageId());
-      } else {
-        visitMailboxSend(leader, equivalenceGroups);
-      }
-      return null;
-    }
-
-    private boolean canSubstitute(MailboxSendNode actualSender, MailboxSendNode leader) {
-      return actualSender != leader // we don't need to replace the leader with itself
-          // the leader is already sending to this stage. Given we don't have the ability to send to multiple
-          // receivers in the same stage, we cannot optimize this case right now.
-          // If this case seems to be useful, it can be supported in the future.
-          && !leader.sharesReceiverStages(actualSender);
     }
   }
 }

@@ -337,7 +337,7 @@ public abstract class CustomDataQueryClusterIntegrationTest extends CustomSuiteH
     LOGGER.warn("Finished tearing down integration test class: {}", getClass().getSimpleName());
   }
 
-  protected void addRealtimeTableConfigWithRetry(TableConfig tableConfig)
+  private void addRealtimeTableConfigWithRetry(TableConfig tableConfig)
       throws Exception {
     for (int attempt = 1; attempt <= REALTIME_TABLE_CONFIG_RETRY_COUNT; attempt++) {
       try {
@@ -369,7 +369,7 @@ public abstract class CustomDataQueryClusterIntegrationTest extends CustomSuiteH
     return false;
   }
 
-  protected void waitForKafkaTopicMetadataReadyForConsumer(String topic, int expectedPartitions) {
+  private void waitForKafkaTopicMetadataReadyForConsumer(String topic, int expectedPartitions) {
     TestUtils.waitForCondition(aVoid -> isKafkaTopicMetadataReadyForConsumer(topic, expectedPartitions), 200L,
         KAFKA_TOPIC_METADATA_READY_TIMEOUT_MS,
         "Kafka topic '" + topic + "' metadata is not visible to consumers in custom cluster suite");
@@ -458,8 +458,9 @@ public abstract class CustomDataQueryClusterIntegrationTest extends CustomSuiteH
     return _sharedClusterTestSuite._controllerStarter;
   }
 
-  protected BaseBrokerStarter getSharedBrokerStarter() {
-    return _sharedClusterTestSuite._brokerStarters.get(0);
+  /// Returns broker starters from the shared suite instance.
+  protected List<BaseBrokerStarter> getSharedBrokerStarters() {
+    return _sharedClusterTestSuite._brokerStarters;
   }
 
   /// Returns server starters from the shared suite instance.

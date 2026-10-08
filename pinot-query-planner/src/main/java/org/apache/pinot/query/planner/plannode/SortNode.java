@@ -19,13 +19,24 @@
 package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 
 
 public class SortNode extends BasePlanNode {
-  public static final String REQUIRES_SINGLE_RUN_HINT = "requiresSingleRun";
+  private static final String SINGLE_RUN_HINT = "single_run_sort";
+
+  public SortNode requiringSingleRun() {
+    return new SortNode(_stageId, _dataSchema, _nodeHint.with(SINGLE_RUN_HINT, Map.of()), _inputs,
+        _collations, _fetch, _offset);
+  }
+
+  public boolean isSingleRunRequired() {
+    return _nodeHint.getHintOptions().containsKey(SINGLE_RUN_HINT);
+  }
+
   private final List<RelFieldCollation> _collations;
   private final int _fetch;
   private final int _offset;
@@ -48,11 +59,6 @@ public class SortNode extends BasePlanNode {
 
   public int getOffset() {
     return _offset;
-  }
-
-  /// Whether this sender sort must consume the combined leaf input to produce one ordered stream per mailbox.
-  public boolean requiresSingleRun() {
-    return _nodeHint.getHintOptions().containsKey(REQUIRES_SINGLE_RUN_HINT);
   }
 
   @Override

@@ -108,12 +108,6 @@ public abstract class DefaultPostOrderTraversalVisitor<T, C> implements PlanNode
   }
 
   @Override
-  public T visitKWayMergeExchange(KWayMergeExchangeNode node, C context) {
-    node.getInputs().forEach(input -> input.visit(this, context));
-    return process(node, context);
-  }
-
-  @Override
   public T visitExplained(ExplainedNode node, C context) {
     node.getInputs().forEach(input -> input.visit(this, context));
     return process(node, context);
