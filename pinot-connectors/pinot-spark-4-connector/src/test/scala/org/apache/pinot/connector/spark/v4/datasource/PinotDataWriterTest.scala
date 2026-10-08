@@ -231,14 +231,14 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
     Files.exists(untarDir) shouldBe true
 
     val segmentFiles = Files.list(untarDir).toArray.map(_.toString)
-    segmentFiles should contain (untarDir + "/creation.meta")
-    segmentFiles should contain (untarDir + "/index_map")
-    segmentFiles should contain (untarDir + "/metadata.properties")
-    segmentFiles should contain (untarDir + "/columns.psf")
+    segmentFiles should contain (untarDir.toString + "/creation.meta")
+    segmentFiles should contain (untarDir.toString + "/index_map")
+    segmentFiles should contain (untarDir.toString + "/metadata.properties")
+    segmentFiles should contain (untarDir.toString + "/columns.psf")
 
     // Verify basic metadata content
-    val metadataSrc = Source.fromFile(untarDir + "/metadata.properties")
-    val metadataContent = metadataSrc.getLines.mkString("\n")
+    val metadataSrc = Source.fromFile(untarDir.toString + "/metadata.properties")
+    val metadataContent = metadataSrc.getLines().mkString("\n")
     metadataSrc.close()
 
     metadataContent should include ("segment.name = testTable_1234567890_1234567891_000")
