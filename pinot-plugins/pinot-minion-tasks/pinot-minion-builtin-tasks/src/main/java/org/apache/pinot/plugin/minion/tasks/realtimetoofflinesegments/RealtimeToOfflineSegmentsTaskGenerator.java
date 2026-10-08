@@ -332,7 +332,10 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     // collectorType alias. SegmentProcessorConfig re-enforces this at execution time.
     String effectiveMergeType = taskConfigs.get(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY);
     if (effectiveMergeType == null) {
-      effectiveMergeType = taskConfigs.get(RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY);
+      // Persisted task configs still use this legacy alias, so validate it before scheduling as well.
+      @SuppressWarnings("deprecation")
+      String legacyMergeType = taskConfigs.get(RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY);
+      effectiveMergeType = legacyMergeType;
     }
     if (schema != null) {
       MergeTaskUtils.validateMergeTypeForVariantColumns(schema, effectiveMergeType);
