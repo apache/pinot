@@ -691,8 +691,10 @@ public final class RelToPlanNodeConverter {
     }
     List<PlanNode> inputs = convertInputs(node.getInputs());
     if (inputs.get(0) instanceof SortNode && ((SortNode) inputs.get(0)).getFetch() < 0) {
-      // Window evaluation needs the complete ordered input, including on the receiver-sort fallback path.
-      SortNode fullSort = ((SortNode) inputs.get(0)).requiringSingleRun();
+      // Older servers ignore the single-run hint, so encode the complete receiver input as an explicit fetch.
+      SortNode sort = (SortNode) inputs.get(0);
+      SortNode fullSort = new SortNode(sort.getStageId(), sort.getDataSchema(), sort.getNodeHint(), sort.getInputs(),
+          sort.getCollations(), Integer.MAX_VALUE, sort.getOffset()).requiringSingleRun();
       inputs.set(0, fullSort);
       if (_tracker != null) {
         _tracker.trackCreation(node.getInput(), fullSort);
