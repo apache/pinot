@@ -65,7 +65,6 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -245,7 +244,8 @@ public final class PlanNodeToRelConverter {
 
       List<RelNode> inputs = readAlreadyPushedChildren(node);
 
-      PinotExplainedRelNode explained = new PinotExplainedRelNode(_builder.getCluster(), "MailboxReceive",
+      PinotExplainedRelNode explained = new PinotExplainedRelNode(_builder.getCluster(),
+          "MailboxReceive",
           attributes.build(), node.getDataSchema(), inputs);
       _builder.push(explained);
       return null;
@@ -253,10 +253,12 @@ public final class PlanNodeToRelConverter {
 
     @Override
     public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, Void context) {
+      visitChildren(node);
       _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "MailboxMergeReceive", Map.of(),
-          node.getDataSchema(), inputsAsList(node)));
+          node.getDataSchema(), readAlreadyPushedChildren(node)));
       return null;
     }
+
 
     @Override
     public Void visitMailboxSend(MailboxSendNode node, Void context) {
@@ -617,13 +619,6 @@ public final class PlanNodeToRelConverter {
             exchangeNode.getDataSchema(), readAlreadyPushedChildren(exchangeNode)));
       }
 
-      return null;
-    }
-
-    @Override
-    public Void visitKWayMergeExchange(KWayMergeExchangeNode node, Void context) {
-      _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "KWayMergeExchange", Map.of(),
-          node.getDataSchema(), inputsAsList(node)));
       return null;
     }
 

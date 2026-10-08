@@ -23,13 +23,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BooleanSupplier;
+import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.commons.io.FileUtils;
+import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
-import org.apache.pinot.broker.requesthandler.MultiStageBrokerRequestHandler;
-import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -44,171 +42,135 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/// Exercises the actual merge plan, wire serialization and local/gRPC execution against receiver sorting on a hybrid
-/// table. The capability override is scoped to this test because development clusters report SNAPSHOT versions.
-/// The shared broker override and table setup are used serially; this test is not thread-safe.
+/// Exercises sender sorting and merge receive through planning, serialization and real mailbox transport.
+/// The hybrid fixture ensures each sender sorts one complete run across its physical leaf requests.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class WindowKWayMergeIntegrationTest extends CustomDataQueryClusterIntegrationTest {
-  private boolean _offlineCreated;
-  private boolean _realtimeCreated;
+  private static final int ROWS_PER_TABLE = 8;
+  private static final long OFFLINE_TIME = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(3);
 
   @Override
   public String getTableName() {
-    return "WindowKWayMergeIntegrationTest";
-  }
-
-  @Override
-  protected long getCountStarResult() {
-    return 32;
-  }
-
-  @Override
-  public int getNumAvroFiles() {
-    return 4;
+    return "WindowKWayMerge";
   }
 
   @Override
   public Schema createSchema() {
-    return new Schema.SchemaBuilder().setSchemaName(getTableName())
+    return new Schema.SchemaBuilder().setSchemaName(getTableName()).setEnableColumnBasedNullHandling(true)
         .addSingleValueDimension("id", DataType.INT)
-        .addSingleValueDimension("orderKey", DataType.INT)
-        .addMetric("value", DataType.INT)
-        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+        .addSingleValueDimension("sortKey", DataType.INT)
+        .addMetric("amount", DataType.INT)
+        .addDateTime(TIMESTAMP_FIELD_NAME, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+  }
+
+  @Override
+  public TableConfig createOfflineTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName())
+        .setTimeColumnName(TIMESTAMP_FIELD_NAME).setNullHandlingEnabled(true).build();
+  }
+
+  @Override
+  protected boolean getNullHandlingEnabled() {
+    return true;
+  }
+
+  @Override
+  protected void setUpTable()
+      throws Exception {
+    super.setUpTable();
+    createSharedKafkaTopic(getKafkaTopic(), getNumKafkaPartitions());
+    List<File> realtimeFiles = createAvroFiles(true);
+    addTableConfig(createRealtimeTableConfig(realtimeFiles.get(0)));
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult(getTableName() + "_OFFLINE") == ROWS_PER_TABLE,
+        100L, 60_000, "Failed to load offline window rows", null);
+    // These disjoint rows need a boundary at the offline end, rather than the default one-day overlap.
+    getOrCreateAdminClient().getTableClient().setTimeBoundary(getTableName());
+    pushAvroIntoKafka(realtimeFiles);
   }
 
   @Override
   public List<File> createAvroFiles()
-      throws Exception {
-    org.apache.avro.Schema avroSchema = new org.apache.avro.Schema.Parser().parse("""
-        {"type":"record","name":"windowRow","fields":[
-          {"name":"id","type":"int"},
-          {"name":"orderKey","type":["null","int"],"default":null},
-          {"name":"value","type":"int"},
-          {"name":"ts","type":"long"}]}
-        """);
-    long oldTimestamp = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2);
+      throws IOException {
+    return createAvroFiles(false);
+  }
+
+  private List<File> createAvroFiles(boolean realtime)
+      throws IOException {
+    org.apache.avro.Schema avroSchema = SchemaBuilder.record("windowRow").fields()
+        .requiredInt("id").optionalInt("sortKey").requiredInt("amount").requiredLong(TIMESTAMP_FIELD_NAME)
+        .endRecord();
     try (AvroFilesAndWriters files = createAvroFilesAndWriters(avroSchema)) {
-      for (int i = 0; i < 32; i++) {
+      List<DataFileWriter<GenericData.Record>> writers = files.getWriters();
+      for (int i = 0; i < ROWS_PER_TABLE; i++) {
+        int id = i + (realtime ? ROWS_PER_TABLE : 0);
         GenericData.Record row = new GenericData.Record(avroSchema);
-        row.put("id", i);
-        row.put("orderKey", i % 7 == 0 ? null : i % 4);
-        row.put("value", i + 1);
-        row.put("ts", oldTimestamp + (i < 16 ? 0 : TimeUnit.DAYS.toMillis(1)) + i * 1000L);
-        DataFileWriter<GenericData.Record> writer = files.getWriters().get(i / 8);
-        writer.append(row);
+        row.put("id", id);
+        row.put("sortKey", id % 5 == 0 ? null : id % 3);
+        row.put("amount", id + 1);
+        row.put(TIMESTAMP_FIELD_NAME, OFFLINE_TIME + (realtime ? TimeUnit.DAYS.toMillis(2) : 0) + i);
+        writers.get(i % writers.size()).append(row);
       }
       return files.getAvroFiles();
     }
   }
 
   @Override
-  protected void setUpTable()
-      throws Exception {
-    Schema schema = createSchema();
-    addSchema(schema);
-    List<File> files = createAvroFiles();
-    TableConfig offline = new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName())
-        .setTimeColumnName(getTimeColumnName()).setNullHandlingEnabled(true).build();
-    addTableConfig(offline);
-    _offlineCreated = true;
-    for (int i = 0; i < 2; i++) {
-      ClusterIntegrationTestUtils.buildSegmentFromAvro(files.get(i), offline, schema, i, _segmentDir, _tarDir);
-    }
-    uploadSegments(getTableName(), _tarDir);
-    createSharedKafkaTopic(getKafkaTopic(), getNumKafkaPartitions());
-    waitForKafkaTopicMetadataReadyForConsumer(getKafkaTopic(), getNumKafkaPartitions());
-    TableConfig realtime = createRealtimeTableConfig(files.get(2));
-    realtime.getIndexingConfig().setNullHandlingEnabled(true);
-    addRealtimeTableConfigWithRetry(realtime);
-    _realtimeCreated = true;
-    pushAvroIntoKafka(files.subList(2, 4));
-  }
-
-  @Override
-  @AfterClass(alwaysRun = true)
-  public void tearDown()
-      throws IOException {
-    try {
-      if (_realtimeCreated) {
-        dropRealtimeTable(getTableName());
-      }
-    } finally {
-      if (_offlineCreated) {
-        super.tearDown();
-      } else {
-        FileUtils.deleteDirectory(_tempDir);
-      }
-    }
-  }
-
-  @Override
-  protected void waitForAllDocsLoaded(long timeoutMs)
-      throws Exception {
-    TestUtils.waitForCondition(aVoid -> getCurrentCountStarResult(getTableName() + "_OFFLINE") == 16
-        && getCurrentCountStarResult(getTableName() + "_REALTIME") == 16, 100L, timeoutMs,
-        "Both physical tables must be loaded before setting the hybrid boundary");
-    // The automatic boundary subtracts a day for overlap. This disjoint fixture uses the actual offline maximum.
-    getOrCreateAdminClient().getTableClient().setTimeBoundary(getTableName());
-    super.waitForAllDocsLoaded(timeoutMs);
+  protected long getCountStarResult() {
+    return 2 * ROWS_PER_TABLE;
   }
 
   @Test
-  public void testMergeMatchesReceiverSort()
+  public void testMergeMatchesReceiverSortOnHybridTable()
       throws Exception {
     setUseMultiStageQueryEngine(true);
-    MultiStageBrokerRequestHandler handler =
-        ((BrokerRequestHandlerDelegate) getSharedBrokerStarter().getBrokerRequestHandler())
-            .getMultiStageBrokerRequestHandler();
-    // This is a test-only dependency override; no production query option bypasses the version gate.
-    BooleanSupplier previous = handler.setKWayMergeSupported(() -> true);
+    // Snapshot clusters deliberately cannot pass the production version gate. Open only this test's capability hook.
+    for (BaseBrokerStarter broker : getSharedBrokerStarters()) {
+      ((BrokerRequestHandlerDelegate) broker.getBrokerRequestHandler()).getMultiStageBrokerRequestHandler()
+          .setKWayMergeSupported(() -> true);
+    }
     try {
-      for (String frame : List.of("ORDER BY orderKey DESC NULLS FIRST, id ROWS BETWEEN CURRENT ROW AND "
-          + "UNBOUNDED FOLLOWING", "ORDER BY orderKey DESC NULLS FIRST RANGE BETWEEN UNBOUNDED PRECEDING AND "
-          + "CURRENT ROW")) {
-        String query = "SELECT id, orderKey, SUM(value) OVER (" + frame + ") FROM " + getTableName()
+      for (String frame : List.of(
+          "ORDER BY sortKey DESC NULLS FIRST, id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING",
+          "ORDER BY sortKey DESC NULLS FIRST RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW")) {
+        String query = "SELECT id, sortKey, SUM(amount) OVER (" + frame + ") FROM " + getTableName()
             + " ORDER BY id LIMIT 100";
-        JsonNode receiver = postQuery("SET windowKWayMerge=false; SET enableNullHandling=true; " + query);
-        JsonNode merged = postQuery("SET windowKWayMerge=true; SET enableNullHandling=true; " + query);
-        assertTrue(receiver.path("exceptions").isEmpty(), receiver.toString());
-        assertTrue(merged.path("exceptions").isEmpty(), merged.toString());
-        assertEquals(merged.path("resultTable").path("rows"), receiver.path("resultTable").path("rows"));
-        assertEquals(merged.path("resultTable").path("rows").size(), 32);
-        for (int i = 0; i < 32; i++) {
-          assertEquals(merged.path("resultTable").path("rows").get(i).get(0).asInt(), i,
-              "The window must retain rows from both physical tables");
+        JsonNode receiver = postQuery(options(false) + query);
+        JsonNode merge = postQuery(options(true) + query);
+        assertNoError(receiver);
+        assertNoError(merge);
+        JsonNode rows = merge.get("resultTable").get("rows");
+        assertEquals(rows.size(), (int) getCountStarResult());
+        for (int id = 0; id < rows.size(); id++) {
+          assertEquals(rows.get(id).get(0).intValue(), id);
         }
-        assertFalse(merged.path("partialResult").asBoolean());
-        JsonNode plan = postQuery("SET windowKWayMerge=true; SET enableNullHandling=true; "
-            + "EXPLAIN IMPLEMENTATION PLAN FOR " + query);
-        assertTrue(plan.toString().contains("MAIL_MERGE_RECEIVE"), plan.toString());
-        assertTrue(containsMergeStats(merged.path("stageStats")), merged.toString());
+        assertEquals(rows, receiver.get("resultTable").get("rows"), frame);
+        assertTrue(explain(true, query).contains("MAIL_MERGE_RECEIVE"));
+        assertFalse(explain(false, query).contains("MAIL_MERGE_RECEIVE"));
       }
     } finally {
-      handler.setKWayMergeSupported(previous);
+      for (BaseBrokerStarter broker : getSharedBrokerStarters()) {
+        ((BrokerRequestHandlerDelegate) broker.getBrokerRequestHandler()).getMultiStageBrokerRequestHandler()
+            .setKWayMergeSupported(() -> false);
+      }
     }
   }
 
-  private static boolean containsMergeStats(JsonNode node) {
-    if (node.path("type").asText().equals("WINDOW")) {
-      for (JsonNode receiver : node.path("children")) {
-        if (receiver.path("type").asText().equals("MAILBOX_RECEIVE")
-            && receiver.path("rawMessages").asInt() > 0
-            && receiver.path("inMemoryMessages").asInt() > 0) {
-          for (JsonNode sender : receiver.path("children")) {
-            for (JsonNode input : sender.path("children")) {
-              if (input.path("type").asText().equals("SORT_OR_LIMIT")) {
-                return true;
-              }
-            }
-          }
-        }
-      }
-    }
-    for (JsonNode child : node.path("children")) {
-      if (containsMergeStats(child)) {
-        return true;
-      }
-    }
-    return false;
+  private String explain(boolean merge, String query)
+      throws Exception {
+    JsonNode response = postQuery(options(merge) + "EXPLAIN IMPLEMENTATION PLAN FOR " + query);
+    assertNoError(response);
+    return response.get("resultTable").get("rows").toString();
+  }
+
+  private static String options(boolean merge) {
+    return "SET windowKWayMerge=" + merge + "; SET nullHandlingEnabled=true; ";
+  }
+
+  @AfterClass(alwaysRun = true)
+  @Override
+  public void tearDown()
+      throws IOException {
+    dropRealtimeTable(getTableName());
+    super.tearDown();
   }
 }

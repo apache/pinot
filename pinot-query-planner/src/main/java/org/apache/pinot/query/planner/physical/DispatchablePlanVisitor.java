@@ -30,12 +30,12 @@ import org.apache.pinot.core.routing.LogicalTableRouteInfo;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -97,11 +97,6 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   @Override
   public Void visitExchange(ExchangeNode exchangeNode, DispatchablePlanContext context) {
     throw new UnsupportedOperationException("ExchangeNode should not be visited by DispatchablePlanVisitor");
-  }
-
-  @Override
-  public Void visitKWayMergeExchange(KWayMergeExchangeNode node, DispatchablePlanContext context) {
-    throw new UnsupportedOperationException("KWayMergeExchangeNode should not be visited by DispatchablePlanVisitor");
   }
 
   @Override
@@ -176,13 +171,13 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   /// orders each partition only - it feeds a `PARTITION BY ... ORDER BY` window or a `WITHIN GROUP` aggregate - so it
   /// keeps the partitioned worker assignment.
   private static boolean isFinalSort(SortNode node) {
-    if (!(node.getInputs().get(0) instanceof MailboxReceiveNode)) {
+    if (!(node.getInputs().get(0) instanceof BaseMailboxReceiveNode)) {
       return false;
     }
     if (node.getFetch() >= 0 || node.getOffset() >= 0) {
       return true;
     }
-    MailboxReceiveNode receiveNode = (MailboxReceiveNode) node.getInputs().get(0);
+    BaseMailboxReceiveNode receiveNode = (BaseMailboxReceiveNode) node.getInputs().get(0);
     return receiveNode.getDistributionType() != RelDistribution.Type.HASH_DISTRIBUTED
         || receiveNode.getKeys().isEmpty();
   }

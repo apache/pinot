@@ -58,7 +58,7 @@ import org.slf4j.LoggerFactory;
 public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SortedMailboxMergeReceiveOperator.class);
 
-  private static final String EXPLAIN_NAME = "SORTED_MAILBOX_MERGE_RECEIVE";
+  private static final String EXPLAIN_NAME = "MAIL_MERGE_RECEIVE";
   private static final String MERGE_SCOPE = "SortedMailboxMergeReceiveOperator";
   private final DataSchema _dataSchema;
   private final Comparator<Object[]> _comparator;
@@ -74,7 +74,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
   private MseBlock _eosBlock;
 
   public SortedMailboxMergeReceiveOperator(OpChainExecutionContext context, MailboxMergeReceiveNode node) {
-    super(context, node.getDistributionType(), node.getSenderStageId());
+    super(context, node);
     Preconditions.checkState(!CollectionUtils.isEmpty(node.getCollations()), "Field collations must be set");
     _dataSchema = node.getDataSchema();
     _comparator = new SortUtils.SortComparator(List.copyOf(node.getCollations()), false);
@@ -303,6 +303,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
     Object[] next() {
       return _rows.get(_index++);
     }
+
 
     int getRetainedRowCount() {
       int retainedRowCount = _rows.size();
