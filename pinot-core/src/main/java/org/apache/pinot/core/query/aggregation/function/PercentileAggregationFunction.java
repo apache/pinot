@@ -19,6 +19,9 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import java.io.DataOutput;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -207,9 +210,64 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
   }
 
   @Override
+  public DoubleArrayList mergeSerializedIntermediateResult(@Nullable DoubleArrayList intermediateResult,
+      CustomObject serialized) {
+    if (intermediateResult == null) {
+      return deserializeIntermediateResult(serialized);
+    }
+    // Reads the values straight into the merged list, in the format of ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE:
+    // a big-endian int count, then the big-endian doubles. Same growth as addAll(), without the incoming list.
+    ByteBuffer buffer = serialized.getBuffer();
+    int numValues = buffer.getInt();
+    int size = intermediateResult.size();
+    int capacity = intermediateResult.elements().length;
+    if (size + numValues > capacity) {
+      intermediateResult.ensureCapacity(
+          (int) Math.min(Math.max((long) size + numValues, (long) capacity + (capacity >> 1)), Integer.MAX_VALUE - 8));
+    }
+    for (int i = 0; i < numValues; i++) {
+      intermediateResult.add(buffer.getDouble());
+    }
+    return intermediateResult;
+  }
+
+  @Override
   public SerializedIntermediateResult serializeIntermediateResult(DoubleArrayList doubleArrayList) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(),
-        ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(doubleArrayList));
+    return new SerializedDoubleArrayList(doubleArrayList);
+  }
+
+  /// Serializes a [DoubleArrayList] on demand, with the bytes of ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE: a
+  /// big-endian int count, then the big-endian doubles. [#writeTo] writes the values straight into the destination,
+  /// so the builders never hold the full-size byte array. Not thread-safe; the list must not change until it is
+  /// written.
+  private static final class SerializedDoubleArrayList extends SerializedIntermediateResult {
+    private final DoubleArrayList _values;
+
+    SerializedDoubleArrayList(DoubleArrayList values) {
+      super(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue());
+      _values = values;
+    }
+
+    @Override
+    public byte[] getBytes() {
+      return ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(_values);
+    }
+
+    @Override
+    public int getSize() {
+      return Math.toIntExact(Integer.BYTES + (long) _values.size() * Double.BYTES);
+    }
+
+    @Override
+    public void writeTo(DataOutput output)
+        throws IOException {
+      int size = _values.size();
+      double[] elements = _values.elements();
+      output.writeInt(size);
+      for (int i = 0; i < size; i++) {
+        output.writeDouble(elements[i]);
+      }
+    }
   }
 
   @Override

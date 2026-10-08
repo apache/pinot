@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.io.DataOutput;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -199,6 +201,28 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /// [AggregationFunction].
   IntermediateResult merge(IntermediateResult intermediateResult1, IntermediateResult intermediateResult2);
 
+  /// Merges a serialized intermediate result into `intermediateResult`, which may be `null`, and returns the merged
+  /// result. The result may be `intermediateResult` itself, modified in place.
+  ///
+  /// The default deserializes `serialized` and merges it with [#merge]. Override it when the function can read the
+  /// serialized form straight into `intermediateResult`, to skip a full-size copy of the incoming value. This matters
+  /// for large intermediate results, such as the value list of an exact percentile, which are humongous objects for G1.
+  ///
+  /// Call [AggregationFunctionUtils#mergeSerialized] instead of calling this directly: it settles a `null` serialized
+  /// value.
+  @Nullable
+  default IntermediateResult mergeSerializedIntermediateResult(@Nullable IntermediateResult intermediateResult,
+      CustomObject serialized) {
+    IntermediateResult incoming = deserializeIntermediateResult(serialized);
+    if (intermediateResult == null) {
+      return incoming;
+    }
+    if (incoming == null) {
+      return intermediateResult;
+    }
+    return merge(intermediateResult, incoming);
+  }
+
   /// Returns the [ColumnDataType] of the intermediate result.
   ///
   /// This column data type is used for transferring data in data table.
@@ -211,6 +235,11 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   }
 
   /// Serialized intermediate result. Type can be used to identify the intermediate result type when deserializing it.
+  ///
+  /// Data table and data block builders write the value with [#getSize()] and [#writeTo(DataOutput)], and do not call
+  /// [#getBytes()]. A subclass can therefore write a large intermediate result straight into the destination, without
+  /// building the full byte array first. Such a subclass reads the intermediate result when it is written, so it must
+  /// be written before the intermediate result changes.
   class SerializedIntermediateResult {
     private final int _type;
     private final byte[] _bytes;
@@ -220,12 +249,30 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
       _bytes = buffer;
     }
 
+    /// Constructor for subclasses that serialize on demand. They must override [#getBytes()], [#getSize()] and
+    /// [#writeTo(DataOutput)].
+    protected SerializedIntermediateResult(int type) {
+      _type = type;
+      _bytes = null;
+    }
+
     public int getType() {
       return _type;
     }
 
     public byte[] getBytes() {
       return _bytes;
+    }
+
+    /// Returns the number of bytes [#writeTo(DataOutput)] writes, which is the length of [#getBytes()].
+    public int getSize() {
+      return _bytes.length;
+    }
+
+    /// Writes the bytes of [#getBytes()] to `output`.
+    public void writeTo(DataOutput output)
+        throws IOException {
+      output.write(_bytes);
     }
   }
 
