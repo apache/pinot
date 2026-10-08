@@ -76,7 +76,6 @@ import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNode.NodeHint;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -570,7 +569,7 @@ public final class RelToPlanNodeConverter {
     return null;
   }
 
-  private PlanNode convertLogicalExchange(Exchange node) {
+  private ExchangeNode convertLogicalExchange(Exchange node) {
     RelDistribution distribution = node.getDistribution();
     RelDistribution.Type distributionType = distribution.getType();
     PinotRelExchangeType exchangeType;
@@ -581,9 +580,15 @@ public final class RelToPlanNodeConverter {
     boolean sortOnReceiver;
     if (node instanceof PinotKWayMergeSortExchange) {
       PinotKWayMergeSortExchange merge = (PinotKWayMergeSortExchange) node;
-      return new KWayMergeExchangeNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()),
-          convertInputs(node.getInputs()), distributionType, distribution.getKeys(), false,
-          merge.getCollation().getFieldCollations(), _hashFunction);
+      List<PlanNode> inputs = convertInputs(node.getInputs());
+      Preconditions.checkState(inputs.get(0) instanceof SortNode, "Merge exchange requires an explicit sender sort");
+      SortNode senderSort = ((SortNode) inputs.get(0)).requiringSingleRun();
+      inputs.set(0, senderSort);
+      if (_tracker != null) {
+        _tracker.trackCreation(merge.getInput(), senderSort);
+      }
+      return ExchangeNode.kWayMerge(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), inputs, distributionType,
+          distribution.getKeys(), merge.getCollation().getFieldCollations(), _hashFunction);
     }
     if (node instanceof PinotLogicalSortExchange) {
       PinotLogicalSortExchange sortExchange = (PinotLogicalSortExchange) node;
@@ -684,8 +689,17 @@ public final class RelToPlanNodeConverter {
     for (RexLiteral constant : node.constants) {
       constants.add(RexExpressionUtils.fromRexLiteral(constant));
     }
+    List<PlanNode> inputs = convertInputs(node.getInputs());
+    if (inputs.get(0) instanceof SortNode && ((SortNode) inputs.get(0)).getFetch() < 0) {
+      // Window evaluation needs the complete ordered input, including on the receiver-sort fallback path.
+      SortNode fullSort = ((SortNode) inputs.get(0)).requiringSingleRun();
+      inputs.set(0, fullSort);
+      if (_tracker != null) {
+        _tracker.trackCreation(node.getInput(), fullSort);
+      }
+    }
     return new WindowNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
-        convertInputs(node.getInputs()), windowGroup.keys.asList(), windowGroup.orderKeys.getFieldCollations(),
+        inputs, windowGroup.keys.asList(), windowGroup.orderKeys.getFieldCollations(),
         aggCalls, windowFrameType, lowerBound, upperBound, fromRexWindowExclusion(windowGroup.exclude), constants);
   }
 

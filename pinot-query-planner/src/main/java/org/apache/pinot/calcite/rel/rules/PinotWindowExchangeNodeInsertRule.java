@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -134,8 +133,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         boolean sortOnSender = isWindowKWayMergeEnabled(call);
         if (sortOnSender) {
           // An unbounded sender sort retains every row, independent of the broker response limit.
-          RelNode orderedInput = LogicalSort.create(input, windowGroup.orderKeys, null,
-              window.getCluster().getRexBuilder().makeExactLiteral(BigDecimal.valueOf(Integer.MAX_VALUE)));
+          RelNode orderedInput = LogicalSort.create(input, windowGroup.orderKeys, null, null);
           exchange = PinotKWayMergeSortExchange.create(orderedInput, RelDistributions.hash(List.of()),
               windowGroup.orderKeys);
         } else {
@@ -163,9 +161,8 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
             windowGroup.orderKeys, false, false, prePartitioned);
       }
     }
-    // The k-way merge exchange preserves the input order. Plain sort exchanges need an explicit receiver Sort.
-    // PinotSortExchangeNodeInsertRule does not re-fire on it: its matches() rejects a Sort whose input is an
-    // exchange. PinotSortExchangeCopyRule also declines this receiver Sort because it has no fetch.
+    // An ordinary sort exchange only transports data; its downstream explicit Sort establishes window ordering.
+    // The merge exchange instead preserves the ordering guaranteed by its sender's explicit Sort.
     RelNode windowInput = exchange instanceof PinotLogicalSortExchange
         ? LogicalSort.create(exchange, ((PinotLogicalSortExchange) exchange).getCollation(), null, null) : exchange;
     // NOTE: Need to create a new LogicalWindow to use the modified window group.
