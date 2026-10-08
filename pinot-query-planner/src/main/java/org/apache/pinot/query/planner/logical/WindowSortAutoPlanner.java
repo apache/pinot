@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.planner.logical;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -86,8 +85,7 @@ public final class WindowSortAutoPlanner {
   }
 
   private static LogicalSort unboundedSort(RelNode input, PinotLogicalSortExchange auto) {
-    return LogicalSort.create(input, auto.getCollation(), null,
-        input.getCluster().getRexBuilder().makeExactLiteral(BigDecimal.valueOf(Integer.MAX_VALUE)));
+    return LogicalSort.create(input, auto.getCollation(), null, null);
   }
 
   public record Selection(WindowSortAutoPlan.ExchangeKey key, boolean profile,
