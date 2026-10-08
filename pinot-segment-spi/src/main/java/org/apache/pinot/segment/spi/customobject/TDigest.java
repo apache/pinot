@@ -31,6 +31,7 @@ public abstract class TDigest {
     add(value, (double) weight);
   }
 
+  /// Adds positive finite mass, rejecting a valid distribution's total that would overflow double.
   public abstract void add(double value, double weight);
 
   public abstract void add(TDigest other);
@@ -42,7 +43,8 @@ public abstract class TDigest {
   /// Returns the legacy long size view, saturating when the precise mass exceeds its range.
   public abstract long size();
 
-  /// Returns centroid mass without narrowing fractional or large weights.
+  /// Returns centroid mass without narrowing fractional or large weights. Valid totals must remain finite;
+  /// add and merge throw IllegalArgumentException when the summed mass exceeds the finite double range.
   public abstract double getTotalWeight();
 
   /// Returns false when historical numerical corruption leaves the distribution unknown.
@@ -67,7 +69,15 @@ public abstract class TDigest {
 
   public abstract int byteSize();
 
+  /// Bounds bytes written by asBytes for the current state; conservative bounds may include verbose expansion.
+  /// Mutable implementations should override this without flushing buffered inputs; the default asks byteSize
+  /// and may perform compression.
+  public int maxSerializedByteSize() {
+    return byteSize();
+  }
+
   /// Returns space for asSmallBytes; degraded legacy state can retain its original verbose encoding.
+  /// Implementations fail explicitly when compact centroid counts or capacities cannot fit their signed short fields.
   public abstract int smallByteSize();
 
   public abstract void asBytes(ByteBuffer buffer);

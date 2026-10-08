@@ -438,6 +438,7 @@ public class TDigestUtilsTest {
       assertEquals(stored.compression(), 10.0);
       assertEquals(stored.size(), 2L);
       assertEquals(stored.quantile(0.5), 20.0);
+      assertEquals(ByteBuffer.wrap(TDigestUtils.serialize(stored)).getDouble(20), 10.0);
       ByteBuffer compact = ByteBuffer.allocate(46);
       compact.putInt(SMALL_ENCODING).putDouble(10.0).putDouble(20.0).putFloat((float) compression);
       compact.putShort((short) 50).putShort((short) 250).putShort((short) 2);
@@ -449,6 +450,33 @@ public class TDigestUtilsTest {
     for (double compression : new double[]{Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY}) {
       assertThrows(IllegalArgumentException.class, () -> TDigestUtils.createMergingDigest(compression));
     }
+  }
+
+  @Test
+  public void testLowRawCompressionHeaderIsNormalizedForLegacyVerboseCapacity() {
+    double[] means = new double[25];
+    double[] weights = new double[25];
+    for (int i = 0; i < means.length; i++) {
+      means[i] = i;
+      weights[i] = 1.0;
+    }
+    assertEquals(TDigestUtils.getLegacyDefaultCentroidCapacity(5.0), 20);
+    byte[] bytes = verboseBytes(5.0, means, weights);
+    for (byte[] output : new byte[][]{
+        TDigestUtils.makeLegacyCompatible(bytes), TDigestUtils.serialize(TDigestUtils.deserialize(bytes))
+    }) {
+      ByteBuffer encoded = ByteBuffer.wrap(output);
+      assertEquals(encoded.getInt(), VERBOSE_ENCODING);
+      assertEquals(encoded.getDouble(20), 10.0);
+      assertEquals(encoded.getInt(28), 25);
+      assertTrue(encoded.getInt(28) <= TDigestUtils.getLegacyDefaultCentroidCapacity(encoded.getDouble(20)));
+      assertEquals(TDigestUtils.deserialize(output).size(), 25L);
+    }
+    // Unknown distributions cannot be reduced safely merely to fit an old reader's smaller array.
+    means[12] = Double.NaN;
+    byte[] poisoned = verboseBytes(5.0, means, weights);
+    assertEquals(TDigestUtils.makeLegacyCompatible(poisoned), poisoned);
+    assertEquals(TDigestUtils.serialize(TDigestUtils.deserialize(poisoned)), poisoned);
   }
 
   @Test
@@ -479,10 +507,24 @@ public class TDigestUtilsTest {
   }
 
   @Test
-  public void testCentroidBoundsRejectCorruptionAndPermitCompactEndpointRounding() {
+  public void testCentroidBoundsRetainUnknownStateAndPermitCompactEndpointRounding() {
     byte[] malformed = verboseBytes(100.0, new double[]{1.0, 9.0}, new double[]{3.0, 4.0});
     ByteBuffer.wrap(malformed).putDouble(4, 5.0);
-    assertThrows(IllegalArgumentException.class, () -> TDigestUtils.deserialize(malformed));
+    TDigest unknown = TDigestUtils.deserialize(malformed);
+    assertFalse(unknown.hasValidStatistics());
+    assertTrue(Double.isNaN(unknown.quantile(0.5)));
+    assertEquals(TDigestUtils.serialize(unknown), malformed);
+    byte[] inverted = malformed.clone();
+    ByteBuffer.wrap(inverted).putDouble(4, 10.0);
+    assertThrows(IllegalArgumentException.class, () -> TDigestUtils.deserialize(inverted));
+
+    byte[] drifted = verboseBytes(100.0, new double[]{0.7, 0.9}, new double[]{1.0, 1.0});
+    ByteBuffer.wrap(drifted).putDouble(4, Math.nextUp(Math.nextUp(0.7)));
+    TDigest driftedStored = TDigestUtils.deserialize(drifted);
+    assertEquals(driftedStored.getTotalWeight(), 2.0);
+    assertFalse(driftedStored.hasValidStatistics());
+    assertTrue(Double.isNaN(driftedStored.cdf(0.8)));
+    assertEquals(TDigestUtils.serialize(driftedStored), drifted);
 
     ByteBuffer compact = ByteBuffer.allocate(46);
     compact.putInt(SMALL_ENCODING).putDouble(0.1).putDouble(0.9).putFloat(100.0F);
@@ -494,7 +536,9 @@ public class TDigestUtilsTest {
     assertEquals(rounded.size(), 2L);
     assertTrue(rounded.quantile(0.5) >= 0.1 && rounded.quantile(0.5) <= 0.9);
     compact.putFloat(42, 1.0F);
-    assertThrows(IllegalArgumentException.class, () -> TDigestUtils.deserialize(compact.array()));
+    TDigest unknownCompact = TDigestUtils.deserialize(compact.array());
+    assertFalse(unknownCompact.hasValidStatistics());
+    assertEquals(TDigestUtils.serialize(unknownCompact), compact.array());
 
     // These endpoints round outside the double extrema, so decode must clamp them before fresh verbose output.
     for (double[] extrema : new double[][]{
@@ -542,7 +586,6 @@ public class TDigestUtilsTest {
     byte[][] poisoned = {
         verboseBytes(100.0, new double[]{0.0, Double.NaN, 10.0}, new double[]{1.0, 5.0, 1.0}),
         verboseBytes(100.0, new double[]{0.0, 5.0, 10.0}, new double[]{1.0, -0.5, 1.0}),
-        verboseBytes(100.0, new double[]{0.0, 5.0, 10.0}, new double[]{1.0, 0.0, 1.0}),
         verboseBytes(100.0, new double[]{0.0, Double.NEGATIVE_INFINITY, 10.0}, new double[]{1.0, 5.0, 1.0})
     };
     for (byte[] bytes : poisoned) {
@@ -564,6 +607,52 @@ public class TDigestUtilsTest {
     TDigest updated = TDigestUtils.deserialize(TDigestUtils.serialize(largePoisoned));
     assertEquals(updated.getMax(), 42.0);
     assertTrue(Double.isNaN(updated.quantile(0.5)));
+  }
+
+  @Test
+  public void testZeroWeightCentroidsDoNotPoisonHealthyStoredOrMergedMass() {
+    for (int encoding : new int[]{VERBOSE_ENCODING, SMALL_ENCODING}) {
+      for (double unusedMean : new double[]{5.0, Double.NaN}) {
+        byte[] bytes;
+        if (encoding == VERBOSE_ENCODING) {
+          bytes = verboseBytes(100.0, new double[]{0.0, unusedMean, 10.0}, new double[]{1.0, 0.0, 1.0});
+        } else {
+          ByteBuffer encoded = ByteBuffer.allocate(54);
+          encoded.putInt(SMALL_ENCODING).putDouble(0.0).putDouble(10.0).putFloat(100.0F);
+          encoded.putShort((short) 210).putShort((short) 1050).putShort((short) 3);
+          encoded.putFloat(1.0F).putFloat(0.0F).putFloat(0.0F).putFloat((float) unusedMean);
+          encoded.putFloat(1.0F).putFloat(10.0F);
+          bytes = encoded.array();
+        }
+        TDigestUtils.SerializedTDigestMetadata metadata = TDigestUtils.inspectSerialized(ByteBuffer.wrap(bytes));
+        assertTrue(metadata.hasZeroWeightCentroids());
+        assertFalse(metadata.needsLegacyFallback());
+        assertFalse(metadata.weightedBoundaries());
+        TDigest stored = TDigestUtils.deserialize(bytes);
+        assertTrue(stored.hasValidStatistics());
+        assertEquals(stored.getTotalWeight(), 2.0);
+        assertEquals(stored.quantile(0.5), 10.0);
+        TDigest emitted = TDigestUtils.deserialize(TDigestUtils.serialize(TDigestUtils.deserialize(bytes)));
+        assertEquals(emitted.centroidCount(), 2);
+        for (Centroid centroid : emitted.centroids()) {
+          assertTrue(centroid.weight() > 0.0);
+        }
+        for (boolean storedFirst : new boolean[]{false, true}) {
+          TDigest merged = TDigestUtils.createMergingDigest(100.0);
+          if (storedFirst) {
+            merged.add(TDigestUtils.deserialize(bytes));
+          }
+          merged.add(10.0, 1_000_000.0);
+          if (!storedFirst) {
+            merged.add(TDigestUtils.deserialize(bytes));
+          }
+          TDigest persisted = TDigestUtils.deserialize(TDigestUtils.serialize(merged));
+          assertTrue(persisted.hasValidStatistics());
+          assertEquals(persisted.getTotalWeight(), 1_000_002.0);
+          assertEquals(persisted.quantile(0.5), 10.0);
+        }
+      }
+    }
   }
 
   @Test
@@ -646,6 +735,8 @@ public class TDigestUtilsTest {
       weights[i] = i == 0 || i == count - 1 ? 3.0 : 1.0;
     }
     TDigest pending = TDigestUtils.deserialize(verboseBytes(100.0, means, weights));
+    assertTrue(TDigestUtils.inspectSerialized(ByteBuffer.wrap(verboseBytes(100.0, means, weights)))
+        .weightedBoundaries());
     ByteBuffer repaired = ByteBuffer.wrap(TDigestUtils.serialize(pending));
     assertEquals(repaired.getInt(), VERBOSE_ENCODING);
     assertEquals(repaired.getInt(28), count + 2,

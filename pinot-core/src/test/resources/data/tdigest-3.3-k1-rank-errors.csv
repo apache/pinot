@@ -21,6 +21,19 @@
 # SERVER_LOCAL/DISTRIBUTED; duplicate CDF jumps can depend on centroid partition and merge order.
 # Generated with assertions disabled (-da): 3.3's known duplicate-boundary assertion otherwise
 # aborts valid cases. Repeated generation produced byte-identical output.
+# Regenerate from the repo root with JDK 25; no POM edits or checkout switch is needed.
+# Set TDIGEST_ORACLE_DIR=target/tdigest-rank-oracle, then mkdir -p "$TDIGEST_ORACLE_DIR".
+# ./mvnw -N org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy \
+#   -Dartifact=com.tdunning:t-digest:3.3:jar -DoutputDirectory="$TDIGEST_ORACLE_DIR"
+# git show f818bae6d75a91228eb3aac95c921bca4aeb2128:pinot-segment-local/src/main/java/org/apache/pinot/segment/local/utils/TDigestUtils.java \
+#   > "$TDIGEST_ORACLE_DIR/TDigestUtils.java"
+# javac -cp "$TDIGEST_ORACLE_DIR/t-digest-3.3.jar" -d "$TDIGEST_ORACLE_DIR" \
+#   "$TDIGEST_ORACLE_DIR/TDigestUtils.java" compatibility-verifier/tdigest-compatibility/GenerateRankErrors.java
+# java -da -cp "$TDIGEST_ORACLE_DIR:$TDIGEST_ORACLE_DIR/t-digest-3.3.jar" GenerateRankErrors \
+#   > "$TDIGEST_ORACLE_DIR/rank-errors.csv"
+# Compare the generated dimension metadata and all 45 data rows before replacing this reference.
+# mergeOrders=ORIGINAL,REVERSED,RANDOMIZED
+# reducerInputs=SERVER_LOCAL,DISTRIBUTED
 # key,p0,p50,p75,p95,p99,p100
 8/20/UNIFORM,0.0,0.00390625,0.0,0.004687499999999956,0.004140625000000009,0.0
 8/20/SKEWED,0.0,0.0390625,0.02734375,0.0007812499999999556,0.004140625000000009,0.0

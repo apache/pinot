@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Suppliers;
 import com.google.common.io.Resources;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -31,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.SplittableRandom;
 import java.util.function.IntPredicate;
+import java.util.function.Supplier;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -58,7 +60,8 @@ import static org.testng.Assert.assertTrue;
 
 public class PercentileTDigestAggregationFunctionTest {
   private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("col");
-  private static final Map<String, double[]> LEGACY_REDUCER_RANK_ERRORS = loadLegacyReducerRankErrors();
+  private static final Supplier<Map<String, double[]>> LEGACY_REDUCER_RANK_ERRORS =
+      Suppliers.memoize(PercentileTDigestAggregationFunctionTest::loadLegacyReducerRankErrors);
 
   @DataProvider(name = "rowCounts")
   public static Object[][] rowCounts() {
@@ -1026,7 +1029,7 @@ public class PercentileTDigestAggregationFunctionTest {
         fanIn + "/" + compression + "/" + distribution + "/" + mergeOrder + "/" + reducerInput;
     // The independent 3.3 K1 corpus uses the worst of the six merge/input orders for each quantile, allowing
     // one raw observation of sampling slack. It was generated with -da because 3.3 asserts on duplicate boundaries.
-    double[] referenceRankErrors = LEGACY_REDUCER_RANK_ERRORS.get(fanIn + "/" + compression + "/" + distribution);
+    double[] referenceRankErrors = LEGACY_REDUCER_RANK_ERRORS.get().get(fanIn + "/" + compression + "/" + distribution);
     assertNotNull(referenceRankErrors, "Missing 3.3 oracle for " + caseDescription);
     double[] maxRankErrors = referenceRankErrors.clone();
     for (int i = 0; i < maxRankErrors.length; i++) {
@@ -1290,17 +1293,36 @@ public class PercentileTDigestAggregationFunctionTest {
 
   private static Map<String, double[]> loadLegacyReducerRankErrors() {
     Map<String, double[]> errors = new HashMap<>();
+    boolean mergeOrdersVerified = false;
+    boolean reducerInputsVerified = false;
     try {
       for (String line : Resources.readLines(Resources.getResource("data/tdigest-3.3-k1-rank-errors.csv"),
           StandardCharsets.UTF_8)) {
-        if (!line.startsWith("#")) {
-          String[] fields = line.split(",");
-          errors.put(fields[0], Arrays.stream(fields).skip(1).mapToDouble(Double::parseDouble).toArray());
+        if (line.startsWith("# mergeOrders=")) {
+          assertEquals(line.substring("# mergeOrders=".length()),
+              String.join(",", Arrays.stream(MergeOrder.values()).map(Enum::name).toList()),
+              "Regenerate the legacy oracle for changed merge orders");
+          mergeOrdersVerified = true;
+        } else if (line.startsWith("# reducerInputs=")) {
+          assertEquals(line.substring("# reducerInputs=".length()),
+              String.join(",", Arrays.stream(ReducerInput.values()).map(Enum::name).toList()),
+              "Regenerate the legacy oracle for changed reducer inputs");
+          reducerInputsVerified = true;
+        } else if (!line.startsWith("#") && !line.isBlank()) {
+          String[] fields = line.split(",", -1);
+          assertEquals(fields.length, 7, "Invalid legacy oracle row: " + line);
+          double[] rankErrors = Arrays.stream(fields).skip(1).mapToDouble(Double::parseDouble).toArray();
+          for (double error : rankErrors) {
+            assertTrue(Double.isFinite(error) && error >= 0.0 && error <= 1.0,
+                "Invalid legacy oracle rank error for " + fields[0]);
+          }
+          assertNull(errors.put(fields[0], rankErrors), "Duplicate legacy oracle key: " + fields[0]);
         }
       }
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+    assertTrue(mergeOrdersVerified && reducerInputsVerified, "Missing legacy oracle test dimensions");
     return Map.copyOf(errors);
   }
 

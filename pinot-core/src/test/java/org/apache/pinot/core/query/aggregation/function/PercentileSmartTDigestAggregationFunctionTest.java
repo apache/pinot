@@ -56,13 +56,14 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     AggregationFunction.SerializedIntermediateResult serialized =
         function.serializeIntermediateResult(intermediateResult);
     assertEquals(serialized.getType(), ObjectSerDeUtils.ObjectType.TDigest.getValue());
-    assertLegacyCompatibleShape(serialized.getBytes(), 20.0);
+    PercentileRawTDigestAggregationFunctionTest.assertLegacyCompatibleShape(serialized.getBytes(), 20.0);
 
     Object roundTripped = function.deserializeIntermediateResult(
         new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes())));
     assertTrue(roundTripped instanceof PercentileTDigestAccumulator);
     assertUnitCentroidDigest((TDigest) roundTripped, 51, 20.0);
-    assertLegacyCompatibleShape(function.serializeIntermediateResult(roundTripped).getBytes(), 20.0);
+    PercentileRawTDigestAggregationFunctionTest.assertLegacyCompatibleShape(
+        function.serializeIntermediateResult(roundTripped).getBytes(), 20.0);
   }
 
   /// The intermediate result must round-trip through the [PercentileTDigestAccumulator] so that
@@ -119,7 +120,7 @@ public class PercentileSmartTDigestAggregationFunctionTest {
         function.deserializeIntermediateResult(
             new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(empty))));
     byte[] serialized = function.serializeIntermediateResult(merged).getBytes();
-    assertLegacyCompatibleShape(serialized, 20.0);
+    PercentileRawTDigestAggregationFunctionTest.assertLegacyCompatibleShape(serialized, 20.0);
     assertEquals(((TDigest) merged).byteSize(), serialized.length);
     TDigest roundTripped = TDigestUtils.deserialize(ByteBuffer.wrap(serialized));
     assertEquals(roundTripped.size(), numCentroids);
@@ -312,19 +313,6 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     assertEquals(result.quantile(0.0), Double.NEGATIVE_INFINITY);
     assertEquals(result.quantile(0.5), 0.0);
     assertEquals(result.quantile(1.0), Double.POSITIVE_INFINITY);
-  }
-
-  private static void assertLegacyCompatibleShape(byte[] bytes, double compression) {
-    ByteBuffer buffer = ByteBuffer.wrap(bytes);
-    int encoding = buffer.getInt();
-    if (encoding == 1) {
-      assertEquals(buffer.getDouble(Integer.BYTES + 2 * Double.BYTES), compression);
-      int centroidCount = buffer.getInt(Integer.BYTES + 3 * Double.BYTES);
-      assertTrue(centroidCount <= 2 * Math.ceil(compression) + 10,
-          "Verbose encoding exceeds the t-digest 3.2 centroid capacity: " + centroidCount);
-    } else {
-      assertEquals(encoding, 2, "Unexpected t-digest encoding");
-    }
   }
 
   private static void assertUnitCentroidDigest(TDigest digest, int expectedSize, double compression) {

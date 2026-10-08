@@ -41,7 +41,7 @@ public final class LegacyReader {
     }
     Path directory = Path.of(args[0]);
     List<String> manifest = Files.readAllLines(directory.resolve("manifest.tsv"));
-    assert manifest.size() == 35 : "Missing compatibility fixtures";
+    assert manifest.size() == 37 : "Missing compatibility fixtures";
     for (String line : manifest) {
       String[] fields = line.split("\t");
       try {

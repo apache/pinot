@@ -83,8 +83,23 @@ public class LegacyTDigestCompatibilityTest {
     TDigest digest = TDigestUtils.deserialize(compact.array());
     write(directory, manifest, "oversized-compact", digest, TDigestUtils.serialize(digest));
     count++;
+    // Externally stored verbose headers below ten must be normalized before a 3.2 reader allocates its arrays.
+    ByteBuffer lowCompression = ByteBuffer.allocate(32 + 16 * 25);
+    lowCompression.putInt(1).putDouble(0).putDouble(24).putDouble(5).putInt(25);
+    for (int i = 0; i < 25; i++) {
+      lowCompression.putDouble(1).putDouble(i);
+    }
+    digest = TDigestUtils.deserialize(lowCompression.array());
+    write(directory, manifest, "low-compression-header", digest, TDigestUtils.serialize(digest));
+    count++;
+    ByteBuffer zeroWeight = ByteBuffer.allocate(32 + 16 * 3);
+    zeroWeight.putInt(1).putDouble(0).putDouble(10).putDouble(100).putInt(3);
+    zeroWeight.putDouble(1).putDouble(0).putDouble(0).putDouble(5).putDouble(1).putDouble(10);
+    digest = TDigestUtils.deserialize(zeroWeight.array());
+    write(directory, manifest, "zero-weight-centroid", digest, TDigestUtils.serialize(digest));
+    count++;
     Files.writeString(directory.resolve("manifest.tsv"), manifest);
-    assertEquals(count, 35);
+    assertEquals(count, 37);
   }
 
   private static int export(Path directory, StringBuilder manifest, String name, TDigest digest)

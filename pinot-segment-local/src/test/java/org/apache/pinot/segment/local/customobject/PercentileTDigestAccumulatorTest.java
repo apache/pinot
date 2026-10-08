@@ -28,6 +28,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 /// Regression tests for degraded legacy views, source-preserving merges, and primitive weighted sorting.
 public class PercentileTDigestAccumulatorTest {
@@ -81,6 +82,38 @@ public class PercentileTDigestAccumulatorTest {
     assertEquals(digest.getTotalWeight(), 1e30);
     assertEquals(digest.centroidCount(), 1);
     assertEquals(List.copyOf(digest.centroids()), List.of(new Centroid(Double.NaN, 1e30)));
+  }
+
+  @Test
+  public void testUnknownInputRemainsPresentAfterMergingWithHealthyMass() {
+    byte[] poison = verbose(new double[]{1, 3}, new double[]{3, -3});
+    PercentileTDigestAccumulator digest = PercentileTDigestAccumulator.forReduction(100);
+    digest.add(10, 1_000_000);
+    digest.add(fromBytes(poison));
+    assertFalse(digest.hasValidStatistics());
+    assertFalse(digest.isEmpty(), "Unknown historical mass must not be discarded as empty");
+    assertTrue(Double.isNaN(digest.quantile(0.5)));
+    assertEquals(digest.getTotalWeight(), 1_000_000.0);
+    PercentileTDigestAccumulator stored = fromBytes(digest.serialize());
+    assertFalse(stored.hasValidStatistics());
+    assertTrue(Double.isNaN(stored.quantile(0.5)));
+    assertEquals(stored.getTotalWeight(), digest.getTotalWeight());
+  }
+
+  @Test
+  public void testCompactSizeAndWriteRejectTooManyCentroidsConsistently() {
+    PercentileTDigestAccumulator digest = PercentileTDigestAccumulator.forReduction(1_000_000);
+    double[] values = new double[Short.MAX_VALUE + 1];
+    for (int i = 0; i < values.length; i++) {
+      values[i] = i;
+    }
+    digest.add(values, 0, values.length);
+    IllegalStateException sizeFailure = expectThrows(IllegalStateException.class, digest::smallByteSize);
+    IllegalStateException writeFailure = expectThrows(IllegalStateException.class,
+        () -> digest.asSmallBytes(ByteBuffer.allocate(TDigestUtils.SMALL_HEADER_SIZE)));
+    assertEquals(sizeFailure.getMessage(), writeFailure.getMessage());
+    assertEquals(digest.centroidCount(), values.length);
+    assertTrue(digest.serialize().length <= digest.maxSerializedByteSize());
   }
 
   @Test
