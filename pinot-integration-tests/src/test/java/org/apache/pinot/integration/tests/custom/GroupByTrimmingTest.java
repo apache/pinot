@@ -275,7 +275,7 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
             + "98,\t998,\t4\n"
             + "97,\t997,\t4\n"
             + "96,\t996,\t4\n"
-            + "95,\t995,\t4");
+            + "95,\t995,\t4", result.getExecutionStats().toString());
 
     assertEquals(toExplainStr(postQuery(options + "SET explainAskingServers=true; EXPLAIN PLAN FOR " + query), true),
         "Execution Plan\n"
