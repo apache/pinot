@@ -38,6 +38,7 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
+import org.apache.pinot.common.request.context.AggregateCallBinding;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -92,6 +93,13 @@ public class RexExpressionUtilsTest {
     RexExpression.FunctionCall sum0 =
         new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.SUM0.name(), List.of(input));
     assertSame(RexExpressionUtils.getAggFunction(sum0), SqlStdOperatorTable.SUM0);
+    AggregateCallBinding binding = new AggregateCallBinding(List.of(ColumnDataType.INT), ColumnDataType.DOUBLE);
+    RexExpression.FunctionCall boundSum0 = new RexExpression.FunctionCall(ColumnDataType.DOUBLE,
+        SqlKind.SUM0.name(), List.of(input), false, false, binding);
+    BoundAggregationFunction boundFunction = (BoundAggregationFunction) RexExpressionUtils.getAggFunction(boundSum0);
+    assertSame(boundFunction.getBinding(), binding);
+    assertEquals(boundFunction.inferReturnType(_typeFactory, List.of(ColumnDataType.INT.toType(_typeFactory))),
+        ColumnDataType.DOUBLE.toType(_typeFactory));
   }
 
   @Test
