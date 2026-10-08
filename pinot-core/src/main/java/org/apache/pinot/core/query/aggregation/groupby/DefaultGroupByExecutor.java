@@ -64,6 +64,10 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   protected final GroupKeyGenerator _groupKeyGenerator;
   protected final GroupByResultHolder[] _groupByResultHolders;
   protected final boolean _hasMVGroupByExpression;
+  /// True when this is a grouping-set query that aggregated only the base (union) grouping, so the caller
+  /// derives the individual grouping-set records from the base groups. Equivalent to
+  /// `isGroupingSets() && !expandGroupingSets` computed in the constructor.
+  protected final boolean _groupingSetsBaseAggregation;
   protected final int[] _svGroupKeys;
   protected final int[][] _mvGroupKeys;
 
@@ -89,20 +93,27 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       // isDictionaryEncoded() flag rather than gating on dictionary nullness alone.
       hasNoDictionaryGroupByExpression |= !columnContext.isDictionaryEncoded();
     }
-    // Grouping-set queries expand each row into one group per grouping set, so they always use the
-    // multi-value (int[][]) executor path even though the union group-by columns are single-valued.
-    boolean groupingSets = queryContext.isGroupingSets();
-    _hasMVGroupByExpression = hasMVGroupByExpression || groupingSets;
+    /// A grouping-set query using the legacy per-row expansion path expands each row into one group per
+    /// grouping set, so it always uses the multi-value (int[][]) executor path even though the union group-by
+    /// columns are single-valued. With base aggregation (the default), the segment instead aggregates the base
+    /// grouping (union columns) exactly like a plain GROUP BY -- no forced MV path, no grouping-set key
+    /// generator -- and the grouping-set records are derived afterwards from the base groups. Base aggregation
+    /// is disabled when any group-by column is multi-valued: an MV column fans a row across its values in the
+    /// base grouping, so rolling that column up would over-count the row (see
+    /// [QueryContext#isGroupingSetsBaseAggregation]).
+    boolean expandGroupingSets = queryContext.isGroupingSets()
+        && !(queryContext.isGroupingSetsBaseAggregation() && !hasMVGroupByExpression);
+    _hasMVGroupByExpression = hasMVGroupByExpression || expandGroupingSets;
+    _groupingSetsBaseAggregation = queryContext.isGroupingSets() && !expandGroupingSets;
 
     // Initialize group key generator
     int numGroupsLimit = queryContext.getNumGroupsLimit();
     int maxInitialResultHolderCapacity = queryContext.getMaxInitialResultHolderCapacity();
     if (groupKeyGenerator != null) {
       _groupKeyGenerator = groupKeyGenerator;
-    } else if (groupingSets) {
-      _groupKeyGenerator =
-          new GroupingSetsGroupKeyGenerator(projectOperator, groupByExpressions, queryContext.getGroupingSets(),
-              numGroupsLimit, _nullHandlingEnabled);
+    } else if (expandGroupingSets) {
+      _groupKeyGenerator = new GroupingSetsGroupKeyGenerator(projectOperator, groupByExpressions,
+          queryContext.getGroupingSets(), numGroupsLimit, _nullHandlingEnabled);
     } else {
       Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates =
           queryContext.isOptimizeMaxInitialResultHolderCapacity()
@@ -247,6 +258,11 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   @Override
   public GroupKeyGenerator getGroupKeyGenerator() {
     return _groupKeyGenerator;
+  }
+
+  @Override
+  public boolean isGroupingSetsBaseAggregation() {
+    return _groupingSetsBaseAggregation;
   }
 
   @Override

@@ -32,9 +32,11 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -430,6 +432,135 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
     expected.put("NULL", 8L);
     assertEquals(actual, expected);
     assertTrue(actual.containsKey("NULL"), "rolled-up grand-total row must have NULL key without null handling");
+  }
+
+  /// The base-aggregation derive path (default) must produce results identical to the legacy per-row expansion
+  /// path (`groupingSetsBaseAggregation=false`) for every aggregation type and grouping-set shape. Each case
+  /// below covers a distinct risk:
+  /// - object (mutable) accumulators (DISTINCTCOUNT, AVG) exercise the per-set clone that prevents a base
+  ///   group's shared accumulator from being aliased into multiple derived grouping-set records;
+  /// - the null-handling variant produces empty base intermediates (a base group of only rolled-up nulls),
+  ///   which is exactly the case where AggregationFunction#merge returns its argument unchanged and would leak
+  ///   an uncloned base object without the defensive clone on the merge branch;
+  /// - scalar (SUM) and a non-CUBE GROUPING SETS shape guard the general derivation math.
+  @Test(dataProvider = "baseAggregationEquivalenceCases")
+  public void testBaseAggregationMatchesExpansion(String description, String aggregations, String groupBy,
+      boolean nullHandling)
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT " + D1 + ", " + D2 + ", " + aggregations + ", GROUPING(" + D1 + "), GROUPING(" + D2
+        + ") FROM " + getTableName() + " GROUP BY " + groupBy;
+    String prefix = nullHandling ? "SET enableNullHandling=true; " : "";
+
+    Map<String, String> baseAgg =
+        rowsByKey(postQuery(prefix + "SET groupingSetsBaseAggregation=true; " + query));
+    Map<String, String> expansion =
+        rowsByKey(postQuery(prefix + "SET groupingSetsBaseAggregation=false; " + query));
+
+    assertEquals(baseAgg, expansion,
+        "base-aggregation and per-row expansion must produce identical results for case: " + description);
+    assertFalse(baseAgg.isEmpty(), "case produced no rows: " + description);
+  }
+
+  @DataProvider(name = "baseAggregationEquivalenceCases")
+  public Object[][] baseAggregationEquivalenceCases() {
+    // description, aggregation projection, GROUP BY clause, enableNullHandling
+    return new Object[][]{
+        {"distinctcount-cube-nullhandling", "DISTINCTCOUNT(" + LNG + "), COUNT(*)", "CUBE(" + D1 + ", " + D2 + ")",
+            true},
+        {"distinctcount-cube-no-nullhandling", "DISTINCTCOUNT(" + LNG + "), COUNT(*)",
+            "CUBE(" + D1 + ", " + D2 + ")", false},
+        {"avg-rollup-nullhandling", "AVG(" + LNG + "), COUNT(*)", "ROLLUP(" + D1 + ", " + D2 + ")", true},
+        {"sum-cube", "SUM(" + LNG + "), COUNT(*)", "CUBE(" + D1 + ", " + D2 + ")", false},
+        {"distinctcount-groupingsets", "DISTINCTCOUNT(" + LNG + "), COUNT(*)",
+            "GROUPING SETS ((" + D1 + "), (" + D2 + "), ())", true},
+    };
+  }
+
+  /// Indexes a result table by its key columns (d1|d2|grouping(d1)|grouping(d2)) to the remaining value
+  /// columns, so two result sets can be compared regardless of row order. The two aggregation columns sit at
+  /// indexes 2 and 3; the GROUPING() columns are the last two.
+  private static Map<String, String> rowsByKey(JsonNode response) {
+    JsonNode rows = response.get("resultTable").get("rows");
+    Map<String, String> byKey = new HashMap<>();
+    int numColumns = response.get("resultTable").get("dataSchema").get("columnNames").size();
+    for (JsonNode row : rows) {
+      String key = cell(row, 0) + "|" + cell(row, 1) + "|" + row.get(numColumns - 2).asInt() + "|"
+          + row.get(numColumns - 1).asInt();
+      byKey.put(key, row.get(2).asText() + "|" + row.get(3).asText());
+    }
+    return byKey;
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testMultiColumnRollupWithoutNullHandling(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    /// Multi-column ROLLUP with null handling DISABLED over two dictionary-encoded columns that have NO genuine
+    /// nulls (d1 in {a,b}, lng in {100,200}, functionally determined by d1). With no genuine nulls, every NULL
+    /// below is unambiguously a rolled-up (subtotal / grand-total) key. This uses the default (base-aggregation)
+    /// path; the legacy long-packed generator is covered separately by
+    /// [#testMultiColumnRollupLongPackedPath].
+    String query = "SELECT " + D1 + ", " + LNG + ", COUNT(*), GROUPING(" + D1 + "), GROUPING(" + LNG + ") FROM "
+        + getTableName() + " GROUP BY ROLLUP(" + D1 + ", " + LNG + ")";
+    JsonNode rows = postQuery(query).get("resultTable").get("rows");
+
+    Map<String, Long> actual = new HashMap<>();
+    for (JsonNode row : rows) {
+      String key = cell(row, 0) + "|" + cell(row, 1) + "|" + row.get(3).asInt() + "|" + row.get(4).asInt();
+      actual.put(key, row.get(2).asLong());
+    }
+
+    Map<String, Long> expected = new HashMap<>();
+    /// {d1, lng} detail groups (GROUPING = 0,0): a/100 and b/200, 4 docs each.
+    expected.put("a|100|0|0", 4L);
+    expected.put("b|200|0|0", 4L);
+    /// {d1} subtotals (lng rolled up, GROUPING = 0,1), distinct from the detail rows by the grouping-id slot.
+    expected.put("a|NULL|0|1", 4L);
+    expected.put("b|NULL|0|1", 4L);
+    /// {} grand total (GROUPING = 1,1).
+    expected.put("NULL|NULL|1|1", 8L);
+
+    assertEquals(actual, expected);
+    assertEquals(rows.size(), expected.size());
+    /// Crux of the packed round-trip: the (a, 100) detail and the (a, rolled-up-NULL) subtotal stay distinct,
+    /// proving the set-ordinal slot and the per-column NULL sentinel survive packing and unpacking.
+    assertTrue(actual.containsKey("a|100|0|0") && actual.containsKey("a|NULL|0|1"),
+        "detail row and rolled-up subtotal must both be present");
+  }
+
+  @Test
+  public void testMultiColumnRollupLongPackedPath()
+      throws Exception {
+    // Forces the legacy per-row expansion generator (groupingSetsBaseAggregation=false) onto its long-packed
+    // fast path: null handling OFF and multiple dictionary-encoded union columns, so
+    // GroupingSetsGroupKeyGenerator packs (d1 dict-id, lng dict-id, set ordinal) into a single long. This is
+    // the only configuration that exercises the per-column bit-shifts, the trailing set-ordinal slot, the
+    // rolled-up NULL sentinel, and the inverse unpacking. It must match the default base-aggregation path.
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT " + D1 + ", " + LNG + ", COUNT(*), SUM(" + LNG + "), GROUPING(" + D1 + "), GROUPING("
+        + LNG + ") FROM " + getTableName() + " GROUP BY ROLLUP(" + D1 + ", " + LNG + ")";
+
+    Map<String, String> longPacked = rowsByLngKey(postQuery("SET groupingSetsBaseAggregation=false; " + query));
+    Map<String, String> baseAgg = rowsByLngKey(postQuery("SET groupingSetsBaseAggregation=true; " + query));
+
+    assertEquals(longPacked, baseAgg,
+        "long-packed expansion path must match the base-aggregation path");
+    // {d1,lng} detail (a/100, b/200), {d1} subtotals (a/NULL, b/NULL), {} grand total => 5 groups.
+    assertEquals(longPacked.size(), 5);
+    assertTrue(longPacked.containsKey("a|100|0|0") && longPacked.containsKey("a|NULL|0|1"),
+        "detail row and rolled-up subtotal must both be present on the long-packed path");
+  }
+
+  /// Indexes a (d1, lng, count, sum, grouping(d1), grouping(lng)) result table by d1|lng|grouping|grouping.
+  private static Map<String, String> rowsByLngKey(JsonNode response) {
+    JsonNode rows = response.get("resultTable").get("rows");
+    Map<String, String> byKey = new HashMap<>();
+    for (JsonNode row : rows) {
+      String key = cell(row, 0) + "|" + cell(row, 1) + "|" + row.get(4).asInt() + "|" + row.get(5).asInt();
+      byKey.put(key, row.get(2).asText() + "|" + row.get(3).asText());
+    }
+    return byKey;
   }
 
   @Test(dataProvider = "useBothQueryEngines")
