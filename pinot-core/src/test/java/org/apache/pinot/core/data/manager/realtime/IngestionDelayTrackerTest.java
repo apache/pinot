@@ -41,6 +41,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -50,7 +51,10 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
@@ -352,6 +356,34 @@ public class IngestionDelayTrackerTest {
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partitionId), Long.MIN_VALUE);
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionReportingStatus(partitionId), 0);
     }
+  }
+
+  @Test
+  public void testTimeoutInactivePartitionsRemovesConsumingGauge() {
+    Pair<TableConfig, Schema> tableConfigAndSchema = REALTIME_TABLE_DATA_MANAGER.getCachedTableConfigAndSchema();
+    RealtimeTableDataManager realtimeTableDataManager = mock(RealtimeTableDataManager.class);
+    when(realtimeTableDataManager.getCachedTableConfigAndSchema()).thenReturn(tableConfigAndSchema);
+    // Partition 0 has no CONSUMING segment on this server anymore (e.g. an ended Kinesis shard), partition 1 does
+    when(realtimeTableDataManager.getHostedPartitionsGroupIds()).thenReturn(Set.of(1));
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    IngestionDelayTracker ingestionDelayTracker =
+        new MockIngestionDelayTracker(serverMetrics, REALTIME_TABLE_NAME, realtimeTableDataManager, 3_600_000,
+            3_600_000, () -> true);
+    Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
+    ingestionDelayTracker.setClock(clock);
+
+    // Both segments went from CONSUMING to ONLINE, and neither partition consumed for longer than the timeout
+    ingestionDelayTracker.markPartitionForVerification(new LLCSegmentName(RAW_TABLE_NAME, 0, 0, 123).getSegmentName());
+    ingestionDelayTracker.markPartitionForVerification(new LLCSegmentName(RAW_TABLE_NAME, 1, 0, 123).getSegmentName());
+    ingestionDelayTracker.setClock(Clock.offset(clock, Duration.ofMinutes(11)));
+    ingestionDelayTracker.timeoutInactivePartitions();
+
+    // The gauge is keyed by "<tableNameWithType>-<topic>-<streamPartitionId>"
+    verify(serverMetrics, atLeastOnce()).removeTableGauge(REALTIME_TABLE_NAME + "-test-0",
+        ServerGauge.LLC_PARTITION_CONSUMING);
+    verify(serverMetrics, never()).removeTableGauge(REALTIME_TABLE_NAME + "-test-1",
+        ServerGauge.LLC_PARTITION_CONSUMING);
+    ingestionDelayTracker.shutdown();
   }
 
   @Test
