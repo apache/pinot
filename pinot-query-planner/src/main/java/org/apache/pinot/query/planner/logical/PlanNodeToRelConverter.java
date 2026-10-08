@@ -67,6 +67,7 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -241,24 +242,22 @@ public final class PlanNodeToRelConverter {
       visitChildren(node);
 
       ExplainAttributeBuilder attributes = new ExplainAttributeBuilder();
-      if (node instanceof MailboxMergeReceiveNode) {
-        MailboxMergeReceiveNode merge = (MailboxMergeReceiveNode) node;
-        if (merge.getFetch() >= 0) {
-          attributes.putLong("fetch", merge.getFetch());
-        }
-        if (merge.getOffset() >= 0) {
-          attributes.putLong("offset", merge.getOffset());
-        }
-      } else if (node.isSortedOnSender()) {
+      if (node.isSortedOnSender()) {
         attributes.putBool("sortedOnSender", true);
       }
 
       List<RelNode> inputs = readAlreadyPushedChildren(node);
 
-      PinotExplainedRelNode explained = new PinotExplainedRelNode(_builder.getCluster(),
-          node instanceof MailboxMergeReceiveNode ? "MailboxMergeReceive" : "MailboxReceive",
+      PinotExplainedRelNode explained = new PinotExplainedRelNode(_builder.getCluster(), "MailboxReceive",
           attributes.build(), node.getDataSchema(), inputs);
       _builder.push(explained);
+      return null;
+    }
+
+    @Override
+    public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, Void context) {
+      _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "MailboxMergeReceive", Map.of(),
+          node.getDataSchema(), inputsAsList(node)));
       return null;
     }
 
@@ -661,6 +660,13 @@ public final class PlanNodeToRelConverter {
             exchangeNode.getDataSchema(), readAlreadyPushedChildren(exchangeNode)));
       }
 
+      return null;
+    }
+
+    @Override
+    public Void visitKWayMergeExchange(KWayMergeExchangeNode node, Void context) {
+      _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "KWayMergeExchange", Map.of(),
+          node.getDataSchema(), inputsAsList(node)));
       return null;
     }
 

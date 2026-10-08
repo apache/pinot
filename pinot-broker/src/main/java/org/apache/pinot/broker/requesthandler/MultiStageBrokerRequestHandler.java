@@ -281,8 +281,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         config.getCommaSeparatedList(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES, List.of()));
   }
 
-  public void setKWayMergeSupported(BooleanSupplier supported) {
+  public BooleanSupplier setKWayMergeSupported(BooleanSupplier supported) {
+    BooleanSupplier previous = _kWayMergeSupported;
     _kWayMergeSupported = supported;
+    return previous;
   }
 
   @Override
@@ -669,9 +671,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     boolean preferSelectAliasInGroupBy = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY,
         CommonConstants.Broker.DEFAULT_PREFER_SELECT_ALIAS_IN_GROUP_BY);
-    boolean windowSortOnSender = _config.getProperty(
-        CommonConstants.Broker.CONFIG_OF_WINDOW_SORT_ON_SENDER,
-        CommonConstants.Broker.DEFAULT_WINDOW_SORT_ON_SENDER);
+    boolean windowKWayMerge = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_WINDOW_K_WAY_MERGE,
+        CommonConstants.Broker.DEFAULT_WINDOW_K_WAY_MERGE);
     boolean defaultUnnestColumnPruning = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_UNNEST_COLUMN_PRUNING,
         CommonConstants.Broker.DEFAULT_UNNEST_COLUMN_PRUNING);
@@ -713,8 +715,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultSealedInListThreshold(sealedInListThreshold)
         .defaultPreferSelectAliasInGroupBy(preferSelectAliasInGroupBy)
         .meterGroupByAliasShadowedByColumn(true)
-        .defaultWindowSortOnSender(windowSortOnSender)
-        .isKWayMergeSupported(!QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
+        .defaultWindowKWayMerge(windowKWayMerge)
+        .isKWayMergeSupported(QueryOptionsUtils.isWindowKWayMerge(queryOptions, windowKWayMerge)
+            && !QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
             && _kWayMergeSupported.getAsBoolean())
         .build();
   }

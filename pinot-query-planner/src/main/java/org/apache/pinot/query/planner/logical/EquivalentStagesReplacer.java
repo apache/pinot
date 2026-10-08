@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -129,6 +130,28 @@ public class EquivalentStagesReplacer {
       _substitutions.add(new SpoolSubstitution(node.getStageId(), sender.getStageId(), leader.getStageId(),
           SpoolSubstitution.Outcome.APPLIED, null));
       return null;
+    }
+
+    @Override
+    public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, GroupedStages equivalenceGroups) {
+      MailboxSendNode sender = node.getSender();
+      MailboxSendNode leader = equivalenceGroups.getGroup(sender).first();
+      if (canSubstitute(sender, leader)) {
+        node.setSender(leader);
+        leader.addReceiver(node.getStageId());
+        _listener.onSubstitution(node.getStageId(), sender.getStageId(), leader.getStageId());
+      } else {
+        visitMailboxSend(leader, equivalenceGroups);
+      }
+      return null;
+    }
+
+    private boolean canSubstitute(MailboxSendNode actualSender, MailboxSendNode leader) {
+      return actualSender != leader // we don't need to replace the leader with itself
+          // the leader is already sending to this stage. Given we don't have the ability to send to multiple
+          // receivers in the same stage, we cannot optimize this case right now.
+          // If this case seems to be useful, it can be supported in the future.
+          && !leader.sharesReceiverStages(actualSender);
     }
   }
 }
