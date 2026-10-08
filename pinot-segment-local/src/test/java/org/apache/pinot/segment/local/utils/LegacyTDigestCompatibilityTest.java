@@ -100,6 +100,24 @@ public class LegacyTDigestCompatibilityTest {
     digest = TDigestUtils.deserialize(zeroWeight.array());
     writeVerbose(directory, manifest, "zero-weight-centroid", digest);
     count++;
+    // Repair adjacent zero-mass NaN means before reducing to the smaller fractional-compression reader capacity.
+    double[] means = new double[320];
+    double[] weights = new double[means.length];
+    means[0] = 0.0;
+    weights[0] = 1.0;
+    for (int i = 1; i <= 100; i++) {
+      means[i] = Double.NaN;
+    }
+    for (int i = 1; i < 220; i++) {
+      means[i + 100] = i;
+      weights[i + 100] = 1.0;
+    }
+    byte[] repaired = TDigestUtils.makeLegacyCompatible(
+        TDigestUtils.serializeCentroids(100.1, 0.0, 219.0, means, weights, means.length));
+    assertEquals(ByteBuffer.wrap(repaired).getInt(28), 211);
+    digest = TDigestUtils.deserialize(repaired);
+    write(directory, manifest, "zero-weight-capacity-repair", digest, repaired, quantiles(digest), false);
+    count++;
     // Compact float fields cannot represent this finite mean; the actual small writer must fall back to verbose.
     digest = TDigestUtils.createMergingDigest(100);
     digest.add(1e100);
@@ -110,7 +128,7 @@ public class LegacyTDigestCompatibilityTest {
     write(directory, manifest, "huge-mean-small-fallback", digest, hugeSmall.array(), hugeExpected, true);
     count++;
     Files.writeString(directory.resolve("manifest.tsv"), manifest);
-    assertEquals(count, 38);
+    assertEquals(count, 39);
   }
 
   private static int export(Path directory, StringBuilder manifest, String name, TDigest digest,

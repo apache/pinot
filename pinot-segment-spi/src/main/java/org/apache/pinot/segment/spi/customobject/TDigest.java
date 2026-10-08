@@ -24,6 +24,7 @@ import java.util.List;
 
 /// Mutable percentile digest contract for aggregation plugins and legacy t-digest byte encodings.
 /// Implementations are not thread-safe; callers must serialize access to each aggregation state.
+/// Historical corrupted payloads may be retained unchanged, but cannot be mutated or mixed with healthy state.
 /// Fractional mass is preserved; t-digest 3.3 can reject endpoint weights below one or singleton masses between
 /// one and two during recompression because its endpoint invariant requires unit weights.
 public abstract class TDigest {
@@ -36,6 +37,7 @@ public abstract class TDigest {
   /// Adds positive finite mass, rejecting a valid distribution's total that would overflow double.
   public abstract void add(double value, double weight);
 
+  /// Merges an exclusively owned source; implementations may compress that mutable source in place.
   public abstract void add(TDigest other);
 
   public abstract void add(List<? extends TDigest> others);
@@ -47,6 +49,7 @@ public abstract class TDigest {
 
   /// Returns centroid mass without narrowing fractional or large weights. Valid totals must remain finite;
   /// add and merge throw IllegalArgumentException when the summed mass exceeds the finite double range.
+  /// An invalid historical payload may report its original negative total; it cannot contribute to another digest.
   public abstract double getTotalWeight();
 
   /// Returns false when historical numerical corruption leaves the distribution unknown.
@@ -69,6 +72,8 @@ public abstract class TDigest {
 
   public abstract double compression();
 
+  /// Returns bytes needed by asBytes. New fractional endpoint masses that cannot be encoded safely for legacy
+  /// readers are rejected; unchanged retained historical encodings may be passed through byte-exactly.
   public abstract int byteSize();
 
   /// Bounds bytes written by asBytes for the current state; conservative bounds may include verbose expansion.
@@ -80,6 +85,8 @@ public abstract class TDigest {
 
   /// Returns space for asSmallBytes; degraded legacy state or finite fields that overflow float retain verbose bytes.
   /// Implementations fail explicitly when compact centroid counts or capacities cannot fit their signed short fields.
+  /// New fractional boundary masses below one or a singleton mass between one and two cannot satisfy legacy unit
+  /// endpoint requirements without changing total mass, and serialization rejects them.
   public abstract int smallByteSize();
 
   /// Writes one legacy payload at the current position and advances the position past the complete payload.

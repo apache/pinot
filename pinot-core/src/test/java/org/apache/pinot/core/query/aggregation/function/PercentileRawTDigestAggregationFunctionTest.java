@@ -19,9 +19,11 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
 import org.apache.pinot.segment.local.customobject.SerializedTDigest;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
@@ -37,6 +39,30 @@ import static org.testng.Assert.assertTrue;
 /// Capacity-preserving inputs can contain more centroids than a default legacy reader allocates.
 public class PercentileRawTDigestAggregationFunctionTest {
   private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("col");
+
+  @Test
+  public void testHistoricalUnknownQuantileOrdering() {
+    TDigest finiteDigest = TDigestUtils.createMergingDigest(100.0);
+    finiteDigest.add(0.5);
+    TDigest infinityDigest = new PercentileTDigestValueAggregator(List.of())
+        .getInitialAggregatedValue(Double.POSITIVE_INFINITY);
+    byte[] corruptBytes = TDigestUtils.serializeCentroids(100.0, 0.0, 1.0,
+        new double[]{100.0}, new double[]{1.0}, 1);
+    TDigest unknownDigest = TDigestUtils.deserialize(corruptBytes);
+    assertTrue(Double.isNaN(unknownDigest.quantile(0.5)));
+
+    SerializedTDigest finite = new SerializedTDigest(finiteDigest, 50.0);
+    SerializedTDigest infinity = new SerializedTDigest(infinityDigest, 50.0);
+    SerializedTDigest unknown = new SerializedTDigest(unknownDigest, 50.0);
+    assertTrue(finite.compareTo(infinity) < 0);
+    assertTrue(infinity.compareTo(unknown) < 0);
+    assertTrue(finite.compareTo(unknown) < 0);
+    for (SerializedTDigest first : List.of(finite, infinity, unknown)) {
+      for (SerializedTDigest second : List.of(finite, infinity, unknown)) {
+        assertEquals(Integer.signum(first.compareTo(second)), -Integer.signum(second.compareTo(first)));
+      }
+    }
+  }
 
   @Test
   public void testFinalResultPreservesLegacyCapacityState() {

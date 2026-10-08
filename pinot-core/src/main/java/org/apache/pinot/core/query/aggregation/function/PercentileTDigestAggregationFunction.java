@@ -314,7 +314,7 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
 
   @Override
   public TDigest deserializeIntermediateResult(CustomObject customObject) {
-    return PercentileTDigestAccumulator.forSerializedTDigest(customObject.getBuffer());
+    return ObjectSerDeUtils.deserialize(customObject);
   }
 
   @Override

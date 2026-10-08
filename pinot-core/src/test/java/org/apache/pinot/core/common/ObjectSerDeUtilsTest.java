@@ -59,6 +59,7 @@ import org.apache.pinot.segment.local.customobject.FloatLongPair;
 import org.apache.pinot.segment.local.customobject.IntLongPair;
 import org.apache.pinot.segment.local.customobject.LongLongPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
+import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
@@ -353,6 +354,30 @@ public class ObjectSerDeUtilsTest {
         }
       }
     }
+  }
+
+  @Test
+  public void testTDigestIntermediateReductionStrategy() {
+    TDigest source = TDigestUtils.createMergingDigest(100.0);
+    Random random = new Random(42);
+    for (int i = 0; i < 1000; i++) {
+      source.add(random.nextDouble());
+    }
+    byte[] bytes = TDigestUtils.serialize(source);
+    TDigest expected = PercentileTDigestAccumulator.forSerializedTDigest(ByteBuffer.wrap(bytes));
+    TDigest fromBytes = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytes);
+    TDigest fromBuffer = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ByteBuffer.wrap(bytes));
+    // Raw values appended to a peer's intermediate must use reducer compression, rather than the stored-sketch policy.
+    for (int i = 0; i < 5000; i++) {
+      double value = random.nextDouble();
+      expected.add(value);
+      fromBytes.add(value);
+      fromBuffer.add(value);
+    }
+    byte[] expectedBytes = TDigestUtils.serialize(expected);
+    assertEquals(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(fromBytes), expectedBytes);
+    assertEquals(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(fromBuffer), expectedBytes);
+    assertEquals(fromBytes.getTotalWeight(), 6000.0);
   }
 
   @DataProvider(name = "tdigest32Fixtures")

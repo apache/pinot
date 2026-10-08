@@ -34,109 +34,153 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
-/// Regression tests for degraded legacy views, source-preserving merges, and primitive weighted sorting.
+/// Regression tests for opaque legacy payloads, fractional statistics, and primitive centroid merging.
 public class PercentileTDigestAccumulatorTest {
   @Test
-  public void testDegradedCentroidViewsMatchUntouchedAndMergedBytes() {
-    byte[] poison = verbose(new double[]{1, 2, 3}, new double[]{1, -0.5, 1});
-    PercentileTDigestAccumulator digest = fromBytes(poison);
-    List<Centroid> original = List.copyOf(digest.centroids());
-    assertFalse(digest.hasValidStatistics());
-    assertEquals(original, List.of(new Centroid(1, 1), new Centroid(2, -0.5), new Centroid(3, 1)));
-    assertEquals(digest.centroidCount(), original.size());
-    assertEquals(original.stream().mapToDouble(Centroid::weight).sum(), digest.getTotalWeight());
-    digest.compress();
-    assertEquals(digest.serialize(), poison, "A read or flush must preserve historical bytes");
-    ByteBuffer small = ByteBuffer.allocate(digest.smallByteSize());
-    digest.asSmallBytes(small);
-    assertEquals(small.array(), poison);
-
-    PercentileTDigestAccumulator merged = PercentileTDigestAccumulator.forReduction(100);
-    merged.add(1);
-    merged.add(2);
-    merged.quantile(0.5);
-    merged.add(digest);
-    List<Centroid> canonical = List.copyOf(merged.centroids());
-    assertEquals(canonical.size(), 1);
-    assertEquals(merged.centroidCount(), 1);
-    assertTrue(Double.isNaN(canonical.get(0).mean()));
-    assertEquals(canonical.get(0).weight(), 3.5);
-    assertEquals(canonical.get(0).weight(), merged.getTotalWeight());
-    assertEquals(TDigestUtils.deserialize(merged.serialize()).centroids(), canonical);
-  }
-
-  @Test
-  public void testZeroMassPoisonMergeUsesCanonicalBytesInBothOrders() {
-    byte[] poison = verbose(new double[]{1, 2, 3}, new double[]{1, -0.5, 1});
-    byte[] zeroMass = verbose(new double[]{1, 3}, new double[]{3, -3});
-    PercentileTDigestAccumulator first = fromBytes(poison);
-    first.add(fromBytes(zeroMass));
-    PercentileTDigestAccumulator reversed = fromBytes(zeroMass);
-    reversed.add(fromBytes(poison));
-    assertEquals(first.serialize(), reversed.serialize());
-    assertEquals(first.centroidCount(), 1);
-    assertEquals(first.getTotalWeight(), 1.5);
-  }
-
-  @Test
-  public void testRawAdditionMarksDegradedStateDirtyEvenWhenMassRoundsAway() {
-    byte[] poison = verbose(new double[]{1, 2, 3}, new double[]{1, -1, 1e30});
-    PercentileTDigestAccumulator digest = fromBytes(poison);
-    digest.add(2);
-    assertEquals(digest.getTotalWeight(), 1e30);
-    assertEquals(digest.centroidCount(), 1);
-    assertEquals(List.copyOf(digest.centroids()), List.of(new Centroid(Double.NaN, 1e30)));
-  }
-
-  @Test
-  public void testDegradedOverflowLeavesOriginalBytesAndFiniteMassIntact() {
-    byte[] poison = verbose(new double[]{1, 2}, new double[]{1e308, -1});
-    PercentileTDigestAccumulator healthy = PercentileTDigestAccumulator.forReduction(100);
-    healthy.add(1, 1e308);
-    TDigest generic = mock(TDigest.class);
-    when(generic.hasValidStatistics()).thenReturn(true);
-    when(generic.getTotalWeight()).thenReturn(1e308);
-    for (int mergeKind = 0; mergeKind < 4; mergeKind++) {
+  public void testHistoricalCorruptionRemainsOpaqueAndRejectsMutation() {
+    for (byte[] poison : new byte[][]{verbose(new double[]{1, 2, 3}, new double[]{1, -0.5, 1}),
+        verbose(new double[]{1, 2}, new double[]{1, -200}),
+        verbose(new double[]{Double.NaN}, new double[]{1}),
+        verbose(new double[]{1, 3}, new double[]{3, -3})}) {
       PercentileTDigestAccumulator digest = fromBytes(poison);
-      switch (mergeKind) {
-        case 0:
-          expectThrows(IllegalArgumentException.class, () -> digest.add(1, 1e308));
-          break;
-        case 1:
-          expectThrows(IllegalArgumentException.class, () -> digest.add(healthy));
-          break;
-        case 2:
-          expectThrows(IllegalArgumentException.class, () -> digest.add(generic));
-          break;
-        default:
-          expectThrows(IllegalArgumentException.class, () -> digest.addSerializedTDigest(poison));
-          break;
-      }
-      assertEquals(digest.getTotalWeight(), 1e308);
+      List<Centroid> original = List.copyOf(digest.centroids());
+      assertFalse(digest.hasValidStatistics());
+      assertFalse(digest.isEmpty(), "Unknown state cannot be discarded as empty");
+      assertTrue(Double.isNaN(digest.quantile(0.5)));
+      assertTrue(Double.isNaN(digest.cdf(1.5)));
+      digest.compress();
+      assertEquals(digest.serialize(), poison);
+      assertEquals(digest.centroidCount(), original.size());
+      double originalWeight = digest.getTotalWeight();
+      expectThrows(IllegalArgumentException.class, () -> digest.add(2));
+      expectThrows(IllegalArgumentException.class, () -> digest.add(2, 0.5));
+      expectThrows(IllegalArgumentException.class, () -> digest.add(new double[]{2}, 0, 1));
+      expectThrows(IllegalArgumentException.class, () -> digest.addSerializedTDigest(poison));
+      assertEquals(digest.getTotalWeight(), originalWeight);
+      assertEquals(List.copyOf(digest.centroids()), original);
+      assertEquals(digest.serialize(), poison);
+      ByteBuffer small = ByteBuffer.allocate(digest.smallByteSize());
+      digest.asSmallBytes(small);
+      assertEquals(small.array(), poison);
+
+      PercentileTDigestAccumulator copy = PercentileTDigestAccumulator.forReduction(100);
+      copy.add(digest);
+      assertEquals(copy.serialize(), poison);
+      PercentileTDigestAccumulator healthy = PercentileTDigestAccumulator.forReduction(100);
+      healthy.add(10, 100);
+      expectThrows(IllegalArgumentException.class, () -> healthy.add(digest));
+      assertEquals(healthy.getTotalWeight(), 100.0, "Historical negative weights must not subtract valid mass");
+      assertEquals(healthy.quantile(0.5), 10.0);
+      expectThrows(IllegalArgumentException.class, () -> digest.add(healthy));
       assertEquals(digest.serialize(), poison);
     }
-
-    PercentileTDigestAccumulator negative = fromBytes(verbose(new double[]{1, 2}, new double[]{1, -2}));
-    negative.add(1, 0.5);
-    assertEquals(negative.getTotalWeight(), -0.5);
-    negative.add(1);
-    assertEquals(negative.getTotalWeight(), 0.5);
-    assertEquals(TDigestUtils.deserialize(negative.serialize()).getTotalWeight(), 0.5);
   }
 
   @Test
-  public void testMergedDegradedBytesCanonicalizeNaNPayloads() {
-    byte[] first = verbose(new double[]{Double.NaN}, new double[]{1});
-    byte[] second = first.clone();
-    ByteBuffer.wrap(first).putLong(4, 0x7ff8000000000001L);
-    ByteBuffer.wrap(second).putLong(4, 0x7ff8000000000002L);
-    assertEquals(fromBytes(first).serialize(), first, "Untouched historical NaN payload bits remain intact");
-    PercentileTDigestAccumulator forward = fromBytes(first);
-    forward.addSerializedTDigest(second);
-    PercentileTDigestAccumulator reverse = fromBytes(second);
-    reverse.addSerializedTDigest(first);
-    assertEquals(forward.serialize(), reverse.serialize());
-    assertEquals(ByteBuffer.wrap(forward.serialize()).getLong(4), Double.doubleToRawLongBits(Double.NaN));
+  public void testSubUnitFractionalQuantileCdfAndHistoricalSerialization() {
+    PercentileTDigestAccumulator digest = PercentileTDigestAccumulator.forReduction(100);
+    digest.add(1, 0.3);
+    digest.add(2, 0.3);
+    assertEquals(digest.getTotalWeight(), 0.6);
+    assertEquals(digest.quantile(0), 1.0);
+    assertEquals(digest.quantile(0.5), 1.5, Math.ulp(1.5));
+    assertEquals(digest.quantile(0.99), 2.0);
+    assertEquals(digest.quantile(1), 2.0);
+    assertEquals(digest.cdf(1), 0.25);
+    assertEquals(digest.cdf(1.5), 0.5);
+    assertEquals(digest.cdf(2), 0.75);
+    expectThrows(IllegalArgumentException.class, digest::serialize);
+    expectThrows(IllegalArgumentException.class, digest::smallByteSize);
+
+    TDigest wideBounds = TDigestUtils.deserialize(TDigestUtils.serializeCentroids(100, 0, 3,
+        new double[]{1, 2}, new double[]{0.3, 0.3}, 2));
+    assertEquals(wideBounds.quantile(0.25), 1.0);
+    assertEquals(wideBounds.quantile(0.75), 2.0);
+    assertEquals(wideBounds.cdf(2.0), 0.75);
+
+
+    for (byte[] historical : new byte[][]{verbose(new double[]{1, 2}, new double[]{0.3, 0.3}),
+        verbose(new double[]{42}, new double[]{1.5}),
+        TDigestUtils.serializeCentroids(100, 0, 3, new double[]{1, 0, 2, 3}, new double[]{1, 0.3, 1, 1}, 4)}) {
+      PercentileTDigestAccumulator stored = fromBytes(historical);
+      assertEquals(stored.serialize(), historical);
+      stored.quantile(0.5);
+      stored.centroids();
+      assertEquals(stored.serialize(), historical, "Read-only materialization preserves unsupported original bytes");
+      PercentileTDigestAccumulator copy = PercentileTDigestAccumulator.forReduction(stored.compression());
+      copy.add(stored);
+      assertEquals(copy.serialize(), historical, "Copying a queried source retains its original encoding");
+      expectThrows(IllegalArgumentException.class, () -> stored.add(Double.NaN));
+      expectThrows(IllegalArgumentException.class,
+          () -> stored.add(fromBytes(verbose(new double[]{Double.NaN}, new double[]{1}))));
+      assertEquals(stored.serialize(), historical, "Failed mutation preserves retained original bytes");
+      byte[] isolated = stored.serialize();
+      isolated[0] = 0;
+      assertEquals(stored.serialize(), historical);
+    }
+    PercentileTDigestAccumulator singleton = PercentileTDigestAccumulator.forReduction(100);
+    singleton.add(42, 1.5);
+    assertEquals(singleton.quantile(1), 42.0);
+    expectThrows(IllegalArgumentException.class, singleton::serialize);
+    singleton = fromBytes(verbose(new double[]{42}, new double[]{1.5}));
+    singleton.add(1);
+    assertFalse(singleton.hasOriginalFractionalPayload());
+    assertEquals(TDigestUtils.deserialize(singleton.serialize()).getTotalWeight(), 2.5);
+  }
+
+  @Test
+  public void testQueryCompressionRetainsTheUpstreamPositiveGuard() {
+    expectThrows(IllegalArgumentException.class, () -> new PercentileTDigestAccumulator(0));
+    expectThrows(IllegalArgumentException.class, () -> new PercentileTDigestAccumulator(-5));
+    expectThrows(IllegalArgumentException.class, () -> PercentileTDigestAccumulator.forReduction(0));
+    byte[] historical = verbose(new double[]{1}, new double[]{1});
+    ByteBuffer.wrap(historical).putDouble(20, -5);
+    assertEquals(fromBytes(historical).compression(), 10.0);
+  }
+
+  @Test
+  public void testBulkCentroidsSortWithoutChangingCallerArrays() {
+    double[] means = {20, Double.NaN, 10, 30};
+    double[] weights = {2, 0, 1, 1};
+    PercentileTDigestAccumulator digest = PercentileTDigestAccumulator.forLegacyAggregation(100);
+    digest.addCentroids(means, weights, means.length, 10, 30, true);
+    assertEquals(means, new double[]{20, Double.NaN, 10, 30});
+    assertEquals(weights, new double[]{2, 0, 1, 1});
+    assertEquals(digest.getTotalWeight(), 4.0);
+    assertEquals(digest.quantile(0), 10.0);
+    assertEquals(digest.quantile(1), 30.0);
+    assertEquals(digest.centroids(), fromBytes(verbose(new double[]{10, 20, 30}, new double[]{1, 2, 1})).centroids());
+    double[] copiedMeans = {-1, -1, -1, -1, -1};
+    double[] copiedWeights = {-1, -1, -1, -1, -1};
+    digest.copyCentroids(copiedMeans, copiedWeights, 1);
+    assertEquals(copiedMeans, new double[]{-1, 10, 20, 30, -1});
+    assertEquals(copiedWeights, new double[]{-1, 1, 2, 1, -1});
+    copiedMeans[2] = -2;
+    assertEquals(digest.quantile(0.5), 20.0);
+    digest.addCentroids(new double[]{5, 25}, new double[]{1, 1}, 2, 5, 25, false);
+    assertEquals(digest.getTotalWeight(), 6.0);
+    assertEquals(digest.quantile(0), 5.0);
+    assertEquals(digest.quantile(1), 30.0);
+  }
+
+  @Test
+  public void testByteSizeCachesOneWriteAndMutationInvalidatesIt() throws Exception {
+    PercentileTDigestAccumulator digest = PercentileTDigestAccumulator.forReduction(100);
+    digest.add(10);
+    int size = digest.byteSize();
+    byte[] cached = (byte[]) field(digest, "_serializedBytesForWrite");
+    assertEquals(digest.byteSize(), size);
+    assertTrue(field(digest, "_serializedBytesForWrite") == cached);
+    ByteBuffer output = ByteBuffer.allocate(size);
+    digest.asBytes(output);
+    assertEquals(output.array(), cached);
+    assertEquals(field(digest, "_serializedBytesForWrite"), null);
+    digest.byteSize();
+    digest.add(20);
+    assertEquals(field(digest, "_serializedBytesForWrite"), null);
+    ByteBuffer changed = ByteBuffer.allocate(digest.byteSize());
+    digest.asBytes(changed);
+    assertEquals(TDigestUtils.deserialize(changed.array()).getTotalWeight(), 2.0);
   }
 
   @Test
@@ -261,22 +305,6 @@ public class PercentileTDigestAccumulatorTest {
   }
 
   @Test
-  public void testUnknownInputRemainsPresentAfterMergingWithHealthyMass() {
-    byte[] poison = verbose(new double[]{1, 3}, new double[]{3, -3});
-    PercentileTDigestAccumulator digest = PercentileTDigestAccumulator.forReduction(100);
-    digest.add(10, 1_000_000);
-    digest.add(fromBytes(poison));
-    assertFalse(digest.hasValidStatistics());
-    assertFalse(digest.isEmpty(), "Unknown historical mass must not be discarded as empty");
-    assertTrue(Double.isNaN(digest.quantile(0.5)));
-    assertEquals(digest.getTotalWeight(), 1_000_000.0);
-    PercentileTDigestAccumulator stored = fromBytes(digest.serialize());
-    assertFalse(stored.hasValidStatistics());
-    assertTrue(Double.isNaN(stored.quantile(0.5)));
-    assertEquals(stored.getTotalWeight(), digest.getTotalWeight());
-  }
-
-  @Test
   public void testCompactSizeAndWriteRejectTooManyCentroidsConsistently() {
     PercentileTDigestAccumulator digest = PercentileTDigestAccumulator.forReduction(1_000_000);
     double[] values = new double[Short.MAX_VALUE + 1];
@@ -305,18 +333,31 @@ public class PercentileTDigestAccumulatorTest {
   }
 
   @Test
-  public void testNativeMergeDoesNotPubliclyCompressItsSource() {
+  public void testNativeMergeConsumesItsSourceAtPublicCompression() {
+    PercentileTDigestAccumulator empty = PercentileTDigestAccumulator.forReduction(100);
+    empty.add(empty);
+    assertTrue(empty.isEmpty());
+    PercentileTDigestAccumulator fractional = PercentileTDigestAccumulator.forReduction(100);
+    fractional.add(42.0, 1.5);
+    fractional.add(fractional);
+    assertEquals(fractional.getTotalWeight(), 3.0);
+    assertEquals(fractional.quantile(0.5), 42.0);
+    assertEquals(TDigestUtils.deserialize(fractional.serialize()).getTotalWeight(), 3.0);
+
     PercentileTDigestAccumulator source = PercentileTDigestAccumulator.forLegacyAggregation(100);
+    PercentileTDigestAccumulator expected = PercentileTDigestAccumulator.forLegacyAggregation(100);
     SplittableRandom random = new SplittableRandom(10);
     for (int i = 0; i < 94; i++) {
-      source.add(random.nextDouble() * 10_000);
+      double value = random.nextDouble() * 10_000;
+      source.add(value);
+      expected.add(value);
     }
-    double expected = source.quantile(0.86);
-    List<Centroid> centroids = List.copyOf(source.centroids());
+    expected.compress();
     PercentileTDigestAccumulator parent = PercentileTDigestAccumulator.forLegacyAggregation(100);
     parent.add(source);
-    assertEquals(source.quantile(0.86), expected);
-    assertEquals(List.copyOf(source.centroids()), centroids);
+    assertEquals(source.centroids(), expected.centroids());
+    assertEquals(source.quantile(0.86), expected.quantile(0.86));
+    assertEquals(parent.getTotalWeight(), source.getTotalWeight());
   }
 
   @Test

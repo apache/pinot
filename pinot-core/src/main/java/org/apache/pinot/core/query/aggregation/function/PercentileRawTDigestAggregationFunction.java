@@ -24,6 +24,7 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.SerializedTDigest;
@@ -138,7 +139,7 @@ public class PercentileRawTDigestAggregationFunction
 
   @Override
   public TDigest deserializeIntermediateResult(CustomObject customObject) {
-    return _percentileTDigestAggregationFunction.deserializeIntermediateResult(customObject);
+    return ObjectSerDeUtils.deserialize(customObject);
   }
 
   @Override

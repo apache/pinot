@@ -25,6 +25,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import static com.google.common.base.Preconditions.checkArgument;
 
 /// Serialized and comparable version of TDigest. Compares TDigest for a specific percentile value.
+/// Uses Double.compare ordering: NaN quantiles from corrupted historical inputs sort after positive infinity.
 public class SerializedTDigest implements Comparable<SerializedTDigest> {
   private final double _percentile;
   private final TDigest _tDigest;

@@ -59,6 +59,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 public class PercentileTDigestAggregationFunctionTest {
@@ -1101,7 +1102,8 @@ public class PercentileTDigestAggregationFunctionTest {
     assertTrue(Double.isNaN(function.extractFinalResult(poisoned)));
     TDigest singleton = TDigestUtils.createMergingDigest(100.0);
     singleton.add(42.0);
-    assertTrue(Double.isNaN(function.extractFinalResult(function.merge(poisoned, singleton))));
+    assertThrows(IllegalArgumentException.class, () -> function.merge(poisoned, singleton));
+    assertEquals(singleton.getTotalWeight(), 1.0);
   }
 
   @Test(dataProvider = "compressionFactors")

@@ -88,6 +88,7 @@ import org.apache.pinot.segment.local.customobject.FloatLongPair;
 import org.apache.pinot.segment.local.customobject.IntLongPair;
 import org.apache.pinot.segment.local.customobject.LongLongPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
+import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
@@ -1108,6 +1109,7 @@ public class ObjectSerDeUtils {
     }
   };
 
+  // Type-10 intermediate results use reduction compression; stored sketch readers remain in TDigestUtils.
   public static final ObjectSerDe<TDigest> TDIGEST_SER_DE = new ObjectSerDe<TDigest>() {
 
     @Override
@@ -1117,12 +1119,12 @@ public class ObjectSerDeUtils {
 
     @Override
     public TDigest deserialize(byte[] bytes) {
-      return TDigestUtils.deserialize(bytes);
+      return deserialize(ByteBuffer.wrap(bytes));
     }
 
     @Override
     public TDigest deserialize(ByteBuffer byteBuffer) {
-      return TDigestUtils.deserialize(byteBuffer);
+      return PercentileTDigestAccumulator.forSerializedTDigest(byteBuffer);
     }
   };
 

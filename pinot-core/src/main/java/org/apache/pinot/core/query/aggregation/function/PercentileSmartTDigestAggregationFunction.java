@@ -340,10 +340,6 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
 
   @Override
   public Object deserializeIntermediateResult(CustomObject customObject) {
-    if (customObject.getType() == ObjectSerDeUtils.ObjectType.TDigest.getValue()) {
-      // Retain serialized state lazily so subsequent merges preserve source capacity and compression.
-      return PercentileTDigestAccumulator.forSerializedTDigest(customObject.getBuffer());
-    }
     return ObjectSerDeUtils.deserialize(customObject);
   }
 

@@ -161,24 +161,28 @@ public class PercentileTDigestValueAggregatorTest {
   }
 
   @Test
-  public void testCopyAndParentMergeDoNotRecompressSource() {
+  public void testConsumingMergeKeepsSourceMassAndDerivedCachesConsistent() {
     SplittableRandom random = new SplittableRandom(10);
     PercentileTDigestValueAggregator aggregator = newAggregator(100);
     TDigest source = aggregator.getInitialAggregatedValue(random.nextDouble() * 10_000);
     for (int i = 1; i < 94; i++) {
       aggregator.applyRawValue(source, random.nextDouble() * 10_000);
     }
-    // Query the working-compression state before any serialization; serializing first hides source recompression.
-    double beforeCopy = source.quantile(0.86);
-    aggregator.cloneAggregatedValue(source);
-    assertEquals(source.quantile(0.86), beforeCopy);
+    source.centroids();
+    source.quantile(0.86);
+    TDigest copy = aggregator.cloneAggregatedValue(source);
     TDigest parent = aggregator.getInitialAggregatedValue(0.0);
     aggregator.applyAggregatedValue(parent, source);
-    assertEquals(source.quantile(0.86), beforeCopy);
     TDigest queryAccumulator = TDigestUtils.createMergingDigest(100.0);
     queryAccumulator.add(source);
-    assertEquals(source.quantile(0.86), beforeCopy,
-        "Generic centroid ingestion must not perform the source's final compression");
+
+    assertEquals(source.getTotalWeight(), 94.0);
+    assertEquals(copy.getTotalWeight(), 94.0);
+    assertEquals(parent.getTotalWeight(), 95.0);
+    TDigest roundTripped = aggregator.deserializeAggregatedValue(aggregator.serializeAggregatedValue(source));
+    assertEquals(source.centroids().stream().mapToDouble(Centroid::weight).sum(), 94.0);
+    assertEquals(roundTripped.getTotalWeight(), 94.0);
+    assertEquals(source.quantile(0.86), roundTripped.quantile(0.86));
   }
 
   @Test
@@ -417,22 +421,18 @@ public class PercentileTDigestValueAggregatorTest {
   }
 
   @Test
-  public void testFractionalMassDoesNotUnderestimateRegisteredByteSize() {
-    for (double secondWeight : new double[]{0.5, 1.5}) {
-      PercentileTDigestValueAggregator aggregator = newAggregator(100);
-      TDigest result = aggregator.getInitialAggregatedValue(createVerboseEncoding(
-          new double[]{0.0}, new double[]{0.5}));
-      aggregator.applyRawValue(result, createVerboseEncoding(new double[]{2.0}, new double[]{secondWeight}));
-
-      int registeredBound = aggregator.getMaxAggregatedValueByteSize();
-      byte[] serialized = aggregator.serializeAggregatedValue(result);
-      assertTrue(serialized.length <= registeredBound);
-      assertEquals(aggregator.deserializeAggregatedValue(serialized).getTotalWeight(), 0.5 + secondWeight);
-    }
+  public void testFreshFractionalBoundaryFailsBeforeWritingLegacyBytes() {
+    PercentileTDigestValueAggregator aggregator = newAggregator(100);
+    TDigest result = aggregator.getInitialAggregatedValue(createVerboseEncoding(
+        new double[]{0.0}, new double[]{0.5}));
+    aggregator.applyRawValue(result, createVerboseEncoding(new double[]{2.0}, new double[]{1.5}));
+    assertThrows(IllegalArgumentException.class, () -> aggregator.serializeAggregatedValue(result));
+    assertEquals(result.getTotalWeight(), 2.0);
+    assertEquals(result.quantile(1.0), 2.0);
   }
 
   @Test
-  public void testDegradedNonPositiveMassSurvivesCopyAndBothMergeOrders() {
+  public void testDegradedNonPositiveMassRetainsBytesAndRejectsBothMergeOrders() {
     for (double[] weights : new double[][]{{1.0, -1.0}, {-5.0, 0.0}}) {
       PercentileTDigestValueAggregator aggregator = newAggregator(100);
       byte[] poisonedBytes = createVerboseEncoding(new double[]{1.0, 2.0}, weights);
@@ -449,12 +449,16 @@ public class PercentileTDigestValueAggregatorTest {
       for (boolean poisonedFirst : new boolean[]{true, false}) {
         TDigest valid = aggregator.getInitialAggregatedValue(42.0);
         TDigest degraded = aggregator.deserializeAggregatedValue(poisonedBytes);
-        TDigest merged = poisonedFirst ? aggregator.applyAggregatedValue(degraded, valid)
-            : aggregator.applyAggregatedValue(valid, degraded);
-        assertFalse(merged.hasValidStatistics());
-        assertTrue(Double.isNaN(merged.quantile(0.5)));
-        assertTrue(Double.isNaN(aggregator.deserializeAggregatedValue(
-            aggregator.serializeAggregatedValue(merged)).quantile(0.5)));
+        assertThrows(IllegalArgumentException.class, () -> {
+          if (poisonedFirst) {
+            aggregator.applyAggregatedValue(degraded, valid);
+          } else {
+            aggregator.applyAggregatedValue(valid, degraded);
+          }
+        });
+        assertEquals(valid.getTotalWeight(), 1.0);
+        assertEquals(valid.quantile(0.5), 42.0);
+        assertEquals(aggregator.serializeAggregatedValue(degraded), poisonedBytes);
       }
     }
   }
@@ -486,47 +490,58 @@ public class PercentileTDigestValueAggregatorTest {
   }
 
   @Test
-  public void testDegradedCompactPayloadWithInfinityMutationUsesCanonicalBytes() {
+  public void testDegradedCompactPayloadRejectsInfinityMutationAndRetainsBytes() {
     int centroidCount = 100;
     byte[] compact = createSmallEncoding(10, centroidCount, 500, centroidCount);
     ByteBuffer.wrap(compact).putFloat(TDigestUtils.SMALL_HEADER_SIZE, -1.0F);
     PercentileTDigestValueAggregator aggregator = newAggregator(10);
     TDigest digest = aggregator.getInitialAggregatedValue(compact);
-    aggregator.applyRawValue(digest, Double.NEGATIVE_INFINITY);
-    int registeredBound = aggregator.getMaxAggregatedValueByteSize();
-
-    byte[] serialized = aggregator.serializeAggregatedValue(digest);
-
-    assertEquals(ByteBuffer.wrap(serialized).getInt(), TDigestUtils.VERBOSE_ENCODING);
-    assertEquals(serialized.length, TDigestUtils.VERBOSE_HEADER_SIZE + TDigestUtils.VERBOSE_CENTROID_SIZE);
-    assertTrue(serialized.length <= registeredBound);
-    TDigest roundTripped = aggregator.deserializeAggregatedValue(serialized);
-    assertFalse(roundTripped.hasValidStatistics());
-    assertEquals(roundTripped.getTotalWeight(), centroidCount - 1.0);
+    assertThrows(IllegalArgumentException.class, () -> aggregator.applyRawValue(digest, Double.NEGATIVE_INFINITY));
+    assertEquals(aggregator.serializeAggregatedValue(digest), compact);
   }
 
   @Test
-  public void testInfinityOnlyReceiverMergingDegradedCompactPayloadUsesCanonicalBytes() {
+  public void testInfinityOnlyReceiverRejectsDegradedCompactPayloadWithoutMutation() {
     int centroidCount = 100;
     byte[] compact = createSmallEncoding(10, centroidCount, 500, centroidCount);
     ByteBuffer.wrap(compact).putFloat(TDigestUtils.SMALL_HEADER_SIZE, -1.0F);
     PercentileTDigestValueAggregator aggregator = newAggregator(10);
     TDigest result = aggregator.getInitialAggregatedValue(Double.NEGATIVE_INFINITY);
     TDigest source = aggregator.deserializeAggregatedValue(compact);
+    byte[] original = aggregator.serializeAggregatedValue(result);
 
-    aggregator.applyAggregatedValue(result, source);
+    assertThrows(IllegalArgumentException.class, () -> aggregator.applyAggregatedValue(result, source));
 
-    int registeredBound = aggregator.getMaxAggregatedValueByteSize();
-    byte[] serialized = aggregator.serializeAggregatedValue(result);
-    assertEquals(serialized.length, TDigestUtils.VERBOSE_HEADER_SIZE + TDigestUtils.VERBOSE_CENTROID_SIZE);
-    assertTrue(serialized.length <= registeredBound);
-    TDigest roundTripped = aggregator.deserializeAggregatedValue(serialized);
-    assertFalse(roundTripped.hasValidStatistics());
-    assertEquals(roundTripped.getTotalWeight(), centroidCount - 1.0);
-    assertEquals(roundTripped.getMin(), Double.NEGATIVE_INFINITY);
-    assertEquals(roundTripped.getMax(), centroidCount - 1.0);
-    assertEquals(aggregator.serializeAggregatedValue(source), compact,
-        "Merging into an unknown distribution must not mutate the source");
+    assertEquals(result.getTotalWeight(), 1.0);
+    assertEquals(aggregator.serializeAggregatedValue(result), original);
+    assertEquals(aggregator.serializeAggregatedValue(source), compact);
+  }
+
+  @Test
+  public void testHistoricalFractionalInfinityBytesSurviveViewsCopyAndReturnedByteMutation() {
+    PercentileTDigestValueAggregator aggregator = newAggregator(100);
+    byte[] original = createVerboseEncoding(new double[]{Double.NEGATIVE_INFINITY, 2.0, Double.POSITIVE_INFINITY},
+        new double[]{0.5, 0.3, 0.5});
+    TDigest digest = aggregator.deserializeAggregatedValue(original);
+    digest.centroids();
+    digest.quantile(0.5);
+    digest.compress();
+    TDigest copy = aggregator.cloneAggregatedValue(digest);
+    byte[] returned = aggregator.serializeAggregatedValue(digest);
+    assertEquals(returned, original);
+    returned[0] = 0;
+    assertEquals(aggregator.serializeAggregatedValue(digest), original);
+    assertEquals(aggregator.serializeAggregatedValue(copy), original);
+
+    TDigest fresh = aggregator.deserializeAggregatedValue(createVerboseEncoding(
+        new double[]{Double.NEGATIVE_INFINITY, 1.0, 2.0, Double.POSITIVE_INFINITY},
+        new double[]{1.0, 0.3, 0.3, 1.0}));
+    // Mutating removes original-byte provenance. Unit outer tails still make fractional interior mass readable.
+    fresh.add(1.5, 0.1);
+    TDigest roundTripped = aggregator.deserializeAggregatedValue(aggregator.serializeAggregatedValue(fresh));
+    assertEquals(roundTripped.getTotalWeight(), 2.7, 1e-12);
+    assertEquals(roundTripped.quantile(0.0), Double.NEGATIVE_INFINITY);
+    assertEquals(roundTripped.quantile(1.0), Double.POSITIVE_INFINITY);
   }
 
   @Test

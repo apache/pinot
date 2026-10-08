@@ -56,6 +56,11 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
+
 
 /// Tests MergeRollup task executor with PercentileTDigest aggregation on BYTES columns.
 ///
@@ -425,6 +430,28 @@ public class MergeRollupTDigestTaskExecutorTest {
     // 3 distinct dimension keys: latency-group1, latency-group2, latency-group3
     Assert.assertEquals(metadata.getTotalDocs(), 3,
         "Rollup doc count should equal the number of distinct dimension keys");
+  }
+
+  @Test
+  public void testCorruptedDigestFailsRollupBeforePersistingAResult() throws Exception {
+    byte[] corrupted = TDigestUtils.serializeCentroids(DEFAULT_COMPRESSION, 0.0, 10.0,
+        new double[]{0.0, 50.0, 10.0}, new double[]{1.0, 5.0, 1.0}, 3);
+    GenericRow corruptRow = new GenericRow();
+    corruptRow.putValue(DIMENSION_COL, GROUP_1);
+    corruptRow.putValue(TDIGEST_COL, corrupted);
+    List<File> segmentDirs = buildSegments(List.of(
+        List.of(makeRow(GROUP_1, createTDigest(1, 101))), List.of(corruptRow)));
+    File outputDir = new File(new File(TEMP_DIR, "workingDir_" + _workingDirCounter), "segments_output");
+
+    Exception failure = expectThrows(Exception.class, () -> runExecutor(segmentDirs, null));
+    Throwable cause = failure;
+    while (cause.getCause() != null) {
+      cause = cause.getCause();
+    }
+    assertTrue(cause instanceof IllegalArgumentException, "Rollup must fail because the digest is corrupted");
+    assertEquals(cause.getMessage(), "Cannot merge or mutate a historically corrupted TDigest; "
+        + "only its unchanged original bytes can be retained");
+    assertFalse(outputDir.exists(), "A failed rollup must not leave a synthetic percentile result");
   }
 
   private static TDigest createTDigest(final int start, final int end) {
