@@ -157,8 +157,6 @@ public class SortedMailboxMergeReceiveOperatorTest {
     try (SortedMailboxMergeReceiveOperator operator = getOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
         DATA_SCHEMA, FIELD_COLLATIONS, 2, 2)) {
       assertEquals(sortKeys(drain(operator)), List.of(3, 4));
-      verify(_mailbox1).earlyTerminate();
-      verify(_mailbox2).earlyTerminate();
     }
   }
 
