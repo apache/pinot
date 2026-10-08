@@ -38,6 +38,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.logging.log4j.util.Strings;
+import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
@@ -134,8 +135,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   /// Enforces the optional compressed-segment size limit on live data independently of time retention. Replaced
   /// segments are excluded from accounting. Eviction proceeds oldest first and stops before the first active segment
-  /// owned by lineage, including replacement copies excluded from accounting. The newest OFFLINE segment and realtime
-  /// recovery segments are preserved; hybrid realtime eviction requires offline coverage.
+  /// listed on either side of any lineage entry, including replacement copies excluded from accounting. The newest
+  /// OFFLINE segment and realtime recovery segments are preserved; hybrid realtime eviction requires offline coverage.
   /// Unknown sizes or missing metadata disable this pass; consuming segments are excluded from accounting and eviction.
   @VisibleForTesting
   protected void manageSizeBasedRetention(TableConfig tableConfig) {
@@ -173,8 +174,13 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     Set<String> activeSegments = new HashSet<>(_pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false));
     SegmentLineage segmentLineage =
         SegmentLineageAccessHelper.getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
-    Set<String> lineageOwnedSegments = segmentLineage == null ? new HashSet<>()
-        : new HashSet<>(SegmentLineageUtils.getDeleteBlockedSegments(segmentLineage));
+    Map<String, LineageEntry> lineageEntries = segmentLineage == null ? Map.of() : segmentLineage.getLineageEntries();
+    Set<String> lineageOwnedSegments = new HashSet<>();
+    // Size retention protects both sides of every retained entry, regardless of state, age, or the deletion flag.
+    lineageEntries.values().forEach(entry -> {
+      lineageOwnedSegments.addAll(entry.getSegmentsFrom());
+      lineageOwnedSegments.addAll(entry.getSegmentsTo());
+    });
     lineageOwnedSegments.retainAll(activeSegments);
     // Replaced segments awaiting lineage cleanup are no longer queryable and must not trigger live-data eviction.
     SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(activeSegments, segmentLineage);
@@ -268,7 +274,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         break;
       }
       // Stop at the lineage boundary even when that segment is excluded by another protection or from accounting.
-      // This snapshot rule applies regardless of the lineage-exclusive deletion flag; deletion retains its fresh guard.
+      // This snapshot rule applies regardless of the lineage-exclusive deletion flag.
       if (lineageBarrier != null && evictionOrder.compare(metadata, lineageBarrier) >= 0) {
         LOGGER.info("Stop size retention for table: {} at lineage-owned segment: {}", tableNameWithType,
             lineageBarrier.getSegmentName());
@@ -282,9 +288,21 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       projectedRetainedBytes = projectedRetainedBytes.subtract(BigInteger.valueOf(size));
     }
     if (!segmentsToDelete.isEmpty()) {
-      // The public deletion path rechecks live lineage in case it changed after candidate selection.
-      PinotResourceManagerResponse response =
-          _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
+      PinotResourceManagerResponse response;
+      // Coordinate with local lineage writers and reject stale accounting or a changed stopping point, even when
+      // lineage-exclusive deletion is disabled. Other controllers can still update lineage after this fresh read.
+      synchronized (_pinotHelixResourceManager.getLineageUpdaterLock(tableNameWithType)) {
+        SegmentLineage currentLineage =
+            SegmentLineageAccessHelper.getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(),
+                tableNameWithType);
+        Map<String, LineageEntry> currentEntries =
+            currentLineage == null ? Map.of() : currentLineage.getLineageEntries();
+        if (!lineageEntries.equals(currentEntries)) {
+          LOGGER.warn("Segment lineage changed for table: {}, skip size retention deletion", tableNameWithType);
+          return false;
+        }
+        response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
+      }
       if (response == null || !response.isSuccessful()) {
         LOGGER.warn("Size retention deletion failed for table: {}, bytes retained: {}, cap: {}, response: {}",
             tableNameWithType, retainedBytes, retentionSize, response);

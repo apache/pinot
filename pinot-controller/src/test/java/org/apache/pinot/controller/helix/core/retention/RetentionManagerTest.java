@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
@@ -1122,7 +1123,8 @@ public class RetentionManagerTest {
     verify(resourceManager).getSegmentsFor(OFFLINE_TABLE_NAME, false);
     verify(resourceManager, never()).getSegmentsFor(OFFLINE_TABLE_NAME, true);
     verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("olderLive"));
-    verify(resourceManager.getPropertyStore()).get(anyString(), any(Stat.class), eq(AccessOption.PERSISTENT));
+    verify(resourceManager.getPropertyStore(), times(2))
+        .get(anyString(), any(Stat.class), eq(AccessOption.PERSISTENT));
     verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 0);
   }
 
@@ -1156,17 +1158,18 @@ public class RetentionManagerTest {
     readOrder.verify(resourceManager).getSegmentsFor(OFFLINE_TABLE_NAME, false);
     readOrder.verify(propertyStore).get(anyString(), any(Stat.class), eq(AccessOption.PERSISTENT));
     readOrder.verify(resourceManager).getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
-    verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("olderLive"));
+    readOrder.verify(propertyStore).get(anyString(), any(Stat.class), eq(AccessOption.PERSISTENT));
+    readOrder.verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("olderLive"));
     verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 1);
   }
 
   @Test
   public void testSizeRetentionStopsBeforeExcludedLineageShadowSegment() {
-    for (LineageEntryState state : List.of(LineageEntryState.IN_PROGRESS, LineageEntryState.COMPLETED)) {
+    for (LineageEntryState state : LineageEntryState.values()) {
       TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "1B");
       long now = System.currentTimeMillis();
-      String shadow = state == LineageEntryState.IN_PROGRESS ? "destination" : "source";
-      String live = state == LineageEntryState.IN_PROGRESS ? "source" : "destination";
+      String shadow = state == LineageEntryState.COMPLETED ? "source" : "destination";
+      String live = state == LineageEntryState.COMPLETED ? "destination" : "source";
       List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", 40, now - 4),
           createSizeRetentionSegment(shadow, -1, now - 3), createSizeRetentionSegment("newerLive", 40, now - 2),
           createSizeRetentionSegment(live, 80, now - 1), createSizeRetentionSegment("newest", 40, now));
@@ -1277,7 +1280,7 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testSizeRetentionRevertedLineageDoesNotCreateBarrier() {
+  public void testSizeRetentionRevertedSourceCreatesBarrier() {
     TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "40B");
     long now = System.currentTimeMillis();
     List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", 40, now - 3),
@@ -1290,8 +1293,143 @@ public class RetentionManagerTest {
 
     retentionManager.manageSizeBasedRetention(tableConfig);
 
-    verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest", "source"));
+    verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest"));
+    verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 1);
+  }
+
+  @Test
+  public void testSizeRetentionCompletedDestinationCreatesBarrierWithSourceAbsentOrNewer() {
+    for (boolean sourceAbsent : List.of(true, false)) {
+      TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "1B");
+      long now = System.currentTimeMillis();
+      List<SegmentZKMetadata> segments = new ArrayList<>(List.of(createSizeRetentionSegment("oldest", 40, now - 3),
+          createSizeRetentionSegment("destination", 40, now - 2), createSizeRetentionSegment("newerLive", 40, now - 1),
+          createSizeRetentionSegment("newest", 40, now)));
+      if (!sourceAbsent) {
+        segments.add(createSizeRetentionSegment("source", -1, now + 1));
+      }
+      PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+      ControllerMetrics metrics = mock(ControllerMetrics.class);
+      ControllerConf conf = new ControllerConf();
+      conf.setProperty(ControllerConf.LINEAGE_EXCLUSIVE_DELETE_ENABLED, false);
+      RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager, metrics,
+          conf, mock(BrokerServiceHelper.class));
+      setupSizeRetentionLineage(resourceManager, OFFLINE_TABLE_NAME, "source", "destination",
+          LineageEntryState.COMPLETED, now - TimeUnit.DAYS.toMillis(400));
+
+      retentionManager.manageSizeBasedRetention(tableConfig);
+
+      verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest"));
+      verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 1);
+    }
+  }
+
+  @Test
+  public void testSizeRetentionRejectsPrefixWhenLineageMembershipChangesWithExclusiveDeleteDisabled() {
+    for (LineageEntryState state : LineageEntryState.values()) {
+      for (boolean selectedTarget : List.of(true, false)) {
+        TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "60B");
+        long now = System.currentTimeMillis();
+        List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("lateMarker", 0, now - 3),
+            createSizeRetentionSegment("oldest", 60, now - 2), createSizeRetentionSegment("middle", 60, now - 1),
+            createSizeRetentionSegment("newest", 60, now));
+        PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+        ControllerMetrics metrics = mock(ControllerMetrics.class);
+        ControllerConf conf = new ControllerConf();
+        conf.setProperty(ControllerConf.LINEAGE_EXCLUSIVE_DELETE_ENABLED, false);
+        RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager, metrics,
+            conf, mock(BrokerServiceHelper.class));
+        SegmentLineage lineage = new SegmentLineage(OFFLINE_TABLE_NAME);
+        lineage.addLineageEntry("replacement", new LineageEntry(List.of("absentSource"),
+            List.of(selectedTarget ? "oldest" : "lateMarker"), state, now));
+        when(resourceManager.getPropertyStore().get(anyString(), any(Stat.class), eq(AccessOption.PERSISTENT)))
+            .thenReturn(null, lineage.toZNRecord());
+
+        retentionManager.manageSizeBasedRetention(tableConfig);
+
+        // An earlier boundary change invalidates the batch even when no selected target is a new lineage member.
+        verify(resourceManager, never()).deleteSegments(anyString(), anyList());
+        verify(resourceManager.getPropertyStore(), times(2))
+            .get(anyString(), any(Stat.class), eq(AccessOption.PERSISTENT));
+        verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 1);
+      }
+    }
+  }
+
+  @Test
+  public void testSizeRetentionReadsFreshLineageAndDeletesUnderUpdaterLock() {
+    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "60B");
+    long now = System.currentTimeMillis();
+    List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", 60, now - 1),
+        createSizeRetentionSegment("newest", 60, now));
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    ControllerMetrics metrics = mock(ControllerMetrics.class);
+    RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager, metrics);
+    Object updaterLock = resourceManager.getLineageUpdaterLock(OFFLINE_TABLE_NAME);
+    AtomicInteger lineageReads = new AtomicInteger();
+    when(resourceManager.getPropertyStore().get(anyString(), any(Stat.class), eq(AccessOption.PERSISTENT)))
+        .thenAnswer(invocation -> {
+          if (lineageReads.incrementAndGet() == 2) {
+            assertTrue(Thread.holdsLock(updaterLock));
+          }
+          return null;
+        });
+    when(resourceManager.deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest"))).thenAnswer(invocation -> {
+      assertTrue(Thread.holdsLock(updaterLock));
+      return PinotResourceManagerResponse.SUCCESS;
+    });
+
+    retentionManager.manageSizeBasedRetention(tableConfig);
+
+    assertEquals(lineageReads.get(), 2);
+    verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest"));
     verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 0);
+  }
+
+  @Test
+  public void testSizeRetentionRejectsPrefixWhenLineageStateOrTimestampChanges() {
+    for (boolean stateChanges : List.of(true, false)) {
+      TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "160B");
+      long now = System.currentTimeMillis();
+      List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", 60, now - 3),
+          createSizeRetentionSegment("source", 80, now - 2), createSizeRetentionSegment("destination", 40, now - 1),
+          createSizeRetentionSegment("newest", 60, now));
+      PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+      ControllerMetrics metrics = mock(ControllerMetrics.class);
+      RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager, metrics);
+      SegmentLineage planningLineage = new SegmentLineage(OFFLINE_TABLE_NAME);
+      planningLineage.addLineageEntry("replacement",
+          new LineageEntry(List.of("source"), List.of("destination"), LineageEntryState.IN_PROGRESS, now));
+      SegmentLineage latestLineage = new SegmentLineage(OFFLINE_TABLE_NAME);
+      latestLineage.addLineageEntry("replacement", new LineageEntry(List.of("source"), List.of("destination"),
+          stateChanges ? LineageEntryState.COMPLETED : LineageEntryState.IN_PROGRESS, stateChanges ? now : now + 1));
+      when(resourceManager.getPropertyStore().get(anyString(), any(Stat.class), eq(AccessOption.PERSISTENT)))
+          .thenReturn(planningLineage.toZNRecord(), latestLineage.toZNRecord());
+
+      retentionManager.manageSizeBasedRetention(tableConfig);
+
+      // The members are unchanged, but a state transition changes which side is queryable and how bytes are counted.
+      verify(resourceManager, never()).deleteSegments(anyString(), anyList());
+      verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 1);
+    }
+  }
+
+  @Test
+  public void testSizeRetentionPublishesBlockedGaugeWhenFreshLineageReadThrows() {
+    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "60B");
+    long now = System.currentTimeMillis();
+    List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", 60, now - 1),
+        createSizeRetentionSegment("newest", 60, now));
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    ControllerMetrics metrics = mock(ControllerMetrics.class);
+    RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager, metrics);
+    when(resourceManager.getPropertyStore().get(anyString(), any(Stat.class), eq(AccessOption.PERSISTENT)))
+        .thenReturn(null).thenThrow(new IllegalStateException("Fresh lineage read failed"));
+
+    assertThrows(IllegalStateException.class, () -> retentionManager.manageSizeBasedRetention(tableConfig));
+
+    verify(resourceManager, never()).deleteSegments(anyString(), anyList());
+    verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 1);
   }
 
   @Test
@@ -1802,9 +1940,14 @@ public class RetentionManagerTest {
 
   private void setupSizeRetentionLineage(PinotHelixResourceManager resourceManager, String tableName,
       String source, String destination, LineageEntryState state) {
+    setupSizeRetentionLineage(resourceManager, tableName, source, destination, state, System.currentTimeMillis());
+  }
+
+  private void setupSizeRetentionLineage(PinotHelixResourceManager resourceManager, String tableName,
+      String source, String destination, LineageEntryState state, long timestamp) {
     SegmentLineage lineage = new SegmentLineage(tableName);
     lineage.addLineageEntry("replacement",
-        new LineageEntry(List.of(source), List.of(destination), state, System.currentTimeMillis()));
+        new LineageEntry(List.of(source), List.of(destination), state, timestamp));
     when(resourceManager.getPropertyStore().get(anyString(), any(Stat.class), eq(AccessOption.PERSISTENT)))
         .thenReturn(lineage.toZNRecord());
   }
