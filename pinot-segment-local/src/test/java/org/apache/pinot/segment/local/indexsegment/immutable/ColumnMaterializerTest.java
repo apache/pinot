@@ -46,6 +46,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
+/// Tests lazy per-column materialization and value-based config sharing with fixtures local to each test.
 public class ColumnMaterializerTest {
 
   @Test
@@ -73,9 +74,9 @@ public class ColumnMaterializerTest {
   @Test
   public void testOpenStructConfigsThatDifferAreNotCollapsed() {
     OpenStructIndexConfig keysA =
-        new OpenStructIndexConfig(false, null, null, Set.of("a"), null, null, null, null, null);
+        new OpenStructIndexConfig(false, null, null, Set.of("a"), null, null, null, null, null, null, null);
     OpenStructIndexConfig keysB =
-        new OpenStructIndexConfig(false, null, null, Set.of("b"), null, null, null, null, null);
+        new OpenStructIndexConfig(false, null, null, Set.of("b"), null, null, null, null, null, null, null);
     FieldIndexConfigs a = new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), keysA).build();
     FieldIndexConfigs b = new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), keysB).build();
 
