@@ -22,7 +22,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptTable;
@@ -107,6 +109,8 @@ public final class RelToPlanNodeConverter {
   private final boolean _caseSensitive;
   // When true, UNNEST output is pruned to drop input (passthrough) columns not referenced downstream. Default off.
   private final boolean _pruneUnnestColumns;
+  private final Map<Exchange, WindowSortAutoPlanner.Selection> _autoExchanges;
+  private final Map<ExchangeNode, WindowSortAutoPlanner.Selection> _autoBindings = new IdentityHashMap<>();
 
   public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
       String hashFunction) {
@@ -120,10 +124,21 @@ public final class RelToPlanNodeConverter {
 
   public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
       String hashFunction, boolean caseSensitive, boolean pruneUnnestColumns) {
+    this(tracker, hashFunction, caseSensitive, pruneUnnestColumns, Map.of());
+  }
+
+  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
+      String hashFunction, boolean caseSensitive, boolean pruneUnnestColumns,
+      Map<Exchange, WindowSortAutoPlanner.Selection> autoExchanges) {
+    _autoExchanges = autoExchanges;
     _tracker = tracker;
     _hashFunction = hashFunction;
     _caseSensitive = caseSensitive;
     _pruneUnnestColumns = pruneUnnestColumns;
+  }
+
+  public Map<ExchangeNode, WindowSortAutoPlanner.Selection> getAutoBindings() {
+    return _autoBindings;
   }
 
   /// Converts a [RelNode] into its serializable counterpart.
@@ -146,6 +161,10 @@ public final class RelToPlanNodeConverter {
       result = convertLogicalSort((LogicalSort) node);
     } else if (node instanceof Exchange) {
       result = convertLogicalExchange((Exchange) node);
+      WindowSortAutoPlanner.Selection selection = _autoExchanges.get(node);
+      if (selection != null) {
+        _autoBindings.put((ExchangeNode) result, selection);
+      }
     } else if (node instanceof LogicalJoin) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.JOIN_COUNT, 1);
       if (!_joinFound) {

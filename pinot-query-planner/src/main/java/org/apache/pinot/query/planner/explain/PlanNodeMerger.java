@@ -268,7 +268,7 @@ class PlanNodeMerger {
       }
       MailboxReceiveNode other = (MailboxReceiveNode) context;
       return node.isSort() == other.isSort() && node.isSortedOnSender() == other.isSortedOnSender()
-          ? mergeReceives(node, other) : null;
+          && node.isAutoProfile() == other.isAutoProfile() ? mergeReceives(node, other) : null;
     }
 
     @Nullable

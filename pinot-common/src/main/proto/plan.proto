@@ -200,6 +200,7 @@ message MailboxReceiveNode {
   repeated Collation collations = 5;
   bool sort = 6 [deprecated = true];
   bool sortedOnSender = 7 [deprecated = true];
+  bool autoProfile = 8;
 }
 
 // Each input stream is ordered by the logical plan. Older servers reject the unknown PlanNode oneof tag.

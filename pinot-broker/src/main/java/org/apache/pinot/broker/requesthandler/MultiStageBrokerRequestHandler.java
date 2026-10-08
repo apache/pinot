@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -83,6 +84,7 @@ import org.apache.pinot.query.ImmutableQueryEnvironment;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.explain.AskingServerStageExplainer;
+import org.apache.pinot.query.planner.logical.WindowSortAutoPlan;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -138,6 +140,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final WorkerManager _multiClusterWorkerManager;
   private final MailboxService _mailboxService;
   private final QueryDispatcher _queryDispatcher;
+  private final WindowSortAutoTuner _windowSortAutoTuner = new WindowSortAutoTuner();
   @Nullable
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final boolean _explainAskingServerDefault;
@@ -502,7 +505,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
 
     try {
-      ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, queryOptions, requestId);
+      String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
+      // The profile key contains no SQL text. Stage/input/collation fingerprints further separate individual
+      // ordered-window exchanges, even when a query has several windows.
+      String windowSortMode = QueryOptionsUtils.getWindowKWayMergeMode(queryOptions,
+          _config.getProperty(CommonConstants.Broker.CONFIG_OF_WINDOW_K_WAY_MERGE,
+              CommonConstants.Broker.DEFAULT_WINDOW_K_WAY_MERGE_MODE));
+      WindowSortAutoTuner.Session windowSortAutoSession = "auto".equalsIgnoreCase(windowSortMode)
+          ? _windowSortAutoTuner.newSession(Objects.hash(query, database, queryOptions)) : null;
+      ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, queryOptions, requestId,
+          windowSortAutoSession);
       QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf, _multiClusterRoutingContext);
       return callAsync(requestId, query, () -> queryEnv.compile(query, sqlNodeAndOptions), queryTimer);
     } catch (WebApplicationException e) {
@@ -547,6 +559,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions,
       long requestId) {
+    return getQueryEnvConf(httpHeaders, queryOptions, requestId, null);
+  }
+
+  private ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions,
+      long requestId, @Nullable WindowSortAutoPlan windowSortAutoPlan) {
     String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
     boolean inferPartitionHint = _config.getProperty(CommonConstants.Broker.CONFIG_OF_INFER_PARTITION_HINT,
         CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
@@ -597,9 +614,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int sealedInListThreshold = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_SEALED_IN_LIST_THRESHOLD,
         CommonConstants.Broker.DEFAULT_SEALED_IN_LIST_THRESHOLD);
-    boolean windowKWayMerge = _config.getProperty(
+    String windowKWayMergeMode = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_WINDOW_K_WAY_MERGE,
-        CommonConstants.Broker.DEFAULT_WINDOW_K_WAY_MERGE);
+        CommonConstants.Broker.DEFAULT_WINDOW_K_WAY_MERGE_MODE);
     boolean defaultUnnestColumnPruning = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_UNNEST_COLUMN_PRUNING,
         CommonConstants.Broker.DEFAULT_UNNEST_COLUMN_PRUNING);
@@ -639,9 +656,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultDisabledPlannerRules(_defaultDisabledPlannerRules)
         .defaultSortExchangeCopyLimit(sortExchangeCopyThreshold)
         .defaultSealedInListThreshold(sealedInListThreshold)
-        .defaultWindowKWayMerge(windowKWayMerge)
-        .isKWayMergeSupported((QueryOptionsUtils.isWindowKWayMerge(queryOptions, windowKWayMerge)
-            || QueryOptionsUtils.isStreamingSortedMailboxReceiveEnabled(queryOptions))
+        .defaultWindowKWayMergeMode(windowKWayMergeMode)
+        .windowSortAutoPlan(windowSortAutoPlan)
+        .isKWayMergeSupported((!"false".equals(QueryOptionsUtils.getWindowKWayMergeMode(queryOptions,
+            windowKWayMergeMode)) || QueryOptionsUtils.isStreamingSortedMailboxReceiveEnabled(queryOptions))
             && !QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
             && _kWayMergeSupported.getAsBoolean())
         .build();
@@ -837,6 +855,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         }
       }
 
+      long dispatchToReduceTimeNs = System.nanoTime() - executionStartTimeNs;
       BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
 
       QueryProcessingException processingException = queryResults.getProcessingException();
@@ -853,9 +872,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         requestContext.setErrorCode(errorCode);
       } else {
         brokerResponse.setResultTable(queryResults.getResultTable());
-        long executionEndTimeNs = System.nanoTime();
         updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION,
-            executionEndTimeNs - executionStartTimeNs);
+            dispatchToReduceTimeNs);
       }
 
       brokerResponse.setClientRequestId(clientRequestId);
@@ -892,6 +910,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
             : _multiClusterRoutingContext.getUnavailableClusterExceptions()) {
           brokerResponse.addException(clusterException);
         }
+      }
+
+      List<QueryDispatcher.QueryResult.StageCoverage> stageCoverage = queryResults.getStageCoverage();
+      if (processingException == null && brokerResponse.getExceptions().isEmpty()
+          && (stageCoverage == null || stageCoverage.stream().noneMatch(c -> c != null
+              && (c.getMissing() > 0 || c.getMergeFailed() > 0)))
+          && query.getWindowSortAutoPlan() instanceof WindowSortAutoTuner.Session) {
+        ((WindowSortAutoTuner.Session) query.getWindowSortAutoPlan()).observe(queryResults.getQueryStats(),
+            dispatchToReduceTimeNs);
       }
 
       fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(), dispatchableSubPlan,

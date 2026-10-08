@@ -202,7 +202,7 @@ public class EquivalentStagesFinder {
         }
         MailboxReceiveNode that = (MailboxReceiveNode) node2;
         return node1.isSort() == that.isSort() && node1.isSortedOnSender() == that.isSortedOnSender()
-            && areReceivesEquivalent(node1, that);
+            && node1.isAutoProfile() == that.isAutoProfile() && areReceivesEquivalent(node1, that);
       }
 
       @Override

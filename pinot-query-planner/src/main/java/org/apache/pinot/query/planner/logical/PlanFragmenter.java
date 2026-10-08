@@ -24,6 +24,8 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
@@ -65,6 +67,20 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
   private final IdentityHashMap<MailboxSendNode, ExchangeNode> _mailboxSendToExchangeNodeMap = new IdentityHashMap<>();
   private final IdentityHashMap<BaseMailboxReceiveNode, ExchangeNode> _mailboxReceiveToExchangeNodeMap =
       new IdentityHashMap<>();
+
+  @Nullable
+  private final WindowSortAutoPlan _autoSelector;
+  private final Map<ExchangeNode, WindowSortAutoPlanner.Selection> _autoBindings;
+
+  public PlanFragmenter() {
+    this(null, Map.of());
+  }
+
+  public PlanFragmenter(@Nullable WindowSortAutoPlan autoSelector,
+      Map<ExchangeNode, WindowSortAutoPlanner.Selection> autoBindings) {
+    _autoSelector = autoSelector;
+    _autoBindings = autoBindings;
+  }
 
   // ROOT PlanFragment ID is 0, current PlanFragment ID starts with 1, next PlanFragment ID starts with 2.
   private int _nextPlanFragmentId = 2;
@@ -190,6 +206,10 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     int senderPlanFragmentId = _nextPlanFragmentId++;
     _childPlanFragmentIdsMap.computeIfAbsent(receiverPlanFragmentId, k -> new IntArrayList()).add(senderPlanFragmentId);
 
+    WindowSortAutoPlanner.Selection auto = _autoBindings.get(node);
+    if (auto != null && _autoSelector != null) {
+      _autoSelector.bind(auto.key(), receiverPlanFragmentId, senderPlanFragmentId);
+    }
     // Create a new context for the next PlanFragment with MailboxSendNode as the root node.
     PlanNode nextPlanFragmentRoot = node.getInputs().get(0).visit(this, new Context(senderPlanFragmentId));
     PinotRelExchangeType exchangeType = node.getExchangeType();
@@ -209,8 +229,9 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
             senderPlanFragmentId, exchangeType, distributionType, keys, node.getCollations(),
             node.getMergeFetch(), node.getMergeOffset(), mailboxSendNode)
         : new MailboxReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
-            senderPlanFragmentId, exchangeType, distributionType, keys, node.getCollations(), node.isSortOnReceiver(),
-            node.isSortOnSender(), mailboxSendNode);
+            senderPlanFragmentId, exchangeType, distributionType, keys,
+            auto != null ? auto.collations() : node.getCollations(), node.isSortOnReceiver(),
+            node.isSortOnSender(), auto != null && auto.profile(), mailboxSendNode);
     _mailboxReceiveToExchangeNodeMap.put(mailboxReceiveNode, node);
     return mailboxReceiveNode;
   }

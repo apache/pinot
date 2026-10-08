@@ -27,14 +27,21 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.pinot.calcite.rel.logical.PinotKWayMergeSortExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.query.QueryEnvironment.CompiledQuery;
 import org.apache.pinot.query.planner.PlannerUtils;
+import org.apache.pinot.query.planner.logical.WindowSortAutoPlan;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
@@ -1357,6 +1364,179 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
           "Compatibility fallback must retain the complete window input on older servers");
       assertFalse(window.getInputs().get(0).getInputs().get(0) instanceof MailboxMergeReceiveNode);
     }
+  }
+
+  // The compatibility sender flag stays disabled while explicit SortNode establishes the ordering.
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testAutoColdPlanIsResolvedBeforeFragmentation() {
+    QueryEnvironment environment = windowAutoEnvironment(key -> false, true);
+    try (CompiledQuery compiled = environment.compile("SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d")) {
+      RelNode logicalInput = findLogicalWindow(compiled.getRelRoot().rel).getInput();
+      assertTrue(logicalInput instanceof LogicalSort);
+      assertNull(((LogicalSort) logicalInput).fetch);
+      assertTrue(logicalInput.getInput(0) instanceof PinotLogicalExchange);
+      DispatchableSubPlan plan = compiled.planQuery(0).getQueryPlan();
+      SortNode sort = (SortNode) findWindowNode(plan).getInputs().get(0);
+      assertEquals(sort.getFetch(), Integer.MAX_VALUE, "Window input must outlive the broker response cap");
+      assertTrue(sort.isSingleRunRequired());
+      MailboxReceiveNode receive = (MailboxReceiveNode) sort.getInputs().get(0);
+      assertTrue(receive.isAutoProfile());
+      assertFalse(findWindowInputSendNode(plan).getInputs().get(0) instanceof SortNode);
+      assertFalse(findWindowInputSendNode(plan).isSort());
+    }
+  }
+
+  @Test
+  public void testSupportedStandaloneAutoDoesNotProfile() {
+    QueryEnvironment environment = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS,
+        SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP, true);
+    DispatchableSubPlan plan = planWindowQuery(environment,
+        "SET windowKWayMerge='auto'; SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d");
+    SortNode sort = (SortNode) findWindowNode(plan).getInputs().get(0);
+    assertEquals(sort.getFetch(), Integer.MAX_VALUE);
+    assertTrue(sort.isSingleRunRequired());
+    MailboxReceiveNode receive = (MailboxReceiveNode) sort.getInputs().get(0);
+    assertFalse(receive.isAutoProfile(), "A standalone planner has no tuner to consume samples");
+  }
+
+  // The compatibility sender flag stays disabled while explicit SortNode establishes the ordering.
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testAutoWarmPlanIsResolvedBeforeFragmentation() {
+    QueryEnvironment environment = windowAutoEnvironment(key -> true, true);
+    try (CompiledQuery compiled = environment.compile("SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d")) {
+      RelNode logicalInput = findLogicalWindow(compiled.getRelRoot().rel).getInput();
+      assertTrue(logicalInput instanceof PinotKWayMergeSortExchange);
+      assertTrue(logicalInput.getInput(0) instanceof LogicalSort);
+      assertNull(((LogicalSort) logicalInput.getInput(0)).fetch);
+      DispatchableSubPlan plan = compiled.planQuery(0).getQueryPlan();
+      assertTrue(findWindowNode(plan).getInputs().get(0) instanceof MailboxMergeReceiveNode);
+      MailboxSendNode send = findWindowInputSendNode(plan);
+      assertFalse(send.isSort());
+      assertTrue(send.getInputs().get(0) instanceof SortNode);
+      assertEquals(((SortNode) send.getInputs().get(0)).getFetch(), -1);
+      assertTrue(((SortNode) send.getInputs().get(0)).isSingleRunRequired());
+    }
+  }
+
+  @Test
+  public void testAutoCannotSelectOrProfileWithoutCapability() {
+    AtomicInteger calls = new AtomicInteger();
+    QueryEnvironment environment = windowAutoEnvironment(key -> {
+      calls.incrementAndGet();
+      return true;
+    }, false);
+    for (String prefix : List.of("", "SET windowKWayMerge='auto'; ", "SET windowKWayMerge=true; ")) {
+      DispatchableSubPlan plan = planWindowQuery(environment,
+          prefix + "SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d");
+      SortNode sort = (SortNode) findWindowNode(plan).getInputs().get(0);
+      assertEquals(sort.getFetch(), Integer.MAX_VALUE);
+      assertTrue(sort.isSingleRunRequired());
+      MailboxReceiveNode receive = (MailboxReceiveNode) sort.getInputs().get(0);
+      assertFalse(receive.isAutoProfile());
+    }
+    assertEquals(calls.get(), 0);
+  }
+
+  @Test
+  public void testExplicitWindowModesNeverTrainAuto() {
+    AtomicInteger calls = new AtomicInteger();
+    QueryEnvironment environment = windowAutoEnvironment(key -> {
+      calls.incrementAndGet();
+      return true;
+    }, true);
+    for (String mode : List.of("true", "false")) {
+      DispatchableSubPlan plan = planWindowQuery(environment,
+          "SET windowKWayMerge=" + mode + "; SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d");
+      BaseMailboxReceiveNode receive = findNodeOfType(findWindowNode(plan), BaseMailboxReceiveNode.class);
+      assertNotNull(receive);
+      if (receive instanceof MailboxReceiveNode) {
+        assertFalse(((MailboxReceiveNode) receive).isAutoProfile());
+      } else {
+        assertTrue(receive instanceof MailboxMergeReceiveNode);
+      }
+    }
+    assertEquals(calls.get(), 0);
+  }
+
+  @Test
+  public void testAutoLogicalKeysStableAndBoundToAllocatedStages() {
+    String query = "SELECT SUM(col3) OVER (ORDER BY col3), SUM(col3) OVER (ORDER BY col7) FROM d";
+    List<WindowSortAutoPlan.ExchangeKey> first = new ArrayList<>();
+    List<WindowSortAutoPlan.ExchangeKey> second = new ArrayList<>();
+    Map<WindowSortAutoPlan.ExchangeKey, Integer> bindings = new HashMap<>();
+    WindowSortAutoPlan selector = new WindowSortAutoPlan() {
+      @Override
+      public boolean useSenderSort(ExchangeKey key) {
+        first.add(key);
+        return first.size() == 1;
+      }
+
+      @Override
+      public void bind(ExchangeKey key, int receiverStageId, int senderStageId) {
+        bindings.put(key, receiverStageId);
+      }
+    };
+    DispatchableSubPlan plan;
+    try (CompiledQuery compiled = windowAutoEnvironment(selector, true).compile(query)) {
+      assertEquals(first.size(), 2, "Selections must exist before physical stages are allocated");
+      assertTrue(bindings.isEmpty());
+      plan = compiled.planQuery(0).getQueryPlan();
+    }
+    try (CompiledQuery compiled = windowAutoEnvironment(key -> {
+      second.add(key);
+      return false;
+    }, true).compile(query)) {
+      compiled.planQuery(1);
+    }
+    assertEquals(second, first, "Choosing warm/cold must not change any logical evidence key");
+    assertNotEquals(first.get(0), first.get(1));
+    assertEquals(bindings.size(), 2);
+    int merges = 0;
+    int profiled = 0;
+    for (DispatchablePlanFragment fragment : plan.getQueryStages()) {
+      BaseMailboxReceiveNode receive = findNodeOfType(fragment.getPlanFragment().getFragmentRoot(),
+          BaseMailboxReceiveNode.class);
+      if (receive instanceof MailboxMergeReceiveNode) {
+        merges++;
+      } else if (receive instanceof MailboxReceiveNode && ((MailboxReceiveNode) receive).isAutoProfile()) {
+        profiled++;
+        assertTrue(bindings.containsValue(receive.getStageId()));
+      }
+    }
+    assertEquals(merges, 1);
+    assertEquals(profiled, 1);
+  }
+
+  @Test
+  public void testInvalidAutoOptionRejectedEvenWithoutCapability() {
+    expectThrows(Exception.class, () -> _queryEnvironment.compile(
+        "SET windowKWayMerge='invalid'; SELECT SUM(col3) OVER (ORDER BY col3) FROM d"));
+  }
+
+  private QueryEnvironment windowAutoEnvironment(WindowSortAutoPlan selector, boolean supported) {
+    return getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS, SERVER2_SEGMENTS,
+        PARTITIONED_SEGMENTS_MAP, supported, selector);
+  }
+
+  private static DispatchableSubPlan planWindowQuery(QueryEnvironment environment, String query) {
+    try (CompiledQuery compiled = environment.compile(query)) {
+      return compiled.planQuery(0).getQueryPlan();
+    }
+  }
+
+  private static Window findLogicalWindow(RelNode root) {
+    if (root instanceof Window) {
+      return (Window) root;
+    }
+    for (RelNode input : root.getInputs()) {
+      Window window = findLogicalWindow(input);
+      if (window != null) {
+        return window;
+      }
+    }
+    return null;
   }
 
   @DataProvider

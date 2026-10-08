@@ -170,7 +170,7 @@ public class PlanNodeDeserializer {
         protoMailboxReceiveNode.getSenderStageId(), convertExchangeType(protoMailboxReceiveNode.getExchangeType()),
         convertDistributionType(protoMailboxReceiveNode.getDistributionType()), protoMailboxReceiveNode.getKeysList(),
         convertCollations(protoMailboxReceiveNode.getCollationsList()), protoMailboxReceiveNode.getSort(),
-        protoMailboxReceiveNode.getSortedOnSender(), null);
+        protoMailboxReceiveNode.getSortedOnSender(), protoMailboxReceiveNode.getAutoProfile(), null);
   }
 
   private static MailboxSendNode deserializeMailboxSendNode(Plan.PlanNode protoNode) {
