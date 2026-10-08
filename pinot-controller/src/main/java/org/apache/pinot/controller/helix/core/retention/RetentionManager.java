@@ -21,7 +21,6 @@ package org.apache.pinot.controller.helix.core.retention;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.math.BigInteger;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -193,7 +192,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     List<SegmentZKMetadata> completedSegments = new ArrayList<>();
     Map<String, Long> completedSegmentSizes = new HashMap<>();
     boolean realtime = tableConfig.getTableType() == TableType.REALTIME;
-    BigInteger retainedBytes = BigInteger.ZERO;
+    long retainedBytes = 0L;
     for (SegmentZKMetadata metadata : metadataList) {
       String segmentName = metadata.getSegmentName();
       if (lineageOwnedSegments.contains(segmentName)) {
@@ -211,8 +210,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         LOGGER.warn("Unknown size for segment: {} in table: {}, skip size retention", segmentName, tableNameWithType);
         return false;
       }
-      // Avoid overflowing the table total even if individual segment sizes are valid longs.
-      retainedBytes = retainedBytes.add(BigInteger.valueOf(size));
+      retainedBytes += size;
       completedSegments.add(metadata);
       completedSegmentSizes.put(segmentName, size);
     }
@@ -220,8 +218,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       LOGGER.warn("Missing active segment metadata for table: {}, skip size retention", tableNameWithType);
       return false;
     }
-    BigInteger limit = BigInteger.valueOf(retentionSizeBytes);
-    if (retainedBytes.compareTo(limit) <= 0) {
+    if (retainedBytes <= retentionSizeBytes) {
       return true;
     }
 
@@ -235,12 +232,11 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       return false;
     }
     SegmentZKMetadata lineageBarrier = lineageOwnedMetadata.values().stream().min(evictionOrder).orElse(null);
-    List<String> candidateNames = completedSegments.stream()
-        .filter(metadata -> getSizeRetentionTimestamp(metadata) >= 0)
-        .map(SegmentZKMetadata::getSegmentName)
-        .collect(Collectors.toCollection(ArrayList::new));
+    completedSegments.removeIf(metadata -> getSizeRetentionTimestamp(metadata) < 0);
     if (realtime) {
-      candidateNames.removeAll(_pinotHelixResourceManager.getLastLLCCompletedSegments(metadataList));
+      Set<String> lastCompletedSegments =
+          new HashSet<>(_pinotHelixResourceManager.getLastLLCCompletedSegments(metadataList));
+      completedSegments.removeIf(metadata -> lastCompletedSegments.contains(metadata.getSegmentName()));
       if (_isHybridTableRetentionStrategyEnabled) {
         TableConfig offlineTableConfig =
             _pinotHelixResourceManager.getOfflineTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType));
@@ -252,25 +248,20 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
             LOGGER.warn("Cannot determine offline coverage for table: {}, skip size retention", tableNameWithType, e);
             return false;
           }
-          Set<String> coveredSegments = completedSegments.stream()
-              .filter(metadata -> metadata.getEndTimeMs() >= 0 && metadata.getEndTimeMs() < timeBoundaryMs)
-              .map(SegmentZKMetadata::getSegmentName).collect(Collectors.toSet());
-          candidateNames.retainAll(coveredSegments);
+          completedSegments.removeIf(metadata -> metadata.getEndTimeMs() < 0
+              || metadata.getEndTimeMs() >= timeBoundaryMs);
         }
       }
     } else {
       // A size typo must not remove the entire OFFLINE table, even if its newest segment exceeds the cap alone.
-      completedSegments.stream().filter(metadata -> getSizeRetentionTimestamp(metadata) >= 0)
-          .max(evictionOrder).map(SegmentZKMetadata::getSegmentName).ifPresent(candidateNames::remove);
+      completedSegments.stream().max(evictionOrder).ifPresent(completedSegments::remove);
     }
-    Set<String> candidates = new HashSet<>(candidateNames);
-    completedSegments.removeIf(metadata -> !candidates.contains(metadata.getSegmentName()));
     completedSegments.sort(evictionOrder);
 
     List<String> segmentsToDelete = new ArrayList<>();
-    BigInteger projectedRetainedBytes = retainedBytes;
+    long projectedRetainedBytes = retainedBytes;
     for (SegmentZKMetadata metadata : completedSegments) {
-      if (projectedRetainedBytes.compareTo(limit) <= 0) {
+      if (projectedRetainedBytes <= retentionSizeBytes) {
         break;
       }
       // Stop at the lineage boundary even when that segment is excluded by another protection or from accounting.
@@ -285,7 +276,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         continue;
       }
       segmentsToDelete.add(metadata.getSegmentName());
-      projectedRetainedBytes = projectedRetainedBytes.subtract(BigInteger.valueOf(size));
+      projectedRetainedBytes -= size;
     }
     if (!segmentsToDelete.isEmpty()) {
       PinotResourceManagerResponse response;
@@ -303,7 +294,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         }
         response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
       }
-      if (response == null || !response.isSuccessful()) {
+      if (!response.isSuccessful()) {
         LOGGER.warn("Size retention deletion failed for table: {}, bytes retained: {}, cap: {}, response: {}",
             tableNameWithType, retainedBytes, retentionSize, response);
         return false;
@@ -312,7 +303,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       LOGGER.info("Deleted {} oldest segments from table: {} for retention size: {}", segmentsToDelete.size(),
           tableNameWithType, retentionSize);
     }
-    if (retainedBytes.compareTo(limit) > 0) {
+    if (retainedBytes > retentionSizeBytes) {
       LOGGER.warn("Table: {} remains above retention size: {} due to protected, undated, or lineage-owned segments",
           tableNameWithType, retentionSize);
       return false;

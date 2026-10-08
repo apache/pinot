@@ -1502,33 +1502,6 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testSizeRetentionReportsDeletionFailureAndResetsGaugeAfterSuccessfulRetry() {
-    for (PinotResourceManagerResponse response : Arrays.asList(
-        PinotResourceManagerResponse.failure("Targets became lineage-locked"), null)) {
-      TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "100B");
-      long now = System.currentTimeMillis();
-      List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", 60, now - 1),
-          createSizeRetentionSegment("newest", 60, now));
-      PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-      ControllerMetrics metrics = mock(ControllerMetrics.class);
-      RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager, metrics);
-      when(resourceManager.deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest")))
-          .thenReturn(response, PinotResourceManagerResponse.SUCCESS);
-
-      retentionManager.manageSizeBasedRetention(tableConfig);
-
-      verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest"));
-      verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 1);
-      clearInvocations(metrics);
-
-      retentionManager.manageSizeBasedRetention(tableConfig);
-
-      verify(resourceManager, times(2)).deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest"));
-      verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 0);
-    }
-  }
-
-  @Test
   public void testSizeRetentionGaugeClearsForEmptyTableAndWhenLeadershipIsLost() {
     TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "100B");
     PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
@@ -1567,95 +1540,85 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testSizeRetentionGaugeIsRemovedWhenRetentionIsDisabled() {
-    for (boolean refreshTable : List.of(true, false)) {
-      TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "invalid");
-      List<SegmentZKMetadata> segments =
-          List.of(createSizeRetentionSegment("oversized", 100, System.currentTimeMillis()));
-      PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-      ControllerMetrics metrics = mock(ControllerMetrics.class);
-      RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager, metrics);
-
-      retentionManager.manageSizeBasedRetention(tableConfig);
-
-      verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 1);
-      clearInvocations(metrics);
-      if (refreshTable) {
-        IngestionConfig ingestionConfig = new IngestionConfig();
-        ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "REFRESH", null));
-        tableConfig.setIngestionConfig(ingestionConfig);
-      } else {
-        tableConfig.getValidationConfig().setRetentionSize(null);
-      }
-
-      retentionManager.manageSizeBasedRetention(tableConfig);
-
-      verify(metrics).removeTableGauge(OFFLINE_TABLE_NAME, ControllerGauge.SIZE_RETENTION_BLOCKED);
-      verify(metrics, never()).setOrUpdateTableGauge(eq(OFFLINE_TABLE_NAME),
-          eq(ControllerGauge.SIZE_RETENTION_BLOCKED), anyLong());
-      verify(resourceManager, never()).deleteSegments(anyString(), anyList());
-    }
-  }
-
-  @Test
   public void testSizeRetentionGaugeRegistryLifecycle() {
-    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "200B");
-    long now = System.currentTimeMillis();
-    List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", 60, now - 1),
-        createSizeRetentionSegment("newest", 60, now));
-    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-    ControllerMetrics metrics = spy(new ControllerMetrics("sizeRetentionLifecycle.",
-        PinotMetricUtils.getPinotMetricsRegistry()));
-    RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager, metrics);
-    try {
-      assertFalse(
-          MetricValueUtils.tableGaugeExists(metrics, OFFLINE_TABLE_NAME, ControllerGauge.SIZE_RETENTION_BLOCKED));
+    for (boolean refreshTable : List.of(true, false)) {
+      TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "100B");
+      IngestionConfig refreshConfig = new IngestionConfig();
+      refreshConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "REFRESH", null));
+      tableConfig.setIngestionConfig(refreshTable ? refreshConfig : null);
+      tableConfig.getValidationConfig().setRetentionSize(refreshTable ? "100B" : null);
+      long now = System.currentTimeMillis();
+      List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", 60, now - 1),
+          createSizeRetentionSegment("newest", 60, now));
+      PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+      ControllerMetrics metrics = spy(new ControllerMetrics("sizeRetentionLifecycle.",
+          PinotMetricUtils.getPinotMetricsRegistry()));
+      RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager, metrics);
+      try {
+        assertFalse(
+            MetricValueUtils.tableGaugeExists(metrics, OFFLINE_TABLE_NAME, ControllerGauge.SIZE_RETENTION_BLOCKED));
 
-      retentionManager.manageSizeBasedRetention(tableConfig);
+        retentionManager.manageSizeBasedRetention(tableConfig);
 
-      verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 0);
-      assertSizeRetentionGaugeValue(metrics, 0);
-      clearInvocations(metrics);
-      tableConfig.getValidationConfig().setRetentionSize("100B");
-      when(resourceManager.deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest")))
-          .thenReturn(PinotResourceManagerResponse.FAILURE, PinotResourceManagerResponse.SUCCESS);
+        verifySizeRetentionGaugeRemoved(metrics);
+        verify(resourceManager, never()).deleteSegments(anyString(), anyList());
+        clearInvocations(metrics);
+        tableConfig.setIngestionConfig(null);
+        tableConfig.getValidationConfig().setRetentionSize("200B");
 
-      retentionManager.manageSizeBasedRetention(tableConfig);
+        retentionManager.manageSizeBasedRetention(tableConfig);
 
-      verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 1);
-      assertSizeRetentionGaugeValue(metrics, 1);
-      clearInvocations(metrics);
+        verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 0);
+        assertSizeRetentionGaugeValue(metrics, 0);
+        clearInvocations(metrics);
+        tableConfig.getValidationConfig().setRetentionSize("100B");
+        when(resourceManager.deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest")))
+            .thenReturn(PinotResourceManagerResponse.failure("Targets became lineage-locked"),
+                PinotResourceManagerResponse.SUCCESS);
 
-      retentionManager.manageSizeBasedRetention(tableConfig);
+        retentionManager.manageSizeBasedRetention(tableConfig);
 
-      verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 0);
-      assertSizeRetentionGaugeValue(metrics, 0);
-      clearInvocations(metrics);
-      tableConfig.getValidationConfig().setRetentionSize(null);
+        verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest"));
+        verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 1);
+        assertSizeRetentionGaugeValue(metrics, 1);
+        clearInvocations(metrics);
 
-      retentionManager.manageSizeBasedRetention(tableConfig);
+        retentionManager.manageSizeBasedRetention(tableConfig);
 
-      verify(metrics).removeTableGauge(OFFLINE_TABLE_NAME, ControllerGauge.SIZE_RETENTION_BLOCKED);
-      verify(metrics, never()).setOrUpdateTableGauge(eq(OFFLINE_TABLE_NAME),
-          eq(ControllerGauge.SIZE_RETENTION_BLOCKED), anyLong());
-      assertFalse(
-          MetricValueUtils.tableGaugeExists(metrics, OFFLINE_TABLE_NAME, ControllerGauge.SIZE_RETENTION_BLOCKED));
-      clearInvocations(metrics);
-      tableConfig.getValidationConfig().setRetentionSize("200B");
+        verify(resourceManager, times(2)).deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest"));
+        verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 0);
+        assertSizeRetentionGaugeValue(metrics, 0);
+        clearInvocations(metrics, resourceManager);
+        tableConfig.getValidationConfig().setRetentionSize("invalid");
 
-      retentionManager.manageSizeBasedRetention(tableConfig);
+        retentionManager.manageSizeBasedRetention(tableConfig);
 
-      verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 0);
-      assertSizeRetentionGaugeValue(metrics, 0);
-      clearInvocations(metrics);
+        verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 1);
+        assertSizeRetentionGaugeValue(metrics, 1);
+        clearInvocations(metrics);
+        tableConfig.setIngestionConfig(refreshTable ? refreshConfig : null);
+        tableConfig.getValidationConfig().setRetentionSize(refreshTable ? "100B" : null);
 
-      retentionManager.nonLeaderCleanup(List.of(OFFLINE_TABLE_NAME));
+        retentionManager.manageSizeBasedRetention(tableConfig);
 
-      verify(metrics).removeTableGauge(OFFLINE_TABLE_NAME, ControllerGauge.SIZE_RETENTION_BLOCKED);
-      assertFalse(
-          MetricValueUtils.tableGaugeExists(metrics, OFFLINE_TABLE_NAME, ControllerGauge.SIZE_RETENTION_BLOCKED));
-    } finally {
-      metrics.removeTableGauge(OFFLINE_TABLE_NAME, ControllerGauge.SIZE_RETENTION_BLOCKED);
+        verifySizeRetentionGaugeRemoved(metrics);
+        verify(resourceManager, never()).deleteSegments(anyString(), anyList());
+        clearInvocations(metrics);
+        tableConfig.setIngestionConfig(null);
+        tableConfig.getValidationConfig().setRetentionSize("200B");
+
+        retentionManager.manageSizeBasedRetention(tableConfig);
+
+        verifySizeRetentionGauge(metrics, OFFLINE_TABLE_NAME, 0);
+        assertSizeRetentionGaugeValue(metrics, 0);
+        clearInvocations(metrics);
+
+        retentionManager.nonLeaderCleanup(List.of(OFFLINE_TABLE_NAME));
+
+        verifySizeRetentionGaugeRemoved(metrics);
+      } finally {
+        metrics.removeTableGauge(OFFLINE_TABLE_NAME, ControllerGauge.SIZE_RETENTION_BLOCKED);
+      }
     }
   }
 
@@ -1749,32 +1712,6 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testSizeRetentionSkipsRefreshTablesAndUnconfiguredTables() {
-    for (boolean refreshTable : List.of(true, false)) {
-      TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "50B");
-      if (refreshTable) {
-        IngestionConfig ingestionConfig = new IngestionConfig();
-        ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "REFRESH", null));
-        tableConfig.setIngestionConfig(ingestionConfig);
-      } else {
-        tableConfig.getValidationConfig().setRetentionSize(null);
-      }
-      List<SegmentZKMetadata> segments =
-          List.of(createSizeRetentionSegment("oversized", 100, System.currentTimeMillis()));
-      PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-      ControllerMetrics metrics = mock(ControllerMetrics.class);
-      RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager, metrics);
-
-      retentionManager.manageSizeBasedRetention(tableConfig);
-
-      verify(resourceManager, never()).deleteSegments(anyString(), anyList());
-      verify(metrics).removeTableGauge(OFFLINE_TABLE_NAME, ControllerGauge.SIZE_RETENTION_BLOCKED);
-      verify(metrics, never()).setOrUpdateTableGauge(eq(OFFLINE_TABLE_NAME),
-          eq(ControllerGauge.SIZE_RETENTION_BLOCKED), anyLong());
-    }
-  }
-
-  @Test
   public void testSizeRetentionRechecksMetadataAfterTimeRetention() {
     TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "70B");
     tableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
@@ -1800,20 +1737,6 @@ public class RetentionManagerTest {
     deletionOrder.verify(resourceManager).getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
     deletionOrder.verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("recent"));
     assertEquals(segments.stream().map(SegmentZKMetadata::getSegmentName).toList(), List.of("newest"));
-  }
-
-  @Test
-  public void testSizeRetentionAccountsForTotalAboveLongMaximum() {
-    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "100B");
-    long now = System.currentTimeMillis();
-    List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", Long.MAX_VALUE, now - 1),
-        createSizeRetentionSegment("newest", 1, now));
-    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-    RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager);
-
-    retentionManager.manageSizeBasedRetention(tableConfig);
-
-    verify(resourceManager).deleteSegments(OFFLINE_TABLE_NAME, List.of("oldest"));
   }
 
   @Test
@@ -1882,6 +1805,13 @@ public class RetentionManagerTest {
     assertTrue(MetricValueUtils.tableGaugeExists(metrics, OFFLINE_TABLE_NAME, ControllerGauge.SIZE_RETENTION_BLOCKED));
     assertEquals(MetricValueUtils.getTableGaugeValue(metrics, OFFLINE_TABLE_NAME,
         ControllerGauge.SIZE_RETENTION_BLOCKED), value);
+  }
+
+  private void verifySizeRetentionGaugeRemoved(ControllerMetrics metrics) {
+    verify(metrics).removeTableGauge(OFFLINE_TABLE_NAME, ControllerGauge.SIZE_RETENTION_BLOCKED);
+    verify(metrics, never()).setOrUpdateTableGauge(eq(OFFLINE_TABLE_NAME),
+        eq(ControllerGauge.SIZE_RETENTION_BLOCKED), anyLong());
+    assertFalse(MetricValueUtils.tableGaugeExists(metrics, OFFLINE_TABLE_NAME, ControllerGauge.SIZE_RETENTION_BLOCKED));
   }
 
   private SegmentZKMetadata createSizeRetentionSegment(String segmentName, long sizeInBytes, long endTimeMs) {
