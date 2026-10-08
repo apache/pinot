@@ -197,9 +197,10 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testVariantReturningFunctionIsNotConstantFolded() {
     // Calcite cannot represent a VARIANT RexLiteral. The literal-only evaluation rule must leave parseJson as a
     // runtime call so it can be composed with functions that consume VARIANT.
-    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
-        "SELECT variant_get(parse_json('{\"answer\":42}'), '$.answer', 'INT') FROM a");
-    assertNotNull(dispatchableSubPlan);
+    try (CompiledQuery compiledQuery = _queryEnvironment.compile(
+        "SELECT variant_get(parse_json('{\"answer\":42}'), '$.answer', 'INT') FROM a")) {
+      assertNotNull(compiledQuery.planQuery(0).getQueryPlan());
+    }
   }
 
   @Test

@@ -169,9 +169,10 @@ public class QueryOpTest {
 
   @Test
   public void testNullHandlingYamlPropertyUsesBooleanNaming() {
-    Representer representer = new Representer(new DumperOptions());
+    DumperOptions dumperOptions = new DumperOptions();
+    Representer representer = new Representer(dumperOptions);
     representer.getPropertyUtils().setSkipMissingProperties(true);
-    Yaml yaml = new Yaml(new CompatibilityOpsRunner.CustomConstructor(new LoaderOptions()), representer);
+    Yaml yaml = new Yaml(new CompatibilityOpsRunner.CustomConstructor(new LoaderOptions()), representer, dumperOptions);
 
     CompatTestOperation operation = yaml.loadAs("""
         description: Test null handling property
