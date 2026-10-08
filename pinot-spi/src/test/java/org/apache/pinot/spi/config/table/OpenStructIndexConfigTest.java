@@ -355,5 +355,9 @@ public class OpenStructIndexConfigTest {
     assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, Set.of("i"),
         null, null),
         base);
+    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, null,
+        2, null), base);
+    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, null,
+        null, new FieldConfig("blob", null, null, null, null)), base);
   }
 }
