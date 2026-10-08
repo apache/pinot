@@ -97,7 +97,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     }
     /// A grouping-set query using the legacy per-row expansion path expands each row into one group per
     /// grouping set, so it always uses the multi-value (int[][]) executor path even though the union group-by
-    /// columns are single-valued. With base aggregation (the default), the segment instead aggregates the base
+    /// columns are single-valued. With opt-in base aggregation, the segment instead aggregates the base
     /// grouping (union columns) exactly like a plain GROUP BY -- no forced MV path, no grouping-set key
     /// generator -- and emits the base groups; the combine phase merges them and derives the individual grouping
     /// sets in parallel. Base aggregation is disabled when:
@@ -106,8 +106,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     ///   - the estimated base-group count (union columns' dictionary cardinality product) exceeds the configured
     ///     max (default `numGroupsLimit`): if base groups could overflow the group limit, dropped base keys
     ///     would vanish from EVERY derived set -- corrupting the grand total and coarse subtotals, which the
-    ///     expansion path keeps exact under the limit -- and the derived output (base x numSets) would grow
-    ///     unbounded (see [QueryContext#isGroupingSetsBaseAggregation] and
+    ///     expansion path keeps exact under the limit -- and the derive would do excessive work (see
+    ///     [QueryContext#isGroupingSetsBaseAggregation] and
     ///     [QueryContext#getGroupingSetsBaseAggregationMaxGroups]).
     boolean useBaseAggregation = queryContext.isGroupingSets() && queryContext.isGroupingSetsBaseAggregation()
         && !hasMVGroupByExpression

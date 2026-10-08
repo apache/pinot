@@ -149,18 +149,36 @@ public class DeriveGroupingSetsTest {
     IndexedTable derived =
         GroupByUtils.deriveGroupingSetsFromMergedBaseTable(buildBaseTable(24), queryContext, 8, _executorService);
     assertTrue(derived.isTrimmed(), "capping the derived output must mark the table trimmed");
+    assertTrue(derived.isNumGroupsLimitReached(), "capping derived groups must report the group limit");
     Map<String, Double> first = toMap(derived);
     assertEquals(first.size(), 10, "derived output must be capped at numGroupsLimit");
     assertTrue(first.keySet().stream().anyMatch(k -> k.startsWith("null|null|")),
         "grand-total grouping set must survive the cap");
+    assertEquals(first.get("null|null|2"), 552.0, "the grand total must include every base group");
     long numD1Subtotals = first.keySet().stream().filter(k -> k.endsWith("|1") && !k.startsWith("null|")).count();
     assertEquals(numD1Subtotals, 4, "every {d1} subtotal must survive the cap");
+    for (int i = 0; i < 4; i++) {
+      assertEquals(first.get("a" + i + "|null|1"), 120.0 + 12.0 * i,
+          "a retained subtotal must include every matching base group");
+    }
     // Deterministic across parallel runs.
     for (int i = 0; i < 4; i++) {
       Map<String, Double> again =
           toMap(GroupByUtils.deriveGroupingSetsFromMergedBaseTable(buildBaseTable(24), queryContext, 8,
               _executorService));
       assertEquals(again, first, "parallel derive must be deterministic");
+    }
+    queryContext.setAccurateGroupByWithoutOrderBy(true);
+    Map<String, Double> accurate =
+        toMap(GroupByUtils.deriveGroupingSetsFromMergedBaseTable(buildBaseTable(24), queryContext, 8,
+            _executorService));
+    assertEquals(accurate.get("null|null|2"), 552.0);
+    assertEquals(accurate.size(), 10);
+    for (int i = 0; i < 2; i++) {
+      Map<String, Double> again =
+          toMap(GroupByUtils.deriveGroupingSetsFromMergedBaseTable(buildBaseTable(24), queryContext, 8,
+              _executorService));
+      assertEquals(again, accurate, "accurate group-by must retain a stable capped result");
     }
   }
 

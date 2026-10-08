@@ -131,6 +131,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         /// live in the same query.
         boolean baseLayout = _groupingSets && resultsBlock.getDataSchema() != null
             && resultsBlock.getDataSchema().size() == _numBaseColumns;
+        if (!baseLayout) {
+          GroupByUtils.validateFullGroupingSetsLayout(resultsBlock, _queryContext);
+        }
         IndexedTable indexedTable = baseLayout ? ensureBaseIndexedTable(resultsBlock)
             : ensureIndexedTable(resultsBlock);
         int numKeyColumns = baseLayout ? _numBaseKeyColumns : _numKeyColumns;
@@ -291,10 +294,15 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           _numTasks, _executorService);
       if (indexedTable != null) {
         // Merge full-layout (expansion-path) records first so all their groups exist before the overflow fold.
+        int derivedCap = Math.max(_queryContext.getNumGroupsLimit(), _queryContext.getGroupingSets().size());
         int mergedKeys = 0;
         for (Map.Entry<Key, Record> entry : indexedTable.getRecordEntries()) {
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
-          derivedTable.upsert(entry.getKey(), entry.getValue());
+          if (derivedTable.size() < derivedCap) {
+            derivedTable.upsert(entry.getKey(), entry.getValue());
+          } else if (!derivedTable.upsertExistingIfPresent(entry.getKey(), entry.getValue())) {
+            derivedTable.markNumGroupsLimitReached();
+          }
         }
       }
       if (baseIndexedTable.isFull()) {
@@ -313,6 +321,12 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       // propagate the trimmed flag so the broker response reports the approximation.
       if (derivedTable.isTrimmed()) {
         _groupsTrimmed = true;
+      }
+      if (derivedTable.isNumGroupsLimitReached()) {
+        _numGroupsLimitReached = true;
+      }
+      if (derivedTable.size() >= _queryContext.getNumGroupsWarningLimit()) {
+        _numGroupsWarningLimitReached = true;
       }
       indexedTable = derivedTable;
     }
