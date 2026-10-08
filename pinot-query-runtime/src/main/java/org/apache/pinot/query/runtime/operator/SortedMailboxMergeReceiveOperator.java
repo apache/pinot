@@ -304,7 +304,6 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
       return _rows.get(_index++);
     }
 
-
     int getRetainedRowCount() {
       int retainedRowCount = _rows.size();
       for (List<Object[]> pendingRows : _pending) {
