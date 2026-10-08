@@ -1756,19 +1756,41 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // allows consumption during build, so the next consuming segment can be running during this download as well
     boolean releasedDuringBuild =
         _parallelSegmentConsumptionPolicy.isAllowedDuringBuild() && !_consumerSemaphoreAcquired.get();
-    if ((allowedDuringDownload || releasedDuringBuild) && _partitionUpsertMetadataManager != null
-        && _partitionUpsertMetadataManager.shouldRevertMetadataOnInconsistency(_realtimeSegment)) {
-      // Table config validation rejects this in PROTECTED mode. It still happens when the mode is switched after the
-      // table is created, when the server-level default allows partial upsert consumption during commit, or when a
-      // pauseless table falls back to a download after its local build fails.
-      _segmentLogger.error("Next consuming segment can run during download while this replace reverts upsert "
-          + "metadata. Its snapshot can miss the rows the revert restores. Use DISALLOW_ALWAYS");
+    // The committed segment ends before what this replica consumed, so the replacement holds fewer rows: every
+    // primary key this segment took over past that offset loses its record location when the replace lands. The next
+    // consuming segment must not replay against that half-updated metadata, whatever the upsert table's mode is.
+    boolean replaceDropsConsumedRows =
+        _partitionUpsertMetadataManager != null && consumedPastCommittedEndOffset(segmentZKMetadata);
+    if (replaceDropsConsumedRows && releasedDuringBuild) {
+      // Nothing left to hold back: the build path released the semaphore before anyone could know this replace would
+      // drop rows, so the next consuming segment is already running.
+      _segmentLogger.error("Next consuming segment can run during download while this replace drops rows consumed "
+          + "past the committed end offset. Its snapshot can miss those rows. Use DISALLOW_ALWAYS");
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD, 1L);
     }
-    if (allowedDuringDownload) {
+    // Keep the semaphore across a replace that drops rows, so the next consuming segment starts only once the upsert
+    // metadata is consistent. doOffload() releases it afterwards, and closes the stream consumer with it.
+    if (allowedDuringDownload && !replaceDropsConsumedRows) {
       closeStreamConsumerAndReleaseSemaphore();
     }
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
+  }
+
+  /// Returns true when this replica consumed past the offset the committed segment ends at, which is what makes the
+  /// replacement hold fewer rows than the segment it replaces.
+  private boolean consumedPastCommittedEndOffset(SegmentZKMetadata segmentZKMetadata) {
+    String endOffset = segmentZKMetadata.getEndOffset();
+    if (endOffset == null || _currentOffset == null) {
+      // Without both offsets this cannot be ruled out, so take the safe side and treat the replace as dropping rows.
+      return true;
+    }
+    try {
+      return _currentOffset.compareTo(_streamPartitionMsgOffsetFactory.create(endOffset)) > 0;
+    } catch (Exception e) {
+      _segmentLogger.warn("Could not compare current offset: {} against committed end offset: {}, treating the "
+          + "replace as dropping consumed rows", _currentOffset, endOffset, e);
+      return true;
+    }
   }
 
   protected long now() {

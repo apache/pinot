@@ -895,8 +895,9 @@ public class RealtimeSegmentDataManagerTest {
       throws Exception {
     long finalOffsetValue = START_OFFSET_VALUE + 600;
 
-    // ALLOW_DURING_BUILD_ONLY: the local build releases the consumer semaphore, its CRC mismatches the committed copy,
-    // and the download that follows reverts upsert metadata while the next consuming segment can already be running.
+    // ALLOW_DURING_BUILD_ONLY: the local build releases the consumer semaphore and its CRC mismatches the committed
+    // copy, so the download that follows runs while the next consuming segment can already be going. Consumption
+    // stopped at the committed end offset though, so the replacement holds the same rows and nothing is flagged.
     _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
     ServerMetrics serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManagerForUpsertRevert(
@@ -907,8 +908,8 @@ public class RealtimeSegmentDataManagerTest {
       runGoOnlineForCrcGuard(segmentDataManager, crcMetadata(finalOffsetValue, 12345L), false, finalOffsetValue);
       Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertEquals(semaphore.availablePermits(), 1);
-      verify(serverMetrics).addMeteredTableValue(anyString(),
-          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), eq(1L));
+      verify(serverMetrics, never()).addMeteredTableValue(anyString(),
+          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), anyLong());
     }
 
     // ALLOW_DURING_BUILD_ONLY without a local build: the download still holds the semaphore, so nothing is flagged.
@@ -933,6 +934,52 @@ public class RealtimeSegmentDataManagerTest {
       segmentDataManager.downloadSegmentAndReplace(crcMetadata(finalOffsetValue, 12345L));
       verify(serverMetrics, never()).addMeteredTableValue(anyString(),
           eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), anyLong());
+    }
+  }
+
+  @Test
+  public void testDownloadHoldsConsumptionWhenConsumedPastCommittedEndOffset()
+      throws Exception {
+    // Consumed past the committed end offset: the replacement holds fewer rows, so the next consuming segment waits
+    // for the replace even though the policy would let it run.
+    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    ServerMetrics serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManagerForUpsertRevert(
+        ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, serverMetrics)) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager.setCurrentOffset(START_OFFSET_VALUE + 100);
+      segmentDataManager.downloadSegmentAndReplace(crcMetadata(START_OFFSET_VALUE, 12345L));
+      Assert.assertEquals(semaphore.availablePermits(), 0);
+      verify(serverMetrics, never()).addMeteredTableValue(anyString(),
+          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), anyLong());
+    }
+
+    // Stopped exactly at the committed end offset: nothing is dropped, so the next consuming segment is released as
+    // it was before.
+    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManagerForUpsertRevert(
+        ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, serverMetrics)) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager.setCurrentOffset(START_OFFSET_VALUE);
+      segmentDataManager.downloadSegmentAndReplace(crcMetadata(START_OFFSET_VALUE, 12345L));
+      Assert.assertEquals(semaphore.availablePermits(), 1);
+    }
+
+    // Consumed past the committed end offset, but the build already released the semaphore: the next consuming
+    // segment is beyond recall, so the replace is flagged instead of held.
+    serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManagerForUpsertRevert(
+        ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY, serverMetrics)) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(false);
+      segmentDataManager.setCurrentOffset(START_OFFSET_VALUE + 100);
+      segmentDataManager.downloadSegmentAndReplace(crcMetadata(START_OFFSET_VALUE, 12345L));
+      verify(serverMetrics).addMeteredTableValue(anyString(),
+          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), eq(1L));
     }
   }
 
