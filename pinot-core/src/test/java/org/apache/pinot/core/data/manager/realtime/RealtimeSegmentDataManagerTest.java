@@ -953,8 +953,9 @@ public class RealtimeSegmentDataManagerTest {
       segmentDataManager.setCurrentOffset(START_OFFSET_VALUE + 100);
       segmentDataManager.downloadSegmentAndReplace(crcMetadata(START_OFFSET_VALUE, 12345L));
       Assert.assertEquals(semaphore.availablePermits(), 0);
-      verify(serverMetrics, never()).addMeteredTableValue(anyString(),
-          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), anyLong());
+      // The policy would have let the next segment run, so the replace is flagged even though it is now held back.
+      verify(serverMetrics).addMeteredTableValue(anyString(),
+          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), eq(1L));
     }
 
     // Stopped exactly at the committed end offset: nothing is dropped, so the next consuming segment is released as

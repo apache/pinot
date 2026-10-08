@@ -1764,9 +1764,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     boolean replaceDropsConsumedRows =
         (_partitionUpsertMetadataManager != null || _partitionDedupMetadataManager != null)
             && consumedPastCommittedEndOffset(segmentZKMetadata);
-    if (replaceDropsConsumedRows && releasedDuringBuild) {
-      // Nothing left to hold back: the build path released the semaphore before anyone could know this replace would
-      // drop rows, so the next consuming segment is already running.
+    if (replaceDropsConsumedRows && (allowedDuringDownload || releasedDuringBuild)) {
+      // The policy lets the next consuming segment run across this replace, or the build path already released the
+      // semaphore before anyone could know this replace would drop rows.
       _segmentLogger.error("Next consuming segment can run during download while this replace drops rows consumed "
           + "past the committed end offset. Its snapshot can miss those rows. Use DISALLOW_ALWAYS");
       if (_partitionUpsertMetadataManager != null) {
