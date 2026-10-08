@@ -299,6 +299,12 @@ public class PinotOperatorTable implements SqlOperatorTable {
           OperandTypes.family(
               List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER), i -> i == 2)),
 
+      // IN_SUBQUERY(expr, 'subquery') never runs: the broker runs the subquery first and replaces the call with an
+      // IN_ID_SET on the result. It is registered for the paths that only compile queries, such as the controller
+      // routing a query to a broker. Nullable like IN_ID_SET.
+      new PinotSqlFunction("IN_SUBQUERY", ReturnTypes.BOOLEAN_NULLABLE,
+          OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)),
+
       // Placeholder for special functions to handle MV
       // NOTE:
       // ARRAY_TO_MV is not deterministic.

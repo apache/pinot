@@ -347,6 +347,16 @@ public class QueryEnvironment {
     }
   }
 
+  /// Validates the query without converting or optimizing it, which costs less than [#compile(String,
+  /// SqlNodeAndOptions)]. The validation changes the parsed query.
+  ///
+  /// @throws QueryException if the query does not validate
+  public void validate(SqlNodeAndOptions sqlNodeAndOptions) {
+    try (PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions)) {
+      validate(sqlNodeAndOptions.getSqlNode(), plannerContext);
+    }
+  }
+
   /// Results of planning a query
   public static class QueryPlannerResult {
     private final DispatchableSubPlan _dispatchableSubPlan;

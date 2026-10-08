@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -46,7 +47,9 @@ import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
@@ -67,12 +70,14 @@ import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.Timer;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
@@ -101,9 +106,13 @@ import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.slf4j.Logger;
@@ -131,6 +140,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Marker MSE_STATS_MARKER = MarkerFactory.getMarker("MSE_STATS_MARKER");
 
   private static final int NUM_UNAVAILABLE_SEGMENTS_TO_LOG = 10;
+  // Extra column of the EXPLAIN response with the IdSet subqueries as a JSON array. EXPLAIN does not run them: the plan
+  // uses the empty IdSet in their place.
+  private static final String EXPLAIN_ID_SET_SUBQUERIES_FIELD = "ID_SET_SUBQUERIES_NOT_RUN";
 
   private final WorkerManager _workerManager;
   private final WorkerManager _multiClusterWorkerManager;
@@ -449,6 +461,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     long activeDeadlineMs = startTimeMs + timeoutMs;
     long passiveDeadlineMs = activeDeadlineMs + getExtraPassiveTimeoutMs(options);
 
+    // Runs before the query context opens, because each subquery opens its own. As in the single-stage engine, they
+    // run before the query is checked for access and quota, and each is checked like any other query.
+    List<String> idSetSubqueries =
+        rewriteIdSetSubqueries(requestId, query, sqlNodeAndOptions, requesterIdentity, httpHeaders, activeDeadlineMs);
+    if (!idSetSubqueries.isEmpty()) {
+      // Keeps the time of the subqueries out of the compilation time of the query
+      queryTimer = new Timer(queryTimer.getRemainingTimeMs(), TimeUnit.MILLISECONDS);
+    }
+
     QueryExecutionContext executionContext =
         new QueryExecutionContext(QueryExecutionContext.QueryType.MSE, requestId, cid, workloadName, startTimeMs,
             activeDeadlineMs, passiveDeadlineMs, _brokerId, _brokerId, queryHash);
@@ -468,7 +489,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       prepareCompiledQueryForPlanning(compiledQuery, requestId, requestContext, httpHeaders);
 
       if (sqlNodeAndOptions.getSqlNode().getKind() == SqlKind.EXPLAIN) {
-        return explain(compiledQuery, requestId, requestContext, queryTimer);
+        return explain(compiledQuery, requestId, requestContext, queryTimer, idSetSubqueries);
       } else {
         return query(compiledQuery, requestId, requesterIdentity, requestContext, httpHeaders, queryTimer,
             rlsFiltersApplied.get(), queryWasLogged, workloadName);
@@ -673,8 +694,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   /// Explains the query and returns the broker response.
   ///
   /// Throws using the same conventions as handleRequestThrowing.
+  ///
+  /// @param idSetSubqueries the IdSet subqueries that did not run, see [IdSetSubqueryRewriter]
   private BrokerResponse explain(QueryEnvironment.CompiledQuery query, long requestId, RequestContext requestContext,
-      Timer timer)
+      Timer timer, List<String> idSetSubqueries)
       throws WebApplicationException, QueryException {
     Map<String, String> queryOptions = query.getOptions();
 
@@ -689,7 +712,153 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         () -> query.explain(requestId, fragmentToPlanNode), timer);
     String plan = queryPlanResult.getExplainPlan();
     Map<String, String> extraFields = queryPlanResult.getExtraFields();
+    if (!idSetSubqueries.isEmpty()) {
+      ArrayNode subqueries = JsonNodeFactory.instance.arrayNode();
+      idSetSubqueries.forEach(subqueries::add);
+      extraFields = new LinkedHashMap<>(extraFields);
+      extraFields.put(EXPLAIN_ID_SET_SUBQUERIES_FIELD, subqueries.toString());
+    }
     return constructMultistageExplainPlan(query.getTextQuery(), plan, extraFields);
+  }
+
+  /// Runs the IdSet subqueries of the query, or not to explain it, and replaces them with their IdSets. See
+  /// [IdSetSubqueryRewriter]. Returns the subqueries that were replaced.
+  private List<String> rewriteIdSetSubqueries(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
+      @Nullable RequesterIdentity requesterIdentity, @Nullable HttpHeaders httpHeaders, long deadlineMs) {
+    SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
+    boolean explain = sqlNode.getKind() == SqlKind.EXPLAIN;
+    SqlNode queryNode = explain ? ((SqlExplain) sqlNode).getExplicandum() : sqlNode;
+    Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
+    return IdSetSubqueryRewriter.rewrite(query, queryNode, explain, new IdSetSubqueryRewriter.SubqueryRunner() {
+      @Override
+      public boolean validates(String subquery) {
+        return validatesOnItsOwn(requestId, subquery, queryOptions, httpHeaders, deadlineMs);
+      }
+
+      @Nullable
+      @Override
+      public String run(String subquery) {
+        return runIdSetSubquery(requestId, subquery, queryOptions, requesterIdentity, httpHeaders, deadlineMs);
+      }
+    });
+  }
+
+  /// Returns whether the subquery validates on its own, i.e. whether it does not refer to the query it is in.
+  /// Validation does not optimize the subquery, so it is quick enough to run without a timeout.
+  private boolean validatesOnItsOwn(long requestId, String subquery, Map<String, String> queryOptions,
+      @Nullable HttpHeaders httpHeaders, long deadlineMs) {
+    getTimeLeftMs(subquery, deadlineMs);
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(subquery);
+    RequestUtils.setOptions(sqlNodeAndOptions, queryOptions);
+    QueryEnvironment queryEnv = new QueryEnvironment(
+        getQueryEnvConf(httpHeaders, sqlNodeAndOptions.getOptions(), requestId), _multiClusterRoutingContext);
+    try {
+      queryEnv.validate(sqlNodeAndOptions);
+      return true;
+    } catch (QueryException e) {
+      return false;
+    }
+  }
+
+  /// Runs an IdSet subquery as a query of its own, and returns the serialized IdSet it returns, or `null` if it returns
+  /// no rows or NULL.
+  ///
+  /// The subquery inherits the options of the query, which the options set in the subquery override, and the time left
+  /// until the deadline of the query. It runs like any other query: it is checked for access and quota, and it can be
+  /// cancelled. As it inherits the client query id, cancelling the query by that id cancels the subquery, which fails
+  /// the query.
+  @Nullable
+  private String runIdSetSubquery(long requestId, String subquery, Map<String, String> queryOptions,
+      @Nullable RequesterIdentity requesterIdentity, @Nullable HttpHeaders httpHeaders, long deadlineMs) {
+    SqlNodeAndOptions sqlNodeAndOptions;
+    try {
+      sqlNodeAndOptions = RequestUtils.parseQuery(subquery);
+    } catch (Exception e) {
+      throw new QueryException(QueryErrorCode.fromThrowable(e, QueryErrorCode.SQL_PARSING),
+          "Failed to parse subquery: " + subquery + ": " + e.getMessage(), e);
+    }
+    if (sqlNodeAndOptions.getSqlType() != PinotSqlType.DQL
+        || !sqlNodeAndOptions.getSqlNode().getKind().belongsTo(SqlKind.QUERY)) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException("Subquery is not a query: " + subquery);
+    }
+    RequestUtils.setOptions(sqlNodeAndOptions, queryOptions);
+    Map<String, String> options = sqlNodeAndOptions.getOptions();
+    long timeLeftMs = getTimeLeftMs(subquery, deadlineMs);
+    Long timeoutMs = QueryOptionsUtils.getTimeoutMs(options);
+    options.put(QueryOptionKey.TIMEOUT_MS,
+        Long.toString(timeoutMs != null ? Math.min(timeoutMs, timeLeftMs) : timeLeftMs));
+    // The rows of the subquery are its result
+    options.remove(QueryOptionKey.DROP_RESULTS);
+
+    // Like BaseBrokerRequestHandler.handleRequest, except for the first access check and the application quota, which
+    // the query passed
+    long subqueryRequestId = _requestIdGenerator.get();
+    RequestContext requestContext = new DefaultRequestContext();
+    requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
+    requestContext.setBrokerId(_brokerId);
+    requestContext.setRequestId(subqueryRequestId);
+    requestContext.setQuery(subquery);
+    setTrackedHeadersInRequestContext(requestContext, httpHeaders, _trackedHeaders);
+    LOGGER.info("Request {} runs a subquery as request {}", requestId, subqueryRequestId);
+    BrokerResponse response = handleRequest(subqueryRequestId, subquery, sqlNodeAndOptions,
+        JsonNodeFactory.instance.objectNode().put(CommonConstants.Broker.Request.SQL, subquery), requesterIdentity,
+        requestContext, httpHeaders, _accessControlFactory.create());
+    response.setBrokerId(_brokerId);
+    response.setRequestId(Long.toString(subqueryRequestId));
+    onQueryCompletion(requestContext, response);
+
+    if (!response.getExceptions().isEmpty()) {
+      QueryProcessingException exception = response.getExceptions().get(0);
+      throw new QueryException(QueryErrorCode.fromErrorCode(exception.getErrorCode()),
+          "Subquery failed: " + subquery + ": " + exception.getMessage());
+    }
+    // An IdSet built from part of the rows would make the query miss rows without an error
+    List<String> partialResultReasons = getPartialResultReasons(response);
+    if (!partialResultReasons.isEmpty()) {
+      throw QueryErrorCode.QUERY_EXECUTION.asException(
+          "Subquery returned a partial result " + partialResultReasons + ": " + subquery);
+    }
+    ResultTable resultTable = response.getResultTable();
+    DataSchema dataSchema = resultTable != null ? resultTable.getDataSchema() : null;
+    if (dataSchema == null || dataSchema.size() != 1 || dataSchema.getColumnDataType(0) != ColumnDataType.STRING) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException(
+          "Subquery must return one STRING column, the serialized IdSet, got: " + dataSchema + " for: " + subquery);
+    }
+    List<Object[]> rows = resultTable.getRows();
+    if (rows.size() > 1) {
+      throw QueryErrorCode.QUERY_EXECUTION.asException(
+          "Subquery must return at most one row, got: " + rows.size() + " for: " + subquery);
+    }
+    return rows.isEmpty() ? null : (String) rows.get(0)[0];
+  }
+
+  /// Returns the reasons why the response holds a partial result without an exception, if any.
+  private static List<String> getPartialResultReasons(BrokerResponse response) {
+    List<String> reasons = new ArrayList<>();
+    if (response.isNumGroupsLimitReached()) {
+      reasons.add("numGroupsLimitReached");
+    }
+    if (response.isMaxRowsInJoinReached()) {
+      reasons.add("maxRowsInJoinReached");
+    }
+    if (response.isMaxRowsInWindowReached()) {
+      reasons.add("maxRowsInWindowReached");
+    }
+    if (response.isMseLiteLeafStageLimitReached()) {
+      reasons.add("mseLiteLeafStageLimitReached");
+    }
+    if (response instanceof BrokerResponseNativeV2) {
+      reasons.addAll(((BrokerResponseNativeV2) response).getEarlyTerminationReasons());
+    }
+    return reasons;
+  }
+
+  private static long getTimeLeftMs(String subquery, long deadlineMs) {
+    long timeLeftMs = deadlineMs - System.currentTimeMillis();
+    if (timeLeftMs <= 0) {
+      throw QueryErrorCode.BROKER_TIMEOUT.asException("Timed out before running subquery: " + subquery);
+    }
+    return timeLeftMs;
   }
 
   private BrokerResponse query(QueryEnvironment.CompiledQuery query, long requestId,

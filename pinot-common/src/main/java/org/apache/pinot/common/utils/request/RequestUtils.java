@@ -116,7 +116,13 @@ public class RequestUtils {
       return;
     }
     LOGGER.debug("Query options are set to: {}", requestOptions);
-    requestOptions = QueryOptionsUtils.resolveCaseInsensitiveOptions(requestOptions);
+    setOptions(sqlNodeAndOptions, QueryOptionsUtils.resolveCaseInsensitiveOptions(requestOptions));
+  }
+
+  /// Merges the given options into the options parsed from the SQL, like [#setOptions(SqlNodeAndOptions, JsonNode)]
+  /// does with the options of the request payload. The keys of the given options must be resolved, see
+  /// [QueryOptionsUtils#resolveCaseInsensitiveOptions(Map)].
+  public static void setOptions(SqlNodeAndOptions sqlNodeAndOptions, Map<String, String> requestOptions) {
     SqlOptionsMode sqlOptionsMode = QueryOptionsUtils.getSqlOptionsMode(requestOptions);
     Map<String, String> sqlOptions = sqlNodeAndOptions.getOptions();
     if (sqlOptionsMode != SqlOptionsMode.ALLOW && !sqlOptions.isEmpty()) {
