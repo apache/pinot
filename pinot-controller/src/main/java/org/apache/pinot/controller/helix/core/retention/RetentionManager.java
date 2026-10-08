@@ -38,7 +38,6 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.logging.log4j.util.Strings;
-import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
@@ -134,8 +133,9 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   }
 
   /// Enforces the optional compressed-segment size limit on live data independently of time retention. Replaced
-  /// segments are excluded from accounting, and an in-progress replacement postpones the entire pass. The newest
-  /// OFFLINE segment and realtime recovery segments are preserved; hybrid realtime eviction requires offline coverage.
+  /// segments are excluded from accounting. Eviction proceeds oldest first and stops before the first active segment
+  /// owned by lineage, including replacement copies excluded from accounting. The newest OFFLINE segment and realtime
+  /// recovery segments are preserved; hybrid realtime eviction requires offline coverage.
   /// Unknown sizes or missing metadata disable this pass; consuming segments are excluded from accounting and eviction.
   @VisibleForTesting
   protected void manageSizeBasedRetention(TableConfig tableConfig) {
@@ -173,17 +173,16 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     Set<String> activeSegments = new HashSet<>(_pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false));
     SegmentLineage segmentLineage =
         SegmentLineageAccessHelper.getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
-    if (segmentLineage != null && segmentLineage.getLineageEntries().values().stream()
-        .anyMatch(entry -> entry.getState() == LineageEntryState.IN_PROGRESS)) {
-      LOGGER.warn("In-progress segment lineage for table: {}, skip size retention", tableNameWithType);
-      return false;
-    }
+    Set<String> lineageOwnedSegments = segmentLineage == null ? new HashSet<>()
+        : new HashSet<>(SegmentLineageUtils.getDeleteBlockedSegments(segmentLineage));
+    lineageOwnedSegments.retainAll(activeSegments);
     // Replaced segments awaiting lineage cleanup are no longer queryable and must not trigger live-data eviction.
     SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(activeSegments, segmentLineage);
     if (activeSegments.isEmpty()) {
       return true;
     }
     List<SegmentZKMetadata> metadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType);
+    Map<String, SegmentZKMetadata> lineageOwnedMetadata = new HashMap<>();
     Set<String> segmentsWithMetadata = new HashSet<>();
     List<SegmentZKMetadata> completedSegments = new ArrayList<>();
     Map<String, Long> completedSegmentSizes = new HashMap<>();
@@ -191,6 +190,9 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     BigInteger retainedBytes = BigInteger.ZERO;
     for (SegmentZKMetadata metadata : metadataList) {
       String segmentName = metadata.getSegmentName();
+      if (lineageOwnedSegments.contains(segmentName)) {
+        lineageOwnedMetadata.put(segmentName, metadata);
+      }
       if (!activeSegments.contains(segmentName)) {
         continue;
       }
@@ -219,6 +221,14 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
     Comparator<SegmentZKMetadata> evictionOrder = Comparator.comparingLong(RetentionManager::getSizeRetentionTimestamp)
         .thenComparing(SegmentZKMetadata::getSegmentName);
+    // Shadow copies do not count toward the cap, but still stop eviction at their position in the ordering.
+    // Without metadata or a timestamp for any active lineage-owned segment, its position cannot be determined safely.
+    if (lineageOwnedMetadata.size() != lineageOwnedSegments.size() || lineageOwnedMetadata.values().stream()
+        .anyMatch(metadata -> getSizeRetentionTimestamp(metadata) < 0)) {
+      LOGGER.warn("Cannot order lineage-owned segments for table: {}, skip size retention", tableNameWithType);
+      return false;
+    }
+    SegmentZKMetadata lineageBarrier = lineageOwnedMetadata.values().stream().min(evictionOrder).orElse(null);
     List<String> candidateNames = completedSegments.stream()
         .filter(metadata -> getSizeRetentionTimestamp(metadata) >= 0)
         .map(SegmentZKMetadata::getSegmentName)
@@ -247,10 +257,6 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       completedSegments.stream().filter(metadata -> getSizeRetentionTimestamp(metadata) >= 0)
           .max(evictionOrder).map(SegmentZKMetadata::getSegmentName).ifPresent(candidateNames::remove);
     }
-    // Use the same lineage snapshot for accounting and candidate protection; deletion still performs a fresh check.
-    if (_controllerConf.isLineageExclusiveDeleteEnabled() && segmentLineage != null) {
-      candidateNames.removeAll(SegmentLineageUtils.getDeleteBlockedSegments(segmentLineage));
-    }
     Set<String> candidates = new HashSet<>(candidateNames);
     completedSegments.removeIf(metadata -> !candidates.contains(metadata.getSegmentName()));
     completedSegments.sort(evictionOrder);
@@ -259,6 +265,13 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     BigInteger projectedRetainedBytes = retainedBytes;
     for (SegmentZKMetadata metadata : completedSegments) {
       if (projectedRetainedBytes.compareTo(limit) <= 0) {
+        break;
+      }
+      // Stop at the lineage boundary even when that segment is excluded by another protection or from accounting.
+      // This snapshot rule applies regardless of the lineage-exclusive deletion flag; deletion retains its fresh guard.
+      if (lineageBarrier != null && evictionOrder.compare(metadata, lineageBarrier) >= 0) {
+        LOGGER.info("Stop size retention for table: {} at lineage-owned segment: {}", tableNameWithType,
+            lineageBarrier.getSegmentName());
         break;
       }
       long size = completedSegmentSizes.get(metadata.getSegmentName());
@@ -282,7 +295,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
           tableNameWithType, retentionSize);
     }
     if (retainedBytes.compareTo(limit) > 0) {
-      LOGGER.warn("Table: {} remains above retention size: {} due to protected or undated segments",
+      LOGGER.warn("Table: {} remains above retention size: {} due to protected, undated, or lineage-owned segments",
           tableNameWithType, retentionSize);
       return false;
     }

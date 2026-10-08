@@ -92,24 +92,29 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   /// Returns the size retention limit, expressed as a positive size understood by
   /// [DataSizeUtils#toBytes(String)], for example `"100G"`.
   ///
-  /// The limit applies to the sum of compressed archive bytes for active, live segments, counted once regardless of
-  /// replication. Segments replaced by COMPLETED lineage entries are excluded. An IN_PROGRESS lineage entry, missing
-  /// segment metadata, or an unknown completed segment size causes the entire size retention pass to be skipped.
-  /// OFFLINE and REALTIME tables enforce their limits independently, including the two types of a hybrid table.
+  /// The limit sums compressed archive bytes for active, live completed segments, counted once regardless of
+  /// replication. COMPLETED lineage source segments and IN_PROGRESS lineage destination segments are excluded to avoid
+  /// counting shadow copies. OFFLINE and REALTIME limits are enforced independently, including hybrid tables.
   ///
-  /// Size retention removes the oldest eligible segments first, preserving the newest OFFLINE segment and the
-  /// highest-sequence DONE LLC segment in each REALTIME partition group. Consuming segments are never removed by this
-  /// policy. With lineage-exclusive deletion enabled, lineage-locked segments are also protected. The IN_PROGRESS
-  /// lineage skip applies regardless of that setting. When hybrid retention is enabled and an OFFLINE counterpart
-  /// exists, REALTIME size retention only removes segments whose end time is strictly below the OFFLINE time boundary;
-  /// an unavailable boundary prevents REALTIME size retention. These protections can leave the table above the
-  /// configured limit.
+  /// Segments are ordered ascending by the first nonnegative end time, creation time, or push time, in that priority,
+  /// then by segment name. Eviction removes only an old prefix before the first active lineage-owned segment: either
+  /// side of an IN_PROGRESS entry or a source of a COMPLETED entry. These segments remain stop positions when their
+  /// bytes are excluded. The stop applies regardless of the lineage-exclusive deletion setting. Missing live metadata
+  /// or unknown live completed-segment sizes cause the pass to skip safely. Missing metadata or timestamps for an
+  /// active lineage stop prevent eviction when over cap.
+  ///
+  /// The newest OFFLINE segment, highest-sequence DONE LLC segment per REALTIME partition group, and undated segments
+  /// are preserved. Consuming segments are neither counted nor removed. When hybrid retention is enabled and an
+  /// OFFLINE counterpart exists, REALTIME eviction requires an end time strictly below the OFFLINE time boundary;
+  /// an unavailable boundary prevents REALTIME size retention. These protections can leave the table above its cap.
   ///
   /// With lineage-exclusive deletion disabled, a concurrent replacement that starts after the initial lineage
   /// snapshot can race with size eviction because the legacy deletion path does not recheck lineage before deletion.
   ///
   /// This is an asynchronous, best-effort retention policy, not a limit on decompressed server disk usage,
   /// memory usage, or ingestion. When time retention is also configured, a segment can be deleted by either criterion.
+  /// The table-scoped `sizeRetentionBlocked` controller gauge is 1 after an unsafe, failed, or still-over-cap pass,
+  /// 0 after a successful pass, and absent when the policy is disabled or unsupported.
   /// A null value disables size retention.
   public String getRetentionSize() {
     return _retentionSize;
