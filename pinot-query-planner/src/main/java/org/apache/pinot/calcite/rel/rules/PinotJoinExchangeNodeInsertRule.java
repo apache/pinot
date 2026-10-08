@@ -19,7 +19,6 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import com.google.common.base.Preconditions;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -205,9 +204,8 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
           RelFieldCollation.NullDirection.LAST));
     }
     RelCollation collation = RelCollations.of(fieldCollations);
-    // Join inputs must include every row; a missing fetch would apply the default selection response limit at runtime.
-    RelNode sortedInput = LogicalSort.create(input, collation, null,
-        input.getCluster().getRexBuilder().makeExactLiteral(BigDecimal.valueOf(Integer.MAX_VALUE)));
+    // Join inputs must include every row. The merge converter marks this unbounded sort as one complete run.
+    RelNode sortedInput = LogicalSort.create(input, collation, null, null);
     return PinotKWayMergeSortExchange.create(sortedInput, RelDistributions.hash(joinKeys), collation, prePartitioned);
   }
 }
