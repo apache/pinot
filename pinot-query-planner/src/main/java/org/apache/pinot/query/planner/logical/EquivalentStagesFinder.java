@@ -207,8 +207,12 @@ public class EquivalentStagesFinder {
 
       @Override
       public Boolean visitMailboxMergeReceive(MailboxMergeReceiveNode node1, PlanNode node2) {
-        return node2 instanceof MailboxMergeReceiveNode
-            && areReceivesEquivalent(node1, (MailboxMergeReceiveNode) node2);
+        if (!(node2 instanceof MailboxMergeReceiveNode)) {
+          return false;
+        }
+        MailboxMergeReceiveNode that = (MailboxMergeReceiveNode) node2;
+        return node1.getFetch() == that.getFetch() && node1.getOffset() == that.getOffset()
+            && areReceivesEquivalent(node1, that);
       }
 
       private Boolean areReceivesEquivalent(BaseMailboxReceiveNode node1, BaseMailboxReceiveNode that) {

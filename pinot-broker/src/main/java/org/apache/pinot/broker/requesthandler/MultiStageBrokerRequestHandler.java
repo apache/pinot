@@ -640,7 +640,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultSortExchangeCopyLimit(sortExchangeCopyThreshold)
         .defaultSealedInListThreshold(sealedInListThreshold)
         .defaultWindowKWayMerge(windowKWayMerge)
-        .isKWayMergeSupported(QueryOptionsUtils.isWindowKWayMerge(queryOptions, windowKWayMerge)
+        .isKWayMergeSupported((QueryOptionsUtils.isWindowKWayMerge(queryOptions, windowKWayMerge)
+            || QueryOptionsUtils.isStreamingSortedMailboxReceiveEnabled(queryOptions))
             && !QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
             && _kWayMergeSupported.getAsBoolean())
         .build();

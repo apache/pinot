@@ -143,6 +143,40 @@ public class SortedMailboxMergeReceiveOperatorTest {
   }
 
   @Test
+  public void shouldApplyGlobalOffsetAndLimitAfterMerging() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
+    when(_mailbox1.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{1, 1}, new Object[]{3, 1}, new Object[]{5, 1}),
+        OperatorTestUtil.eosWithEmptyStats());
+    when(_mailbox2.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{2, 2}, new Object[]{4, 2}, new Object[]{6, 2}),
+        OperatorTestUtil.eosWithEmptyStats());
+    OpChainExecutionContext context =
+        OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadataBoth);
+    try (SortedMailboxMergeReceiveOperator operator = getOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
+        DATA_SCHEMA, FIELD_COLLATIONS, 2, 2)) {
+      assertEquals(sortKeys(drain(operator)), List.of(3, 4));
+      verify(_mailbox1).earlyTerminate();
+      verify(_mailbox2).earlyTerminate();
+    }
+  }
+
+  @Test
+  public void shouldEmitNoRowsForExplicitZeroFetch() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{1, 1}), OperatorTestUtil.eosWithEmptyStats());
+    OpChainExecutionContext context =
+        OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadata1);
+    try (SortedMailboxMergeReceiveOperator operator = getOperator(context, RelDistribution.Type.SINGLETON,
+        DATA_SCHEMA, FIELD_COLLATIONS, 0, -1)) {
+      assertTrue(drain(operator).isEmpty());
+      verify(_mailbox1).earlyTerminate();
+    }
+  }
+
+  @Test
   public void shouldMergeSortedSenders() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     Object[] row1 = new Object[]{1, 1};
@@ -552,11 +586,19 @@ public class SortedMailboxMergeReceiveOperatorTest {
 
   private SortedMailboxMergeReceiveOperator getOperator(OpChainExecutionContext context,
       RelDistribution.Type distributionType, DataSchema dataSchema, List<RelFieldCollation> collations) {
+    return getOperator(context, distributionType, dataSchema, collations, -1, -1);
+  }
+
+  private SortedMailboxMergeReceiveOperator getOperator(OpChainExecutionContext context,
+      RelDistribution.Type distributionType, DataSchema dataSchema, List<RelFieldCollation> collations,
+      int fetch, int offset) {
     MailboxMergeReceiveNode node = mock(MailboxMergeReceiveNode.class);
     when(node.getDistributionType()).thenReturn(distributionType);
     when(node.getSenderStageId()).thenReturn(1);
     when(node.getDataSchema()).thenReturn(dataSchema);
     when(node.getCollations()).thenReturn(collations);
+    when(node.getFetch()).thenReturn(fetch);
+    when(node.getOffset()).thenReturn(offset);
     return new SortedMailboxMergeReceiveOperator(context, node);
   }
 }
