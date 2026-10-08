@@ -45,7 +45,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.ingest.InsertExecutor;
 import org.apache.pinot.spi.ingest.InsertRequest;
 import org.apache.pinot.spi.ingest.InsertResult;
 import org.apache.pinot.spi.ingest.InsertType;
@@ -66,31 +65,19 @@ public class SqlQueryExecutor {
 
   private final String _controllerUrl;
   private final HelixManager _helixManager;
-  private final InsertExecutor _insertExecutor;
 
   /// Fetch the lead controller from helix, HA is not guaranteed.
   /// @param helixManager is used to query leader controller from helix.
   public SqlQueryExecutor(HelixManager helixManager) {
-    this(null, helixManager, null);
+    _controllerUrl = null;
+    _helixManager = helixManager;
   }
 
   /// Recommended to provide the controller vip or service name for access.
   /// @param controllerUrl controller service name for sending minion task requests
   public SqlQueryExecutor(String controllerUrl) {
-    this(controllerUrl, null, null);
-  }
-
-  /// Constructor for controller-local use: the coordinator is wired at construction time,
-  /// so push-based INSERTs bypass the HTTP round-trip and remain observable on the same process.
-  public SqlQueryExecutor(String controllerUrl, @Nullable InsertExecutor insertExecutor) {
-    this(controllerUrl, null, insertExecutor);
-  }
-
-  private SqlQueryExecutor(@Nullable String controllerUrl, @Nullable HelixManager helixManager,
-      @Nullable InsertExecutor insertExecutor) {
     _controllerUrl = controllerUrl;
-    _helixManager = helixManager;
-    _insertExecutor = insertExecutor;
+    _helixManager = null;
   }
 
   private static String getControllerBaseUrl(HelixManager helixManager) {
@@ -152,7 +139,7 @@ public class SqlQueryExecutor {
           result.setResultTable(new ResultTable(statement.getResultSchema(), pushRows));
         } catch (IllegalArgumentException e) {
           // Pre-acceptance validation errors (table not found, hybrid-table without explicit type,
-          // missing rows, etc.) thrown directly by the in-process path — surface as SQL-parsing-
+          // missing rows, etc.) surface as SQL-parsing-
           // level errors so the broker's HTTP layer maps them to 4xx rather than the generic 5xx-
           // equivalent. Provide a non-empty message even when e.getMessage() is null so clients see
           // something actionable.
@@ -191,13 +178,7 @@ public class SqlQueryExecutor {
 
     InsertRequest request = buildInsertRequest(insertStmt);
 
-    // If a local executor is available (controller-side), call it directly
-    if (_insertExecutor != null) {
-      LOGGER.info("Executing push-based INSERT locally via InsertExecutor");
-      return _insertExecutor.execute(request);
-    }
-
-    // Otherwise, POST to controller /insert/execute (broker-side). Controller requires
+    // POST to controller /insert/execute for authorization on both broker and controller SQL paths. It requires
     // ?tableName=... as a query parameter for table-scoped @Authorize binding, so include it.
     String controllerBaseUrl = getControllerUrl();
     String tableName = request.getTableName();
@@ -320,7 +301,7 @@ public class SqlQueryExecutor {
   /// JSON round trip with full fidelity. Jackson turns `byte[]` into Base64 and reads numbers back
   /// as `Double` (losing BigDecimal precision), while the controller-side type coercion
   /// (DataTypeTransformer) expects BYTES-as-STRING to be HEX. Encoding bytes as hex and
-  /// BigDecimal as a plain string keeps both entry points (broker HTTP and in-process controller
+  /// BigDecimal as a plain string keeps both entry points (broker HTTP and controller
   /// SQL) byte-identical, so schema-driven coercion and the server-computed idempotency hash
   /// behave the same on either path.
   private static Object canonicalizeForWire(Object value) {

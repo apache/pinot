@@ -58,21 +58,9 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 
 /// REST API endpoints for push-based INSERT INTO statement management.
 ///
-/// Provides endpoints to submit, monitor, and abort INSERT INTO statements. These endpoints
-/// are used by the broker to coordinate push-based data ingestion through the controller.
-///
-/// **FILE-insert completion paths.** The v1 design uses two completion paths for FILE inserts:
-///
-/// - The controller's cleanup-sweep (`autoCompleteFileInsertIfTaskDone`) polls Minion task state and is the
-///   load-bearing completion path today. It bypasses this REST resource and transitions the manifest to VISIBLE
-///   (or ABORTED on task failure) in-process.
-/// - The `/insert/complete` endpoint exists for external task observers (e.g., a future Minion-side hook) that produce
-///   the segment-names list. It rejects empty segment lists as a basic input check; deeper IdealState membership
-///   validation lives in [InsertStatementCoordinator#completeFileInsert]. **Do NOT route the sweep through this
-///   endpoint** — the empty-list rejection would block sweep auto-complete, and the sweep already runs as the leader
-///   controller (no further auth-scoping needed).
-///
-/// Thread-safe: relies on the injected [InsertStatementCoordinator] for all state.
+/// Provides authenticated submit, status and list endpoints for synchronous ROW inserts.
+/// Request handlers share a thread-safe coordinator; cancellation and FILE completion are not
+/// exposed because this version executes each accepted ROW request synchronously.
 @Api(tags = "Insert", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(
     apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in =
@@ -88,7 +76,7 @@ public class InsertStatementResource {
   /// Short-circuits every handler in this resource when the feature flag is off. Returns HTTP 503
   /// so that a client can distinguish "feature disabled on this controller" from "request failed".
   /// Without this guard, the coordinator would be reachable, return NO_EXECUTOR, and still allow
-  /// list/abort/status enumeration against ZK.
+  /// list/status enumeration against ZK.
   private void checkEnabled() {
     if (!_coordinator.isStarted()) {
       throw new ControllerApplicationException(LOGGER,
@@ -204,83 +192,6 @@ public class InsertStatementResource {
           Response.Status.NOT_FOUND);
     }
     return result;
-  }
-
-  @POST
-  @Path("/abort/{statementId}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.ABORT_INSERT)
-  @Authenticate(AccessType.DELETE)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Abort an INSERT statement", notes = "Aborts a running insert statement and releases "
-      + "any resources it holds.")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Statement aborted"),
-      @ApiResponse(code = 404, message = "Statement not found")
-  })
-  public InsertResult abortStatement(
-      @ApiParam(value = "Statement ID", required = true) @PathParam("statementId") String statementId,
-      @ApiParam(value = "Table name with type (required — pairs with @Authorize TABLE-scoped check)",
-          required = true)
-      @QueryParam("tableName") String tableNameWithType,
-      @Context HttpHeaders headers) {
-    checkEnabled();
-    if (tableNameWithType == null || tableNameWithType.isEmpty()) {
-      // See getStatus — same auth-bypass concern.
-      throw new ControllerApplicationException(LOGGER,
-          "Query parameter 'tableName' is required for table-scoped authorization",
-          Response.Status.BAD_REQUEST);
-    }
-    try {
-      return _coordinator.abortStatement(statementId, tableNameWithType);
-    } catch (Exception e) {
-      throw translateError(e, "Failed to abort statement " + statementId);
-    }
-  }
-
-  @POST
-  @Path("/complete/{statementId}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.COMPLETE_INSERT)
-  @Authenticate(AccessType.UPDATE)
-  @Consumes(MediaType.APPLICATION_JSON)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Complete a file INSERT statement",
-      notes = "Called by a Minion task observer when segment generation and push is done. Finalizes the segment "
-          + "lineage and makes the new segments visible to queries. v1 note: SegmentGenerationAndPushTask does NOT "
-          + "currently call this endpoint; the load-bearing completion path is the controller cleanup sweep's "
-          + "autoCompleteFileInsertIfTaskDone poll. This endpoint exists for external task observers (e.g., a "
-          + "future Minion-side hook) that produce the segment names list.")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Statement completed"),
-      @ApiResponse(code = 404, message = "Statement not found"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  public InsertResult completeFileInsert(
-      @ApiParam(value = "Statement ID", required = true) @PathParam("statementId") String statementId,
-      @ApiParam(value = "Table name with type (required to scope the completion to a specific table — "
-          + "omitting it would let any caller with UPDATE access target a foreign tenant's manifest)",
-          required = true)
-      @QueryParam("tableName") String tableNameWithType,
-      @ApiParam(value = "Segment names produced by the task", required = true) List<String> segmentNames,
-      @Context HttpHeaders headers) {
-    checkEnabled();
-    if (tableNameWithType == null || tableNameWithType.isEmpty()) {
-      throw new ControllerApplicationException(LOGGER, "Query parameter 'tableName' is required for "
-          + "/insert/complete/{statementId} to scope the completion to a specific table",
-          Response.Status.BAD_REQUEST);
-    }
-    if (segmentNames == null || segmentNames.isEmpty()) {
-      // Empty list would let an attacker with /insert/complete UPDATE access flip the manifest
-      // to VISIBLE before the Minion task actually finishes, leaving the produced segments
-      // orphaned with the manifest claiming visible-with-no-segments. Sweep auto-complete is
-      // an internal-only path and does not call this REST endpoint.
-      throw new ControllerApplicationException(LOGGER, "Request body 'segmentNames' is required and must "
-          + "be a non-empty list", Response.Status.BAD_REQUEST);
-    }
-    try {
-      return _coordinator.completeFileInsert(statementId, tableNameWithType, segmentNames);
-    } catch (Exception e) {
-      throw translateError(e, "Failed to complete file insert for statement " + statementId);
-    }
   }
 
   @GET

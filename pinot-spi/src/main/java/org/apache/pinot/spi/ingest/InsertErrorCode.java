@@ -30,7 +30,7 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 ///       before persisting a manifest. No statementId is queryable via `getStatus` afterward.
 /// - **Post-acceptance** (`ABORTED`/`VISIBLE` state): manifest exists in
 ///       ZK; the code distinguishes failure modes during execution or persistence.
-/// - **Query-side**: rejection of a `getStatus`/`abort`/`complete`
+/// - **Query-side**: rejection of a `getStatus`
 ///       call — typically because the statement does not exist or is in an incompatible state.
 ///
 /// This is a constants holder, not an enum, because executor plugins may emit additional codes
@@ -54,12 +54,8 @@ public final class InsertErrorCode {
   public static final String UNSUPPORTED_CONSISTENCY_MODE = "UNSUPPORTED_CONSISTENCY_MODE";
   /// No {@link InsertExecutor} registered for the requested {@link InsertType}.
   public static final String NO_EXECUTOR = "NO_EXECUTOR";
-  /// Stale-rebind race lost; client should retry.
-  public static final String REBIND_RACE_LOST = "REBIND_RACE_LOST";
   /// Failed to persist the manifest in ZK during initial create.
   public static final String STORE_ERROR = "STORE_ERROR";
-  /// Segment names provided to /insert/complete failed Pinot's segment-name pattern.
-  public static final String INVALID_SEGMENT_NAME = "INVALID_SEGMENT_NAME";
   /// ROW insert request had null/empty rows; coordinator rejects pre-acceptance.
   public static final String EMPTY_ROWS = "EMPTY_ROWS";
   /// ROW insert exceeded the configured per-statement row-count limit; rejected pre-acceptance.
@@ -74,22 +70,8 @@ public final class InsertErrorCode {
 
   /// Executor threw during execute(); manifest is now ABORTED.
   public static final String EXECUTOR_ERROR = "EXECUTOR_ERROR";
-  /// Executor threw but the manifest reached a terminal state durably; data may already be queryable.
-  public static final String EXECUTOR_ERROR_BUT_DURABLE = "EXECUTOR_ERROR_BUT_DURABLE";
-  /// Failed to persist a state transition after CAS retries; cleanup sweep will reconcile.
+  /// Failed to persist a state transition after CAS retries; requestId remains reserved for inspection.
   public static final String STATE_PERSIST_ERROR = "STATE_PERSIST_ERROR";
-  /// Concurrent writer changed the manifest's state during this operation.
-  public static final String CONCURRENT_STATE_CHANGE = "CONCURRENT_STATE_CHANGE";
-  /// Tried a state transition that is not legal from the current state (e.g., abort a VISIBLE).
-  public static final String INVALID_STATE = "INVALID_STATE";
-  /// /insert/complete invoked with a wrong-typed FILE executor wrapper.
-  public static final String WRONG_EXECUTOR = "WRONG_EXECUTOR";
-  /// Failed to persist Minion task name to the manifest after task creation.
-  public static final String TASK_NAME_PERSIST_ERROR = "TASK_NAME_PERSIST_ERROR";
-  /// Execution succeeded and data is durably visible, but post-success bookkeeping (e.g., releasing
-  /// the idempotency reservation) failed. The statement state is authoritative; the bookkeeping
-  /// artifact will be reconciled by the cleanup sweep.
-  public static final String POST_SUCCESS_BOOKKEEPING_ERROR = "POST_SUCCESS_BOOKKEEPING_ERROR";
 
   /// ---- Executor-tier (raised by InsertExecutor implementations) -----------------------------
 
@@ -112,16 +94,6 @@ public final class InsertErrorCode {
   /// Multi-partition upload partially succeeded; rollback was disabled by config so already-uploaded
   /// segments remain registered. Uploaded segment names are returned in `result.segmentNames`.
   public static final String SEGMENT_UPLOAD_FAILED_PARTIAL = "SEGMENT_UPLOAD_FAILED_PARTIAL";
-  /// /insert FROM FILE was given a URI that could not be parsed or resolved.
-  public static final String INVALID_FILE_URI = "INVALID_FILE_URI";
-  /// Minion task could not be scheduled or produced no subtasks.
-  public static final String TASK_SCHEDULE_FAILED = "TASK_SCHEDULE_FAILED";
-  /// /insert/complete was called for a statement that the executor cannot find.
-  public static final String STATEMENT_NOT_FOUND = "STATEMENT_NOT_FOUND";
-  /// /insert/complete was called for a statement already in ABORTED state.
-  public static final String STATEMENT_ABORTED = "STATEMENT_ABORTED";
-  /// /insert/complete was called from a state that cannot transition to VISIBLE.
-  public static final String INVALID_STATE_FOR_COMPLETION = "INVALID_STATE_FOR_COMPLETION";
 
   /// ---- Query-side ---------------------------------------------------------------------------
 

@@ -79,21 +79,8 @@ import org.slf4j.LoggerFactory;
 ///
 /// Instances are thread-safe; each {@link #execute} call uses its own temporary directory.
 ///
-/// ## Known v1 limitation: single-phase visibility
-///
-/// {@link #execute} uploads segments to the deep store and registers them in Helix IdealState
-/// within a single call, returning {@link InsertStatementState#VISIBLE} before the coordinator has
-/// persisted that state to ZK. If the subsequent manifest persist fails after {@code
-/// persistWithCasRetry}'s three CAS attempts, the data is queryable but the manifest is stuck in
-/// `ACCEPTED`. The cleanup sweep deliberately does NOT abort such stuck-ACCEPTED ROW
-/// manifests — flipping them to ABORTED would falsely report failure for live data. Instead, the
-/// sweep GCs them after a long `ACCEPTED_ROW_RETENTION_MS` window (default 7 days), giving
-/// operators time to investigate. Until GC, `/insert/status` will report state=ACCEPTED.
-///
-/// A proper two-phase protocol (stage-without-register, then finalize on coordinator signal)
-/// is a follow-up. Documented so operators can reason about the tradeoff: duplicate data is
-/// prevented (we never release the requestId on persist failure), but metric counters and UI
-/// status may lag the actual visible state in rare ZK-down-for-minutes scenarios.
+/// Upload completes before result persistence. On a persistence failure, the coordinator retains
+/// the ACCEPTED manifest and requestId for inspection, so retries cannot duplicate the uploaded rows.
 public class ControllerRowInsertExecutor implements InsertExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerRowInsertExecutor.class);
 
@@ -174,7 +161,7 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
       return buildErrorResult(statementId, "Table not found: " + tableNameWithType, InsertErrorCode.TABLE_NOT_FOUND);
     }
 
-    /// 3a. Validate table mode safety (same rules as FileInsertExecutor)
+    /// 3a. Validate table mode safety
     String safetyError = validateTableModeSafety(tableConfig);
     if (safetyError != null) {
       return buildErrorResult(statementId, safetyError, InsertErrorCode.TABLE_MODE_REJECTED);
@@ -204,9 +191,9 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
       return buildErrorResult(statementId, e.getMessage(), InsertErrorCode.PARTITION_VALUE_REJECTED);
     }
 
-    /// 5. Build all segments first (staging phase), then upload all atomically.
-    /// If any build fails, no segments have been uploaded yet so nothing to roll back.
-    /// If upload fails partway through, we roll back already-uploaded segments.
+    /// 5. Build and validate all segments before starting uploads. If a build or quota check
+    /// fails, no segment has been uploaded. Upload failures retain the partial result unless
+    /// destructive rollback was explicitly enabled.
     ///
     /// Segment build is heap/CPU-heavy and runs inside the request thread, so gate it behind the
     /// concurrency permit. Fail fast (retryable error) rather than queueing request threads.
@@ -222,6 +209,8 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
 
       /// Phase 1: Build all segments locally without uploading
       List<StagedSegment> stagedSegments = new ArrayList<>();
+      long stagedTarBytes = 0;
+      long stagedSegmentBytes = 0;
 
       for (Map.Entry<Integer, List<GenericRow>> entry : partitionedRows.entrySet()) {
         int partitionId = entry.getKey();
@@ -264,15 +253,21 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
         SegmentMetadataImpl builtSegmentMetadata = new SegmentMetadataImpl(segmentOutputDir);
         SegmentValidationUtils.validateTimeInterval(builtSegmentMetadata, tableConfig);
         SegmentValidationUtils.validateUpsertSegmentPartitionMetadata(builtSegmentMetadata, tableConfig);
-        if (_storageQuotaChecker != null) {
-          SegmentValidationUtils.checkStorageQuota(segmentName, segmentTarFile.length(),
-              FileUtils.sizeOfDirectory(segmentOutputDir), tableConfig, _storageQuotaChecker);
-        }
+        stagedTarBytes = Math.addExact(stagedTarBytes, segmentTarFile.length());
+        stagedSegmentBytes = Math.addExact(stagedSegmentBytes, FileUtils.sizeOfDirectory(segmentOutputDir));
 
         stagedSegments.add(new StagedSegment(segmentName, segmentOutputDir, segmentTarFile, partitionRows.size(),
             partitionId));
 
         LOGGER.info("Staged segment {} ({} rows, partition {})", segmentName, partitionRows.size(), partitionId);
+      }
+
+      if (_storageQuotaChecker != null) {
+        // Every staged segment has a new statement-scoped name. Check their combined size against
+        // the existing table size before any upload, so partitions cannot independently consume
+        // the same remaining quota. The checker applies the table's replication factor.
+        SegmentValidationUtils.checkStorageQuota(stagedSegments.get(0)._segmentName, stagedTarBytes,
+            stagedSegmentBytes, tableConfig, _storageQuotaChecker);
       }
 
       /// Phase 2: Upload all staged segments. Track what was fully uploaded (deep-store copy AND
@@ -340,15 +335,6 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
     }
   }
 
-  @Override
-  public void abort(String statementId) {
-    /// Row inserts are synchronous and complete within execute(), so abort is a no-op. A trace log
-    /// is included so a future maintainer who wires asynchronous row inserts can spot stray abort
-    /// calls reaching here without needing to add the log themselves. If trace logging shows up,
-    /// re-evaluate the no-op contract before adding rollback logic — the manifest state machine
-    /// already handles abort at the coordinator layer.
-    LOGGER.trace("ControllerRowInsertExecutor.abort({}): no-op for synchronous ROW path", statementId);
-  }
 
   /// Partitions rows by the table's segment partition config. If no partition config exists,
   /// all rows are placed in partition 0 (single segment).
@@ -428,7 +414,7 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
     for (int rowIdx = 0; rowIdx < rows.size(); rowIdx++) {
       GenericRow row = rows.get(rowIdx);
       for (String pkColumn : pkColumns) {
-        if (row.getValue(pkColumn) == null) {
+        if (row.getValue(pkColumn) == null || row.isNullValue(pkColumn)) {
           return "Null value in primary-key column '" + pkColumn + "' is not allowed for full upsert tables "
               + "(row index " + rowIdx + ")";
         }
@@ -565,7 +551,7 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
   /// because INSERT INTO VALUES is documented as interactive / quickstart-only, but operators
   /// running it against live tables should be aware. v2 should stage segments via
   /// `startReplaceSegments` / `endReplaceSegments` so the failed batch never reaches
-  /// IdealState — see `FileInsertExecutor` for the lineage pattern.
+  /// IdealState.
   ///
   /// Branches on the response status (not just thrown exceptions): `deleteSegment` can
   /// return `!isSuccessful()` silently when the segment participates in a live lineage entry

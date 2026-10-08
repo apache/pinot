@@ -42,7 +42,7 @@ public class InsertResult {
   private final String _message;
   /// Operator-visible note attached to a non-error state. Distinct from {@link #_message} so UI/JDBC
   /// clients reading the result don't confuse "informational note on a successful statement" (e.g.,
-  /// a VISIBLE statement auto-completed by the cleanup sweep without explicit segment-name
+  /// a VISIBLE statement with an additional status note alongside its segment-name
   /// surfacing) with "executor produced this message" semantics on `_message`. Nullable.
   private final String _informationalMessage;
   private final List<String> _segmentNames;
@@ -121,7 +121,7 @@ public class InsertResult {
   }
 
   /// Returns an operator-visible note attached to a non-error state (e.g., a VISIBLE statement
-  /// auto-completed by the cleanup sweep). Distinct from {@link #getMessage()} so clients can
+  /// carrying an additional status note). Distinct from {@link #getMessage()} so clients can
   /// present it alongside successful state without conflating with executor-produced messages.
   @JsonProperty("informationalMessage")
   @Nullable
@@ -182,7 +182,7 @@ public class InsertResult {
     /// Builds the {@link InsertResult}. Validates that `state` is non-null — a result with no
     /// state is meaningless to clients and indicates a programming error in the executor or
     /// coordinator that constructed it. `statementId` is similarly required since callers
-    /// use it to correlate status/abort/list operations.
+    /// use it to correlate status/list operations.
     public InsertResult build() {
       if (_state == null) {
         throw new IllegalStateException("InsertResult.state is required; set it via setState() before build(). "

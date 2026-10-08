@@ -27,7 +27,7 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 
 
 /// Shared table-mode safety validator used by both {@link ControllerRowInsertExecutor} and
-/// {@link FileInsertExecutor}. Centralizing here ensures a single source of truth for the rules
+/// the ROW executor. Centralizing here ensures a single source of truth for the rules
 /// that gate INSERT INTO against unsafe table modes (upsert/dedup/multi-column partition); a future
 /// rule change lands in one place rather than diverging across executors.
 ///

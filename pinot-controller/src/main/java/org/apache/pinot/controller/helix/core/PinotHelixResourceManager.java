@@ -2673,6 +2673,12 @@ public class PinotHelixResourceManager {
           tableNameWithType, e);
     }
 
+    // Keep insert requestIds scoped to this table's lifetime, including drop/re-create.
+    _propertyStore.remove(ZKMetadataProvider.PROPERTYSTORE_INSERT_STATEMENTS_PREFIX + "/" + tableNameWithType,
+        AccessOption.PERSISTENT);
+    _propertyStore.remove(ZKMetadataProvider.PROPERTYSTORE_INSERT_REQUEST_IDS_PREFIX + "/" + tableNameWithType,
+        AccessOption.PERSISTENT);
+
     // Remove table config
     // NOTE: This should always be the last step for deletion to avoid race condition in table re-create
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, tableNameWithType);

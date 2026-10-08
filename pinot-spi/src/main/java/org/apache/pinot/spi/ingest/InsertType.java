@@ -25,22 +25,11 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
-/// The type of data provided in an INSERT INTO request.
-///
-/// - {@link #ROW} — inline row values (e.g., `INSERT INTO t VALUES (...)`).
-/// - {@link #FILE} — reference to an external file (e.g., `INSERT INTO t FROM FILE '...'`).
-///
-/// **Wire compatibility: these enum values are PERMANENT.** They are serialized into
-/// the `InsertStatementManifest` JSON written to ZooKeeper. Renaming or removing a value
-/// would orphan every manifest persisted by an older controller; a rolling upgrade that reads such
-/// a blob would fail Jackson deserialization. To add a new insert type, append a new value; never
-/// reuse or rename existing ones.
-///
-/// This enum is thread-safe (immutable).
+/// ROW is the synchronous push-based insertion type. SQL file ingestion uses the existing batch path.
+/// Enum values are immutable and JSON accepts their case-insensitive spelling.
 @InterfaceStability.Evolving
 public enum InsertType {
-  ROW,
-  FILE;
+  ROW;
 
   /// Strict deserializer for the `insertType` JSON field. Uses {@link Locale#ROOT} to match
   /// sibling SPI enums (`InsertConsistencyMode`, `InsertStatementState`). Throws

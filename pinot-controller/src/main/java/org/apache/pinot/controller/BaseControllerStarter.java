@@ -106,7 +106,6 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.cleanup.StaleInstancesCleanupTask;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.ingest.ControllerRowInsertExecutor;
-import org.apache.pinot.controller.helix.core.ingest.FileInsertExecutor;
 import org.apache.pinot.controller.helix.core.ingest.InsertStatementCoordinator;
 import org.apache.pinot.controller.helix.core.ingest.InsertStatementStore;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -161,9 +160,6 @@ import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.apache.pinot.spi.ingest.InsertExecutor;
-import org.apache.pinot.spi.ingest.InsertRequest;
-import org.apache.pinot.spi.ingest.InsertResult;
 import org.apache.pinot.spi.ingest.InsertType;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
@@ -685,47 +681,15 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // errorCode=COORDINATOR_NOT_READY (fail-closed, never a partial execution).
     InsertStatementStore insertStatementStore =
         new InsertStatementStore(_helixResourceManager.getPropertyStore());
-    // Pass the LeadControllerManager so the coordinator's cleanup sweep only touches tables this
-    // controller leads — with N flag-enabled controllers, ungated sweeps would race on the same
-    // CAS transitions and each poll Minion task state.
     _insertStatementCoordinator = new InsertStatementCoordinator(_helixResourceManager, insertStatementStore,
-        _controllerMetrics, InsertStatementCoordinator.DEFAULT_STATEMENT_TIMEOUT_MS,
-        InsertStatementCoordinator.DEFAULT_VISIBLE_RETENTION_MS, _leadControllerManager,
-        _config.getInsertRowMaxRowsPerStatement(), _config.getInsertRowMaxBytesPerStatement());
+        _controllerMetrics, _config.getInsertRowMaxRowsPerStatement(), _config.getInsertRowMaxBytesPerStatement());
 
-    if (_config.isInsertEnabled()) {
-      // The ROW executor is registered later, together with the FILE executor, because it needs
-      // _storageQuotaChecker which is constructed below; start() is deferred until ALL executors
-      // are registered so isStarted()=true means "ready for any insert type".
-
-      // Wire the coordinator (not the raw executor) so that controller-local INSERTs go through
-      // the same idempotency, hybrid-table validation, and manifest tracking as HTTP-submitted ones.
-      InsertStatementCoordinator coordinator = _insertStatementCoordinator;
-      _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl(), new InsertExecutor() {
-        @Override
-        public InsertResult execute(InsertRequest request) {
-          return coordinator.submitInsert(request);
-        }
-
-        @Override
-        public void abort(String statementId) {
-          // SqlQueryExecutor's PUSH branch never calls abort on the in-process adapter — the abort
-          // SPI is invoked by the coordinator's own cleanup-sweep / user-abort REST paths against
-          // the registered executor (FileInsertExecutor / ControllerRowInsertExecutor). Fail-fast
-          // here so a future caller that wires up abort flow notices the gap rather than silently
-          // routing through coordinator.abortStatement(stmtId, null) which would do a cross-table
-          // scan that bypasses table-scoped authorization.
-          throw new UnsupportedOperationException("InsertExecutor.abort() is not supported through the "
-              + "SqlQueryExecutor adapter; route abort requests through the /insert/abort REST endpoint "
-              + "with a tableName for proper auth scoping.");
-        }
-      });
-    } else {
+    if (!_config.isInsertEnabled()) {
       LOGGER.info("Push-based INSERT INTO is disabled (controller.insert.enabled=false); "
-          + "the /insert REST surface returns HTTP 503 and in-process INSERTs return "
-          + "COORDINATOR_NOT_READY");
-      _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
+          + "the /insert REST surface returns HTTP 503");
     }
+    // Route SQL inserts through the REST authorization checks with the original caller's credentials.
+    _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
 
     _connectionManager = PoolingHttpClientConnectionManagerHelper.createWithSocketFactory();
     _connectionManager.setDefaultSocketConfig(
@@ -758,35 +722,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
 
-    // Register FILE executor now that _taskManager is available (created during periodic task setup).
-    // Pass _helixTaskResourceManager so the executor can poll Minion task state to auto-complete inserts.
-    // Then start() the coordinator — only now is isStarted() flipped to true and the REST surface
-    // unlocked. Until this line a ROW or FILE INSERT request would have hit checkEnabled()'s 503
-    // because isStarted()=false, avoiding the "ROW works but FILE returns NO_EXECUTOR" window.
     if (_config.isInsertEnabled()) {
-      // Register the ROW executor here (not at coordinator construction) so it can reuse the
-      // upload-path validators: _storageQuotaChecker is only constructed above, after the
-      // coordinator wiring.
       ControllerRowInsertExecutor rowInsertExecutor =
           new ControllerRowInsertExecutor(_helixResourceManager, _config.isInsertRowAllowDestructiveRollback(),
               _storageQuotaChecker, _config.getInsertRowMaxConcurrentStatements());
       _insertStatementCoordinator.registerExecutor(InsertType.ROW.name(), rowInsertExecutor);
-      if (_taskManager == null) {
-        // No Minion task manager configured — register only the ROW executor and start the
-        // coordinator. ROW inserts (INSERT INTO VALUES) are designed for interactive / quickstart
-        // workloads and don't require Minion. FILE inserts will be rejected with NO_EXECUTOR by
-        // the coordinator's existing executor lookup; operators who need FILE support must enable
-        // Minion task management. Log at ERROR — partial-feature state is a misconfiguration that
-        // operators should notice immediately rather than discover when an INSERT FROM FILE fails.
-        LOGGER.error("controller.insert.enabled=true but PinotTaskManager is not configured. "
-            + "ROW inserts will work but FILE inserts will be rejected with NO_EXECUTOR. "
-            + "To enable FILE inserts, configure Minion task management; otherwise set "
-            + "controller.insert.enabled=false to make the partial-feature state explicit.");
-      } else {
-        FileInsertExecutor fileInsertExecutor =
-            new FileInsertExecutor(_helixResourceManager, _taskManager, _helixTaskResourceManager);
-        _insertStatementCoordinator.registerExecutor(InsertType.FILE.name(), fileInsertExecutor);
-      }
       _insertStatementCoordinator.start();
     }
 

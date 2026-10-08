@@ -20,6 +20,8 @@ package org.apache.pinot.spi.ingest;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -36,6 +38,19 @@ import static org.testng.Assert.expectThrows;
 public class InsertRequestTest {
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+  @Test
+  public void testPayloadHashIncludesLogicalNullFields() {
+    GenericRow logicalNull = new GenericRow();
+    logicalNull.putDefaultNullValue("id", Integer.MIN_VALUE);
+    GenericRow sentinelValue = new GenericRow();
+    sentinelValue.putValue("id", Integer.MIN_VALUE);
+    InsertRequest first = new InsertRequest.Builder().setTableName("t").setInsertType(InsertType.ROW)
+        .setRows(List.of(logicalNull)).build();
+    InsertRequest second = new InsertRequest.Builder().setTableName("t").setInsertType(InsertType.ROW)
+        .setRows(List.of(sentinelValue)).build();
+    assertNotEquals(first.computePayloadHash(), second.computePayloadHash());
+  }
 
   @Test
   public void testJsonCreatorRejectsMissingTableName() {
@@ -64,42 +79,16 @@ public class InsertRequestTest {
         "Expected missing-insertType error; got: " + ex.getMessage());
   }
 
-  /// FILE inserts must carry a fileUri. The check mirrors {@link InsertRequest.Builder#build()} so
-  /// the wire-deserialized and in-process paths reject this case with the same message.
-  @Test
-  public void testJsonCreatorRejectsFileWithoutFileUri() {
-    String badJson = "{\"tableName\":\"t\",\"insertType\":\"FILE\"}";
-    JsonMappingException ex = expectThrows(JsonMappingException.class,
-        () -> OBJECT_MAPPER.readValue(badJson, InsertRequest.class));
-    assertTrue(ex.getMessage().contains("fileUri is required"),
-        "Expected missing-fileUri error; got: " + ex.getMessage());
-  }
 
   @Test
-  public void testJsonCreatorAcceptsRowInsertWithoutFileUri() throws Exception {
+  public void testJsonCreatorAcceptsRowInsert() throws Exception {
     String json = "{\"tableName\":\"t\",\"insertType\":\"ROW\"}";
     InsertRequest r = OBJECT_MAPPER.readValue(json, InsertRequest.class);
     assertEquals(r.getTableName(), "t");
     assertEquals(r.getInsertType(), InsertType.ROW);
   }
 
-  @Test
-  public void testJsonCreatorAcceptsFileInsertWithFileUri() throws Exception {
-    String json = "{\"tableName\":\"t\",\"insertType\":\"FILE\",\"fileUri\":\"s3://bucket/path\"}";
-    InsertRequest r = OBJECT_MAPPER.readValue(json, InsertRequest.class);
-    assertEquals(r.getTableName(), "t");
-    assertEquals(r.getInsertType(), InsertType.FILE);
-    assertEquals(r.getFileUri(), "s3://bucket/path");
-  }
 
-  @Test
-  public void testBuilderAcceptsFileInsertWithFileUri() {
-    InsertRequest r = new InsertRequest.Builder()
-        .setTableName("t").setInsertType(InsertType.FILE).setFileUri("s3://bucket/path").build();
-    assertEquals(r.getTableName(), "t");
-    assertEquals(r.getInsertType(), InsertType.FILE);
-    assertEquals(r.getFileUri(), "s3://bucket/path");
-  }
 
   @Test
   public void testBuilderRejectsMissingTableName() {
@@ -115,16 +104,10 @@ public class InsertRequestTest {
     assertTrue(ex.getMessage().contains("insertType is required"));
   }
 
-  @Test
-  public void testBuilderRejectsFileWithoutFileUri() {
-    InsertRequest.Builder b = new InsertRequest.Builder().setTableName("t").setInsertType(InsertType.FILE);
-    IllegalArgumentException ex = expectThrows(IllegalArgumentException.class, b::build);
-    assertTrue(ex.getMessage().contains("fileUri is required"));
-  }
 
   /// The two enforcement paths (wire-deserialized and Builder) must throw with the identical
   /// message text so log-greps catch both code paths exhaustively. Locks all three invariants:
-  /// missing-tableName, missing-insertType, and FILE-without-fileUri.
+  /// missing-tableName and missing-insertType.
   @Test
   public void testBuilderAndJsonCreatorThrowSameMessages() {
     /// Missing tableName.
@@ -137,11 +120,6 @@ public class InsertRequestTest {
         () -> new InsertRequest.Builder().setTableName("t").build(),
         "{\"tableName\":\"t\"}",
         "insertType is required for InsertRequest");
-    /// FILE without fileUri.
-    assertCanonicalPhraseOnBothPaths(
-        () -> new InsertRequest.Builder().setTableName("t").setInsertType(InsertType.FILE).build(),
-        "{\"tableName\":\"t\",\"insertType\":\"FILE\"}",
-        "fileUri is required for FILE insert");
   }
 
   private static void assertCanonicalPhraseOnBothPaths(
@@ -214,5 +192,50 @@ public class InsertRequestTest {
         .setTableName("t").setInsertType(InsertType.ROW).setRows(List.of(differentRow)).build();
     assertNotEquals(a.computePayloadHash(), c.computePayloadHash(),
         "a changed row value must change the payload hash");
+  }
+
+  private static String hashFields(Map<String, Object> fields) {
+    GenericRow row = new GenericRow();
+    fields.forEach(row::putValue);
+    return new InsertRequest.Builder().setTableName("t").setInsertType(InsertType.ROW)
+        .setRows(List.of(row)).build().computePayloadHash();
+  }
+
+  @Test
+  public void testPayloadHashSeparatesMultiValueShapeAndEmbeddedDelimiters() {
+    assertNotEquals(hashFields(Map.of("tags", List.of("a", "b"))),
+        hashFields(Map.of("tags", List.of("a, b"))));
+    assertNotEquals(hashFields(Map.of("x", "a\u0000y\u0000Sb")),
+        hashFields(Map.of("x", "a", "y", "b")));
+    assertNotEquals(hashFields(Map.of("x\u0000Sa", "b")), hashFields(Map.of("x", "a\u0000Sb")));
+    assertNotEquals(hashFields(Map.of("tags", List.of(List.of("a", "b")))),
+        hashFields(Map.of("tags", List.of("[a, b]"))));
+  }
+
+  @Test
+  public void testPayloadHashCanonicalizesRowFieldsSequencesAndIntegerBoxing() {
+    Map<String, Object> reversed = new LinkedHashMap<>();
+    reversed.put("b", 2L);
+    reversed.put("a", List.of(1L, 2L));
+    assertEquals(hashFields(reversed), hashFields(Map.of("a", new Integer[]{1, 2}, "b", 2)));
+    assertNotEquals(hashFields(Map.of("value", 2)), hashFields(Map.of("value", "2")));
+    // STRING columns store integer 1 and double 1.0 differently, despite numeric equality.
+    assertNotEquals(hashFields(Map.of("value", 1)), hashFields(Map.of("value", 1.0)));
+    assertNotEquals(hashFields(Map.of("value", new BigDecimal("2.00"))), hashFields(Map.of("value", 2)));
+    assertNotEquals(hashFields(Map.of("value", new BigDecimal("2.00"))),
+        hashFields(Map.of("value", new BigDecimal("2.0"))));
+    assertNotEquals(hashFields(Map.of("value", 0.1f)), hashFields(Map.of("value", 0.1d)));
+  }
+
+  @Test
+  public void testPayloadHashPreservesNestedMapValueOrder() {
+    Map<String, Object> first = new LinkedHashMap<>();
+    first.put("a", "first");
+    first.put("b", "second");
+    Map<String, Object> reversed = new LinkedHashMap<>();
+    reversed.put("b", "second");
+    reversed.put("a", "first");
+    // Ingestion standardizes a column-value Map to its values in iteration order.
+    assertNotEquals(hashFields(Map.of("tags", first)), hashFields(Map.of("tags", reversed)));
   }
 }

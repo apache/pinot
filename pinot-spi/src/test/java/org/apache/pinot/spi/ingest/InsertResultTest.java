@@ -42,7 +42,7 @@ public class InsertResultTest {
         .setStatementId("stmt-rt")
         .setState(InsertStatementState.VISIBLE)
         .setMessage("rows applied")
-        .setInformationalMessage("Auto-completed via cleanup sweep")
+        .setInformationalMessage("Created one segment")
         .setSegmentNames(Arrays.asList("seg-a", "seg-b"))
         .setErrorCode(null)
         .build();
@@ -53,7 +53,7 @@ public class InsertResultTest {
     assertEquals(round.getStatementId(), "stmt-rt");
     assertEquals(round.getState(), InsertStatementState.VISIBLE);
     assertEquals(round.getMessage(), "rows applied");
-    assertEquals(round.getInformationalMessage(), "Auto-completed via cleanup sweep");
+    assertEquals(round.getInformationalMessage(), "Created one segment");
     assertEquals(round.getSegmentNames(), Arrays.asList("seg-a", "seg-b"));
     assertNull(round.getErrorCode());
     /// The segmentNames list must be immutable so callers can't mutate the result's internal state.

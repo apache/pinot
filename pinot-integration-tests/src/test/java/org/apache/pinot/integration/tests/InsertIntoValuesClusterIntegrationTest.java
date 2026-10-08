@@ -23,12 +23,18 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
@@ -37,6 +43,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.ingest.InsertConsistencyMode;
 import org.apache.pinot.spi.ingest.InsertType;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -52,38 +59,36 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/// Integration tests for push-based INSERT INTO functionality.
-///
-/// Tests the controller coordinator REST API for statement lifecycle management,
-/// idempotency, hybrid table validation, abort, and list operations.
-///
-/// The ROW executor is registered with the coordinator at controller startup,
-/// so submitted inserts are expected to succeed (state = VISIBLE).
-///
-/// **Base class choice:** this test extends {@link BaseClusterIntegrationTest} rather than
-/// {@link org.apache.pinot.integration.tests.custom.CustomDataQueryClusterIntegrationTest}
-/// for three concrete reasons:
-/// - **Per-test table topology** — each test method creates its own OFFLINE and/or REALTIME
-///   table inside the test body and tears it down at the end. This is required because tests
-///   exercise hybrid table validation (which needs both _OFFLINE and _REALTIME variants present),
-///   table-not-found rejection (needs a table to NOT exist), and idempotency across distinct
-///   tables. The `CustomDataQueryClusterIntegrationTest` pattern of one shared schema/table
-///   per test class cannot express these topologies.
-/// - **Coordinator state isolation** — each test asserts on coordinator-internal state
-///   (active-statement counter, request-id reservation tombstones, manifest GC). Sharing tables
-///   across tests would let one test's manifest leak into another's listStatements assertions.
-/// - **Controller config override** — {@link #overrideControllerConf} sets
-///   `controller.insert.enabled=true`. `BaseClusterIntegrationTest` runs setUp/tearDown
-///   per class so the flag binding is stable; cluster restart per method is not needed.
+/// End-to-end ROW insert tests with two controllers, a broker, two servers and Kafka.
+/// Covers durable idempotency, broker value fidelity, hybrid table selection and uploaded
+/// REALTIME segments beside consuming segments, including partitioned full upsert.
 public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER =
       LoggerFactory.getLogger(InsertIntoValuesClusterIntegrationTest.class);
+
+  private BaseControllerStarter _secondController;
 
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
     /// Enable the push-based INSERT INTO feature flag. The flag defaults to false in production
     /// so operators must opt in; integration tests need it on to exercise the coordinator.
     properties.put(ControllerConf.INSERT_ENABLED, true);
+    BasicAuthTestUtils.addControllerConfiguration(properties);
+  }
+
+  @Override
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    BasicAuthTestUtils.addServerConfiguration(serverConf);
+  }
+
+  @Override
+  protected Map<String, String> getAdminClientHeaders() {
+    return BasicAuthTestUtils.AUTH_HEADER;
+  }
+
+  @Override
+  public JsonNode queryBrokerHttpEndpoint(String query) throws Exception {
+    return postQuery(query, BasicAuthTestUtils.AUTH_HEADER);
   }
 
   @BeforeClass
@@ -92,6 +97,9 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
     startZk();
     startController();
+    _secondController = createControllerStarter();
+    _secondController.init(new PinotConfiguration(getDefaultControllerConfiguration()));
+    _secondController.start();
     startBroker();
     startServers(2);
     startKafkaWithoutTopic();
@@ -102,6 +110,9 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
     try {
       stopServer();
       stopBroker();
+      if (_secondController != null) {
+        _secondController.stop();
+      }
       stopController();
       stopKafka();
       stopZk();
@@ -215,11 +226,14 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
     /// The /insert/execute endpoint requires ?tableName=<table> as a query param to bind the
     /// table-scoped @Authorize check. Extract the value from the payload so callers don't need to
     /// pass it twice.
+    return postInsertRequest(payload, getControllerBaseApiUrl());
+  }
+
+  private JsonNode postInsertRequest(String payload, String controllerUrl) throws Exception {
     String tableName = JsonUtils.stringToJsonNode(payload).get("tableName").asText();
-    String url = getControllerBaseApiUrl() + "/insert/execute?tableName="
+    String url = controllerUrl + "/insert/execute?tableName="
         + URLEncoder.encode(tableName, StandardCharsets.UTF_8);
-    String response = sendPostRequest(url, payload,
-        Collections.singletonMap("accept", "application/json"));
+    String response = sendPostRequest(url, payload, BasicAuthTestUtils.AUTH_HEADER);
     return JsonUtils.stringToJsonNode(response);
   }
 
@@ -227,23 +241,14 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
       throws Exception {
     String url = getControllerBaseApiUrl() + "/insert/status/" + statementId
         + "?tableName=" + tableNameWithType;
-    String response = sendGetRequest(url);
-    return JsonUtils.stringToJsonNode(response);
-  }
-
-  private JsonNode postInsertAbort(String statementId, String tableNameWithType)
-      throws Exception {
-    String url = getControllerBaseApiUrl() + "/insert/abort/" + statementId
-        + "?tableName=" + tableNameWithType;
-    String response = sendPostRequest(url, null,
-        Collections.singletonMap("accept", "application/json"));
+    String response = sendGetRequest(url, BasicAuthTestUtils.AUTH_HEADER);
     return JsonUtils.stringToJsonNode(response);
   }
 
   private JsonNode getInsertList(String tableNameWithType)
       throws Exception {
     String url = getControllerBaseApiUrl() + "/insert/list?tableName=" + tableNameWithType;
-    String response = sendGetRequest(url);
+    String response = sendGetRequest(url, BasicAuthTestUtils.AUTH_HEADER);
     return JsonUtils.stringToJsonNode(response);
   }
 
@@ -343,15 +348,14 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
     String requestId = "idemp-001";
     String payloadHash = "hash-abc";
 
-    String payload = buildInsertRequestJson(tableName, null, requestId, payloadHash);
+    String payload = buildInsertRequestJson(tableName, null, requestId, payloadHash,
+        List.of(Map.of("id", 1, "name", 1, "score", 90.0)));
 
     /// First submit — succeeds with executor registered
     JsonNode result1 = postInsertRequest(payload);
     LOGGER.info("First submit: {}", result1);
     String state1 = result1.get("state").asText();
-    assertFalse("REJECTED".equals(state1) && result1.has("errorCode")
-        && "NO_EXECUTOR".equals(result1.get("errorCode").asText()),
-        "Executor should be registered; should not get NO_EXECUTOR");
+    assertEquals(state1, "VISIBLE", result1.toString());
     String statementId1 = result1.get("statementId").asText();
 
     /// Second submit with same requestId + payloadHash — should be idempotent
@@ -359,6 +363,25 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
     LOGGER.info("Second submit: {}", result2);
     assertEquals(result2.get("statementId").asText(), statementId1,
         "Idempotent retry should return same statementId");
+
+    List<Map<String, Object>> decimalFields = List.of(Map.of("id", 2, "name", 1.0, "score", 90.0));
+    // Keep every other field the same to isolate the INTEGER versus DOUBLE hash distinction.
+    JsonNode conflict = postInsertRequest(buildInsertRequestJson(tableName, null, requestId, payloadHash,
+        List.of(Map.of("id", 1, "name", 1.0, "score", 90.0))));
+    assertEquals(conflict.path("errorCode").asText(), "IDEMPOTENCY_CONFLICT", conflict.toString());
+    JsonNode decimal = postInsertRequest(buildInsertRequestJson(tableName, null, "idemp-decimal", payloadHash,
+        decimalFields));
+    assertEquals(decimal.path("state").asText(), "VISIBLE", decimal.toString());
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode names = postQuery("SELECT name FROM " + tableName + " ORDER BY name")
+            .path("resultTable").path("rows");
+        return names.size() == 2 && "1".equals(names.path(0).path(0).asText())
+            && "1.0".equals(names.path(1).path(0).asText());
+      } catch (Exception e) {
+        return false;
+      }
+    }, 30_000, "Integer and decimal payloads did not retain distinct STRING conversion results");
   }
 
   /// ---- Test: Status API returns NOT_FOUND for unknown statement ----
@@ -385,19 +408,6 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
       assertTrue(httpEx.getMessage().contains("errorCode=NOT_FOUND"),
           "Expected message to mention errorCode=NOT_FOUND, got: " + httpEx.getMessage());
     }
-  }
-
-  /// ---- Test: Abort returns NOT_FOUND for unknown statement ----
-
-  @Test
-  public void testInsertAbortNotFound()
-      throws Exception {
-    String tableName = "insertAbortNotFound";
-    createOfflineTable(tableName);
-
-    JsonNode abortResult = postInsertAbort("unknown-stmt-id", tableName + "_OFFLINE");
-    LOGGER.info("Abort not found: {}", abortResult);
-    assertEquals(abortResult.get("errorCode").asText(), "NOT_FOUND");
   }
 
   /// ---- Test: List returns empty array for table with no statements ----
@@ -602,6 +612,22 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
     assertEquals(insert.path("state").asText(), "VISIBLE", insert.toString());
     assertEquals(insert.path("segmentNames").size(), 2, "Each partition should produce one segment: " + insert);
 
+    IdealState idealState = _helixResourceManager.getTableIdealState(realtimeTable);
+    Map<Integer, Map<String, String>> consumingAssignments = new HashMap<>();
+    for (String segmentName : idealState.getPartitionSet()) {
+      LLCSegmentName llc = LLCSegmentName.of(segmentName);
+      if (llc != null) {
+        consumingAssignments.put(llc.getPartitionGroupId(), idealState.getInstanceStateMap(segmentName));
+      }
+    }
+    for (JsonNode segment : insert.path("segmentNames")) {
+      String segmentName = segment.asText();
+      int partitionId = Integer.parseInt(segmentName.substring(segmentName.lastIndexOf("_p") + 2));
+      assertNotNull(consumingAssignments.get(partitionId), "Missing consuming partition " + partitionId);
+      assertEquals(idealState.getInstanceStateMap(segmentName).keySet(),
+          consumingAssignments.get(partitionId).keySet(), "Uploaded segment assigned to the wrong server");
+    }
+
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode response = postQuery("SELECT id, name, score FROM " + realtimeTable + " ORDER BY id");
@@ -617,5 +643,101 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
         return false;
       }
     }, 60_000, "The newer uploaded primary-key row did not win across both partitions");
+  }
+
+  @Test
+  public void testControllerSqlInsertRequiresCallerWriteAuthorization() throws Exception {
+    String tableName = "userTableOnly";
+    createOfflineTable(tableName);
+    String sql = "INSERT INTO " + tableName + " (id, name, score) VALUES (1, 'authorized', 90.0)";
+    JsonNode unauthenticated = postQueryToController(sql, getControllerBaseApiUrl(), Map.of(), Map.of());
+    assertTrue(unauthenticated.path("exceptions").size() > 0, unauthenticated.toString());
+    assertTrue(unauthenticated.path("exceptions").toString().contains("401"), unauthenticated.toString());
+    JsonNode readOnly = postQueryToController(sql, getControllerBaseApiUrl(), BasicAuthTestUtils.AUTH_HEADER_USER,
+        Map.of());
+    assertTrue(readOnly.path("exceptions").size() > 0, readOnly.toString());
+    assertTrue(readOnly.path("exceptions").toString().contains("403"), readOnly.toString());
+    assertEquals(getInsertList(tableName + "_OFFLINE").size(), 0,
+        "Unauthorized SQL must not create insert manifests");
+
+    JsonNode authorized = postQueryToController(sql, getControllerBaseApiUrl(), BasicAuthTestUtils.AUTH_HEADER,
+        Map.of());
+    assertEquals(authorized.path("exceptions").size(), 0, authorized.toString());
+    assertEquals(authorized.path("resultTable").path("rows").path(0).path(1).asText(), "VISIBLE",
+        authorized.toString());
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return postQuery("SELECT COUNT(*) FROM " + tableName).path("resultTable").path("rows")
+            .path(0).path(0).asInt() == 1;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 30_000, "Authenticated controller SQL insert did not preserve caller credentials");
+  }
+
+  @Test
+  public void testTwoControllersReserveOneRequestAndRetainItAfterRestart() throws Exception {
+    String tableName = "insertTwoControllers";
+    createOfflineTable(tableName);
+    String payload = buildInsertRequestJson(tableName, TableType.OFFLINE, "shared-request", null);
+    String secondControllerUrl = _secondController.getConfig().generateVipUrl();
+    CountDownLatch ready = new CountDownLatch(2);
+    CountDownLatch start = new CountDownLatch(1);
+    JsonNode first;
+    JsonNode second;
+    try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+      Future<JsonNode> firstRequest = executor.submit(() -> {
+        ready.countDown();
+        assertTrue(start.await(10, TimeUnit.SECONDS));
+        return postInsertRequest(payload, getControllerBaseApiUrl());
+      });
+      Future<JsonNode> secondRequest = executor.submit(() -> {
+        ready.countDown();
+        assertTrue(start.await(10, TimeUnit.SECONDS));
+        return postInsertRequest(payload, secondControllerUrl);
+      });
+      assertTrue(ready.await(10, TimeUnit.SECONDS));
+      start.countDown();
+      first = firstRequest.get(60, TimeUnit.SECONDS);
+      second = secondRequest.get(60, TimeUnit.SECONDS);
+    }
+    JsonNode winner = "VISIBLE".equals(first.path("state").asText()) ? first : second;
+    assertEquals(winner.path("state").asText(), "VISIBLE", first + " / " + second);
+    String statementId = winner.path("statementId").asText();
+    assertEquals(postInsertRequest(payload).path("statementId").asText(), statementId);
+    assertEquals(postInsertRequest(payload, secondControllerUrl).path("statementId").asText(), statementId);
+    assertEquals(getInsertList(tableName + "_OFFLINE").size(), 1);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return postQuery("SELECT COUNT(*) FROM " + tableName).path("resultTable").path("rows")
+            .path(0).path(0).asInt() == 1;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 30_000, "Two controllers produced duplicate or missing inserted rows");
+
+    Map<String, Object> secondConfig = _secondController.getConfig().toMap();
+    _secondController.stop();
+    _secondController = createControllerStarter();
+    _secondController.init(new PinotConfiguration(secondConfig));
+    _secondController.start();
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return "OK".equals(sendGetRequest(secondControllerUrl + "/health"));
+      } catch (Exception e) {
+        return false;
+      }
+    }, 30_000, "The restarted controller did not become healthy");
+    assertEquals(postInsertRequest(payload, secondControllerUrl).path("statementId").asText(), statementId);
+    assertEquals(getInsertList(tableName + "_OFFLINE").size(), 1);
+
+    // Dropping the table must also drop the permanent request reservation before re-creation.
+    dropOfflineTable(tableName);
+    TestUtils.waitForCondition(aVoid -> _helixResourceManager.getTableExternalView(tableName + "_OFFLINE") == null,
+        30_000, "The deleted table's ExternalView was not removed");
+    createOfflineTable(tableName);
+    JsonNode recreated = postInsertRequest(payload);
+    assertEquals(recreated.path("state").asText(), "VISIBLE", recreated.toString());
+    assertNotEquals(recreated.path("statementId").asText(), statementId);
   }
 }

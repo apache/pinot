@@ -24,7 +24,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -32,7 +34,7 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingest.InsertRequest;
@@ -44,6 +46,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -108,6 +111,85 @@ public class ControllerRowInsertExecutorTest {
   }
 
   @Test
+  public void testLogicalNullPrimaryKeyRejectsBeforeSegmentBuild() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).build();
+    tableConfig.getIndexingConfig().setSegmentPartitionConfig(
+        new SegmentPartitionConfig(Map.of("id", new ColumnPartitionConfig("murmur3", 2))));
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("id", DataType.INT).setPrimaryKeyColumns(List.of("id")).build();
+    when(_resourceManager.getTableConfig("testTable_REALTIME")).thenReturn(tableConfig);
+    when(_resourceManager.getTableSchema("testTable_REALTIME")).thenReturn(schema);
+    GenericRow row = new GenericRow();
+    row.putDefaultNullValue("id", Integer.MIN_VALUE);
+    AtomicInteger uploads = new AtomicInteger();
+    ControllerRowInsertExecutor executor = createTestExecutor(uploads, null, -1);
+    InsertResult result = executor.execute(new InsertRequest.Builder().setStatementId("stmt-null-pk")
+        .setTableName("testTable_REALTIME").setTableType(TableType.REALTIME).setInsertType(InsertType.ROW)
+        .setRows(List.of(row)).build());
+    assertEquals(result.getErrorCode(), "PRIMARY_KEY_REJECTED");
+    assertEquals(result.getState(), InsertStatementState.ABORTED);
+    assertEquals(uploads.get(), 0);
+    assertEquals(_tempDir.list().length, 0, "Null primary keys must fail before creating a segment working directory");
+  }
+
+  @Test
+  public void testCombinedPartitionSizeRejectsBeforeAnyUpload() throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    tableConfig.getIndexingConfig().setSegmentPartitionConfig(
+        new SegmentPartitionConfig(Map.of("col1", new ColumnPartitionConfig("murmur3", 2))));
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("col1", DataType.STRING).build();
+    when(_resourceManager.getTableConfig(TABLE_NAME)).thenReturn(tableConfig);
+    when(_resourceManager.getTableSchema(TABLE_NAME)).thenReturn(schema);
+    File workingDir = new File(_tempDir, "quota-work");
+    StorageQuotaChecker quotaChecker = mock(StorageQuotaChecker.class);
+    when(quotaChecker.isSegmentStorageWithinQuota(eq(tableConfig), anyString(), anyLong(), anyLong()))
+        .thenAnswer(invocation -> {
+          File[] partitions = workingDir.listFiles(File::isDirectory);
+          assertNotNull(partitions);
+          assertEquals(partitions.length, 2, "All partitions must be staged before checking quota");
+          long total = 0;
+          long largest = 0;
+          for (File partition : partitions) {
+            long size = FileUtils.sizeOfDirectory(new File(partition, "output_segment"));
+            largest = Math.max(largest, size);
+            total += size;
+          }
+          long incoming = invocation.getArgument(3);
+          assertEquals(incoming, total, "Quota check must include every staged partition");
+          // The remaining quota fits either partition independently, but not both together.
+          assertTrue(total > largest);
+          return incoming > largest ? StorageQuotaChecker.failure("Combined partitions exceed remaining quota")
+              : StorageQuotaChecker.success("One partition fits");
+        });
+    AtomicInteger uploads = new AtomicInteger();
+    ControllerRowInsertExecutor executor = new ControllerRowInsertExecutor(_resourceManager, false, quotaChecker, 1) {
+      @Override
+      File createWorkingDir(String tableNameWithType) {
+        return workingDir;
+      }
+
+      @Override
+      void uploadSegment(String tableNameWithType, File segmentDir, File segmentTarFile, String segmentName) {
+        uploads.incrementAndGet();
+      }
+    };
+    List<GenericRow> rows = new ArrayList<>();
+    for (int i = 0; i < 100; i++) {
+      GenericRow row = new GenericRow();
+      row.putValue("col1", "quota-key-" + i);
+      rows.add(row);
+    }
+    InsertResult result = executor.execute(new InsertRequest.Builder().setStatementId("stmt-quota")
+        .setTableName(TABLE_NAME).setTableType(TableType.OFFLINE).setInsertType(InsertType.ROW).setRows(rows).build());
+    assertEquals(result.getState(), InsertStatementState.ABORTED);
+    assertTrue(result.getMessage().contains("Combined partitions exceed remaining quota"), result.getMessage());
+    assertEquals(uploads.get(), 0, "Quota failure must reject the complete statement before any upload");
+    verify(quotaChecker, times(1)).isSegmentStorageWithinQuota(eq(tableConfig), anyString(), anyLong(), anyLong());
+  }
+
+  @Test
   public void testEmptyRowsRejected() {
     ControllerRowInsertExecutor executor = createTestExecutor(new AtomicInteger(), null, -1);
 
@@ -158,7 +240,7 @@ public class ControllerRowInsertExecutorTest {
         .build();
     Schema schema = new Schema.SchemaBuilder()
         .setSchemaName("testTable")
-        .addSingleValueDimension("col1", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("col1", DataType.STRING)
         .build();
     when(_resourceManager.getTableConfig(TABLE_NAME)).thenReturn(tableConfig);
     when(_resourceManager.getTableSchema(TABLE_NAME)).thenReturn(schema);
@@ -203,7 +285,7 @@ public class ControllerRowInsertExecutorTest {
 
     Schema schema = new Schema.SchemaBuilder()
         .setSchemaName("testTable")
-        .addSingleValueDimension("col1", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("col1", DataType.STRING)
         .build();
     when(_resourceManager.getTableConfig(TABLE_NAME)).thenReturn(tableConfig);
     when(_resourceManager.getTableSchema(TABLE_NAME)).thenReturn(schema);
@@ -265,7 +347,7 @@ public class ControllerRowInsertExecutorTest {
 
     Schema schema = new Schema.SchemaBuilder()
         .setSchemaName("testTable")
-        .addSingleValueDimension("col1", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("col1", DataType.STRING)
         .build();
     when(_resourceManager.getTableConfig(TABLE_NAME)).thenReturn(tableConfig);
     when(_resourceManager.getTableSchema(TABLE_NAME)).thenReturn(schema);
@@ -322,7 +404,7 @@ public class ControllerRowInsertExecutorTest {
   @Test
   public void testRejectDedupTableForRowInsert() {
     ControllerRowInsertExecutor executor = createTestExecutor(new AtomicInteger(), null, -1);
-    DedupConfig dedupConfig = new DedupConfig(true, null);
+    DedupConfig dedupConfig = new DedupConfig();
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
         .setTableName("testTable")
         .setDedupConfig(dedupConfig)
@@ -430,7 +512,7 @@ public class ControllerRowInsertExecutorTest {
 
     Schema schema = new Schema.SchemaBuilder()
         .setSchemaName("testTable")
-        .addSingleValueDimension("col1", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("col1", DataType.STRING)
         .build();
     when(_resourceManager.getTableConfig(TABLE_NAME)).thenReturn(tableConfig);
     when(_resourceManager.getTableSchema(TABLE_NAME)).thenReturn(schema);
