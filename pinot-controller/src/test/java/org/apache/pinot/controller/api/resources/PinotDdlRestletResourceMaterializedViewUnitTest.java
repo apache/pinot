@@ -49,6 +49,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.ddl.compile.CompiledCreateMaterializedView;
+import org.apache.pinot.sql.ddl.compile.DdlCompileContext;
 import org.apache.pinot.sql.ddl.compile.DdlCompiler;
 import org.glassfish.grizzly.http.server.Request;
 import org.mockito.ArgumentCaptor;
@@ -635,7 +636,7 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
     streamConfigs.put("stream.kafka.topic.name", benignTopic);
 
     CompiledCreateMaterializedView compiled = (CompiledCreateMaterializedView) DdlCompiler.compile(
-        "CREATE MATERIALIZED VIEW " + commonMaterializedViewBody(true));
+        "CREATE MATERIALIZED VIEW " + commonMaterializedViewBody(true), DdlCompileContext.STATELESS);
     TableConfig storedConfig = compiled.getTableConfig();
     storedConfig.setTableName(MATERIALIZED_VIEW_WITH_TYPE);
     storedConfig.getIndexingConfig().setStreamConfigs(streamConfigs);
