@@ -340,12 +340,15 @@ public class OpenStructIndexConfig extends IndexConfig {
         && _sparseJsonIndex == that._sparseJsonIndex && _perKeyMetricsEnabled == that._perKeyMetricsEnabled
         && Objects.equals(_defaultValueFieldConfig, that._defaultValueFieldConfig)
         && Objects.equals(_denseKeys, that._denseKeys) && Objects.equals(_valueFieldConfigs, that._valueFieldConfigs)
-        && Objects.equals(_ignoredKeys, that._ignoredKeys);
+        && Objects.equals(_ignoredKeys, that._ignoredKeys)
+        && _maxNestedKeyDepth == that._maxNestedKeyDepth
+        && Objects.equals(_sparseFieldConfig, that._sparseFieldConfig);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _defaultValueFieldConfig, _maxDenseKeys, _denseKeys, _denseKeyMinFillRate,
-        _valueFieldConfigs, _sparseJsonIndex, _perKeyMetricsEnabled, _ignoredKeys);
+        _valueFieldConfigs, _sparseJsonIndex, _perKeyMetricsEnabled, _ignoredKeys, _maxNestedKeyDepth,
+        _sparseFieldConfig);
   }
 }
