@@ -243,7 +243,8 @@ public class ColumnMetadataImplTest {
         "columnName", "dataType", "fieldSpec", "fieldType", "fixedLength", "forwardIndexEncoding", "hasDictionary",
         "indexSizeMap", "lengthOfLongestElement", "lengthOfShortestElement", "materializedChild",
         "maxNumberOfMultiValues", "maxRowLengthInBytes", "maxValue", "minMaxValueInvalid", "minValue", "nonNull",
-        "parentColumn", "partitionFunction", "partitions", "singleValue", "sorted", "sparseKeys", "storedType",
+        "parentColumn", "partitionFunction", "partitions", "singleValue", "sorted", "sparseKeys",
+        "sparseMultiValueKeys", "sparseKeyTypes", "storedType",
         "totalDocs", "totalNumberOfEntries"));
     for (ColumnMetadataImpl metadata : List.of(fullyPopulated().build(),
         ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col"))) {
@@ -263,6 +264,8 @@ public class ColumnMetadataImplTest {
     assertEquals(metadata.getParentColumn(), "metrics");
     assertTrue(metadata.isMaterializedChild());
     assertEquals(metadata.getSparseKeys(), List.of("region", "latencyMs"));
+    assertEquals(metadata.getSparseMultiValueKeys(), Map.of("latencyMs", 3));
+    assertEquals(metadata.getSparseKeyTypes(), Map.of("region", DataType.STRING, "latencyMs", DataType.LONG));
     assertEquals(metadata.getRawForwardIndexUncompressedValueSizeInBytes(), 4096L);
     assertEquals(metadata.getRawForwardIndexChunkCompressionType(), ChunkCompressionType.LZ4);
     assertEquals(metadata.getDictionaryEncodedUncompressedValueSizeInBytes(), 2048L);
@@ -273,6 +276,8 @@ public class ColumnMetadataImplTest {
     assertNotEquals(fullyPopulated().setPartitions(Set.of(2)).build(), metadata);
     assertNotEquals(fullyPopulated().setParentColumn("other").build(), metadata);
     assertNotEquals(fullyPopulated().setSparseKeys(List.of("region")).build(), metadata);
+    assertNotEquals(fullyPopulated().setSparseMultiValueKeys(Map.of("latencyMs", 2)).build(), metadata);
+    assertNotEquals(fullyPopulated().setSparseKeyTypes(Map.of("latencyMs", DataType.INT)).build(), metadata);
     assertNotEquals(fullyPopulated().setDictionaryEncodedUncompressedValueSizeInBytes(1).build(), metadata);
 
     String string = metadata.toString();
@@ -280,6 +285,8 @@ public class ColumnMetadataImplTest {
     assertTrue(string.contains("_partitions=[1, 3]"), string);
     assertTrue(string.contains("_parentColumn=metrics"), string);
     assertTrue(string.contains("_sparseKeys=[region, latencyMs]"), string);
+    assertTrue(string.contains("_sparseMultiValueKeys={latencyMs=3}"), string);
+    assertTrue(string.contains("_sparseKeyTypes="), string);
     assertTrue(string.contains("_compressionMetadata=CompressionMetadata{_uncompressedValueSizeInBytes=4096"), string);
 
     JsonNode json = JsonUtils.objectToJsonNode(metadata);
@@ -288,6 +295,8 @@ public class ColumnMetadataImplTest {
     assertEquals(json.get("parentColumn").asText(), "metrics");
     assertTrue(json.get("materializedChild").asBoolean());
     assertEquals(json.get("sparseKeys").get(1).asText(), "latencyMs");
+    assertEquals(json.get("sparseMultiValueKeys").get("latencyMs").asInt(), 3);
+    assertEquals(json.get("sparseKeyTypes").get("latencyMs").asText(), "LONG");
   }
 
   /// An ordinary column carries none of those, so every accessor reports absence and the JSON keeps its null slots.
@@ -299,8 +308,11 @@ public class ColumnMetadataImplTest {
     assertNull(metadata.getParentColumn());
     assertFalse(metadata.isMaterializedChild());
     assertNull(metadata.getSparseKeys());
+    assertNull(metadata.getSparseMultiValueKeys());
+    assertNull(metadata.getSparseKeyTypes());
     JsonNode json = JsonUtils.objectToJsonNode(metadata);
-    for (String key : List.of("partitionFunction", "partitions", "parentColumn", "sparseKeys")) {
+    for (String key : List.of("partitionFunction", "partitions", "parentColumn", "sparseKeys", "sparseMultiValueKeys",
+        "sparseKeyTypes")) {
       assertTrue(json.get(key).isNull(), key);
     }
     assertFalse(json.get("materializedChild").asBoolean());
@@ -402,6 +414,8 @@ public class ColumnMetadataImplTest {
         .setPartitions(new TreeSet<>(Set.of(1, 3)))
         .setParentColumn("metrics")
         .setSparseKeys(List.of("region", "latencyMs"))
+        .setSparseMultiValueKeys(Map.of("latencyMs", 3))
+        .setSparseKeyTypes(Map.of("region", DataType.STRING, "latencyMs", DataType.LONG))
         .setRawForwardIndexUncompressedValueSizeInBytes(4096)
         .setRawForwardIndexChunkCompressionType(ChunkCompressionType.LZ4)
         .setDictionaryEncodedUncompressedValueSizeInBytes(2048);
