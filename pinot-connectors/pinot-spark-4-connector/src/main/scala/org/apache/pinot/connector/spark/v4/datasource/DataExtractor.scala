@@ -98,7 +98,7 @@ private[pinot] object DataExtractor {
           }
         }
       }
-      InternalRow.fromSeq(columns)
+      InternalRow.fromSeq(columns.toIndexedSeq)
     }
   }
 
