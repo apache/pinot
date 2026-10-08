@@ -24,8 +24,8 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.Context;
-import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelRule;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistributions;
@@ -40,6 +40,7 @@ import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.immutables.value.Value;
 
 
 /// Special rule for Pinot, this rule is fixed to always insert an exchange below the MATCH_RECOGNIZE node, mirroring
@@ -64,12 +65,20 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 ///
 /// TODO(#19395): Support sender-side sorting so the receiver can k-way merge already sorted streams instead of
 /// re-sorting.
-public class PinotMatchExchangeNodeInsertRule extends RelOptRule {
+@Value.Enclosing
+public class PinotMatchExchangeNodeInsertRule extends RelRule<PinotMatchExchangeNodeInsertRule.Config> {
   public static final PinotMatchExchangeNodeInsertRule INSTANCE =
       new PinotMatchExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
 
   public PinotMatchExchangeNodeInsertRule(RelBuilderFactory factory) {
-    super(operand(Match.class, any()), factory, null);
+    this(ImmutablePinotMatchExchangeNodeInsertRule.Config.builder()
+        .relBuilderFactory(factory)
+        .operandSupplier(b0 -> b0.operand(Match.class).anyInputs())
+        .build());
+  }
+
+  private PinotMatchExchangeNodeInsertRule(Config config) {
+    super(config);
   }
 
   @Override
@@ -134,5 +143,14 @@ public class PinotMatchExchangeNodeInsertRule extends RelOptRule {
   private static PlannerContext getPlannerContext(RelOptRuleCall call) {
     Context context = call.getPlanner().getContext();
     return context != null ? context.unwrap(PlannerContext.class) : null;
+  }
+
+  /// Configuration for the MATCH_RECOGNIZE exchange rule.
+  @Value.Immutable
+  public interface Config extends RelRule.Config {
+    @Override
+    default PinotMatchExchangeNodeInsertRule toRule() {
+      return new PinotMatchExchangeNodeInsertRule(this);
+    }
   }
 }
