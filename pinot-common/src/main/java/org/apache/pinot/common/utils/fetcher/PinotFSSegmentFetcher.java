@@ -59,7 +59,7 @@ public class PinotFSSegmentFetcher extends BaseSegmentFetcher {
       int tries =
           RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
             try (InputStream inputStream = pinotFS.open(uri)) {
-              List<File> untarredFiles = TarCompressionUtils.untarWithRateLimiter(inputStream, dest, rateLimit);
+              List<File> untarredFiles = TarCompressionUtils.untarDurably(inputStream, dest, rateLimit);
               untarredFileRef.set(untarredFiles.get(0));
               return true;
             } catch (Exception e) {

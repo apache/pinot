@@ -23,9 +23,10 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -53,8 +54,8 @@ public final class BitmapInvertedIndexWriter implements Closeable {
   // 128KB derived from 1M rows (15 containers), worst case 8KB per container = 120KB + 8KB extra
   private static final long PESSIMISTIC_BITMAP_SIZE_ESTIMATE = 128 << 10;
   private final FileChannel _fileChannel;
-  private final ByteBuffer _offsetBuffer;
-  private ByteBuffer _bitmapBuffer;
+  private final MappedByteBuffer _offsetBuffer;
+  private MappedByteBuffer _bitmapBuffer;
   private long _currentBufferPosition;
   private final boolean _ownsChannel;
 
@@ -116,12 +117,15 @@ public final class BitmapInvertedIndexWriter implements Closeable {
   private void mapBitmapBuffer(long size)
       throws IOException {
     cleanBitmapBuffer();
-    _bitmapBuffer = _fileChannel.map(FileChannel.MapMode.READ_WRITE, _currentBufferPosition, size)
-        .order(ByteOrder.LITTLE_ENDIAN);
+    _bitmapBuffer = _fileChannel.map(FileChannel.MapMode.READ_WRITE, _currentBufferPosition, size);
+    _bitmapBuffer.order(ByteOrder.LITTLE_ENDIAN);
   }
 
   private void cleanBitmapBuffer()
       throws IOException {
+    if (_bitmapBuffer != null) {
+      FileUtils.forceMappedBuffers(_bitmapBuffer);
+    }
     if (_bitmapBuffer != null && CleanerUtil.UNMAP_SUPPORTED) {
       CleanerUtil.getCleaner().freeBuffer(_bitmapBuffer);
     }
@@ -136,14 +140,24 @@ public final class BitmapInvertedIndexWriter implements Closeable {
       throws IOException {
     long fileLength = _currentBufferPosition;
     _offsetBuffer.putInt(asUnsignedInt(fileLength));
-    _fileChannel.truncate(fileLength);
-    if (_ownsChannel) {
-      _fileChannel.close();
-    }
-    if (CleanerUtil.UNMAP_SUPPORTED) {
-      CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();
-      cleaner.freeBuffer(_offsetBuffer);
-      cleanBitmapBuffer();
+    try {
+      FileUtils.forceMappedBuffers(_offsetBuffer, _bitmapBuffer);
+      _fileChannel.truncate(fileLength);
+      if (!_ownsChannel) {
+        _fileChannel.force(true);
+      }
+    } finally {
+      try {
+        if (_ownsChannel) {
+          FileUtils.syncAndClose(_fileChannel);
+        }
+      } finally {
+        if (CleanerUtil.UNMAP_SUPPORTED) {
+          CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();
+          cleaner.freeBuffer(_offsetBuffer);
+          cleanBitmapBuffer();
+        }
+      }
     }
   }
 

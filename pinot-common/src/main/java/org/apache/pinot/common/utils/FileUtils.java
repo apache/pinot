@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -103,6 +104,79 @@ public class FileUtils {
   public static void close(Closeable... closeables)
       throws IOException {
     close(Arrays.asList(closeables));
+  }
+
+  /// Forces each channel's dirty pages to durable storage before closing it. Without this, a write can sit
+  /// unconfirmed in the page cache, and a fault before the OS's own lazy writeback runs can leave bad bytes on
+  /// disk with no error. Every channel is attempted even if an earlier one fails to sync or close, mirroring
+  /// the leak-avoidance behavior of [FileUtils#close].
+  ///
+  /// @param channels one or more writable file channels to sync and close
+  /// @throws IOException the first exception encountered while syncing or closing, with the rest suppressed
+  public static void syncAndClose(FileChannel... channels)
+      throws IOException {
+    IOException topLevelException = null;
+
+    for (FileChannel channel : channels) {
+      if (channel == null) {
+        continue;
+      }
+      try {
+        if (channel.isOpen()) {
+          channel.force(true);
+        }
+      } catch (IOException e) {
+        if (topLevelException == null) {
+          topLevelException = e;
+        } else {
+          topLevelException.addSuppressed(e);
+        }
+      }
+      try {
+        channel.close();
+      } catch (IOException e) {
+        if (topLevelException == null) {
+          topLevelException = e;
+        } else {
+          topLevelException.addSuppressed(e);
+        }
+      }
+    }
+
+    if (topLevelException != null) {
+      throw topLevelException;
+    }
+  }
+
+  /// Forces dirty pages in each writable memory-mapped buffer to durable storage.
+  ///
+  /// FileChannel.force() does not guarantee that changes made through a memory-mapped buffer are persisted, so callers
+  /// that write through mappings must force the mappings separately before closing the channel.
+  /// @param buffers one or more writable memory-mapped buffers to force
+  /// @throws IOException if forcing any buffer fails
+  public static void forceMappedBuffers(MappedByteBuffer... buffers)
+      throws IOException {
+    IOException topLevelException = null;
+
+    for (MappedByteBuffer buffer : buffers) {
+      if (buffer == null) {
+        continue;
+      }
+      try {
+        buffer.force();
+      } catch (RuntimeException e) {
+        IOException exception = new IOException("Failed to force memory-mapped buffer", e);
+        if (topLevelException == null) {
+          topLevelException = exception;
+        } else {
+          topLevelException.addSuppressed(exception);
+        }
+      }
+    }
+
+    if (topLevelException != null) {
+      throw topLevelException;
+    }
   }
 
   /// Concatenates the folderDir and filename and validates that the resulting file path is still within the folderDir.

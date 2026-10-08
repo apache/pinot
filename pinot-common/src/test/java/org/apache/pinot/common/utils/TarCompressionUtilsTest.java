@@ -87,6 +87,11 @@ public class TarCompressionUtilsTest {
     assertEquals(untarredFile, new File(UNTAR_DIR, fileName));
     assertEquals(FileUtils.readFileToString(untarredFile, StandardCharsets.UTF_8), fileContent);
 
+    File durableUntarDir = new File(UNTAR_DIR, "durable-" + compressedTarFileExtension.substring(1));
+    List<File> durablyUntarredFiles = TarCompressionUtils.untarDurably(compressedTarFile, durableUntarDir);
+    assertEquals(durablyUntarredFiles.size(), 1);
+    assertEquals(FileUtils.readFileToString(durablyUntarredFiles.get(0), StandardCharsets.UTF_8), fileContent);
+
     untarredFile = new File(UNTAR_DIR, "untarred");
     TarCompressionUtils.untarOneFile(compressedTarFile, fileName, untarredFile);
     assertEquals(FileUtils.readFileToString(untarredFile, StandardCharsets.UTF_8), fileContent);

@@ -317,8 +317,9 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
       total -= transferred;
       position += transferred;
     }
+    // _dataChannel is a scratch working file deleted below, so only _output needs forcing.
     _dataChannel.close();
-    _output.close();
+    org.apache.pinot.common.utils.FileUtils.syncAndClose(_output.getChannel());
     CleanerUtil.cleanQuietly(_compressionBuffer);
     CleanerUtil.cleanQuietly(_chunkBuffer);
     FileUtils.deleteQuietly(_dataBuffer);

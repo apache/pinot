@@ -510,7 +510,7 @@ public class PredownloadScheduler {
     try {
       // If an exception is thrown when untarring, it means the tar file is broken
       // or not found after the retry. Thus, there's no need to retry again.
-      File untaredSegDir = TarCompressionUtils.untar(tarFile, untarDir).get(0);
+      File untaredSegDir = TarCompressionUtils.untarDurably(tarFile, untarDir).get(0);
       LOGGER.info("Uncompressed tar file: {} into target dir: {}", tarFile, untarDir);
       // Replace the existing index directory.
       File indexDir =
