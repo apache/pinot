@@ -30,8 +30,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -76,10 +76,10 @@ public class JsonUtilsTest {
     doc.put("bool", true);
     doc.put("nul", null);
     doc.put("obj", nested);
-    doc.put("arrObj", Arrays.asList(Collections.singletonMap("k", "v1"), Collections.singletonMap("k", "v2")));
+    doc.put("arrObj", List.of(Map.of("k", "v1"), Map.of("k", "v2")));
     doc.put("empty", new HashMap<>());
-    // The old path serialized the Map (objectToString) and re-parsed it; flattenParsed must match that.
-    String oldPathInput = JsonUtils.objectToString(doc);
+    // JSON-column Map inputs use MapUtils' canonical key ordering for the forward value.
+    String oldPathInput = MapUtils.toString(doc);
 
     for (int maxLevels : new int[]{-1, 1, 2, 3}) {
       JsonIndexConfig config = new JsonIndexConfig();
@@ -91,10 +91,31 @@ public class JsonUtilsTest {
     }
 
     // Top-level list input (the cache stores List values too).
-    List<Object> topList = Arrays.asList(Collections.singletonMap("k", "a"), Collections.singletonMap("k", "b"));
+    List<Object> topList = List.of(Map.of("k", "a"), Map.of("k", "b"));
     JsonIndexConfig config = new JsonIndexConfig();
     assertEqualsNoOrder(JsonUtils.flattenParsed(topList, config).toArray(),
         JsonUtils.flatten(JsonUtils.objectToString(topList), config).toArray());
+  }
+
+  @Test
+  public void testFlattenParsedPreservesDecimalRepresentationAndMapOrder()
+      throws Exception {
+    Map<String, Object> collision = new LinkedHashMap<>();
+    collision.put("a.b", 2);
+    collision.put("a", Map.of("b", 1));
+    Map<String, Object> decimals = Map.of("scaled", new BigDecimal("2.0"),
+        "large", new BigDecimal("123456789012345678900"),
+        "array", new Object[]{new BigDecimal("0.0100"), Map.of("n", new BigDecimal("9007199254740993.0"))});
+    JsonIndexConfig config = new JsonIndexConfig();
+    for (Map<String, Object> doc : List.<Map<String, Object>>of(decimals, collision, Map.of("nested", collision))) {
+      assertTrue(JsonUtils.canFlattenParsedValue(doc));
+      assertEqualsNoOrder(JsonUtils.flattenParsed(doc, config).toArray(),
+          JsonUtils.flatten(MapUtils.toString(doc), config).toArray());
+    }
+    // A List forward value preserves map insertion order instead of using MapUtils' sorted writer.
+    List<Object> list = List.of(collision, decimals);
+    assertEqualsNoOrder(JsonUtils.flattenParsed(list, config).toArray(),
+        JsonUtils.flatten(JsonUtils.objectToString(list), config).toArray());
   }
 
   @Test
