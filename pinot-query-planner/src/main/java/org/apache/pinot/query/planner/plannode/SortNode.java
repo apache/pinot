@@ -25,6 +25,7 @@ import org.apache.pinot.common.utils.DataSchema;
 
 
 public class SortNode extends BasePlanNode {
+  public static final String REQUIRES_SINGLE_RUN_HINT = "requiresSingleRun";
   private final List<RelFieldCollation> _collations;
   private final int _fetch;
   private final int _offset;
@@ -47,6 +48,11 @@ public class SortNode extends BasePlanNode {
 
   public int getOffset() {
     return _offset;
+  }
+
+  /// Whether this sender sort must consume the combined leaf input to produce one ordered stream per mailbox.
+  public boolean requiresSingleRun() {
+    return _nodeHint.getHintOptions().containsKey(REQUIRES_SINGLE_RUN_HINT);
   }
 
   @Override

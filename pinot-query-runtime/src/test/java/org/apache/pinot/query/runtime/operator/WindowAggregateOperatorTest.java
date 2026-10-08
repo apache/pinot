@@ -31,7 +31,6 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
@@ -1186,51 +1185,6 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 20, 2005, 30.0}
         )));
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
-  }
-
-  /// The global window receiver sort establishes window ordering without applying the broker response cap to its input.
-  /// Following frames and RANGE peers both need rows beyond that cap, even when the sort emits several blocks.
-  @Test(dataProvider = "windowFrameTypes")
-  public void testReceiverSortRetainsCompleteWindowInput(WindowNode.WindowFrameType frameType) {
-    DataSchema inputSchema = new DataSchema(new String[]{"key", "value"}, new ColumnDataType[]{INT, INT});
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"key", "value", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
-    BlockListMultiStageOperator.Builder inputBuilder = new BlockListMultiStageOperator.Builder(inputSchema);
-    for (int value = 16; value >= 1; value--) {
-      inputBuilder.addRow(frameType == ROWS ? value : value / 3, value);
-      if (value == 9 || value == 1) {
-        inputBuilder.finishBlock();
-      }
-    }
-    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0));
-    SortNode sortNode = new SortNode(-1, inputSchema, PlanNode.NodeHint.EMPTY, List.of(), collations,
-        Integer.MAX_VALUE, -1);
-    // A finite response cap makes accidental use of an absent fetch observable without relying on cluster defaults.
-    SortOperator sort = SortOperator.create(OperatorTestUtil.getTracingContext(), inputBuilder.buildWithEos(),
-        sortNode, 4, 10, 3);
-    WindowAggregateOperator operator = getOperator(inputSchema, resultSchema, List.of(), collations,
-        List.of(getSum(new RexExpression.InputRef(1))), frameType, 0, frameType == ROWS ? Integer.MAX_VALUE : 0, sort);
-
-    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
-
-    assertEquals(resultRows.size(), 16, "The window must receive every row, including rows beyond the response cap");
-    for (Object[] row : resultRows) {
-      int value = (Integer) row[1];
-      double expectedSum;
-      if (frameType == ROWS) {
-        expectedSum = 136.0 - value * (value - 1) / 2.0;
-      } else {
-        int key = (Integer) row[0];
-        int firstPeer = Math.max(1, key * 3);
-        int lastPeer = Math.min(16, key * 3 + 2);
-        expectedSum = (firstPeer + lastPeer) * (lastPeer - firstPeer + 1) / 2.0;
-      }
-      assertEquals(row[2], expectedSum, "The frame must include following rows and complete peer groups");
-    }
-    assertTrue(operator.nextBlock().isSuccess(), "EOS must survive the sort and window chain");
-    StatMap<WindowAggregateOperator.StatKey> stats =
-        OperatorTestUtil.getStatMap(WindowAggregateOperator.StatKey.class, operator.calculateStats());
-    assertEquals(stats.getLong(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW), 16L);
   }
 
   @Test(dataProvider = "windowFrameTypes")

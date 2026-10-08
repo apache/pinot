@@ -570,7 +570,7 @@ public final class RelToPlanNodeConverter {
     return null;
   }
 
-  private ExchangeNode convertLogicalExchange(Exchange node) {
+  private PlanNode convertLogicalExchange(Exchange node) {
     RelDistribution distribution = node.getDistribution();
     RelDistribution.Type distributionType = distribution.getType();
     PinotRelExchangeType exchangeType;
