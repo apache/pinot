@@ -44,6 +44,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
 
@@ -109,6 +110,23 @@ public class AggregateCallBindingTest {
     assertEquals(bound, unbound);
     assertEquals(bound.hashCode(), unbound.hashCode());
     assertEquals(bound.toString(), unbound.toString());
+  }
+
+  @Test
+  public void testEquality() {
+    AggregateCallBinding binding =
+        new AggregateCallBinding(List.of(ColumnDataType.TIMESTAMP, ColumnDataType.LONG), ColumnDataType.TIMESTAMP);
+    assertEquals(binding, binding);
+    AggregateCallBinding same =
+        new AggregateCallBinding(List.of(ColumnDataType.TIMESTAMP, ColumnDataType.LONG), ColumnDataType.TIMESTAMP);
+    assertEquals(same, binding);
+    assertEquals(same.hashCode(), binding.hashCode());
+    assertNotEquals(new AggregateCallBinding(List.of(ColumnDataType.LONG, ColumnDataType.LONG),
+        ColumnDataType.TIMESTAMP), binding);
+    assertNotEquals(new AggregateCallBinding(List.of(ColumnDataType.TIMESTAMP, ColumnDataType.LONG),
+        ColumnDataType.LONG), binding);
+    assertNotEquals(binding.toThrift(), binding);
+    assertEquals(AggregateCallBinding.fromThrift(binding.toThrift()), binding);
   }
 
   @Test
