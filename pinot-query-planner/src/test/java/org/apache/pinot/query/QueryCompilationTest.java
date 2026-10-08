@@ -1342,8 +1342,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertFalse(sendNode.getInputs().get(0) instanceof SortNode);
     assertTrue(findWindowNode(plan).getInputs().get(0) instanceof SortNode,
         "The disabled path must retain the legacy post-exchange full sort");
-    assertEquals(((SortNode) findWindowNode(plan).getInputs().get(0)).getFetch(), -1,
-        "The disabled path must retain the complete window input");
+    assertEquals(((SortNode) findWindowNode(plan).getInputs().get(0)).getFetch(), Integer.MAX_VALUE,
+        "Older servers must retain the complete window input without understanding the single-run hint");
     assertTrue(((SortNode) findWindowNode(plan).getInputs().get(0)).isSingleRunRequired());
   }
 
@@ -1353,8 +1353,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     try (CompiledQuery compiled = _queryEnvironment.compile(query)) {
       WindowNode window = findWindowNode(compiled.planQuery(0).getQueryPlan());
       assertTrue(window.getInputs().get(0) instanceof SortNode);
-      assertEquals(((SortNode) window.getInputs().get(0)).getFetch(), -1,
-          "Compatibility fallback must retain the complete window input");
+      assertEquals(((SortNode) window.getInputs().get(0)).getFetch(), Integer.MAX_VALUE,
+          "Compatibility fallback must retain the complete window input on older servers");
       assertFalse(window.getInputs().get(0).getInputs().get(0) instanceof MailboxMergeReceiveNode);
     }
   }
@@ -1370,7 +1370,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
     MailboxSendNode sendNode = findWindowInputSendNode(plan);
     SortNode receiverSort = (SortNode) findWindowNode(plan).getInputs().get(0);
-    assertEquals(receiverSort.getFetch(), -1);
+    assertEquals(receiverSort.getFetch(), Integer.MAX_VALUE);
     assertTrue(receiverSort.isSingleRunRequired());
 
     assertFalse(sendNode.isSort(), "The partitioned exchange must not advertise a globally sorted sender stream");

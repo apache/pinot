@@ -269,16 +269,22 @@ public class SortOperatorTest {
   @Test
   public void shouldRetainCompleteRequiredRunBeyondResponseLimit() {
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
-    SortOperator operator = SortOperator.create(OperatorTestUtil.getTracingContext(), _input,
-        new SortNode(-1, schema, PlanNode.NodeHint.EMPTY, List.of(), collations, -1, 0).requiringSingleRun(), 10, 1, 2);
+    for (int fetch : List.of(-1, Integer.MAX_VALUE)) {
+      when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
+          .thenReturn(SuccessMseBlock.INSTANCE);
+      SortNode node = new SortNode(-1, schema, PlanNode.NodeHint.EMPTY, List.of(), collations, fetch, 0);
+      // Explicit MAX_VALUE must also work without the hint, as on an older server during a rolling upgrade.
+      if (fetch < 0) {
+        node = node.requiringSingleRun();
+      }
+      SortOperator operator = SortOperator.create(OperatorTestUtil.getTracingContext(), _input, node, 10, 1, 2);
 
-    assertTrue(operator instanceof FullSortOperator);
-    assertBlockRows(operator.nextBlock(), new Object[]{1}, new Object[]{2});
-    assertBlockRows(operator.nextBlock(), new Object[]{3});
-    assertTrue(operator.nextBlock().isSuccess());
+      assertTrue(operator instanceof FullSortOperator);
+      assertBlockRows(operator.nextBlock(), new Object[]{1}, new Object[]{2});
+      assertBlockRows(operator.nextBlock(), new Object[]{3});
+      assertTrue(operator.nextBlock().isSuccess());
+    }
   }
 
   @Test
