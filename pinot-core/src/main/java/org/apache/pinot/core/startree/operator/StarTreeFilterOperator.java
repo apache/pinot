@@ -48,6 +48,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.startree.StarTree;
 import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
+import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -195,6 +196,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   @Nullable
   private StarTreeResult traverseStarTree() {
     MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
+    RoaringBitmap heapMatchingDocIds = null;
     Set<String> globalRemainingPredicateColumns = null;
 
     StarTree starTree = _starTreeV2.getStarTree();
@@ -233,7 +235,11 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
       // If all predicate columns and group-by columns are matched, we can use aggregated document
       if (remainingPredicateColumns.isEmpty() && remainingGroupByColumns.isEmpty()) {
-        matchingDocIds.add(starTreeNode.getAggregatedDocId());
+        if (heapMatchingDocIds == null) {
+          matchingDocIds.add(starTreeNode.getAggregatedDocId());
+        } else {
+          heapMatchingDocIds.add(starTreeNode.getAggregatedDocId());
+        }
         continue;
       }
 
@@ -241,7 +247,11 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       // the aggregated document. Add the range of documents for this node to the bitmap, and keep track of the
       // remaining predicate columns for this node
       if (starTreeNode.isLeaf()) {
-        matchingDocIds.add((long) starTreeNode.getStartDocId(), starTreeNode.getEndDocId());
+        if (heapMatchingDocIds == null) {
+          // Range additions grow heap array containers geometrically. Keep aggregate-only matches in the buffer bitmap.
+          heapMatchingDocIds = matchingDocIds.toRoaringBitmap();
+        }
+        heapMatchingDocIds.add((long) starTreeNode.getStartDocId(), starTreeNode.getEndDocId());
         continue;
       }
 
@@ -342,6 +352,9 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       }
     }
 
+    if (heapMatchingDocIds != null) {
+      matchingDocIds = heapMatchingDocIds.toMutableRoaringBitmap();
+    }
     return new StarTreeResult(matchingDocIds,
         globalRemainingPredicateColumns != null ? globalRemainingPredicateColumns : Set.of());
   }
