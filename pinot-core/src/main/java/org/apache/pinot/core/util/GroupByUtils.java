@@ -21,6 +21,7 @@ package org.apache.pinot.core.util;
 import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -30,6 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -154,7 +156,7 @@ public final class GroupByUtils {
     List<Map.Entry<Key, Record>> baseEntries = new ArrayList<>(baseTable.getRecordEntries());
     // A full-union set (one that contains every union column, i.e. the identity grouping) maps base groups to
     // derived groups 1:1: keys are unique so no merge ever runs on its records, and its stored intermediates can
-    // safely be the base objects themselves (all other readers of a base intermediate treat it as read-only).
+    // safely be the base objects themselves (after the pre-serialize pass below, no other task touches them).
     boolean[] isFullUnionSet = new boolean[numSets];
     for (int s = 0; s < numSets; s++) {
       boolean fullUnion = true;
@@ -163,71 +165,121 @@ public final class GroupByUtils {
       }
       isFullUnionSet[s] = fullUnion;
     }
+
+    /// Serialize each OBJECT base intermediate exactly ONCE, on exactly one thread (parallel by base-entry
+    /// range, so no object is shared between pre-pass tasks). This is a correctness requirement, not just a
+    /// perf win: serialization can MUTATE the accumulator (TDigest#compress rewrites centroid arrays; theta /
+    /// CPC / tuple sketch accumulators flush their pending lists in getResult), so concurrent serialization of
+    /// the same base object by multiple derive tasks corrupts it. After this pass, derive tasks read only the
+    /// immutable bytes and deserialize their own private copies.
+    SerializedIntermediateResult[][] serializedIntermediates =
+        preSerializeObjectIntermediates(baseEntries, aggregationFunctions, numUnionColumns, numTasks,
+            queryContext, executorService);
+
     int numTaskSlots = Math.max(1, Math.min(numTasks, numSets));
-    List<Map<Key, Record>> taskMaps;
+    List<Map<Key, Record>[]> taskResults = new ArrayList<>(numTaskSlots);
     if (numTaskSlots == 1) {
-      taskMaps = List.of(deriveSets(baseEntries, setContains, isFullUnionSet, 0, 1, numUnionColumns,
-          numAggregationFunctions, aggregationFunctions));
+      taskResults.add(deriveSets(baseEntries, serializedIntermediates, setContains, isFullUnionSet, 0, 1,
+          numUnionColumns, numAggregationFunctions, aggregationFunctions));
     } else {
-      List<Future<Map<Key, Record>>> futures = new ArrayList<>(numTaskSlots);
+      List<Future<Map<Key, Record>[]>> futures = new ArrayList<>(numTaskSlots);
       for (int t = 0; t < numTaskSlots; t++) {
         int taskIndex = t;
-        futures.add(executorService.submit(() -> deriveSets(baseEntries, setContains, isFullUnionSet, taskIndex,
-            numTaskSlots, numUnionColumns, numAggregationFunctions, aggregationFunctions)));
+        futures.add(executorService.submit(() -> deriveSets(baseEntries, serializedIntermediates, setContains,
+            isFullUnionSet, taskIndex, numTaskSlots, numUnionColumns, numAggregationFunctions,
+            aggregationFunctions)));
       }
-      taskMaps = new ArrayList<>(numTaskSlots);
-      try {
-        // Bound each wait by the query deadline (when one is set) so a stuck task cannot hold the combine past
-        // the timeout.
-        long endTimeMs = queryContext.getEndTimeMs();
-        for (Future<Map<Key, Record>> future : futures) {
-          if (endTimeMs > 0) {
-            taskMaps.add(future.get(Math.max(endTimeMs - System.currentTimeMillis(), 0), TimeUnit.MILLISECONDS));
-          } else {
-            taskMaps.add(future.get());
-          }
+      taskResults.addAll(awaitAll(futures, queryContext));
+    }
+    // Per-set maps in ordinal order (each produced by exactly one task).
+    Map<Key, Record>[] perSetMaps = taskResults.get(0);
+    for (int t = 1; t < taskResults.size(); t++) {
+      Map<Key, Record>[] taskSetMaps = taskResults.get(t);
+      for (int s = 0; s < numSets; s++) {
+        if (taskSetMaps[s] != null) {
+          perSetMaps[s] = taskSetMaps[s];
         }
-      } catch (InterruptedException e) {
-        cancelAll(futures);
-        Thread.currentThread().interrupt();
-        throw new RuntimeException("Interrupted while deriving grouping sets", e);
-      } catch (TimeoutException e) {
-        cancelAll(futures);
-        throw new RuntimeException("Timed out while deriving grouping sets", e);
-      } catch (ExecutionException e) {
-        cancelAll(futures);
-        throw new RuntimeException("Caught exception while deriving grouping sets", e.getCause());
       }
     }
 
-    // Union the disjoint task maps into the result table. Since task key spaces are disjoint, the union never
-    // merges records. In the common case, adopt the largest task map as the table's backing map and putAll the
-    // rest into it, so the largest map's keys are never re-hashed. The deterministic accurate-group-by mode
-    // needs a sorted (skip-list) backing map for deterministic iteration order, so it keeps the upsert-based
-    // union into the table produced by getTrimDisabledIndexedTable (single-threaded, numThreads = 1).
+    /// Union the disjoint per-set maps into the result table, bounding the derived output at `numGroupsLimit`
+    /// like the expansion path's combine table. Sets are admitted COARSEST FIRST (fewest participating columns,
+    /// then ordinal), so low-magnitude sets such as the grand total and the subtotals always survive the cap and
+    /// only the finest (largest) sets get trimmed; a trim is surfaced via the table's trimmed flag. Without a
+    /// trim, the largest per-set map is adopted as the table's backing map so its keys are never re-hashed. The
+    /// deterministic accurate-group-by mode needs a sorted (skip-list) backing map, so it uses upserts instead.
+    int derivedCap = Math.max(queryContext.getNumGroupsLimit(), numSets);
+    long totalDerived = 0;
+    for (int s = 0; s < numSets; s++) {
+      totalDerived += perSetMaps[s] != null ? perSetMaps[s].size() : 0;
+    }
+    Integer[] setOrder = new Integer[numSets];
+    for (int s = 0; s < numSets; s++) {
+      setOrder[s] = s;
+    }
+    Arrays.sort(setOrder, (a, b) -> {
+      int lengthCompare = Integer.compare(groupingSets.get(a).length, groupingSets.get(b).length);
+      return lengthCompare != 0 ? lengthCompare : Integer.compare(a, b);
+    });
     IndexedTable derivedTable;
     if (useDeterministicIndexedTable(queryContext)) {
       derivedTable = getTrimDisabledIndexedTable(groupingSetsSchema, false, queryContext, Integer.MAX_VALUE,
           initialCapacity, 1, executorService);
-      for (Map<Key, Record> taskMap : taskMaps) {
-        for (Map.Entry<Key, Record> entry : taskMap.entrySet()) {
+      int admitted = 0;
+      for (int s : setOrder) {
+        Map<Key, Record> setMap = perSetMaps[s];
+        if (setMap == null) {
+          continue;
+        }
+        for (Map.Entry<Key, Record> entry : setMap.entrySet()) {
+          if (admitted >= derivedCap) {
+            break;
+          }
           derivedTable.upsert(entry.getKey(), entry.getValue());
+          admitted++;
         }
       }
-    } else {
-      Map<Key, Record> mergedMap = taskMaps.get(0);
-      for (Map<Key, Record> taskMap : taskMaps) {
-        if (taskMap.size() > mergedMap.size()) {
-          mergedMap = taskMap;
+      if (totalDerived > derivedCap) {
+        derivedTable.markTrimmed();
+      }
+    } else if (totalDerived <= derivedCap) {
+      Map<Key, Record> mergedMap = null;
+      for (int s = 0; s < numSets; s++) {
+        Map<Key, Record> setMap = perSetMaps[s];
+        if (setMap != null && (mergedMap == null || setMap.size() > mergedMap.size())) {
+          mergedMap = setMap;
         }
       }
-      for (Map<Key, Record> taskMap : taskMaps) {
-        if (taskMap != mergedMap) {
-          mergedMap.putAll(taskMap);
+      if (mergedMap == null) {
+        mergedMap = new HashMap<>();
+      }
+      for (int s = 0; s < numSets; s++) {
+        Map<Key, Record> setMap = perSetMaps[s];
+        if (setMap != null && setMap != mergedMap) {
+          mergedMap.putAll(setMap);
         }
       }
       derivedTable = new SimpleIndexedTable(groupingSetsSchema, false, queryContext, Integer.MAX_VALUE,
           Integer.MAX_VALUE, Integer.MAX_VALUE, mergedMap, executorService);
+    } else {
+      Map<Key, Record> mergedMap = new HashMap<>(HashUtil.getHashMapCapacity(derivedCap));
+      int admitted = 0;
+      for (int s : setOrder) {
+        Map<Key, Record> setMap = perSetMaps[s];
+        if (setMap == null) {
+          continue;
+        }
+        for (Map.Entry<Key, Record> entry : setMap.entrySet()) {
+          if (admitted >= derivedCap) {
+            break;
+          }
+          mergedMap.put(entry.getKey(), entry.getValue());
+          admitted++;
+        }
+      }
+      derivedTable = new SimpleIndexedTable(groupingSetsSchema, false, queryContext, Integer.MAX_VALUE,
+          Integer.MAX_VALUE, Integer.MAX_VALUE, mergedMap, executorService);
+      derivedTable.markTrimmed();
     }
 
     /// Optional server-side per-set trim: when configured (and there is an ORDER BY), keep at most K groups
@@ -267,80 +319,218 @@ public final class GroupByUtils {
     return table;
   }
 
+  /// Serializes each OBJECT aggregation intermediate of each base entry exactly once, parallel by base-entry
+  /// range (no object is shared between pre-pass tasks). Returns `null` when the query has no OBJECT
+  /// intermediates (scalar intermediates are immutable and need no cloning). Row `i` of the result corresponds
+  /// to `baseEntries.get(i)`; column `j` is `null` for non-OBJECT aggregation `j`.
+  @Nullable
+  private static SerializedIntermediateResult[][] preSerializeObjectIntermediates(
+      List<Map.Entry<Key, Record>> baseEntries, AggregationFunction[] aggregationFunctions, int numUnionColumns,
+      int numTasks, QueryContext queryContext, ExecutorService executorService) {
+    int numAggregationFunctions = aggregationFunctions.length;
+    boolean hasObjectIntermediate = false;
+    for (AggregationFunction aggregationFunction : aggregationFunctions) {
+      hasObjectIntermediate |= aggregationFunction.getIntermediateResultColumnType() == ColumnDataType.OBJECT;
+    }
+    if (!hasObjectIntermediate || baseEntries.isEmpty()) {
+      return null;
+    }
+    int numEntries = baseEntries.size();
+    SerializedIntermediateResult[][] serialized = new SerializedIntermediateResult[numEntries][];
+    int numChunks = Math.max(1, Math.min(numTasks, numEntries));
+    if (numChunks == 1) {
+      serializeChunk(baseEntries, serialized, 0, numEntries, numUnionColumns, aggregationFunctions);
+    } else {
+      int chunkSize = (numEntries + numChunks - 1) / numChunks;
+      List<Future<Void>> futures = new ArrayList<>(numChunks);
+      for (int c = 0; c < numChunks; c++) {
+        int from = c * chunkSize;
+        int to = Math.min(from + chunkSize, numEntries);
+        if (from >= to) {
+          break;
+        }
+        futures.add(executorService.submit(() -> {
+          serializeChunk(baseEntries, serialized, from, to, numUnionColumns, aggregationFunctions);
+          return null;
+        }));
+      }
+      awaitAll(futures, queryContext);
+    }
+    return serialized;
+  }
+
+  private static void serializeChunk(List<Map.Entry<Key, Record>> baseEntries,
+      SerializedIntermediateResult[][] serialized, int from, int to, int numUnionColumns,
+      AggregationFunction[] aggregationFunctions) {
+    int numAggregationFunctions = aggregationFunctions.length;
+    for (int e = from; e < to; e++) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(e - from, "GroupByUtils#serializeChunk");
+      Object[] baseValues = baseEntries.get(e).getValue().getValues();
+      SerializedIntermediateResult[] row = new SerializedIntermediateResult[numAggregationFunctions];
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        Object intermediate = baseValues[numUnionColumns + i];
+        if (intermediate != null
+            && aggregationFunctions[i].getIntermediateResultColumnType() == ColumnDataType.OBJECT) {
+          row[i] = aggregationFunctions[i].serializeIntermediateResult(intermediate);
+        }
+      }
+      serialized[e] = row;
+    }
+  }
+
   /// One derive task: projects every base group into the grouping sets owned by `taskIndex` (set `s` is owned
-  /// when `s % numTaskSlots == taskIndex`) and aggregates the derived groups into a task-local map. Each task
-  /// runs single-threaded over its own map, so a plain HashMap suffices; task key spaces are disjoint because
-  /// every derived key ends with its set ordinal.
+  /// when `s % numTaskSlots == taskIndex`) and aggregates each owned set into its own task-local map (returned
+  /// in an array indexed by set ordinal; non-owned slots are `null`). Each task runs single-threaded over its
+  /// own maps, so plain HashMaps suffice; key spaces are disjoint because every derived key ends with its set
+  /// ordinal.
   ///
-  /// The first record stored for a derived key holds cloned intermediates (it becomes the group's accumulator,
-  /// mutated by later merges); on merge, OBJECT intermediates from the shared base group are cloned again so the
-  /// merge can never mutate a base accumulator that other tasks are still reading. Scalar intermediates are
-  /// immutable and pass through uncloned.
-  private static Map<Key, Record> deriveSets(List<Map.Entry<Key, Record>> baseEntries, boolean[][] setContains,
+  /// Cloning: OBJECT intermediates are never read from the shared base objects here -- they are deserialized
+  /// from the pre-serialized bytes (see [#preSerializeObjectIntermediates]), each call producing a private
+  /// copy, so no derive task can observe or cause mutation of a base accumulator. Scalar intermediates are
+  /// immutable and pass through directly. Full-union sets store the base objects themselves: their records
+  /// never merge (base keys are unique) and after the pre-pass no other task touches those objects.
+  @SuppressWarnings("unchecked")
+  private static Map<Key, Record>[] deriveSets(List<Map.Entry<Key, Record>> baseEntries,
+      @Nullable SerializedIntermediateResult[][] serializedIntermediates, boolean[][] setContains,
       boolean[] isFullUnionSet, int taskIndex, int numTaskSlots, int numUnionColumns, int numAggregationFunctions,
       AggregationFunction[] aggregationFunctions) {
     int numSets = setContains.length;
-    // A full-union owned set produces exactly one derived group per base entry, so presize for it (it never
-    // rehashes); tasks owning only coarser sets start small and grow, since their distinct-group counts are
-    // usually far below the base size and a full-size bucket array per task would be wasted memory.
-    boolean ownsFullUnionSet = false;
+    Map<Key, Record>[] setMaps = new Map[numSets];
     for (int s = taskIndex; s < numSets; s += numTaskSlots) {
-      ownsFullUnionSet |= isFullUnionSet[s];
+      // A set produces at most one derived group per base entry; presize the full-union (identity) set for
+      // exactly that (it never rehashes), and let coarser sets start small and grow.
+      setMaps[s] = isFullUnionSet[s] ? new HashMap<>(HashUtil.getHashMapCapacity(baseEntries.size()))
+          : new HashMap<>();
     }
-    Map<Key, Record> taskMap =
-        ownsFullUnionSet ? new HashMap<>(HashUtil.getHashMapCapacity(baseEntries.size())) : new HashMap<>();
     // Flyweight probe: reuse one key buffer for lookups (HashMap.get does not retain its argument) and copy it
     // into a fresh array only when inserting a new derived group. Most projections into coarse sets hit an
     // existing group, so this avoids a key-array + Key allocation per projection on the merge path.
     Object[] probeValues = new Object[numUnionColumns + 1];
     Key probeKey = new Key(probeValues);
     int numProjections = 0;
-    for (Map.Entry<Key, Record> baseEntry : baseEntries) {
+    for (int e = 0; e < baseEntries.size(); e++) {
+      Map.Entry<Key, Record> baseEntry = baseEntries.get(e);
       Object[] baseKeys = baseEntry.getKey().getValues();
       Object[] baseValues = baseEntry.getValue().getValues();
+      SerializedIntermediateResult[] serializedRow =
+          serializedIntermediates != null ? serializedIntermediates[e] : null;
       for (int s = taskIndex; s < numSets; s += numTaskSlots) {
         // Keep the derive responsive to query timeout / cancellation and visible to resource accounting, like
         // the segment-merge loop in GroupByCombineOperator.
         QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numProjections++, "GroupByUtils#deriveSets");
+        Map<Key, Record> setMap = setMaps[s];
         boolean[] contains = setContains[s];
         for (int col = 0; col < numUnionColumns; col++) {
           probeValues[col] = contains[col] ? baseKeys[col] : null;
         }
         probeValues[numUnionColumns] = s;
-        // Full-union sets never see a duplicate key, so skip the probe and insert blindly. Their records can
-        // also share the base intermediates without cloning: no merge will ever mutate them (this set never
-        // merges, and every merge into OTHER sets clones its second argument before use).
+        // Full-union sets never see a duplicate key, so skip the probe and insert blindly.
         boolean fullUnion = isFullUnionSet[s];
-        Record existing = fullUnion ? null : taskMap.get(probeKey);
+        Record existing = fullUnion ? null : setMap.get(probeKey);
         if (existing == null) {
           Object[] keyValues = probeValues.clone();
           Object[] values = new Object[numUnionColumns + 1 + numAggregationFunctions];
           System.arraycopy(keyValues, 0, values, 0, numUnionColumns + 1);
           for (int i = 0; i < numAggregationFunctions; i++) {
-            Object intermediate = baseValues[numUnionColumns + i];
-            values[numUnionColumns + 1 + i] =
-                fullUnion ? intermediate : cloneIntermediate(aggregationFunctions[i], intermediate);
+            values[numUnionColumns + 1 + i] = fullUnion ? baseValues[numUnionColumns + i]
+                : cloneIntermediate(aggregationFunctions[i], baseValues, serializedRow, numUnionColumns, i);
           }
-          taskMap.put(new Key(keyValues), new Record(values));
+          setMap.put(new Key(keyValues), new Record(values));
         } else {
           Object[] values = existing.getValues();
           for (int i = 0; i < numAggregationFunctions; i++) {
             int valueIndex = numUnionColumns + 1 + i;
             // The first argument is this set's owned accumulator (mutating it is safe). The second argument is
-            // cloned because AggregationFunction#merge may RETURN its second argument as the new accumulator
-            // (e.g. HyperLogLog merge with mismatched sizes), which would then be mutated by later merges while
-            // other tasks are still reading the shared base intermediate.
+            // a private deserialized copy, because AggregationFunction#merge may mutate it or RETURN it as the
+            // new accumulator (e.g. HyperLogLog merge with mismatched sizes).
             values[valueIndex] = AggregationFunctionUtils.merge(aggregationFunctions[i], values[valueIndex],
-                cloneIntermediate(aggregationFunctions[i], baseValues[numUnionColumns + i]));
+                cloneIntermediate(aggregationFunctions[i], baseValues, serializedRow, numUnionColumns, i));
           }
         }
       }
     }
-    return taskMap;
+    return setMaps;
   }
 
-  private static void cancelAll(List<Future<Map<Key, Record>>> futures) {
-    for (Future<Map<Key, Record>> future : futures) {
+  /// Merges base records that OVERFLOWED the combine base table (their base key arrived after the table hit
+  /// `numGroupsLimit` and was dropped) into the ALREADY EXISTING derived groups, mirroring the expansion path's
+  /// behavior under the group limit: the grand total and the coarse subtotals -- whose groups exist -- stay
+  /// exact, and only the overflowing fine-set groups are lost. Runs single-threaded on the merge thread; each
+  /// OBJECT intermediate is serialized once here (single owner) and a private copy is deserialized per set.
+  public static void mergeOverflowBaseRecords(IndexedTable derivedTable, List<Record> overflowRecords,
+      QueryContext queryContext) {
+    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
+    int numAggregationFunctions = aggregationFunctions.length;
+    List<int[]> groupingSets = queryContext.getGroupingSets();
+    int numSets = groupingSets.size();
+    int numUnionColumns = queryContext.getGroupByExpressions().size();
+    boolean[][] setContains = new boolean[numSets][numUnionColumns];
+    for (int s = 0; s < numSets; s++) {
+      for (int columnIndex : groupingSets.get(s)) {
+        setContains[s][columnIndex] = true;
+      }
+    }
+    int numMerged = 0;
+    for (Record overflowRecord : overflowRecords) {
+      Object[] baseValues = overflowRecord.getValues();
+      SerializedIntermediateResult[] serializedRow = new SerializedIntermediateResult[numAggregationFunctions];
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        Object intermediate = baseValues[numUnionColumns + i];
+        if (intermediate != null
+            && aggregationFunctions[i].getIntermediateResultColumnType() == ColumnDataType.OBJECT) {
+          serializedRow[i] = aggregationFunctions[i].serializeIntermediateResult(intermediate);
+        }
+      }
+      for (int s = 0; s < numSets; s++) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numMerged++,
+            "GroupByUtils#mergeOverflowBaseRecords");
+        boolean[] contains = setContains[s];
+        Object[] keyValues = new Object[numUnionColumns + 1];
+        for (int col = 0; col < numUnionColumns; col++) {
+          keyValues[col] = contains[col] ? baseValues[col] : null;
+        }
+        keyValues[numUnionColumns] = s;
+        Object[] values = new Object[numUnionColumns + 1 + numAggregationFunctions];
+        System.arraycopy(keyValues, 0, values, 0, numUnionColumns + 1);
+        for (int i = 0; i < numAggregationFunctions; i++) {
+          values[numUnionColumns + 1 + i] =
+              cloneIntermediate(aggregationFunctions[i], baseValues, serializedRow, numUnionColumns, i);
+        }
+        derivedTable.upsertExisting(new Key(keyValues), new Record(values));
+      }
+    }
+  }
+
+  /// Waits for all futures, bounded by the query deadline when one is set, cancelling the whole batch on
+  /// interrupt, timeout or failure.
+  private static <T> List<T> awaitAll(List<Future<T>> futures, QueryContext queryContext) {
+    List<T> results = new ArrayList<>(futures.size());
+    try {
+      long endTimeMs = queryContext.getEndTimeMs();
+      for (Future<T> future : futures) {
+        if (endTimeMs > 0) {
+          results.add(future.get(Math.max(endTimeMs - System.currentTimeMillis(), 0), TimeUnit.MILLISECONDS));
+        } else {
+          results.add(future.get());
+        }
+      }
+      return results;
+    } catch (InterruptedException e) {
+      cancelAll(futures);
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while deriving grouping sets", e);
+    } catch (TimeoutException e) {
+      cancelAll(futures);
+      throw new RuntimeException("Timed out while deriving grouping sets", e);
+    } catch (ExecutionException e) {
+      cancelAll(futures);
+      throw new RuntimeException("Caught exception while deriving grouping sets", e.getCause());
+    }
+  }
+
+  private static <T> void cancelAll(List<Future<T>> futures) {
+    for (Future<T> future : futures) {
       future.cancel(true);
     }
   }
@@ -362,16 +552,16 @@ public final class GroupByUtils {
     return new DataSchema(names, types);
   }
 
-  /// Returns a defensive copy of an aggregation intermediate result so that a subsequent
-  /// [AggregationFunction#merge] into a derived grouping-set group cannot mutate a base group's shared
-  /// accumulator. Scalar (non-OBJECT) intermediates are immutable boxed values and are returned as-is; `null`
-  /// (nothing aggregated) is the merge identity and needs no copy; OBJECT accumulators are cloned via the
-  /// function's own serialize/deserialize round-trip.
-  private static Object cloneIntermediate(AggregationFunction aggregationFunction, Object intermediate) {
-    if (intermediate == null || aggregationFunction.getIntermediateResultColumnType() != ColumnDataType.OBJECT) {
-      return intermediate;
+  /// Returns a private copy of aggregation `i`'s intermediate for one base record, safe to hand to
+  /// [AggregationFunction#merge]: scalar (non-OBJECT) intermediates are immutable boxed values returned as-is
+  /// (`serializedRow[i]` is null for them); `null` (nothing aggregated) is the merge identity; OBJECT
+  /// accumulators are deserialized from the pre-serialized bytes, never touching the shared base object.
+  private static Object cloneIntermediate(AggregationFunction aggregationFunction, Object[] baseValues,
+      @Nullable SerializedIntermediateResult[] serializedRow, int numUnionColumns, int i) {
+    SerializedIntermediateResult serialized = serializedRow != null ? serializedRow[i] : null;
+    if (serialized == null) {
+      return baseValues[numUnionColumns + i];
     }
-    SerializedIntermediateResult serialized = aggregationFunction.serializeIntermediateResult(intermediate);
     return aggregationFunction.deserializeIntermediateResult(
         new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes())));
   }
@@ -403,7 +593,7 @@ public final class GroupByUtils {
 
   /// Returns the initial capacity of the indexed table required by the given query.
   @VisibleForTesting
-  static int getIndexedTableInitialCapacity(int maxRowsToKeep, int minNumGroups, int minCapacity) {
+  public static int getIndexedTableInitialCapacity(int maxRowsToKeep, int minNumGroups, int minCapacity) {
     // The upper bound of the initial capacity is the capacity required to hold all the required rows. The indexed table
     // should never grow over this capacity.
     int upperBound = HashUtil.getHashMapCapacity(maxRowsToKeep);

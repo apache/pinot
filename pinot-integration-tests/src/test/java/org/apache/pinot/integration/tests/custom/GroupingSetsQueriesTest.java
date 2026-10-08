@@ -471,10 +471,9 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
   public void testNumGroupsLimitPressureKeepsTotalsExactByDefault()
       throws Exception {
     // Under numGroupsLimit pressure, the expansion path keeps the grand total exact (the coarse groups are
-    // created on the first row and keep aggregating after the limit), while an ungated base path would drop
-    // overflowing BASE keys from EVERY derived set, corrupting the totals. The cardinality gate (default
-    // groupingSetsBaseAggregationMaxGroups = numGroupsLimit) must therefore route this query to expansion and
-    // keep the grand total exact. This fails without the gate.
+    // created on the first row and keep aggregating after the limit). With base aggregation off by default --
+    // and, even when opted in, the cardinality gate (default groupingSetsBaseAggregationMaxGroups =
+    // numGroupsLimit) routing limit-pressured queries to expansion -- the default result keeps exact totals.
     //
     // The table has 4 distinct (d1, d2) base groups per segment. numGroupsLimit=3 makes both paths hit the
     // limit: expansion creates exactly its first row's 3 groups -- (d1,d2), (d1) and the grand total -- so the
@@ -499,8 +498,9 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
     // When the user overrides the gate (accepting the risk), dropped base keys must at least be surfaced via
     // the numGroupsLimitReached flag instead of failing silently.
     JsonNode forcedBase = postQuery("SET enableNullHandling=true; SET numGroupsLimit=3; "
-        + "SET groupingSetsBaseAggregationMaxGroups=1000000; SELECT " + D1 + ", " + D2 + ", COUNT(*) FROM "
-        + getTableName() + " GROUP BY ROLLUP(" + D1 + ", " + D2 + ") LIMIT 10000");
+        + "SET groupingSetsBaseAggregation=true; SET groupingSetsBaseAggregationMaxGroups=1000000; SELECT "
+        + D1 + ", " + D2 + ", COUNT(*) FROM " + getTableName() + " GROUP BY ROLLUP(" + D1 + ", " + D2
+        + ") LIMIT 10000");
     assertTrue(forcedBase.get("numGroupsLimitReached").asBoolean(),
         "dropping base groups under an overridden gate must surface numGroupsLimitReached");
   }

@@ -259,22 +259,38 @@ public class QueryContext {
 
   /// Returns whether grouping-set queries should aggregate the base grouping (union columns) once per segment
   /// and derive the individual grouping-set records from those base groups, instead of expanding every input
-  /// row into one group per grouping set. Enabled by default; the `groupingSetsBaseAggregation=false` query
-  /// option forces the legacy per-row expansion path. See [CommonConstants.Broker.Request.QueryOptionKey].
+  /// row into one group per grouping set. Disabled by default (opt in with `groupingSetsBaseAggregation=true`):
+  /// the derive can be slower than expansion for expensive-to-merge intermediates (sketches), and the derived
+  /// output is bounded by the base-group estimate rather than `numGroupsLimit`. See
+  /// [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_BASE_AGGREGATION].
   ///
-  /// Only the standard [org.apache.pinot.core.operator.combine.GroupByCombineOperator] performs the merge-time
-  /// derive that turns the emitted base groups back into grouping-set records. Base aggregation is therefore
-  /// disabled whenever a different combine path would run: filtered aggregations (distinct shared group-key
-  /// generator), the streaming combine used on MSE leaf stages (`streamingGroupByFlushThreshold > 0`, which
-  /// flushes incrementally and cannot derive over the fully-merged base table), and the sorted-aggregate combine
-  /// ([#shouldSortAggregateUnderSafeTrim()]). In all these cases the segment expands per row so the emitted rows
-  /// already carry the $groupingId discriminator.
+  /// Even when opted in, base aggregation is disabled when:
+  /// - any aggregation function cannot merge intermediates across groups (the derive merges base groups of the
+  ///   same segment into coarser sets; e.g. SEGMENTPARTITIONEDDISTINCTCOUNT and partitioned FUNNELCOUNT keep
+  ///   per-segment-final counts and would double-count) -- see
+  ///   [AggregationFunction#canMergeIntermediatesAcrossGroups];
+  /// - a combine path other than the standard
+  ///   [org.apache.pinot.core.operator.combine.GroupByCombineOperator] would run, since only it performs the
+  ///   merge-time derive: filtered aggregations (distinct shared group-key generator), the streaming combine
+  ///   used on MSE leaf stages (`streamingGroupByFlushThreshold > 0`), and the sorted-aggregate combine
+  ///   ([#shouldSortAggregateUnderSafeTrim()]). In all these cases the segment expands per row so the emitted
+  ///   rows already carry the $groupingId discriminator.
   public boolean isGroupingSetsBaseAggregation() {
     if (_hasFilteredAggregations || _streamingGroupByFlushThreshold > 0 || shouldSortAggregateUnderSafeTrim()) {
       return false;
     }
     String option = _queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION);
-    return option == null || Boolean.parseBoolean(option);
+    if (option == null || !Boolean.parseBoolean(option)) {
+      return false;
+    }
+    if (_aggregationFunctions != null) {
+      for (AggregationFunction aggregationFunction : _aggregationFunctions) {
+        if (!aggregationFunction.canMergeIntermediatesAcrossGroups()) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   /// Returns the total number of group-by key columns in the server result / reducer row layout: the union

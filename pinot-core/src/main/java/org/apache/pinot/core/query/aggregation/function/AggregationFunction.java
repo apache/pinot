@@ -269,6 +269,16 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
     return true;
   }
 
+  /// Returns whether intermediate results of DIFFERENT groups may be merged together. Most functions merge
+  /// intermediates commutatively regardless of which group produced them, but some are only mergeable across
+  /// SEGMENTS for the SAME group: e.g. SEGMENTPARTITIONEDDISTINCTCOUNT and partitioned FUNNELCOUNT keep a count
+  /// that is already final within one segment and one group, so merging two groups of the same segment
+  /// double-counts entities present in both. The grouping-sets base-aggregation derive merges base groups into
+  /// coarser grouping sets and must not be used for such functions.
+  default boolean canMergeIntermediatesAcrossGroups() {
+    return true;
+  }
+
   /// @return Description of this operator for Explain Plan
   String toExplainString();
 }
