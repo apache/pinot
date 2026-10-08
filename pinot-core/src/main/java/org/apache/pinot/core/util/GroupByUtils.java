@@ -175,7 +175,36 @@ public final class GroupByUtils {
         throw new RuntimeException("Caught exception while deriving grouping sets", e.getCause());
       }
     }
+
+    /// Optional server-side per-set trim: when configured (and there is an ORDER BY), keep at most K groups
+    /// within each grouping set (bucketed by $groupingId), bounding this server's derived output for
+    /// high-cardinality unions. Bucketing per set means a global top-K cannot starve a low-magnitude set. This
+    /// is an approximate top-K (deferred exact ORDER BY + LIMIT still runs at the broker); unset -> keep all.
+    int serverTrimSize = queryContext.getGroupingSetServerTrimSize();
+    if (serverTrimSize > 0 && derivedTable.size() > (long) serverTrimSize * numSets) {
+      derivedTable.finish(false);
+      TableResizer tableResizer = new TableResizer(groupingSetsSchema, queryContext);
+      List<IntermediateRecord> kept = tableResizer.trimTableByGroupingSet(derivedTable, serverTrimSize,
+          numUnionColumns);
+      ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
+      return buildIndexedTableFromRecords(groupingSetsSchema, queryContext, kept, numTasks, executorService);
+    }
     return derivedTable;
+  }
+
+  /// Builds a trim-disabled grouping-set [IndexedTable] pre-populated with the given (already unique) records.
+  /// Used to materialize the per-set-trim survivors back into the table the combine returns.
+  private static IndexedTable buildIndexedTableFromRecords(DataSchema dataSchema, QueryContext queryContext,
+      List<IntermediateRecord> records, int numTasks, ExecutorService executorService) {
+    int numRecords = records.size();
+    int initialCapacity =
+        getIndexedTableInitialCapacity(numRecords, numRecords, queryContext.getMinInitialIndexedTableCapacity());
+    IndexedTable table = getTrimDisabledIndexedTable(dataSchema, false, queryContext, Integer.MAX_VALUE,
+        initialCapacity, numTasks, executorService);
+    for (IntermediateRecord record : records) {
+      table.upsert(record._key, record._record);
+    }
+    return table;
   }
 
   /// Derives grouping-set records for base entries `[from, to)` into the shared concurrent `derivedTable`.

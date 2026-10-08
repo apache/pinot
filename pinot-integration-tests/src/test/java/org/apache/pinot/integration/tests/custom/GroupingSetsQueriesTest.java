@@ -23,8 +23,10 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -432,6 +434,37 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
     expected.put("NULL", 8L);
     assertEquals(actual, expected);
     assertTrue(actual.containsKey("NULL"), "rolled-up grand-total row must have NULL key without null handling");
+  }
+
+  @Test
+  public void testServerTrimSizeBoundsWithoutStarvingSets()
+      throws Exception {
+    // groupingSetsServerTrimSize applies a per-set (bucketed on $groupingId) top-K on the server-derived
+    // grouping sets, but must never starve a set: every requested grouping set -- including the grand total --
+    // must still be represented, and with a K large enough to hold every group the result must be exact.
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT " + D1 + ", " + D2 + ", COUNT(*), GROUPING(" + D1 + "), GROUPING(" + D2 + ") FROM "
+        + getTableName() + " GROUP BY CUBE(" + D1 + ", " + D2 + ") ORDER BY COUNT(*) DESC";
+
+    // K = 100 is larger than any per-set group count over the 8-doc dataset, so trimming keeps everything and
+    // the result must equal the untrimmed (exact) run.
+    Map<String, String> untrimmed = rowsByKey(postQuery("SET enableNullHandling=true; " + query));
+    Map<String, String> largeK = rowsByKey(
+        postQuery("SET enableNullHandling=true; SET groupingSetsServerTrimSize=100; " + query));
+    assertEquals(largeK, untrimmed, "a per-set trim larger than every set must not drop any group");
+    assertEquals(untrimmed.size(), 9);
+
+    // With K = 1 the server keeps only the top row per set, but every set (grouping-id 0,0 / 0,1 / 1,0 / 1,1)
+    // must still contribute at least one row -- no set is starved, including the grand total (1,1).
+    JsonNode rows =
+        postQuery("SET enableNullHandling=true; SET groupingSetsServerTrimSize=1; " + query).get("resultTable")
+            .get("rows");
+    Set<String> groupingIds = new HashSet<>();
+    for (JsonNode row : rows) {
+      groupingIds.add(row.get(3).asInt() + "," + row.get(4).asInt());
+    }
+    assertTrue(groupingIds.contains("1,1"), "grand-total set must survive a small per-set trim");
+    assertTrue(groupingIds.size() >= 3, "multiple grouping sets must survive the per-set trim, not just one");
   }
 
   /// The base-aggregation derive path (default) must produce results identical to the legacy per-row expansion
