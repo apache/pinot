@@ -89,6 +89,28 @@ public abstract class PinotOutputStream extends OutputStream implements DataOutp
     write(bytes, 0, bytes.length);
   }
 
+  /// Writes `length` ints of `values` from `offset`, with the same big-endian bytes as calling [#writeInt(int)] on
+  /// each one. The default encodes the values in small chunks; subclasses can write them in bulk.
+  public void writeInts(int[] values, int offset, int length)
+      throws IOException {
+    PrimitiveArrayOutput.writeIntsChunked(this, values, offset, length);
+  }
+
+  /// Writes `length` longs of `values` from `offset`, with the same big-endian bytes as calling [#writeLong(long)] on
+  /// each one. The default encodes the values in small chunks; subclasses can write them in bulk.
+  public void writeLongs(long[] values, int offset, int length)
+      throws IOException {
+    PrimitiveArrayOutput.writeLongsChunked(this, values, offset, length);
+  }
+
+  /// Writes `length` doubles of `values` from `offset` as big-endian raw bits ([Double#doubleToRawLongBits]), the same
+  /// bytes as `ByteBuffer.putDouble`. Unlike [#writeDouble(double)], a NaN keeps its payload. The default
+  /// encodes the values in small chunks; subclasses can write them in bulk.
+  public void writeDoubles(double[] values, int offset, int length)
+      throws IOException {
+    PrimitiveArrayOutput.writeDoublesChunked(this, values, offset, length);
+  }
+
   public void writeShort(int v) throws IOException {
     write(0xFF & (v >> 8));
     write(0xFF & v);

@@ -97,7 +97,8 @@ public class PercentileIntermediateResultSerDeTest {
         {sequence(10), sequence(10)},
         // Fills the exact capacity, then grows past it.
         {new DoubleArrayList(new double[]{1, 2}), sequence(1)},
-        {sequence(1000), sequence(3000)}
+        {sequence(1000), sequence(3000)},
+        {sequence(2), new DoubleArrayList(new double[]{Double.longBitsToDouble(0x7ff8_0000_0000_0123L), -0.0})}
     };
   }
 
@@ -106,9 +107,13 @@ public class PercentileIntermediateResultSerDeTest {
     DoubleArrayList expectedState = state == null ? null : new DoubleArrayList(state);
     DoubleArrayList expected = _byteArrayFunction.mergeSerializedIntermediateResult(expectedState, serialize(incoming));
 
-    DoubleArrayList actual = _function.mergeSerializedIntermediateResult(state, serialize(incoming));
+    CustomObject serialized = serialize(incoming);
+    DoubleArrayList actual = _function.mergeSerializedIntermediateResult(state, serialized);
 
-    assertEquals(actual, expected);
+    // Compares the serialized bytes, so the values must match bit for bit, NaN payloads included.
+    assertEquals(ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(actual),
+        ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(expected));
+    assertEquals(serialized.getBuffer().remaining(), 0, "Consumes the whole value");
     if (state != null) {
       assertSame(actual, state, "Merges in place");
     }
@@ -123,7 +128,10 @@ public class PercentileIntermediateResultSerDeTest {
   @Test
   public void testSerializedIntermediateResultMatchesByteArray()
       throws IOException {
-    for (DoubleArrayList values : List.of(sequence(0), sequence(1), sequence(1000))) {
+    // A NaN with a payload must keep its raw bits, like ByteBuffer.putDouble in the byte array serializer.
+    DoubleArrayList specialValues = new DoubleArrayList(
+        new double[]{Double.NaN, Double.longBitsToDouble(0x7ff8_0000_0000_0123L), -0.0, Double.NEGATIVE_INFINITY});
+    for (DoubleArrayList values : List.of(sequence(0), sequence(1), sequence(1000), specialValues)) {
       AggregationFunction.SerializedIntermediateResult expected =
           _byteArrayFunction.serializeIntermediateResult(values);
       AggregationFunction.SerializedIntermediateResult actual = _function.serializeIntermediateResult(values);

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -210,6 +211,76 @@ public class PagedPinotOutputStream extends PinotOutputStream {
       }
     }
     _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
+  }
+
+  /// Puts as many values as fit in the current page straight into it, through a big-endian typed view. A value that
+  /// does not fit in the rest of the page (the page offset depends on everything written before, so it is not aligned
+  /// to the value width) is written with [#writeInt(int)], which splits it across the two pages.
+  @Override
+  public void writeInts(int[] values, int offset, int length)
+      throws IOException {
+    Objects.checkFromIndexSize(offset, length, values.length);
+    int end = offset + length;
+    int i = offset;
+    while (i < end) {
+      int numValues = Math.min(end - i, remainingInPage() / Integer.BYTES);
+      if (numValues == 0) {
+        writeInt(values[i++]);
+        continue;
+      }
+      currentPageView().asIntBuffer().put(values, i, numValues);
+      i += numValues;
+      _offsetInPage += numValues * Integer.BYTES;
+      _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
+    }
+  }
+
+  /// Same as [#writeInts(int[], int, int)], for longs.
+  @Override
+  public void writeLongs(long[] values, int offset, int length)
+      throws IOException {
+    Objects.checkFromIndexSize(offset, length, values.length);
+    int end = offset + length;
+    int i = offset;
+    while (i < end) {
+      int numValues = Math.min(end - i, remainingInPage() / Long.BYTES);
+      if (numValues == 0) {
+        writeLong(values[i++]);
+        continue;
+      }
+      currentPageView().asLongBuffer().put(values, i, numValues);
+      i += numValues;
+      _offsetInPage += numValues * Long.BYTES;
+      _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
+    }
+  }
+
+  /// Same as [#writeInts(int[], int, int)], for doubles.
+  @Override
+  public void writeDoubles(double[] values, int offset, int length)
+      throws IOException {
+    Objects.checkFromIndexSize(offset, length, values.length);
+    int end = offset + length;
+    int i = offset;
+    while (i < end) {
+      int numValues = Math.min(end - i, remainingInPage() / Double.BYTES);
+      if (numValues == 0) {
+        // Raw bits, like the typed view (and ByteBuffer#putDouble): writeDouble() would canonicalize NaN.
+        writeLong(Double.doubleToRawLongBits(values[i++]));
+        continue;
+      }
+      currentPageView().asDoubleBuffer().put(values, i, numValues);
+      i += numValues;
+      _offsetInPage += numValues * Double.BYTES;
+      _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
+    }
+  }
+
+  /// Returns a big-endian view of the current page that starts at the current offset. The page itself is not changed.
+  private ByteBuffer currentPageView() {
+    ByteBuffer view = _currentPage.duplicate();
+    view.position(_offsetInPage);
+    return view.order(ByteOrder.BIG_ENDIAN);
   }
 
   @Override
