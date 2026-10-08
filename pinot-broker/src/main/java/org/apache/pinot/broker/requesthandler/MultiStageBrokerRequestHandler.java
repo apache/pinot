@@ -47,13 +47,18 @@ import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.SqlHint;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
+import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.datatable.StatMap;
@@ -291,7 +296,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     // TODO: extend warmup to exercise the full query execution path (planning + dispatch + execution),
     //       not just compilation, to amortize all cold-start costs before serving traffic.
     try {
-      ImmutableQueryEnvironment.Config warmupConf = getQueryEnvConf(null, Map.of(), -1L);
+      ImmutableQueryEnvironment.Config warmupConf = getQueryEnvConf(null, Map.of(), -1L, false);
       QueryEnvironment warmupEnv = new QueryEnvironment(warmupConf, _multiClusterRoutingContext);
       long startMs = System.currentTimeMillis();
       LOGGER.info("MSE startup warmup: compiling query");
@@ -502,7 +507,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
 
     try {
-      ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, queryOptions, requestId);
+      ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, queryOptions, requestId,
+          hasSortedMergeJoinHint(sqlNodeAndOptions.getSqlNode()));
       QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf, _multiClusterRoutingContext);
       return callAsync(requestId, query, () -> queryEnv.compile(query, sqlNodeAndOptions), queryTimer);
     } catch (WebApplicationException e) {
@@ -545,8 +551,33 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
+  /// Checks parsed hints so explicit merge joins request the cached capability without enabling it for ordinary SQL.
+  @VisibleForTesting
+  static boolean hasSortedMergeJoinHint(SqlNode sqlNode) {
+    AtomicBoolean requested = new AtomicBoolean();
+    sqlNode.accept(new SqlBasicVisitor<Void>() {
+      @Override
+      public Void visit(SqlCall call) {
+        if (requested.get()) {
+          return null;
+        }
+        if (call instanceof SqlHint) {
+          SqlHint hint = (SqlHint) call;
+          if (PinotHintOptions.JOIN_HINT_OPTIONS.equalsIgnoreCase(hint.getName())
+              && PinotHintOptions.JoinHintOptions.SORTED_MERGE_JOIN_STRATEGY.equalsIgnoreCase(
+              hint.getOptionKVPairs().get(PinotHintOptions.JoinHintOptions.JOIN_STRATEGY))) {
+            requested.set(true);
+            return null;
+          }
+        }
+        return super.visit(call);
+      }
+    });
+    return requested.get();
+  }
+
   private ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions,
-      long requestId) {
+      long requestId, boolean sortedMergeJoinRequested) {
     String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
     boolean inferPartitionHint = _config.getProperty(CommonConstants.Broker.CONFIG_OF_INFER_PARTITION_HINT,
         CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
@@ -641,7 +672,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultSealedInListThreshold(sealedInListThreshold)
         .defaultWindowKWayMerge(windowKWayMerge)
         .isKWayMergeSupported((QueryOptionsUtils.isWindowKWayMerge(queryOptions, windowKWayMerge)
-            || QueryOptionsUtils.isStreamingSortedMailboxReceiveEnabled(queryOptions))
+            || QueryOptionsUtils.isStreamingSortedMailboxReceiveEnabled(queryOptions) || sortedMergeJoinRequested)
             && !QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
             && _kWayMergeSupported.getAsBoolean())
         .build();

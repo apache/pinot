@@ -1189,6 +1189,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return null;
   }
 
+  // Verify the legacy sender flag stays disabled while the explicit sort owns the run.
+  @SuppressWarnings("deprecation")
   @Test
   public void testSortedMergeJoinColocation() {
     QueryEnvironment capableEnvironment =
@@ -1225,7 +1227,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         assertTrue(sender.getInputs().get(0) instanceof SortNode);
         SortNode sort = (SortNode) sender.getInputs().get(0);
         assertEquals(sort.getCollations(), collations);
-        assertEquals(sort.getFetch(), Integer.MAX_VALUE);
+        assertEquals(sort.getFetch(), -1);
+        assertTrue(sort.isSingleRunRequired());
         assertEquals(sort.getOffset(), -1);
       }
     }
@@ -1249,7 +1252,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   @Test
   public void testSortedMergeJoinRequiresCapability() {
     String query = "SELECT /*+ joinOptions(join_strategy='sorted') */ a.col2, b.col1 FROM a JOIN b ON a.col2 = b.col1";
-    for (String options : List.of("", "SET streamingSortedMailboxReceive=true; SET windowSortOnSender=true; ")) {
+    for (String options : List.of("", "SET streamingSortedMailboxReceive=true; SET windowKWayMerge=true; ")) {
       RuntimeException exception =
           expectThrows(RuntimeException.class, () -> planSortedJoinQuery(_queryEnvironment, options + query));
       assertTrue(Throwables.getStackTraceAsString(exception)

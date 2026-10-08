@@ -54,6 +54,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.mockito.Mockito;
 import org.testng.Assert;
@@ -63,11 +64,26 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase {
+
+  @Test
+  public void testSortedMergeJoinHintDetection() {
+    String join = "a.col1 FROM a JOIN b ON a.col1 = b.col1";
+    assertTrue(MultiStageBrokerRequestHandler.hasSortedMergeJoinHint(CalciteSqlParser.compileToSqlNodeAndOptions(
+        "SELECT /*+ joinOptions(join_strategy='sorted') */ " + join).getSqlNode()));
+    assertTrue(MultiStageBrokerRequestHandler.hasSortedMergeJoinHint(CalciteSqlParser.compileToSqlNodeAndOptions(
+        "SELECT * FROM (SELECT /*+ joinOptions(join_strategy='SORTED') */ " + join + ") nested").getSqlNode()));
+    assertFalse(MultiStageBrokerRequestHandler.hasSortedMergeJoinHint(CalciteSqlParser.compileToSqlNodeAndOptions(
+        "SELECT /*+ joinOptions(join_strategy='hash') */ " + join).getSqlNode()));
+    assertFalse(MultiStageBrokerRequestHandler.hasSortedMergeJoinHint(CalciteSqlParser.compileToSqlNodeAndOptions(
+        "SELECT 'joinOptions(join_strategy=sorted)' FROM a").getSqlNode()));
+  }
 
   @Test
   public void testOnQueryCompletionHookReceivesBrokerResponseForMse()
