@@ -408,8 +408,7 @@ public class QueryEnvironment {
     SqlNode validated = validate(sqlNode, plannerContext);
     RelRoot relation = toRelation(validated, plannerContext);
     RelNode optimized = optimize(relation, plannerContext);
-    String windowSortMode = plannerContext.getOptions().getOrDefault(
-        CommonConstants.Broker.Request.QueryOptionKey.WINDOW_K_WAY_MERGE,
+    String windowSortMode = QueryOptionsUtils.getWindowKWayMergeMode(plannerContext.getOptions(),
         _envConfig.defaultWindowKWayMergeMode());
     WindowSortAutoPlanner.Result resolved = _envConfig.isKWayMergeSupported()
         && !plannerContext.isUsePhysicalOptimizer() && "auto".equalsIgnoreCase(windowSortMode)

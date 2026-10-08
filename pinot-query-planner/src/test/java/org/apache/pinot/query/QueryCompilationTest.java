@@ -36,7 +36,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.logical.PinotKWayMergeSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
@@ -1367,19 +1366,21 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
+  // The compatibility sender flag stays disabled while explicit SortNode establishes the ordering.
+  @SuppressWarnings("deprecation")
   @Test
   public void testAutoColdPlanIsResolvedBeforeFragmentation() {
     QueryEnvironment environment = windowAutoEnvironment(key -> false, true);
     try (CompiledQuery compiled = environment.compile("SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d")) {
       RelNode logicalInput = findLogicalWindow(compiled.getRelRoot().rel).getInput();
       assertTrue(logicalInput instanceof LogicalSort);
-      assertEquals(RexLiteral.intValue(((LogicalSort) logicalInput).fetch), Integer.MAX_VALUE);
+      assertNull(((LogicalSort) logicalInput).fetch);
       assertTrue(logicalInput.getInput(0) instanceof PinotLogicalExchange);
       DispatchableSubPlan plan = compiled.planQuery(0).getQueryPlan();
       SortNode sort = (SortNode) findWindowNode(plan).getInputs().get(0);
-      assertEquals(sort.getFetch(), Integer.MAX_VALUE, "Window input must outlive the broker response cap");
+      assertEquals(sort.getFetch(), -1, "Window input must outlive the broker response cap");
+      assertTrue(sort.isSingleRunRequired());
       MailboxReceiveNode receive = (MailboxReceiveNode) sort.getInputs().get(0);
-      assertFalse(receive instanceof MailboxMergeReceiveNode);
       assertTrue(receive.isAutoProfile());
       assertFalse(findWindowInputSendNode(plan).getInputs().get(0) instanceof SortNode);
       assertFalse(findWindowInputSendNode(plan).isSort());
@@ -1393,12 +1394,14 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     DispatchableSubPlan plan = planWindowQuery(environment,
         "SET windowKWayMerge='auto'; SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d");
     SortNode sort = (SortNode) findWindowNode(plan).getInputs().get(0);
-    assertEquals(sort.getFetch(), Integer.MAX_VALUE);
+    assertEquals(sort.getFetch(), -1);
+    assertTrue(sort.isSingleRunRequired());
     MailboxReceiveNode receive = (MailboxReceiveNode) sort.getInputs().get(0);
-    assertFalse(receive instanceof MailboxMergeReceiveNode);
     assertFalse(receive.isAutoProfile(), "A standalone planner has no tuner to consume samples");
   }
 
+  // The compatibility sender flag stays disabled while explicit SortNode establishes the ordering.
+  @SuppressWarnings("deprecation")
   @Test
   public void testAutoWarmPlanIsResolvedBeforeFragmentation() {
     QueryEnvironment environment = windowAutoEnvironment(key -> true, true);
@@ -1406,14 +1409,14 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       RelNode logicalInput = findLogicalWindow(compiled.getRelRoot().rel).getInput();
       assertTrue(logicalInput instanceof PinotKWayMergeSortExchange);
       assertTrue(logicalInput.getInput(0) instanceof LogicalSort);
-      assertEquals(RexLiteral.intValue(((LogicalSort) logicalInput.getInput(0)).fetch), Integer.MAX_VALUE);
+      assertNull(((LogicalSort) logicalInput.getInput(0)).fetch);
       DispatchableSubPlan plan = compiled.planQuery(0).getQueryPlan();
-      MailboxMergeReceiveNode receive = (MailboxMergeReceiveNode) findWindowNode(plan).getInputs().get(0);
-      assertFalse(receive.isAutoProfile());
+      assertTrue(findWindowNode(plan).getInputs().get(0) instanceof MailboxMergeReceiveNode);
       MailboxSendNode send = findWindowInputSendNode(plan);
       assertFalse(send.isSort());
       assertTrue(send.getInputs().get(0) instanceof SortNode);
-      assertEquals(((SortNode) send.getInputs().get(0)).getFetch(), Integer.MAX_VALUE);
+      assertEquals(((SortNode) send.getInputs().get(0)).getFetch(), -1);
+      assertTrue(((SortNode) send.getInputs().get(0)).isSingleRunRequired());
     }
   }
 
@@ -1428,9 +1431,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       DispatchableSubPlan plan = planWindowQuery(environment,
           prefix + "SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d");
       SortNode sort = (SortNode) findWindowNode(plan).getInputs().get(0);
-      assertEquals(sort.getFetch(), Integer.MAX_VALUE);
+      assertEquals(sort.getFetch(), -1);
+      assertTrue(sort.isSingleRunRequired());
       MailboxReceiveNode receive = (MailboxReceiveNode) sort.getInputs().get(0);
-      assertFalse(receive instanceof MailboxMergeReceiveNode);
       assertFalse(receive.isAutoProfile());
     }
     assertEquals(calls.get(), 0);
@@ -1446,8 +1449,13 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     for (String mode : List.of("true", "false")) {
       DispatchableSubPlan plan = planWindowQuery(environment,
           "SET windowKWayMerge=" + mode + "; SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d");
-      MailboxReceiveNode receive = findNodeOfType(findWindowNode(plan), MailboxReceiveNode.class);
-      assertFalse(receive.isAutoProfile());
+      BaseMailboxReceiveNode receive = findNodeOfType(findWindowNode(plan), BaseMailboxReceiveNode.class);
+      assertNotNull(receive);
+      if (receive instanceof MailboxReceiveNode) {
+        assertFalse(((MailboxReceiveNode) receive).isAutoProfile());
+      } else {
+        assertTrue(receive instanceof MailboxMergeReceiveNode);
+      }
     }
     assertEquals(calls.get(), 0);
   }
@@ -1488,11 +1496,11 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     int merges = 0;
     int profiled = 0;
     for (DispatchablePlanFragment fragment : plan.getQueryStages()) {
-      MailboxReceiveNode receive = findNodeOfType(fragment.getPlanFragment().getFragmentRoot(),
-          MailboxReceiveNode.class);
+      BaseMailboxReceiveNode receive = findNodeOfType(fragment.getPlanFragment().getFragmentRoot(),
+          BaseMailboxReceiveNode.class);
       if (receive instanceof MailboxMergeReceiveNode) {
         merges++;
-      } else if (receive != null && receive.isAutoProfile()) {
+      } else if (receive instanceof MailboxReceiveNode && ((MailboxReceiveNode) receive).isAutoProfile()) {
         profiled++;
         assertTrue(bindings.containsValue(receive.getStageId()));
       }

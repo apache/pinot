@@ -769,6 +769,16 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
+  /// Returns the requested window merge mode; AUTO is eligible for the cluster capability check.
+  public static String getWindowKWayMergeMode(Map<String, String> queryOptions, String defaultValue) {
+    String mode = queryOptions.getOrDefault(QueryOptionKey.WINDOW_K_WAY_MERGE, defaultValue).trim()
+        .toLowerCase(Locale.ROOT);
+    if (!"auto".equals(mode) && !"true".equals(mode) && !"false".equals(mode)) {
+      throw new IllegalArgumentException("windowKWayMerge must be auto, true or false: " + mode);
+    }
+    return mode;
+  }
+
   public static boolean isWindowKWayMerge(Map<String, String> queryOptions, boolean defaultValue) {
     String option = queryOptions.get(QueryOptionKey.WINDOW_K_WAY_MERGE);
     return option != null ? Boolean.parseBoolean(option) : defaultValue;

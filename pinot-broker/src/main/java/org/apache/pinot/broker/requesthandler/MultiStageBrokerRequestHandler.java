@@ -508,9 +508,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
       // The profile key contains no SQL text. Stage/input/collation fingerprints further separate individual
       // ordered-window exchanges, even when a query has several windows.
-      String windowSortMode = queryOptions.getOrDefault(CommonConstants.Broker.Request.QueryOptionKey
-          .WINDOW_K_WAY_MERGE, _config.getProperty(CommonConstants.Broker.CONFIG_OF_WINDOW_K_WAY_MERGE,
-          CommonConstants.Broker.DEFAULT_WINDOW_K_WAY_MERGE_MODE));
+      String windowSortMode = QueryOptionsUtils.getWindowKWayMergeMode(queryOptions,
+          _config.getProperty(CommonConstants.Broker.CONFIG_OF_WINDOW_K_WAY_MERGE,
+              CommonConstants.Broker.DEFAULT_WINDOW_K_WAY_MERGE_MODE));
       WindowSortAutoTuner.Session windowSortAutoSession = "auto".equalsIgnoreCase(windowSortMode)
           ? _windowSortAutoTuner.newSession(Objects.hash(query, database, queryOptions)) : null;
       ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, queryOptions, requestId,
@@ -658,7 +658,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultSealedInListThreshold(sealedInListThreshold)
         .defaultWindowKWayMergeMode(windowKWayMergeMode)
         .windowSortAutoPlan(windowSortAutoPlan)
-        .isKWayMergeSupported(!QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
+        .isKWayMergeSupported((!"false".equals(QueryOptionsUtils.getWindowKWayMergeMode(queryOptions,
+            windowKWayMergeMode)) || QueryOptionsUtils.isStreamingSortedMailboxReceiveEnabled(queryOptions))
+            && !QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
             && _kWayMergeSupported.getAsBoolean())
         .build();
   }
