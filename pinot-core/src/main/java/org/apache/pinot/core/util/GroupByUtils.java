@@ -19,18 +19,26 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.DeterministicConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
+import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.data.table.SortedRecords;
@@ -38,6 +46,9 @@ import org.apache.pinot.core.data.table.SortedRecordsMerger;
 import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedIntermediateResult;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -85,6 +96,125 @@ public final class GroupByUtils {
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
     resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
     return resultsBlock;
+  }
+
+  /// Builds the segment-level [GroupByResultsBlock] for a grouping-set query from BASE groups, i.e. groups
+  /// aggregated once over the union of all grouping-set columns (a plain GROUP BY), rather than by expanding
+  /// every input row into one group per grouping set. Each base group is then projected into each grouping set:
+  /// its rolled-up (non-participating) columns are set to `null`, the `$groupingId` discriminator is appended,
+  /// and the base group's aggregation intermediates are merged into the derived group. This moves the per-set
+  /// fan-out from O(rows) to O(base groups), reusing the fast plain-GROUP-BY scan path.
+  ///
+  /// Because a base group's intermediate result flows into every grouping set, and [AggregationFunction#merge]
+  /// mutates its first argument, each base intermediate is cloned per set before it becomes a merge target (see
+  /// [#cloneIntermediate]). This keeps the derivation exact for object-backed accumulators (AVG, DISTINCTCOUNT,
+  /// percentiles, ...) as well as scalar ones.
+  ///
+  /// @param discriminatorColumnIndex index of the synthetic $groupingId column, i.e. the number of union
+  ///                                 group-by columns
+  public static GroupByResultsBlock buildGroupingSetsResultsBlockFromBaseGroups(QueryContext queryContext,
+      DataSchema dataSchema, AggregationGroupByResult baseResult, int discriminatorColumnIndex,
+      boolean numGroupsLimitReached, boolean numGroupsWarningLimitReached) {
+    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
+    int numAggregationFunctions = aggregationFunctions.length;
+    List<int[]> groupingSets = queryContext.getGroupingSets();
+    int numSets = groupingSets.size();
+    int numUnionColumns = discriminatorColumnIndex;
+    // Per grouping set: membership mask over the union columns (true = participates, false = rolled up to NULL).
+    boolean[][] setContains = new boolean[numSets][numUnionColumns];
+    for (int s = 0; s < numSets; s++) {
+      for (int columnIndex : groupingSets.get(s)) {
+        setContains[s][columnIndex] = true;
+      }
+    }
+
+    // Derived group table keyed on (projected union values..., $groupingId). Values layout mirrors the record
+    // schema: key columns first, then the aggregation intermediates.
+    Map<Key, Record> derived = new HashMap<>();
+    try {
+      Iterator<GroupKeyGenerator.GroupKey> baseGroups = baseResult.getGroupKeyIterator();
+      while (baseGroups.hasNext()) {
+        GroupKeyGenerator.GroupKey baseGroup = baseGroups.next();
+        Object[] baseKeys = baseGroup._keys;
+        int baseGroupId = baseGroup._groupId;
+        Object[] baseIntermediates = new Object[numAggregationFunctions];
+        for (int i = 0; i < numAggregationFunctions; i++) {
+          baseIntermediates[i] = baseResult.getResultForGroupId(i, baseGroupId);
+        }
+        for (int s = 0; s < numSets; s++) {
+          boolean[] contains = setContains[s];
+          Object[] keyValues = new Object[numUnionColumns + 1];
+          for (int col = 0; col < numUnionColumns; col++) {
+            keyValues[col] = contains[col] ? baseKeys[col] : null;
+          }
+          keyValues[numUnionColumns] = s;
+          Key key = new Key(keyValues);
+          Record existing = derived.get(key);
+          if (existing == null) {
+            Object[] values = new Object[numUnionColumns + 1 + numAggregationFunctions];
+            System.arraycopy(keyValues, 0, values, 0, numUnionColumns + 1);
+            for (int i = 0; i < numAggregationFunctions; i++) {
+              // Clone so a later merge into this derived group cannot mutate the base group's shared intermediate.
+              values[numUnionColumns + 1 + i] = cloneIntermediate(aggregationFunctions[i], baseIntermediates[i]);
+            }
+            derived.put(key, new Record(values));
+          } else {
+            Object[] values = existing.getValues();
+            for (int i = 0; i < numAggregationFunctions; i++) {
+              int index = numUnionColumns + 1 + i;
+              // Clone the base intermediate here too: merge() may RETURN its second argument unchanged (when the
+              // derived accumulator is null or an empty object), which would otherwise alias the base group's
+              // live shared accumulator into this derived record and corrupt it when a later base group mutates
+              // it in place. See cloneIntermediate.
+              values[index] = AggregationFunctionUtils.merge(aggregationFunctions[i], values[index],
+                  cloneIntermediate(aggregationFunctions[i], baseIntermediates[i]));
+            }
+          }
+        }
+      }
+    } finally {
+      baseResult.closeGroupKeyGenerator();
+    }
+
+    List<IntermediateRecord> intermediateRecords = new ArrayList<>(derived.size());
+    for (Map.Entry<Key, Record> entry : derived.entrySet()) {
+      intermediateRecords.add(IntermediateRecord.withoutOrderByValues(entry.getKey(), entry.getValue()));
+    }
+
+    /// Apply the same per-set bucketed segment trim as the legacy expansion path so the base-aggregation path
+    /// keeps the same memory/network guardrail: when the per-set budget is enabled and the derived group count
+    /// exceeds it, keep each grouping set's own top candidates (a global top-K cannot starve low-magnitude sets
+    /// such as the grand total). The broker still applies the final ORDER BY + LIMIT across all sets.
+    int perSetTrimSize = queryContext.getGroupingSetSegmentTrimSize();
+    boolean groupsTrimmed = false;
+    if (perSetTrimSize > 0 && intermediateRecords.size() > (long) perSetTrimSize * numSets) {
+      TableResizer tableResizer = new TableResizer(dataSchema, queryContext);
+      intermediateRecords = tableResizer.trimInSegmentRecordsByGroupingSet(intermediateRecords, perSetTrimSize,
+          discriminatorColumnIndex);
+      groupsTrimmed = true;
+      ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
+    }
+
+    GroupByResultsBlock resultsBlock = new GroupByResultsBlock(dataSchema, intermediateRecords, queryContext);
+    resultsBlock.setGroupsTrimmed(groupsTrimmed);
+    resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+    resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
+    return resultsBlock;
+  }
+
+  /// Returns a defensive copy of an aggregation intermediate result so that a subsequent
+  /// [AggregationFunction#merge] into a derived grouping-set group cannot mutate a base group's shared
+  /// accumulator. Scalar (non-OBJECT) intermediates are immutable boxed values and are returned as-is; `null`
+  /// (nothing aggregated) is the merge identity and needs no copy; OBJECT accumulators are cloned via the
+  /// function's own serialize/deserialize round-trip.
+  private static Object cloneIntermediate(AggregationFunction aggregationFunction, Object intermediate) {
+    if (intermediate == null || aggregationFunction.getIntermediateResultColumnType() != ColumnDataType.OBJECT) {
+      return intermediate;
+    }
+    SerializedIntermediateResult serialized = aggregationFunction.serializeIntermediateResult(intermediate);
+    return aggregationFunction.deserializeIntermediateResult(
+        new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes())));
   }
 
   /// Returns the capacity of the table required by the given query. NOTE: It returns `max(limit * 5, 5000)` to
