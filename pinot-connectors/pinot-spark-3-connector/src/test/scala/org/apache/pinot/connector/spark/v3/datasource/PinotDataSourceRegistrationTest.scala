@@ -24,7 +24,7 @@ import java.util.ServiceLoader
 // Use the cross-2.12/2.13 compatible converter package, matching the rest of pinot-spark-3-connector
 // (which still supports Scala 2.12 via the root pom's -Pscala-2.12 profile). The Spark 4 sibling
 // is Scala 2.13 only and can use scala.jdk.CollectionConverters there.
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * Verifies that PinotDataSource is correctly registered via the Java ServiceLoader under the
