@@ -59,13 +59,18 @@ final class TDigestBenchmarkUtils {
         start = 1 + (centroidId - 1) * numInteriorValues / numInteriorCentroids;
         end = 1 + centroidId * numInteriorValues / numInteriorCentroids;
       }
-      double sum = 0.0;
-      for (int valueId = start; valueId < end; valueId++) {
-        sum += sortedValues[valueId];
+      double mean = sortedValues[start];
+      for (int valueId = start + 1; valueId < end; valueId++) {
+        double fraction = 1.0 / (valueId - start + 1);
+        double value = sortedValues[valueId];
+        mean = Math.copySign(1.0, mean) == Math.copySign(1.0, value)
+            ? mean + (value - mean) * fraction
+            : mean * (1.0 - fraction) + value * fraction;
       }
-      double weight = end - start;
-      buffer.putDouble(weight);
-      buffer.putDouble(sum / weight);
+      // Rounding must not move a bucket mean beyond its observed range or invert adjacent duplicate buckets.
+      mean = Math.max(sortedValues[start], Math.min(sortedValues[end - 1], mean));
+      buffer.putDouble(end - start);
+      buffer.putDouble(mean);
     }
     return buffer.array();
   }

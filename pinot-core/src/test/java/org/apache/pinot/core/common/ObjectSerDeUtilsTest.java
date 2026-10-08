@@ -66,6 +66,7 @@ import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
+import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -319,7 +320,8 @@ public class ObjectSerDeUtilsTest {
   @Test
   public void testTDigest() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
-      TDigest expected = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      TDigest expected =
+          TDigestUtils.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
       int size = RANDOM.nextInt(100) + 1;
       for (int j = 0; j < size; j++) {
         expected.add(RANDOM.nextDouble());
@@ -337,7 +339,7 @@ public class ObjectSerDeUtilsTest {
     List<Double> compressionFactorsToTest = Arrays.asList(10d, 200d, 500d, 1000d, 10000d);
     for (double compressionFactor : compressionFactorsToTest) {
       for (int i = 0; i < NUM_ITERATIONS; i++) {
-        TDigest expected = TDigest.createMergingDigest(compressionFactor);
+        TDigest expected = TDigestUtils.createMergingDigest(compressionFactor);
         int size = RANDOM.nextInt(100) + 1;
         for (int j = 0; j < size; j++) {
           expected.add(RANDOM.nextDouble());

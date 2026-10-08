@@ -76,7 +76,7 @@ public class PercentileRawTDigestAggregationFunctionTest {
   @Test
   public void testFinalResultRoundTripForRegularDigest() {
     double compression = 100.0;
-    TDigest input = TDigest.createMergingDigest(compression);
+    TDigest input = TDigestUtils.createMergingDigest(compression);
     for (int i = 0; i < 1000; i++) {
       input.add(i);
     }

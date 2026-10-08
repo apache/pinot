@@ -26,10 +26,6 @@ import java.util.List;
 ///
 /// Implementations are not safe for concurrent mutation; callers must serialize access to each aggregation state.
 public abstract class TDigest {
-  public static TDigest createMergingDigest(double compression) {
-    return PercentileTDigestAccumulator.forLegacyAggregation(compression);
-  }
-
   public abstract void add(double value);
 
   public abstract void add(double value, int weight);
@@ -41,6 +37,11 @@ public abstract class TDigest {
   public abstract void compress();
 
   public abstract long size();
+
+  /// Returns centroid mass without narrowing fractional or large weights to the legacy long size view.
+  public double getTotalWeight() {
+    return size();
+  }
 
   public abstract double cdf(double value);
 

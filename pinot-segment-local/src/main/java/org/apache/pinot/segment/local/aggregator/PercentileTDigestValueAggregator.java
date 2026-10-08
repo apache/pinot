@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator.SerializedTDigestInput;
 import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
@@ -127,7 +129,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
   @Override
   public byte[] serializeAggregatedValue(TDigest value) {
-    int requiredCapacity = getMaxVerboseByteSize(getDefaultCentroidCapacity(value.compression()));
+    int requiredCapacity = Math.max(_maxByteSize, VERBOSE_HEADER_SIZE);
     if (_serializationBuffer == null || _serializationBuffer.capacity() < requiredCapacity) {
       _serializationBuffer = ByteBuffer.allocate(requiredCapacity);
     }
@@ -138,6 +140,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
   @Override
   public TDigest deserializeAggregatedValue(byte[] bytes) {
+    _maxByteSize = Math.max(_maxByteSize, bytes.length);
     return NonFiniteAwareTDigest.fromBytes(bytes);
   }
 
@@ -152,7 +155,19 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
   private void updateMaxByteSize(TDigest value) {
     long defaultCapacity = getDefaultCentroidCapacity(value.compression());
-    long maxCentroids = Math.min(value.size(), defaultCapacity);
+    long maxCentroids = (long) Math.min(Math.ceil(value.getTotalWeight()), defaultCapacity);
+    if (value instanceof NonFiniteAwareTDigest) {
+      TDigest finite = ((NonFiniteAwareTDigest) value)._finiteDigest;
+      if (finite instanceof PercentileTDigestAccumulator) {
+        PercentileTDigestAccumulator accumulator = (PercentileTDigestAccumulator) finite;
+        NonFiniteAwareTDigest wrapped = (NonFiniteAwareTDigest) value;
+        boolean fractionalMass = accumulator.hasFractionalWeights()
+            || wrapped._negativeInfinityWeight != Math.rint(wrapped._negativeInfinityWeight)
+            || wrapped._positiveInfinityWeight != Math.rint(wrapped._positiveInfinityWeight);
+        long bufferedBound = accumulator.getCentroidCountUpperBound() + 6L;
+        maxCentroids = fractionalMass ? bufferedBound : Math.min(maxCentroids, bufferedBound);
+      }
+    }
     _maxByteSize = Math.max(_maxByteSize, getMaxVerboseByteSize(maxCentroids));
   }
 
@@ -167,8 +182,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
     int padding = normalizedCompression < 30.0 ? LOW_COMPRESSION_CAPACITY_PADDING
         : DEFAULT_CENTROID_CAPACITY_PADDING;
     long defaultCapacity = (long) Math.ceil(2.0 * normalizedCompression + padding);
-    long legacyCapacity = Math.addExact(Math.multiplyExact(2L, (long) Math.ceil(compression)),
-        DEFAULT_CENTROID_CAPACITY_PADDING);
+    long legacyCapacity = (long) Math.ceil(2.0 * compression + DEFAULT_CENTROID_CAPACITY_PADDING);
     return Math.max(defaultCapacity, legacyCapacity);
   }
 
@@ -183,17 +197,17 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
     private static final int VERBOSE_CENTROID_SIZE = 16;
 
     private final TDigest _finiteDigest;
-    private long _negativeInfinityWeight;
-    private long _positiveInfinityWeight;
+    private double _negativeInfinityWeight;
+    private double _positiveInfinityWeight;
     private byte[] _finiteSerializedBytes;
     private List<Centroid> _finiteCentroids;
     private byte[] _serializedBytes;
 
     private NonFiniteAwareTDigest(double compression) {
-      this(TDigestUtils.createMergingDigestWithLegacyBuffer(compression), 0L, 0L);
+      this(TDigestUtils.createMergingDigest(compression), 0L, 0L);
     }
 
-    private NonFiniteAwareTDigest(TDigest finiteDigest, long negativeInfinityWeight, long positiveInfinityWeight) {
+    private NonFiniteAwareTDigest(TDigest finiteDigest, double negativeInfinityWeight, double positiveInfinityWeight) {
       _finiteDigest = finiteDigest;
       _negativeInfinityWeight = negativeInfinityWeight;
       _positiveInfinityWeight = positiveInfinityWeight;
@@ -201,16 +215,19 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
     private NonFiniteAwareTDigest copy() {
       invalidateCaches();
-      int minimumMainCapacity = Math.addExact(_finiteDigest.centroidCount(), 2);
-      TDigest finiteDigest = TDigestUtils.createMergingDigestWithLegacyBuffer(compression(), minimumMainCapacity);
-      if (_finiteDigest.size() > 0L) {
+      TDigest finiteDigest = TDigestUtils.createMergingDigest(compression());
+      if (_finiteDigest.getTotalWeight() > 0.0) {
         finiteDigest.add(List.of(_finiteDigest));
       }
       return new NonFiniteAwareTDigest(finiteDigest, _negativeInfinityWeight, _positiveInfinityWeight);
     }
 
     private static NonFiniteAwareTDigest fromBytes(byte[] bytes) {
-      TDigestUtils.validateSerialized(bytes);
+      SerializedTDigestInput validated = new SerializedTDigestInput();
+      validated.reset(bytes);
+      if (!validated.hasNonFiniteMeans() || validated.needsLegacyFallback()) {
+        return new NonFiniteAwareTDigest(TDigestUtils.deserializeFinite(validated), 0.0, 0.0);
+      }
       ByteBuffer input = ByteBuffer.wrap(bytes);
       int encoding = input.getInt();
       double encodedMin = input.getDouble();
@@ -233,46 +250,50 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       }
 
       int centroidOffset = input.position();
-      long negativeInfinityWeight = 0L;
-      long positiveInfinityWeight = 0L;
+      double negativeInfinityWeight = 0L;
+      double positiveInfinityWeight = 0L;
       for (int i = 0; i < centroidCount; i++) {
         double weight = verbose ? input.getDouble() : input.getFloat();
         double mean = verbose ? input.getDouble() : input.getFloat();
         if (mean == Double.NEGATIVE_INFINITY) {
-          negativeInfinityWeight = Math.addExact(negativeInfinityWeight, toLongWeight(weight));
+          negativeInfinityWeight = negativeInfinityWeight + weight;
         } else if (mean == Double.POSITIVE_INFINITY) {
-          positiveInfinityWeight = Math.addExact(positiveInfinityWeight, toLongWeight(weight));
+          positiveInfinityWeight = positiveInfinityWeight + weight;
         } else if (Double.isNaN(mean)) {
           throw new IllegalArgumentException("Cannot deserialize a TDigest with a NaN centroid mean");
         }
       }
-      if (negativeInfinityWeight == 0L && positiveInfinityWeight == 0L) {
-        return new NonFiniteAwareTDigest(TDigestUtils.deserializeFiniteWithLegacyBuffer(bytes), 0L, 0L);
-      }
-
       double[] finiteMeans = new double[centroidCount];
       double[] finiteWeights = new double[centroidCount];
       int finiteCount = 0;
+      double finiteMin = Double.POSITIVE_INFINITY;
+      double finiteMax = Double.NEGATIVE_INFINITY;
       input.position(centroidOffset);
       for (int i = 0; i < centroidCount; i++) {
         double weight = verbose ? input.getDouble() : input.getFloat();
         double mean = verbose ? input.getDouble() : input.getFloat();
         if (Double.isFinite(mean)) {
+          if (!verbose) {
+            mean = Math.max(encodedMin, Math.min(mean, encodedMax));
+          }
           finiteWeights[finiteCount] = weight;
           finiteMeans[finiteCount] = mean;
+          finiteMin = Math.min(finiteMin, mean);
+          finiteMax = Math.max(finiteMax, mean);
           finiteCount++;
         }
       }
 
       TDigest finiteDigest;
       if (finiteCount == 0) {
-        finiteDigest = TDigestUtils.createMergingDigestWithLegacyBuffer(compression);
+        finiteDigest = TDigestUtils.createMergingDigest(compression);
       } else {
-        double finiteMin = Double.isFinite(encodedMin) ? encodedMin : finiteMeans[0];
-        double finiteMax = Double.isFinite(encodedMax) ? encodedMax : finiteMeans[finiteCount - 1];
+        finiteMin = Double.isFinite(encodedMin) ? encodedMin : finiteMin;
+        finiteMax = Double.isFinite(encodedMax) ? encodedMax : finiteMax;
         byte[] finiteBytes = toVerboseBytes(finiteMin, finiteMax, compression, finiteMeans, finiteWeights, finiteCount);
-        finiteDigest = TDigestUtils.deserializeFiniteWithLegacyBuffer(
-            TDigestUtils.makeLegacyCompatible(finiteBytes));
+        SerializedTDigestInput finiteInput = new SerializedTDigestInput();
+        finiteInput.reset(ByteBuffer.wrap(finiteBytes), false);
+        finiteDigest = TDigestUtils.deserializeFinite(finiteInput);
       }
       return new NonFiniteAwareTDigest(finiteDigest, negativeInfinityWeight, positiveInfinityWeight);
     }
@@ -290,11 +311,12 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       if (weight <= 0) {
         throw new IllegalArgumentException("TDigest weight must be positive: " + weight);
       }
+      checkTotalWeight(getTotalWeight() + weight);
       invalidateCaches();
       if (value == Double.NEGATIVE_INFINITY) {
-        _negativeInfinityWeight = Math.addExact(_negativeInfinityWeight, weight);
+        _negativeInfinityWeight = _negativeInfinityWeight + weight;
       } else if (value == Double.POSITIVE_INFINITY) {
-        _positiveInfinityWeight = Math.addExact(_positiveInfinityWeight, weight);
+        _positiveInfinityWeight = _positiveInfinityWeight + weight;
       } else {
         _finiteDigest.add(value, weight);
       }
@@ -302,22 +324,23 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
     @Override
     public void add(TDigest other) {
+      checkTotalWeight(getTotalWeight() + other.getTotalWeight());
       if (other instanceof NonFiniteAwareTDigest) {
         NonFiniteAwareTDigest wrapped = (NonFiniteAwareTDigest) other;
-        long negativeInfinityWeight = wrapped._negativeInfinityWeight;
-        long positiveInfinityWeight = wrapped._positiveInfinityWeight;
+        double negativeInfinityWeight = wrapped._negativeInfinityWeight;
+        double positiveInfinityWeight = wrapped._positiveInfinityWeight;
         // Merging shared state preserves double-precision weights without narrowing through Centroid.count().
         wrapped.invalidateCaches();
         invalidateCaches();
-        if (wrapped._finiteDigest.size() > 0L) {
+        if (wrapped._finiteDigest.getTotalWeight() > 0.0) {
           _finiteDigest.add(List.of(wrapped._finiteDigest));
         }
-        _negativeInfinityWeight = Math.addExact(_negativeInfinityWeight, negativeInfinityWeight);
-        _positiveInfinityWeight = Math.addExact(_positiveInfinityWeight, positiveInfinityWeight);
+        _negativeInfinityWeight = _negativeInfinityWeight + negativeInfinityWeight;
+        _positiveInfinityWeight = _positiveInfinityWeight + positiveInfinityWeight;
         return;
       }
 
-      if (other.size() == 0L) {
+      if (other.getTotalWeight() == 0.0) {
         return;
       }
       invalidateCaches();
@@ -325,9 +348,13 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
         _finiteDigest.add(List.of(other));
         return;
       }
-      for (Centroid centroid : other.centroids()) {
-        add(centroid.mean(), centroid.count());
-      }
+      // Replay the double-precision wire weights: Centroid.count() truncates positive fractional mass to zero.
+      ByteBuffer encoded = ByteBuffer.allocate(other.byteSize());
+      other.asBytes(encoded);
+      encoded.flip();
+      byte[] bytes = new byte[encoded.remaining()];
+      encoded.get(bytes);
+      add(fromBytes(bytes));
     }
 
     @Override
@@ -344,7 +371,12 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
     @Override
     public long size() {
-      return Math.addExact(Math.addExact(_finiteDigest.size(), _negativeInfinityWeight), _positiveInfinityWeight);
+      return (long) getTotalWeight();
+    }
+
+    @Override
+    public double getTotalWeight() {
+      return _finiteDigest.getTotalWeight() + _negativeInfinityWeight + _positiveInfinityWeight;
     }
 
     @Override
@@ -352,11 +384,11 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       if (Double.isNaN(value) || Double.isInfinite(value)) {
         throw new IllegalArgumentException(String.format("Invalid value: %f", value));
       }
-      long size = size();
+      double size = getTotalWeight();
       if (size == 0L) {
         return Double.NaN;
       }
-      long finiteSize = _finiteDigest.size();
+      double finiteSize = _finiteDigest.getTotalWeight();
       double finiteWeight = finiteSize == 0L ? 0.0 : _finiteDigest.cdf(value) * finiteSize;
       return (_negativeInfinityWeight + finiteWeight) / size;
     }
@@ -366,7 +398,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       if (Double.isNaN(quantile) || quantile < 0.0 || quantile > 1.0) {
         throw new IllegalArgumentException("q should be in [0,1], got " + quantile);
       }
-      long size = size();
+      double size = getTotalWeight();
       if (size == 0L) {
         return Double.NaN;
       }
@@ -377,7 +409,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       if (_positiveInfinityWeight > 0L && index >= size - _positiveInfinityWeight) {
         return Double.POSITIVE_INFINITY;
       }
-      long finiteSize = _finiteDigest.size();
+      double finiteSize = _finiteDigest.getTotalWeight();
       if (finiteSize == 0L) {
         return _negativeInfinityWeight > 0L ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
       }
@@ -430,7 +462,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       if (_negativeInfinityWeight > 0L) {
         return Double.NEGATIVE_INFINITY;
       }
-      if (_finiteDigest.size() > 0L) {
+      if (_finiteDigest.getTotalWeight() > 0.0) {
         return _finiteDigest.getMin();
       }
       return Double.POSITIVE_INFINITY;
@@ -441,7 +473,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       if (_positiveInfinityWeight > 0L) {
         return Double.POSITIVE_INFINITY;
       }
-      if (_finiteDigest.size() > 0L) {
+      if (_finiteDigest.getTotalWeight() > 0.0) {
         return _finiteDigest.getMax();
       }
       return Double.NEGATIVE_INFINITY;
@@ -475,7 +507,8 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
         for (int i = 0; i < centroidCount; i++) {
           double weight = verbose ? input.getDouble() : input.getFloat();
           double mean = verbose ? input.getDouble() : input.getFloat();
-          appendCentroids(_finiteCentroids, mean, toLongWeight(weight), false, false);
+          // The public centroid view retains integer counts; precise aggregation and serialization use bytes.
+          appendCentroids(_finiteCentroids, mean, weight, false, false);
         }
       }
       return _finiteCentroids;
@@ -483,7 +516,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
     private List<Centroid> getAllCentroids() {
       List<Centroid> finiteCentroids = getFiniteCentroids();
-      boolean hasFiniteValues = _finiteDigest.size() > 0L;
+      boolean hasFiniteValues = _finiteDigest.getTotalWeight() > 0.0;
       List<Centroid> centroids = new ArrayList<>(finiteCentroids.size() + 6);
       appendInfinityCentroids(centroids, Double.NEGATIVE_INFINITY, _negativeInfinityWeight, true,
           !hasFiniteValues && _positiveInfinityWeight == 0L);
@@ -524,7 +557,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
           throw new IllegalStateException("Invalid format for serialized histogram");
         }
 
-        boolean hasFiniteValues = _finiteDigest.size() > 0L;
+        boolean hasFiniteValues = _finiteDigest.getTotalWeight() > 0.0;
         int negativeInfinityCentroidCount = getInfinityCentroidCount(_negativeInfinityWeight, true,
             !hasFiniteValues && _positiveInfinityWeight == 0L);
         int positiveInfinityCentroidCount = getInfinityCentroidCount(_positiveInfinityWeight,
@@ -571,83 +604,80 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       _serializedBytes = null;
     }
 
-    private static void appendInfinityCentroids(List<Centroid> centroids, double value, long weight,
+    private static void appendInfinityCentroids(List<Centroid> centroids, double value, double weight,
         boolean unitWeightAtStart, boolean unitWeightAtEnd) {
       appendCentroids(centroids, value, weight, unitWeightAtStart, unitWeightAtEnd);
     }
 
-    private static void appendCentroids(List<Centroid> centroids, double value, long weight,
+    private static void appendCentroids(List<Centroid> centroids, double value, double weight,
         boolean unitWeightAtStart, boolean unitWeightAtEnd) {
       if (weight == 0L) {
         return;
       }
-      if (unitWeightAtStart) {
+      if (unitWeightAtStart && weight >= (unitWeightAtEnd ? 2.0 : 1.0)) {
         centroids.add(new Centroid(value, 1));
-        weight--;
+        weight -= 1.0;
       }
-      boolean appendUnitWeightAtEnd = unitWeightAtEnd && weight > 0L;
+      boolean appendUnitWeightAtEnd = unitWeightAtEnd && weight >= 1.0;
       if (appendUnitWeightAtEnd) {
         weight--;
       }
-      while (weight > 0L) {
-        int centroidWeight = (int) Math.min(weight, Integer.MAX_VALUE);
-        centroids.add(new Centroid(value, centroidWeight));
-        weight -= centroidWeight;
+      if (weight > 0.0) {
+        // The public int view narrows each double-weight wire centroid, just as the accumulator does. Internal
+        // replay consumes its wire bytes, so neither saturated nor zero integer counts lose aggregation mass.
+        centroids.add(new Centroid(value, (int) weight));
       }
       if (appendUnitWeightAtEnd) {
         centroids.add(new Centroid(value, 1));
       }
     }
 
-    private static void appendInfinityCentroids(ByteBuffer buffer, double value, long weight,
+    private static void appendInfinityCentroids(ByteBuffer buffer, double value, double weight,
         boolean unitWeightAtStart, boolean unitWeightAtEnd) {
-      if (weight == 0L) {
+      if (!(weight > 0.0)) {
         return;
       }
-      if (unitWeightAtStart) {
+      boolean splitStart = unitWeightAtStart && weight >= (unitWeightAtEnd ? 2.0 : 1.0);
+      if (splitStart) {
         buffer.putDouble(1.0);
         buffer.putDouble(value);
-        weight--;
+        weight -= 1.0;
       }
-      boolean appendUnitWeightAtEnd = unitWeightAtEnd && weight > 0L;
-      if (appendUnitWeightAtEnd) {
-        weight--;
+      boolean splitEnd = unitWeightAtEnd && weight >= 1.0;
+      if (splitEnd) {
+        weight -= 1.0;
       }
-      while (weight > 0L) {
-        int centroidWeight = (int) Math.min(weight, Integer.MAX_VALUE);
-        buffer.putDouble(centroidWeight);
+      if (weight > 0.0) {
+        buffer.putDouble(weight);
         buffer.putDouble(value);
-        weight -= centroidWeight;
       }
-      if (appendUnitWeightAtEnd) {
+      if (splitEnd) {
         buffer.putDouble(1.0);
         buffer.putDouble(value);
       }
     }
 
-    private static int getInfinityCentroidCount(long weight, boolean unitWeightAtStart, boolean unitWeightAtEnd) {
-      if (weight == 0L) {
+    private static int getInfinityCentroidCount(double weight, boolean unitWeightAtStart,
+        boolean unitWeightAtEnd) {
+      if (!(weight > 0.0)) {
         return 0;
       }
       int count = 0;
-      if (unitWeightAtStart) {
+      if (unitWeightAtStart && weight >= (unitWeightAtEnd ? 2.0 : 1.0)) {
         count++;
-        weight--;
+        weight -= 1.0;
       }
-      if (unitWeightAtEnd && weight > 0L) {
+      if (unitWeightAtEnd && weight >= 1.0) {
         count++;
-        weight--;
+        weight -= 1.0;
       }
-      long fullCentroids = weight / Integer.MAX_VALUE;
-      long partialCentroid = weight % Integer.MAX_VALUE == 0L ? 0L : 1L;
-      return Math.addExact(count, Math.toIntExact(fullCentroids + partialCentroid));
+      return count + (weight > 0.0 ? 1 : 0);
     }
 
-    private static long toLongWeight(double weight) {
-      if (!(weight > 0.0) || weight >= 0x1p63 || weight != Math.rint(weight)) {
-        throw new IllegalArgumentException("Invalid TDigest centroid weight: " + weight);
+    private static void checkTotalWeight(double weight) {
+      if (!(weight >= 0.0) || !Double.isFinite(weight)) {
+        throw new IllegalArgumentException("Invalid TDigest total weight: " + weight);
       }
-      return (long) weight;
     }
 
     private static byte[] toVerboseBytes(double min, double max, double compression, double[] means,

@@ -38,6 +38,7 @@ import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -185,7 +186,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       _quantileDigests[i] = quantileDigest;
       row.putValue(PERCENTILE_EST_COLUMN, ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest));
 
-      TDigest tDigest = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+      TDigest tDigest = TDigestUtils.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
       for (int value : values) {
         tDigest.add(value);
       }
@@ -275,7 +276,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
 
     // PercentileTDigest
     TDigest tDigest = (TDigest) aggregationResult.get(4);
-    TDigest expectedTDigest = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest expectedTDigest = TDigestUtils.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
     for (int value : _valuesArray[0]) {
       expectedTDigest.add(value);
     }
@@ -373,8 +374,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     long expectedPercentileEstResult = quantileDigest1.getQuantile(0.5);
 
     // PercentileTDigest
-    TDigest tDigest1 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
-    TDigest tDigest2 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest tDigest1 = TDigestUtils.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest tDigest2 = TDigestUtils.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
     for (int value : _valuesArray[0]) {
       tDigest1.add(value);
       tDigest2.add(value);
@@ -471,7 +472,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
 
       // PercentileTDigest
       TDigest tDigest = (TDigest) groupByResult.get(groupId)._record.getValues()[5];
-      TDigest expectedTDigest = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+      TDigest expectedTDigest = TDigestUtils.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
       for (int value : _valuesArray[groupId]) {
         expectedTDigest.add(value);
       }
@@ -571,8 +572,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       long expectedPercentileEstResult = quantileDigest1.getQuantile(0.5);
 
       // PercentileTDigest
-      TDigest tDigest1 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
-      TDigest tDigest2 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+      TDigest tDigest1 = TDigestUtils.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+      TDigest tDigest2 = TDigestUtils.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
       for (int value : _valuesArray[groupId]) {
         tDigest1.add(value);
         tDigest2.add(value);
@@ -655,7 +656,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     }
 
     // PercentileTDigest
-    TDigest expectedTDigest = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest expectedTDigest = TDigestUtils.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
     for (int value : _valuesArray[0]) {
       expectedTDigest.add(value);
     }
@@ -782,8 +783,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     long expectedPercentileEstResult = quantileDigest1.getQuantile(0.5);
 
     // PercentileTDigest
-    TDigest tDigest1 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
-    TDigest tDigest2 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest tDigest1 = TDigestUtils.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest tDigest2 = TDigestUtils.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
     for (int value : _valuesArray[0]) {
       tDigest1.add(value);
       tDigest2.add(value);

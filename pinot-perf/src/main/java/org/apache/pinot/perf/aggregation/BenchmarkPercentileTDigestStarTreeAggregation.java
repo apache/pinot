@@ -32,6 +32,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -172,7 +173,8 @@ public class BenchmarkPercentileTDigestStarTreeAggregation {
     byte[][] serializedDigests = new byte[NUM_STAR_TREE_ROWS][];
     for (int rowId = 0; rowId < NUM_STAR_TREE_ROWS; rowId++) {
       if (sourceLayout == SourceLayout.NATIVE) {
-        TDigest digest = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+        TDigest digest =
+            TDigestUtils.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
         for (int i = 0; i < SOURCE_ROWS_PER_DIGEST; i++) {
           digest.add(random.nextDouble());
         }

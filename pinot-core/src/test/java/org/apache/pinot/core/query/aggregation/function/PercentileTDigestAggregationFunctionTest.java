@@ -18,10 +18,15 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.io.Resources;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SplittableRandom;
@@ -45,9 +50,12 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 public class PercentileTDigestAggregationFunctionTest {
   private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("col");
+  private static final Map<String, double[]> LEGACY_REDUCER_RANK_ERRORS = loadLegacyReducerRankErrors();
 
   @DataProvider(name = "rowCounts")
   public static Object[][] rowCounts() {
@@ -444,12 +452,12 @@ public class PercentileTDigestAggregationFunctionTest {
   @Test
   public void testSerializedGroupByMVSharedInputEdgeCases()
       throws ReflectiveOperationException {
-    TDigest empty = TDigest.createMergingDigest(20.0);
-    TDigest one = TDigest.createMergingDigest(100.0);
+    TDigest empty = TDigestUtils.createMergingDigest(20.0);
+    TDigest one = TDigestUtils.createMergingDigest(100.0);
     one.add(1.0);
     ByteBuffer smallBuffer = ByteBuffer.allocate(one.smallByteSize());
     one.asSmallBytes(smallBuffer);
-    TDigest two = TDigest.createMergingDigest(100.0);
+    TDigest two = TDigestUtils.createMergingDigest(100.0);
     two.add(2.0);
     byte[][] values = {
         new byte[0], ObjectSerDeUtils.TDIGEST_SER_DE.serialize(empty), smallBuffer.array(),
@@ -499,7 +507,7 @@ public class PercentileTDigestAggregationFunctionTest {
       oversizedSmall.putFloat(1.0F);
       oversizedSmall.putFloat(i);
     }
-    TDigest empty = TDigest.createMergingDigest(20.0);
+    TDigest empty = TDigestUtils.createMergingDigest(20.0);
 
     PercentileTDigestAggregationFunction function =
         new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, false);
@@ -523,7 +531,7 @@ public class PercentileTDigestAggregationFunctionTest {
     Assert.assertEquals(result.size(), numCentroids + 1L);
 
     double preciseCompression = 20.0000001;
-    TDigest preciseEmpty = TDigest.createMergingDigest(preciseCompression);
+    TDigest preciseEmpty = TDigestUtils.createMergingDigest(preciseCompression);
     GroupByResultHolder preciseResultHolder = function.createGroupByResultHolder(1, 1);
     function.aggregateGroupByMV(2, new int[][]{{0}, {0}}, preciseResultHolder,
         Map.of(EXPRESSION, bytesBlockValSet(
@@ -602,7 +610,7 @@ public class PercentileTDigestAggregationFunctionTest {
     oneCentroid.putShort((short) 1);
     oneCentroid.putFloat(1.0F);
     oneCentroid.putFloat(1.0F);
-    TDigest empty = TDigest.createMergingDigest(20.0);
+    TDigest empty = TDigestUtils.createMergingDigest(20.0);
     byte[] emptyBytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(empty);
     PercentileTDigestAccumulator accumulator = PercentileTDigestAccumulator.forSerializedTDigest(emptyBytes);
     accumulator.addSerializedTDigest(emptyBytes);
@@ -667,7 +675,7 @@ public class PercentileTDigestAggregationFunctionTest {
 
   @Test
   public void testSerializedAccumulatorGrowsBuffersForRawValues() {
-    TDigest serializedDigest = TDigest.createMergingDigest(100.0);
+    TDigest serializedDigest = TDigestUtils.createMergingDigest(100.0);
     serializedDigest.add(-1.0);
     byte[] serializedBytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(serializedDigest);
     PercentileTDigestAccumulator accumulator =
@@ -689,9 +697,9 @@ public class PercentileTDigestAggregationFunctionTest {
 
   @Test
   public void testSerializedAccumulatorPreservesCompressionAfterEmptyDigests() {
-    TDigest first = TDigest.createMergingDigest(20.0);
-    TDigest second = TDigest.createMergingDigest(30.0);
-    TDigest third = TDigest.createMergingDigest(40.0);
+    TDigest first = TDigestUtils.createMergingDigest(20.0);
+    TDigest second = TDigestUtils.createMergingDigest(30.0);
+    TDigest third = TDigestUtils.createMergingDigest(40.0);
     third.add(1.0);
     byte[] firstBytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(first);
     PercentileTDigestAccumulator accumulator = PercentileTDigestAccumulator.forSerializedTDigest(firstBytes);
@@ -953,7 +961,7 @@ public class PercentileTDigestAggregationFunctionTest {
     Assert.assertEquals(groupByActual.getClass(), expected.getClass());
     Assert.assertEquals(groupByActual.getMessage(), expected.getMessage());
 
-    TDigest empty = TDigest.createMergingDigest(100.0);
+    TDigest empty = TDigestUtils.createMergingDigest(100.0);
     byte[] emptyBytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(empty);
     RuntimeException materializedActual = Assert.expectThrows(RuntimeException.class,
         () -> aggregateSerialized(new byte[][]{emptyBytes, bytes}, null, false));
@@ -1010,7 +1018,7 @@ public class PercentileTDigestAggregationFunctionTest {
 
     PercentileTDigestAggregationFunction function =
         new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, compression, false);
-    TDigest result = TDigest.createMergingDigest(compression);
+    TDigest result = TDigestUtils.createMergingDigest(compression);
     for (int sourceIndex : mergeOrder.sourceIndexes(fanIn)) {
       result = function.merge(result, sources[sourceIndex]);
     }
@@ -1018,12 +1026,15 @@ public class PercentileTDigestAggregationFunctionTest {
     Arrays.sort(rawValues);
     String caseDescription =
         fanIn + "/" + compression + "/" + distribution + "/" + mergeOrder + "/" + reducerInput;
-    // Validate against the empirical CDF. The former 3.3 reference allowed 0.25 after duplicate-boundary
-    // assertions at compression 20; preserve that historical envelope for this discontinuous distribution.
-    double maxRankError = compression == 20 && distribution == ReducerDistribution.DUPLICATE_HEAVY
-        ? 0.25
-        : compression == 20 || distribution == ReducerDistribution.DUPLICATE_HEAVY ? 0.06 : 0.02;
-    assertValidReducerResult(result, rawValues, caseDescription, maxRankError);
+    // The independent 3.3 K1 corpus uses the worst of the six merge/input orders for each quantile, allowing
+    // one raw observation of sampling slack. It was generated with -da because 3.3 asserts on duplicate boundaries.
+    double[] referenceRankErrors = LEGACY_REDUCER_RANK_ERRORS.get(fanIn + "/" + compression + "/" + distribution);
+    assertNotNull(referenceRankErrors, "Missing 3.3 oracle for " + caseDescription);
+    double[] maxRankErrors = referenceRankErrors.clone();
+    for (int i = 0; i < maxRankErrors.length; i++) {
+      maxRankErrors[i] += 1.0 / numValues;
+    }
+    assertValidReducerResult(result, rawValues, caseDescription, maxRankErrors);
 
     SerializedIntermediateResult serializedResult = function.serializeIntermediateResult(result);
     Assert.assertEquals(serializedResult.getType(), ObjectSerDeUtils.ObjectType.TDigest.getValue());
@@ -1074,11 +1085,17 @@ public class PercentileTDigestAggregationFunctionTest {
     double maxAbsoluteError = compression == 10 ? 0.03 : 0.02;
     Assert.assertEquals(actual, sortedValues[numRows * 75 / 100], maxAbsoluteError);
 
-    TDigest reference = TDigestUtils.createMergingDigest(compression);
-    for (double value : values) {
-      reference.add(value);
-    }
-    Assert.assertEquals(actual, reference.quantile(0.75), 0.001,
+    // Frozen P75 from independent tdunning 3.3 K1 over these exact seeded raw values.
+    double reference = switch (compression) {
+      case 10 -> 0.7440263683309334;
+      case 50 -> 0.7480218174152883;
+      case 100 -> 0.7476447224992978;
+      case 200 -> 0.7474362129360227;
+      case 1_000 -> 0.7471732639922914;
+      case 10_000 -> 0.7470900970758036;
+      default -> throw new IllegalArgumentException("Missing 3.3 oracle for compression " + compression);
+    };
+    assertEquals(actual, reference, 0.001,
         "Pinot accumulator diverges from t-digest 3.3 K1 at compression " + compression);
   }
 
@@ -1237,6 +1254,22 @@ public class PercentileTDigestAggregationFunctionTest {
     Assert.assertEquals(result.quantile(0.75), 0.75, 0.02);
   }
 
+  private static Map<String, double[]> loadLegacyReducerRankErrors() {
+    Map<String, double[]> errors = new HashMap<>();
+    try {
+      for (String line : Resources.readLines(Resources.getResource("data/tdigest-3.3-k1-rank-errors.csv"),
+          StandardCharsets.UTF_8)) {
+        if (!line.startsWith("#")) {
+          String[] fields = line.split(",");
+          errors.put(fields[0], Arrays.stream(fields).skip(1).mapToDouble(Double::parseDouble).toArray());
+        }
+      }
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+    return Map.copyOf(errors);
+  }
+
   private static void assertValidReducerResult(TDigest result, double[] sortedValues, String caseDescription) {
     assertValidReducerResult(result, sortedValues, caseDescription, 0.02);
   }
@@ -1337,7 +1370,7 @@ public class PercentileTDigestAggregationFunctionTest {
       return function.extractAggregationResult(resultHolder);
     }
 
-    TDigest digest = TDigest.createMergingDigest(compression);
+    TDigest digest = TDigestUtils.createMergingDigest(compression);
     for (double value : values) {
       digest.add(value);
     }

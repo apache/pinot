@@ -109,7 +109,7 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     int numCentroids = 51;
     byte[] small =
         PercentileRawTDigestAggregationFunctionTest.createSmallUnitCentroidDigest(numCentroids, 20.0, 60, 100);
-    byte[] empty = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(TDigest.createMergingDigest(20.0));
+    byte[] empty = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(TDigestUtils.createMergingDigest(20.0));
     PercentileSmartTDigestAggregationFunction function = newFunction();
 
     Object merged = function.merge(

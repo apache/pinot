@@ -273,7 +273,7 @@ public class BenchmarkPercentileTDigestCombine {
     for (int sourceId = 0; sourceId < _fanIn; sourceId++) {
       TDigest nativeDigest = null;
       if (_sourceLayout == SourceLayout.NATIVE) {
-        nativeDigest = TDigest.createMergingDigest(_compression);
+        nativeDigest = TDigestUtils.createMergingDigest(_compression);
       }
       double[] sourceValues = new double[VALUES_PER_DIGEST];
       SplittableRandom random = new SplittableRandom(0x6A09E667F3BCC909L + sourceId);
@@ -913,7 +913,7 @@ public class BenchmarkPercentileTDigestCombine {
       if (pending.isEmpty()) {
         return;
       }
-      TDigest batch = TDigest.createMergingDigest(_compressionFactor);
+      TDigest batch = TDigestUtils.createMergingDigest(_compressionFactor);
       batch.add(pending);
       pending.clear();
       target.add(batch);

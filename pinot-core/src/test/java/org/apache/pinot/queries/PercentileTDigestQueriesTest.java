@@ -46,6 +46,7 @@ import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -136,13 +137,14 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
       double value = RANDOM.nextDouble() * VALUE_RANGE;
       row.putValue(DOUBLE_COLUMN, value);
 
-      TDigest tDigest = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      TDigest tDigest =
+          TDigestUtils.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
       tDigest.add(value);
       ByteBuffer byteBuffer = ByteBuffer.allocate(tDigest.byteSize());
       tDigest.asBytes(byteBuffer);
       row.putValue(TDIGEST_COLUMN, byteBuffer.array());
 
-      TDigest tDigestCustom = TDigest.createMergingDigest(CUSTOM_COMPRESSION);
+      TDigest tDigestCustom = TDigestUtils.createMergingDigest(CUSTOM_COMPRESSION);
       tDigestCustom.add(value);
       ByteBuffer byteBufferCustom = ByteBuffer.allocate(tDigestCustom.byteSize());
       tDigestCustom.asBytes(byteBufferCustom);

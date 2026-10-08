@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -45,11 +46,11 @@ public class PercentileTDigestAggregatorTest {
 
   @Test
   public void testAggregateWithDefaultCompression() {
-    TDigest first = TDigest.createMergingDigest(100);
+    TDigest first = TDigestUtils.createMergingDigest(100);
     for (int i = 0; i < 100; i++) {
       first.add(i);
     }
-    TDigest second = TDigest.createMergingDigest(100);
+    TDigest second = TDigestUtils.createMergingDigest(100);
     for (int i = 100; i < 200; i++) {
       second.add(i);
     }
@@ -68,11 +69,11 @@ public class PercentileTDigestAggregatorTest {
 
   @Test
   public void testAggregateWithCustomCompression() {
-    TDigest first = TDigest.createMergingDigest(100);
+    TDigest first = TDigestUtils.createMergingDigest(100);
     for (int i = 0; i < 50; i++) {
       first.add(i);
     }
-    TDigest second = TDigest.createMergingDigest(100);
+    TDigest second = TDigestUtils.createMergingDigest(100);
     for (int i = 50; i < 100; i++) {
       second.add(i);
     }
@@ -94,8 +95,8 @@ public class PercentileTDigestAggregatorTest {
 
   @Test
   public void testAggregateEncodedEmptyDigestUsesConfiguredCompression() {
-    TDigest empty = TDigest.createMergingDigest(20);
-    TDigest values = TDigest.createMergingDigest(100);
+    TDigest empty = TDigestUtils.createMergingDigest(20);
+    TDigest values = TDigestUtils.createMergingDigest(100);
     for (int i = 0; i < 50; i++) {
       values.add(i);
     }
@@ -163,7 +164,7 @@ public class PercentileTDigestAggregatorTest {
 
   @Test
   public void testAggregateWithFirstEmptyBytes() {
-    TDigest second = TDigest.createMergingDigest(100);
+    TDigest second = TDigestUtils.createMergingDigest(100);
     for (int i = 0; i < 50; i++) {
       second.add(i);
     }
@@ -181,7 +182,7 @@ public class PercentileTDigestAggregatorTest {
 
   @Test
   public void testAggregateWithSecondEmptyBytes() {
-    TDigest first = TDigest.createMergingDigest(100);
+    TDigest first = TDigestUtils.createMergingDigest(100);
     for (int i = 0; i < 50; i++) {
       first.add(i);
     }

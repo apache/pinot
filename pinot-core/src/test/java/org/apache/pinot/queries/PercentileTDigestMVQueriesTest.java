@@ -25,6 +25,7 @@ import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggrega
 import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -60,8 +61,9 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
       int numMultiValues = RANDOM.nextInt(MAX_NUM_MULTI_VALUES) + 1;
       _numValues += numMultiValues;
       Double[] values = new Double[numMultiValues];
-      TDigest tDigest = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
-      TDigest tDigestCustom = TDigest.createMergingDigest(CUSTOM_COMPRESSION);
+      TDigest tDigest =
+          TDigestUtils.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      TDigest tDigestCustom = TDigestUtils.createMergingDigest(CUSTOM_COMPRESSION);
       for (int j = 0; j < numMultiValues; j++) {
         double value = RANDOM.nextDouble() * VALUE_RANGE;
         values[j] = value;
