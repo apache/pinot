@@ -21,16 +21,17 @@ package org.apache.pinot.controller.helix.core;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TimeZone;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -78,18 +79,15 @@ public class SegmentDeletionManager {
   public static final String DELETED_SEGMENTS = "Deleted_Segments";
   private static final String RETENTION_UNTIL_SEPARATOR = "__RETENTION_UNTIL__";
   private static final String DELETED_METADATA_FILE_SUFFIX = ".metadata";
-  private static final String RETENTION_DATE_FORMAT_STR = "yyyyMMddHHmm";
-  private static final SimpleDateFormat RETENTION_DATE_FORMAT;
+  // DateTimeFormatter is immutable and thread-safe; this is shared by the deletion executor, table deletion and the
+  // RetentionManager sweep.
+  private static final DateTimeFormatter RETENTION_DATE_FORMAT =
+      DateTimeFormatter.ofPattern("yyyyMMddHHmm").withZone(ZoneOffset.UTC);
   private static final String DELIMITER = "/";
 
   public static final int NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT = 1000;
   private static final int OBJECT_DELETION_TIMEOUT = 5;
   private static final int MAX_BATCH_DELETION_TIMEOUT_SECONDS = 600; // 10 minutes
-
-  static {
-    RETENTION_DATE_FORMAT = new SimpleDateFormat(RETENTION_DATE_FORMAT_STR);
-    RETENTION_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
-  }
 
   private final ScheduledExecutorService _executorService;
   private final String _dataDir;
@@ -592,15 +590,15 @@ public class SegmentDeletionManager {
 
 
   private String getRetentionSuffix(long deletedSegmentsRetentionMs) {
-    return RETENTION_UNTIL_SEPARATOR + RETENTION_DATE_FORMAT.format(new Date(
-        System.currentTimeMillis() + deletedSegmentsRetentionMs));
+    return RETENTION_UNTIL_SEPARATOR + RETENTION_DATE_FORMAT.format(
+        Instant.ofEpochMilli(System.currentTimeMillis() + deletedSegmentsRetentionMs));
   }
 
   private long getDeletionTimeMsFromFile(String targetFile, long lastModifiedTime) {
     String[] split = StringUtils.splitByWholeSeparator(targetFile, RETENTION_UNTIL_SEPARATOR);
     if (split.length == 2) {
       try {
-        return RETENTION_DATE_FORMAT.parse(split[1]).getTime();
+        return LocalDateTime.parse(split[1], RETENTION_DATE_FORMAT).toInstant(ZoneOffset.UTC).toEpochMilli();
       } catch (Exception e) {
         LOGGER.warn("No retention suffix found for file: {}", targetFile);
       }
