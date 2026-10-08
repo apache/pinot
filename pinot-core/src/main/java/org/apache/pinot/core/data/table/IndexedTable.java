@@ -59,6 +59,7 @@ public abstract class IndexedTable extends BaseTable {
   protected Collection<Record> _topRecords;
   private int _numResizes;
   private long _resizeTimeNs;
+  private boolean _markedTrimmed;
 
   /// Constructor for the IndexedTable.
   ///
@@ -280,7 +281,13 @@ public abstract class IndexedTable extends BaseTable {
     // single resize occurs on finish() if there's orderBy
     // all other re-sizes are triggered by trim size and threshold
     int min = _topRecords != null && _hasOrderBy ? 1 : 0;
-    return _numResizes > min;
+    return _markedTrimmed || _numResizes > min;
+  }
+
+  /// Marks this table as holding a trimmed (group-dropping) result even though no resize ran on it, e.g. when
+  /// it was rebuilt from the survivors of an external trim such as the grouping-sets per-set server trim.
+  public void markTrimmed() {
+    _markedTrimmed = true;
   }
 
   public long getResizeTimeMs() {

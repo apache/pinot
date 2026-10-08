@@ -28,6 +28,8 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -150,30 +152,50 @@ public final class GroupByUtils {
         queryContext.getMinInitialIndexedTableCapacity());
 
     List<Map.Entry<Key, Record>> baseEntries = new ArrayList<>(baseTable.getRecordEntries());
+    // A full-union set (one that contains every union column, i.e. the identity grouping) maps base groups to
+    // derived groups 1:1: keys are unique so no merge ever runs on its records, and its stored intermediates can
+    // safely be the base objects themselves (all other readers of a base intermediate treat it as read-only).
+    boolean[] isFullUnionSet = new boolean[numSets];
+    for (int s = 0; s < numSets; s++) {
+      boolean fullUnion = true;
+      for (int col = 0; col < numUnionColumns; col++) {
+        fullUnion &= setContains[s][col];
+      }
+      isFullUnionSet[s] = fullUnion;
+    }
     int numTaskSlots = Math.max(1, Math.min(numTasks, numSets));
     List<Map<Key, Record>> taskMaps;
     if (numTaskSlots == 1) {
-      taskMaps = List.of(deriveSets(baseEntries, setContains, 0, 1, numUnionColumns, numAggregationFunctions,
-          aggregationFunctions));
+      taskMaps = List.of(deriveSets(baseEntries, setContains, isFullUnionSet, 0, 1, numUnionColumns,
+          numAggregationFunctions, aggregationFunctions));
     } else {
       List<Future<Map<Key, Record>>> futures = new ArrayList<>(numTaskSlots);
       for (int t = 0; t < numTaskSlots; t++) {
         int taskIndex = t;
-        futures.add(executorService.submit(() -> deriveSets(baseEntries, setContains, taskIndex, numTaskSlots,
-            numUnionColumns, numAggregationFunctions, aggregationFunctions)));
+        futures.add(executorService.submit(() -> deriveSets(baseEntries, setContains, isFullUnionSet, taskIndex,
+            numTaskSlots, numUnionColumns, numAggregationFunctions, aggregationFunctions)));
       }
       taskMaps = new ArrayList<>(numTaskSlots);
       try {
+        // Bound each wait by the query deadline (when one is set) so a stuck task cannot hold the combine past
+        // the timeout.
+        long endTimeMs = queryContext.getEndTimeMs();
         for (Future<Map<Key, Record>> future : futures) {
-          taskMaps.add(future.get());
+          if (endTimeMs > 0) {
+            taskMaps.add(future.get(Math.max(endTimeMs - System.currentTimeMillis(), 0), TimeUnit.MILLISECONDS));
+          } else {
+            taskMaps.add(future.get());
+          }
         }
       } catch (InterruptedException e) {
+        cancelAll(futures);
         Thread.currentThread().interrupt();
         throw new RuntimeException("Interrupted while deriving grouping sets", e);
+      } catch (TimeoutException e) {
+        cancelAll(futures);
+        throw new RuntimeException("Timed out while deriving grouping sets", e);
       } catch (ExecutionException e) {
-        for (Future<Map<Key, Record>> future : futures) {
-          future.cancel(true);
-        }
+        cancelAll(futures);
         throw new RuntimeException("Caught exception while deriving grouping sets", e.getCause());
       }
     }
@@ -219,7 +241,12 @@ public final class GroupByUtils {
       List<IntermediateRecord> kept = tableResizer.trimTableByGroupingSet(derivedTable, serverTrimSize,
           numUnionColumns);
       ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
-      return buildIndexedTableFromRecords(groupingSetsSchema, queryContext, kept, executorService);
+      IndexedTable trimmedTable =
+          buildIndexedTableFromRecords(groupingSetsSchema, queryContext, kept, executorService);
+      // Surface the approximation: groups were dropped on the server, so the merged block (and ultimately the
+      // broker response) must be flagged as trimmed.
+      trimmedTable.markTrimmed();
+      return trimmedTable;
     }
     return derivedTable;
   }
@@ -250,40 +277,59 @@ public final class GroupByUtils {
   /// merge can never mutate a base accumulator that other tasks are still reading. Scalar intermediates are
   /// immutable and pass through uncloned.
   private static Map<Key, Record> deriveSets(List<Map.Entry<Key, Record>> baseEntries, boolean[][] setContains,
-      int taskIndex, int numTaskSlots, int numUnionColumns, int numAggregationFunctions,
+      boolean[] isFullUnionSet, int taskIndex, int numTaskSlots, int numUnionColumns, int numAggregationFunctions,
       AggregationFunction[] aggregationFunctions) {
     int numSets = setContains.length;
-    // A single set can produce at most one derived group per base entry, so this covers the largest owned set
-    // (typically the near-identity one) without rehashing; coarser owned sets add far fewer distinct groups.
-    Map<Key, Record> taskMap = new HashMap<>(HashUtil.getHashMapCapacity(baseEntries.size()));
+    // A full-union owned set produces exactly one derived group per base entry, so presize for it (it never
+    // rehashes); tasks owning only coarser sets start small and grow, since their distinct-group counts are
+    // usually far below the base size and a full-size bucket array per task would be wasted memory.
+    boolean ownsFullUnionSet = false;
+    for (int s = taskIndex; s < numSets; s += numTaskSlots) {
+      ownsFullUnionSet |= isFullUnionSet[s];
+    }
+    Map<Key, Record> taskMap =
+        ownsFullUnionSet ? new HashMap<>(HashUtil.getHashMapCapacity(baseEntries.size())) : new HashMap<>();
     // Flyweight probe: reuse one key buffer for lookups (HashMap.get does not retain its argument) and copy it
     // into a fresh array only when inserting a new derived group. Most projections into coarse sets hit an
     // existing group, so this avoids a key-array + Key allocation per projection on the merge path.
     Object[] probeValues = new Object[numUnionColumns + 1];
     Key probeKey = new Key(probeValues);
+    int numProjections = 0;
     for (Map.Entry<Key, Record> baseEntry : baseEntries) {
       Object[] baseKeys = baseEntry.getKey().getValues();
       Object[] baseValues = baseEntry.getValue().getValues();
       for (int s = taskIndex; s < numSets; s += numTaskSlots) {
+        // Keep the derive responsive to query timeout / cancellation and visible to resource accounting, like
+        // the segment-merge loop in GroupByCombineOperator.
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numProjections++, "GroupByUtils#deriveSets");
         boolean[] contains = setContains[s];
         for (int col = 0; col < numUnionColumns; col++) {
           probeValues[col] = contains[col] ? baseKeys[col] : null;
         }
         probeValues[numUnionColumns] = s;
-        Record existing = taskMap.get(probeKey);
+        // Full-union sets never see a duplicate key, so skip the probe and insert blindly. Their records can
+        // also share the base intermediates without cloning: no merge will ever mutate them (this set never
+        // merges, and every merge into OTHER sets clones its second argument before use).
+        boolean fullUnion = isFullUnionSet[s];
+        Record existing = fullUnion ? null : taskMap.get(probeKey);
         if (existing == null) {
           Object[] keyValues = probeValues.clone();
           Object[] values = new Object[numUnionColumns + 1 + numAggregationFunctions];
           System.arraycopy(keyValues, 0, values, 0, numUnionColumns + 1);
           for (int i = 0; i < numAggregationFunctions; i++) {
+            Object intermediate = baseValues[numUnionColumns + i];
             values[numUnionColumns + 1 + i] =
-                cloneIntermediate(aggregationFunctions[i], baseValues[numUnionColumns + i]);
+                fullUnion ? intermediate : cloneIntermediate(aggregationFunctions[i], intermediate);
           }
           taskMap.put(new Key(keyValues), new Record(values));
         } else {
           Object[] values = existing.getValues();
           for (int i = 0; i < numAggregationFunctions; i++) {
             int valueIndex = numUnionColumns + 1 + i;
+            // The first argument is this set's owned accumulator (mutating it is safe). The second argument is
+            // cloned because AggregationFunction#merge may RETURN its second argument as the new accumulator
+            // (e.g. HyperLogLog merge with mismatched sizes), which would then be mutated by later merges while
+            // other tasks are still reading the shared base intermediate.
             values[valueIndex] = AggregationFunctionUtils.merge(aggregationFunctions[i], values[valueIndex],
                 cloneIntermediate(aggregationFunctions[i], baseValues[numUnionColumns + i]));
           }
@@ -291,6 +337,12 @@ public final class GroupByUtils {
       }
     }
     return taskMap;
+  }
+
+  private static void cancelAll(List<Future<Map<Key, Record>>> futures) {
+    for (Future<Map<Key, Record>> future : futures) {
+      future.cancel(true);
+    }
   }
 
   /// Returns `schema` with a synthetic `$groupingId` INT column inserted at `index` (after the union group-by
