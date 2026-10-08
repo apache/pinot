@@ -48,6 +48,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.testng.annotations.DataProvider;
@@ -403,7 +404,9 @@ public class ImmutableSegmentImplTest {
         Map.of("views", new DimensionFieldSpec("views", FieldSpec.DataType.LONG, true)));
     String viewsColumn = OpenStructNaming.materializedColumnName("metrics", "views");
     String sparseColumn = OpenStructNaming.sparseColumnName("metrics");
-    ColumnMetadataImpl parent = columnMetadata(metrics, null);
+    ColumnMetadataImpl parent = ColumnMetadataImpl.builder().setFieldSpec(metrics).setTotalDocs(NUM_DOCS)
+        .setSparseKeys(List.of("latencyMs")).setSparseMultiValueKeys(Map.of("latencyMs", 3))
+        .setSparseKeyTypes(Map.of("latencyMs", DataType.LONG)).build();
     ColumnMetadataImpl views = columnMetadata(new DimensionFieldSpec(viewsColumn, FieldSpec.DataType.LONG, true),
         "metrics");
     ColumnMetadataImpl sparse = columnMetadata(new DimensionFieldSpec(sparseColumn, FieldSpec.DataType.STRING, true),
@@ -423,6 +426,8 @@ public class ImmutableSegmentImplTest {
     assertTrue(parentDataSource instanceof ImmutableOpenStructDataSource);
     ImmutableOpenStructDataSource openStruct = (ImmutableOpenStructDataSource) parentDataSource;
     assertTrue(openStruct.isMaterialized("views"));
+    assertEquals(openStruct.getValueFieldSpec("latencyMs").getDataType(), DataType.LONG);
+    assertFalse(openStruct.getValueFieldSpec("latencyMs").isSingleValueField());
     assertSame(openStruct.getDataSource("views").getIndexContainer(), viewsContainer);
     assertFalse(openStruct.isFullyMaterialized());
     assertSame(segment.getDataSourceNullable("metrics"), parentDataSource);
@@ -543,7 +548,9 @@ public class ImmutableSegmentImplTest {
         Map.of("views", new DimensionFieldSpec("views", FieldSpec.DataType.LONG, true)));
     String viewsColumn = OpenStructNaming.materializedColumnName("metrics", "views");
     String sparseColumn = OpenStructNaming.sparseColumnName("metrics");
-    ColumnMetadataImpl parent = columnMetadata(metrics, null);
+    ColumnMetadataImpl parent = ColumnMetadataImpl.builder().setFieldSpec(metrics).setTotalDocs(NUM_DOCS)
+        .setSparseKeys(List.of("latencyMs")).setSparseMultiValueKeys(Map.of("latencyMs", 3))
+        .setSparseKeyTypes(Map.of("latencyMs", DataType.LONG)).build();
     ColumnMetadataImpl views = columnMetadata(new DimensionFieldSpec(viewsColumn, FieldSpec.DataType.LONG, true),
         "metrics");
     ColumnMetadataImpl sparse = columnMetadata(new DimensionFieldSpec(sparseColumn, FieldSpec.DataType.STRING, true),
@@ -559,6 +566,8 @@ public class ImmutableSegmentImplTest {
     assertTrue(parentDataSource instanceof ImmutableOpenStructDataSource);
     ImmutableOpenStructDataSource openStruct = (ImmutableOpenStructDataSource) parentDataSource;
     assertTrue(openStruct.isMaterialized("views"));
+    assertEquals(openStruct.getValueFieldSpec("latencyMs").getDataType(), DataType.LONG);
+    assertFalse(openStruct.getValueFieldSpec("latencyMs").isSingleValueField());
     assertSame(openStruct.getDataSource("views").getIndexContainer(), viewsContainer);
     // Children are reachable only through their parent
     assertNull(segment.getDataSourceNullable(viewsColumn));
