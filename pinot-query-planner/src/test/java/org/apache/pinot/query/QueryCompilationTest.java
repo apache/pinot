@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.pinot.query.QueryEnvironment.CompiledQuery;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
