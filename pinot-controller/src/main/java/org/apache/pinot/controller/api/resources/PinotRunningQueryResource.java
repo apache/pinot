@@ -30,6 +30,7 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.net.URI;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -104,7 +105,7 @@ public class PinotRunningQueryResource {
 
   private final Cache<String, Map<String, InstanceInfo>> _progressBrokers = CacheBuilder.newBuilder()
       .maximumSize(PROGRESS_BROKER_CACHE_MAX_DATABASES)
-      .expireAfterWrite(PROGRESS_BROKER_CACHE_EXPIRATION_SECONDS, TimeUnit.SECONDS).build();
+      .expireAfterWrite(Duration.ofSeconds(PROGRESS_BROKER_CACHE_EXPIRATION_SECONDS)).build();
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;

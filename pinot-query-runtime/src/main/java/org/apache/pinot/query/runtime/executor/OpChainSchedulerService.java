@@ -25,6 +25,7 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFutureTask;
 import com.google.common.util.concurrent.MoreExecutors;
+import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
@@ -120,7 +121,7 @@ public class OpChainSchedulerService {
         .build();
     _completedProgressStats = enableQueryProgress
         ? CacheBuilder.newBuilder().maximumSize(COMPLETED_PROGRESS_STATS_CACHE_SIZE)
-            .expireAfterWrite(COMPLETED_PROGRESS_STATS_CACHE_EXPIRATION_MINUTES, TimeUnit.MINUTES).build()
+            .expireAfterWrite(Duration.ofMinutes(COMPLETED_PROGRESS_STATS_CACHE_EXPIRATION_MINUTES)).build()
         : null;
   }
 
