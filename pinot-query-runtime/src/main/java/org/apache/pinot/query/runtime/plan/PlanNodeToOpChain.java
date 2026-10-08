@@ -33,7 +33,6 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -196,7 +195,7 @@ public class PlanNodeToOpChain {
     @Override
     public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, OpChainExecutionContext context) {
       try {
-        // Legacy sort=true nodes retain receiver sorting for older broker plans.
+        // Legacy sort=true plans remain compatible; current plans express ordering in distinct nodes.
         if (node.isSort()) {
           return new SortedMailboxReceiveOperator(context, node);
         } else {
@@ -215,6 +214,7 @@ public class PlanNodeToOpChain {
         return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage());
       }
     }
+
 
     @Override
     public MultiStageOperator visitMailboxSend(MailboxSendNode node, OpChainExecutionContext context) {
@@ -338,11 +338,6 @@ public class PlanNodeToOpChain {
     @Override
     public MultiStageOperator visitExchange(ExchangeNode exchangeNode, OpChainExecutionContext context) {
       return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, "ExchangeNode should not be visited");
-    }
-
-    @Override
-    public MultiStageOperator visitKWayMergeExchange(KWayMergeExchangeNode node, OpChainExecutionContext context) {
-      return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, "KWayMergeExchangeNode should not be visited");
     }
 
     @Override

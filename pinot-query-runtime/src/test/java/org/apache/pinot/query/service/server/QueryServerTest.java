@@ -34,7 +34,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -48,7 +47,6 @@ import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
-import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -488,11 +486,9 @@ public class QueryServerTest extends QueryTestSet {
 
   @Test
   public void testCollectUpstreamStageIdsMultipleReceives() {
-    // SendNode(stage=1) → [ReceiveNode(sender=2), MergeReceiveNode(sender=3)]
+    // SendNode(stage=1) → [ReceiveNode(sender=2), ReceiveNode(sender=3)]
     MailboxReceiveNode receive1 = receiveNode(1, 2);
-    MailboxMergeReceiveNode receive2 = new MailboxMergeReceiveNode(1, DUMMY_SCHEMA, 3,
-        PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED, null,
-        List.of(new RelFieldCollation(0)), null);
+    MailboxReceiveNode receive2 = receiveNode(1, 3);
     MailboxSendNode root = sendNode(1, List.of(receive1, receive2), 0);
     assertEquals(QueryServer.collectUpstreamStageIds(root), Set.of(2, 3));
   }

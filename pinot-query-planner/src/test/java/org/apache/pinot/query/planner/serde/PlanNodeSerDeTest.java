@@ -21,7 +21,6 @@ package org.apache.pinot.query.planner.serde;
 import com.google.protobuf.UnknownFieldSet;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
@@ -39,12 +38,10 @@ import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
@@ -58,11 +55,6 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
     Plan.PlanNode proto = PlanNodeSerializer.process(node);
     assertEquals(proto.getNodeCase(), Plan.PlanNode.NodeCase.MAILBOXMERGERECEIVENODE);
     assertEquals(PlanNodeDeserializer.process(proto), node);
-    SortNode senderSort = new SortNode(2, schema,
-        PlanNode.NodeHint.EMPTY.with(SortNode.REQUIRES_SINGLE_RUN_HINT, Map.of()), List.of(), node.getCollations(), -1,
-        -1);
-    SortNode deserializedSort = (SortNode) PlanNodeDeserializer.process(PlanNodeSerializer.process(senderSort));
-    assertTrue(deserializedSort.requiresSingleRun());
     // Emulate a legacy parser retaining tag 19 as unknown: there is no recognized executable node, so fail loudly.
     Plan.PlanNode unknown = proto.toBuilder().clearMailboxMergeReceiveNode().setUnknownFields(
         UnknownFieldSet.newBuilder().addField(19, UnknownFieldSet.Field.newBuilder()
