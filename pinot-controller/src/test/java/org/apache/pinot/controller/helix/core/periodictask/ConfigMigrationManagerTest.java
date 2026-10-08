@@ -127,8 +127,10 @@ public class ConfigMigrationManagerTest {
     verify(_resourceManager).setExistingTableConfig(captor.capture(), eq(7), eq(true));
     TableConfig persisted = captor.getValue();
     assertEquals(ConfigMigrationUtils.getTableConfigVersion(persisted), 1);
-    // Deprecated fields folded into ingestionConfig and cleared.
-    assertEquals(persisted.getValidationConfig().getSegmentPushType(), null);
+    // Read the deprecated field to verify migration folds it into ingestionConfig and clears the legacy value.
+    @SuppressWarnings("deprecation")
+    String legacyPushType = persisted.getValidationConfig().getSegmentPushType();
+    assertEquals(legacyPushType, null);
     assertEquals(meterValue(ControllerMeter.CONFIG_MIGRATION_SUCCESS), 1L);
   }
 
