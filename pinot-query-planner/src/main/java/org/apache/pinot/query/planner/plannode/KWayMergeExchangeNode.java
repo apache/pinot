@@ -19,26 +19,85 @@
 package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
 
 
 /// Planning-only exchange requiring ordered inputs and producing a k-way merge receive and a plain send.
 /// Instances are local to a query's planning thread and are never serialized.
-public class KWayMergeExchangeNode extends ExchangeNode {
+public class KWayMergeExchangeNode extends BasePlanNode {
+  private final RelDistribution.Type _distributionType;
+  private final List<Integer> _keys;
+  private final boolean _prePartitioned;
+  private final List<RelFieldCollation> _collations;
+  private final String _hashFunction;
+
   public KWayMergeExchangeNode(int stageId, DataSchema schema, List<PlanNode> inputs,
       RelDistribution.Type distribution, @Nullable List<Integer> keys, boolean prePartitioned,
       List<RelFieldCollation> collations, String hashFunction) {
-    super(stageId, schema, inputs, PinotRelExchangeType.STREAMING, distribution, keys, prePartitioned, collations,
-        false, false, null, null, hashFunction);
+    super(stageId, schema, null, inputs);
+    _distributionType = distribution;
+    _keys = keys != null ? keys : List.of();
+    _prePartitioned = prePartitioned;
+    _collations = collations;
+    _hashFunction = hashFunction;
+  }
+
+  public RelDistribution.Type getDistributionType() {
+    return _distributionType;
+  }
+
+  public List<Integer> getKeys() {
+    return _keys;
+  }
+
+  public boolean isPrePartitioned() {
+    return _prePartitioned;
+  }
+
+  public List<RelFieldCollation> getCollations() {
+    return _collations;
+  }
+
+  public String getHashFunction() {
+    return _hashFunction;
+  }
+
+  @Override
+  public String explain() {
+    return "K_WAY_MERGE_EXCHANGE";
+  }
+
+  @Override
+  public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
+    return visitor.visitKWayMergeExchange(this, context);
   }
 
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
     return new KWayMergeExchangeNode(getStageId(), getDataSchema(), inputs, getDistributionType(), getKeys(),
         isPrePartitioned(), getCollations(), getHashFunction());
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (this == other) {
+      return true;
+    }
+    if (other == null || getClass() != other.getClass() || !super.equals(other)) {
+      return false;
+    }
+    KWayMergeExchangeNode that = (KWayMergeExchangeNode) other;
+    return _distributionType == that._distributionType && _keys.equals(that._keys)
+        && _prePartitioned == that._prePartitioned && _collations.equals(that._collations)
+        && Objects.equals(_hashFunction, that._hashFunction);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _distributionType, _keys, _prePartitioned, _collations, _hashFunction);
   }
 }

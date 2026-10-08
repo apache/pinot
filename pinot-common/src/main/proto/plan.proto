@@ -198,8 +198,8 @@ message MailboxReceiveNode {
   DistributionType distributionType = 3;
   repeated int32 keys = 4;
   repeated Collation collations = 5;
-  bool sort = 6;
-  bool sortedOnSender = 7;
+  bool sort = 6 [deprecated = true];
+  bool sortedOnSender = 7 [deprecated = true];
 }
 
 // Each input stream is ordered by the logical plan. Older servers reject the unknown PlanNode oneof tag.
@@ -210,8 +210,7 @@ message MailboxMergeReceiveNode {
   DistributionType distributionType = 3;
   repeated int32 keys = 4;
   repeated Collation collations = 5;
-  int32 fetch = 6;
-  int32 offset = 7;
+  reserved 6, 7;
 }
 
 message MailboxSendNode {
@@ -222,7 +221,7 @@ message MailboxSendNode {
   repeated int32 keys = 4;
   bool prePartitioned = 5;
   repeated Collation collations = 6;
-  bool sort = 7;
+  bool sort = 7 [deprecated = true];
   repeated int32 receiverStageIds = 8;
   string hashFunction = 9;
 }

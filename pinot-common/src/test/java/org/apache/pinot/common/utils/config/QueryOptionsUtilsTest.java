@@ -113,11 +113,11 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
-  public void shouldResolveWindowSortOnSenderOptionOverDefault() {
-    assertFalse(QueryOptionsUtils.isWindowSortOnSender(Map.of(), false));
-    assertTrue(QueryOptionsUtils.isWindowSortOnSender(Map.of(), true));
-    assertTrue(QueryOptionsUtils.isWindowSortOnSender(Map.of(WINDOW_SORT_ON_SENDER, "true"), false));
-    assertFalse(QueryOptionsUtils.isWindowSortOnSender(Map.of(WINDOW_SORT_ON_SENDER, "false"), true));
+  public void shouldResolveWindowKWayMergeOptionOverDefault() {
+    assertFalse(QueryOptionsUtils.isWindowKWayMerge(Map.of(), false));
+    assertTrue(QueryOptionsUtils.isWindowKWayMerge(Map.of(), true));
+    assertTrue(QueryOptionsUtils.isWindowKWayMerge(Map.of(WINDOW_K_WAY_MERGE, "true"), false));
+    assertFalse(QueryOptionsUtils.isWindowKWayMerge(Map.of(WINDOW_K_WAY_MERGE, "false"), true));
   }
 
   @Test
