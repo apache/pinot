@@ -22,14 +22,20 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.segment.local.customobject.TDigest;
-import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
+import org.apache.pinot.segment.spi.customobject.TDigest;
+import org.apache.pinot.segment.spi.customobject.TDigest.Centroid;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
@@ -321,6 +327,60 @@ public class PercentileTDigestValueAggregatorTest {
     }
   }
 
+  @Test
+  public void testDegradedNonPositiveMassSurvivesCopyAndBothMergeOrders() {
+    for (double[] weights : new double[][]{{1.0, -1.0}, {-5.0, 0.0}}) {
+      PercentileTDigestValueAggregator aggregator = newAggregator(100);
+      byte[] poisonedBytes = createVerboseEncoding(new double[]{1.0, 2.0}, weights);
+      TDigest poisoned = aggregator.getInitialAggregatedValue(poisonedBytes);
+      assertFalse(poisoned.hasValidStatistics());
+      assertFalse(poisoned.isEmpty());
+      TDigest copied = aggregator.cloneAggregatedValue(poisoned);
+      assertFalse(copied.hasValidStatistics());
+      assertTrue(Double.isNaN(copied.quantile(0.5)));
+      assertTrue(Double.isNaN(copied.cdf(1.5)));
+      assertFalse(aggregator.deserializeAggregatedValue(
+          aggregator.serializeAggregatedValue(copied)).hasValidStatistics());
+
+      for (boolean poisonedFirst : new boolean[]{true, false}) {
+        TDigest valid = aggregator.getInitialAggregatedValue(42.0);
+        TDigest degraded = aggregator.deserializeAggregatedValue(poisonedBytes);
+        TDigest merged = poisonedFirst ? aggregator.applyAggregatedValue(degraded, valid)
+            : aggregator.applyAggregatedValue(valid, degraded);
+        assertFalse(merged.hasValidStatistics());
+        assertTrue(Double.isNaN(merged.quantile(0.5)));
+        assertTrue(Double.isNaN(aggregator.deserializeAggregatedValue(
+            aggregator.serializeAggregatedValue(merged)).quantile(0.5)));
+      }
+    }
+  }
+
+  @Test
+  public void testGenericInfinityMergeUsesPreciseCentroidsWithoutSerializingSource() {
+    double largeWeight = 3_000_000_000.0;
+    TDigest source = mock(TDigest.class);
+    when(source.hasValidStatistics()).thenReturn(true);
+    when(source.getTotalWeight()).thenReturn(largeWeight + 2.5);
+    when(source.getMin()).thenReturn(Double.NEGATIVE_INFINITY);
+    when(source.getMax()).thenReturn(Double.POSITIVE_INFINITY);
+    when(source.compression()).thenReturn(100.0);
+    when(source.centroids()).thenReturn(List.of(
+        new Centroid(Double.NEGATIVE_INFINITY, 1.0), new Centroid(42.0, 0.5),
+        new Centroid(42.0, largeWeight), new Centroid(Double.POSITIVE_INFINITY, 1.0)));
+    PercentileTDigestValueAggregator aggregator = newAggregator(100);
+    TDigest result = aggregator.getInitialAggregatedValue(42.0);
+
+    aggregator.applyAggregatedValue(result, source);
+
+    assertEquals(result.getTotalWeight(), largeWeight + 3.5);
+    assertEquals(result.centroids().stream().mapToDouble(Centroid::weight).sum(), largeWeight + 3.5);
+    assertEquals(result.quantile(0.5), 42.0);
+    TDigest roundTripped = aggregator.deserializeAggregatedValue(aggregator.serializeAggregatedValue(result));
+    assertEquals(roundTripped.getTotalWeight(), largeWeight + 3.5);
+    verify(source, never()).byteSize();
+    verify(source, never()).asBytes(any(ByteBuffer.class));
+  }
+
   private static void assertInfinityDistribution(TDigest digest, long expectedSize) {
     assertEquals(digest.size(), expectedSize);
     assertEquals(digest.getMin(), Double.NEGATIVE_INFINITY);
@@ -332,21 +392,20 @@ public class PercentileTDigestValueAggregatorTest {
     assertEquals(digest.cdf(0.0), 0.5, 1.0e-12);
     assertEquals(digest.cdf(1.0), 2.0 / 3.0, 1.0e-12);
 
-    long centroidWeight = 0L;
+    double centroidWeight = 0.0;
     double previousMean = Double.NEGATIVE_INFINITY;
     for (Centroid centroid : digest.centroids()) {
       assertTrue(!Double.isNaN(centroid.mean()));
       assertTrue(centroid.mean() >= previousMean);
-      assertTrue(centroid.count() > 0);
-      centroidWeight += centroid.count();
+      assertTrue(centroid.weight() > 0);
+      centroidWeight += centroid.weight();
       previousMean = centroid.mean();
     }
-    assertEquals(centroidWeight, expectedSize);
+    assertEquals(centroidWeight, (double) expectedSize);
   }
 
   private static void assertCentroidWeight(TDigest digest, long expectedWeight) {
-    // The public integer centroid view narrows weights above Integer.MAX_VALUE. Check the precision-bearing
-    // representation used for aggregation, rather than summing that compatibility view.
+    assertEquals(digest.centroids().stream().mapToDouble(Centroid::weight).sum(), (double) expectedWeight);
     assertEquals(TDigestUtils.validateSerialized(TDigestUtils.serialize(digest)), (double) expectedWeight);
   }
 

@@ -22,8 +22,8 @@ import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
-import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.segment.spi.customobject.TDigest;
 
 
 /// Aggregator for merging serialized TDigest sketches during segment processing

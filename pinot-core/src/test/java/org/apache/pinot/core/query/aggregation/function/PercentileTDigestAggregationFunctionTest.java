@@ -40,10 +40,10 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedIntermediateResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
-import org.apache.pinot.segment.local.customobject.TDigest;
-import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.segment.spi.customobject.TDigest;
+import org.apache.pinot.segment.spi.customobject.TDigest.Centroid;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
@@ -51,7 +51,10 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 public class PercentileTDigestAggregationFunctionTest {
   private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("col");
@@ -205,7 +208,7 @@ public class PercentileTDigestAggregationFunctionTest {
 
     List<Centroid> centroids = new ArrayList<>(accumulator.centroids());
     Assert.assertEquals(centroids.size(), 3);
-    Assert.assertEquals(centroids.get(1).count(), 2);
+    Assert.assertEquals(centroids.get(1).weight(), 2);
     Assert.assertEquals(Double.doubleToRawLongBits(centroids.get(1).mean()),
         Double.doubleToRawLongBits(0.0));
   }
@@ -526,7 +529,8 @@ public class PercentileTDigestAggregationFunctionTest {
     Assert.assertEquals(result.getMin(), 0.0);
     Assert.assertEquals(result.getMax(), numCentroids - 1.0);
     Assert.assertEquals(result.quantile(0.75), 59.5, 1.0);
-    assertOversizedSmallIntermediateRoundTrip(function, result, numCentroids, 1, 70);
+    assertEquals(result.centroidCount(), numCentroids);
+    assertOversizedSmallIntermediateRoundTrip(function, result, numCentroids, 2, numCentroids);
     result.add(numCentroids);
     Assert.assertEquals(result.size(), numCentroids + 1L);
 
@@ -544,14 +548,14 @@ public class PercentileTDigestAggregationFunctionTest {
   }
 
   private static void assertOversizedSmallIntermediateRoundTrip(PercentileTDigestAggregationFunction function,
-      TDigest result, int expectedSize, int expectedEncoding, int maxCentroids) {
+      TDigest result, int expectedSize, int expectedEncoding, int expectedCentroids) {
     SerializedIntermediateResult serializedResult = function.serializeIntermediateResult(result);
     Assert.assertEquals(serializedResult.getType(), ObjectSerDeUtils.ObjectType.TDigest.getValue());
     byte[] serializedBytes = serializedResult.getBytes();
     Assert.assertEquals(ByteBuffer.wrap(serializedBytes).getInt(), expectedEncoding);
     TDigest roundTripped = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(serializedBytes);
     Assert.assertEquals(roundTripped.size(), expectedSize);
-    Assert.assertTrue(roundTripped.centroidCount() <= maxCentroids);
+    assertEquals(roundTripped.centroidCount(), expectedCentroids);
     Assert.assertEquals(roundTripped.compression(), 20.0);
     Assert.assertEquals(roundTripped.getMin(), 0.0);
     Assert.assertEquals(roundTripped.getMax(), expectedSize - 1.0);
@@ -576,25 +580,19 @@ public class PercentileTDigestAggregationFunctionTest {
     Assert.assertEquals(exception.getMessage(), "q should be in [0,1], got NaN");
   }
 
-  /// `Centroid` stores the weight as an `int`, so `centroids()` must saturate like `MergingDigest.centroids()`
-  /// rather than throwing on a centroid whose weight exceeds `Integer.MAX_VALUE`.
   @Test
-  public void testCentroidsSaturateWeightExceedingIntegerMaxValue()
-      throws ReflectiveOperationException {
+  public void testCentroidsPreserveWeightExceedingIntegerMaxValue() {
     PercentileTDigestAccumulator accumulator = PercentileTDigestAccumulator.forReduction(100.0);
-    accumulator.add(1.0);
-    accumulator.compress();
-
-    // A centroid weight above Integer.MAX_VALUE is only reachable from an externally produced digest, since
-    // add(double, int) caps a single contribution at Integer.MAX_VALUE.
-    double oversizedWeight = Integer.MAX_VALUE + 1_000.0;
-    setAccumulatorField(accumulator, "_centroidWeights", new double[]{oversizedWeight});
-    setAccumulatorField(accumulator, "_totalWeight", oversizedWeight);
+    double oversizedWeight = Integer.MAX_VALUE + 1_000.5;
+    accumulator.add(1.0, oversizedWeight);
 
     List<Centroid> centroids = new ArrayList<>(accumulator.centroids());
-    Assert.assertEquals(centroids.size(), 1);
-    Assert.assertEquals(centroids.get(0).mean(), 1.0);
-    Assert.assertEquals(centroids.get(0).count(), Integer.MAX_VALUE);
+    assertEquals(accumulator.getTotalWeight(), oversizedWeight);
+    assertEquals(centroids.stream().mapToDouble(Centroid::weight).sum(), oversizedWeight);
+    assertTrue(centroids.stream().anyMatch(centroid -> centroid.weight() > Integer.MAX_VALUE));
+    for (Centroid centroid : centroids) {
+      assertEquals(centroid.mean(), 1.0);
+    }
   }
 
   @Test
@@ -916,7 +914,7 @@ public class PercentileTDigestAggregationFunctionTest {
     long weight = 0L;
     for (Centroid centroid : accumulator.centroids()) {
       Assert.assertEquals(centroid.mean(), 1.0e308);
-      weight += centroid.count();
+      weight += centroid.weight();
     }
     Assert.assertEquals(weight, 2L);
   }
@@ -1060,6 +1058,42 @@ public class PercentileTDigestAggregationFunctionTest {
       Assert.assertSame(function.merge(result, createReducerSource(new double[0], 100, reducerInput)), result);
       assertValidReducerResult(result, new double[]{42.0}, "singleton/" + reducerInput);
     }
+  }
+
+  @Test
+  public void testFractionalMassIsNotEmptyDuringAggregationMergeOrFinalExtraction() {
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 50.0, true);
+    ByteBuffer fractionalBytes = ByteBuffer.allocate(48);
+    fractionalBytes.putInt(1).putDouble(42.0).putDouble(42.0).putDouble(100.0).putInt(1)
+        .putDouble(0.5).putDouble(42.0);
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    function.aggregate(1, holder, Map.of(EXPRESSION,
+        bytesBlockValSet(new byte[][]{fractionalBytes.array()}, null)));
+    TDigest fractional = function.extractAggregationResult(holder);
+    assertEquals(fractional.size(), 0L);
+    assertFalse(fractional.isEmpty());
+    assertEquals(function.extractFinalResult(fractional), 42.0);
+    assertNull(function.extractFinalResult(TDigestUtils.createMergingDigest(100.0)));
+
+    for (boolean fractionalFirst : new boolean[]{true, false}) {
+      TDigest half = TDigestUtils.deserialize(fractionalBytes.array());
+      TDigest singleton = TDigestUtils.createMergingDigest(100.0);
+      singleton.add(42.0);
+      TDigest merged = fractionalFirst ? function.merge(half, singleton) : function.merge(singleton, half);
+      assertEquals(merged.getTotalWeight(), 1.5);
+      assertEquals(function.extractFinalResult(merged), 42.0);
+    }
+
+    ByteBuffer poisonedBytes = ByteBuffer.allocate(64);
+    poisonedBytes.putInt(1).putDouble(1.0).putDouble(2.0).putDouble(100.0).putInt(2)
+        .putDouble(1.0).putDouble(1.0).putDouble(-1.0).putDouble(2.0);
+    TDigest poisoned = TDigestUtils.deserialize(poisonedBytes.array());
+    assertFalse(poisoned.isEmpty());
+    assertTrue(Double.isNaN(function.extractFinalResult(poisoned)));
+    TDigest singleton = TDigestUtils.createMergingDigest(100.0);
+    singleton.add(42.0);
+    assertTrue(Double.isNaN(function.extractFinalResult(function.merge(poisoned, singleton))));
   }
 
   @Test(dataProvider = "compressionFactors")
@@ -1298,10 +1332,10 @@ public class PercentileTDigestAggregationFunctionTest {
     double previousMean = Double.NEGATIVE_INFINITY;
     for (Centroid centroid : result.centroids()) {
       Assert.assertTrue(Double.isFinite(centroid.mean()), "Non-finite centroid mean for " + caseDescription);
-      Assert.assertTrue(centroid.count() > 0, "Non-positive centroid weight for " + caseDescription);
+      Assert.assertTrue(centroid.weight() > 0, "Non-positive centroid weight for " + caseDescription);
       Assert.assertTrue(centroid.mean() + 1e-12 >= previousMean,
           "Centroids are not sorted for " + caseDescription);
-      centroidWeight += centroid.count();
+      centroidWeight += centroid.weight();
       previousMean = centroid.mean();
     }
     Assert.assertEquals(centroidWeight, sortedValues.length,
@@ -1353,7 +1387,7 @@ public class PercentileTDigestAggregationFunctionTest {
     Assert.assertEquals(result.getMax(), Double.POSITIVE_INFINITY);
     for (Centroid centroid : result.centroids()) {
       Assert.assertFalse(Double.isNaN(centroid.mean()));
-      Assert.assertTrue(centroid.count() > 0);
+      Assert.assertTrue(centroid.weight() > 0);
     }
     Assert.assertEquals(result.quantile(0.0), Double.NEGATIVE_INFINITY);
     Assert.assertEquals(result.quantile(0.5), 0.0);

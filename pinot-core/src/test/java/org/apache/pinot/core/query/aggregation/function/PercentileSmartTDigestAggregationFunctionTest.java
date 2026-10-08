@@ -31,9 +31,10 @@ import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
-import org.apache.pinot.segment.local.customobject.TDigest;
-import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
+import org.apache.pinot.segment.spi.customobject.TDigest;
+import org.apache.pinot.segment.spi.customobject.TDigest.Centroid;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -178,6 +179,46 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     Object merged = function.merge(first, second);
     assertTrue(merged instanceof PercentileTDigestAccumulator);
     assertDuplicateInfinityResult((TDigest) merged, 2L * values.length);
+  }
+
+  @Test
+  public void testMultiValueAggregationRespectsEachNotNullRange() {
+    double[][] values = {{1.0, 2.0}, {1_000.0}, {3.0}, {-1_000.0}, {4.0}};
+    RoaringBitmap nulls = RoaringBitmap.bitmapOf(1, 3);
+    for (int threshold : new int[]{100, 1}) {
+      PercentileSmartTDigestAggregationFunction function = new PercentileSmartTDigestAggregationFunction(
+          List.of(EXPRESSION, ExpressionContext.forLiteral(Literal.doubleValue(50.0)),
+              ExpressionContext.forLiteral(Literal.stringValue("THRESHOLD=" + threshold + ";COMPRESSION=20"))),
+          true);
+      AggregationResultHolder holder = function.createAggregationResultHolder();
+      function.aggregate(values.length, holder,
+          Map.of(EXPRESSION, SyntheticBlockValSets.DoubleMV.create(nulls, values)));
+      Object result = function.extractAggregationResult(holder);
+      if (result instanceof DoubleArrayList) {
+        assertEquals(((DoubleArrayList) result).toDoubleArray(), new double[]{1.0, 2.0, 3.0, 4.0});
+      } else {
+        assertEquals(((TDigest) result).getTotalWeight(), 4.0);
+      }
+      assertEquals(function.extractFinalResult(result), 3.0);
+
+      function.aggregate(values.length, holder,
+          Map.of(EXPRESSION, SyntheticBlockValSets.DoubleMV.create(nulls, values)));
+      result = function.extractAggregationResult(holder);
+      assertEquals(result instanceof TDigest ? ((TDigest) result).getTotalWeight()
+          : ((DoubleArrayList) result).size(), 8.0);
+      assertEquals(function.extractFinalResult(result), 3.0);
+    }
+  }
+
+  @Test
+  public void testFractionalDigestFinalExtractionWithNullHandling() {
+    PercentileSmartTDigestAggregationFunction function = new PercentileSmartTDigestAggregationFunction(
+        List.of(EXPRESSION, ExpressionContext.forLiteral(Literal.doubleValue(50.0))), true);
+    TDigest digest = new PercentileTDigestAccumulator(100.0);
+    digest.add(42.0, 0.5);
+    assertEquals(digest.size(), 0L);
+    assertFalse(digest.isEmpty());
+    assertEquals(function.extractFinalResult(digest), 42.0);
   }
 
   @Test

@@ -44,9 +44,9 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction.Seri
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.segment.local.customobject.TDigest;
-import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
+import org.apache.pinot.segment.spi.customobject.TDigest;
+import org.apache.pinot.segment.spi.customobject.TDigest.Centroid;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -519,11 +519,11 @@ public class BenchmarkPercentileTDigestCombine {
     long centroidWeight = 0L;
     double previousMean = Double.NEGATIVE_INFINITY;
     for (Centroid centroid : digest.centroids()) {
-      if (!Double.isFinite(centroid.mean()) || centroid.count() <= 0 || centroid.mean() + 1e-12 < previousMean) {
+      if (!Double.isFinite(centroid.mean()) || centroid.weight() <= 0 || centroid.mean() + 1e-12 < previousMean) {
         throw new IllegalStateException("Invalid centroid: previousMean=" + previousMean + ", mean=" + centroid.mean()
-            + ", weight=" + centroid.count());
+            + ", weight=" + centroid.weight());
       }
-      centroidWeight += centroid.count();
+      centroidWeight += centroid.weight();
       previousMean = centroid.mean();
     }
     if (centroidWeight != expectedWeight) {
@@ -765,7 +765,7 @@ public class BenchmarkPercentileTDigestCombine {
     }
 
     @Override
-    public void add(double value, int weight) {
+    public void add(double value, double weight) {
       throw new UnsupportedOperationException("Fixed TDigest is immutable");
     }
 
@@ -785,6 +785,11 @@ public class BenchmarkPercentileTDigestCombine {
 
     @Override
     public long size() {
+      return _size;
+    }
+
+    @Override
+    public double getTotalWeight() {
       return _size;
     }
 

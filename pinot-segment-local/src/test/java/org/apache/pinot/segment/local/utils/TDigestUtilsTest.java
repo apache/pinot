@@ -25,8 +25,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.SplittableRandom;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
-import org.apache.pinot.segment.local.customobject.TDigest;
-import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
+import org.apache.pinot.segment.spi.customobject.TDigest;
+import org.apache.pinot.segment.spi.customobject.TDigest.Centroid;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -85,15 +85,18 @@ public class TDigestUtilsTest {
   }
 
   @Test
-  public void testSerializeReusesCallerScratchWithoutSharingOutput() {
+  public void testPinotSerializationLeavesCallerScratchUntouched() {
     TDigest digest = TDigestUtils.createMergingDigest(100.0);
     for (int i = 0; i < 1_000; i++) {
       digest.add(i);
     }
     ByteBuffer scratch = ByteBuffer.allocate(4_096);
+    scratch.putInt(1234);
+    int originalPosition = scratch.position();
 
     byte[] bytes = TDigestUtils.serialize(digest, scratch);
-    assertTrue(scratch.position() >= bytes.length);
+    assertEquals(scratch.position(), originalPosition);
+    assertEquals(scratch.getInt(0), 1234);
     scratch.put(0, (byte) 0);
     assertEquals(ByteBuffer.wrap(bytes).getInt(), VERBOSE_ENCODING);
     assertEquals(TDigestUtils.deserialize(bytes).size(), digest.size());
@@ -269,14 +272,14 @@ public class TDigestUtilsTest {
 
     List<Centroid> centroids = List.copyOf(digest.centroids());
     assertEquals(centroids.get(0).mean(), means[0]);
-    assertEquals(centroids.get(0).count(), 1L);
+    assertEquals(centroids.get(0).weight(), 1L);
     assertEquals(centroids.get(centroids.size() - 1).mean(), means[centroidCount - 1]);
-    assertEquals(centroids.get(centroids.size() - 1).count(), 1L);
+    assertEquals(centroids.get(centroids.size() - 1).weight(), 1L);
     double actualWeight = 0.0;
     double actualFirstMoment = 0.0;
     for (Centroid centroid : centroids) {
-      actualWeight += centroid.count();
-      actualFirstMoment += centroid.mean() * centroid.count();
+      actualWeight += centroid.weight();
+      actualFirstMoment += centroid.mean() * centroid.weight();
     }
     assertEquals(actualWeight, expectedWeight);
     assertEquals(actualFirstMoment, expectedFirstMoment, Math.ulp(expectedFirstMoment) * 16.0);
@@ -344,8 +347,8 @@ public class TDigestUtilsTest {
     double actualFirstMoment = 0.0;
     for (Centroid centroid : digest.centroids()) {
       assertTrue(Double.isFinite(centroid.mean()));
-      actualWeight += centroid.count();
-      actualFirstMoment += centroid.mean() * centroid.count();
+      actualWeight += centroid.weight();
+      actualFirstMoment += centroid.mean() * centroid.weight();
     }
     assertEquals(actualWeight, expectedWeight);
     assertEquals(actualFirstMoment, expectedFirstMoment, Math.ulp(expectedFirstMoment) * 4.0);
@@ -372,7 +375,7 @@ public class TDigestUtilsTest {
     assertEquals(digest.getMax(), Double.POSITIVE_INFINITY);
     for (Centroid centroid : digest.centroids()) {
       assertFalse(Double.isNaN(centroid.mean()));
-      assertTrue(centroid.count() > 0);
+      assertTrue(centroid.weight() > 0);
     }
     assertEquals(digest.quantile(0.0), Double.NEGATIVE_INFINITY);
     assertEquals(digest.quantile(1.0), Double.POSITIVE_INFINITY);
@@ -402,7 +405,7 @@ public class TDigestUtilsTest {
   @Test
   public void testMalformedHeadersAndNonFiniteWeightsAreRejected() {
     byte[] bytes = verboseBytes(100.0, new double[]{0.0, 1.0}, new double[]{1.0, 1.0});
-    for (double compression : new double[]{0.0, -1.0, Double.NaN, Double.POSITIVE_INFINITY}) {
+    for (double compression : new double[]{Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY}) {
       assertThrows(IllegalArgumentException.class, () -> {
         byte[] malformed = bytes.clone();
         ByteBuffer.wrap(malformed).putDouble(20, compression);
@@ -421,6 +424,58 @@ public class TDigestUtilsTest {
       ByteBuffer.wrap(malformed).putInt(28, Integer.MAX_VALUE);
       TDigestUtils.deserialize(malformed);
     });
+  }
+
+  @Test
+  public void testFiniteCompressionBelowMinimumRetainsLegacyClamping() {
+    for (double compression : new double[]{-100.0, -1.0, 0.0, 1.0, 9.0}) {
+      TDigest configured = TDigestUtils.createMergingDigest(compression);
+      configured.add(42.0);
+      assertEquals(configured.compression(), 10.0);
+      assertEquals(configured.quantile(0.5), 42.0);
+      byte[] bytes = verboseBytes(compression, new double[]{10.0, 20.0}, new double[]{1.0, 1.0});
+      TDigest stored = TDigestUtils.deserialize(bytes);
+      assertEquals(stored.compression(), 10.0);
+      assertEquals(stored.size(), 2L);
+      assertEquals(stored.quantile(0.5), 20.0);
+      ByteBuffer compact = ByteBuffer.allocate(46);
+      compact.putInt(SMALL_ENCODING).putDouble(10.0).putDouble(20.0).putFloat((float) compression);
+      compact.putShort((short) 50).putShort((short) 250).putShort((short) 2);
+      compact.putFloat(1.0F).putFloat(10.0F).putFloat(1.0F).putFloat(20.0F);
+      TDigest compactStored = TDigestUtils.deserialize(compact.array());
+      assertEquals(compactStored.compression(), 10.0);
+      assertEquals(compactStored.quantile(0.5), 20.0);
+    }
+    for (double compression : new double[]{Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY}) {
+      assertThrows(IllegalArgumentException.class, () -> TDigestUtils.createMergingDigest(compression));
+    }
+  }
+
+  @Test
+  public void testVerboseReencodingAndOneUlpEndpointDriftAreRepaired() {
+    double[][] extremaCases = {
+        {0.7, 0.9}, {Math.nextUp(0.7), Math.nextDown(0.9)}
+    };
+    double[][] meanCases = {
+        {(double) 0.7F, (double) 0.9F}, {0.7, 0.9}
+    };
+    for (int i = 0; i < extremaCases.length; i++) {
+      double[] extrema = extremaCases[i];
+      byte[] bytes = verboseBytes(100.0, meanCases[i], new double[]{3.0, 4.0});
+      ByteBuffer.wrap(bytes).putDouble(4, extrema[0]).putDouble(12, extrema[1]);
+      TDigest stored = TDigestUtils.deserialize(bytes);
+      assertEquals(stored.size(), 7L);
+      assertEquals(stored.quantile(0.0), extrema[0]);
+      assertEquals(stored.quantile(1.0), extrema[1]);
+      for (Centroid centroid : stored.centroids()) {
+        assertTrue(centroid.mean() >= extrema[0] && centroid.mean() <= extrema[1]);
+      }
+      stored.add(1.0);
+      TDigest reEmitted = TDigestUtils.deserialize(TDigestUtils.serialize(stored));
+      assertEquals(reEmitted.size(), 8L);
+      assertEquals(reEmitted.quantile(0.0), extrema[0]);
+      assertEquals(reEmitted.quantile(1.0), 1.0);
+    }
   }
 
   @Test
@@ -509,6 +564,91 @@ public class TDigestUtilsTest {
     TDigest updated = TDigestUtils.deserialize(TDigestUtils.serialize(largePoisoned));
     assertEquals(updated.getMax(), 42.0);
     assertTrue(Double.isNaN(updated.quantile(0.5)));
+  }
+
+  @Test
+  public void testDegradedTotalsRemainPresentAcrossCopyAndMergeOrder() {
+    byte[][] poisoned = {
+        verboseBytes(100.0, new double[]{10.0}, new double[]{-5.0}),
+        verboseBytes(100.0, new double[]{0.0, 10.0}, new double[]{1.0, -1.0})
+    };
+    for (byte[] bytes : poisoned) {
+      TDigest source = TDigestUtils.deserialize(bytes);
+      assertFalse(source.hasValidStatistics());
+      assertFalse(source.isEmpty());
+      assertTrue(Double.isNaN(source.quantile(0.5)));
+      assertTrue(Double.isNaN(source.cdf(5.0)));
+      TDigest copy = TDigestUtils.createMergingDigest(100.0);
+      copy.add(source);
+      assertFalse(copy.hasValidStatistics());
+      assertFalse(copy.isEmpty());
+      assertEquals(copy.getTotalWeight(), source.getTotalWeight());
+      for (boolean poisonedFirst : new boolean[]{false, true}) {
+        TDigest merged = TDigestUtils.createMergingDigest(100.0);
+        if (poisonedFirst) {
+          merged.add(source);
+          merged.add(42.0);
+        } else {
+          merged.add(42.0);
+          merged.add(source);
+        }
+        assertFalse(merged.hasValidStatistics());
+        assertTrue(Double.isNaN(merged.quantile(0.5)));
+        assertTrue(Double.isNaN(merged.cdf(5.0)));
+        assertEquals(merged.getTotalWeight(), source.getTotalWeight() + 1.0);
+        TDigest roundTripped = TDigestUtils.deserialize(TDigestUtils.serialize(merged));
+        assertFalse(roundTripped.hasValidStatistics());
+        assertEquals(roundTripped.getMax(), 42.0);
+      }
+    }
+  }
+
+  @Test
+  public void testUntouchedWeightedLegacyDigestOnlyRepairsBoundaries() {
+    int count = 200;
+    double[] means = new double[count];
+    double[] weights = new double[count];
+    for (int i = 0; i < count; i++) {
+      means[i] = i;
+      weights[i] = i == 0 || i == count - 1 ? 3.0 : 1.0;
+    }
+    TDigest pending = TDigestUtils.deserialize(verboseBytes(100.0, means, weights));
+    ByteBuffer repaired = ByteBuffer.wrap(TDigestUtils.serialize(pending));
+    assertEquals(repaired.getInt(), VERBOSE_ENCODING);
+    assertEquals(repaired.getInt(28), count + 2,
+        "Re-emitting stored centroids must only split the two weighted endpoints, without a lossy K1 merge");
+    repaired.position(VERBOSE_HEADER_SIZE);
+    double total = 0.0;
+    for (int i = 0; i < count + 2; i++) {
+      double weight = repaired.getDouble();
+      double mean = repaired.getDouble();
+      total += weight;
+      if (i == 0 || i == count + 1) {
+        assertEquals(weight, 1.0);
+      } else if (i > 1 && i < count) {
+        assertEquals(weight, 1.0);
+        assertEquals(mean, i - 1.0, "Interior centroids must not be recompressed");
+      }
+    }
+    assertEquals(total, count + 4.0);
+  }
+
+  @Test
+  public void testCentroidViewReconstructionPreservesPreciseMass() {
+    for (double weight : new double[]{0.5, 0x1p53}) {
+      TDigest source = TDigestUtils.createMergingDigest(100.0);
+      source.add(42.0, weight);
+      TDigest reconstructed = TDigestUtils.createMergingDigest(100.0);
+      double viewedWeight = 0.0;
+      for (Centroid centroid : source.centroids()) {
+        viewedWeight += centroid.weight();
+        reconstructed.add(centroid.mean(), centroid.weight());
+      }
+      assertEquals(viewedWeight, weight);
+      assertEquals(reconstructed.getTotalWeight(), weight);
+      assertEquals(reconstructed.quantile(0.5), 42.0);
+      assertEquals(TDigestUtils.deserialize(TDigestUtils.serialize(reconstructed)).getTotalWeight(), weight);
+    }
   }
 
   @Test

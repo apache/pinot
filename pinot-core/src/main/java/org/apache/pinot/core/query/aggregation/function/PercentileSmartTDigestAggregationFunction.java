@@ -36,8 +36,8 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
-import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.customobject.TDigest;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -173,7 +173,7 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
     } else {
       double[][] doubleValues = blockValSet.getDoubleValuesMV();
       forEachNotNull(length, blockValSet, (from, toEx) -> {
-        for (int i = 0; i < length; i++) {
+        for (int i = from; i < toEx; i++) {
           valueList.addElements(valueList.size(), doubleValues[i]);
         }
       }
@@ -365,7 +365,7 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
       TDigest tDigest = (TDigest) intermediateResult;
       // An empty digest holds the same state as the empty value list below, so the two branches must answer alike:
       // which one a query lands in depends only on whether the accumulator crossed the conversion threshold.
-      if (_nullHandlingEnabled && tDigest.size() == 0L) {
+      if (_nullHandlingEnabled && tDigest.isEmpty()) {
         return null;
       }
       return tDigest.quantile(_percentile / 100.0);

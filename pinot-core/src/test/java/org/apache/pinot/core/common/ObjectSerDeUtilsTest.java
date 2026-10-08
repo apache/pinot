@@ -61,13 +61,13 @@ import org.apache.pinot.segment.local.customobject.LongLongPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
-import org.apache.pinot.segment.local.customobject.TDigest;
-import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
+import org.apache.pinot.segment.spi.customobject.TDigest;
+import org.apache.pinot.segment.spi.customobject.TDigest.Centroid;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -378,9 +378,9 @@ public class ObjectSerDeUtilsTest {
     double previousMean = Double.NEGATIVE_INFINITY;
     for (Centroid centroid : digest.centroids()) {
       assertTrue(Double.isFinite(centroid.mean()));
-      assertTrue(centroid.count() > 0);
+      assertTrue(centroid.weight() > 0);
       assertTrue(centroid.mean() + 1e-12 >= previousMean);
-      centroidWeight += centroid.count();
+      centroidWeight += centroid.weight();
       previousMean = centroid.mean();
     }
     assertEquals(centroidWeight, expectedSize);

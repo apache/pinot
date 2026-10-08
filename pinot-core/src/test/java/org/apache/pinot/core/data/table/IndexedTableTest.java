@@ -42,8 +42,8 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction.Seri
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.segment.local.customobject.TDigest;
-import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
+import org.apache.pinot.segment.spi.customobject.TDigest;
+import org.apache.pinot.segment.spi.customobject.TDigest.Centroid;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -199,9 +199,9 @@ public class IndexedTableTest {
       double previousMean = Double.NEGATIVE_INFINITY;
       for (Centroid centroid : result.centroids()) {
         Assert.assertTrue(Double.isFinite(centroid.mean()));
-        Assert.assertTrue(centroid.count() > 0);
+        Assert.assertTrue(centroid.weight() > 0);
         Assert.assertTrue(centroid.mean() + 1e-12 >= previousMean);
-        centroidWeight += centroid.count();
+        centroidWeight += centroid.weight();
         previousMean = centroid.mean();
       }
       Assert.assertEquals(centroidWeight, expectedSize);

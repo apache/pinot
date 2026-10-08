@@ -19,12 +19,10 @@
 package org.apache.pinot.perf.aggregation;
 
 import java.nio.ByteBuffer;
+import org.apache.pinot.segment.local.utils.TDigestUtils;
 
 /// Creates deterministic legacy TDigest inputs for benchmarks.
 final class TDigestBenchmarkUtils {
-  private static final int VERBOSE_ENCODING = 1;
-  private static final int VERBOSE_HEADER_SIZE = 32;
-  private static final int VERBOSE_CENTROID_SIZE = 16;
 
   private TDigestBenchmarkUtils() {
   }
@@ -38,8 +36,9 @@ final class TDigestBenchmarkUtils {
       throw new IllegalArgumentException("Fixed verbose benchmark input requires at least two values");
     }
     int numCentroids = Math.min(sortedValues.length, Math.max(2, (int) Math.ceil(compression * 1.28)));
-    ByteBuffer buffer = ByteBuffer.allocate(VERBOSE_HEADER_SIZE + numCentroids * VERBOSE_CENTROID_SIZE);
-    buffer.putInt(VERBOSE_ENCODING);
+    ByteBuffer buffer = ByteBuffer.allocate(
+        TDigestUtils.VERBOSE_HEADER_SIZE + numCentroids * TDigestUtils.VERBOSE_CENTROID_SIZE);
+    buffer.putInt(TDigestUtils.VERBOSE_ENCODING);
     buffer.putDouble(sortedValues[0]);
     buffer.putDouble(sortedValues[sortedValues.length - 1]);
     buffer.putDouble(compression);

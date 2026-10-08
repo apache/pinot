@@ -23,7 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator.SerializedTDigestInput;
-import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.spi.customobject.TDigest;
 
 /// Compatibility helpers for the serialized t-digest format shared by t-digest 3.2 and 3.3.
 ///
@@ -41,14 +41,14 @@ import org.apache.pinot.segment.local.customobject.TDigest;
 /// Fractional boundary masses below one, and single-centroid masses between one and two, are retained exactly:
 /// t-digest 3.3's recompression assertion cannot be satisfied for these inputs without changing their mass.
 public final class TDigestUtils {
-  private static final int VERBOSE_ENCODING = 1;
-  private static final int SMALL_ENCODING = 2;
+  public static final int VERBOSE_ENCODING = 1;
+  public static final int SMALL_ENCODING = 2;
   private static final int LEGACY_CAPACITY_PADDING = 10;
-  private static final int VERBOSE_HEADER_SIZE = 32;
-  private static final int VERBOSE_CENTROID_SIZE = 16;
-  private static final int SMALL_HEADER_SIZE = 30;
-  private static final int SMALL_CENTROID_SIZE = 8;
-  private static final int DEFAULT_MERGE_BUFFER_MULTIPLIER = 5;
+  public static final int VERBOSE_HEADER_SIZE = 32;
+  public static final int VERBOSE_CENTROID_SIZE = 16;
+  public static final int SMALL_HEADER_SIZE = 30;
+  public static final int SMALL_CENTROID_SIZE = 8;
+  public static final int DEFAULT_MERGE_BUFFER_MULTIPLIER = 5;
 
   private TDigestUtils() {
   }
@@ -58,11 +58,17 @@ public final class TDigestUtils {
     return PercentileTDigestAccumulator.forLegacyAggregation(compression);
   }
 
-  /// Rejects non-positive or non-finite compression while retaining historical positive finite settings.
+  /// Rejects non-finite compression while retaining the legacy clamping of finite settings below ten.
   public static void validateCompression(double compression) {
-    if (!(compression > 0.0) || !Double.isFinite(compression)) {
+    if (!Double.isFinite(compression)) {
       throw new IllegalArgumentException("Invalid TDigest compression: " + compression);
     }
+  }
+
+  /// Applies the legacy minimum compression to query, ingestion and serialized-header settings.
+  public static double normalizeCompression(double compression) {
+    validateCompression(compression);
+    return Math.max(compression, 10.0);
   }
 
   /// Serializes a digest in a representation readable by both t-digest 3.2 and 3.3.
@@ -72,8 +78,8 @@ public final class TDigestUtils {
 
   /// Serializes a digest using `scratchBuffer` for the temporary verbose representation when it is large enough.
   ///
-  /// The returned array is independently owned. The scratch buffer is cleared and may be reused by the caller after
-  /// this method returns.
+  /// The returned array is independently owned. Pinot-owned digests do not use the scratch buffer; callers can
+  /// clear and reuse it after serialization.
   public static byte[] serialize(TDigest tDigest, ByteBuffer scratchBuffer) {
     ByteOrder scratchOrder = scratchBuffer != null ? scratchBuffer.order() : null;
     try {
@@ -81,12 +87,7 @@ public final class TDigestUtils {
         // Preserve the legacy two-level raw flush before final compression. Pending serialized state answers
         // this count from cached metadata, so stored reads do not acquire an extra lossy compression pass.
         tDigest.centroidCount();
-        byte[] bytes = ((PercentileTDigestAccumulator) tDigest).serialize();
-        if (scratchBuffer != null && !scratchBuffer.isReadOnly() && scratchBuffer.capacity() >= bytes.length) {
-          scratchBuffer.clear();
-          scratchBuffer.put(bytes);
-        }
-        return bytes;
+        return ((PercentileTDigestAccumulator) tDigest).serialize();
       }
       // centroidCount flushes buffered input. Boundary repair can add at most two centroids; compression and
       // total weight are not allocation sizes, so extreme historical settings need no enormous scratch array.
@@ -196,7 +197,8 @@ public final class TDigestUtils {
     return inspectSerialized(input, checkCapacity).totalWeight();
   }
 
-  /// Validated metadata for one legacy byte payload. The centroid bytes remain owned by the caller.
+  /// Header and numerical metadata for one legacy byte payload. The centroid bytes remain owned by the caller.
+  /// Header-only inspection leaves total weight as NaN until centroid inspection validates the numerical fields.
   ///
   /// Legacy writers can emit poisoned numerical state after overflow or broken fractional boundary repair.
   /// Such state is retained with degraded quantiles, rather than being passed to the sorted K1 kernel.
@@ -213,6 +215,18 @@ public final class TDigestUtils {
 
   /// Inspects a payload, optionally enforcing the legacy decoder's declared centroid capacity.
   public static SerializedTDigestMetadata inspectSerialized(ByteBuffer input, boolean checkCapacity) {
+    return inspectSerialized(input, readSerializedHeader(input, checkCapacity), null, null);
+  }
+
+  /// Reads and validates the fixed-size header without scanning or allocating centroid arrays.
+  public static SerializedTDigestMetadata readSerializedHeader(ByteBuffer input) {
+    return readSerializedHeader(input, true);
+  }
+
+  /// Reads a fixed-size header, optionally enforcing the declared centroid capacity.
+  ///
+  /// Numerical flags and total weight are computed by the subsequent inspection or decoding pass.
+  public static SerializedTDigestMetadata readSerializedHeader(ByteBuffer input, boolean checkCapacity) {
     ByteBuffer encoded = input.slice().order(ByteOrder.BIG_ENDIAN);
     int encoding = encoded.getInt();
     if (encoding != VERBOSE_ENCODING && encoding != SMALL_ENCODING) {
@@ -226,14 +240,12 @@ public final class TDigestUtils {
     int centroidCount;
     int centroidSize;
     if (encoding == VERBOSE_ENCODING) {
-      compression = encoded.getDouble();
-      validateCompression(compression);
+      compression = normalizeCompression(encoded.getDouble());
       mainCapacity = Math.max(getDefaultCentroidCapacity(compression), getLegacyDefaultCentroidCapacity(compression));
       centroidCount = encoded.getInt();
       centroidSize = VERBOSE_CENTROID_SIZE;
     } else {
-      compression = encoded.getFloat();
-      validateCompression(compression);
+      compression = normalizeCompression(encoded.getFloat());
       mainCapacity = encoded.getShort();
       bufferCapacity = encoded.getShort();
       checkSmallArrayCapacity(mainCapacity);
@@ -257,6 +269,23 @@ public final class TDigestUtils {
       throw new IllegalArgumentException("Invalid TDigest extrema: " + min + ", " + max);
     }
     int centroidOffset = encoded.position();
+    int encodedLength = centroidOffset + centroidCount * centroidSize;
+    return new SerializedTDigestMetadata(encoding, min, max, compression, centroidCount, mainCapacity,
+        bufferCapacity, centroidOffset, centroidSize, encodedLength, Double.NaN, false, false, false, false);
+  }
+
+  /// Validates centroids in one pass and optionally decodes their means and weights into reusable arrays.
+  ///
+  /// The header must describe this exact input, and each supplied array must hold all encoded centroids. Endpoint
+  /// rounding inherited from compact re-encoding or old merge arithmetic is restored to the double header bounds.
+  public static SerializedTDigestMetadata inspectSerialized(ByteBuffer input, SerializedTDigestMetadata header,
+      double[] means, double[] weights) {
+    ByteBuffer encoded = input.slice().order(ByteOrder.BIG_ENDIAN);
+    encoded.position(header.centroidOffset());
+    int centroidCount = header.centroidCount();
+    int centroidSize = header.centroidSize();
+    double min = header.min();
+    double max = header.max();
     double totalWeight = 0.0;
     double previousMean = Double.NEGATIVE_INFINITY;
     boolean hasNonFiniteMeans = false;
@@ -264,6 +293,10 @@ public final class TDigestUtils {
     boolean unorderedMeans = false;
     boolean fractionalWeights = false;
     boolean withinBounds = true;
+    double roundedMin = (double) (float) min;
+    double roundedMax = (double) (float) max;
+    double lowerAdjacent = Math.nextDown(min);
+    double upperAdjacent = Math.nextUp(max);
     for (int i = 0; i < centroidCount; i++) {
       double weight = centroidSize == VERBOSE_CENTROID_SIZE ? encoded.getDouble() : encoded.getFloat();
       double mean = centroidSize == VERBOSE_CENTROID_SIZE ? encoded.getDouble() : encoded.getFloat();
@@ -279,12 +312,18 @@ public final class TDigestUtils {
       hasNonFiniteMeans |= !Double.isFinite(mean);
       unorderedMeans |= mean < previousMean;
       if (!Double.isNaN(mean)) {
-        // Compact means are floats but extrema are doubles. Permit only the rounding of an actual endpoint,
-        // rather than admitting arbitrary out-of-range means that boundary normalization would rewrite.
-        boolean lowerRounded = encoding == SMALL_ENCODING && mean == (double) (float) min;
-        boolean upperRounded = encoding == SMALL_ENCODING && mean == (double) (float) max;
+        // A compact digest can be re-emitted as verbose without recovering its double endpoint means. Old
+        // merge arithmetic can also drift by one ULP. Permit only these identifiable endpoint roundings.
+        boolean lowerRounded = mean == roundedMin || mean == lowerAdjacent;
+        boolean upperRounded = mean == roundedMax || mean == upperAdjacent;
         withinBounds &= (mean >= min || lowerRounded) && (mean <= max || upperRounded);
         previousMean = mean;
+      }
+      if (means != null) {
+        means[i] = Math.max(min, Math.min(mean, max));
+      }
+      if (weights != null) {
+        weights[i] = weight;
       }
       totalWeight += weight;
       if (!Double.isFinite(totalWeight)) {
@@ -294,9 +333,9 @@ public final class TDigestUtils {
     if (!needsLegacyFallback && !withinBounds) {
       throw new IllegalArgumentException("TDigest centroid mean is outside its extrema: " + min + ", " + max);
     }
-    return new SerializedTDigestMetadata(encoding, min, max, compression, centroidCount, mainCapacity,
-        bufferCapacity, centroidOffset, centroidSize, encoded.position(), totalWeight, hasNonFiniteMeans,
-        needsLegacyFallback, unorderedMeans, fractionalWeights);
+    return new SerializedTDigestMetadata(header.encoding(), min, max, header.compression(), centroidCount,
+        header.mainCapacity(), header.bufferCapacity(), header.centroidOffset(), centroidSize,
+        header.encodedLength(), totalWeight, hasNonFiniteMeans, needsLegacyFallback, unorderedMeans, fractionalWeights);
   }
 
   /// Deserializes a finite-valued digest without recompressing stored centroids on each rollup generation.
@@ -308,7 +347,8 @@ public final class TDigestUtils {
 
   /// Deserializes an already validated input without scanning the same centroid bytes again.
   public static TDigest deserializeFinite(SerializedTDigestInput input) {
-    if (input.hasNonFiniteMeans() && !input.needsLegacyFallback()) {
+    SerializedTDigestMetadata metadata = input.getMetadata();
+    if (metadata.hasNonFiniteMeans() && !metadata.needsLegacyFallback()) {
       throw new IllegalArgumentException("Expected finite TDigest centroid means");
     }
     PercentileTDigestAccumulator digest = PercentileTDigestAccumulator.forLegacyAggregation(input.getCompression());
@@ -427,12 +467,15 @@ public final class TDigestUtils {
     return Math.max(Math.min(firstMean, secondMean), Math.min(average, Math.max(firstMean, secondMean)));
   }
 
-  private static int getLegacyDefaultCentroidCapacity(double compression) {
-    return (int) Math.min(Integer.MAX_VALUE, 2.0 * Math.ceil(compression) + LEGACY_CAPACITY_PADDING);
+  /// Default centroid capacity allocated by the verbose t-digest 3.2 reader.
+  public static int getLegacyDefaultCentroidCapacity(double compression) {
+    return (int) Math.min(Integer.MAX_VALUE,
+        2.0 * Math.ceil(normalizeCompression(compression)) + LEGACY_CAPACITY_PADDING);
   }
 
-  private static int getDefaultCentroidCapacity(double compression) {
-    double normalizedCompression = Math.max(compression, 10.0);
+  /// Default centroid capacity allocated by the t-digest 3.3 reader.
+  public static int getDefaultCentroidCapacity(double compression) {
+    double normalizedCompression = normalizeCompression(compression);
     int padding = normalizedCompression < 30.0 ? 30 : 10;
     return (int) Math.min(Integer.MAX_VALUE, Math.ceil(2.0 * normalizedCompression + padding));
   }

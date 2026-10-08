@@ -30,10 +30,10 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
-import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.segment.spi.customobject.TDigest;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -272,10 +272,10 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
 
   @Override
   public TDigest merge(TDigest intermediateResult1, TDigest intermediateResult2) {
-    if (intermediateResult1.size() == 0L) {
+    if (intermediateResult1.isEmpty()) {
       return intermediateResult2;
     }
-    if (intermediateResult2.size() == 0L) {
+    if (intermediateResult2.isEmpty()) {
       return intermediateResult1;
     }
     if (intermediateResult1 instanceof PercentileTDigestAccumulator) {
@@ -328,7 +328,7 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
     // A null intermediate result means nothing was aggregated, and so does an empty digest, which is what a
     // deserialized peer can still carry. With null handling enabled the percentile of nothing is NULL; with it
     // disabled it is what `quantile` returns for an empty digest, which is NaN.
-    if (intermediateResult == null || intermediateResult.size() == 0L) {
+    if (intermediateResult == null || intermediateResult.isEmpty()) {
       return _nullHandlingEnabled ? null : Double.NaN;
     }
     return intermediateResult.quantile(_percentile / 100.0);
