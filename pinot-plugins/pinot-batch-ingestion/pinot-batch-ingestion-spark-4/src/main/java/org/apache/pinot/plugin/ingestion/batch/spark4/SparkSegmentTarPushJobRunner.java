@@ -46,6 +46,7 @@ public class SparkSegmentTarPushJobRunner extends BaseSparkSegmentTarPushJobRunn
     super(spec);
   }
 
+  @Override
   public void parallelizeTarPushJob(List<PinotFSSpec> pinotFSSpecs, List<String> segmentUris, int pushParallelism,
       URI outputDirURI) {
     JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());

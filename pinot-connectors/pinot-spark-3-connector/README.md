@@ -33,26 +33,17 @@ migration during this release cycle.
 
 ### Runtime requirements (this release)
 
-Pinot's master branch raised the Java baseline to JDK 21, which means the
-`pinot-spark-3-connector` jar (and the `pinot-core` / `pinot-common` classes it bundles
-transitively) is now compiled to class file 65 (JDK 21 bytecode). To run it you need:
-
-- **JDK 21 or newer** on your Spark application JVM (driver and executors)
-- **Apache Spark 3.5.5 or newer** — Spark 3.5.5+ added official JDK 21 support; earlier
-  Spark 3.5.x patch releases and Spark 3.4.x will refuse to start on JDK 21 with
-  `IllegalArgumentException: Unsupported class file major version 65`
-
-If your deployment is stuck on Spark 3.5.x with JDK 17, **stay on the previous Pinot release
-(`1.5.x`) for the connector jar** until you can either upgrade to JDK 21 / Spark 3.5.5+ or
-migrate to `pinot-spark-4-connector`. Mixing a 1.6+ connector jar with a JDK 17 Spark
-runtime will fail with `UnsupportedClassVersionError` at first class resolution.
+This module and its Pinot dependencies inherit the default Java 25 baseline (class file
+major version 69). Build with JDK 25 or newer and use JDK 25 or newer on the Spark driver
+and executors. An older Java runtime cannot load these jars; use artifacts from a Pinot
+release compatible with your deployment if you cannot update the runtime.
 
 ### Migration path to Spark 4
 
 `pinot-spark-4-connector` is a faithful port of this module: the read API surface is
 identical (`spark.read.format("pinot")…`), the write API is the same except `mode("overwrite")`
 now fails fast (which is also true here as of this release — see "Behavior changes" below).
-The Spark 4 module requires Spark 4.1.x and JDK 21+.
+The Spark 4 module requires Spark 4.1.x and JDK 25+.
 
 ## Behavior changes since the previous release
 

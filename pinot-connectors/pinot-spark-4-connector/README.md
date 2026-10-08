@@ -20,9 +20,9 @@
 -->
 # Spark 4 Pinot Connector
 
-Spark connector to read from and write to Pinot, built for **Apache Spark 4.x on JDK 21**.
+Spark connector to read from and write to Pinot, built for **Apache Spark 4.x on JDK 25**.
 
-If you are on Spark 3.5.x or an older JDK, use
+If you are on Spark 3.5.x, use
 [pinot-spark-3-connector](../pinot-spark-3-connector/) instead. Both
 connectors share the underlying infrastructure via
 [pinot-spark-common](../pinot-spark-common/).
@@ -34,15 +34,15 @@ Detailed write-model documentation: [Spark-Pinot Connector Write Model](document
 
 | Pinot module                 | Spark | Scala       | JDK (build & runtime) |
 |------------------------------|-------|-------------|------------------------|
-| `pinot-spark-3-connector`    | 3.5.x | 2.12 / 2.13 | 8 / 11 / 17            |
-| `pinot-spark-4-connector`    | 4.1.x | 2.13 only   | **21 only**            |
+| `pinot-spark-3-connector`    | 3.5.x | 2.12 / 2.13 | 25+                    |
+| `pinot-spark-4-connector`    | 4.1.x | 2.13 only   | **25+**            |
 
-The produced jar is compiled with `--release 21` (class file major version 65), so it will
-not load on a JDK 17 runtime despite Spark 4 itself supporting JDK 17. If JDK 17 runtime is
-required, use the Spark 3 connector.
+The module inherits Pinot's default `--release 25` (class file major version 69). Build
+with JDK 25 or newer, and use JDK 25 or newer on the Spark driver and executors. Switching
+between the Spark 3 and Spark 4 modules does not lower this Java requirement.
 
 This module sits next to [`pinot-spark-3-connector`](../pinot-spark-3-connector) under
-`pinot-connectors/` and is built unconditionally as part of the default reactor. JDK 21+ is
+`pinot-connectors/` and is built unconditionally as part of the default reactor. JDK 25+ is
 enforced build-wide by the root pom's `requireJavaVersion` rule, and the module's own
 `maven-enforcer-plugin` rule rejects `-Pscala-2.12` because Apache Spark 4 is Scala 2.13 only.
 
@@ -132,7 +132,7 @@ spark-submit \
 
 > **New to the connector?** The companion
 > [End-to-end Docker tutorial](documentation/end-to-end-docker-tutorial.md) brings up a Pinot
-> cluster, a Spark 4 driver on JDK 21, and walks through both read and write paths with copy-
+> cluster, a Spark 4 driver on JDK 25, and walks through both read and write paths with copy-
 > pasteable commands. Recommended first read — it also documents the classpath + JDK gotchas
 > you are likely to hit.
 

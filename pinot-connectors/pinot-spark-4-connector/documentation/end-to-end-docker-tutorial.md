@@ -22,8 +22,8 @@
 
 This walkthrough brings up Apache Pinot in Docker, builds the Pinot Spark 4 connector, and
 exercises both the **read** and **write** paths from a Spark 4 driver. The connector compiles
-against Apache Spark `4.1.1` (the latest 4.x release at the time of writing); a matching
-`apache/spark:4.1.1` runtime is published with a Scala 2.13 + Java 21 variant ready to use.
+against Apache Spark `4.1.1` and inherits Pinot's Java 25 baseline. The image below adds
+JDK 25 to the matching Spark runtime.
 
 If you only need the one-liner: point Spark 4 at a running Pinot cluster, drop the shaded
 connector jar on the classpath, prepend a recent `commons-lang3`, and use
@@ -37,14 +37,12 @@ why behind each switch.
 | Tool | Version | Notes |
 |---|---|---|
 | Docker | 20.10+ | Tested on 28.x. `docker info` must succeed. |
-| JDK | 21+ | Only required if you build the connector locally. |
+| JDK | 25+ | Only required if you build the connector locally. |
 | Maven wrapper | bundled (`./mvnw`) | `-pl pinot-connectors/pinot-spark-4-connector` |
 
-**Why JDK 21.** The Pinot Spark 4 connector is compiled with `--release 21` (class file 65).
-The default `apache/spark:4.1.1` image ships **JDK 17**, which cannot load class-file-65
-bytecode (`UnsupportedClassVersionError`). Use the JDK 21 variant
-`apache/spark:4.1.1-scala2.13-java21-python3-ubuntu` (or its short alias
-`apache/spark:4.1.1-java21-python3`); the rest of this tutorial assumes that image.
+**Why JDK 25.** The default build produces class file 69. Both the Spark driver and
+executors need JDK 25 or newer to load the connector and its Pinot dependencies. The
+Spark image is rebuilt with that JDK in step 4.
 
 ---
 
@@ -109,18 +107,22 @@ gotchas* at the bottom for the longer-term options.
 
 ---
 
-## 4. Pull the Spark 4 + JDK 21 image
+## 4. Build the Spark 4 + JDK 25 image
 
-The official Apache Spark 4.1.1 image ships a JDK 21 variant, so no custom build is needed —
-just pull:
+Copy the JDK from the Temurin image into the Spark image:
 
 ```bash
-docker pull apache/spark:4.1.1-scala2.13-java21-python3-ubuntu
-docker tag apache/spark:4.1.1-scala2.13-java21-python3-ubuntu spark4-jdk21:local
+docker build -t spark4-jdk25:local - <<'DOCKERFILE'
+FROM eclipse-temurin:25-jdk AS jdk
+FROM apache/spark:4.1.1-scala2.13-java21-python3-ubuntu
+COPY --from=jdk /opt/java/openjdk /opt/java/openjdk
+ENV JAVA_HOME=/opt/java/openjdk
+ENV PATH=/opt/java/openjdk/bin:${PATH}
+DOCKERFILE
+docker run --rm --entrypoint java spark4-jdk25:local -version
 ```
 
-(The `spark4-jdk21:local` tag is purely cosmetic; the rest of this tutorial uses it so you can
-swap the underlying image without re-editing every command.)
+Confirm the command reports Java 25 before running the examples.
 
 ---
 
@@ -158,7 +160,7 @@ docker run --rm \
   --network=container:pinot-quickstart \
   -v /tmp/pinot-spark4-demo:/jars:ro \
   -e HOME=/tmp \
-  spark4-jdk21:local \
+  spark4-jdk25:local \
   /opt/spark/bin/spark-submit \
     --jars /jars/pinot-spark-4-connector-1.6.0-SNAPSHOT-shaded.jar,/jars/commons-lang3-3.20.0.jar \
     --conf 'spark.driver.extraClassPath=/jars/commons-lang3-3.20.0.jar' \
@@ -300,7 +302,7 @@ docker run --rm \
   -v /tmp/pinot-spark4-demo:/jars:ro \
   -v /tmp/pinot-spark4-demo/segments:/segments \
   -e HOME=/tmp \
-  spark4-jdk21:local \
+  spark4-jdk25:local \
   /opt/spark/bin/spark-submit \
     --jars /jars/pinot-spark-4-connector-1.6.0-SNAPSHOT-shaded.jar,/jars/commons-lang3-3.20.0.jar \
     --conf 'spark.driver.extraClassPath=/jars/commons-lang3-3.20.0.jar' \
@@ -345,7 +347,7 @@ docker run --rm \
   --network=container:pinot-quickstart \
   -v /tmp/pinot-spark4-demo:/jars:ro \
   -e HOME=/tmp \
-  spark4-jdk21:local \
+  spark4-jdk25:local \
   /opt/spark/bin/spark-submit \
     --jars /jars/pinot-spark-4-connector-1.6.0-SNAPSHOT-shaded.jar,/jars/commons-lang3-3.20.0.jar \
     --conf 'spark.driver.extraClassPath=/jars/commons-lang3-3.20.0.jar' \
@@ -385,10 +387,10 @@ rm -rf /tmp/pinot-spark4-demo
 
 ## Known gotchas (things that tripped me up while validating this)
 
-1. **`UnsupportedClassVersionError` on JDK 17 Spark images.** The Pinot shaded jar is class file
-   65 (JDK 21). The default `apache/spark:4.1.1` tag uses JDK 17. Use the JDK 21 variant
-   `apache/spark:4.1.1-scala2.13-java21-python3-ubuntu` (or `apache/spark:4.1.1-java21-python3`)
-   instead, as shown in §4.
+1. **`UnsupportedClassVersionError` on older Java runtimes.** The default Pinot build
+   produces class file 69 (JDK 25). Use the `spark4-jdk25:local` image built in step 4
+   for both the Spark driver and executors.
+
 2. **`NoSuchMethodError: ObjectUtils.getIfNull(...)` during the first executor task.** Spark 4's
    bundled `commons-lang3` is older than what Pinot expects. Prepend `commons-lang3:3.20.0` (or
    newer) to `spark.{driver,executor}.extraClassPath`. A follow-up PR can relocate

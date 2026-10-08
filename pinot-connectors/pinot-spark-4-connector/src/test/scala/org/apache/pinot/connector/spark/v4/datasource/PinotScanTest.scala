@@ -36,7 +36,7 @@ class PinotScanTest extends BaseTest {
     )
     val scanQuery = ScanQuery(
       "myTable",
-      Some(TableType.OFFLINE),
+      Some(TableType.REALTIME),
       "select * from myTable",
       "")
 
