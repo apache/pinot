@@ -1378,7 +1378,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       assertTrue(logicalInput.getInput(0) instanceof PinotLogicalExchange);
       DispatchableSubPlan plan = compiled.planQuery(0).getQueryPlan();
       SortNode sort = (SortNode) findWindowNode(plan).getInputs().get(0);
-      assertEquals(sort.getFetch(), -1, "Window input must outlive the broker response cap");
+      assertEquals(sort.getFetch(), Integer.MAX_VALUE, "Window input must outlive the broker response cap");
       assertTrue(sort.isSingleRunRequired());
       MailboxReceiveNode receive = (MailboxReceiveNode) sort.getInputs().get(0);
       assertTrue(receive.isAutoProfile());
@@ -1394,7 +1394,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     DispatchableSubPlan plan = planWindowQuery(environment,
         "SET windowKWayMerge='auto'; SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d");
     SortNode sort = (SortNode) findWindowNode(plan).getInputs().get(0);
-    assertEquals(sort.getFetch(), -1);
+    assertEquals(sort.getFetch(), Integer.MAX_VALUE);
     assertTrue(sort.isSingleRunRequired());
     MailboxReceiveNode receive = (MailboxReceiveNode) sort.getInputs().get(0);
     assertFalse(receive.isAutoProfile(), "A standalone planner has no tuner to consume samples");
@@ -1431,7 +1431,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       DispatchableSubPlan plan = planWindowQuery(environment,
           prefix + "SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d");
       SortNode sort = (SortNode) findWindowNode(plan).getInputs().get(0);
-      assertEquals(sort.getFetch(), -1);
+      assertEquals(sort.getFetch(), Integer.MAX_VALUE);
       assertTrue(sort.isSingleRunRequired());
       MailboxReceiveNode receive = (MailboxReceiveNode) sort.getInputs().get(0);
       assertFalse(receive.isAutoProfile());
