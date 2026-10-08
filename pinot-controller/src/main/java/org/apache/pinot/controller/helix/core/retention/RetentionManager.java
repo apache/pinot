@@ -210,7 +210,12 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         LOGGER.warn("Unknown size for segment: {} in table: {}, skip size retention", segmentName, tableNameWithType);
         return false;
       }
-      retainedBytes += size;
+      try {
+        retainedBytes = Math.addExact(retainedBytes, size);
+      } catch (ArithmeticException e) {
+        LOGGER.warn("Segment size overflow for table: {}, skip size retention", tableNameWithType);
+        return false;
+      }
       completedSegments.add(metadata);
       completedSegmentSizes.put(segmentName, size);
     }

@@ -1740,6 +1740,24 @@ public class RetentionManagerTest {
   }
 
   @Test
+  public void testSizeRetentionSkipsTableWhenSegmentSizeTotalOverflows() {
+    for (TableType tableType : List.of(TableType.OFFLINE, TableType.REALTIME)) {
+      TableConfig tableConfig = createSizeRetentionTableConfig(tableType, "100B");
+      long now = System.currentTimeMillis();
+      List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", Long.MAX_VALUE, now - 1),
+          createSizeRetentionSegment("newest", 1, now));
+      PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+      ControllerMetrics metrics = mock(ControllerMetrics.class);
+      RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager, metrics);
+
+      retentionManager.manageSizeBasedRetention(tableConfig);
+
+      verify(resourceManager, never()).deleteSegments(anyString(), anyList());
+      verifySizeRetentionGauge(metrics, tableConfig.getTableName(), 1);
+    }
+  }
+
+  @Test
   public void testSizeRetentionSkipsTableWhenActiveMetadataIsMissing() {
     TableConfig tableConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "50B");
     List<SegmentZKMetadata> segments =
