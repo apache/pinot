@@ -1771,7 +1771,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // table is created, when the server-level default allows partial upsert consumption during commit, or when a
       // pauseless table falls back to a download after its local build fails.
       _segmentLogger.error("Next consuming segment can run during download while this replace rewrites upsert or "
-          + "dedup metadata. Its snapshot can miss those rows. Use DISALLOW_ALWAYS");
+          + "dedup metadata. Use DISALLOW_ALWAYS");
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REPLACE_WITH_CONSUMPTION_DURING_DOWNLOAD, 1L);
     }
     // Keep the semaphore across a replace that drops rows, so the next consuming segment starts only once the upsert
