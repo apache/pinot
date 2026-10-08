@@ -84,11 +84,6 @@
       <artifactId>auto-service-annotations</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.jetbrains</groupId>
-      <artifactId>annotations</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
       <groupId>com.uber</groupId>
       <artifactId>h3</artifactId>
     </dependency>
