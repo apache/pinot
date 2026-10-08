@@ -49,7 +49,6 @@ import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.OperandTypes;
-import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.validate.SqlNameMatchers;
 import org.apache.calcite.tools.RelBuilder;
@@ -207,7 +206,7 @@ public class RexExpressionUtils {
     return functionCall.getAggregationBinding() == null
         ? function
         : new BoundAggregationFunction(function.getName(), function.getKind(),
-            ReturnTypes.explicit(functionCall.getDataType().toType(cluster.getTypeFactory())), OperandTypes.VARIADIC,
+            opBinding -> functionCall.getDataType().toType(opBinding.getTypeFactory()), OperandTypes.VARIADIC,
             function.getFunctionType(), functionCall.getAggregationBinding());
   }
 
