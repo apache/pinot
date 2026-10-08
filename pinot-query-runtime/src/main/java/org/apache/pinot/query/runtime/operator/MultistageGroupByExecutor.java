@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -43,6 +44,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.groupby.GroupIdGenerator;
 import org.apache.pinot.query.runtime.operator.groupby.GroupIdGeneratorFactory;
+import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.roaringbitmap.PeekableIntIterator;
@@ -186,24 +188,30 @@ public class MultistageGroupByExecutor {
     }
   }
 
-  /// Get aggregation result limited to first `maxRows` rows, ordered with `comparator`.
-  public List<Object[]> getResult(Comparator<Object[]> comparator, int maxRows) {
+  /// Get aggregation result limited to first `maxRows` rows, ordered with `collations`.
+  public List<Object[]> getResult(List<RelFieldCollation> collations, int maxRows) {
     int numGroups = Math.min(_groupIdGenerator.getNumGroups(), maxRows);
     if (numGroups == 0) {
       return List.of();
     }
 
-    // TODO: Change it to use top-K algorithm
-    PriorityQueue<Object[]> sortedRows = new PriorityQueue<>(numGroups, comparator);
     int numKeys = _groupKeyIds.length;
     int numFunctions = _aggFunctions.length;
+    int[] columnsToFinalize = _aggType.isOutputIntermediateFormat() && !_leafReturnFinalResult
+        ? collations.stream().mapToInt(RelFieldCollation::getFieldIndex).filter(index -> index >= numKeys).distinct()
+            .toArray()
+        : new int[0];
+    SortUtils.SortComparator sortComparator = new SortUtils.SortComparator(collations, true);
+    Comparator<SortedRow> comparator = (r1, r2) -> sortComparator.compare(r1.sortKeys(), r2.sortKeys());
+    PriorityQueue<SortedRow> sortedRows = new PriorityQueue<>(numGroups, comparator);
     ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
     Iterator<GroupIdGenerator.GroupKey> groupKeyIterator =
         _groupIdGenerator.getGroupKeyIterator(numKeys + numFunctions);
 
     int idx = 0;
     while (idx < numGroups && groupKeyIterator.hasNext()) {
-      Object[] row = getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes);
+      SortedRow row =
+          getSortedRow(getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes), columnsToFinalize);
       sortedRows.add(row);
       idx++;
     }
@@ -211,7 +219,8 @@ public class MultistageGroupByExecutor {
     while (groupKeyIterator.hasNext()) {
       idx++;
       // TODO: allocate new array row only if row enters set
-      Object[] row = getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes);
+      SortedRow row =
+          getSortedRow(getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes), columnsToFinalize);
       if (comparator.compare(sortedRows.peek(), row) < 0) {
         sortedRows.poll();
         sortedRows.offer(row);
@@ -223,11 +232,35 @@ public class MultistageGroupByExecutor {
     int resultSize = sortedRows.size();
     ArrayList<Object[]> result = new ArrayList<>(sortedRows.size());
     for (int i = resultSize - 1; i >= 0; i--) {
-      result.add(sortedRows.poll());
+      result.add(sortedRows.poll().row());
     }
     // reverse priority queue order because comparators are reversed
     Collections.reverse(result);
     return result;
+  }
+
+  private SortedRow getSortedRow(Object[] row, int[] columnsToFinalize) {
+    if (columnsToFinalize.length == 0) {
+      return new SortedRow(row, row);
+    }
+    // Extract each sort value once per group, retaining intermediate values for downstream aggregation.
+    Object[] sortKeys = row.clone();
+    for (int index : columnsToFinalize) {
+      AggregationFunction aggFunction = _aggFunctions[index - _groupKeyIds.length];
+      Object intermediateResult = row[index];
+      // Funnel finalization consumes the event queue, so extract from a copy.
+      if (intermediateResult instanceof PriorityQueue<?> queue) {
+        intermediateResult = new PriorityQueue<>(queue);
+      }
+      Object finalResult = aggFunction.extractFinalResult(intermediateResult);
+      sortKeys[index] = finalResult != null
+          ? TypeUtils.convert(finalResult, aggFunction.getFinalResultColumnType().getStoredType()) : null;
+    }
+    return new SortedRow(row, sortKeys);
+  }
+
+  /// Query-local heap entry keeping final sort values separate from the mergeable output row.
+  private record SortedRow(Object[] row, Object[] sortKeys) {
   }
 
   /// Get aggregation result limited to `maxRows` rows.

@@ -44,6 +44,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.BOOLEAN;
@@ -55,6 +56,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertEqualsNoOrder;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -349,6 +351,130 @@ public class AggregateOperatorTest {
     OpChainExecutionContext context =
         OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "100"));
     assertEquals(getAggregateOperator(context, nodeHint, 5, List.of(new RelFieldCollation(1))).getGroupTrimSize(), 30);
+  }
+
+  @DataProvider
+  public Object[][] distinctCountGroupTrimCases() {
+    return new Object[][]{
+        {"DISTINCTCOUNT", null, AggType.LEAF},
+        {"DISTINCTCOUNT", null, AggType.INTERMEDIATE},
+        {"DISTINCTCOUNTHLL", null, AggType.LEAF},
+        {"DISTINCTCOUNTHLL", null, AggType.INTERMEDIATE},
+        {"DISTINCTCOUNTSMARTHLL", null, AggType.LEAF},
+        {"DISTINCTCOUNTSMARTHLL", null, AggType.INTERMEDIATE},
+        {"DISTINCTCOUNTSMARTHLL", "threshold=1", AggType.LEAF},
+        {"DISTINCTCOUNTSMARTHLL", "threshold=1", AggType.INTERMEDIATE}
+    };
+  }
+
+  @Test(dataProvider = "distinctCountGroupTrimCases")
+  public void testOrderedGroupTrimPreservesIntermediateResults(String functionName, @Nullable String parameters,
+      AggType trimmedStage) {
+    OpChainExecutionContext context =
+        OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "1"));
+    ColumnDataType finalType = functionName.equals("DISTINCTCOUNTHLL") ? ColumnDataType.LONG : INT;
+    List<RexExpression> operands = parameters == null ? List.of(new RexExpression.InputRef(1))
+        : List.of(new RexExpression.InputRef(1), new RexExpression.Literal(STRING, parameters));
+    List<RexExpression.FunctionCall> aggCalls =
+        List.of(new RexExpression.FunctionCall(finalType, functionName, operands));
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING), new RelFieldCollation(0));
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    DataSchema intermediateSchema =
+        new DataSchema(new String[]{"group", "distinctCount"}, new ColumnDataType[]{INT, ColumnDataType.OBJECT});
+    BlockListMultiStageOperator.Builder partials = new BlockListMultiStageOperator.Builder(context, intermediateSchema);
+    // Each leaf has six groups with cardinalities 1..6. Disjoint partials must merge to cardinalities 2..12.
+    for (int partition = 0; partition < 2; partition++) {
+      BlockListMultiStageOperator.Builder input = new BlockListMultiStageOperator.Builder(context, inputSchema);
+      for (int group = 1; group <= 6; group++) {
+        for (int value = 0; value < group; value++) {
+          input.addRow(group, partition * 10 + value);
+        }
+      }
+      AggregateOperator leaf = new AggregateOperator(context, input.buildWithEos(),
+          new AggregateNode(-1, intermediateSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1),
+              List.of(0), AggType.LEAF, false, collations, trimmedStage == AggType.LEAF ? 1 : 0));
+      partials.addBlock(leaf.nextBlock());
+      assertTrue(leaf.nextBlock().isSuccess());
+    }
+    AggregateOperator intermediate = new AggregateOperator(context, partials.buildWithEos(),
+        new AggregateNode(-1, intermediateSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.INTERMEDIATE, false, collations, trimmedStage == AggType.INTERMEDIATE ? 1 : 0));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "distinctCount"}, new ColumnDataType[]{INT, finalType});
+    AggregateOperator result = new AggregateOperator(context, intermediate,
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.FINAL, false, null, 0));
+
+    List<Object[]> rows = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.size(), 5);
+    Map<Integer, Long> counts = new HashMap<>();
+    for (Object[] row : rows) {
+      counts.put((Integer) row[0], ((Number) row[1]).longValue());
+    }
+    assertEquals(counts, Map.of(2, 4L, 3, 6L, 4, 8L, 5, 10L, 6, 12L));
+    assertTrue(result.nextBlock().isSuccess());
+  }
+
+  @Test
+  public void testOrderedGroupTrimPreservesFunnelEvents() {
+    OpChainExecutionContext context =
+        OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "1"));
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "timestamp", "step"},
+        new ColumnDataType[]{INT, ColumnDataType.LONG, BOOLEAN});
+    List<RexExpression.FunctionCall> aggCalls = List.of(new RexExpression.FunctionCall(INT, "FUNNELMAXSTEP",
+        List.of(new RexExpression.InputRef(1), new RexExpression.Literal(ColumnDataType.LONG, 1000L),
+            new RexExpression.Literal(INT, 1), new RexExpression.InputRef(2))));
+    DataSchema intermediateSchema =
+        new DataSchema(new String[]{"group", "funnel"}, new ColumnDataType[]{INT, ColumnDataType.OBJECT});
+    AggregateOperator leaf = new AggregateOperator(context,
+        new BlockListMultiStageOperator(context,
+            OperatorTestUtil.block(inputSchema, new Object[]{1, 1L, 1}, new Object[]{2, 2L, 1})),
+        new AggregateNode(-1, intermediateSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.LEAF, false, List.of(new RelFieldCollation(1)), 1));
+    DataSchema resultSchema = new DataSchema(new String[]{"group", "funnel"}, new ColumnDataType[]{INT, INT});
+    AggregateOperator result = new AggregateOperator(context, leaf,
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.FINAL, false, null, 0));
+
+    List<Object[]> rows = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.stream().map(row -> row[0]).sorted().toList(), List.of(1, 2));
+    rows.forEach(row -> assertEquals(row[1], 1));
+    assertTrue(result.nextBlock().isSuccess());
+  }
+
+  @Test
+  public void testOrderedRawHllGroupTrimMatchesDirectResults() {
+    OpChainExecutionContext context =
+        OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "1"));
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    MseBlock.Data input = OperatorTestUtil.block(inputSchema, new Object[]{1, 1}, new Object[]{2, 2},
+        new Object[]{3, 3}, new Object[]{4, 4}, new Object[]{5, 5}, new Object[]{6, 6});
+    List<RexExpression.FunctionCall> aggCalls = List.of(new RexExpression.FunctionCall(STRING, "DISTINCTCOUNTRAWHLL",
+        List.of(new RexExpression.InputRef(1), new RexExpression.Literal(INT, 4))));
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING), new RelFieldCollation(0));
+    DataSchema resultSchema = new DataSchema(new String[]{"group", "hll"}, new ColumnDataType[]{INT, STRING});
+    AggregateOperator direct = new AggregateOperator(context, new BlockListMultiStageOperator(context, input),
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.DIRECT, false, collations, 1));
+    DataSchema intermediateSchema =
+        new DataSchema(new String[]{"group", "hll"}, new ColumnDataType[]{INT, ColumnDataType.OBJECT});
+    AggregateOperator leaf = new AggregateOperator(context, new BlockListMultiStageOperator(context, input),
+        new AggregateNode(-1, intermediateSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.LEAF, false, collations, 1));
+    AggregateOperator result = new AggregateOperator(context, leaf,
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.FINAL, false, null, 0));
+
+    List<Object[]> expected = ((MseBlock.Data) direct.nextBlock()).asRowHeap().getRows();
+    List<Object[]> actual = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
+    assertEquals(expected.size(), 5);
+    // Equal cardinalities would select groups 1..5; stored STRING ordering must retain group 6 instead of group 2.
+    assertTrue(expected.stream().anyMatch(row -> row[0].equals(6)));
+    assertEqualsNoOrder(actual.stream().map(row -> List.of(row)).toArray(),
+        expected.stream().map(row -> List.of(row)).toArray());
+    assertTrue(result.nextBlock().isSuccess());
   }
 
   private AggregateOperator getAggregateOperator(OpChainExecutionContext context, PlanNode.NodeHint nodeHint, int limit,
