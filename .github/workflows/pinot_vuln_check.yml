@@ -25,6 +25,7 @@ on:
   pull_request:
     branches:
       - master
+      - 'xiangfu0/codex1/sorted-exchange-core'
     paths:
       - "**/pom.xml"
       - "**/package.json"

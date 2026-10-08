@@ -39,6 +39,8 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.routing.SharedMailboxInfos;
@@ -62,6 +64,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -115,6 +118,60 @@ public class SortedMailboxMergeReceiveOperatorTest {
   public void tearDownMethod()
       throws Exception {
     _mocks.close();
+  }
+
+  @Test
+  public void shouldStreamLimitOverMatchingMergeBeforeSenderEos() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{1, 1}),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{2, 1}),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{3, 1}),
+        OperatorTestUtil.eosWithEmptyStats());
+    try (SortedMailboxMergeReceiveOperator receive = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON)) {
+      SortOperator sort = SortOperator.create(OperatorTestUtil.getTracingContext(), receive,
+          new SortNode(0, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), FIELD_COLLATIONS, 1, 1));
+      assertTrue(sort instanceof LimitSortOperator);
+      assertTrue(receive.isSortedOn(FIELD_COLLATIONS));
+      assertFalse(receive.isSortedOn(List.of()));
+      assertFalse(receive.isSortedOn(List.of(new RelFieldCollation(0, Direction.DESCENDING))));
+      assertEquals(((MseBlock.Data) sort.nextBlock()).asRowHeap().getRows().get(0), new Object[]{2, 1});
+      verify(_mailbox1, times(2)).poll();
+      verify(_mailbox1).earlyTerminate();
+      assertTrue(sort.nextBlock().isSuccess());
+    }
+  }
+
+  @Test
+  public void shouldApplyGlobalOffsetAndLimitAfterMerging() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
+    when(_mailbox1.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{1, 1}, new Object[]{3, 1}, new Object[]{5, 1}),
+        OperatorTestUtil.eosWithEmptyStats());
+    when(_mailbox2.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{2, 2}, new Object[]{4, 2}, new Object[]{6, 2}),
+        OperatorTestUtil.eosWithEmptyStats());
+    OpChainExecutionContext context =
+        OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadataBoth);
+    try (SortedMailboxMergeReceiveOperator operator = getOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
+        DATA_SCHEMA, FIELD_COLLATIONS, 2, 2)) {
+      assertEquals(sortKeys(drain(operator)), List.of(3, 4));
+    }
+  }
+
+  @Test
+  public void shouldEmitNoRowsForExplicitZeroFetch() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{1, 1}), OperatorTestUtil.eosWithEmptyStats());
+    OpChainExecutionContext context =
+        OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadata1);
+    try (SortedMailboxMergeReceiveOperator operator = getOperator(context, RelDistribution.Type.SINGLETON,
+        DATA_SCHEMA, FIELD_COLLATIONS, 0, -1)) {
+      assertTrue(drain(operator).isEmpty());
+      verify(_mailbox1).earlyTerminate();
+    }
   }
 
   @Test
@@ -527,11 +584,19 @@ public class SortedMailboxMergeReceiveOperatorTest {
 
   private SortedMailboxMergeReceiveOperator getOperator(OpChainExecutionContext context,
       RelDistribution.Type distributionType, DataSchema dataSchema, List<RelFieldCollation> collations) {
+    return getOperator(context, distributionType, dataSchema, collations, -1, -1);
+  }
+
+  private SortedMailboxMergeReceiveOperator getOperator(OpChainExecutionContext context,
+      RelDistribution.Type distributionType, DataSchema dataSchema, List<RelFieldCollation> collations,
+      int fetch, int offset) {
     MailboxMergeReceiveNode node = mock(MailboxMergeReceiveNode.class);
     when(node.getDistributionType()).thenReturn(distributionType);
     when(node.getSenderStageId()).thenReturn(1);
     when(node.getDataSchema()).thenReturn(dataSchema);
     when(node.getCollations()).thenReturn(collations);
+    when(node.getFetch()).thenReturn(fetch);
+    when(node.getOffset()).thenReturn(offset);
     return new SortedMailboxMergeReceiveOperator(context, node);
   }
 }
