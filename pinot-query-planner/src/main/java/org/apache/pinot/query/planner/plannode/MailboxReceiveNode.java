@@ -34,7 +34,9 @@ public class MailboxReceiveNode extends BasePlanNode {
   private RelDistribution.Type _distributionType;
   private final List<Integer> _keys;
   private final List<RelFieldCollation> _collations;
+  @Deprecated
   private final boolean _sort;
+  @Deprecated
   private final boolean _sortedOnSender;
 
   // NOTE: This is only available during query planning, and should not be serialized.
@@ -82,10 +84,14 @@ public class MailboxReceiveNode extends BasePlanNode {
     return _collations;
   }
 
+  /// @deprecated Current plans use an explicit SortNode above a plain receive.
+  @Deprecated
   public boolean isSort() {
     return _sort;
   }
 
+  /// @deprecated Current plans use MailboxMergeReceiveNode to merge ordered sender streams.
+  @Deprecated
   public boolean isSortedOnSender() {
     return _sortedOnSender;
   }
@@ -126,7 +132,7 @@ public class MailboxReceiveNode extends BasePlanNode {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof MailboxReceiveNode)) {
       return false;
     }
     if (!super.equals(o)) {

@@ -37,6 +37,7 @@ public class MailboxSendNode extends BasePlanNode {
   private final List<Integer> _keys;
   private final boolean _prePartitioned;
   private final List<RelFieldCollation> _collations;
+  @Deprecated
   private final boolean _sort;
   private final String _hashFunction;
 
@@ -124,10 +125,14 @@ public class MailboxSendNode extends BasePlanNode {
   }
 
   public void addReceiver(MailboxReceiveNode node) {
-    if (_receiverStages.get(node.getStageId())) {
-      throw new IllegalStateException("Receiver already added: " + node.getStageId());
+    addReceiver(node.getStageId());
+  }
+
+  public void addReceiver(int stageId) {
+    if (_receiverStages.get(stageId)) {
+      throw new IllegalStateException("Receiver already added: " + stageId);
     }
-    _receiverStages.set(node.getStageId());
+    _receiverStages.set(stageId);
   }
 
   public PinotRelExchangeType getExchangeType() {
@@ -154,6 +159,8 @@ public class MailboxSendNode extends BasePlanNode {
     return _collations;
   }
 
+  /// @deprecated Current plans establish sender ordering with an explicit SortNode.
+  @Deprecated
   public boolean isSort() {
     return _sort;
   }
