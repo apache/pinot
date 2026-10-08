@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.queries;
 
-import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
+import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;

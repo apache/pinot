@@ -68,10 +68,6 @@
       <artifactId>hash4j</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.tdunning</groupId>
-      <artifactId>t-digest</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.clearspring.analytics</groupId>
       <artifactId>stream</artifactId>
     </dependency>
@@ -86,6 +82,12 @@
     <dependency>
       <groupId>com.uber</groupId>
       <artifactId>h3</artifactId>
+    </dependency>
+    <!-- Zstd's deprecated API signatures reference these annotations during compilation. -->
+    <dependency>
+      <groupId>org.jetbrains</groupId>
+      <artifactId>annotations</artifactId>
+      <scope>provided</scope>
     </dependency>
 
     <!-- Test dependencies -->

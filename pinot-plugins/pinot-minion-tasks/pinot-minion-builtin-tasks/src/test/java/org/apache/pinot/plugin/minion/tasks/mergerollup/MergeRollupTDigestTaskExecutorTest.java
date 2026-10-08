@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
-import com.tdunning.math.stats.TDigest;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,6 +36,7 @@ import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskTestUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
+import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;

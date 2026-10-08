@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.tdunning.math.stats.Centroid;
-import com.tdunning.math.stats.MergingDigest;
-import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -33,6 +30,10 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
+import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -64,7 +65,7 @@ public class PercentileSmartTDigestAggregationFunctionTest {
   }
 
   /// The intermediate result must round-trip through the [PercentileTDigestAccumulator] so that
-  /// capacity-preserving digests (more centroids than a fresh legacy [MergingDigest] of the same
+  /// capacity-preserving digests (more centroids than a fresh legacy tdunning reader of the same
   /// compression can hold) are not re-encoded into bytes a receiving server cannot read.
   @Test
   public void testIntermediateResultRoundTripPreservesCapacityPreservingState() {
@@ -80,9 +81,9 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     AggregationFunction.SerializedIntermediateResult serialized =
         function.serializeIntermediateResult(intermediateResult);
     assertEquals(serialized.getType(), ObjectSerDeUtils.ObjectType.TDigest.getValue());
-    // A verbose re-encoding with 51 centroids would be rejected by a plain legacy MergingDigest.fromBytes reader
-    // with ArrayIndexOutOfBoundsException.
-    TDigest roundTripped = MergingDigest.fromBytes(ByteBuffer.wrap(serialized.getBytes()));
+    assertEquals(serialized.getBytes(), small, "Untouched legacy state must retain its original bytes");
+    PercentileRawTDigestAggregationFunctionTest.assertLegacyCompatibleShape(serialized.getBytes(), 20.0);
+    TDigest roundTripped = TDigestUtils.deserialize(ByteBuffer.wrap(serialized.getBytes()));
     assertEquals(roundTripped.size(), numCentroids);
     assertEquals(roundTripped.quantile(0.5), (numCentroids - 1.0) / 2.0, 1.0);
 
@@ -94,9 +95,9 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     assertTrue(merged instanceof PercentileTDigestAccumulator);
     assertEquals(((TDigest) merged).size(), 2L * numCentroids);
 
-    // The materialized (merged) accumulator must also serialize into plain-reader-compatible bytes.
-    TDigest mergedRoundTripped = MergingDigest.fromBytes(
-        ByteBuffer.wrap(function.serializeIntermediateResult(merged).getBytes()));
+    byte[] mergedBytes = function.serializeIntermediateResult(merged).getBytes();
+    PercentileRawTDigestAggregationFunctionTest.assertLegacyCompatibleShape(mergedBytes, 20.0);
+    TDigest mergedRoundTripped = TDigestUtils.deserialize(ByteBuffer.wrap(mergedBytes));
     assertEquals(mergedRoundTripped.size(), 2L * numCentroids);
     assertEquals(mergedRoundTripped.quantile(0.5), (numCentroids - 1.0) / 2.0, 1.0);
   }
@@ -119,7 +120,7 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     byte[] serialized = function.serializeIntermediateResult(merged).getBytes();
     assertLegacyCompatibleShape(serialized, 20.0);
     assertEquals(((TDigest) merged).byteSize(), serialized.length);
-    TDigest roundTripped = MergingDigest.fromBytes(ByteBuffer.wrap(serialized));
+    TDigest roundTripped = TDigestUtils.deserialize(ByteBuffer.wrap(serialized));
     assertEquals(roundTripped.size(), numCentroids);
     assertEquals(roundTripped.quantile(0.5), (numCentroids - 1.0) / 2.0, 1.0);
   }
@@ -142,7 +143,7 @@ public class PercentileSmartTDigestAggregationFunctionTest {
       assertTrue(merged instanceof PercentileTDigestAccumulator);
       assertEquals(((TDigest) merged).size(), numCentroids + 3L);
       assertEquals(((TDigest) merged).quantile(0.5), (numCentroids - 1.0) / 2.0, 1.0);
-      TDigest roundTripped = MergingDigest.fromBytes(
+      TDigest roundTripped = TDigestUtils.deserialize(
           ByteBuffer.wrap(function.serializeIntermediateResult(merged).getBytes()));
       assertEquals(roundTripped.size(), numCentroids + 3L);
     }

@@ -20,8 +20,6 @@ package org.apache.pinot.queries;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
-import com.tdunning.math.stats.MergingDigest;
-import com.tdunning.math.stats.TDigest;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,6 +34,7 @@ import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
+import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -186,7 +185,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       _quantileDigests[i] = quantileDigest;
       row.putValue(PERCENTILE_EST_COLUMN, ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest));
 
-      TDigest tDigest = MergingDigest.createDigest(PERCENTILE_TDIGEST_COMPRESSION);
+      TDigest tDigest = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
       for (int value : values) {
         tDigest.add(value);
       }

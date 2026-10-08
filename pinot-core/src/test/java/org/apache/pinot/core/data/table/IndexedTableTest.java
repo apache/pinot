@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.data.table;
 
-import com.tdunning.math.stats.Centroid;
-import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,6 +42,8 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction.Seri
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;

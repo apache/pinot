@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
-import com.tdunning.math.stats.Centroid;
-import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
 import java.util.List;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.testng.annotations.DataProvider;
@@ -77,7 +77,7 @@ public class PercentileTDigestValueAggregatorTest {
 
   @Test
   public void testPreAggregatedCompressionExpandsRegisteredBound() {
-    TDigest input = TDigest.createMergingDigest(200);
+    TDigest input = TDigestUtils.createMergingDigest(200);
     input.add(42.0);
     byte[] inputBytes = CustomSerDeUtils.TDIGEST_SER_DE.serialize(input);
 
@@ -136,7 +136,7 @@ public class PercentileTDigestValueAggregatorTest {
   public void testAggregatedUpdateDoesNotForceDestinationCompression() {
     PercentileTDigestValueAggregator aggregator = newAggregator(100);
     TDigest destination = aggregator.getInitialAggregatedValue(1.0);
-    TDigest source = TDigest.createMergingDigest(100);
+    TDigest source = TDigestUtils.createMergingDigest(100);
     source.add(2.0);
     source.add(3.0);
 

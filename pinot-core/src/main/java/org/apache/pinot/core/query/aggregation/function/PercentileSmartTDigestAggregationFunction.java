@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
-import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.doubles.DoubleListIterator;
 import java.util.Arrays;
@@ -36,6 +35,8 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -340,8 +341,7 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
   @Override
   public Object deserializeIntermediateResult(CustomObject customObject) {
     if (customObject.getType() == ObjectSerDeUtils.ObjectType.TDigest.getValue()) {
-      // Generic TDigest deserialization returns a plain MergingDigest. Keep this function's TDigest intermediates as
-      // accumulators so subsequent merges retain the capacity-preserving serialization path.
+      // Retain serialized state lazily so subsequent merges preserve source capacity and compression.
       return PercentileTDigestAccumulator.forSerializedTDigest(customObject.getBuffer());
     }
     return ObjectSerDeUtils.deserialize(customObject);

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.perf.aggregation;
 
-import com.tdunning.math.stats.TDigest;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.SplittableRandom;
@@ -32,6 +31,7 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -55,9 +55,9 @@ import org.roaringbitmap.RoaringBitmap;
 /// round-robin across 100, 1,000, or 10,000 result groups. It measures query-time deserialization, merging, and result
 /// extraction, but deliberately excludes segment generation and forward-index I/O.
 ///
-/// `NATIVE` measures the production end-to-end layout, including the dependency version's source compression.
+/// `NATIVE` measures the production end-to-end layout, including the current accumulator's source compression.
 /// `FIXED_VERBOSE` serializes the same raw values into a deterministic verbose centroid layout, including singleton
-/// endpoint centroids, so a TDigest 3.2 build and a 3.3 build receive byte-for-byte identical query inputs.
+/// endpoint centroids, to hold query inputs constant across implementation changes.
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 2, time = 1)
@@ -172,8 +172,7 @@ public class BenchmarkPercentileTDigestStarTreeAggregation {
     byte[][] serializedDigests = new byte[NUM_STAR_TREE_ROWS][];
     for (int rowId = 0; rowId < NUM_STAR_TREE_ROWS; rowId++) {
       if (sourceLayout == SourceLayout.NATIVE) {
-        TDigest digest = TDigestBenchmarkUtils.usePinotScaleFunction(
-            TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION));
+        TDigest digest = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
         for (int i = 0; i < SOURCE_ROWS_PER_DIGEST; i++) {
           digest.add(random.nextDouble());
         }

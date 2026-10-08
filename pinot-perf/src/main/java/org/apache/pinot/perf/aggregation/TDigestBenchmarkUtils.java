@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.perf.aggregation;
 
-import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
 
-/// Keeps benchmark inputs on Pinot's K1 policy while allowing the same benchmark bytecode to run with t-digest 3.2.
+/// Creates deterministic legacy TDigest inputs for benchmarks.
 final class TDigestBenchmarkUtils {
-  private static final String SCALE_FUNCTION_CLASS = "com.tdunning.math.stats.ScaleFunction";
   private static final int VERBOSE_ENCODING = 1;
   private static final int VERBOSE_HEADER_SIZE = 32;
   private static final int VERBOSE_CENTROID_SIZE = 16;
@@ -31,24 +29,10 @@ final class TDigestBenchmarkUtils {
   private TDigestBenchmarkUtils() {
   }
 
-  static <T extends TDigest> T usePinotScaleFunction(T digest) {
-    try {
-      Class<?> scaleFunctionClass = Class.forName(SCALE_FUNCTION_CLASS);
-      Object k1 = scaleFunctionClass.getField("K_1").get(null);
-      digest.getClass().getMethod("setScaleFunction", scaleFunctionClass).invoke(digest, k1);
-      return digest;
-    } catch (ClassNotFoundException e) {
-      // T-digest 3.2 predates configurable scale functions and already uses the K1 weight limit.
-      return digest;
-    } catch (ReflectiveOperationException e) {
-      throw new IllegalStateException("Cannot configure the TDigest benchmark scale function", e);
-    }
-  }
-
   /// Creates a deterministic verbose TDigest encoding from sorted raw values.
   ///
   /// The endpoint values remain singleton centroids, matching the TDigest boundary invariant. This layout is used as
-  /// a byte-for-byte dependency-version control by benchmarks that otherwise consume native 3.2 or 3.3 encodings.
+  /// a fixed-layout control for benchmarks that otherwise consume the current accumulator encoding.
   static byte[] createFixedVerboseBytes(double[] sortedValues, double compression) {
     if (sortedValues.length < 2) {
       throw new IllegalArgumentException("Fixed verbose benchmark input requires at least two values");

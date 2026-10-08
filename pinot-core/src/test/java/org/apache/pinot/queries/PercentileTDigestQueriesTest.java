@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.queries;
 
-import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.DoubleList;
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -43,6 +42,7 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;

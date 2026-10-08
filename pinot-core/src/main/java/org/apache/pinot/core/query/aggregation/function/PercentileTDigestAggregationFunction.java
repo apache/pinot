@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.tdunning.math.stats.TDigest;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
@@ -30,6 +29,8 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;

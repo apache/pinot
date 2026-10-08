@@ -18,18 +18,27 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-import com.tdunning.math.stats.Centroid;
-import com.tdunning.math.stats.MergingDigest;
-import com.tdunning.math.stats.ScaleFunction;
-import com.tdunning.math.stats.TDigest;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.SplittableRandom;
+import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 public class TDigestUtilsTest {
@@ -38,52 +47,41 @@ public class TDigestUtilsTest {
   private static final int VERBOSE_HEADER_SIZE = 32;
 
   @Test
-  public void testPinotMergingDigestUsesAccuracyPreservingScaleFunction() {
-    MergingDigest digest = (MergingDigest) TDigestUtils.createMergingDigest(100.0);
-    assertEquals(digest.getScaleFunction(), ScaleFunction.K_1);
+  public void testPinotDigestRetainsQuantileAccuracyAcrossLegacyBytes() {
+    TDigest digest = TDigestUtils.createMergingDigestWithLegacyBuffer(100.0);
     for (int i = 0; i < 1_000; i++) {
       digest.add(i);
     }
 
-    MergingDigest roundTripped = (MergingDigest) TDigestUtils.deserialize(TDigestUtils.serialize(digest));
-    assertEquals(roundTripped.getScaleFunction(), ScaleFunction.K_1);
+    TDigest roundTripped = TDigestUtils.deserializeFiniteWithLegacyBuffer(TDigestUtils.serialize(digest));
     assertEquals(roundTripped.size(), digest.size());
+    assertEquals(roundTripped.getMin(), 0.0);
+    assertEquals(roundTripped.getMax(), 999.0);
+    assertEquals(roundTripped.quantile(0.75), 749.5, 2.0);
   }
 
   @Test
-  public void testLegacyBufferFactoryLimitsHighCardinalityState() {
-    MergingDigest digest = (MergingDigest) TDigestUtils.createMergingDigestWithLegacyBuffer(100.0);
-    assertEquals(digest.getScaleFunction(), ScaleFunction.K_1);
-    for (int i = 0; i < 1_000; i++) {
-      digest.add(i);
+  public void testBufferedRawQuantilesRetainLegacyTwoLevelCompression() {
+    SplittableRandom random = new SplittableRandom(10);
+    double[] values = new double[94];
+    TDigest raw = TDigestUtils.createMergingDigestWithLegacyBuffer(100.0);
+    TDigest merged = TDigestUtils.createMergingDigestWithLegacyBuffer(100.0);
+    for (int start = 0; start < values.length; start += 10) {
+      TDigest partial = TDigestUtils.createMergingDigestWithLegacyBuffer(100.0);
+      for (int i = start; i < Math.min(start + 10, values.length); i++) {
+        values[i] = random.nextDouble() * 10_000;
+        raw.add(values[i]);
+        partial.add(values[i]);
+      }
+      merged.add(partial);
     }
-
-    ByteBuffer small = ByteBuffer.allocate(4_096);
-    digest.asSmallBytes(small);
-    small.flip();
-    assertEquals(small.getInt(), SMALL_ENCODING);
-    small.position(Integer.BYTES + 2 * Double.BYTES + Float.BYTES);
-    assertEquals(small.getShort(), 210, "The main buffer must retain the t-digest 3.3 capacity");
-    assertEquals(small.getShort(), 500, "The temporary buffer must retain the t-digest 3.2 footprint");
-  }
-
-  @Test
-  public void testFiniteDeserializationRetainsLegacyBufferFootprint() {
-    TDigest source = TDigestUtils.createMergingDigest(100.0);
-    for (int i = 0; i < 1_000; i++) {
-      source.add(i);
+    Arrays.sort(values);
+    for (double quantile : new double[]{0.1, 0.4, 0.5, 0.75, 0.86, 0.95}) {
+      // At this size legacy working compression retains unit centroids, whose quantiles are order statistics.
+      double expected = values[(int) (quantile * values.length)];
+      assertEquals(raw.quantile(quantile), expected, 1e-9);
+      assertEquals(merged.quantile(quantile), expected, 1e-9);
     }
-
-    MergingDigest digest = (MergingDigest) TDigestUtils.deserializeFiniteWithLegacyBuffer(
-        TDigestUtils.serialize(source));
-    ByteBuffer small = ByteBuffer.allocate(4_096);
-    digest.asSmallBytes(small);
-    small.flip();
-    assertEquals(small.getInt(), SMALL_ENCODING);
-    small.position(Integer.BYTES + 2 * Double.BYTES + Float.BYTES);
-    assertEquals(small.getShort(), 210);
-    assertEquals(small.getShort(), 500);
-    assertEquals(digest.size(), source.size());
   }
 
   @Test
@@ -202,21 +200,39 @@ public class TDigestUtilsTest {
 
   @Test
   public void testSerializeForceCompressesOnce() {
-    AtomicInteger compressionCount = new AtomicInteger();
-    MergingDigest digest = new MergingDigest(100.0) {
-      @Override
-      public void compress() {
-        compressionCount.incrementAndGet();
-        super.compress();
-      }
-    };
+    PercentileTDigestAccumulator digest = spy(new PercentileTDigestAccumulator(100.0));
     for (int i = 0; i < 1_000; i++) {
       digest.add(i);
     }
 
     TDigestUtils.serialize(digest);
-    assertEquals(compressionCount.get(), 1,
-        "Sizing the output must not invoke the final destructive compression pass");
+    verify(digest, times(1)).compress();
+  }
+
+  @Test
+  public void testCompactOutputRetainsMergeCapacityAndUnitWeightBoundaries() {
+    for (boolean weighted : new boolean[]{false, true}) {
+      PercentileTDigestAccumulator digest = new PercentileTDigestAccumulator(10.0);
+      if (weighted) {
+        digest.add(10.0, 7);
+        digest.add(20.0, 3);
+        digest.add(30.0, 11);
+      }
+      ByteBuffer compact = ByteBuffer.allocate(digest.smallByteSize());
+      digest.asSmallBytes(compact);
+      assertEquals(compact.position(), compact.capacity());
+      assertEquals(compact.getInt(0), SMALL_ENCODING);
+      int mainCapacity = compact.getShort(24);
+      assertTrue(mainCapacity >= 50, "Legacy readers need room for subsequent merges, including empty digests");
+      assertTrue(compact.getShort(26) > mainCapacity);
+      int centroidCount = compact.getShort(28);
+      if (weighted) {
+        assertEquals(compact.getFloat(30), 1.0F);
+        assertEquals(compact.getFloat(30 + 8 * (centroidCount - 1)), 1.0F);
+      } else {
+        assertEquals(centroidCount, 0);
+      }
+    }
   }
 
   @Test
@@ -251,9 +267,8 @@ public class TDigestUtilsTest {
     assertEquals(digest.getMin(), means[0]);
     assertEquals(digest.getMax(), means[centroidCount - 1]);
 
-    assertEquals(digest.centroidCount(), 211, "The payload must fit the t-digest 3.3 default main array");
     List<Centroid> centroids = List.copyOf(digest.centroids());
-    assertTrue(centroids.size() <= 211);
+    assertTrue(centroids.size() <= centroidCount, "The payload must fit the legacy verbose capacity");
     assertEquals(centroids.get(0).mean(), means[0]);
     assertEquals(centroids.get(0).count(), 1L);
     assertEquals(centroids.get(centroids.size() - 1).mean(), means[centroidCount - 1]);
@@ -292,6 +307,11 @@ public class TDigestUtilsTest {
     small.putFloat(0.5F);
 
     TDigest digest = TDigestUtils.deserialize(small.array());
+    ByteBuffer reEmitted = ByteBuffer.wrap(TDigestUtils.serialize(digest));
+    assertEquals(reEmitted.getInt(), VERBOSE_ENCODING);
+    assertEquals(reEmitted.getInt(28), 2);
+    assertEquals(reEmitted.getDouble(32), 1.0);
+    assertEquals(reEmitted.getDouble(48), 1.0);
     assertEquals(digest.getMin(), min);
     assertEquals(digest.getMax(), max);
     List<Centroid> centroids = List.copyOf(digest.centroids());
@@ -374,36 +394,49 @@ public class TDigestUtilsTest {
     assertEquals(centroids.get(2).mean(), max);
   }
 
-  private static MergingDigest craftedVerboseDigest(double compression, double[] means, double[] weights) {
-    return new MergingDigest(compression) {
-      @Override
-      public long size() {
-        return means.length;
-      }
+  @Test
+  public void testMalformedCentroidsAndResourceHeadersAreRejected() {
+    byte[] bytes = verboseBytes(100.0, new double[]{0.0, 1.0}, new double[]{1.0, 1.0});
+    assertThrows(IllegalArgumentException.class, () -> {
+      byte[] malformed = bytes.clone();
+      ByteBuffer.wrap(malformed).putDouble(20, Double.MAX_VALUE);
+      TDigestUtils.deserialize(malformed);
+    });
+    assertThrows(IllegalArgumentException.class, () -> {
+      byte[] malformed = bytes.clone();
+      ByteBuffer.wrap(malformed).putDouble(40, Double.NaN);
+      TDigestUtils.deserialize(malformed);
+    });
+    for (double weight : new double[]{0.0, -1.0, Double.NaN, Double.POSITIVE_INFINITY}) {
+      assertThrows(IllegalArgumentException.class, () -> {
+        byte[] malformed = bytes.clone();
+        ByteBuffer.wrap(malformed).putDouble(32, weight);
+        TDigestUtils.deserialize(malformed);
+      });
+    }
+    assertThrows(IllegalArgumentException.class, () -> {
+      byte[] malformed = bytes.clone();
+      ByteBuffer.wrap(malformed).putDouble(40, 2.0);
+      TDigestUtils.deserialize(malformed);
+    });
+    assertThrows(BufferUnderflowException.class, () -> {
+      byte[] malformed = bytes.clone();
+      ByteBuffer.wrap(malformed).putInt(28, Integer.MAX_VALUE);
+      TDigestUtils.deserialize(malformed);
+    });
+  }
 
-      @Override
-      public double compression() {
-        return compression;
-      }
-
-      @Override
-      public int centroidCount() {
-        return means.length;
-      }
-
-      @Override
-      public void asBytes(ByteBuffer buffer) {
-        buffer.putInt(VERBOSE_ENCODING);
-        buffer.putDouble(means[0]);
-        buffer.putDouble(means[means.length - 1]);
-        buffer.putDouble(compression);
-        buffer.putInt(means.length);
-        for (int i = 0; i < means.length; i++) {
-          buffer.putDouble(weights[i]);
-          buffer.putDouble(means[i]);
-        }
-      }
-    };
+  private static TDigest craftedVerboseDigest(double compression, double[] means, double[] weights) {
+    TDigest digest = mock(TDigest.class);
+    when(digest.size()).thenReturn((long) means.length);
+    when(digest.compression()).thenReturn(compression);
+    when(digest.centroidCount()).thenReturn(means.length);
+    doAnswer(invocation -> {
+      ByteBuffer buffer = invocation.getArgument(0);
+      buffer.put(verboseBytes(compression, means, weights));
+      return null;
+    }).when(digest).asBytes(any(ByteBuffer.class));
+    return digest;
   }
 
   private static byte[] verboseBytes(double compression, double[] means, double[] weights) {

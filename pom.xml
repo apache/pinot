@@ -253,7 +253,6 @@
     <hadoop-shaded-protobuf_3_25.version>1.5.0</hadoop-shaded-protobuf_3_25.version>
     <clearspring-stream-lib.version>2.9.8</clearspring-stream-lib.version>
     <datasketches-java.version>9.0.0</datasketches-java.version>
-    <t-digest.version>3.3</t-digest.version>
     <picocli.version>4.7.7</picocli.version>
     <tyrus-standalone-client.version>2.2.2</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
@@ -1442,11 +1441,6 @@
         <groupId>com.dynatrace.hash4j</groupId>
         <artifactId>hash4j</artifactId>
         <version>${dynatrace.hash4j.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.tdunning</groupId>
-        <artifactId>t-digest</artifactId>
-        <version>${t-digest.version}</version>
       </dependency>
       <dependency>
         <groupId>com.jayway.jsonpath</groupId>

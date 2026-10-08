@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
-import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.data.FieldSpec.DataType;

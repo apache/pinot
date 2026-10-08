@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
-import com.tdunning.math.stats.Centroid;
-import com.tdunning.math.stats.ScaleFunction;
-import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -307,8 +306,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
         NonFiniteAwareTDigest wrapped = (NonFiniteAwareTDigest) other;
         long negativeInfinityWeight = wrapped._negativeInfinityWeight;
         long positiveInfinityWeight = wrapped._positiveInfinityWeight;
-        // MergingDigest.add(List) copies the implementation's double-precision weight arrays directly. The generic
-        // add(TDigest) path goes through Centroid.count(), which is limited to an int and truncates large weights.
+        // Merging shared state preserves double-precision weights without narrowing through Centroid.count().
         wrapped.invalidateCaches();
         invalidateCaches();
         if (wrapped._finiteDigest.size() > 0L) {
@@ -392,7 +390,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       List<Centroid> centroids = getAllCentroids();
       List<Centroid> copies = new ArrayList<>(centroids.size());
       for (Centroid centroid : centroids) {
-        copies.add(Centroid.createWeighted(centroid.mean(), centroid.count(), centroid.data()));
+        copies.add(new Centroid(centroid.mean(), centroid.count()));
       }
       return copies;
     }
@@ -420,25 +418,6 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
     @Override
     public void asSmallBytes(ByteBuffer buffer) {
       buffer.put(getSerializedBytes());
-    }
-
-    @Override
-    public TDigest recordAllData() {
-      invalidateCaches();
-      _finiteDigest.recordAllData();
-      return this;
-    }
-
-    @Override
-    public boolean isRecording() {
-      return _finiteDigest.isRecording();
-    }
-
-    @Override
-    public void setScaleFunction(ScaleFunction scaleFunction) {
-      invalidateCaches();
-      _finiteDigest.setScaleFunction(scaleFunction);
-      super.setScaleFunction(scaleFunction);
     }
 
     @Override
@@ -603,7 +582,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
         return;
       }
       if (unitWeightAtStart) {
-        centroids.add(Centroid.createWeighted(value, 1, null));
+        centroids.add(new Centroid(value, 1));
         weight--;
       }
       boolean appendUnitWeightAtEnd = unitWeightAtEnd && weight > 0L;
@@ -612,11 +591,11 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       }
       while (weight > 0L) {
         int centroidWeight = (int) Math.min(weight, Integer.MAX_VALUE);
-        centroids.add(Centroid.createWeighted(value, centroidWeight, null));
+        centroids.add(new Centroid(value, centroidWeight));
         weight -= centroidWeight;
       }
       if (appendUnitWeightAtEnd) {
-        centroids.add(Centroid.createWeighted(value, 1, null));
+        centroids.add(new Centroid(value, 1));
       }
     }
 

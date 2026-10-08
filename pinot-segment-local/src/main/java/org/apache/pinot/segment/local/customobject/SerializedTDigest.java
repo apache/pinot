@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.customobject;
 
-import com.tdunning.math.stats.TDigest;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 
