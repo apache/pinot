@@ -78,7 +78,8 @@ public class ServerPlanRequestVisitorTest {
   public void shouldPushSinglePhysicalSelectionSortIntoLeaf() {
     TableScanNode scan = new TableScanNode(STAGE_ID, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(),
         "testTable", List.of("orderKey"));
-    SortNode sort = new SortNode(STAGE_ID, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(scan), COLLATIONS, 10, -1);
+    SortNode sort = new SortNode(STAGE_ID, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(scan), COLLATIONS, 10, -1)
+        .requiringSingleRun();
     MailboxSendNode send = new MailboxSendNode(STAGE_ID, DATA_SCHEMA, List.of(sort), 2,
         PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED, List.of(), false, List.of(), false,
         null);

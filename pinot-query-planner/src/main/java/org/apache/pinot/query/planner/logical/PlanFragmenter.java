@@ -207,7 +207,7 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     BaseMailboxReceiveNode mailboxReceiveNode = node.isKWayMerge()
         ? new MailboxMergeReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
             senderPlanFragmentId, exchangeType, distributionType, keys, node.getCollations(),
-            ((KWayMergeExchangeNode) node).getFetch(), ((KWayMergeExchangeNode) node).getOffset(), mailboxSendNode)
+            node.getMergeFetch(), node.getMergeOffset(), mailboxSendNode)
         : new MailboxReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
             senderPlanFragmentId, exchangeType, distributionType, keys, node.getCollations(), node.isSortOnReceiver(),
             node.isSortOnSender(), mailboxSendNode);
