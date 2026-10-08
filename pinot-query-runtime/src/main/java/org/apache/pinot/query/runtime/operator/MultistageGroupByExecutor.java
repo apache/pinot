@@ -373,8 +373,18 @@ public class MultistageGroupByExecutor {
     int numRows = groupByKeys.length;
     int numFunctions = _aggFunctions.length;
     Object[][] intermediateResults = new Object[numFunctions][];
+    // Serialized custom object intermediate results are merged straight from the data block (see mergeSerialized).
+    DataBlock[] serializedResults = new DataBlock[numFunctions];
+    int[] serializedResultColIds = new int[numFunctions];
     for (int i = 0; i < numFunctions; i++) {
-      intermediateResults[i] = AggregateOperator.getIntermediateResults(_aggFunctions[i], block);
+      if (!_leafReturnFinalResult) {
+        serializedResults[i] = AggregateOperator.getSerializedIntermediateResults(_aggFunctions[i], block);
+      }
+      if (serializedResults[i] != null) {
+        serializedResultColIds[i] = AggregateOperator.getIntermediateResultColId(_aggFunctions[i]);
+      } else {
+        intermediateResults[i] = AggregateOperator.getIntermediateResults(_aggFunctions[i], block);
+      }
     }
     if (_leafReturnFinalResult) {
       for (int i = 0; i < numRows; i++) {
@@ -408,8 +418,11 @@ public class MultistageGroupByExecutor {
           mergedResults = _mergeResultHolder.get(groupByKey);
         }
         for (int j = 0; j < numFunctions; j++) {
-          mergedResults[j] =
-              AggregationFunctionUtils.merge(_aggFunctions[j], mergedResults[j], intermediateResults[j][i]);
+          DataBlock serialized = serializedResults[j];
+          mergedResults[j] = serialized != null
+              ? AggregationFunctionUtils.mergeSerialized(_aggFunctions[j], mergedResults[j],
+                  serialized.getCustomObject(i, serializedResultColIds[j]))
+              : AggregationFunctionUtils.merge(_aggFunctions[j], mergedResults[j], intermediateResults[j][i]);
         }
       }
     }

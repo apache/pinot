@@ -705,11 +705,10 @@ public class DataBlockBuilder {
       AggregationFunction.SerializedIntermediateResult value)
       throws IOException {
     writeVarOffsetInFixed(fixedSize, varSize);
-    int type = value.getType();
-    byte[] bytes = value.getBytes();
-    fixedSize.putInt(bytes.length);
-    varSize.writeInt(type);
-    varSize.write(bytes);
+    fixedSize.putInt(value.getSize());
+    varSize.writeInt(value.getType());
+    // Writes straight into the pages, so a large intermediate result never needs a full-size byte array.
+    value.writeTo(varSize);
   }
 
   private static void setNull(ByteBuffer fixedSize, PagedPinotOutputStream varSize)

@@ -132,6 +132,17 @@ public class AggregationFunctionUtils {
     return expressions;
   }
 
+  /// Merges a serialized intermediate result into `intermediateResult` (see
+  /// [AggregationFunction#mergeSerializedIntermediateResult]). A `null` serialized value does not change the result.
+  @Nullable
+  public static <I> I mergeSerialized(AggregationFunction<I, ?> aggregationFunction, @Nullable I intermediateResult,
+      @Nullable CustomObject serialized) {
+    if (serialized == null) {
+      return intermediateResult;
+    }
+    return aggregationFunction.mergeSerializedIntermediateResult(intermediateResult, serialized);
+  }
+
   /// Merges two intermediate results, either of which may be `null`.
   ///
   /// A `null` intermediate result means nothing was aggregated, and is thus the identity of merging, which means the
