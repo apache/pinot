@@ -134,7 +134,7 @@ public class SegmentCompressionStatsReaderTest {
 
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn("v7");
-    when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>(Map.of("value", columnMetadata)));
+    when(segmentMetadata.getAllColumnMetadata()).thenReturn(List.of(columnMetadata));
 
     SegmentCompressionStatsContribution contribution = SegmentCompressionStatsReader.read(segmentMetadata, true);
     assertTrue(contribution.isComplete());
