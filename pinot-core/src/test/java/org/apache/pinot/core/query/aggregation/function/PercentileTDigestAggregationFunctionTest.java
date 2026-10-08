@@ -1501,13 +1501,13 @@ public class PercentileTDigestAggregationFunctionTest {
     SKEWED {
       @Override
       double value(double unitValue) {
-        return Math.pow(unitValue, 8.0);
+        return StrictMath.pow(unitValue, 8.0);
       }
     },
     HEAVY_TAIL {
       @Override
       double value(double unitValue) {
-        return Math.pow(1.0 - 0.999 * unitValue, -1.5) - 1.0;
+        return StrictMath.pow(1.0 - 0.999 * unitValue, -1.5) - 1.0;
       }
     },
     BIMODAL {

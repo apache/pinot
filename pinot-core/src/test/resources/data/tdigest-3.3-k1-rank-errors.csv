@@ -19,6 +19,7 @@
 # Each of the 270 rows retains its merge order and input type. SHA-256 covers sorted raw big-endian IEEE 754
 # doubles followed by the actual merge permutation's big-endian int source indices. Tests fingerprint the same
 # index array used by their merge loop before applying the six rank bounds.
+# StrictMath.pow keeps seeded distribution doubles identical across platforms and JVM execution modes.
 # Generated with -da because historical 3.3 duplicate-boundary assertions abort valid cases.
 # Regenerate/check from any checkout, including shallow CI, with JDK 25 and isolated pinned legacy dependencies:
 # bash compatibility-verifier/tdigest-compatibility/generate-rank-errors.sh

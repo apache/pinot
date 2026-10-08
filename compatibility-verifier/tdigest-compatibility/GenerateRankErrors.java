@@ -111,8 +111,8 @@ public final class GenerateRankErrors {
   private static double value(String distribution, double unitValue) {
     return switch (distribution) {
       case "UNIFORM" -> unitValue;
-      case "SKEWED" -> Math.pow(unitValue, 8);
-      case "HEAVY_TAIL" -> Math.pow(1 - 0.999 * unitValue, -1.5) - 1;
+      case "SKEWED" -> StrictMath.pow(unitValue, 8);
+      case "HEAVY_TAIL" -> StrictMath.pow(1 - 0.999 * unitValue, -1.5) - 1;
       case "BIMODAL" -> unitValue < 0.5 ? 0.1 + 0.2 * unitValue : 0.7 + 0.2 * unitValue;
       case "DUPLICATE_HEAVY" -> unitValue < 0.7 ? 0.1 : unitValue < 0.9 ? 0.5 : 0.9;
       default -> throw new IllegalArgumentException("Unknown distribution: " + distribution);
