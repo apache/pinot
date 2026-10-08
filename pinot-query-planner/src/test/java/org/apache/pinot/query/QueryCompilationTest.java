@@ -31,6 +31,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.query.QueryEnvironment.CompiledQuery;
@@ -1186,6 +1187,109 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       }
     }
     return null;
+  }
+
+  // Verify the legacy sender flag stays disabled while the explicit sort owns the run.
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testSortedMergeJoinColocation() {
+    QueryEnvironment capableEnvironment =
+        getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS, SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP, true);
+    for (boolean colocated : new boolean[]{false, true}) {
+      String hint = ", is_colocated_by_join_keys='" + colocated + "'";
+      String query = "SELECT /*+ joinOptions(join_strategy='sorted'" + hint + ") */ "
+          + "a.col2, b.col1 FROM a JOIN b ON a.col2 = b.col1";
+      DispatchableSubPlan dispatchableSubPlan;
+      try (QueryEnvironment.CompiledQuery compiledQuery = capableEnvironment.compile(query)) {
+        dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      }
+      List<MailboxSendNode> joinInputSends = findJoinInputSends(dispatchableSubPlan);
+      assertEquals(joinInputSends.size(), 2);
+      JoinNode join = findJoinNode(dispatchableSubPlan);
+      assertNotNull(join);
+      assertEquals(join.getJoinStrategy(), JoinNode.JoinStrategy.SORTED);
+      assertEquals(join.getInputs().size(), 2);
+      for (int i = 0; i < join.getInputs().size(); i++) {
+        assertTrue(join.getInputs().get(i) instanceof MailboxMergeReceiveNode);
+        MailboxMergeReceiveNode receive = (MailboxMergeReceiveNode) join.getInputs().get(i);
+        List<Integer> keys = i == 0 ? join.getLeftKeys() : join.getRightKeys();
+        List<RelFieldCollation> collations = keys.stream().map(key -> new RelFieldCollation(key,
+            RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST)).toList();
+        assertEquals(receive.getCollations(), collations);
+        assertEquals(receive.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+        assertEquals(receive.getKeys(), keys);
+        assertEquals(receive.getFetch(), -1);
+        assertEquals(receive.getOffset(), -1);
+        MailboxSendNode sender = receive.getSender();
+        assertNotNull(sender);
+        assertFalse(sender.isSort());
+        assertEquals(sender.isPrePartitioned(), colocated);
+        assertTrue(sender.getInputs().get(0) instanceof SortNode);
+        SortNode sort = (SortNode) sender.getInputs().get(0);
+        assertEquals(sort.getCollations(), collations);
+        assertEquals(sort.getFetch(), -1);
+        assertTrue(sort.isSingleRunRequired());
+        assertEquals(sort.getOffset(), -1);
+      }
+    }
+  }
+
+  @Test
+  public void testSortedMergeJoinInfersPrePartitioning() {
+    QueryEnvironment capableEnvironment =
+        getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS, SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP, true);
+    String query = "SELECT /*+ joinOptions(join_strategy='sorted') */ a.col2, b.col1 FROM "
+        + "a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ JOIN "
+        + "b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ "
+        + "ON a.col2 = b.col1";
+    List<MailboxSendNode> senders = findJoinInputSends(planSortedJoinQuery(capableEnvironment, query));
+    assertEquals(senders.size(), 2);
+    for (MailboxSendNode sender : senders) {
+      assertTrue(sender.isPrePartitioned(), "Merge exchange must preserve input distribution trait inference");
+    }
+  }
+
+  @Test
+  public void testSortedMergeJoinRequiresCapability() {
+    String query = "SELECT /*+ joinOptions(join_strategy='sorted') */ a.col2, b.col1 FROM a JOIN b ON a.col2 = b.col1";
+    for (String options : List.of("", "SET streamingSortedMailboxReceive=true; SET windowKWayMerge=true; ")) {
+      RuntimeException exception =
+          expectThrows(RuntimeException.class, () -> planSortedJoinQuery(_queryEnvironment, options + query));
+      assertTrue(Throwables.getStackTraceAsString(exception)
+          .contains("Sorted merge join requires a cluster supporting k-way merge plans"));
+    }
+    QueryEnvironment capableEnvironment =
+        getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS, SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP, true);
+    RuntimeException exception = expectThrows(RuntimeException.class,
+        () -> planSortedJoinQuery(capableEnvironment, "SET usePhysicalOptimizer=true; " + query));
+    assertTrue(Throwables.getStackTraceAsString(exception).contains("Sorted merge join"));
+  }
+
+  private static DispatchableSubPlan planSortedJoinQuery(QueryEnvironment environment, String query) {
+    try (CompiledQuery compiled = environment.compile(query)) {
+      return compiled.planQuery(0).getQueryPlan();
+    }
+  }
+
+  /// Finds the [MailboxSendNode] fragment roots that feed into the join stage (i.e. the two join-input sends).
+  private List<MailboxSendNode> findJoinInputSends(DispatchableSubPlan dispatchableSubPlan) {
+    DispatchablePlanFragment joinStage = findJoinStage(dispatchableSubPlan);
+    assertNotNull(joinStage, "Should have a join stage");
+    int joinStageId = joinStage.getPlanFragment().getFragmentId();
+    List<MailboxSendNode> sends = new ArrayList<>();
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      PlanNode root = fragment.getPlanFragment().getFragmentRoot();
+      if (root instanceof MailboxSendNode) {
+        MailboxSendNode sendNode = (MailboxSendNode) root;
+        for (int receiverStageId : sendNode.getReceiverStageIds()) {
+          if (receiverStageId == joinStageId) {
+            sends.add(sendNode);
+            break;
+          }
+        }
+      }
+    }
+    return sends;
   }
 
   /// Tests that FULL OUTER JOIN with only non-equi conditions uses a singleton worker for the join stage, to ensure
