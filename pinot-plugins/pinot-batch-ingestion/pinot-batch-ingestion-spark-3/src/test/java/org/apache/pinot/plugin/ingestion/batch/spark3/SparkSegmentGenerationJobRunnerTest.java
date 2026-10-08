@@ -59,6 +59,8 @@ public class SparkSegmentGenerationJobRunnerTest {
     _sparkContext = new SparkContext("local", SparkSegmentGenerationJobRunnerTest.class.getName());
   }
 
+  // Cover ingestion policy for legacy FieldSpec transforms in persisted schemas.
+  @SuppressWarnings("deprecation")
   private SegmentGenerationJobSpec setupAppendTableSpec(File testDir)
       throws Exception {
     File inputDir = new File(testDir, "input");
@@ -116,6 +118,8 @@ public class SparkSegmentGenerationJobRunnerTest {
     return jobSpec;
   }
 
+  // Cover ingestion policy for legacy FieldSpec transforms in persisted schemas.
+  @SuppressWarnings("deprecation")
   private SegmentGenerationJobSpec setupRefreshTableSpec(File testDir)
       throws Exception {
     File inputDir = new File(testDir, "input");

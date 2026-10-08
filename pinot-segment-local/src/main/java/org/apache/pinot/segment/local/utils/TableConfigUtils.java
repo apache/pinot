@@ -242,7 +242,10 @@ public final class TableConfigUtils {
 
   public static void validateGroovyPolicy(TableConfig tableConfig, Schema schema, boolean disableGroovy) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      validateGroovyPolicy(fieldSpec.getTransformFunction(), disableGroovy);
+      // Persisted schemas can still carry legacy FieldSpec transforms and must honor the ingestion policy.
+      @SuppressWarnings("deprecation")
+      String transformFunction = fieldSpec.getTransformFunction();
+      validateGroovyPolicy(transformFunction, disableGroovy);
     }
 
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();

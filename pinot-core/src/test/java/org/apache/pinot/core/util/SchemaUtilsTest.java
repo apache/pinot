@@ -490,6 +490,8 @@ public class SchemaUtilsTest {
     SchemaUtils.validate(pinotSchema);
   }
 
+  // Cover ingestion policy for legacy FieldSpec transforms in persisted schemas.
+  @SuppressWarnings("deprecation")
   @Test
   public void testFieldSpecTransformGroovyPolicy() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)

@@ -177,6 +177,8 @@ public class PinotSchemaRestletResourceTest {
         () -> adminClient.getSchemaClient().updateSchema(newSchemaName, schema.toSingleLineJsonString()));
   }
 
+  // Cover ingestion policy for legacy FieldSpec transforms in persisted schemas.
+  @SuppressWarnings("deprecation")
   @Test
   public void testFieldSpecGroovyPolicyAcrossSchemaEndpoints()
       throws Exception {

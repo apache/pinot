@@ -77,8 +77,8 @@ public class SegmentGenerationTaskRunnerTest {
 
       SegmentGenerationTaskSpec enabledTaskSpec = createTaskSpec(testDir);
       String segmentName = new SegmentGenerationTaskRunner(enabledTaskSpec, IngestionGroovyPolicy.ENABLED).run();
-      try (PinotSegmentRecordReader recordReader =
-          new PinotSegmentRecordReader(new File(enabledTaskSpec.getOutputDirectoryPath(), segmentName))) {
+      try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+        recordReader.init(new File(enabledTaskSpec.getOutputDirectoryPath(), segmentName), null, null, false);
         assertEquals(recordReader.next().getValue("derived"), "cba");
       }
     } finally {
@@ -86,6 +86,8 @@ public class SegmentGenerationTaskRunnerTest {
     }
   }
 
+  // Cover ingestion policy for legacy FieldSpec transforms in persisted schemas.
+  @SuppressWarnings("deprecation")
   private static SegmentGenerationTaskSpec createTaskSpec(File testDir)
       throws Exception {
     File inputFile = new File(testDir, "input");

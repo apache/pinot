@@ -145,6 +145,8 @@ public class ManualAuthorizationValidationOrderTest {
     verifyNoInteractions(resourceManager);
   }
 
+  // Cover ingestion policy for legacy FieldSpec transforms in persisted schemas.
+  @SuppressWarnings("deprecation")
   private static Schema invalidGroovySchema() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("source", DataType.STRING)

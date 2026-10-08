@@ -107,6 +107,8 @@ public class SegmentGenerationWithFilterRecordsTest implements PinotBuffersAfter
     }
   }
 
+  // Cover ingestion policy for legacy FieldSpec transforms in persisted schemas.
+  @SuppressWarnings("deprecation")
   @Test
   public void testOfflineSegmentGenerationEnforcesLegacyFieldSpecGroovyPolicy()
       throws Exception {
@@ -128,7 +130,8 @@ public class SegmentGenerationWithFilterRecordsTest implements PinotBuffersAfter
 
       FunctionEvaluatorFactory.setIngestionGroovyDisabled(false);
       File segmentDir = buildSegment(tableConfig, legacySchema);
-      try (PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(segmentDir)) {
+      try (PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader()) {
+        segmentRecordReader.init(segmentDir, null, null, false);
         Assert.assertEquals(segmentRecordReader.next().getValue("derived"),
             new StringBuilder(STRING_VALUES[0]).reverse().toString());
       }
@@ -137,6 +140,8 @@ public class SegmentGenerationWithFilterRecordsTest implements PinotBuffersAfter
     }
   }
 
+  // Cover ingestion policy for legacy FieldSpec transforms in persisted schemas.
+  @SuppressWarnings("deprecation")
   @Test
   public void testColumnarSegmentGenerationRejectsLegacyFieldSpecGroovy()
       throws Exception {

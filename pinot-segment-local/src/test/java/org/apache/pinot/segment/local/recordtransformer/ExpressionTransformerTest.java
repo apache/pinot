@@ -55,6 +55,8 @@ public class ExpressionTransformerTest {
     FunctionEvaluatorFactory.setIngestionGroovyDisabled(true);
   }
 
+  // Cover ingestion policy for legacy FieldSpec transforms in persisted schemas.
+  @SuppressWarnings("deprecation")
   @Test
   public void testRuntimeGroovyPolicyForRealtimeAndOfflineTransforms() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName("legacySchema")

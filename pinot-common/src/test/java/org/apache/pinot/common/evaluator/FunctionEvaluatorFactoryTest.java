@@ -128,6 +128,8 @@ public class FunctionEvaluatorFactoryTest {
     }
   }
 
+  // Cover ingestion policy for legacy FieldSpec transforms in persisted schemas.
+  @SuppressWarnings("deprecation")
   @Test
   public void testBuiltInTransformUnaffected() {
     FunctionEvaluatorFactory.validateIngestionGroovyPolicy("reverse(source)");

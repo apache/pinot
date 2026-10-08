@@ -131,7 +131,7 @@ public class HelixSetupUtils {
   public static boolean reconcileIngestionGroovyPolicy(String zkAddress, String clusterName,
       boolean explicitlyConfigured,
       boolean disableGroovy) {
-    ZkBaseDataAccessor<ZNRecord> accessor = new ZkBaseDataAccessor<>(zkAddress, new ZNRecordSerializer());
+    ZkBaseDataAccessor<ZNRecord> accessor = new ZkBaseDataAccessor.Builder<ZNRecord>().setZkAddress(zkAddress).build();
     try {
       HelixConfigScope configScope =
           new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(clusterName).build();

@@ -49,6 +49,8 @@ import org.testng.annotations.Test;
 
 public class HadoopSegmentGenerationJobRunnerTest {
 
+  // Cover ingestion policy for legacy FieldSpec transforms in persisted schemas.
+  @SuppressWarnings("deprecation")
   @Test
   public void testSegmentGeneration() throws Exception {
     File testDir = Files.createTempDirectory("testSegmentGeneration-").toFile();

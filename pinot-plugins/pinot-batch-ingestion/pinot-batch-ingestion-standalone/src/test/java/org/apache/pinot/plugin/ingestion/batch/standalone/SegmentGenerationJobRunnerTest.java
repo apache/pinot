@@ -236,6 +236,8 @@ public class SegmentGenerationJobRunnerTest {
     return testDir;
   }
 
+  // Cover ingestion policy for legacy FieldSpec transforms in persisted schemas.
+  @SuppressWarnings("deprecation")
   private File makeSchemaFile(File testDir, String schemaName) throws IOException {
     File schemaFile = new File(testDir, "schema");
     Schema schema = new SchemaBuilder()
