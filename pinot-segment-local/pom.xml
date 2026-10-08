@@ -83,12 +83,6 @@
       <groupId>com.uber</groupId>
       <artifactId>h3</artifactId>
     </dependency>
-    <!-- Zstd's deprecated API signatures reference these annotations during compilation. -->
-    <dependency>
-      <groupId>org.jetbrains</groupId>
-      <artifactId>annotations</artifactId>
-      <scope>provided</scope>
-    </dependency>
 
     <!-- Test dependencies -->
     <dependency>
