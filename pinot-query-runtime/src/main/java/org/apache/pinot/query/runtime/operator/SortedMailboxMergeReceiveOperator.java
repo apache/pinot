@@ -41,7 +41,6 @@ import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.utils.AsyncStream;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,8 +64,6 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
   private final Comparator<Object[]> _comparator;
   private final PriorityQueue<SenderCursor> _readyCursors;
   private final boolean _singleSortedSender;
-  private int _rowsToSkip;
-  private long _rowsToEmit;
   /// Senders that have not finished but do not currently have a row ready. Nothing can be emitted while this is
   /// non-empty because any one of these senders may hold the next row.
   private final Set<SenderCursor> _starvedCursors = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -77,11 +74,9 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
   private MseBlock _eosBlock;
 
   public SortedMailboxMergeReceiveOperator(OpChainExecutionContext context, MailboxMergeReceiveNode node) {
-    super(context, node);
+    super(context, node.getDistributionType(), node.getSenderStageId());
     Preconditions.checkState(!CollectionUtils.isEmpty(node.getCollations()), "Field collations must be set");
     _dataSchema = node.getDataSchema();
-    _rowsToSkip = Math.max(node.getOffset(), 0);
-    _rowsToEmit = node.getFetch() < 0 ? Long.MAX_VALUE : node.getFetch();
     _comparator = new SortUtils.SortComparator(List.copyOf(node.getCollations()), false);
     List<AsyncStream<ReceivingMailbox.MseBlockWithStats>> streams = _multiConsumer.getLiveStreamsSnapshot();
     _readyCursors = new PriorityQueue<>(Math.max(streams.size(), 1),
@@ -114,31 +109,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
     if (_isEarlyTerminated) {
       return readUntilEos();
     }
-    if (_rowsToEmit == 0) {
-      earlyTerminate();
-      return readUntilEos();
-    }
-    while (true) {
-      MseBlock block = _singleSortedSender ? readSingleSortedSender() : mergeNextBlock();
-      if (block.isEos()) {
-        return block;
-      }
-      if (_rowsToSkip == 0 && _rowsToEmit == Long.MAX_VALUE) {
-        return block;
-      }
-      List<Object[]> rows = ((MseBlock.Data) block).asRowHeap().getRows();
-      int from = Math.min(_rowsToSkip, rows.size());
-      _rowsToSkip -= from;
-      int count = (int) Math.min(rows.size() - from, _rowsToEmit);
-      _rowsToEmit -= count;
-      if (_rowsToEmit == 0) {
-        earlyTerminate();
-      }
-      if (count > 0) {
-        return from == 0 && count == rows.size() ? block
-            : new RowHeapDataBlock(rows.subList(from, from + count), _dataSchema);
-      }
-    }
+    return _singleSortedSender ? readSingleSortedSender() : mergeNextBlock();
   }
 
   /// Passes through one sorted sender without copying its rows through the merge heap.
@@ -149,7 +120,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
         return terminate(block);
       }
       MseBlock.Data dataBlock = (MseBlock.Data) block;
-      checkActiveTerminationAndSampleUsage();
+      checkTerminationAndSampleUsage();
 
       if (dataBlock.getNumRows() > 0) {
         return dataBlock;
@@ -191,8 +162,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
       } else if (!cursor._finished) {
         _starvedCursors.add(cursor);
       }
-      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rows.size(), MERGE_SCOPE,
-          _context.getActiveDeadlineMs());
+      checkTerminationAndSampleUsagePeriodically(rows.size(), MERGE_SCOPE);
     }
     if (rows.isEmpty()) {
       return terminate(SuccessMseBlock.INSTANCE);
@@ -229,7 +199,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
     SenderCursor cursor = _cursorsByStream.get(stream);
     Preconditions.checkState(cursor != null, "Read a data block from unknown mailbox: %s", stream.getId());
     List<Object[]> rows = ((MseBlock.Data) block).asRowHeap().getRows();
-    checkActiveTerminationAndSampleUsage();
+    checkTerminationAndSampleUsage();
 
     cursor.offer(rows);
     updateFinishedCursors();
@@ -251,10 +221,6 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
         }
       }
     }
-  }
-
-  private void checkActiveTerminationAndSampleUsage() {
-    QueryThreadContext.checkTerminationAndSampleUsage(MERGE_SCOPE, _context.getActiveDeadlineMs());
   }
 
   /// Drops data that raced with early termination until aggregate EOS or a sender error arrives.
@@ -337,8 +303,6 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
     Object[] next() {
       return _rows.get(_index++);
     }
-
-
 
     int getRetainedRowCount() {
       int retainedRowCount = _rows.size();

@@ -35,6 +35,8 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -98,6 +100,11 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   }
 
   @Override
+  public Void visitKWayMergeExchange(KWayMergeExchangeNode node, DispatchablePlanContext context) {
+    throw new UnsupportedOperationException("KWayMergeExchangeNode should not be visited by DispatchablePlanVisitor");
+  }
+
+  @Override
   public Void visitFilter(FilterNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     getOrCreateDispatchablePlanMetadata(node, context);
@@ -126,6 +133,13 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
 
   @Override
   public Void visitMailboxReceive(MailboxReceiveNode node, DispatchablePlanContext context) {
+    node.getSender().visit(this, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
+    return null;
+  }
+
+  @Override
+  public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, DispatchablePlanContext context) {
     node.getSender().visit(this, context);
     getOrCreateDispatchablePlanMetadata(node, context);
     return null;

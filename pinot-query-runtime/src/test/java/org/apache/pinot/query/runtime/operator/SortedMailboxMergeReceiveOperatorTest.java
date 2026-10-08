@@ -217,7 +217,7 @@ public class SortedMailboxMergeReceiveOperatorTest {
         OperatorTestUtil.eosWithEmptyStats());
 
     try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadataBoth,
-        RelDistribution.Type.HASH_DISTRIBUTED, DATA_SCHEMA, collations, Long.MAX_VALUE, -1, -1)) {
+        RelDistribution.Type.HASH_DISTRIBUTED, DATA_SCHEMA, collations)) {
       List<Object[]> rows = drain(operator);
       assertEquals(rows.stream().map(row -> row[0]).collect(Collectors.toList()),
           Arrays.asList(null, null, 5, 5, 4, 3, 3));
@@ -420,38 +420,6 @@ public class SortedMailboxMergeReceiveOperatorTest {
     }
   }
 
-  @Test
-  public void shouldApplyFetchAndOffsetAfterGlobalMerge() {
-    Object[] row0 = new Object[]{0, 1};
-    Object[] row1 = new Object[]{1, 2};
-    Object[] row2 = new Object[]{2, 1};
-    Object[] row3 = new Object[]{3, 2};
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
-    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row0, row2),
-        OperatorTestUtil.eosWithEmptyStats());
-    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1, row3),
-        OperatorTestUtil.eosWithEmptyStats());
-    try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadataBoth,
-        RelDistribution.Type.HASH_DISTRIBUTED, DATA_SCHEMA, FIELD_COLLATIONS, Long.MAX_VALUE, 2, 1)) {
-      assertEquals(drain(operator), List.of(row1, row2));
-      assertFalse(operator.hasBufferedState());
-    }
-  }
-
-  @Test
-  public void shouldHonorZeroFetchAndOffsetBeyondInput() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    for (int fetch : new int[]{0, 10}) {
-      when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{0, 1}),
-          OperatorTestUtil.eosWithEmptyStats());
-      try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadata1,
-          RelDistribution.Type.SINGLETON, DATA_SCHEMA, FIELD_COLLATIONS, Long.MAX_VALUE, fetch, 10)) {
-        assertTrue(drain(operator).isEmpty());
-      }
-    }
-  }
-
   private static Object[][] sortedRows(int start, int count, int sender) {
     Object[][] rows = new Object[count][];
     for (int i = 0; i < count; i++) {
@@ -527,28 +495,22 @@ public class SortedMailboxMergeReceiveOperatorTest {
 
   private SortedMailboxMergeReceiveOperator getOperator(MailboxService mailboxService, StageMetadata stageMetadata,
       RelDistribution.Type distributionType) {
-    return getOperator(mailboxService, stageMetadata, distributionType, DATA_SCHEMA, FIELD_COLLATIONS, Long.MAX_VALUE,
-        -1, -1);
+    return getOperator(mailboxService, stageMetadata, distributionType, DATA_SCHEMA, FIELD_COLLATIONS);
   }
 
   private SortedMailboxMergeReceiveOperator getOperator(StageMetadata stageMetadata,
-      RelDistribution.Type distributionType, DataSchema dataSchema, List<RelFieldCollation> collations,
-      long deadlineMs, int fetch, int offset) {
-    return getOperator(_mailboxService, stageMetadata, distributionType, dataSchema, collations, deadlineMs, fetch,
-        offset);
+      RelDistribution.Type distributionType, DataSchema dataSchema, List<RelFieldCollation> collations) {
+    return getOperator(_mailboxService, stageMetadata, distributionType, dataSchema, collations);
   }
 
   private SortedMailboxMergeReceiveOperator getOperator(MailboxService mailboxService, StageMetadata stageMetadata,
-      RelDistribution.Type distributionType, DataSchema dataSchema, List<RelFieldCollation> collations,
-      long deadlineMs, int fetch, int offset) {
-    OpChainExecutionContext context = OperatorTestUtil.getOpChainContext(mailboxService, deadlineMs, stageMetadata);
+      RelDistribution.Type distributionType, DataSchema dataSchema, List<RelFieldCollation> collations) {
+    OpChainExecutionContext context = OperatorTestUtil.getOpChainContext(mailboxService, Long.MAX_VALUE, stageMetadata);
     MailboxMergeReceiveNode node = mock(MailboxMergeReceiveNode.class);
     when(node.getDistributionType()).thenReturn(distributionType);
     when(node.getSenderStageId()).thenReturn(1);
     when(node.getDataSchema()).thenReturn(dataSchema);
     when(node.getCollations()).thenReturn(collations);
-    when(node.getFetch()).thenReturn(fetch);
-    when(node.getOffset()).thenReturn(offset);
     return new SortedMailboxMergeReceiveOperator(context, node);
   }
 }

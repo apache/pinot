@@ -39,7 +39,9 @@ public class ExchangeNode extends BasePlanNode {
   private final List<Integer> _keys;
   private final boolean _prePartitioned;
   private final List<RelFieldCollation> _collations;
+  @Deprecated
   private final boolean _sortOnSender;
+  @Deprecated
   private final boolean _sortOnReceiver;
   // Table names should be set for SUB_PLAN exchange type.
   private final Set<String> _tableNames;
@@ -86,10 +88,14 @@ public class ExchangeNode extends BasePlanNode {
     return _collations;
   }
 
+  /// @deprecated Current plans establish sender ordering with an explicit SortNode.
+  @Deprecated
   public boolean isSortOnSender() {
     return _sortOnSender;
   }
 
+  /// @deprecated Current plans use an explicit SortNode or a KWayMergeExchangeNode.
+  @Deprecated
   public boolean isSortOnReceiver() {
     return _sortOnReceiver;
   }
@@ -129,7 +135,7 @@ public class ExchangeNode extends BasePlanNode {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof ExchangeNode)) {
       return false;
     }
     if (!super.equals(o)) {
