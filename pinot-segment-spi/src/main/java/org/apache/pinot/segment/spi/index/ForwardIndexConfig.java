@@ -46,6 +46,7 @@ public class ForwardIndexConfig extends IndexConfig {
   private static String _defaultTargetMaxChunkSize = "1MB";
   private static int _defaultTargetMaxChunkSizeBytes = 1024 * 1024;
   private static int _defaultTargetDocsPerChunk = 1000;
+  private static volatile ChunkCompressionType _defaultCompressionType = ChunkCompressionType.LZ4;
 
   public static int getDefaultRawWriterVersion() {
     return _defaultRawIndexWriterVersion;
@@ -74,6 +75,23 @@ public class ForwardIndexConfig extends IndexConfig {
 
   public static void setDefaultTargetDocsPerChunk(int defaultTargetDocsPerChunk) {
     _defaultTargetDocsPerChunk = defaultTargetDocsPerChunk;
+  }
+
+  /// The chunk compression type for a raw column whose table config does not name one. Defaults to LZ4.
+  ///
+  /// This is the raw value: the exemption that keeps metrics uncompressed is applied by the caller, in
+  /// [org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType], so a caller resolving a
+  /// default for a specific column must go through that rather than reading this directly.
+  ///
+  /// `volatile` because it is written by the starter thread and read later by segment-build threads: the
+  /// thread-start happens-before covers today's call order, but a stale read here would silently change
+  /// what gets written to disk.
+  public static ChunkCompressionType getDefaultCompressionType() {
+    return _defaultCompressionType;
+  }
+
+  public static void setDefaultCompressionType(ChunkCompressionType defaultCompressionType) {
+    _defaultCompressionType = defaultCompressionType;
   }
 
   public static ForwardIndexConfig getDefault(EncodingType encodingType) {

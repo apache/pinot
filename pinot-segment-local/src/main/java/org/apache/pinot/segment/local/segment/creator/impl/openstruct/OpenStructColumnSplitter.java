@@ -567,7 +567,8 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
 
     // Reconcile dictionary + forward encoding with the final decision (mirrors BaseSegmentCreator.adaptConfig);
     // ForwardIndexCreatorFactory selects dict-vs-raw from the forward config's EncodingType. A compression codec
-    // applies only to the raw forward format (LZ4 preserves the dense child's current on-disk layout); attaching
+    // applies only to the raw forward format (LZ4 preserves the dense child's current on-disk layout, and is
+    // pinned here regardless of the cluster-wide default compression codec); attaching
     // one to a dictionary-encoded forward is rejected by ForwardIndexType.validate.
     ForwardIndexConfig.Builder forwardBuilder = new ForwardIndexConfig.Builder(
         useDictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW);
