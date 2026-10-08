@@ -25,16 +25,20 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -102,6 +106,12 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
 
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(PRIMARY_KEY_COL, new ColumnPartitionConfig("Murmur", NUM_PARTITIONS));
+    InstanceTagPoolConfig tagPoolConfig = new InstanceTagPoolConfig(
+        TagNameUtils.getOfflineTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME), false, 0, null);
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 0, 2, 0, NUM_PARTITIONS, 1, false, PRIMARY_KEY_COL);
+    InstanceAssignmentConfig instanceAssignmentConfig =
+        new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig, null, false);
 
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(TABLE_NAME)
@@ -111,7 +121,7 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
         .setRoutingConfig(new RoutingConfig(null, null,
             RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PRIMARY_KEY_COL, 1))
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.name(), instanceAssignmentConfig))
         .build();
   }
 

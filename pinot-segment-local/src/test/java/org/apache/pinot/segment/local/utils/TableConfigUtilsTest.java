@@ -2840,15 +2840,25 @@ public class TableConfigUtilsTest {
     }
   }
 
+  private static InstanceAssignmentConfig createOfflineInstanceAssignmentConfig(boolean replicaGroupBased,
+      int numInstancesPerPartition, @Nullable String partitionColumn) {
+    return new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant_OFFLINE", false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(replicaGroupBased, 0, 2, 0, 4, numInstancesPerPartition, false,
+            partitionColumn), null, false);
+  }
+
   @Test
   public void testValidateUpsertConfig() {
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setComparisonColumn("myCol");
     SegmentPartitionConfig segmentPartitionConfig =
         new SegmentPartitionConfig(Map.of("myCol", new ColumnPartitionConfig("murmur", 4)));
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap =
+        Map.of(InstancePartitionsType.OFFLINE.name(), createOfflineInstanceAssignmentConfig(true, 1, "myCol"));
     TableConfig validTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setUpsertConfig(upsertConfig)
         .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
         .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
         .build();
     Schema validSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
@@ -2891,6 +2901,129 @@ public class TableConfigUtilsTest {
         .setTimeColumnName("myCol")
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
         .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
+        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
+        .build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, validSchema);
+
+    // OFFLINE table without OFFLINE instance assignment config should fail
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, validSchema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(),
+          "Offline upsert table must have OFFLINE instance assignment config (instanceAssignmentConfigMap) to ensure "
+              + "all segments of a partition are assigned to the same server");
+    }
+
+    // OFFLINE table with pre-configured instance partitions should fail
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
+        .setInstancePartitionsMap(Map.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
+        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, validSchema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(),
+          "Offline upsert table cannot use pre-configured OFFLINE instance partitions (instancePartitionsMap) because "
+              + "the partition layout cannot be validated");
+    }
+
+    // OFFLINE table with non replica-group based instance assignment should fail
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setInstanceAssignmentConfigMap(
+            Map.of(InstancePartitionsType.OFFLINE.name(), createOfflineInstanceAssignmentConfig(false, 1, "myCol")))
+        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, validSchema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(),
+          "Offline upsert table must use replica-group based OFFLINE instance assignment to ensure all segments of a "
+              + "partition are assigned to the same server");
+    }
+
+    // OFFLINE table with multiple instances per partition should fail
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setInstanceAssignmentConfigMap(
+            Map.of(InstancePartitionsType.OFFLINE.name(), createOfflineInstanceAssignmentConfig(true, 2, "myCol")))
+        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, validSchema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(),
+          "Offline upsert table must have numInstancesPerPartition = 1 in OFFLINE instance assignment config to ensure "
+              + "all segments of a partition are assigned to the same server");
+    }
+
+    // OFFLINE table with partition column missing from the segment partition config should fail
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setInstanceAssignmentConfigMap(
+            Map.of(InstancePartitionsType.OFFLINE.name(), createOfflineInstanceAssignmentConfig(true, 1, "otherCol")))
+        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, validSchema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(),
+          "Partition column: otherCol of OFFLINE instance assignment config is not found in segment partition config "
+              + "of offline upsert table");
+    }
+
+    // OFFLINE table with a single partition column resolves it without partition column in instance assignment
+    // config
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setInstanceAssignmentConfigMap(
+            Map.of(InstancePartitionsType.OFFLINE.name(), createOfflineInstanceAssignmentConfig(true, 1, null)))
+        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
+        .build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, validSchema);
+
+    // OFFLINE table with multiple partition columns requires partition column in instance assignment config
+    SegmentPartitionConfig multiColumnPartitionConfig = new SegmentPartitionConfig(Map.of(
+        "myCol", new ColumnPartitionConfig("murmur", 4),
+        "otherCol", new ColumnPartitionConfig("murmur", 4)
+    ));
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setSegmentPartitionConfig(multiColumnPartitionConfig)
+        .setInstanceAssignmentConfigMap(
+            Map.of(InstancePartitionsType.OFFLINE.name(), createOfflineInstanceAssignmentConfig(true, 1, null)))
+        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, validSchema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(),
+          "Offline upsert table must configure partitionColumn in OFFLINE instance assignment config when segment "
+              + "partition config has multiple columns");
+    }
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setSegmentPartitionConfig(multiColumnPartitionConfig)
+        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
         .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
         .build();
     TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, validSchema);

@@ -38,6 +38,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -84,6 +85,7 @@ import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -1062,6 +1064,7 @@ public final class TableConfigUtils {
           CollectionUtils.isNotEmpty(upsertConfig.getComparisonColumns())
               || tableConfig.getValidationConfig().getTimeColumnName() != null,
           "Offline upsert table must have a comparison column or a time column configured");
+      validateOfflineUpsertInstanceAssignment(tableConfig, segmentPartitionConfig);
     }
 
     if (upsertEnabled) {
@@ -2307,6 +2310,45 @@ public final class TableConfigUtils {
   private static boolean isRoutingStrategyAllowedForUpsert(RoutingConfig routingConfig) {
     String instanceSelectorType = routingConfig.getInstanceSelectorType();
     return UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES.stream().anyMatch(x -> x.equalsIgnoreCase(instanceSelectorType));
+  }
+
+  /// Validates that the OFFLINE instance assignment of an offline upsert table places all segments of a partition on
+  /// exactly one instance per replica-group, and that the partition column used for segment assignment resolves to a
+  /// column in the segment partition config.
+  ///
+  /// Upsert metadata on a server only covers the segments hosted by that server, so a partition spread across
+  /// multiple instances produces inconsistent results. The partition layout of pre-configured instance partitions
+  /// cannot be validated from the table config, so they are rejected.
+  private static void validateOfflineUpsertInstanceAssignment(TableConfig tableConfig,
+      SegmentPartitionConfig segmentPartitionConfig) {
+    Preconditions.checkState(
+        !InstancePartitionsUtils.hasPreConfiguredInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE),
+        "Offline upsert table cannot use pre-configured OFFLINE instance partitions (instancePartitionsMap) because "
+            + "the partition layout cannot be validated");
+    InstanceAssignmentConfig instanceAssignmentConfig =
+        MapUtils.emptyIfNull(tableConfig.getInstanceAssignmentConfigMap()).get(InstancePartitionsType.OFFLINE.name());
+    Preconditions.checkState(instanceAssignmentConfig != null,
+        "Offline upsert table must have OFFLINE instance assignment config (instanceAssignmentConfigMap) to ensure "
+            + "all segments of a partition are assigned to the same server");
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+        instanceAssignmentConfig.getReplicaGroupPartitionConfig();
+    Preconditions.checkState(replicaGroupPartitionConfig.isReplicaGroupBased(),
+        "Offline upsert table must use replica-group based OFFLINE instance assignment to ensure all segments of a "
+            + "partition are assigned to the same server");
+    Preconditions.checkState(replicaGroupPartitionConfig.getNumInstancesPerPartition() == 1,
+        "Offline upsert table must have numInstancesPerPartition = 1 in OFFLINE instance assignment config to ensure "
+            + "all segments of a partition are assigned to the same server");
+    Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
+    String partitionColumn = getPartitionColumn(tableConfig);
+    if (StringUtils.isNotEmpty(partitionColumn)) {
+      Preconditions.checkState(columnPartitionMap.containsKey(partitionColumn),
+          "Partition column: %s of OFFLINE instance assignment config is not found in segment partition config of "
+              + "offline upsert table", partitionColumn);
+    } else {
+      Preconditions.checkState(columnPartitionMap.size() == 1,
+          "Offline upsert table must configure partitionColumn in OFFLINE instance assignment config when segment "
+              + "partition config has multiple columns");
+    }
   }
 
   /// Helper method to extract TableConfig in updated syntax from current TableConfig.
