@@ -36,6 +36,7 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -266,13 +267,6 @@ class PlanNodeMerger {
         return null;
       }
       MailboxReceiveNode otherNode = (MailboxReceiveNode) context;
-      if (node instanceof MailboxMergeReceiveNode) {
-        MailboxMergeReceiveNode merge = (MailboxMergeReceiveNode) node;
-        MailboxMergeReceiveNode otherMerge = (MailboxMergeReceiveNode) otherNode;
-        if (merge.getFetch() != otherMerge.getFetch() || merge.getOffset() != otherMerge.getOffset()) {
-          return null;
-        }
-      }
       if (node.getSenderStageId() != otherNode.getSenderStageId()) {
         return null;
       }
@@ -299,6 +293,22 @@ class PlanNodeMerger {
         return null;
       }
       return node.withInputs(children);
+    }
+
+    @Nullable
+    @Override
+    public PlanNode visitMailboxMergeReceive(MailboxMergeReceiveNode node, PlanNode context) {
+      if (context.getClass() != node.getClass()) {
+        return null;
+      }
+      MailboxMergeReceiveNode other = (MailboxMergeReceiveNode) context;
+      if (node.getSenderStageId() != other.getSenderStageId() || node.getExchangeType() != other.getExchangeType()
+          || node.getDistributionType() != other.getDistributionType() || !node.getKeys().equals(other.getKeys())
+          || !node.getCollations().equals(other.getCollations())) {
+        return null;
+      }
+      List<PlanNode> children = mergeChildren(node, context);
+      return children != null ? node.withInputs(children) : null;
     }
 
     @Nullable
@@ -507,6 +517,22 @@ class PlanNodeMerger {
         return null;
       }
       return exchangeNode.withInputs(children);
+    }
+
+    @Nullable
+    @Override
+    public PlanNode visitKWayMergeExchange(KWayMergeExchangeNode node, PlanNode context) {
+      if (context.getClass() != node.getClass()) {
+        return null;
+      }
+      KWayMergeExchangeNode other = (KWayMergeExchangeNode) context;
+      if (node.getDistributionType() != other.getDistributionType() || !node.getKeys().equals(other.getKeys())
+          || node.isPrePartitioned() != other.isPrePartitioned() || !node.getCollations().equals(other.getCollations())
+          || !node.getHashFunction().equals(other.getHashFunction())) {
+        return null;
+      }
+      List<PlanNode> children = mergeChildren(node, context);
+      return children != null ? node.withInputs(children) : null;
     }
 
     @Nullable

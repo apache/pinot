@@ -36,6 +36,7 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -176,17 +177,6 @@ public class PlanNodeSerializer {
 
     @Override
     public Void visitMailboxReceive(MailboxReceiveNode node, Plan.PlanNode.Builder builder) {
-      if (node instanceof MailboxMergeReceiveNode) {
-        MailboxMergeReceiveNode merge = (MailboxMergeReceiveNode) node;
-        builder.setMailboxMergeReceiveNode(Plan.MailboxMergeReceiveNode.newBuilder()
-            .setSenderStageId(merge.getSenderStageId())
-            .setExchangeType(convertExchangeType(merge.getExchangeType()))
-            .setDistributionType(convertDistributionType(merge.getDistributionType()))
-            .addAllKeys(merge.getKeys())
-            .addAllCollations(convertCollations(merge.getCollations()))
-            .setFetch(merge.getFetch()).setOffset(merge.getOffset()));
-        return null;
-      }
       Plan.MailboxReceiveNode mailboxReceiveNode = Plan.MailboxReceiveNode.newBuilder()
           .setSenderStageId(node.getSenderStageId())
           .setExchangeType(convertExchangeType(node.getExchangeType()))
@@ -197,6 +187,17 @@ public class PlanNodeSerializer {
           .setSortedOnSender(node.isSortedOnSender())
           .build();
       builder.setMailboxReceiveNode(mailboxReceiveNode);
+      return null;
+    }
+
+    @Override
+    public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, Plan.PlanNode.Builder builder) {
+      builder.setMailboxMergeReceiveNode(Plan.MailboxMergeReceiveNode.newBuilder()
+          .setSenderStageId(node.getSenderStageId())
+          .setExchangeType(convertExchangeType(node.getExchangeType()))
+          .setDistributionType(convertDistributionType(node.getDistributionType()))
+          .addAllKeys(node.getKeys())
+          .addAllCollations(convertCollations(node.getCollations())));
       return null;
     }
 
@@ -286,6 +287,11 @@ public class PlanNodeSerializer {
     @Override
     public Void visitExchange(ExchangeNode exchangeNode, Plan.PlanNode.Builder context) {
       throw new IllegalStateException("ExchangeNode should not be visited by SerializationVisitor");
+    }
+
+    @Override
+    public Void visitKWayMergeExchange(KWayMergeExchangeNode node, Plan.PlanNode.Builder context) {
+      throw new UnsupportedOperationException("KWayMergeExchangeNode should not be serialized");
     }
 
     @Override

@@ -22,12 +22,14 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -37,6 +39,7 @@ import org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.StageStatsTreeNode;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -89,7 +92,16 @@ public class MultiStageStatsTreeBuilderTest {
     };
   }
 
-  private static MailboxReceiveNode receiveNode(int stageId, int senderStageId) {
+  @DataProvider
+  public Object[][] receiveNodeTypes() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  private static PlanNode receiveNode(int stageId, int senderStageId, boolean merge) {
+    if (merge) {
+      return new MailboxMergeReceiveNode(stageId, SCHEMA, senderStageId, PinotRelExchangeType.STREAMING,
+          RelDistribution.Type.HASH_DISTRIBUTED, null, List.of(new RelFieldCollation(0)), null);
+    }
     return new MailboxReceiveNode(stageId, SCHEMA, senderStageId, PinotRelExchangeType.STREAMING,
         RelDistribution.Type.HASH_DISTRIBUTED, null, null, false, false, null);
   }
@@ -115,15 +127,15 @@ public class MultiStageStatsTreeBuilderTest {
 
   /// A stage tree made exclusively of plugin types must render fully (no node dropped, custom stat fields present)
   /// and must nest the sender stage's tree under the node whose plan-node id resolves to a
-  /// [MailboxReceiveNode] — even though the receive node carries a plugin type, not the built-in
+  /// mailbox receive node — even though the receive node carries a plugin type, not the built-in
   /// MAILBOX_RECEIVE.
-  @Test
-  public void testPluginTypedTreeRendersWithCrossStageNesting() {
+  @Test(dataProvider = "receiveNodeTypes")
+  public void testPluginTypedTreeRendersWithCrossStageNesting(boolean merge) {
     OperatorTypeDescriptor sendType = pluginType(300, "TEST_PLUGIN_SEND");
     OperatorTypeDescriptor receiveType = pluginType(301, "TEST_PLUGIN_RECEIVE");
 
     // Stage 1: send(0) -> receive(1) [pre-order ids]; stage 2: send(0) -> value(1).
-    MailboxReceiveNode stage1Receive = receiveNode(1, 2);
+    PlanNode stage1Receive = receiveNode(1, 2, merge);
     PlanNode stage1Root = sendNode(1, List.of(stage1Receive), 0);
     PlanNode stage2Root = sendNode(2,
         List.of(new ValueNode(2, SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), List.of())), 1);
@@ -174,12 +186,12 @@ public class MultiStageStatsTreeBuilderTest {
   /// Legacy-path regression: a flat stats list with a plugin type at the send position must not throw
   /// `ArithmeticException` (the built-in PARALLELISM key cannot be read from a foreign StatMap, which used to
   /// yield a zero divisor).
-  @Test
-  public void testLegacyPathWithPluginSendTypeDoesNotThrow() {
+  @Test(dataProvider = "receiveNodeTypes")
+  public void testLegacyPathWithPluginSendTypeDoesNotThrow(boolean merge) {
     OperatorTypeDescriptor sendType = pluginType(300, "TEST_PLUGIN_SEND");
     OperatorTypeDescriptor receiveType = pluginType(301, "TEST_PLUGIN_RECEIVE");
 
-    MailboxReceiveNode stage1Receive = receiveNode(1, 2);
+    PlanNode stage1Receive = receiveNode(1, 2, merge);
     PlanNode stage1Root = sendNode(1, List.of(stage1Receive), 0);
     PlanNode stage2Root = sendNode(2,
         List.of(new ValueNode(2, SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), List.of())), 1);

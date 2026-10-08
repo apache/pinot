@@ -33,6 +33,7 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -195,15 +196,21 @@ public class PlanNodeToOpChain {
     @Override
     public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, OpChainExecutionContext context) {
       try {
-        // The distinct merge node requires ordered streams. Legacy sort=true nodes still use the compatible
-        // receiver sort; current plain receives leave ordering to an explicit downstream SortNode.
-        if (node instanceof MailboxMergeReceiveNode) {
-          return new SortedMailboxMergeReceiveOperator(context, (MailboxMergeReceiveNode) node);
-        } else if (node.isSort()) {
+        // Legacy sort=true nodes retain receiver sorting for older broker plans.
+        if (node.isSort()) {
           return new SortedMailboxReceiveOperator(context, node);
         } else {
           return new MailboxReceiveOperator(context, node);
         }
+      } catch (Exception e) {
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage());
+      }
+    }
+
+    @Override
+    public MultiStageOperator visitMailboxMergeReceive(MailboxMergeReceiveNode node, OpChainExecutionContext context) {
+      try {
+        return new SortedMailboxMergeReceiveOperator(context, node);
       } catch (Exception e) {
         return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage());
       }
@@ -331,6 +338,11 @@ public class PlanNodeToOpChain {
     @Override
     public MultiStageOperator visitExchange(ExchangeNode exchangeNode, OpChainExecutionContext context) {
       return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, "ExchangeNode should not be visited");
+    }
+
+    @Override
+    public MultiStageOperator visitKWayMergeExchange(KWayMergeExchangeNode node, OpChainExecutionContext context) {
+      return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, "KWayMergeExchangeNode should not be visited");
     }
 
     @Override
