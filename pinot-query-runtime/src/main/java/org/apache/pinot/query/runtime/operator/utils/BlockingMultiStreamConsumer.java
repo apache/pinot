@@ -495,7 +495,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     /// Operators should call this method instead of [#readBlockBlocking()] to get the next block, given stats are not
     /// useful for them while reading the blocks.
     public MseBlock readMseBlockBlocking() {
-      return extractMseBlock(readBlockBlocking());
+      return readBlockBlocking().getBlock();
     }
 
     /// Reads the next MSE block or returns `null` when at least one sender finished without another block being ready.
@@ -506,7 +506,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       if (blockWithStats == null) {
         return null;
       }
-      return extractMseBlock(blockWithStats);
+      return blockWithStats.getBlock();
     }
 
     /// Polls the next MSE block without waiting. A `null` result can also report sender completion through
@@ -517,10 +517,6 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       if (blockWithStats == null) {
         return null;
       }
-      return extractMseBlock(blockWithStats);
-    }
-
-    private MseBlock extractMseBlock(ReceivingMailbox.MseBlockWithStats blockWithStats) {
       return blockWithStats.getBlock();
     }
   }

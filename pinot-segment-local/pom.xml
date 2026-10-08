@@ -88,13 +88,6 @@
       <artifactId>h3</artifactId>
     </dependency>
 
-    <!-- Zstd's API annotations are required when javac resolves annotated return types with warnings enabled. -->
-    <dependency>
-      <groupId>org.jetbrains</groupId>
-      <artifactId>annotations</artifactId>
-      <scope>provided</scope>
-    </dependency>
-
     <!-- Test dependencies -->
     <dependency>
       <groupId>org.testng</groupId>

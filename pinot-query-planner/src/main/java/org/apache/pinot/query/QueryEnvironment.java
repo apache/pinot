@@ -959,10 +959,10 @@ public class QueryEnvironment {
       return false;
     }
 
-    /// See [CommonConstants.Broker#CONFIG_OF_WINDOW_SORT_ON_SENDER]
+    /// See [CommonConstants.Broker#CONFIG_OF_WINDOW_K_WAY_MERGE]
     @Value.Default
-    default boolean defaultWindowSortOnSender() {
-      return CommonConstants.Broker.DEFAULT_WINDOW_SORT_ON_SENDER;
+    default boolean defaultWindowKWayMerge() {
+      return CommonConstants.Broker.DEFAULT_WINDOW_K_WAY_MERGE;
     }
   }
 

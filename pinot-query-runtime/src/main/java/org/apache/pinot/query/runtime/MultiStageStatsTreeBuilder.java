@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
@@ -95,7 +96,7 @@ public class MultiStageStatsTreeBuilder {
   }
 
   /// Renders a stage's explicit stats tree. The shape (and any plugin operator types) come straight from the decoded
-  /// tree; the stage's PlanNode tree is consulted only to resolve which plan nodes are [MailboxReceiveNode]s so
+  /// tree; the stage's PlanNode tree is consulted only to resolve the mailbox receive nodes so
   /// the sender stage's tree can be nested under them, mirroring the legacy renderer's cross-stage nesting.
   private ObjectNode jsonFromStatsTree(StageStatsTreeNode statsTree, int stage) {
     Map<Integer, PlanNode> planNodesById = new HashMap<>();
@@ -149,11 +150,13 @@ public class MultiStageStatsTreeBuilder {
     }
     // Cross-stage nesting: a node whose plan node is a mailbox receive gets the sender stage's tree as a child.
     // Type-agnostic on purpose — plugin-defined receive operators carry a different descriptor than the built-in
-    // MAILBOX_RECEIVE but map to the same MailboxReceiveNode.
+    // MAILBOX_RECEIVE but map to the same mailbox receive plan nodes.
     for (Integer planNodeId : node.getPlanNodeIds()) {
       PlanNode planNode = planNodesById.get(planNodeId);
       if (planNode instanceof MailboxReceiveNode) {
         children.add(jsonStatsByStage(((MailboxReceiveNode) planNode).getSenderStageId()));
+      } else if (planNode instanceof MailboxMergeReceiveNode) {
+        children.add(jsonStatsByStage(((MailboxMergeReceiveNode) planNode).getSenderStageId()));
       }
     }
     if (!children.isEmpty()) {

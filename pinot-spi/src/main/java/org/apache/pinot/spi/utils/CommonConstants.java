@@ -824,9 +824,9 @@ public class CommonConstants {
 
     /// Whether global ordered windows sort on each sender and merge the ordered streams at the receiver.
     /// Sender sorting also requires a homogeneous broker/server release build; snapshots retain receiver sorting.
-    public static final String CONFIG_OF_WINDOW_SORT_ON_SENDER =
-        "pinot.broker.multistage.window.sort.on.sender";
-    public static final boolean DEFAULT_WINDOW_SORT_ON_SENDER = false;
+    public static final String CONFIG_OF_WINDOW_K_WAY_MERGE =
+        "pinot.broker.multistage.window.kway.merge.enabled";
+    public static final boolean DEFAULT_WINDOW_K_WAY_MERGE = false;
 
     public static class Request {
       public static final String SQL = "sql";
@@ -1185,8 +1185,8 @@ public class CommonConstants {
         /// Option to customize the value of [Broker#CONFIG_OF_SEALED_IN_LIST_THRESHOLD]
         public static final String SEALED_IN_LIST_THRESHOLD = "sealedInListThreshold";
 
-        /// Per-query override of [Broker#CONFIG_OF_WINDOW_SORT_ON_SENDER].
-        public static final String WINDOW_SORT_ON_SENDER = "windowSortOnSender";
+        /// Per-query override of [Broker#CONFIG_OF_WINDOW_K_WAY_MERGE].
+        public static final String WINDOW_K_WAY_MERGE = "windowKWayMerge";
 
         // Vector search query options
 

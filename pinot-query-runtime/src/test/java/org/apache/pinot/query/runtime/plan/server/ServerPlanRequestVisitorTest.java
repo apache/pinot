@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.plan.server;
 
 import java.util.List;
+import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
@@ -51,7 +52,8 @@ public class ServerPlanRequestVisitorTest {
   public void shouldKeepExplicitSenderSortAboveLeafBoundary() {
     TableScanNode tableScan = new TableScanNode(STAGE_ID, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(),
         "testTable", List.of("orderKey"));
-    SortNode sortNode = new SortNode(STAGE_ID, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(tableScan), COLLATIONS,
+    SortNode sortNode = new SortNode(STAGE_ID, DATA_SCHEMA,
+        PlanNode.NodeHint.EMPTY.with(SortNode.REQUIRES_SINGLE_RUN_HINT, Map.of()), List.of(tableScan), COLLATIONS,
         Integer.MAX_VALUE, -1);
     MailboxSendNode sendNode = new MailboxSendNode(STAGE_ID, DATA_SCHEMA, List.of(sortNode), 2,
         PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED, List.of(), false, List.of(), false,
@@ -75,7 +77,7 @@ public class ServerPlanRequestVisitorTest {
     TableScanNode tableScan = new TableScanNode(STAGE_ID, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(),
         "testTable", List.of("orderKey"));
     SortNode sortNode = new SortNode(STAGE_ID, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(tableScan), COLLATIONS,
-        -1, -1);
+        Integer.MAX_VALUE, -1);
     MailboxSendNode sendNode = new MailboxSendNode(STAGE_ID, DATA_SCHEMA, List.of(sortNode), 2,
         PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED, List.of(), false, COLLATIONS, false,
         null);
@@ -86,5 +88,7 @@ public class ServerPlanRequestVisitorTest {
     assertSame(context.getLeafStageBoundaryNode(), sortNode);
     assertNotNull(context.getPinotQuery().getOrderByList(),
         "An ordinary SortNode should continue to be folded into the V1 leaf request");
+    assertEquals(context.getPinotQuery().getLimit(), Integer.MAX_VALUE,
+        "A user LIMIT MAX_VALUE must remain eligible for V1 pushdown");
   }
 }

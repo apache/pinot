@@ -27,6 +27,7 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -212,13 +213,6 @@ public class EquivalentStagesFinder {
           return false;
         }
 
-        if (node1 instanceof MailboxMergeReceiveNode) {
-          MailboxMergeReceiveNode left = (MailboxMergeReceiveNode) node1;
-          MailboxMergeReceiveNode right = (MailboxMergeReceiveNode) that;
-          if (left.getFetch() != right.getFetch() || left.getOffset() != right.getOffset()) {
-            return false;
-          }
-        }
         return areBaseNodesEquivalent(node1, node2)
             // Commented out fields are used in equals() method of MailboxReceiveNode but not needed for equivalence.
             // sender stage id will be different for sure, but we want (and already did) to compare sender equivalence
@@ -235,6 +229,18 @@ public class EquivalentStagesFinder {
             && node1.isSortedOnSender() == that.isSortedOnSender()
             && Objects.equals(node1.getCollations(), that.getCollations())
             && node1.getExchangeType() == that.getExchangeType();
+      }
+
+      @Override
+      public Boolean visitMailboxMergeReceive(MailboxMergeReceiveNode node1, PlanNode node2) {
+        if (node1.getClass() != node2.getClass()) {
+          return false;
+        }
+        MailboxMergeReceiveNode that = (MailboxMergeReceiveNode) node2;
+        return areBaseNodesEquivalent(node1, node2) && areEquivalent(node1.getSender(), that.getSender())
+            && node1.getExchangeType() == that.getExchangeType()
+            && node1.getDistributionType() == that.getDistributionType()
+            && node1.getKeys().equals(that.getKeys()) && node1.getCollations().equals(that.getCollations());
       }
 
       @Override
@@ -352,6 +358,11 @@ public class EquivalentStagesFinder {
       @Override
       public Boolean visitExchange(ExchangeNode node1, PlanNode node2) {
         throw new UnsupportedOperationException("ExchangeNode should not be visited by NodeEquivalence");
+      }
+
+      @Override
+      public Boolean visitKWayMergeExchange(KWayMergeExchangeNode node1, PlanNode node2) {
+        throw new UnsupportedOperationException("KWayMergeExchangeNode should not be visited by NodeEquivalence");
       }
 
       @Override

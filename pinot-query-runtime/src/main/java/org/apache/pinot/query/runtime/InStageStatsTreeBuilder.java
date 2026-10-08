@@ -36,6 +36,8 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -165,16 +167,16 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
 
   @Nullable
   private ObjectNode extractPipelineBreakerResult(BasePlanNode node, Context context) {
-    MailboxReceiveNode pipelineBreakerNode = getPipelineBreakerNode(node);
+    PlanNode pipelineBreakerNode = getPipelineBreakerNode(node);
     if (pipelineBreakerNode == null) {
       return null;
     }
     _index--;
-    return visitMailboxReceive(pipelineBreakerNode, context);
+    return pipelineBreakerNode.visit(this, context);
   }
 
   @Nullable
-  private MailboxReceiveNode getPipelineBreakerNode(BasePlanNode node) {
+  private PlanNode getPipelineBreakerNode(BasePlanNode node) {
     if (_index == 0) {
       return null;
     }
@@ -192,8 +194,8 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
         JoinNode joinNode = (JoinNode) currentNode;
         if (joinNode.getInputs().size() > 1 && isPipelineBreakerNode(joinNode)) {
           PlanNode planNode = joinNode.getInputs().get(1);
-          if (planNode instanceof MailboxReceiveNode) {
-            return (MailboxReceiveNode) planNode;
+          if (planNode instanceof MailboxReceiveNode || planNode instanceof MailboxMergeReceiveNode) {
+            return planNode;
           }
         }
       }
@@ -292,10 +294,18 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
 
   @Override
   public ObjectNode visitMailboxReceive(MailboxReceiveNode node, Context context) {
+    return mailboxReceiveNode(node.getSenderStageId(), context);
+  }
+
+  @Override
+  public ObjectNode visitMailboxMergeReceive(MailboxMergeReceiveNode node, Context context) {
+    return mailboxReceiveNode(node.getSenderStageId(), context);
+  }
+
+  private ObjectNode mailboxReceiveNode(int senderStageId, Context context) {
     ObjectNode json = selfNode(MultiStageOperator.Type.MAILBOX_RECEIVE, context);
 
     ArrayNode children = JsonUtils.newArrayNode();
-    int senderStageId = node.getSenderStageId();
     children.add(_jsonStatsByStage.apply(senderStageId));
     json.set(CHILDREN_KEY, children);
     return json;
@@ -364,6 +374,11 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
   @Override
   public ObjectNode visitExchange(ExchangeNode node, Context context) {
     throw new UnsupportedOperationException("ExchangeNode should not be visited");
+  }
+
+  @Override
+  public ObjectNode visitKWayMergeExchange(KWayMergeExchangeNode node, Context context) {
+    throw new UnsupportedOperationException("KWayMergeExchangeNode should not be visited");
   }
 
   @Override

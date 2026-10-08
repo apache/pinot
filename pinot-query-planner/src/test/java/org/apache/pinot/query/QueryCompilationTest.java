@@ -1291,10 +1291,11 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   /// A global ordered window keeps the sender-sort/receiver-merge path. Sender-sorted exchanges must express their
   /// ordering as an explicit logical Sort in the sending fragment; the send node only transports its output.
   @Test
+  @SuppressWarnings("deprecation") // Verify the legacy sender-sort flag remains unset.
   public void testGlobalOrderedWindowSenderHasExplicitMatchingSortInput() {
     QueryEnvironment supportedEnv = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS,
         SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP, true);
-    String query = "SET windowSortOnSender=true; SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d";
+    String query = "SET windowKWayMerge=true; SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d";
     DispatchableSubPlan plan;
     try (CompiledQuery compiled = supportedEnv.compile(query)) {
       plan = compiled.planQuery(0).getQueryPlan();
@@ -1306,22 +1307,19 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertTrue(sendNode.getInputs().get(0) instanceof SortNode);
     SortNode sortNode = (SortNode) sendNode.getInputs().get(0);
     assertEquals(sortNode.getCollations(),
-        ((MailboxReceiveNode) findWindowNode(plan).getInputs().get(0)).getCollations());
+        ((MailboxMergeReceiveNode) findWindowNode(plan).getInputs().get(0)).getCollations());
+    assertTrue(sortNode.requiresSingleRun(), "The merge exchange must preserve one sorted run per sender");
     assertEquals(sortNode.getFetch(), Integer.MAX_VALUE);
     assertEquals(sortNode.getOffset(), -1);
     assertEquals(sortNode.getInputs().size(), 1, "The explicit sender sort should preserve the exchange input");
 
     WindowNode window = findWindowNode(plan);
-    assertTrue(window.getInputs().get(0) instanceof MailboxReceiveNode,
+    assertTrue(window.getInputs().get(0) instanceof MailboxMergeReceiveNode,
         "The merge receiver itself establishes ordering; no redundant SortNode should remain above it");
-    MailboxReceiveNode receiveNode = (MailboxReceiveNode) window.getInputs().get(0);
-    assertTrue(receiveNode instanceof MailboxMergeReceiveNode);
-    assertFalse(receiveNode.isSort());
-    assertFalse(receiveNode.isSortedOnSender());
 
     String explain;
     try (CompiledQuery compiled = supportedEnv.compile(
-        "SET windowSortOnSender=true; EXPLAIN IMPLEMENTATION PLAN FOR "
+        "SET windowKWayMerge=true; EXPLAIN IMPLEMENTATION PLAN FOR "
             + "SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d")) {
       explain = compiled.explain(RANDOM_REQUEST_ID_GEN.nextLong(), null).getExplainPlan();
     }
@@ -1330,33 +1328,37 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  @SuppressWarnings("deprecation") // Verify the legacy sender-sort flag remains unset.
   public void testGlobalOrderedWindowSenderSortIsDisabledByDefault() {
-    DispatchableSubPlan plan = _queryEnvironment.planQuery(
-        "SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d");
+    DispatchableSubPlan plan;
+    try (CompiledQuery compiled = _queryEnvironment.compile("SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d")) {
+      plan = compiled.planQuery(0).getQueryPlan();
+    }
     MailboxSendNode sendNode = findWindowInputSendNode(plan);
 
     assertFalse(sendNode.isSort());
     assertFalse(sendNode.getInputs().get(0) instanceof SortNode);
     assertTrue(findWindowNode(plan).getInputs().get(0) instanceof SortNode,
         "The disabled path must retain the legacy post-exchange full sort");
-    assertEquals(((SortNode) findWindowNode(plan).getInputs().get(0)).getFetch(), Integer.MAX_VALUE,
-        "The disabled path must retain the complete window input");
+    assertEquals(((SortNode) findWindowNode(plan).getInputs().get(0)).getFetch(), -1,
+        "The disabled path must preserve master's window sort plan");
   }
 
   @Test
   public void testQueryOptionCannotBypassMergeCapability() {
-    String query = "SET windowSortOnSender=true; SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d";
+    String query = "SET windowKWayMerge=true; SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d";
     try (CompiledQuery compiled = _queryEnvironment.compile(query)) {
       WindowNode window = findWindowNode(compiled.planQuery(0).getQueryPlan());
       assertTrue(window.getInputs().get(0) instanceof SortNode);
-      assertEquals(((SortNode) window.getInputs().get(0)).getFetch(), Integer.MAX_VALUE,
-          "Compatibility fallback must retain the complete window input");
+      assertEquals(((SortNode) window.getInputs().get(0)).getFetch(), -1,
+          "Compatibility fallback must preserve master's window sort plan");
       assertFalse(window.getInputs().get(0).getInputs().get(0) instanceof MailboxMergeReceiveNode);
     }
   }
 
   /// A partitioned ordered window keeps its authoritative full sort after the hash exchange.
   @Test
+  @SuppressWarnings("deprecation") // Verify the legacy sender-sort flag remains unset.
   public void testPartitionedOrderedWindowUsesReceiverFullSort() {
     String query = "SELECT col1, SUM(col3) OVER (PARTITION BY col1 ORDER BY col3) FROM d";
     MailboxSendNode sendNode;
@@ -1373,10 +1375,17 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   /// the exchange inserted directly below the window. The `prePartitioned` flag lives on this send node.
   private MailboxSendNode findWindowInputSendNode(DispatchableSubPlan dispatchableSubPlan) {
     WindowNode window = findWindowNode(dispatchableSubPlan);
-    MailboxReceiveNode receiveNode = findNodeOfType(window, MailboxReceiveNode.class);
-    assertNotNull(receiveNode, "Expected the WINDOW input to be a mailbox exchange");
+    MailboxMergeReceiveNode merge = findNodeOfType(window, MailboxMergeReceiveNode.class);
+    int senderStageId;
+    if (merge != null) {
+      senderStageId = merge.getSenderStageId();
+    } else {
+      MailboxReceiveNode receiveNode = findNodeOfType(window, MailboxReceiveNode.class);
+      assertNotNull(receiveNode, "Expected the WINDOW input to be a mailbox exchange");
+      senderStageId = receiveNode.getSenderStageId();
+    }
     PlanNode senderRoot =
-        dispatchableSubPlan.getQueryStageMap().get(receiveNode.getSenderStageId()).getPlanFragment().getFragmentRoot();
+        dispatchableSubPlan.getQueryStageMap().get(senderStageId).getPlanFragment().getFragmentRoot();
     assertTrue(senderRoot instanceof MailboxSendNode, "Sender fragment root should be a MailboxSendNode");
     return (MailboxSendNode) senderRoot;
   }

@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.datatable.StatMap;
@@ -35,6 +36,7 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.MailboxInfo;
@@ -159,7 +161,9 @@ public class PipelineBreakerExecutorTest {
   public void shouldWorkWithMultiplePBNodeUponNormalOperation()
       throws IOException {
     MailboxReceiveNode mailboxReceiveNode1 = getPBReceiveNode(1);
-    MailboxReceiveNode mailboxReceiveNode2 = getPBReceiveNode(2);
+    MailboxMergeReceiveNode mailboxReceiveNode2 = new MailboxMergeReceiveNode(0, DATA_SCHEMA, 2,
+        PinotRelExchangeType.PIPELINE_BREAKER, RelDistribution.Type.SINGLETON, null,
+        List.of(new RelFieldCollation(0)), null);
     JoinNode joinNode =
         new JoinNode(0, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(mailboxReceiveNode1, mailboxReceiveNode2),
             JoinRelType.INNER, List.of(0), List.of(0), List.of(), JoinNode.JoinStrategy.HASH);

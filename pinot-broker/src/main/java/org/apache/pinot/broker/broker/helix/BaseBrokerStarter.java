@@ -586,11 +586,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
               _serverRoutingStatsManager);
       KWayMergeSupportPredicate mergeSupport = new KWayMergeSupportPredicate(_spectatorHelixManager);
-      try {
-        _spectatorHelixManager.addInstanceConfigChangeListener(mergeSupport);
-        multiStageBrokerRequestHandler.setKWayMergeSupported(mergeSupport);
-      } catch (Exception e) {
-        LOGGER.warn("Cannot register k-way merge version listener; feature remains disabled", e);
+      if (mergeSupport.needWatchForVersionChanges()) {
+        try {
+          _spectatorHelixManager.addLiveInstanceChangeListener(mergeSupport);
+          _spectatorHelixManager.addInstanceConfigChangeListener(mergeSupport);
+          multiStageBrokerRequestHandler.setKWayMergeSupported(mergeSupport);
+        } catch (Exception e) {
+          mergeSupport.stop();
+          LOGGER.warn("Cannot register k-way merge version listeners; feature remains disabled", e);
+        }
       }
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
       _routingManager.setServerReenableCallback(

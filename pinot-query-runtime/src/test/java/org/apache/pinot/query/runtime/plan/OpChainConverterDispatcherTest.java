@@ -156,7 +156,7 @@ public class OpChainConverterDispatcherTest {
     StageMetadata stageMetadata = new StageMetadata(stageId, List.of(workerMetadata), Map.of());
     OpChainExecutionContext context = createContext(mailboxService, stageMetadata, workerMetadata);
 
-    MailboxReceiveNode mergeReceiveNode = new MailboxMergeReceiveNode(stageId, DATA_SCHEMA, senderStageId,
+    MailboxMergeReceiveNode mergeReceiveNode = new MailboxMergeReceiveNode(stageId, DATA_SCHEMA, senderStageId,
         PinotRelExchangeType.STREAMING, RelDistribution.Type.SINGLETON, List.of(), COLLATIONS, null);
     try (OpChain opChain = PlanNodeToOpChain.convert(mergeReceiveNode, context)) {
       assertTrue(opChain.getRoot() instanceof SortedMailboxMergeReceiveOperator);

@@ -841,9 +841,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
     if (sendStatsPredicate.needWatchForInstanceConfigChange()) {
       LOGGER.info("Initializing and registering the SendStatsPredicate");
       try {
+        _helixManager.addLiveInstanceChangeListener(sendStatsPredicate);
         _helixManager.addInstanceConfigChangeListener(sendStatsPredicate);
       } catch (Exception e) {
-        LOGGER.error("Failed to register SendStatsPredicate as the Helix InstanceConfigChangeListener", e);
+        sendStatsPredicate.onRegistrationFailure();
+        LOGGER.error("Failed to register SendStatsPredicate as a Helix version listener", e);
       }
     }
 

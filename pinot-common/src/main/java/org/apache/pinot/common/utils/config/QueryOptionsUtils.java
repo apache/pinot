@@ -769,8 +769,8 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
-  public static boolean isWindowSortOnSender(Map<String, String> queryOptions, boolean defaultValue) {
-    String option = queryOptions.get(QueryOptionKey.WINDOW_SORT_ON_SENDER);
+  public static boolean isWindowKWayMerge(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.WINDOW_K_WAY_MERGE);
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
