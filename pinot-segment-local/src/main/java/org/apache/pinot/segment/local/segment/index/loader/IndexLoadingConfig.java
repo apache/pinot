@@ -31,6 +31,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
@@ -500,7 +501,8 @@ public class IndexLoadingConfig {
     ResolvedIndexState resolvedIndexState = getResolvedIndexState();
     Map<String, FieldIndexConfigs> indexConfigsByColName = resolvedIndexState._indexConfigsByColName;
     Map<String, FieldIndexConfigs> updatedConfigs = null;
-    for (String childColumn : segmentMetadata.getAllColumns()) {
+    for (ColumnMetadata childMetadata : segmentMetadata.getAllColumnMetadata()) {
+      String childColumn = childMetadata.getColumnName();
       if (!childColumn.contains(OpenStructNaming.SEPARATOR) || indexConfigsByColName.containsKey(childColumn)) {
         continue;
       }
@@ -515,7 +517,7 @@ public class IndexLoadingConfig {
       }
       OpenStructIndexConfig openStructConfig = (OpenStructIndexConfig) osConfig;
       if (OpenStructNaming.isSparseColumn(childColumn)) {
-        FieldIndexConfigs blobConfigs = sparseChildConfigs(openStructConfig, entry.getValue().getFieldSpec());
+        FieldIndexConfigs blobConfigs = sparseChildConfigs(openStructConfig, childMetadata.getFieldSpec());
         if (blobConfigs != null) {
           if (updatedConfigs == null) {
             updatedConfigs = new HashMap<>(indexConfigsByColName);
