@@ -198,10 +198,19 @@ public class MultistageGroupByExecutor {
     int numKeys = _groupKeyIds.length;
     int numFunctions = _aggFunctions.length;
     int[] columnsToFinalize = _aggType.isOutputIntermediateFormat() && !_leafReturnFinalResult
-        ? collations.stream().mapToInt(RelFieldCollation::getFieldIndex).filter(index -> index >= numKeys).distinct()
-            .toArray()
+        ? collations.stream().mapToInt(RelFieldCollation::getFieldIndex).filter(index -> index >= numKeys)
+            .filter(index -> {
+              AggregationFunction aggFunction = _aggFunctions[index - numKeys];
+              ColumnDataType intermediateStoredType = aggFunction.getIntermediateResultColumnType().getStoredType();
+              return intermediateStoredType == ColumnDataType.OBJECT
+                  || intermediateStoredType != aggFunction.getFinalResultColumnType().getStoredType();
+            }).distinct().toArray()
         : new int[0];
     SortUtils.SortComparator sortComparator = new SortUtils.SortComparator(collations, true);
+    // Scalar intermediate values already have their final stored representation; keep the original heap path.
+    if (columnsToFinalize.length == 0) {
+      return getResult(sortComparator, maxRows);
+    }
     Comparator<SortedRow> comparator = (r1, r2) -> sortComparator.compare(r1.sortKeys(), r2.sortKeys());
     PriorityQueue<SortedRow> sortedRows = new PriorityQueue<>(numGroups, comparator);
     ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
@@ -233,6 +242,49 @@ public class MultistageGroupByExecutor {
     ArrayList<Object[]> result = new ArrayList<>(sortedRows.size());
     for (int i = resultSize - 1; i >= 0; i--) {
       result.add(sortedRows.poll().row());
+    }
+    // reverse priority queue order because comparators are reversed
+    Collections.reverse(result);
+    return result;
+  }
+
+  /// Get aggregation result limited to first `maxRows` rows, ordered with `comparator`.
+  private List<Object[]> getResult(Comparator<Object[]> comparator, int maxRows) {
+    int numGroups = Math.min(_groupIdGenerator.getNumGroups(), maxRows);
+    if (numGroups == 0) {
+      return List.of();
+    }
+
+    PriorityQueue<Object[]> sortedRows = new PriorityQueue<>(numGroups, comparator);
+    int numKeys = _groupKeyIds.length;
+    int numFunctions = _aggFunctions.length;
+    ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
+    Iterator<GroupIdGenerator.GroupKey> groupKeyIterator =
+        _groupIdGenerator.getGroupKeyIterator(numKeys + numFunctions);
+
+    int idx = 0;
+    while (idx < numGroups && groupKeyIterator.hasNext()) {
+      Object[] row = getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes);
+      sortedRows.add(row);
+      idx++;
+    }
+
+    while (groupKeyIterator.hasNext()) {
+      idx++;
+      // TODO: allocate new array row only if row enters set
+      Object[] row = getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes);
+      if (comparator.compare(sortedRows.peek(), row) < 0) {
+        sortedRows.poll();
+        sortedRows.offer(row);
+      }
+    }
+
+    _rowsProcessed = idx;
+
+    int resultSize = sortedRows.size();
+    ArrayList<Object[]> result = new ArrayList<>(sortedRows.size());
+    for (int i = resultSize - 1; i >= 0; i--) {
+      result.add(sortedRows.poll());
     }
     // reverse priority queue order because comparators are reversed
     Collections.reverse(result);

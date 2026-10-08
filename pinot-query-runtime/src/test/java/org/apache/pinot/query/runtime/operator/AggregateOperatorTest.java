@@ -354,8 +354,10 @@ public class AggregateOperatorTest {
   }
 
   @DataProvider
-  public Object[][] distinctCountGroupTrimCases() {
+  public Object[][] orderedGroupTrimCases() {
     return new Object[][]{
+        {"COUNT", null, AggType.LEAF},
+        {"COUNT", null, AggType.INTERMEDIATE},
         {"DISTINCTCOUNT", null, AggType.LEAF},
         {"DISTINCTCOUNT", null, AggType.INTERMEDIATE},
         {"DISTINCTCOUNTHLL", null, AggType.LEAF},
@@ -367,12 +369,13 @@ public class AggregateOperatorTest {
     };
   }
 
-  @Test(dataProvider = "distinctCountGroupTrimCases")
+  @Test(dataProvider = "orderedGroupTrimCases")
   public void testOrderedGroupTrimPreservesIntermediateResults(String functionName, @Nullable String parameters,
       AggType trimmedStage) {
     OpChainExecutionContext context =
         OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "1"));
-    ColumnDataType finalType = functionName.equals("DISTINCTCOUNTHLL") ? ColumnDataType.LONG : INT;
+    ColumnDataType finalType = functionName.equals("DISTINCTCOUNTHLL") || functionName.equals("COUNT")
+        ? ColumnDataType.LONG : INT;
     List<RexExpression> operands = parameters == null ? List.of(new RexExpression.InputRef(1))
         : List.of(new RexExpression.InputRef(1), new RexExpression.Literal(STRING, parameters));
     List<RexExpression.FunctionCall> aggCalls =
@@ -380,8 +383,8 @@ public class AggregateOperatorTest {
     List<RelFieldCollation> collations =
         List.of(new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING), new RelFieldCollation(0));
     DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
-    DataSchema intermediateSchema =
-        new DataSchema(new String[]{"group", "distinctCount"}, new ColumnDataType[]{INT, ColumnDataType.OBJECT});
+    DataSchema intermediateSchema = new DataSchema(new String[]{"group", "distinctCount"},
+        new ColumnDataType[]{INT, functionName.equals("COUNT") ? ColumnDataType.LONG : ColumnDataType.OBJECT});
     BlockListMultiStageOperator.Builder partials = new BlockListMultiStageOperator.Builder(context, intermediateSchema);
     // Each leaf has six groups with cardinalities 1..6. Disjoint partials must merge to cardinalities 2..12.
     for (int partition = 0; partition < 2; partition++) {
