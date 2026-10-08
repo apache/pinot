@@ -896,9 +896,8 @@ public class RealtimeSegmentDataManagerTest {
       throws Exception {
     long finalOffsetValue = START_OFFSET_VALUE + 600;
 
-    // ALLOW_DURING_BUILD_ONLY: the local build releases the consumer semaphore and its CRC mismatches the committed
-    // copy, so the download that follows runs while the next consuming segment can already be going. Consumption
-    // stopped at the committed end offset though, so the replacement holds the same rows and nothing is flagged.
+    // ALLOW_DURING_BUILD_ONLY: the local build releases the consumer semaphore, its CRC mismatches the committed copy,
+    // and the download that follows reverts upsert metadata while the next consuming segment can already be running.
     _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
     ServerMetrics serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManagerForUpsertRevert(
@@ -909,8 +908,8 @@ public class RealtimeSegmentDataManagerTest {
       runGoOnlineForCrcGuard(segmentDataManager, crcMetadata(finalOffsetValue, 12345L), false, finalOffsetValue);
       Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertEquals(semaphore.availablePermits(), 1);
-      verify(serverMetrics, never()).addMeteredTableValue(anyString(),
-          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), anyLong());
+      verify(serverMetrics).addMeteredTableValue(anyString(),
+          eq(ServerMeter.REPLACE_WITH_CONSUMPTION_DURING_DOWNLOAD), eq(1L));
     }
 
     // ALLOW_DURING_BUILD_ONLY without a local build: the download still holds the semaphore, so nothing is flagged.
@@ -924,7 +923,7 @@ public class RealtimeSegmentDataManagerTest {
       segmentDataManager.downloadSegmentAndReplace(crcMetadata(finalOffsetValue, 12345L));
       Assert.assertEquals(semaphore.availablePermits(), 0);
       verify(serverMetrics, never()).addMeteredTableValue(anyString(),
-          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), anyLong());
+          eq(ServerMeter.REPLACE_WITH_CONSUMPTION_DURING_DOWNLOAD), anyLong());
     }
 
     // DISALLOW_ALWAYS never lets the next segment consume during the replace, even when this segment never acquired the
@@ -934,7 +933,7 @@ public class RealtimeSegmentDataManagerTest {
         ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS, serverMetrics)) {
       segmentDataManager.downloadSegmentAndReplace(crcMetadata(finalOffsetValue, 12345L));
       verify(serverMetrics, never()).addMeteredTableValue(anyString(),
-          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), anyLong());
+          eq(ServerMeter.REPLACE_WITH_CONSUMPTION_DURING_DOWNLOAD), anyLong());
     }
   }
 
@@ -955,7 +954,7 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertEquals(semaphore.availablePermits(), 0);
       // The policy would have let the next segment run, so the replace is flagged even though it is now held back.
       verify(serverMetrics).addMeteredTableValue(anyString(),
-          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), eq(1L));
+          eq(ServerMeter.REPLACE_WITH_CONSUMPTION_DURING_DOWNLOAD), eq(1L));
     }
 
     // Stopped exactly at the committed end offset: nothing is dropped, so the next consuming segment is released as
@@ -981,7 +980,7 @@ public class RealtimeSegmentDataManagerTest {
       segmentDataManager.setCurrentOffset(START_OFFSET_VALUE + 100);
       segmentDataManager.downloadSegmentAndReplace(crcMetadata(START_OFFSET_VALUE, 12345L));
       verify(serverMetrics).addMeteredTableValue(anyString(),
-          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), eq(1L));
+          eq(ServerMeter.REPLACE_WITH_CONSUMPTION_DURING_DOWNLOAD), eq(1L));
     }
 
     // Dedup has the same exposure: the over-consumed keys stay owned by this segment until removeSegment() walks it,
