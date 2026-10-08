@@ -122,8 +122,6 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private final Map<String, List<String>> _openStructChildren;
   @Nullable
   private final ReadWriteLock _materializationLock;
-  // Guarded by _materializationLock
-  private boolean _destroyed;
   // Guards the post-registration hook so it reaches the directory at most once per segment instance, even when the
   // same segment is registered more than once (e.g. an upsert replacement with a consistency mode other than NONE
   // registers the new segment through a DuoSegmentDataManager and then directly).
@@ -318,10 +316,16 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       }
     }
     ComplexFieldSpec fieldSpec = (ComplexFieldSpec) _segmentMetadata.getSchema().getFieldSpecFor(parent);
-    List<String> sparseKeys =
-        columnMetadataMap.get(parent) instanceof ColumnMetadataImpl impl ? impl.getSparseKeys() : null;
+    List<String> sparseKeys = null;
+    Map<String, Integer> sparseMultiValueKeys = null;
+    Map<String, DataType> sparseKeyTypes = null;
+    if (columnMetadataMap.get(parent) instanceof ColumnMetadataImpl impl) {
+      sparseKeys = impl.getSparseKeys();
+      sparseMultiValueKeys = impl.getSparseMultiValueKeys();
+      sparseKeyTypes = impl.getSparseKeyTypes();
+    }
     return new ImmutableOpenStructDataSource(fieldSpec, denseChildren, sparseChild, _segmentMetadata.getTotalDocs(),
-        sparseKeys);
+        sparseKeys, sparseMultiValueKeys, sparseKeyTypes);
   }
 
   /// Lazy mode: returns the index container of the column, creating and registering it on first access. The mapping
@@ -549,24 +553,24 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   public void destroy() {
     String segmentName = getSegmentName();
     LOGGER.info("Trying to destroy segment : {}", segmentName);
-    if (_materializationLock != null) {
-      // Waits for in-flight materialization to register its containers, then refuses any further one, so the loop
-      // below closes exactly the materialized containers
-      Lock lock = _materializationLock.writeLock();
-      lock.lock();
-      try {
-        _destroyed = true;
-      } finally {
-        lock.unlock();
-      }
-    }
     if (_partitionUpsertMetadataManager != null) {
       _partitionUpsertMetadataManager.untrackSegmentForUpsertView(this);
     }
-    // Wait for in-flight column reads (see tryAcquireReadLock) and make later ones skip this segment
+    // Queries take the read guard before materializing a column, so destruction takes the guards in that order.
+    // Wait for cached readers and in-flight materialization before publishing the destroyed flag and closing indexes.
     _destroyLock.writeLock().lock();
     try {
-      _destroyed = true;
+      Lock materializationWriteLock = _materializationLock != null ? _materializationLock.writeLock() : null;
+      if (materializationWriteLock != null) {
+        materializationWriteLock.lock();
+      }
+      try {
+        _destroyed = true;
+      } finally {
+        if (materializationWriteLock != null) {
+          materializationWriteLock.unlock();
+        }
+      }
     } finally {
       _destroyLock.writeLock().unlock();
     }

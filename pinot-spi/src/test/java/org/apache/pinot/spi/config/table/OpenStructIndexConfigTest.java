@@ -333,17 +333,27 @@ public class OpenStructIndexConfigTest {
 
   @Test
   public void testEqualityCoversEverySetting() {
-    OpenStructIndexConfig base = new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, null);
-    assertEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, null), base);
-    assertEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, null).hashCode(),
+    OpenStructIndexConfig base = new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, null,
+        null, null);
+    assertEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, null,
+        null, null), base);
+    assertEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, null,
+        null, null).hashCode(),
         base.hashCode());
-    assertNotEquals(new OpenStructIndexConfig(true, null, 5, Set.of("k"), 0.25, null, false, false, null), base);
-    assertNotEquals(new OpenStructIndexConfig(false, null, 6, Set.of("k"), 0.25, null, false, false, null), base);
-    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("other"), 0.25, null, false, false, null), base);
-    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.5, null, false, false, null), base);
-    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, true, false, null), base);
-    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, true, null), base);
-    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, Set.of("i")),
+    assertNotEquals(new OpenStructIndexConfig(true, null, 5, Set.of("k"), 0.25, null, false, false, null,
+        null, null), base);
+    assertNotEquals(new OpenStructIndexConfig(false, null, 6, Set.of("k"), 0.25, null, false, false, null,
+        null, null), base);
+    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("other"), 0.25, null, false, false, null,
+        null, null), base);
+    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.5, null, false, false, null,
+        null, null), base);
+    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, true, false, null,
+        null, null), base);
+    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, true, null,
+        null, null), base);
+    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, Set.of("i"),
+        null, null),
         base);
   }
 }
