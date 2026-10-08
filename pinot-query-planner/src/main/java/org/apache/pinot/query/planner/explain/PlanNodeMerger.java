@@ -31,12 +31,12 @@ import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.query.reduce.ExplainPlanDataTableReducer;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -263,10 +263,21 @@ class PlanNodeMerger {
     @Nullable
     @Override
     public PlanNode visitMailboxReceive(MailboxReceiveNode node, PlanNode context) {
-      if (context.getClass() != node.getClass()) {
+      if (!(context instanceof MailboxReceiveNode)) {
         return null;
       }
-      MailboxReceiveNode otherNode = (MailboxReceiveNode) context;
+      MailboxReceiveNode other = (MailboxReceiveNode) context;
+      return node.isSort() == other.isSort() && node.isSortedOnSender() == other.isSortedOnSender()
+          ? mergeReceives(node, other) : null;
+    }
+
+    @Nullable
+    @Override
+    public PlanNode visitMailboxMergeReceive(MailboxMergeReceiveNode node, PlanNode context) {
+      return context instanceof MailboxMergeReceiveNode ? mergeReceives(node, (MailboxMergeReceiveNode) context) : null;
+    }
+
+    private PlanNode mergeReceives(BaseMailboxReceiveNode node, BaseMailboxReceiveNode otherNode) {
       if (node.getSenderStageId() != otherNode.getSenderStageId()) {
         return null;
       }
@@ -282,33 +293,11 @@ class PlanNodeMerger {
       if (!node.getCollations().equals(otherNode.getCollations())) {
         return null;
       }
-      if (node.isSort() != otherNode.isSort()) {
-        return null;
-      }
-      if (node.isSortedOnSender() != otherNode.isSortedOnSender()) {
-        return null;
-      }
-      List<PlanNode> children = mergeChildren(node, context);
+      List<PlanNode> children = mergeChildren(node, otherNode);
       if (children == null) {
         return null;
       }
       return node.withInputs(children);
-    }
-
-    @Nullable
-    @Override
-    public PlanNode visitMailboxMergeReceive(MailboxMergeReceiveNode node, PlanNode context) {
-      if (context.getClass() != node.getClass()) {
-        return null;
-      }
-      MailboxMergeReceiveNode other = (MailboxMergeReceiveNode) context;
-      if (node.getSenderStageId() != other.getSenderStageId() || node.getExchangeType() != other.getExchangeType()
-          || node.getDistributionType() != other.getDistributionType() || !node.getKeys().equals(other.getKeys())
-          || !node.getCollations().equals(other.getCollations())) {
-        return null;
-      }
-      List<PlanNode> children = mergeChildren(node, context);
-      return children != null ? node.withInputs(children) : null;
     }
 
     @Nullable
@@ -488,6 +477,9 @@ class PlanNodeMerger {
         return null;
       }
       ExchangeNode otherNode = (ExchangeNode) context;
+      if (exchangeNode.isKWayMerge() != otherNode.isKWayMerge()) {
+        return null;
+      }
       if (exchangeNode.getExchangeType() != otherNode.getExchangeType()) {
         return null;
       }
@@ -517,22 +509,6 @@ class PlanNodeMerger {
         return null;
       }
       return exchangeNode.withInputs(children);
-    }
-
-    @Nullable
-    @Override
-    public PlanNode visitKWayMergeExchange(KWayMergeExchangeNode node, PlanNode context) {
-      if (context.getClass() != node.getClass()) {
-        return null;
-      }
-      KWayMergeExchangeNode other = (KWayMergeExchangeNode) context;
-      if (node.getDistributionType() != other.getDistributionType() || !node.getKeys().equals(other.getKeys())
-          || node.isPrePartitioned() != other.isPrePartitioned() || !node.getCollations().equals(other.getCollations())
-          || !node.getHashFunction().equals(other.getHashFunction())) {
-        return null;
-      }
-      List<PlanNode> children = mergeChildren(node, context);
-      return children != null ? node.withInputs(children) : null;
     }
 
     @Nullable

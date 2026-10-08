@@ -36,7 +36,6 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -261,12 +260,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
 
   @Override
   public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, ServerPlanRequestContext context) {
-    throw new UnsupportedOperationException("Leaf stage should not visit MailboxMergeReceiveNode!");
-  }
-
-  @Override
-  public Void visitKWayMergeExchange(KWayMergeExchangeNode node, ServerPlanRequestContext context) {
-    throw new UnsupportedOperationException("Leaf stage should not visit KWayMergeExchangeNode!");
+    throw new UnsupportedOperationException("Leaf stage should not visit MailboxReceiveNode!");
   }
 
   @Override
@@ -294,8 +288,9 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   @Override
   public Void visitSort(SortNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
-      if (node.requiresSingleRun()) {
-        // The merge exchange requires one ordered run per sender, including combined hybrid/logical-table input.
+      if (node.isSingleRunRequired()) {
+        // An unbounded sort must cover the complete MSE input. Sorting each V1 physical request separately can
+        // interleave multiple runs (hybrid and logical tables), violating downstream ordered-input requirements.
         context.setLeafStageBoundaryNode(node.getInputs().get(0));
         return null;
       }

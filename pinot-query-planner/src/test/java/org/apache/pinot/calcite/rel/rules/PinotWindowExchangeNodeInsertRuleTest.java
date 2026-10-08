@@ -48,8 +48,6 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.when;
-
 
 public class PinotWindowExchangeNodeInsertRuleTest {
   private static final TypeFactory TYPE_FACTORY = new TypeFactory();
@@ -67,7 +65,6 @@ public class PinotWindowExchangeNodeInsertRuleTest {
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    when(_cluster.getRexBuilder()).thenReturn(REX_BUILDER);
     RelTraitSet traits = RelTraitSet.createEmpty();
     Mockito.when(_input.getTraitSet()).thenReturn(traits);
     Mockito.when(_input.getCluster()).thenReturn(_cluster);

@@ -22,12 +22,12 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Objects;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -197,10 +197,21 @@ public class EquivalentStagesFinder {
 
       @Override
       public Boolean visitMailboxReceive(MailboxReceiveNode node1, PlanNode node2) {
-        if (node1.getClass() != node2.getClass()) {
+        if (!(node2 instanceof MailboxReceiveNode)) {
           return false;
         }
         MailboxReceiveNode that = (MailboxReceiveNode) node2;
+        return node1.isSort() == that.isSort() && node1.isSortedOnSender() == that.isSortedOnSender()
+            && areReceivesEquivalent(node1, that);
+      }
+
+      @Override
+      public Boolean visitMailboxMergeReceive(MailboxMergeReceiveNode node1, PlanNode node2) {
+        return node2 instanceof MailboxMergeReceiveNode
+            && areReceivesEquivalent(node1, (MailboxMergeReceiveNode) node2);
+      }
+
+      private Boolean areReceivesEquivalent(BaseMailboxReceiveNode node1, BaseMailboxReceiveNode that) {
         MailboxSendNode node1Sender = node1.getSender();
         String nullSenderMessage = "This method should only be called at planning time, when the sender for a receiver "
             + "node shall be not null.";
@@ -213,7 +224,7 @@ public class EquivalentStagesFinder {
           return false;
         }
 
-        return areBaseNodesEquivalent(node1, node2)
+        return areBaseNodesEquivalent(node1, that)
             // Commented out fields are used in equals() method of MailboxReceiveNode but not needed for equivalence.
             // sender stage id will be different for sure, but we want (and already did) to compare sender equivalence
             // instead
@@ -225,22 +236,8 @@ public class EquivalentStagesFinder {
             && node1.getDistributionType() == that.getDistributionType()
             // TODO: Sort, sort on sender and collations can probably be removed from the equivalence check, but would
             //  require some extra checks or transformation on the spooling logic. We are not doing that for now.
-            && node1.isSort() == that.isSort()
-            && node1.isSortedOnSender() == that.isSortedOnSender()
             && Objects.equals(node1.getCollations(), that.getCollations())
             && node1.getExchangeType() == that.getExchangeType();
-      }
-
-      @Override
-      public Boolean visitMailboxMergeReceive(MailboxMergeReceiveNode node1, PlanNode node2) {
-        if (node1.getClass() != node2.getClass()) {
-          return false;
-        }
-        MailboxMergeReceiveNode that = (MailboxMergeReceiveNode) node2;
-        return areBaseNodesEquivalent(node1, node2) && areEquivalent(node1.getSender(), that.getSender())
-            && node1.getExchangeType() == that.getExchangeType()
-            && node1.getDistributionType() == that.getDistributionType()
-            && node1.getKeys().equals(that.getKeys()) && node1.getCollations().equals(that.getCollations());
       }
 
       @Override
@@ -358,11 +355,6 @@ public class EquivalentStagesFinder {
       @Override
       public Boolean visitExchange(ExchangeNode node1, PlanNode node2) {
         throw new UnsupportedOperationException("ExchangeNode should not be visited by NodeEquivalence");
-      }
-
-      @Override
-      public Boolean visitKWayMergeExchange(KWayMergeExchangeNode node1, PlanNode node2) {
-        throw new UnsupportedOperationException("KWayMergeExchangeNode should not be visited by NodeEquivalence");
       }
 
       @Override

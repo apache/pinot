@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -64,26 +65,21 @@ public class EquivalentStagesReplacer {
 
     @Override
     public Void visitMailboxReceive(MailboxReceiveNode node, GroupedStages equivalenceGroups) {
+      return visitReceive(node, equivalenceGroups);
+    }
+
+    @Override
+    public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, GroupedStages equivalenceGroups) {
+      return visitReceive(node, equivalenceGroups);
+    }
+
+    private Void visitReceive(BaseMailboxReceiveNode node, GroupedStages equivalenceGroups) {
       MailboxSendNode sender = node.getSender();
       MailboxSendNode leader = equivalenceGroups.getGroup(sender).first();
       if (canSubstitute(sender, leader)) {
         // we don't want to visit the children of the node given it is going to be pruned
         node.setSender(leader);
         leader.addReceiver(node);
-        _listener.onSubstitution(node.getStageId(), sender.getStageId(), leader.getStageId());
-      } else {
-        visitMailboxSend(leader, equivalenceGroups);
-      }
-      return null;
-    }
-
-    @Override
-    public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, GroupedStages equivalenceGroups) {
-      MailboxSendNode sender = node.getSender();
-      MailboxSendNode leader = equivalenceGroups.getGroup(sender).first();
-      if (canSubstitute(sender, leader)) {
-        node.setSender(leader);
-        leader.addReceiver(node.getStageId());
         _listener.onSubstitution(node.getStageId(), sender.getStageId(), leader.getStageId());
       } else {
         visitMailboxSend(leader, equivalenceGroups);

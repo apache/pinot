@@ -29,6 +29,7 @@ import org.apache.helix.api.listeners.PreFetch;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
 import org.apache.pinot.common.utils.helix.ClusterVersionTracker;
+import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -47,19 +48,18 @@ import org.apache.pinot.spi.utils.CommonConstants;
 ///  cluster.
 /// - SAFE: In this mode, we will send stats unless we detect a problematic version in the cluster, which means any
 ///  instance reporting a version other than this one. This doesn't require human intervention, and is the mode to
-///  use for a cluster that may still run versions older than 1.4.
+///  use for a cluster that may still run versions older than 1.4. SAFE waits for an initial live-version snapshot
+///  and disables stats after Helix FINALIZE until tracking is initialized again.
 /// - NEVER: In this mode, we will never send stats, regardless of the version of the cluster. This is useful for
 /// testing purposes or if for whatever reason you want to disable stats.
 public abstract class SendStatsPredicate implements InstanceConfigChangeListener, LiveInstanceChangeListener {
+
   public abstract boolean isSendStats();
 
   public abstract boolean needWatchForInstanceConfigChange();
 
-  public void onRegistrationFailure() {
-  }
-
   @Override
-  public void onLiveInstanceChange(List<LiveInstance> liveInstances, NotificationContext context) {
+  public void onLiveInstanceChange(List<LiveInstance> instances, NotificationContext context) {
     throw new UnsupportedOperationException("Should not be invoked");
   }
 
@@ -136,15 +136,16 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
   @BatchMode(enabled = false)
   @PreFetch(enabled = false)
   private static class Safe extends SendStatsPredicate {
-    private final ClusterVersionTracker _versions;
+    private final ClusterVersionTracker _versionTracker;
 
     public Safe(HelixManager helixManager) {
-      _versions = new ClusterVersionTracker(helixManager);
+      // SAFE stats permits homogeneous SNAPSHOT versions and does not require either instance role to be present.
+      _versionTracker = new ClusterVersionTracker(helixManager, PinotVersion.VERSION, true, false);
     }
 
     @Override
     public boolean isSendStats() {
-      return _versions.isSameVersion();
+      return _versionTracker.getAsBoolean();
     }
 
     @Override
@@ -153,19 +154,13 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
     }
 
     @Override
-    public void onRegistrationFailure() {
-      _versions.stop();
+    public void onInstanceConfigChange(List<InstanceConfig> configs, NotificationContext context) {
+      _versionTracker.onInstanceConfigChange(configs, context);
     }
 
     @Override
-    public void onInstanceConfigChange(List<InstanceConfig> instanceConfigs, NotificationContext context) {
-      _versions.onInstanceConfigChange(instanceConfigs, context);
-    }
-
-    @Override
-    @PreFetch(enabled = false)
-    public void onLiveInstanceChange(List<LiveInstance> liveInstances, NotificationContext context) {
-      _versions.onLiveInstanceChange(liveInstances, context);
+    public void onLiveInstanceChange(List<LiveInstance> instances, NotificationContext context) {
+      _versionTracker.onLiveInstanceChange(instances, context);
     }
   }
 }

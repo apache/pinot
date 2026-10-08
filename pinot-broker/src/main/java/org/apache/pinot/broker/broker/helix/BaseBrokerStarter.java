@@ -41,6 +41,7 @@ import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
+import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
@@ -585,16 +586,19 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
               _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
               _serverRoutingStatsManager);
+      // A query can enable windowKWayMerge even when the broker default is off, so keep the listeners registered.
+      // Config data callbacks read one instance; live topology callbacks read only newly live instances.
       KWayMergeSupportPredicate mergeSupport = new KWayMergeSupportPredicate(_spectatorHelixManager);
-      if (mergeSupport.needWatchForVersionChanges()) {
-        try {
-          _spectatorHelixManager.addLiveInstanceChangeListener(mergeSupport);
-          _spectatorHelixManager.addInstanceConfigChangeListener(mergeSupport);
-          multiStageBrokerRequestHandler.setKWayMergeSupported(mergeSupport);
-        } catch (Exception e) {
-          mergeSupport.stop();
-          LOGGER.warn("Cannot register k-way merge version listeners; feature remains disabled", e);
-        }
+      try {
+        _spectatorHelixManager.addLiveInstanceChangeListener(mergeSupport);
+        _spectatorHelixManager.addInstanceConfigChangeListener(mergeSupport);
+        multiStageBrokerRequestHandler.setKWayMergeSupported(mergeSupport);
+      } catch (Exception e) {
+        // Remove a listener that registered before the other registration failed. FINALIZE disables the gate.
+        Builder keyBuilder = _spectatorHelixManager.getHelixDataAccessor().keyBuilder();
+        _spectatorHelixManager.removeListener(keyBuilder.instanceConfigs(), mergeSupport);
+        _spectatorHelixManager.removeListener(keyBuilder.liveInstances(), mergeSupport);
+        LOGGER.warn("Cannot register k-way merge version listener; feature remains disabled", e);
       }
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
       _routingManager.setServerReenableCallback(

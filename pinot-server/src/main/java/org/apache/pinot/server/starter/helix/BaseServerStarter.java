@@ -45,6 +45,7 @@ import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
+import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.model.ExternalView;
@@ -844,8 +845,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _helixManager.addLiveInstanceChangeListener(sendStatsPredicate);
         _helixManager.addInstanceConfigChangeListener(sendStatsPredicate);
       } catch (Exception e) {
-        sendStatsPredicate.onRegistrationFailure();
-        LOGGER.error("Failed to register SendStatsPredicate as a Helix version listener", e);
+        // Remove a listener that registered before the other registration failed. FINALIZE disables the gate.
+        Builder keyBuilder = _helixManager.getHelixDataAccessor().keyBuilder();
+        _helixManager.removeListener(keyBuilder.instanceConfigs(), sendStatsPredicate);
+        _helixManager.removeListener(keyBuilder.liveInstances(), sendStatsPredicate);
+        LOGGER.error("Failed to register SendStatsPredicate Helix listeners", e);
       }
     }
 

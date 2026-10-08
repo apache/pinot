@@ -271,10 +271,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         config.getCommaSeparatedList(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES, List.of()));
   }
 
-  public BooleanSupplier setKWayMergeSupported(BooleanSupplier supported) {
-    BooleanSupplier previous = _kWayMergeSupported;
+  /// Supplies the production version gate; integration tests can force capability for SNAPSHOT clusters.
+  @VisibleForTesting
+  public void setKWayMergeSupported(BooleanSupplier supported) {
     _kWayMergeSupported = supported;
-    return previous;
   }
 
   @Override
