@@ -30,7 +30,12 @@ import java.util.List;
 /// Runs only against one legacy jar in a separate JVM; Pinot classes are deliberately absent from its classpath.
 /// Fractional endpoint masses below one and singleton masses between one and two are excluded: legacy 3.3 cannot
 /// recompress them without changing mass. Those preserved-byte limitations are tested by Pinot's unit tests.
+/// Initial value parity covers ordinary continuous/empty/singleton inputs and huge-mean fallback. Weighted endpoint
+/// or capacity repair can change interpolation, and 3.2 has older singleton rules; those fixtures retain structural,
+/// mass, extrema, and monotonicity checks rather than widening the numerical tolerance.
 public final class LegacyReader {
+  private static final double[] QUANTILES = {0, 0.25, 0.5, 0.75, 0.99, 1};
+
   private LegacyReader() {
   }
 
@@ -41,17 +46,22 @@ public final class LegacyReader {
     }
     Path directory = Path.of(args[0]);
     List<String> manifest = Files.readAllLines(directory.resolve("manifest.tsv"));
-    assert manifest.size() == 37 : "Missing compatibility fixtures";
+    assert manifest.size() == 38 : "Missing compatibility fixtures";
+    int nativeQuantileCases = 0;
     for (String line : manifest) {
       String[] fields = line.split("\t");
       try {
-        TDigest digest = MergingDigest.fromBytes(ByteBuffer.wrap(Files.readAllBytes(
-            directory.resolve(fields[0] + ".bin"))));
+        byte[] bytes = Files.readAllBytes(directory.resolve(fields[0] + ".bin"));
+        TDigest digest = MergingDigest.fromBytes(ByteBuffer.wrap(bytes));
         long size = Long.parseLong(fields[1]);
         double min = Double.parseDouble(fields[2]);
         double max = Double.parseDouble(fields[3]);
         double compression = Double.parseDouble(fields[4]);
         verify(digest, size, min, max, compression, true);
+        if (Boolean.parseBoolean(fields[5])) {
+          verifyInitialQuantiles(digest, fields, compactRoundingBound(bytes));
+          nativeQuantileCases++;
+        }
         digest.add(1);
         digest.compress();
         verify(digest, size + 1, Math.min(min, 1), Math.max(max, 1), compression, false);
@@ -70,7 +80,9 @@ public final class LegacyReader {
         throw new AssertionError("Legacy " + args[1] + " reader failed for " + fields[0], e);
       }
     }
-    System.out.println("Legacy " + args[1] + ": " + manifest.size() + " read/add/compress/rewrite cases passed");
+    assert nativeQuantileCases == 25 : "Missing initial native quantile comparisons";
+    System.out.println("Legacy " + args[1] + ": " + manifest.size() + " read/add/compress/rewrite cases passed, "
+        + nativeQuantileCases + " initial native quantile comparisons");
   }
 
   private static void verify(TDigest digest, long size, double min, double max, double compression,
@@ -89,6 +101,36 @@ public final class LegacyReader {
         previous = value;
       }
     }
+  }
+
+  private static void verifyInitialQuantiles(TDigest digest, String[] fields, double roundingBound) {
+    assert fields.length == 6 + QUANTILES.length : "Missing native quantile expectations";
+    for (int i = 0; i < QUANTILES.length; i++) {
+      double expected = Double.parseDouble(fields[6 + i]);
+      double actual = digest.quantile(QUANTILES[i]);
+      double tolerance = Math.max(roundingBound, 8 * Math.ulp(expected));
+      assert Double.isNaN(expected) ? Double.isNaN(actual) : Math.abs(actual - expected) <= tolerance
+          : "Initial p" + QUANTILES[i] * 100 + " changed: expected=" + expected + ", actual=" + actual
+              + ", tolerance=" + tolerance;
+    }
+  }
+
+  private static double compactRoundingBound(byte[] bytes) {
+    // Fixture weights are exact integers. Interpolation can then move only by float rounding of centroid means.
+    ByteBuffer encoded = ByteBuffer.wrap(bytes);
+    if (encoded.getInt() != 2) {
+      return 0;
+    }
+    encoded.position(28);
+    int count = encoded.getShort();
+    double bound = 0;
+    for (int i = 0; i < count; i++) {
+      float weight = encoded.getFloat();
+      assert weight == Math.rint(weight) : "This rounding bound requires exact integer fixture weights";
+      float mean = encoded.getFloat();
+      bound = Math.max(bound, 2.0 * Math.ulp(mean));
+    }
+    return bound;
   }
 
   private static boolean sameExtremum(double actual, double expected, boolean exact) {

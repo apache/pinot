@@ -91,13 +91,16 @@ public final class TDigestUtils {
         tDigest.centroidCount();
         return ((PercentileTDigestAccumulator) tDigest).serialize();
       }
-      // centroidCount flushes buffered input. Boundary repair can add at most two centroids; compression and
-      // total weight are not allocation sizes, so extreme historical settings need no enormous scratch array.
+      // Keep room for boundary repair as well as any additional buffered state declared by the implementation.
+      // Compression and total weight are not allocation sizes, so extreme settings need no enormous scratch array.
       int maxCentroids = Math.addExact(tDigest.centroidCount(), 2);
-      int requiredCapacity = Math.addExact(VERBOSE_HEADER_SIZE,
-          Math.multiplyExact(VERBOSE_CENTROID_SIZE, maxCentroids));
+      int requiredCapacity = Math.max(tDigest.maxSerializedByteSize(), Math.addExact(VERBOSE_HEADER_SIZE,
+          Math.multiplyExact(VERBOSE_CENTROID_SIZE, maxCentroids)));
       ByteBuffer verboseBuffer = prepareScratchBuffer(scratchBuffer, requiredCapacity);
       tDigest.asBytes(verboseBuffer);
+      if (verboseBuffer.position() < SMALL_HEADER_SIZE) {
+        throw new IllegalStateException("TDigest.asBytes must advance the buffer position past a complete payload");
+      }
       byte[] verboseBytes = new byte[verboseBuffer.position()];
       verboseBuffer.flip();
       verboseBuffer.get(verboseBytes);
@@ -322,6 +325,15 @@ public final class TDigestUtils {
       double mean = centroidSize == VERBOSE_CENTROID_SIZE ? encoded.getDouble() : encoded.getFloat();
       if (!Double.isFinite(weight)) {
         throw new IllegalArgumentException("Invalid TDigest centroid weight: " + weight);
+      }
+      // Legacy compact writers can narrow a finite double endpoint outside the float range to infinity.
+      // Recover that identifiable rounding before classifying non-finite state; verbose infinity remains opaque.
+      if (header.encoding() == SMALL_ENCODING) {
+        if (mean == Double.NEGATIVE_INFINITY && Double.isFinite(min) && roundedMin == mean) {
+          mean = min;
+        } else if (mean == Double.POSITIVE_INFINITY && Double.isFinite(max) && roundedMax == mean) {
+          mean = max;
+        }
       }
       if (means != null) {
         means[i] = Math.max(min, Math.min(mean, max));

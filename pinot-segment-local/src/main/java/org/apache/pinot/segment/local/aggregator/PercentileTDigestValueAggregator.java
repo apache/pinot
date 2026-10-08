@@ -40,7 +40,6 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
   private final int _compressionFactor;
   private int _maxByteSize;
-  private ByteBuffer _serializationBuffer;
 
   public PercentileTDigestValueAggregator(List<ExpressionContext> arguments) {
     if (!arguments.isEmpty()) {
@@ -127,11 +126,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
   public byte[] serializeAggregatedValue(TDigest value) {
     NonFiniteAwareTDigest wrapped = asNonFiniteAware(value);
     updateMaxByteSize(wrapped);
-    int requiredCapacity = Math.max(_maxByteSize, TDigestUtils.VERBOSE_HEADER_SIZE);
-    if (_serializationBuffer == null || _serializationBuffer.capacity() < requiredCapacity) {
-      _serializationBuffer = ByteBuffer.allocate(requiredCapacity);
-    }
-    byte[] bytes = wrapped.serialize(_serializationBuffer);
+    byte[] bytes = wrapped.serialize();
     _maxByteSize = Math.max(_maxByteSize, bytes.length);
     return bytes;
   }
@@ -209,14 +204,17 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       for (int i = 0; i < centroidCount; i++) {
         double weight = verbose ? input.getDouble() : input.getFloat();
         double mean = verbose ? input.getDouble() : input.getFloat();
+        if (weight == 0.0) {
+          continue;
+        }
+        if (!verbose) {
+          mean = Math.max(encodedMin, Math.min(mean, encodedMax));
+        }
         if (mean == Double.NEGATIVE_INFINITY) {
           negativeInfinityWeight += weight;
         } else if (mean == Double.POSITIVE_INFINITY) {
           positiveInfinityWeight += weight;
         } else {
-          if (!verbose) {
-            mean = Math.max(encodedMin, Math.min(mean, encodedMax));
-          }
           finiteWeights[finiteCount] = weight;
           finiteMeans[finiteCount] = mean;
           finiteMin = Math.min(finiteMin, mean);
@@ -317,6 +315,9 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       for (Centroid centroid : centroids) {
         double mean = centroid.mean();
         double weight = centroid.weight();
+        if (weight == 0.0) {
+          continue;
+        }
         if (mean == Double.NEGATIVE_INFINITY) {
           _negativeInfinityWeight += weight;
         } else if (mean == Double.POSITIVE_INFINITY) {
@@ -496,8 +497,14 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       return Double.NEGATIVE_INFINITY;
     }
 
-    private byte[] serialize(ByteBuffer scratchBuffer) {
-      return getSerializedBytes(scratchBuffer).clone();
+    private byte[] serialize() {
+      byte[] bytes = getSerializedBytes();
+      // Transfer ownership of the returned bytes, including the finite-only cache alias.
+      if (bytes == _finiteSerializedBytes) {
+        _finiteSerializedBytes = null;
+      }
+      _serializedBytes = null;
+      return bytes;
     }
 
     private List<Centroid> getFiniteCentroids() {
@@ -520,12 +527,8 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
     }
 
     private byte[] getSerializedBytes() {
-      return getSerializedBytes(null);
-    }
-
-    private byte[] getSerializedBytes(ByteBuffer scratchBuffer) {
       if (_serializedBytes == null) {
-        byte[] finiteBytes = getFiniteSerializedBytes(scratchBuffer);
+        byte[] finiteBytes = getFiniteSerializedBytes();
         if (_negativeInfinityWeight == 0L && _positiveInfinityWeight == 0L) {
           _serializedBytes = finiteBytes;
           return _serializedBytes;
@@ -568,14 +571,10 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
     }
 
     private byte[] getFiniteSerializedBytes() {
-      return getFiniteSerializedBytes(null);
-    }
-
-    private byte[] getFiniteSerializedBytes(ByteBuffer scratchBuffer) {
       if (_finiteSerializedBytes == null) {
         // Serialization performs the single final compression pass. Keep these bytes coupled to the derived
         // centroid/final-wire caches so later reads cannot return state from before another destructive compression.
-        _finiteSerializedBytes = TDigestUtils.serialize(_finiteDigest, scratchBuffer);
+        _finiteSerializedBytes = TDigestUtils.serialize(_finiteDigest);
         _finiteCentroids = null;
         _serializedBytes = null;
       }

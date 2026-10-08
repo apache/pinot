@@ -24,6 +24,8 @@ import java.util.List;
 
 /// Mutable percentile digest contract for aggregation plugins and legacy t-digest byte encodings.
 /// Implementations are not thread-safe; callers must serialize access to each aggregation state.
+/// Fractional mass is preserved; t-digest 3.3 can reject endpoint weights below one or singleton masses between
+/// one and two during recompression because its endpoint invariant requires unit weights.
 public abstract class TDigest {
   public abstract void add(double value);
 
@@ -76,13 +78,16 @@ public abstract class TDigest {
     return byteSize();
   }
 
-  /// Returns space for asSmallBytes; degraded legacy state can retain its original verbose encoding.
+  /// Returns space for asSmallBytes; degraded legacy state or finite fields that overflow float retain verbose bytes.
   /// Implementations fail explicitly when compact centroid counts or capacities cannot fit their signed short fields.
   public abstract int smallByteSize();
 
+  /// Writes one legacy payload at the current position and advances the position past the complete payload.
+  /// The caller supplies at least maxSerializedByteSize bytes of remaining space.
   public abstract void asBytes(ByteBuffer buffer);
 
-  /// Writes compact bytes when possible, retaining verbose bytes for degraded legacy state.
+  /// Writes compact bytes when possible, using verbose bytes for degraded state or finite fields that overflow float.
+  /// Advances the position past the complete payload; the caller supplies at least smallByteSize bytes of space.
   public abstract void asSmallBytes(ByteBuffer buffer);
 
   public abstract int centroidCount();

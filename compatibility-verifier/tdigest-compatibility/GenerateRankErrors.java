@@ -20,8 +20,9 @@
 import com.tdunning.math.stats.Centroid;
 import com.tdunning.math.stats.TDigest;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.SplittableRandom;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
 
@@ -36,36 +37,34 @@ public final class GenerateRankErrors {
   private GenerateRankErrors() {
   }
 
-  public static void main(String[] args) {
-    Map<String, double[]> rows = new LinkedHashMap<>();
+  public static void main(String[] args)
+      throws Exception {
+    System.out.println("# mergeOrders=" + String.join(",", ORDERS));
+    System.out.println("# reducerInputs=" + String.join(",", INPUTS));
     for (int fanIn : new int[]{8, 32, 128}) {
       for (int compression : new int[]{20, 100, 1000}) {
         for (String distribution : DISTRIBUTIONS) {
-          double[] maximumErrors = new double[QUANTILES.length];
           for (String order : ORDERS) {
             for (String input : INPUTS) {
-              double[] errors = referenceCase(fanIn, compression, distribution, order, input);
-              for (int i = 0; i < errors.length; i++) {
-                maximumErrors[i] = Math.max(maximumErrors[i], errors[i]);
+              Reference reference = referenceCase(fanIn, compression, distribution, order, input);
+              System.out.print(fanIn + "/" + compression + "/" + distribution + "/" + order + "/" + input
+                  + "," + reference.inputSha256());
+              for (double error : reference.rankErrors()) {
+                System.out.print("," + error);
               }
+              System.out.println();
             }
           }
-          rows.put(fanIn + "/" + compression + "/" + distribution, maximumErrors);
         }
       }
     }
-    System.out.println("# mergeOrders=" + String.join(",", ORDERS));
-    System.out.println("# reducerInputs=" + String.join(",", INPUTS));
-    for (Map.Entry<String, double[]> row : rows.entrySet()) {
-      System.out.print(row.getKey());
-      for (double error : row.getValue()) {
-        System.out.print("," + error);
-      }
-      System.out.println();
-    }
   }
 
-  private static double[] referenceCase(int fanIn, int compression, String distribution, String order, String input) {
+  private record Reference(String inputSha256, double[] rankErrors) {
+  }
+
+  private static Reference referenceCase(int fanIn, int compression, String distribution, String order, String input)
+      throws Exception {
     TDigest[] sources = new TDigest[fanIn];
     double[] raw = new double[fanIn * 64];
     for (int i = 0; i < fanIn; i++) {
@@ -79,7 +78,8 @@ public final class GenerateRankErrors {
       sources[i] = input.equals("DISTRIBUTED") ? TDigestUtils.deserialize(TDigestUtils.serialize(digest)) : digest;
     }
     TDigest result = TDigestUtils.createMergingDigest(compression);
-    for (int index : indexes(fanIn, order)) {
+    int[] sourceIndexes = indexes(fanIn, order);
+    for (int index : sourceIndexes) {
       if (result.size() == 0) {
         result = sources[index];
       } else {
@@ -97,7 +97,15 @@ public final class GenerateRankErrors {
     for (int i = 0; i < errors.length; i++) {
       errors[i] = rankError(raw, result.quantile(QUANTILES[i]), QUANTILES[i]);
     }
-    return errors;
+    ByteBuffer encodedRaw = ByteBuffer.allocate(Double.BYTES * raw.length + Integer.BYTES * sourceIndexes.length);
+    for (double value : raw) {
+      encodedRaw.putDouble(value);
+    }
+    for (int sourceIndex : sourceIndexes) {
+      encodedRaw.putInt(sourceIndex);
+    }
+    String inputSha256 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(encodedRaw.array()));
+    return new Reference(inputSha256, errors);
   }
 
   private static double value(String distribution, double unitValue) {

@@ -31,6 +31,8 @@ import static org.testng.Assert.assertEquals;
 /// Exports fresh Pinot bytes for the isolated real t-digest 3.2/3.3 reader gate in the unit-test workflow.
 /// This test owns its output directory and does not share mutable state with other test classes.
 public class LegacyTDigestCompatibilityTest {
+  private static final double[] QUANTILES = {0, 0.25, 0.5, 0.75, 0.99, 1};
+
   @Test
   public void testExportLegacyReaderFixtures()
       throws Exception {
@@ -59,7 +61,7 @@ public class LegacyTDigestCompatibilityTest {
           default:
             break;
         }
-        count += export(directory, manifest, compression + "-" + state, digest);
+        count += export(directory, manifest, compression + "-" + state, digest, !state.equals("weighted"));
       }
     }
     // Exercise low-compression capacity fallback with exact floats and with non-float double means.
@@ -70,7 +72,7 @@ public class LegacyTDigestCompatibilityTest {
         verbose.putDouble(1).putDouble(offset + 256 * i);
       }
       TDigest digest = TDigestUtils.deserialize(verbose.array());
-      write(directory, manifest, "capacity-" + offset, digest, TDigestUtils.serialize(digest));
+      writeVerbose(directory, manifest, "capacity-" + offset, digest);
       count++;
     }
     // A compact stored digest can declare more centroids than a default legacy reader allocates.
@@ -81,7 +83,7 @@ public class LegacyTDigestCompatibilityTest {
       compact.putFloat(1).putFloat(i);
     }
     TDigest digest = TDigestUtils.deserialize(compact.array());
-    write(directory, manifest, "oversized-compact", digest, TDigestUtils.serialize(digest));
+    writeVerbose(directory, manifest, "oversized-compact", digest);
     count++;
     // Externally stored verbose headers below ten must be normalized before a 3.2 reader allocates its arrays.
     ByteBuffer lowCompression = ByteBuffer.allocate(32 + 16 * 25);
@@ -90,31 +92,66 @@ public class LegacyTDigestCompatibilityTest {
       lowCompression.putDouble(1).putDouble(i);
     }
     digest = TDigestUtils.deserialize(lowCompression.array());
-    write(directory, manifest, "low-compression-header", digest, TDigestUtils.serialize(digest));
+    writeVerbose(directory, manifest, "low-compression-header", digest);
     count++;
     ByteBuffer zeroWeight = ByteBuffer.allocate(32 + 16 * 3);
     zeroWeight.putInt(1).putDouble(0).putDouble(10).putDouble(100).putInt(3);
     zeroWeight.putDouble(1).putDouble(0).putDouble(0).putDouble(5).putDouble(1).putDouble(10);
     digest = TDigestUtils.deserialize(zeroWeight.array());
-    write(directory, manifest, "zero-weight-centroid", digest, TDigestUtils.serialize(digest));
+    writeVerbose(directory, manifest, "zero-weight-centroid", digest);
+    count++;
+    // Compact float fields cannot represent this finite mean; the actual small writer must fall back to verbose.
+    digest = TDigestUtils.createMergingDigest(100);
+    digest.add(1e100);
+    digest.compress();
+    double[] hugeExpected = quantiles(digest);
+    ByteBuffer hugeSmall = ByteBuffer.allocate(digest.smallByteSize());
+    digest.asSmallBytes(hugeSmall);
+    write(directory, manifest, "huge-mean-small-fallback", digest, hugeSmall.array(), hugeExpected, true);
     count++;
     Files.writeString(directory.resolve("manifest.tsv"), manifest);
-    assertEquals(count, 37);
+    assertEquals(count, 38);
   }
 
-  private static int export(Path directory, StringBuilder manifest, String name, TDigest digest)
+  private static int export(Path directory, StringBuilder manifest, String name, TDigest digest,
+      boolean compareInitialQuantiles)
       throws Exception {
-    write(directory, manifest, name + "-verbose", digest, TDigestUtils.serialize(digest));
+    digest.compress();
+    double[] expected = quantiles(digest);
+    write(directory, manifest, name + "-verbose", digest, TDigestUtils.serialize(digest), expected,
+        compareInitialQuantiles);
+    expected = quantiles(digest);
     ByteBuffer compact = ByteBuffer.allocate(digest.smallByteSize());
     digest.asSmallBytes(compact);
-    write(directory, manifest, name + "-compact", digest, compact.array());
+    write(directory, manifest, name + "-compact", digest, compact.array(), expected, compareInitialQuantiles);
     return 2;
   }
 
-  private static void write(Path directory, StringBuilder manifest, String name, TDigest digest, byte[] bytes)
+  private static double[] quantiles(TDigest digest) {
+    double[] values = new double[QUANTILES.length];
+    for (int i = 0; i < values.length; i++) {
+      values[i] = digest.quantile(QUANTILES[i]);
+    }
+    return values;
+  }
+
+  private static void writeVerbose(Path directory, StringBuilder manifest, String name, TDigest digest)
+      throws Exception {
+    digest.compress();
+    double[] expected = quantiles(digest);
+    // Boundary/capacity repairs and historical 3.2 singleton interpolation can intentionally change quantile values.
+    write(directory, manifest, name, digest, TDigestUtils.serialize(digest), expected, false);
+  }
+
+  private static void write(Path directory, StringBuilder manifest, String name, TDigest digest, byte[] bytes,
+      double[] expectedQuantiles, boolean compareInitialQuantiles)
       throws Exception {
     Files.write(directory.resolve(name + ".bin"), bytes);
     manifest.append(name).append('\t').append(digest.size()).append('\t').append(digest.getMin()).append('\t')
-        .append(digest.getMax()).append('\t').append(digest.compression()).append('\n');
+        .append(digest.getMax()).append('\t').append(digest.compression()).append('\t').append(compareInitialQuantiles);
+    for (double value : expectedQuantiles) {
+      manifest.append('\t').append(value);
+    }
+    manifest.append('\n');
   }
 }

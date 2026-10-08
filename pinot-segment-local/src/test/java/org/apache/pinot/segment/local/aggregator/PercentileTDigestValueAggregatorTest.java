@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.aggregator;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.SplittableRandom;
 import org.apache.pinot.common.request.Literal;
@@ -319,6 +320,47 @@ public class PercentileTDigestValueAggregatorTest {
     assertCentroidWeight(digest, digest.size());
 
     assertEquals(aggregator.serializeAggregatedValue(digest), beforeInspection);
+  }
+
+  @Test(dataProvider = "serializationOwnership")
+  public void testSerializedBytesAreIndependentlyOwned(boolean infiniteTail) {
+    PercentileTDigestValueAggregator aggregator = newAggregator(100);
+    TDigest digest = aggregator.getInitialAggregatedValue(1.0);
+    aggregator.applyRawValue(digest, 2.0);
+    if (infiniteTail) {
+      aggregator.applyRawValue(digest, Double.POSITIVE_INFINITY);
+    }
+    byte[] bytes = aggregator.serializeAggregatedValue(digest);
+    byte[] expected = bytes.clone();
+    double median = digest.quantile(0.5);
+    Arrays.fill(bytes, (byte) 0);
+    assertEquals(aggregator.serializeAggregatedValue(digest), expected);
+    assertEquals(digest.quantile(0.5), median);
+  }
+
+  @DataProvider
+  public static Object[][] serializationOwnership() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test
+  public void testCompactOverflowWithGenuineInfinityTailRemainsFinite() {
+    ByteBuffer compact = ByteBuffer.allocate(TDigestUtils.SMALL_HEADER_SIZE + 3 * TDigestUtils.SMALL_CENTROID_SIZE);
+    compact.putInt(TDigestUtils.SMALL_ENCODING).putDouble(Double.NEGATIVE_INFINITY).putDouble(1e39).putFloat(100);
+    compact.putShort((short) 210).putShort((short) 1050).putShort((short) 3);
+    compact.putFloat(1).putFloat(Float.NEGATIVE_INFINITY);
+    compact.putFloat(1).putFloat(0);
+    compact.putFloat(1).putFloat(Float.POSITIVE_INFINITY);
+    PercentileTDigestValueAggregator aggregator = newAggregator(100);
+    TDigest digest = aggregator.deserializeAggregatedValue(compact.array());
+    assertTrue(digest.hasValidStatistics());
+    assertEquals(digest.getTotalWeight(), 3.0);
+    assertEquals(digest.getMax(), 1e39);
+    assertEquals(digest.quantile(0.5), 0.0);
+    TDigest restored = aggregator.deserializeAggregatedValue(aggregator.serializeAggregatedValue(digest));
+    assertTrue(restored.hasValidStatistics());
+    assertEquals(restored.quantile(0.5), 0.0);
+    assertEquals(restored.getMax(), 1e39);
   }
 
   @Test

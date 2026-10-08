@@ -116,6 +116,52 @@ public class TDigestUtilsTest {
   }
 
   @Test
+  public void testGenericSerializationHonorsBufferedStateBound() {
+    double[] means = new double[10];
+    double[] weights = new double[10];
+    Arrays.setAll(means, i -> i);
+    Arrays.fill(weights, 1.0);
+    byte[] payload = verboseBytes(100.0, means, weights);
+    TDigest digest = craftedVerboseDigest(100.0, means, weights);
+    when(digest.centroidCount()).thenReturn(1);
+    int declaredBound = payload.length + 32;
+    when(digest.maxSerializedByteSize()).thenReturn(declaredBound);
+    doAnswer(invocation -> {
+      ByteBuffer buffer = invocation.getArgument(0);
+      assertTrue(buffer.remaining() >= declaredBound, "The SPI bound includes buffered state omitted from the view");
+      buffer.put(payload);
+      return null;
+    }).when(digest).asBytes(any(ByteBuffer.class));
+
+    for (ByteBuffer scratch : new ByteBuffer[]{
+        null, ByteBuffer.allocate(80), ByteBuffer.allocate(declaredBound + 20)
+    }) {
+      assertEquals(TDigestUtils.serialize(digest, scratch), payload);
+    }
+    // A smaller advertised bound must still leave room for the current centroids and boundary repair.
+    when(digest.maxSerializedByteSize()).thenReturn(1);
+    when(digest.centroidCount()).thenReturn(means.length);
+    doAnswer(invocation -> {
+      ByteBuffer buffer = invocation.getArgument(0);
+      assertTrue(buffer.remaining() >= payload.length + 2 * TDigestUtils.VERBOSE_CENTROID_SIZE);
+      buffer.put(payload);
+      return null;
+    }).when(digest).asBytes(any(ByteBuffer.class));
+    assertEquals(TDigestUtils.serialize(digest), payload);
+  }
+
+  @Test
+  public void testGenericSerializationRequiresWriterToAdvancePosition() {
+    TDigest digest = craftedVerboseDigest(100.0, new double[]{1.0}, new double[]{1.0});
+    doAnswer(invocation -> {
+      ByteBuffer buffer = invocation.getArgument(0);
+      buffer.putInt(0, VERBOSE_ENCODING);
+      return null;
+    }).when(digest).asBytes(any(ByteBuffer.class));
+    assertThrows(IllegalStateException.class, () -> TDigestUtils.serialize(digest));
+  }
+
+  @Test
   public void testLowCompressionLargeMeansRemainDoublePrecision() {
     int centroidCount = 51;
     double firstValue = 1.0e18;
@@ -325,6 +371,43 @@ public class TDigestUtilsTest {
     List<Centroid> centroids = List.copyOf(digest.centroids());
     assertEquals(centroids.get(0).mean(), min);
     assertEquals(centroids.get(centroids.size() - 1).mean(), max);
+  }
+
+  @Test
+  public void testCompactFiniteEndpointOverflowIsRestoredBeforePoisonClassification() {
+    for (double[] means : new double[][]{{1.0, 2.0, 1e39}, {-1e39, -2.0, -1.0}, {-1e39, 0.0, 1e39}}) {
+      ByteBuffer compact = ByteBuffer.allocate(TDigestUtils.SMALL_HEADER_SIZE + 3 * TDigestUtils.SMALL_CENTROID_SIZE);
+      compact.putInt(SMALL_ENCODING).putDouble(means[0]).putDouble(means[2]).putFloat(100.0F);
+      compact.putShort((short) 210).putShort((short) 1050).putShort((short) means.length);
+      for (double mean : means) {
+        compact.putFloat(1.0F).putFloat((float) mean);
+      }
+      TDigestUtils.SerializedTDigestMetadata metadata =
+          TDigestUtils.inspectSerialized(ByteBuffer.wrap(compact.array()));
+      assertFalse(metadata.needsLegacyFallback());
+      assertFalse(metadata.hasNonFiniteMeans(), "Float overflow is recoverable from the finite double extrema");
+      TDigest digest = TDigestUtils.deserializeFinite(compact.array());
+      assertTrue(digest.hasValidStatistics());
+      assertEquals(digest.quantile(0.5), means[1]);
+      assertEquals(digest.quantile(0.0), means[0]);
+      assertEquals(digest.quantile(1.0), means[2]);
+      digest.add(0.0);
+      TDigest merged = TDigestUtils.deserialize(TDigestUtils.serialize(digest));
+      assertTrue(merged.hasValidStatistics());
+      assertTrue(Double.isFinite(merged.quantile(0.5)));
+      assertEquals(merged.getTotalWeight(), 4.0);
+
+      // The verbose format did not narrow its means: infinity under finite extrema is genuine unknown state.
+      double[] corruptMeans = means.clone();
+      int overflowIndex = means[0] < -Float.MAX_VALUE ? 0 : 2;
+      corruptMeans[overflowIndex] = Math.copySign(Double.POSITIVE_INFINITY, means[overflowIndex]);
+      byte[] verbose = verboseBytes(100.0, corruptMeans, new double[]{1.0, 1.0, 1.0});
+      ByteBuffer.wrap(verbose).putDouble(4, means[0]).putDouble(12, means[2]);
+      TDigest corrupted = TDigestUtils.deserialize(verbose);
+      assertFalse(corrupted.hasValidStatistics());
+      assertTrue(Double.isNaN(corrupted.quantile(0.5)));
+      assertEquals(TDigestUtils.serialize(corrupted), verbose);
+    }
   }
 
   @Test

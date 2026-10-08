@@ -34,3 +34,5 @@ for TDIGEST_VERSION in 3.2 3.3; do
     "$TDIGEST_ROOT/compatibility-verifier/tdigest-compatibility/LegacyReader.java"
   java -ea -Xmx128m -cp "$TDIGEST_WORK:$TDIGEST_JAR" LegacyReader "$TDIGEST_FIXTURES" "$TDIGEST_VERSION"
 done
+# Keep the checked-in accuracy oracle executable and independent from the current Pinot implementation.
+bash "$TDIGEST_ROOT/compatibility-verifier/tdigest-compatibility/generate-rank-errors.sh"

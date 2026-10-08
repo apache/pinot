@@ -25,9 +25,12 @@ import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.SplittableRandom;
@@ -60,7 +63,7 @@ import static org.testng.Assert.assertTrue;
 
 public class PercentileTDigestAggregationFunctionTest {
   private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("col");
-  private static final Supplier<Map<String, double[]>> LEGACY_REDUCER_RANK_ERRORS =
+  private static final Supplier<Map<String, LegacyReducerReference>> LEGACY_REDUCER_RANK_ERRORS =
       Suppliers.memoize(PercentileTDigestAggregationFunctionTest::loadLegacyReducerRankErrors);
 
   @DataProvider(name = "rowCounts")
@@ -1020,18 +1023,20 @@ public class PercentileTDigestAggregationFunctionTest {
     PercentileTDigestAggregationFunction function =
         new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, compression, false);
     TDigest result = TDigestUtils.createMergingDigest(compression);
-    for (int sourceIndex : mergeOrder.sourceIndexes(fanIn)) {
+    int[] sourceIndexes = mergeOrder.sourceIndexes(fanIn);
+    for (int sourceIndex : sourceIndexes) {
       result = function.merge(result, sources[sourceIndex]);
     }
 
     Arrays.sort(rawValues);
     String caseDescription =
         fanIn + "/" + compression + "/" + distribution + "/" + mergeOrder + "/" + reducerInput;
-    // The independent 3.3 K1 corpus uses the worst of the six merge/input orders for each quantile, allowing
-    // one raw observation of sampling slack. It was generated with -da because 3.3 asserts on duplicate boundaries.
-    double[] referenceRankErrors = LEGACY_REDUCER_RANK_ERRORS.get().get(fanIn + "/" + compression + "/" + distribution);
-    assertNotNull(referenceRankErrors, "Missing 3.3 oracle for " + caseDescription);
-    double[] maxRankErrors = referenceRankErrors.clone();
+    // Compare each merge/input order with its own independent 3.3 K1 reference, allowing one raw observation.
+    LegacyReducerReference reference = LEGACY_REDUCER_RANK_ERRORS.get().get(caseDescription);
+    assertNotNull(reference, "Missing 3.3 oracle for " + caseDescription);
+    assertEquals(inputSha256(rawValues, sourceIndexes), reference.inputSha256(),
+        "Legacy oracle input changed for " + caseDescription);
+    double[] maxRankErrors = reference.rankErrors().clone();
     for (int i = 0; i < maxRankErrors.length; i++) {
       maxRankErrors[i] += 1.0 / numValues;
     }
@@ -1291,8 +1296,26 @@ public class PercentileTDigestAggregationFunctionTest {
     Assert.assertEquals(result.quantile(0.75), 0.75, 0.02);
   }
 
-  private static Map<String, double[]> loadLegacyReducerRankErrors() {
-    Map<String, double[]> errors = new HashMap<>();
+  private record LegacyReducerReference(String inputSha256, double[] rankErrors) {
+  }
+
+  private static String inputSha256(double[] sortedValues, int[] sourceIndexes) {
+    ByteBuffer bytes = ByteBuffer.allocate(Double.BYTES * sortedValues.length + Integer.BYTES * sourceIndexes.length);
+    for (double value : sortedValues) {
+      bytes.putDouble(value);
+    }
+    for (int sourceIndex : sourceIndexes) {
+      bytes.putInt(sourceIndex);
+    }
+    try {
+      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.array()));
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  private static Map<String, LegacyReducerReference> loadLegacyReducerRankErrors() {
+    Map<String, LegacyReducerReference> errors = new HashMap<>();
     boolean mergeOrdersVerified = false;
     boolean reducerInputsVerified = false;
     try {
@@ -1310,19 +1333,22 @@ public class PercentileTDigestAggregationFunctionTest {
           reducerInputsVerified = true;
         } else if (!line.startsWith("#") && !line.isBlank()) {
           String[] fields = line.split(",", -1);
-          assertEquals(fields.length, 7, "Invalid legacy oracle row: " + line);
-          double[] rankErrors = Arrays.stream(fields).skip(1).mapToDouble(Double::parseDouble).toArray();
+          assertEquals(fields.length, 8, "Invalid legacy oracle row: " + line);
+          assertTrue(fields[1].matches("[0-9a-f]{64}"), "Invalid legacy oracle input fingerprint: " + line);
+          double[] rankErrors = Arrays.stream(fields).skip(2).mapToDouble(Double::parseDouble).toArray();
           for (double error : rankErrors) {
             assertTrue(Double.isFinite(error) && error >= 0.0 && error <= 1.0,
                 "Invalid legacy oracle rank error for " + fields[0]);
           }
-          assertNull(errors.put(fields[0], rankErrors), "Duplicate legacy oracle key: " + fields[0]);
+          assertNull(errors.put(fields[0], new LegacyReducerReference(fields[1], rankErrors)),
+              "Duplicate legacy oracle key: " + fields[0]);
         }
       }
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
     assertTrue(mergeOrdersVerified && reducerInputsVerified, "Missing legacy oracle test dimensions");
+    assertEquals(errors.size(), reducerMergeCases().length, "Missing legacy oracle cases");
     return Map.copyOf(errors);
   }
 
