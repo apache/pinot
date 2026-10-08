@@ -66,6 +66,8 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
   private final Comparator<Object[]> _comparator;
   private final PriorityQueue<SenderCursor> _readyCursors;
   private final boolean _singleSortedSender;
+  private int _rowsToSkip;
+  private long _rowsToEmit;
   /// Senders that have not finished but do not currently have a row ready. Nothing can be emitted while this is
   /// non-empty because any one of these senders may hold the next row.
   private final Set<SenderCursor> _starvedCursors = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -79,6 +81,8 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
     super(context, node);
     Preconditions.checkState(!CollectionUtils.isEmpty(node.getCollations()), "Field collations must be set");
     _dataSchema = node.getDataSchema();
+    _rowsToSkip = Math.max(node.getOffset(), 0);
+    _rowsToEmit = node.getFetch() < 0 ? Long.MAX_VALUE : node.getFetch();
     _collations = List.copyOf(node.getCollations());
     _comparator = new SortUtils.SortComparator(_collations, false);
     List<AsyncStream<ReceivingMailbox.MseBlockWithStats>> streams = _multiConsumer.getLiveStreamsSnapshot();
@@ -112,7 +116,31 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
     if (_isEarlyTerminated) {
       return readUntilEos();
     }
-    return _singleSortedSender ? readSingleSortedSender() : mergeNextBlock();
+    if (_rowsToEmit == 0) {
+      earlyTerminate();
+      return readUntilEos();
+    }
+    while (true) {
+      MseBlock block = _singleSortedSender ? readSingleSortedSender() : mergeNextBlock();
+      if (block.isEos()) {
+        return block;
+      }
+      if (_rowsToSkip == 0 && _rowsToEmit == Long.MAX_VALUE) {
+        return block;
+      }
+      List<Object[]> rows = ((MseBlock.Data) block).asRowHeap().getRows();
+      int from = Math.min(_rowsToSkip, rows.size());
+      _rowsToSkip -= from;
+      int count = (int) Math.min(rows.size() - from, _rowsToEmit);
+      _rowsToEmit -= count;
+      if (_rowsToEmit == 0) {
+        earlyTerminate();
+      }
+      if (count > 0) {
+        return from == 0 && count == rows.size() ? block
+            : new RowHeapDataBlock(rows.subList(from, from + count), _dataSchema);
+      }
+    }
   }
 
   @Override

@@ -25,8 +25,8 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
-import org.apache.pinot.query.planner.plannode.KWayMergeExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -44,6 +44,7 @@ import static org.testng.Assert.assertTrue;
 /// Verifies fragmentation preserves the explicit ordered exchange contract without discovering leaf ordering.
 public class PlanFragmenterTest {
   @Test
+  @SuppressWarnings("deprecation") // Check the legacy ordering flags only on the compatibility node.
   public void shouldLowerOnlyExplicitMergeExchange() {
     DataSchema schema = new DataSchema(new String[]{"key"}, new ColumnDataType[]{ColumnDataType.INT});
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0));
@@ -53,25 +54,27 @@ public class PlanFragmenterTest {
         new SortNode(0, schema, PlanNode.NodeHint.EMPTY, new ArrayList<>(List.of(scan)), collations, 15, -1);
     for (boolean merge : new boolean[]{false, true}) {
       ExchangeNode exchange = merge
-          ? new KWayMergeExchangeNode(0, schema, List.of(sort), RelDistribution.Type.HASH_DISTRIBUTED,
+          ? ExchangeNode.kWayMerge(0, schema, List.of(sort), RelDistribution.Type.HASH_DISTRIBUTED,
               List.of(), false, collations, 10, 5, "hashCode")
           : new ExchangeNode(0, schema, List.of(sort), PinotRelExchangeType.STREAMING,
               RelDistribution.Type.HASH_DISTRIBUTED, List.of(), false, collations, false, false, null, null,
               "hashCode");
       PlanFragmenter fragmenter = new PlanFragmenter();
-      MailboxReceiveNode receive = (MailboxReceiveNode) exchange.visit(fragmenter, fragmenter.createContext());
+      BaseMailboxReceiveNode receive = (BaseMailboxReceiveNode) exchange.visit(fragmenter, fragmenter.createContext());
       assertEquals(receive instanceof MailboxMergeReceiveNode, merge);
-      assertFalse(receive.isSort());
-      assertFalse(receive.isSortedOnSender());
+      if (!merge) {
+        assertFalse(((MailboxReceiveNode) receive).isSort());
+        assertFalse(((MailboxReceiveNode) receive).isSortedOnSender());
+      }
       MailboxSendNode send = (MailboxSendNode) fragmenter.getPlanFragmentMap().get(2).getFragmentRoot();
       assertFalse(send.isSort());
       assertSame(send.getInputs().get(0), sort, "The logical sender sort must be reused");
       if (merge) {
         assertEquals(((MailboxMergeReceiveNode) receive).getFetch(), 10);
         assertEquals(((MailboxMergeReceiveNode) receive).getOffset(), 5);
-        KWayMergeExchangeNode copy = (KWayMergeExchangeNode) exchange.withInputs(List.of(sort));
-        assertEquals(copy.getFetch(), 10);
-        assertEquals(copy.getOffset(), 5);
+        ExchangeNode copy = (ExchangeNode) exchange.withInputs(List.of(sort));
+        assertEquals(copy.getMergeFetch(), 10);
+        assertEquals(copy.getMergeOffset(), 5);
         assertTrue(copy.equals(exchange));
       }
     }
