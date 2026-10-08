@@ -27,6 +27,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.data.table.GroupingSetsBaseIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
@@ -77,7 +78,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   /// Merge table for FULL-layout blocks (also the only table for non-grouping-set queries).
   private volatile IndexedTable _indexedTable;
   /// Merge table for BASE-layout blocks (grouping-set base aggregation); derived into grouping sets on merge.
-  private volatile IndexedTable _baseIndexedTable;
+  private volatile GroupingSetsBaseIndexedTable _baseIndexedTable;
   private volatile boolean _groupsTrimmed;
   private volatile boolean _numGroupsLimitReached;
   private volatile boolean _numGroupsWarningLimitReached;
@@ -208,13 +209,19 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   }
 
   private IndexedTable ensureBaseIndexedTable(GroupByResultsBlock resultsBlock) {
-    IndexedTable baseIndexedTable = _baseIndexedTable;
+    GroupingSetsBaseIndexedTable baseIndexedTable = _baseIndexedTable;
     if (baseIndexedTable == null) {
       synchronized (this) {
         baseIndexedTable = _baseIndexedTable;
         if (baseIndexedTable == null) {
-          baseIndexedTable = GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks,
-              _executorService);
+          // Cap the base table at numGroupsLimit like any combine table, but RETAIN overflowing records so
+          // their contribution to the coarse grouping sets (grand total, subtotals) survives -- the expansion
+          // path keeps those exact under the limit, and the base path must not regress that.
+          int resultSize = _queryContext.getNumGroupsLimit();
+          int initialCapacity = GroupByUtils.getIndexedTableInitialCapacity(resultSize,
+              resultsBlock.getNumGroups(), _queryContext.getMinInitialIndexedTableCapacity());
+          baseIndexedTable = new GroupingSetsBaseIndexedTable(resultsBlock.getDataSchema(), _queryContext,
+              resultSize, initialCapacity, _executorService);
           _baseIndexedTable = baseIndexedTable;
         }
       }
@@ -278,26 +285,34 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     /// some segments used the expansion path (per-segment MV carve-out or cardinality gate), their full-layout
     /// records are merged into the derived table afterwards: both hold intermediate aggregates under the same
     /// grouping-set key space, so this is a plain aggregate merge.
-    IndexedTable baseIndexedTable = _baseIndexedTable;
+    GroupingSetsBaseIndexedTable baseIndexedTable = _baseIndexedTable;
     if (baseIndexedTable != null) {
-      // The base combine table is capped at numGroupsLimit; if it saturated, base keys may have been dropped
-      // from every derived set, so surface the limit like the segment-level cap does.
-      if (baseIndexedTable.size() >= _queryContext.getNumGroupsLimit()) {
-        _numGroupsLimitReached = true;
-      }
       IndexedTable derivedTable = GroupByUtils.deriveGroupingSetsFromMergedBaseTable(baseIndexedTable, _queryContext,
           _numTasks, _executorService);
-      // The per-set server trim (groupingSetsMinServerTrimSize) drops groups; propagate the trimmed flag so the
-      // broker response reports the approximation.
-      if (derivedTable.isTrimmed()) {
-        _groupsTrimmed = true;
-      }
       if (indexedTable != null) {
+        // Merge full-layout (expansion-path) records first so all their groups exist before the overflow fold.
         int mergedKeys = 0;
         for (Map.Entry<Key, Record> entry : indexedTable.getRecordEntries()) {
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
           derivedTable.upsert(entry.getKey(), entry.getValue());
         }
+      }
+      if (baseIndexedTable.isFull()) {
+        // The base table hit numGroupsLimit. Fold the retained overflow records into the EXISTING derived
+        // groups so the grand total and coarse subtotals stay exact (like the expansion path under the limit);
+        // only the overflowing fine-set groups are lost. Surface the limit like the segment-level cap does.
+        _numGroupsLimitReached = true;
+        GroupByUtils.mergeOverflowBaseRecords(derivedTable, baseIndexedTable.getOverflowRecords(), _queryContext);
+        if (baseIndexedTable.isOverflowTruncated()) {
+          // Even the overflow buffer overflowed: some records were dropped entirely, so the totals are
+          // approximate.
+          _groupsTrimmed = true;
+        }
+      }
+      // The per-set server trim (groupingSetsMinServerTrimSize) and the derived-output cap drop groups;
+      // propagate the trimmed flag so the broker response reports the approximation.
+      if (derivedTable.isTrimmed()) {
+        _groupsTrimmed = true;
       }
       indexedTable = derivedTable;
     }

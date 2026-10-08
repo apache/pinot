@@ -925,12 +925,14 @@ public class CommonConstants {
         /// with group by and limit but  without order by
         public static final String ACCURATE_GROUP_BY_WITHOUT_ORDER_BY = "accurateGroupByWithoutOrderBy";
 
-        /// For GROUP BY GROUPING SETS / ROLLUP / CUBE: when enabled (default), each segment aggregates only the
-        /// base grouping (the union of all grouping-set columns) using the regular group-by path and emits the
-        /// base groups; the combine phase merges them and derives the individual grouping sets in parallel. This
-        /// replaces expanding every input row into one group per grouping set, moving the per-set fan-out from
-        /// O(rows) to O(base groups) and onto the multi-threaded combine. Set to `false` to fall back to the
-        /// legacy per-row expansion path.
+        /// For GROUP BY GROUPING SETS / ROLLUP / CUBE: when enabled (OPT-IN, default off), each segment
+        /// aggregates only the base grouping (the union of all grouping-set columns) using the regular group-by
+        /// path and emits the base groups; the combine phase merges them and derives the individual grouping
+        /// sets in parallel. This replaces expanding every input row into one group per grouping set, moving the
+        /// per-set fan-out from O(rows) to O(base groups) and onto the multi-threaded combine -- a ~2-3x win
+        /// when rows collapse into few base groups with cheap-to-merge aggregations (COUNT/SUM/MIN/MAX), but a
+        /// possible regression for expensive-to-merge intermediates (sketches), which is why it is off by
+        /// default.
         ///
         /// Base aggregation is used only when the estimated base-group count (the product of the union columns'
         /// dictionary cardinalities) does not exceed [#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS]; above that
