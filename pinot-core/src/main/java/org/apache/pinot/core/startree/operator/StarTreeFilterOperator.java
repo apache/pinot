@@ -248,8 +248,9 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       // remaining predicate columns for this node
       if (starTreeNode.isLeaf()) {
         if (heapMatchingDocIds == null) {
-          // Range additions grow heap array containers geometrically. Keep aggregate-only matches in the buffer bitmap.
-          heapMatchingDocIds = matchingDocIds.toRoaringBitmap();
+          // Remaining columns only shrink, so aggregate ids cannot precede the first leaf range.
+          // Heap arrays grow geometrically; MappeableArrayContainer.iadd grows to the exact new cardinality.
+          heapMatchingDocIds = new RoaringBitmap();
         }
         heapMatchingDocIds.add((long) starTreeNode.getStartDocId(), starTreeNode.getEndDocId());
         continue;
