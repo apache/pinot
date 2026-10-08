@@ -140,11 +140,12 @@ public class SplitSegmentCommitter implements SegmentCommitter {
     if (metadataFiles == null || metadataFiles.isEmpty()) {
       return null;
     }
-    LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-    String rawTableName = TableNameBuilder.extractRawTableName(llcSegmentName.getTableName());
+    String rawTableName = null;
     File stagingDir = null;
     File metadataTarFile = null;
     try {
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      rawTableName = TableNameBuilder.extractRawTableName(llcSegmentName.getTableName());
       stagingDir = new File(FileUtils.getTempDirectory(), segmentName + "_meta_" + UUID.randomUUID());
       FileUtils.forceMkdir(stagingDir);
       for (Map.Entry<String, File> entry : metadataFiles.entrySet()) {
@@ -160,7 +161,9 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       return metadataTarLocation == null ? null : metadataTarLocation.toString();
     } catch (Exception e) {
       _segmentLogger.warn("Failed to upload metadata tar for segment: {}; continuing with commit", segmentName, e);
-      _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
+      if (rawTableName != null) {
+        _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
+      }
       return null;
     } finally {
       FileUtils.deleteQuietly(stagingDir);
