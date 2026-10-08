@@ -51,6 +51,7 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.Fixtures;
@@ -981,6 +982,23 @@ public class RealtimeSegmentDataManagerTest {
       verify(serverMetrics).addMeteredTableValue(anyString(),
           eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), eq(1L));
     }
+
+    // Dedup has the same exposure: the over-consumed keys stay owned by this segment until removeSegment() walks it,
+    // so a replay that reaches them first is dropped as duplicate and those rows are lost.
+    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
+        null, createTableConfigWithStreamIngestion(false, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS),
+        serverMetrics)) {
+      segmentDataManager.setPartitionDedupMetadataManager(mock(PartitionDedupMetadataManager.class));
+      segmentDataManager._useRealDownloadAndReplace = true;
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager.setCurrentOffset(START_OFFSET_VALUE + 100);
+      segmentDataManager.downloadSegmentAndReplace(crcMetadata(START_OFFSET_VALUE, 12345L));
+      Assert.assertEquals(semaphore.availablePermits(), 0);
+    }
   }
 
   private FakeRealtimeSegmentDataManager createFakeSegmentManagerForUpsertRevert(
@@ -1704,6 +1722,14 @@ public class RealtimeSegmentDataManagerTest {
           RealtimeSegmentDataManager.class.getDeclaredField("_partitionUpsertMetadataManager");
       partitionUpsertMetadataManagerField.setAccessible(true);
       partitionUpsertMetadataManagerField.set(this, partitionUpsertMetadataManager);
+    }
+
+    public void setPartitionDedupMetadataManager(PartitionDedupMetadataManager partitionDedupMetadataManager)
+        throws Exception {
+      Field partitionDedupMetadataManagerField =
+          RealtimeSegmentDataManager.class.getDeclaredField("_partitionDedupMetadataManager");
+      partitionDedupMetadataManagerField.setAccessible(true);
+      partitionDedupMetadataManagerField.set(this, partitionDedupMetadataManager);
     }
 
     public boolean isStreamConsumerClosed()

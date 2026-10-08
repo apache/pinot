@@ -1756,17 +1756,22 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // allows consumption during build, so the next consuming segment can be running during this download as well
     boolean releasedDuringBuild =
         _parallelSegmentConsumptionPolicy.isAllowedDuringBuild() && !_consumerSemaphoreAcquired.get();
-    // The committed segment ends before what this replica consumed, so the replacement holds fewer rows: every
-    // primary key this segment took over past that offset loses its record location when the replace lands. The next
-    // consuming segment must not replay against that half-updated metadata, whatever the upsert table's mode is.
+    // The committed segment ends before what this replica consumed, so the replacement holds fewer rows, and the
+    // metadata this segment built for the rows past that offset is rewritten as the replace lands. Upsert loses the
+    // record locations for those primary keys. Dedup still owns them until removeSegment() walks this segment, so a
+    // replay that reaches them first is dropped as duplicate and the rows are gone. Either way the next consuming
+    // segment must not run until the replace settles, whatever mode the table is in.
     boolean replaceDropsConsumedRows =
-        _partitionUpsertMetadataManager != null && consumedPastCommittedEndOffset(segmentZKMetadata);
+        (_partitionUpsertMetadataManager != null || _partitionDedupMetadataManager != null)
+            && consumedPastCommittedEndOffset(segmentZKMetadata);
     if (replaceDropsConsumedRows && releasedDuringBuild) {
       // Nothing left to hold back: the build path released the semaphore before anyone could know this replace would
       // drop rows, so the next consuming segment is already running.
       _segmentLogger.error("Next consuming segment can run during download while this replace drops rows consumed "
           + "past the committed end offset. Its snapshot can miss those rows. Use DISALLOW_ALWAYS");
-      _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD, 1L);
+      if (_partitionUpsertMetadataManager != null) {
+        _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD, 1L);
+      }
     }
     // Keep the semaphore across a replace that drops rows, so the next consuming segment starts only once the upsert
     // metadata is consistent. doOffload() releases it afterwards, and closes the stream consumer with it.
