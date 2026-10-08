@@ -52,6 +52,7 @@ import org.apache.pinot.query.access.AuthorizationInterceptor;
 import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.grpc.ReceiverIdentity;
 import org.apache.pinot.query.grpc.ReceiverIdentityInterceptor;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -892,8 +893,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     responseObserver.onCompleted();
   }
 
-  // Collects sender stage IDs from all MailboxReceiveNodes in the plan tree via BFS,
-  // since MailboxReceiveNodes can appear at any depth (e.g. joins have multiple inputs).
+  // Collects sender stage IDs from all mailbox receive nodes in the plan tree via BFS,
+  // since mailbox receive nodes can appear at any depth (e.g. joins have multiple inputs).
   @VisibleForTesting
   static Set<Integer> collectUpstreamStageIds(PlanNode rootNode) {
     Set<Integer> ids = new HashSet<>();
@@ -903,6 +904,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       PlanNode node = queue.poll();
       if (node instanceof MailboxReceiveNode) {
         ids.add(((MailboxReceiveNode) node).getSenderStageId());
+      } else if (node instanceof MailboxMergeReceiveNode) {
+        ids.add(((MailboxMergeReceiveNode) node).getSenderStageId());
       }
       queue.addAll(node.getInputs());
     }

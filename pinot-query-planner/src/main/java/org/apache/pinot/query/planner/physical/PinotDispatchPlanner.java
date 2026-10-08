@@ -31,6 +31,7 @@ import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.physical.v2.PlanFragmentAndMailboxAssignment;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -229,11 +230,10 @@ public class PinotDispatchPlanner {
     }
     if (node instanceof MailboxReceiveNode) {
       MailboxReceiveNode mailboxReceiveNode = (MailboxReceiveNode) node;
-      MailboxSendNode sender = mailboxReceiveNode.getSender();
-      List<PlanNode> senderInputs = sender.getInputs();
-      Preconditions.checkState(!senderInputs.isEmpty(),
-          "MailboxSendNode (stageId=%s) has no inputs", sender.getStageId());
-      return inlineAllLeafStagesEmptyInputs(senderInputs.get(0));
+      return inlineSenderInputs(mailboxReceiveNode.getSender());
+    }
+    if (node instanceof MailboxMergeReceiveNode) {
+      return inlineSenderInputs(((MailboxMergeReceiveNode) node).getSender());
     }
     List<PlanNode> inputs = node.getInputs();
     if (inputs.isEmpty()) {
@@ -247,6 +247,13 @@ public class PinotDispatchPlanner {
       changed |= inlinedInput != input;
     }
     return changed ? node.withInputs(inlinedInputs) : node;
+  }
+
+  private static PlanNode inlineSenderInputs(MailboxSendNode sender) {
+    List<PlanNode> senderInputs = sender.getInputs();
+    Preconditions.checkState(!senderInputs.isEmpty(), "MailboxSendNode (stageId=%s) has no inputs",
+        sender.getStageId());
+    return inlineAllLeafStagesEmptyInputs(senderInputs.get(0));
   }
 
   private static void setStageIdRecursively(PlanNode node, int stageId) {

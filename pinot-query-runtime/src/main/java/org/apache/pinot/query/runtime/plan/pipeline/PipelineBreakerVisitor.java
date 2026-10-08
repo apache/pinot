@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.plan.pipeline;
 
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.plannode.DefaultPostOrderTraversalVisitor;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
@@ -40,6 +41,15 @@ class PipelineBreakerVisitor extends DefaultPostOrderTraversalVisitor<Void, Pipe
 
   @Override
   public Void visitMailboxReceive(MailboxReceiveNode node, PipelineBreakerContext context) {
+    process(node, context);
+    if (node.getExchangeType() == PinotRelExchangeType.PIPELINE_BREAKER) {
+      context.addPipelineBreaker(node);
+    }
+    return null;
+  }
+
+  @Override
+  public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, PipelineBreakerContext context) {
     process(node, context);
     if (node.getExchangeType() == PinotRelExchangeType.PIPELINE_BREAKER) {
       context.addPipelineBreaker(node);
