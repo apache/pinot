@@ -42,6 +42,8 @@ public class ExchangeNode extends BasePlanNode {
   private final boolean _sortOnSender;
   private final boolean _sortOnReceiver;
   private final boolean _kWayMerge;
+  private final int _mergeFetch;
+  private final int _mergeOffset;
   // Table names should be set for SUB_PLAN exchange type.
   private final Set<String> _tableNames;
   @Nullable
@@ -53,13 +55,14 @@ public class ExchangeNode extends BasePlanNode {
       @Nullable List<RelFieldCollation> collations, boolean sortOnSender, boolean sortOnReceiver,
       @Nullable Set<String> tableNames, ExchangeStrategy exchangeStrategy, String hashFunction) {
     this(stageId, dataSchema, inputs, exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender,
-        sortOnReceiver, tableNames, exchangeStrategy, hashFunction, false);
+        sortOnReceiver, tableNames, exchangeStrategy, hashFunction, false, -1, -1);
   }
 
   private ExchangeNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs, PinotRelExchangeType exchangeType,
       RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
       @Nullable List<RelFieldCollation> collations, boolean sortOnSender, boolean sortOnReceiver,
-      @Nullable Set<String> tableNames, ExchangeStrategy exchangeStrategy, String hashFunction, boolean kWayMerge) {
+      @Nullable Set<String> tableNames, ExchangeStrategy exchangeStrategy, String hashFunction, boolean kWayMerge,
+      int mergeFetch, int mergeOffset) {
     super(stageId, dataSchema, null, inputs);
     _exchangeType = exchangeType;
     _distributionType = distributionType;
@@ -69,6 +72,8 @@ public class ExchangeNode extends BasePlanNode {
     _sortOnSender = sortOnSender;
     _sortOnReceiver = sortOnReceiver;
     _kWayMerge = kWayMerge;
+    _mergeFetch = mergeFetch;
+    _mergeOffset = mergeOffset;
     _tableNames = tableNames;
     _exchangeStrategy = exchangeStrategy;
     _hashFunction = hashFunction;
@@ -77,12 +82,26 @@ public class ExchangeNode extends BasePlanNode {
   public static ExchangeNode kWayMerge(int stageId, DataSchema schema, List<PlanNode> inputs,
       RelDistribution.Type distribution, @Nullable List<Integer> keys, List<RelFieldCollation> collations,
       String hashFunction) {
-    return new ExchangeNode(stageId, schema, inputs, PinotRelExchangeType.STREAMING, distribution, keys, false,
-        collations, false, false, null, null, hashFunction, true);
+    return kWayMerge(stageId, schema, inputs, distribution, keys, false, collations, -1, -1, hashFunction);
+  }
+
+  public static ExchangeNode kWayMerge(int stageId, DataSchema schema, List<PlanNode> inputs,
+      RelDistribution.Type distribution, @Nullable List<Integer> keys, boolean prePartitioned,
+      List<RelFieldCollation> collations, int fetch, int offset, String hashFunction) {
+    return new ExchangeNode(stageId, schema, inputs, PinotRelExchangeType.STREAMING, distribution, keys,
+        prePartitioned, collations, false, false, null, null, hashFunction, true, fetch, offset);
   }
 
   public boolean isKWayMerge() {
     return _kWayMerge;
+  }
+
+  public int getMergeFetch() {
+    return _mergeFetch;
+  }
+
+  public int getMergeOffset() {
+    return _mergeOffset;
   }
 
   public PinotRelExchangeType getExchangeType() {
@@ -146,7 +165,8 @@ public class ExchangeNode extends BasePlanNode {
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
     return new ExchangeNode(_stageId, _dataSchema, inputs, _exchangeType, _distributionType, _keys, _prePartitioned,
-        _collations, _sortOnSender, _sortOnReceiver, _tableNames, null, _hashFunction, _kWayMerge);
+        _collations, _sortOnSender, _sortOnReceiver, _tableNames, null, _hashFunction, _kWayMerge, _mergeFetch,
+        _mergeOffset);
   }
 
   @Override
@@ -161,7 +181,8 @@ public class ExchangeNode extends BasePlanNode {
       return false;
     }
     ExchangeNode that = (ExchangeNode) o;
-    return _kWayMerge == that._kWayMerge && _sortOnSender == that._sortOnSender
+    return _kWayMerge == that._kWayMerge && _mergeFetch == that._mergeFetch && _mergeOffset == that._mergeOffset
+        && _sortOnSender == that._sortOnSender
         && _sortOnReceiver == that._sortOnReceiver
         && _prePartitioned == that._prePartitioned && _exchangeType == that._exchangeType
         && _distributionType == that._distributionType && Objects.equals(_keys, that._keys)
@@ -172,6 +193,6 @@ public class ExchangeNode extends BasePlanNode {
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _exchangeType, _distributionType, _keys, _sortOnSender, _sortOnReceiver,
-        _prePartitioned, _collations, _tableNames, _hashFunction, _kWayMerge);
+        _prePartitioned, _collations, _tableNames, _hashFunction, _kWayMerge, _mergeFetch, _mergeOffset);
   }
 }

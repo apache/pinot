@@ -1468,6 +1468,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   }
 
   @Test(dataProvider = "orderedLeafCases")
+  @SuppressWarnings("deprecation") // Verify the legacy send flag stays false for an explicit ordered input.
   public void testOrderedLeafMergeIsEstablishedLogically(String query, boolean capability, boolean enabled,
       boolean expected) {
     QueryEnvironment environment = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS,
@@ -1496,6 +1497,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       SortNode senderSort = (SortNode) sender.getInputs().get(0);
       assertEquals(senderSort.getCollations(), merge.getCollations());
       assertEquals(senderSort.getFetch(), 15);
+      assertTrue(senderSort.isSingleRunRequired());
       assertTrue(senderSort.getOffset() <= 0);
     }
   }
