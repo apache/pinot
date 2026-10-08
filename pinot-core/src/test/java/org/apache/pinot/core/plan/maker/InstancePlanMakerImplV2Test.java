@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -148,9 +149,33 @@ public class InstancePlanMakerImplV2Test {
     assertFalse(queryContext.isGroupingSetsBaseAggregation());
   }
 
+  @Test
+  public void testMutableSegmentDisablesBaseAggregation() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT a, b, COUNT(*) FROM t GROUP BY ROLLUP(a, b)");
+    queryContext.setNumGroupsLimit(1000);
+
+    // The mutable segment's current cardinalities fit with plenty of headroom, but new keys indexed between
+    // planning and execution could still push the base groups past the limit, so the proof must fail.
+    SegmentContext mutableSegment = segmentWithTwoColumns(2, 2, true);
+    assertFalse(
+        InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(List.of(mutableSegment), queryContext));
+
+    // One mutable segment disables the proof for the whole query, even next to immutable segments.
+    SegmentContext immutableSegment = segmentWithTwoColumns(2, 2, false);
+    assertTrue(
+        InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(List.of(immutableSegment), queryContext));
+    assertFalse(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(
+        List.of(immutableSegment, mutableSegment), queryContext));
+  }
+
   private static SegmentContext segmentWithTwoColumns(int aCardinality, int bCardinality) {
+    return segmentWithTwoColumns(aCardinality, bCardinality, false);
+  }
+
+  private static SegmentContext segmentWithTwoColumns(int aCardinality, int bCardinality, boolean mutable) {
     SegmentContext segmentContext = mock(SegmentContext.class);
-    IndexSegment segment = mock(IndexSegment.class);
+    IndexSegment segment = mutable ? mock(MutableSegment.class) : mock(IndexSegment.class);
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentContext.getIndexSegment()).thenReturn(segment);
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
