@@ -97,6 +97,10 @@ public class ThreadSafeMutableRoaringBitmap {
     private final byte[] _bytes;
     private final long _capturedAtMs;
 
+    public CardinalityAndBytes(int cardinality, byte[] bytes) {
+      this(cardinality, bytes, System.currentTimeMillis());
+    }
+
     public CardinalityAndBytes(int cardinality, byte[] bytes, long capturedAtMs) {
       _cardinality = cardinality;
       _bytes = bytes;
