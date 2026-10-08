@@ -53,6 +53,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -470,7 +471,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   /// Only emit BASE records when every local BASE key and every derived grouping-set key can fit the combine
   /// table. Summing each segment's dictionary product is conservative even when keys overlap across segments.
-  /// Unknown, raw, transformed and multi-value columns use the per-row expansion path. This also makes a larger
+  /// Unknown, raw, transformed and multi-value columns use the per-row expansion path, and so does any mutable
+  /// segment: a consuming segment keeps indexing between planning and execution, so a bound computed from its
+  /// current dictionaries can be stale by the time the combine runs. This also makes a larger
   /// `groupingSetsBaseAggregationMaxGroups` option unable to bypass the actual `numGroupsLimit` memory guard.
   @VisibleForTesting
   static void boundGroupingSetsBaseAggregation(List<SegmentContext> segmentContexts, QueryContext queryContext) {
@@ -493,6 +496,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     long remainingDerived = limit;
     for (SegmentContext segmentContext : segmentContexts) {
       IndexSegment segment = segmentContext.getIndexSegment();
+      if (segment instanceof MutableSegment) {
+        // Mutable dictionaries grow until FilterPlanNode.run() snapshots the doc count, so neither this bound
+        // nor the zero-doc skip below holds at execution time.
+        return false;
+      }
       if (segment.getSegmentMetadata().getTotalDocs() == 0) {
         continue;
       }
