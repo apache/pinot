@@ -2996,6 +2996,10 @@
                 <exclude>META-INF/maven/org.eclipse.jetty.websocket/**</exclude>
                 <!-- ServiceLoader entries whose implementation classes are removed above. -->
                 <exclude>META-INF/services/org.apache.hadoop.shaded.org.eclipse.jetty.**</exclude>
+                <!-- JLine is used only by YARN's unused interactive shell. -->
+                <exclude>org/apache/hadoop/shaded/org/jline/**</exclude>
+                <exclude>META-INF/maven/org.jline/**</exclude>
+                <exclude>META-INF/services/org.apache.hadoop.shaded.org.jline.**</exclude>
               </excludes>
             </filter>
           </filters>
