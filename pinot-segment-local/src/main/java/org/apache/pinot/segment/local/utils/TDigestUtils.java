@@ -25,7 +25,7 @@ import java.util.Arrays;
 import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator.SerializedTDigestInput;
-import org.apache.pinot.segment.spi.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.TDigest;
 
 /// Compatibility helpers for the serialized t-digest format shared by t-digest 3.2 and 3.3.
 ///
@@ -38,8 +38,9 @@ import org.apache.pinot.segment.spi.customobject.TDigest;
 /// in both directions during a rolling upgrade without silently narrowing double-precision values to floats.
 ///
 /// Pinot owns the in-memory K1 implementation and retains these legacy bytes for stored columns and mixed-version
-/// intermediate results. Decoding checks lengths and numerical state before allocating centroid arrays. Historical
-/// poisoned states remain byte-readable with NaN statistics because their original distribution cannot be recovered.
+/// intermediate results. Decoding checks lengths and numerical state before allocating centroid arrays.
+/// NaN means at an identifiable infinite tail are restored to that infinite bound without changing their weights.
+/// Other poisoned states remain byte-readable with NaN statistics because their distribution cannot be recovered.
 /// They retain their original bytes; attempting to mutate them or mix them with another distribution fails explicitly.
 /// Opaque poisoned payloads retain their original centroids even if an old reader's default array cannot hold them;
 /// these historical exceptions remain readable by Pinot, but are not guaranteed to survive a reverse upgrade.
@@ -117,10 +118,13 @@ public final class TDigestUtils {
       }
       SerializedTDigestMetadata metadata = inspectSerialized(ByteBuffer.wrap(verboseBytes), false);
       if (!metadata.needsLegacyFallback()) {
-        if (metadata.hasZeroWeightCentroids()) {
+        if (metadata.hasZeroWeightCentroids() || !Double.isNaN(metadata.recoveredInfinityMean())) {
           double[] means = new double[metadata.centroidCount()];
           double[] weights = new double[means.length];
           inspectSerialized(ByteBuffer.wrap(verboseBytes), metadata, means, weights);
+          if (!Double.isNaN(metadata.recoveredInfinityMean())) {
+            return serializeRecoveredCentroids(metadata, means, weights);
+          }
           return makeLegacyCompatible(serializeCentroids(metadata.compression(), metadata.min(), metadata.max(),
               means, weights, means.length));
         }
@@ -206,6 +210,12 @@ public final class TDigestUtils {
     if (metadata.needsLegacyFallback()) {
       return verboseBytes;
     }
+    if (!Double.isNaN(metadata.recoveredInfinityMean())) {
+      double[] means = new double[metadata.centroidCount()];
+      double[] weights = new double[means.length];
+      decodeSerializedCentroids(ByteBuffer.wrap(verboseBytes), metadata, means, weights);
+      return serializeRecoveredCentroids(metadata, means, weights);
+    }
     if (metadata.hasZeroWeightCentroids()) {
       verboseBytes = removeZeroWeightCentroids(verboseBytes, metadata);
       metadata = inspectSerialized(ByteBuffer.wrap(verboseBytes), false);
@@ -258,6 +268,13 @@ public final class TDigestUtils {
     return small.array();
   }
 
+  private static byte[] serializeRecoveredCentroids(SerializedTDigestMetadata metadata, double[] means,
+      double[] weights) {
+    PercentileTDigestAccumulator digest = PercentileTDigestAccumulator.forLegacyAggregation(metadata.compression());
+    digest.addCentroids(means, weights, means.length, metadata.min(), metadata.max(), true);
+    return digest.serialize();
+  }
+
   private static byte[] removeZeroWeightCentroids(byte[] verboseBytes, SerializedTDigestMetadata metadata) {
     ByteBuffer source = ByteBuffer.wrap(verboseBytes);
     source.position(metadata.centroidOffset());
@@ -306,7 +323,7 @@ public final class TDigestUtils {
       int centroidCount, int mainCapacity, int bufferCapacity, int centroidOffset, int centroidSize,
       int encodedLength, double totalWeight, boolean hasNonFiniteMeans, boolean needsLegacyFallback,
       boolean unorderedMeans, boolean fractionalWeights, boolean weightedBoundaries, boolean hasZeroWeightCentroids,
-      double encodedCompression) {
+      double encodedCompression, double recoveredInfinityMean) {
   }
 
   /// Inspects one payload without mutating `input`, scanning the centroid values once.
@@ -376,7 +393,7 @@ public final class TDigestUtils {
     SerializedTDigestMetadata header = new SerializedTDigestMetadata(encoding, min, max, compression, centroidCount,
         mainCapacity,
         bufferCapacity, centroidOffset, centroidSize, encodedLength, Double.NaN, false,
-        Double.isNaN(min) || Double.isNaN(max), false, false, false, false, encodedCompression);
+        Double.isNaN(min) || Double.isNaN(max), false, false, false, false, encodedCompression, Double.NaN);
     if (checkCapacity && centroidCount > mainCapacity) {
       SerializedTDigestMetadata inspected = inspectSerialized(input, header, null, null);
       if (!inspected.needsLegacyFallback()) {
@@ -410,6 +427,16 @@ public final class TDigestUtils {
     double firstPositiveWeight = 0.0;
     double lastPositiveWeight = 0.0;
     boolean withinBounds = true;
+    // Infer only a matching one-sided tail, or a distribution consisting entirely of one infinity. A NaN
+    // between finite centroids or in a +/-Infinity mixture has lost information and remains opaque.
+    double infinityMean = min == max && Double.isInfinite(min) ? min
+        : Double.isFinite(min) && max == Double.POSITIVE_INFINITY ? max
+        : min == Double.NEGATIVE_INFINITY && Double.isFinite(max) ? min : Double.NaN;
+    boolean hasNaNMeans = false;
+    boolean hasFiniteMeans = false;
+    boolean positiveInfinityTailStarted = false;
+    boolean negativeInfinityTailEnded = false;
+    boolean identifiableInfinityTail = true;
     double roundedMin = (double) (float) min;
     double roundedMax = (double) (float) max;
     double lowerAdjacent = Math.nextDown(min);
@@ -447,9 +474,30 @@ public final class TDigestUtils {
         lastPositiveWeight = weight;
       }
       fractionalWeights |= weight != Math.rint(weight);
-      // A previous Pinot boundary repair emitted a negative residual for singleton weights between one and two.
-      // Old tdunning merges could also overflow finite means to NaN or infinity. Preserve those stored bytes,
-      // but never normalize or sort them into a plausible distribution.
+      boolean nanMean = Double.isNaN(mean);
+      hasNaNMeans |= nanMean;
+      hasFiniteMeans |= Double.isFinite(mean);
+      if (nanMean && !Double.isNaN(infinityMean)) {
+        mean = infinityMean;
+      }
+      if (infinityMean == Double.POSITIVE_INFINITY) {
+        if (mean == infinityMean) {
+          positiveInfinityTailStarted = true;
+        } else if (positiveInfinityTailStarted) {
+          identifiableInfinityTail = false;
+        }
+      } else if (infinityMean == Double.NEGATIVE_INFINITY) {
+        if (mean == infinityMean && negativeInfinityTailEnded) {
+          identifiableInfinityTail = false;
+        } else if (mean != infinityMean) {
+          negativeInfinityTailEnded = true;
+        }
+      }
+      if (min == max && Double.isInfinite(min) && mean != infinityMean) {
+        identifiableInfinityTail = false;
+      }
+      // Negative residuals and unidentifiable NaN means still have an unknown distribution. Never normalize
+      // or sort them into plausible statistics, even if another centroid could be repaired as an infinite tail.
       needsLegacyFallback |= weight < 0.0 || Double.isNaN(mean)
           || !Double.isFinite(mean) && (mean < min || mean > max);
       hasNonFiniteMeans |= !Double.isFinite(mean);
@@ -469,13 +517,37 @@ public final class TDigestUtils {
     }
     // Identifiable endpoint rounding can be restored safely. Other historical out-of-extrema values have an
     // unknown distribution: retain their original bytes and NaN statistics instead of inventing clamped quantiles.
-    needsLegacyFallback |= !withinBounds;
+    needsLegacyFallback |= !withinBounds
+        || hasNaNMeans && (!identifiableInfinityTail || min != max && !hasFiniteMeans);
+    double recoveredInfinityMean = hasNaNMeans && !needsLegacyFallback ? infinityMean : Double.NaN;
+    if (means != null && !Double.isNaN(recoveredInfinityMean)) {
+      for (int i = 0; i < centroidCount; i++) {
+        if (Double.isNaN(means[i])) {
+          means[i] = recoveredInfinityMean;
+        }
+      }
+    }
     boolean weightedBoundaries = positiveCentroidCount == 1 ? firstPositiveWeight >= 2.0
         : positiveCentroidCount > 1 && (firstPositiveWeight > 1.0 || lastPositiveWeight > 1.0);
     return new SerializedTDigestMetadata(header.encoding(), min, max, header.compression(), centroidCount,
         header.mainCapacity(), header.bufferCapacity(), header.centroidOffset(), centroidSize,
         header.encodedLength(), totalWeight, hasNonFiniteMeans, needsLegacyFallback, unorderedMeans, fractionalWeights,
-        weightedBoundaries, hasZeroWeightCentroids, header.encodedCompression());
+        weightedBoundaries, hasZeroWeightCentroids, header.encodedCompression(), recoveredInfinityMean);
+  }
+
+  /// Materializes previously validated centroids without repeating numerical inspection. The metadata must describe
+  /// these exact bytes; each supplied array must hold the encoded centroid count. Identified NaN infinity tails and
+  /// compact endpoint rounding are restored in the same way as the inspecting decoder.
+  public static void decodeSerializedCentroids(ByteBuffer input, SerializedTDigestMetadata metadata, double[] means,
+      double[] weights) {
+    ByteBuffer encoded = input.slice().order(ByteOrder.BIG_ENDIAN);
+    encoded.position(metadata.centroidOffset());
+    for (int i = 0; i < metadata.centroidCount(); i++) {
+      weights[i] = metadata.centroidSize() == VERBOSE_CENTROID_SIZE ? encoded.getDouble() : encoded.getFloat();
+      double mean = metadata.centroidSize() == VERBOSE_CENTROID_SIZE ? encoded.getDouble() : encoded.getFloat();
+      means[i] = Double.isNaN(mean) ? metadata.recoveredInfinityMean()
+          : Math.max(metadata.min(), Math.min(mean, metadata.max()));
+    }
   }
 
   /// Deserializes a finite-valued digest without recompressing stored centroids on each rollup generation.

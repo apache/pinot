@@ -28,9 +28,9 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.SerializedTDigest;
+import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.segment.spi.customobject.TDigest;
 
 
 /// The `PercentileRawTDigestAggregationFunction` returns the serialized `TDigest` data structure of the

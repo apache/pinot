@@ -44,9 +44,9 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction.Seri
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
-import org.apache.pinot.segment.spi.customobject.TDigest;
-import org.apache.pinot.segment.spi.customobject.TDigest.Centroid;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;

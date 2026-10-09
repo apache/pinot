@@ -31,9 +31,9 @@ import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
-import org.apache.pinot.segment.spi.customobject.TDigest;
-import org.apache.pinot.segment.spi.customobject.TDigest.Centroid;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 

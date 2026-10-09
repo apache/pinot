@@ -53,3 +53,22 @@ OPTIONAL:
   -k, --keep-cluster-on-failure          Keep cluster on test failure
   -h, --help                             Prints this help
 ```
+
+## T-digest migration
+
+The Pinot digest implementation removes `com.tdunning:t-digest` while reading legacy verbose and compact BYTES.
+Plugins that used tdunning types must recompile against `org.apache.pinot.segment.local.customobject.TDigest`;
+use `TDigestUtils.createMergingDigest(100)`, `digest.add(value, doubleWeight)`, and `TDigestUtils.serialize(digest)`.
+Centroid mass is available through `Centroid.weight()` and `getTotalWeight()` without integer truncation.
+
+Release note: an identifiable infinity tail from historical tdunning arithmetic remains usable. NaN extrema and
+ambiguous infinity mixtures remain opaque. Other numerically
+corrupted payloads retain their original bytes and return NaN statistics, including when their weights sum to zero
+and null handling is enabled; they no longer appear empty or return SQL NULL. Mixing them with additional input fails
+instead of subtracting invalid mass from a healthy distribution. Fresh fractional boundary mass below one, or a
+fractional singleton below two, cannot satisfy legacy unit-endpoint requirements and is rejected on serialization;
+unchanged historical encodings remain readable and can be retained byte-for-byte.
+
+After the affected tests generate fixtures, run `compatibility-verifier/tdigest-compatibility/run.sh` to exercise
+the real 3.2 and 3.3 readers, and `compatibility-verifier/tdigest-compatibility/generate-rank-errors.sh` to verify
+the independent 3.3 accuracy oracle.

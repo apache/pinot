@@ -22,7 +22,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.SplittableRandom;
-import org.apache.pinot.segment.spi.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.TDigest;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

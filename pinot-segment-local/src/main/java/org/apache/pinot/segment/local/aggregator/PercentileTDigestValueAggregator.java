@@ -26,11 +26,11 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator.SerializedTDigestInput;
+import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.local.utils.TDigestUtils.SerializedTDigestMetadata;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.segment.spi.customobject.TDigest;
-import org.apache.pinot.segment.spi.customobject.TDigest.Centroid;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -445,12 +445,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
     @Override
     public Collection<Centroid> centroids() {
-      List<Centroid> centroids = getAllCentroids();
-      List<Centroid> copies = new ArrayList<>(centroids.size());
-      for (Centroid centroid : centroids) {
-        copies.add(new Centroid(centroid.mean(), centroid.weight()));
-      }
-      return copies;
+      return getAllCentroids();
     }
 
     @Override
@@ -603,69 +598,52 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
     private static void appendInfinityCentroids(List<Centroid> centroids, double value, double weight,
         boolean unitWeightAtStart, boolean unitWeightAtEnd) {
-      appendCentroids(centroids, value, weight, unitWeightAtStart, unitWeightAtEnd);
+      appendInfinityCentroids(centroids, null, null, 0, value, weight, unitWeightAtStart, unitWeightAtEnd);
     }
 
-    private static void appendCentroids(List<Centroid> centroids, double value, double weight,
-        boolean unitWeightAtStart, boolean unitWeightAtEnd) {
-      if (weight == 0L) {
-        return;
-      }
-      if (unitWeightAtStart && weight >= (unitWeightAtEnd ? 2.0 : 1.0)) {
-        centroids.add(new Centroid(value, 1));
-        weight -= 1.0;
-      }
-      boolean appendUnitWeightAtEnd = unitWeightAtEnd && weight >= 1.0;
-      if (appendUnitWeightAtEnd) {
-        weight--;
-      }
-      if (weight > 0.0) {
-        centroids.add(new Centroid(value, weight));
-      }
-      if (appendUnitWeightAtEnd) {
-        centroids.add(new Centroid(value, 1));
-      }
-    }
-
-    private static void appendInfinityCentroids(double[] means, double[] weights, int offset, double value,
-        double weight, boolean unitWeightAtStart, boolean unitWeightAtEnd) {
-      if (!(weight > 0.0)) {
-        return;
-      }
-      if (unitWeightAtStart && weight >= (unitWeightAtEnd ? 2.0 : 1.0)) {
-        means[offset] = value;
-        weights[offset++] = 1.0;
-        weight -= 1.0;
-      }
-      boolean splitEnd = unitWeightAtEnd && weight >= 1.0;
-      if (splitEnd) {
-        weight -= 1.0;
-      }
-      if (weight > 0.0) {
-        means[offset] = value;
-        weights[offset++] = weight;
-      }
-      if (splitEnd) {
-        means[offset] = value;
-        weights[offset] = 1.0;
-      }
-    }
-
-    private static int getInfinityCentroidCount(double weight, boolean unitWeightAtStart,
+    // A null destination counts the same split without allocating centroids or temporary arrays.
+    private static int appendInfinityCentroids(@Nullable List<Centroid> centroids, @Nullable double[] means,
+        @Nullable double[] weights, int offset, double value, double weight, boolean unitWeightAtStart,
         boolean unitWeightAtEnd) {
       if (!(weight > 0.0)) {
         return 0;
       }
       int count = 0;
       if (unitWeightAtStart && weight >= (unitWeightAtEnd ? 2.0 : 1.0)) {
-        count++;
+        appendInfinityCentroid(centroids, means, weights, offset + count++, value, 1.0);
         weight -= 1.0;
       }
-      if (unitWeightAtEnd && weight >= 1.0) {
-        count++;
+      boolean appendUnitWeightAtEnd = unitWeightAtEnd && weight >= 1.0;
+      if (appendUnitWeightAtEnd) {
         weight -= 1.0;
       }
-      return count + (weight > 0.0 ? 1 : 0);
+      if (weight > 0.0) {
+        appendInfinityCentroid(centroids, means, weights, offset + count++, value, weight);
+      }
+      if (appendUnitWeightAtEnd) {
+        appendInfinityCentroid(centroids, means, weights, offset + count++, value, 1.0);
+      }
+      return count;
+    }
+
+    private static void appendInfinityCentroid(@Nullable List<Centroid> centroids, @Nullable double[] means,
+        @Nullable double[] weights, int offset, double value, double weight) {
+      if (centroids != null) {
+        centroids.add(new Centroid(value, weight));
+      } else if (means != null && weights != null) {
+        means[offset] = value;
+        weights[offset] = weight;
+      }
+    }
+
+    private static void appendInfinityCentroids(double[] means, double[] weights, int offset, double value,
+        double weight, boolean unitWeightAtStart, boolean unitWeightAtEnd) {
+      appendInfinityCentroids(null, means, weights, offset, value, weight, unitWeightAtStart, unitWeightAtEnd);
+    }
+
+    private static int getInfinityCentroidCount(double weight, boolean unitWeightAtStart,
+        boolean unitWeightAtEnd) {
+      return appendInfinityCentroids(null, null, null, 0, 0.0, weight, unitWeightAtStart, unitWeightAtEnd);
     }
 
     private static void checkTotalWeight(double weight) {

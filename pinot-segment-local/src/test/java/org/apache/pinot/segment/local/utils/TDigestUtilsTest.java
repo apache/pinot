@@ -25,8 +25,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.SplittableRandom;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
-import org.apache.pinot.segment.spi.customobject.TDigest;
-import org.apache.pinot.segment.spi.customobject.TDigest.Centroid;
+import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -508,6 +508,106 @@ public class TDigestUtilsTest {
     }
     assertEquals(digest.quantile(0.0), Double.NEGATIVE_INFINITY);
     assertEquals(digest.quantile(1.0), Double.POSITIVE_INFINITY);
+
+    // Both legacy encodings carry the same identifiable NaN tail. Pending metadata and direct decoding must
+    // restore it identically, including when one row fans out to several groups and boundary repair changes count.
+    for (double infinity : new double[]{Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY}) {
+      double[] means = infinity < 0 ? new double[]{Double.NaN, -2, -1, 0}
+          : new double[]{0, 1, 2, Double.NaN};
+      double[] weights = infinity < 0 ? new double[]{4, 1, 0.5, 4} : new double[]{4, 0.5, 1, 4};
+      double min = infinity < 0 ? infinity : 0;
+      double max = infinity < 0 ? 0 : infinity;
+      double[] repairedMeans = means.clone();
+      repairedMeans[infinity < 0 ? 0 : 3] = infinity;
+      TDigest expected = TDigestUtils.deserialize(
+          TDigestUtils.serializeCentroids(100, min, max, repairedMeans, weights, means.length));
+      for (int encoding : new int[]{VERBOSE_ENCODING, TDigestUtils.SMALL_ENCODING}) {
+        ByteBuffer bytes = ByteBuffer.allocate(encoding == VERBOSE_ENCODING ? 32 + 16 * means.length
+            : 30 + 8 * means.length);
+        bytes.putInt(encoding).putDouble(min).putDouble(max);
+        if (encoding == VERBOSE_ENCODING) {
+          bytes.putDouble(100).putInt(means.length);
+          for (int i = 0; i < means.length; i++) {
+            bytes.putDouble(weights[i]).putDouble(means[i]);
+          }
+        } else {
+          bytes.putFloat(100).putShort((short) 210).putShort((short) 1050).putShort((short) means.length);
+          for (int i = 0; i < means.length; i++) {
+            bytes.putFloat((float) weights[i]).putFloat((float) means[i]);
+          }
+        }
+        var input = new PercentileTDigestAccumulator.SerializedTDigestInput();
+        input.reset(bytes.array());
+        assertFalse(input.getMetadata().needsLegacyFallback());
+        assertEquals(input.getMetadata().recoveredInfinityMean(), infinity);
+        double[] decodedMeans = new double[means.length];
+        double[] decodedWeights = new double[means.length];
+        TDigestUtils.decodeSerializedCentroids(ByteBuffer.wrap(bytes.array()), input.getMetadata(), decodedMeans,
+            decodedWeights);
+        assertEquals(decodedMeans, repairedMeans);
+        assertEquals(decodedWeights, weights);
+        TDigest producer = mock(TDigest.class);
+        when(producer.centroidCount()).thenReturn(means.length);
+        when(producer.maxSerializedByteSize()).thenReturn(bytes.capacity());
+        doAnswer(invocation -> {
+          ByteBuffer destination = invocation.getArgument(0);
+          destination.put(bytes.array());
+          return null;
+        }).when(producer).asBytes(any(ByteBuffer.class));
+        byte[] safeOutput = TDigestUtils.serialize(producer);
+        assertTrue(Double.isNaN(TDigestUtils.inspectSerialized(ByteBuffer.wrap(safeOutput)).recoveredInfinityMean()));
+        assertEquals(TDigestUtils.deserialize(safeOutput).getTotalWeight(), 9.5);
+        PercentileTDigestAccumulator pending = PercentileTDigestAccumulator.forSerializedTDigest(input);
+        pending.addSerializedTDigest(input);
+        TDigest direct = TDigestUtils.createMergingDigest(100);
+        direct.add(0);
+        ((PercentileTDigestAccumulator) direct).addSerializedTDigest(input);
+        // The same input was decoded (and boundary-split) for the nonempty group before this empty group sees it.
+        PercentileTDigestAccumulator fanout = PercentileTDigestAccumulator.forSerializedTDigest(input);
+        fanout.addSerializedTDigest(input);
+        assertEquals(fanout.getTotalWeight(), 9.5);
+        for (double q : new double[]{0, 0.25, 0.5, 0.75, 1}) {
+          assertEquals(pending.quantile(q), expected.quantile(q));
+        }
+        assertEquals(pending.cdf(0), expected.cdf(0));
+        assertTrue(pending.hasValidStatistics());
+        assertEquals(pending.getTotalWeight(), 9.5);
+        assertEquals(input.getMetadata().centroidCount(), means.length,
+            "Decoded boundary splits must not replace the encoded metadata count");
+        assertTrue(direct.hasValidStatistics());
+        assertEquals(direct.getTotalWeight(), 10.5);
+        assertTrue(Double.isFinite(direct.quantile(0.5)));
+        pending.add(0);
+        assertEquals(pending.getTotalWeight(), 10.5);
+        assertTrue(Double.isFinite(pending.quantile(0.5)));
+        TDigest rewritten = TDigestUtils.deserialize(TDigestUtils.serialize(pending));
+        assertTrue(rewritten.hasValidStatistics());
+        for (Centroid centroid : rewritten.centroids()) {
+          assertFalse(Double.isNaN(centroid.mean()));
+        }
+      }
+      // Equal infinite bounds identify the whole distribution even when every legacy mean is NaN.
+      TDigest onlyInfinity = TDigestUtils.deserialize(TDigestUtils.serializeCentroids(100, infinity, infinity,
+          new double[]{Double.NaN, Double.NaN}, new double[]{3, 5}, 2));
+      assertTrue(onlyInfinity.hasValidStatistics());
+      assertEquals(onlyInfinity.quantile(0.5), infinity);
+    }
+    // Position or a +/-Infinity mixture can make a NaN's lost value ambiguous. Keep those bytes opaque.
+    for (byte[] ambiguous : new byte[][]{
+        TDigestUtils.serializeCentroids(100, 0, Double.POSITIVE_INFINITY,
+            new double[]{0, Double.NaN, 1, Double.POSITIVE_INFINITY}, new double[]{1, 3, 1, 1}, 4),
+        TDigestUtils.serializeCentroids(100, Double.NEGATIVE_INFINITY, 1,
+            new double[]{Double.NEGATIVE_INFINITY, 0, Double.NaN, 1}, new double[]{1, 1, 3, 1}, 4),
+        TDigestUtils.serializeCentroids(100, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
+            new double[]{Double.NEGATIVE_INFINITY, 0, Double.NaN}, new double[]{1, 1, 3}, 3),
+        TDigestUtils.serializeCentroids(100, 0, Double.POSITIVE_INFINITY,
+            new double[]{0, Double.NaN}, new double[]{1, -1}, 2)}) {
+      TDigest unknown = TDigestUtils.deserialize(ambiguous);
+      assertFalse(unknown.hasValidStatistics());
+      assertTrue(Double.isNaN(unknown.quantile(0.5)));
+      assertEquals(TDigestUtils.serialize(unknown), ambiguous);
+      assertThrows(IllegalArgumentException.class, () -> unknown.add(0));
+    }
   }
 
   @Test

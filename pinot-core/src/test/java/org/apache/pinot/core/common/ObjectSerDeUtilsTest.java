@@ -62,13 +62,13 @@ import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
+import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
-import org.apache.pinot.segment.spi.customobject.TDigest;
-import org.apache.pinot.segment.spi.customobject.TDigest.Centroid;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 

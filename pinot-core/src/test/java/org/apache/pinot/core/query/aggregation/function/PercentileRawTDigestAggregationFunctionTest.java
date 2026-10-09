@@ -26,8 +26,8 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
 import org.apache.pinot.segment.local.customobject.SerializedTDigest;
+import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
-import org.apache.pinot.segment.spi.customobject.TDigest;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.Test;
 

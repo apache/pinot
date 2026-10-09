@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.customobject;
 
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
-import org.apache.pinot.segment.spi.customobject.TDigest;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 import static com.google.common.base.Preconditions.checkArgument;

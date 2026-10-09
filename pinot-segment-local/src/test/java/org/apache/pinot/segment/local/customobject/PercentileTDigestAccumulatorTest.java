@@ -22,9 +22,8 @@ import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.SplittableRandom;
+import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
-import org.apache.pinot.segment.spi.customobject.TDigest;
-import org.apache.pinot.segment.spi.customobject.TDigest.Centroid;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -277,6 +276,27 @@ public class PercentileTDigestAccumulatorTest {
         assertEquals(digest.quantile(1), values[values.length - 1]);
       }
     }
+    for (double compression : new double[]{100, 10_000}) {
+      int capacity = 5 * TDigestUtils.getDefaultCentroidCapacity(compression);
+      PercentileTDigestAccumulator legacy = PercentileTDigestAccumulator.forLegacyAggregation(compression);
+      double[] raw = new double[capacity - 2];
+      for (int i = 0; i < raw.length; i++) {
+        raw[i] = i;
+      }
+      legacy.add(raw, 0, raw.length);
+      assertEquals((int) field(legacy, "_mergeCount"), 0, "Legacy raw batches retain the original 5x buffer policy");
+      assertEquals(((double[]) field(legacy, "_rawValues")).length, capacity);
+      legacy.add(raw.length);
+      assertEquals((int) field(legacy, "_mergeCount"), 0);
+      legacy.add(raw.length + 1);
+      assertEquals((int) field(legacy, "_mergeCount"), 1);
+      assertEquals(legacy.getTotalWeight(), (double) capacity);
+    }
+    PercentileTDigestAccumulator extreme = PercentileTDigestAccumulator.forLegacyAggregation(Double.MAX_VALUE);
+    extreme.add(new double[10_001], 0, 10_001);
+    assertEquals((int) field(extreme, "_mergeCount"), 0);
+    assertEquals(((double[]) field(extreme, "_rawValues")).length, 20_000);
+    assertEquals(extreme.getTotalWeight(), 10_001.0);
   }
 
   @Test

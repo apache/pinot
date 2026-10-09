@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Random;
 import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
-import org.apache.pinot.segment.spi.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.TDigest;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;

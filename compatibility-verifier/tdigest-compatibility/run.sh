@@ -20,16 +20,22 @@
 
 # Run after LegacyTDigestCompatibilityTest. Legacy jars are test-tool artifacts, not Pinot dependencies.
 set -euo pipefail
+# Match the unit-test workflow's Maven Central retry and connection settings, including standalone runs.
+export MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 \
+-Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false"
 TDIGEST_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TDIGEST_FIXTURES="$TDIGEST_ROOT/pinot-segment-local/target/tdigest-compat-fixtures"
 TDIGEST_WORK="$TDIGEST_ROOT/pinot-segment-local/target/tdigest-legacy-reader"
 test -s "$TDIGEST_FIXTURES/manifest.tsv"
 mkdir -p "$TDIGEST_WORK"
 for TDIGEST_VERSION in 3.2 3.3; do
-  "$TDIGEST_ROOT/mvnw" -f "$TDIGEST_ROOT/pom.xml" -N -B -ntp \
-    org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy \
-    "-Dartifact=com.tdunning:t-digest:$TDIGEST_VERSION:jar" "-DoutputDirectory=$TDIGEST_WORK"
   TDIGEST_JAR="$TDIGEST_WORK/t-digest-$TDIGEST_VERSION.jar"
+  if [[ ! -s "$TDIGEST_JAR" ]]; then
+    # Resolution uses the workflow-cached Maven repository; retain each immutable copy for subsequent runs.
+    "$TDIGEST_ROOT/mvnw" -f "$TDIGEST_ROOT/pom.xml" -N -B -ntp \
+      org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy \
+      "-Dartifact=com.tdunning:t-digest:$TDIGEST_VERSION:jar" "-DoutputDirectory=$TDIGEST_WORK"
+  fi
   javac -cp "$TDIGEST_JAR" -d "$TDIGEST_WORK" \
     "$TDIGEST_ROOT/compatibility-verifier/tdigest-compatibility/LegacyReader.java"
   java -ea -Xmx128m -cp "$TDIGEST_WORK:$TDIGEST_JAR" LegacyReader "$TDIGEST_FIXTURES" "$TDIGEST_VERSION"

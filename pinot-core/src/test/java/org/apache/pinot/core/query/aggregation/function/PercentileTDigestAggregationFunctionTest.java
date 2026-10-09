@@ -45,10 +45,10 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedIntermediateResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.spi.Constants;
-import org.apache.pinot.segment.spi.customobject.TDigest;
-import org.apache.pinot.segment.spi.customobject.TDigest.Centroid;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
@@ -1098,12 +1098,25 @@ public class PercentileTDigestAggregationFunctionTest {
     poisonedBytes.putInt(1).putDouble(1.0).putDouble(2.0).putDouble(100.0).putInt(2)
         .putDouble(1.0).putDouble(1.0).putDouble(-1.0).putDouble(2.0);
     TDigest poisoned = TDigestUtils.deserialize(poisonedBytes.array());
+    assertEquals(poisoned.getTotalWeight(), 0.0);
     assertFalse(poisoned.isEmpty());
-    assertTrue(Double.isNaN(function.extractFinalResult(poisoned)));
-    TDigest singleton = TDigestUtils.createMergingDigest(100.0);
-    singleton.add(42.0);
-    assertThrows(IllegalArgumentException.class, () -> function.merge(poisoned, singleton));
-    assertEquals(singleton.getTotalWeight(), 1.0);
+    for (boolean nullHandlingEnabled : new boolean[]{true, false}) {
+      PercentileTDigestAggregationFunction extraction =
+          new PercentileTDigestAggregationFunction(EXPRESSION, 50.0, nullHandlingEnabled);
+      assertTrue(Double.isNaN(extraction.extractFinalResult(poisoned)));
+      TDigest empty = TDigestUtils.createMergingDigest(100.0);
+      if (nullHandlingEnabled) {
+        assertNull(extraction.extractFinalResult(empty));
+      } else {
+        assertTrue(Double.isNaN(extraction.extractFinalResult(empty)));
+      }
+      TDigest singleton = TDigestUtils.createMergingDigest(100.0);
+      singleton.add(42.0);
+      assertThrows(IllegalArgumentException.class, () -> extraction.merge(poisoned, singleton));
+      assertThrows(IllegalArgumentException.class, () -> extraction.merge(singleton, poisoned));
+      assertEquals(singleton.getTotalWeight(), 1.0);
+      assertEquals(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(poisoned), poisonedBytes.array());
+    }
   }
 
   @Test(dataProvider = "compressionFactors")

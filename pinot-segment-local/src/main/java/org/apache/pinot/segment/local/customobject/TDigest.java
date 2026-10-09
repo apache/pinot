@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.customobject;
+package org.apache.pinot.segment.local.customobject;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
 
-/// Mutable percentile digest contract for aggregation plugins and legacy t-digest byte encodings.
+/// Mutable percentile digest base for Pinot aggregation and legacy t-digest byte encodings.
 /// Implementations are not thread-safe; callers must serialize access to each aggregation state.
 /// Historical corrupted payloads may be retained unchanged, but cannot be mutated or mixed with healthy state.
 /// Fractional mass is preserved; t-digest 3.3 can reject endpoint weights below one or singleton masses between

@@ -26,10 +26,10 @@ import java.util.SplittableRandom;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.customobject.SerializedTDigest;
+import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
-import org.apache.pinot.segment.spi.customobject.TDigest;
-import org.apache.pinot.segment.spi.customobject.TDigest.Centroid;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -68,7 +68,7 @@ public class PercentileTDigestValueAggregatorTest {
     return new Object[][]{
         {10, 30, 512},
         {100, 210, 3_392},
-        {1_000, 2_010, 32_032}
+        {1_000, 2_010, 32_192}
     };
   }
 

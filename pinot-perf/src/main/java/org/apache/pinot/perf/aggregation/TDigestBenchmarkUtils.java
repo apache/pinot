@@ -62,14 +62,9 @@ final class TDigestBenchmarkUtils {
       }
       double mean = sortedValues[start];
       for (int valueId = start + 1; valueId < end; valueId++) {
-        double fraction = 1.0 / (valueId - start + 1);
-        double value = sortedValues[valueId];
-        mean = Math.copySign(1.0, mean) == Math.copySign(1.0, value)
-            ? mean + (value - mean) * fraction
-            : mean * (1.0 - fraction) + value * fraction;
+        int weight = valueId - start;
+        mean = TDigestUtils.weightedMean(mean, weight, sortedValues[valueId], 1.0, weight + 1.0, false);
       }
-      // Rounding must not move a bucket mean beyond its observed range or invert adjacent duplicate buckets.
-      mean = Math.max(sortedValues[start], Math.min(sortedValues[end - 1], mean));
       buffer.putDouble(end - start);
       buffer.putDouble(mean);
     }
