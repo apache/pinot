@@ -96,11 +96,21 @@ public interface MseBlock extends Block {
     /// @throws java.io.UncheckedIOException if the block cannot be serialized.
     SerializedDataBlock asSerialized();
 
+    /// Returns the data in the block as an [ArrowBlock].
+    /// Performs an expensive one-time conversion when the block is not already an Arrow block.
+    default ArrowBlock asArrow() {
+      throw new UnsupportedOperationException("asArrow() not supported on " + getClass().getSimpleName());
+    }
+
     /// Returns whether the block is a [RowHeapDataBlock].
     boolean isRowHeap();
     /// Returns whether the block is a [SerializedDataBlock].
     default boolean isSerialized() {
       return !isRowHeap();
+    }
+    /// Returns whether the block is an [ArrowBlock].
+    default boolean isArrow() {
+      return false;
     }
 
     @Override
@@ -131,6 +141,7 @@ public interface MseBlock extends Block {
     interface Visitor<R, A> {
       R visit(RowHeapDataBlock block, A arg);
       R visit(SerializedDataBlock block, A arg);
+      R visit(ArrowBlock block, A arg);
     }
   }
 
