@@ -3142,6 +3142,14 @@ public class PinotHelixResourceManager {
     return updated;
   }
 
+  /// Updates segment metadata using optimistic concurrency control when the segment's data has not changed. Unlike
+  /// [#updateZkMetadata(String, SegmentZKMetadata, int)], this does not invalidate dependent materialized views.
+  public boolean updateZkMetadataWithoutDataChange(String tableNameWithType, SegmentZKMetadata segmentZKMetadata,
+      int expectedVersion) {
+    return ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata,
+        expectedVersion);
+  }
+
   public boolean updateZkMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
     boolean updated = ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
     if (updated) {
