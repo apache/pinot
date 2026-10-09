@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.queries.spans.SpanMultiTermQueryWrapper;
 import org.apache.lucene.queries.spans.SpanNearQuery;
 import org.apache.lucene.queries.spans.SpanQuery;
@@ -31,10 +33,18 @@ import org.apache.lucene.queries.spans.SpanTermQuery;
 import org.apache.lucene.search.AutomatonQuery;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.CollectionTerminatedException;
+import org.apache.lucene.search.Collector;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.LeafCollector;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.Scorable;
+import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.Weight;
 import org.apache.lucene.search.WildcardQuery;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -360,5 +370,84 @@ public class LuceneTextIndexUtils {
   /// @return The LuceneTextIndexOptions wrapper
   public static LuceneTextIndexOptions createOptions(String optionsString) {
     return new LuceneTextIndexOptions(optionsString);
+  }
+
+  /// Counts the documents matching `query` without materializing their ids.
+  ///
+  /// A `count(*)` over a text filter only needs the size of the match set. Collecting every matching doc id
+  /// into a bitmap first costs time proportional to the number of matches, which on a frequent term over a
+  /// large segment is most of the query.
+  ///
+  /// Runs as an ordinary search with a counting collector, so the `BulkScorer` path is preserved for the
+  /// shapes that need to iterate -- conjunctions, disjunctions and phrases, which are most of them. Per leaf,
+  /// [Weight#count] is tried first and the leaf is skipped entirely when it can answer from index metadata,
+  /// the same shortcut [org.apache.lucene.search.TotalHitCountCollector] uses.
+  ///
+  /// The query is passed through unwrapped so that it produces the same cache key as the doc-id path, rather
+  /// than a second [org.apache.lucene.search.LRUQueryCache] entry for the same predicate.
+  ///
+  /// Counts are invariant under Pinot's Lucene-to-Pinot doc id translation, which is 1:1, so no translator is
+  /// needed here. Callers that cannot guarantee that mapping must not use this method.
+  ///
+  /// @return the number of matching documents
+  public static int countWithoutMaterializing(IndexSearcher searcher, Query query)
+      throws IOException {
+    CountingCollector collector = new CountingCollector();
+    searcher.search(query, collector);
+    return collector.getTotalHits();
+  }
+
+  /// Counts matches without recording them, taking [Weight#count] where a leaf can answer from index
+  /// metadata and collecting otherwise.
+  ///
+  /// Mirrors [LuceneDocIdCollector]'s termination handling: a termination is converted to
+  /// [CollectionTerminatedException] so Lucene unwinds cleanly, and the real reason is read back later from
+  /// [QueryThreadContext#getTerminateException].
+  private static final class CountingCollector implements Collector {
+    private Weight _weight;
+    private int _totalHits;
+
+    @Override
+    public void setWeight(Weight weight) {
+      _weight = weight;
+    }
+
+    @Override
+    public ScoreMode scoreMode() {
+      return ScoreMode.COMPLETE_NO_SCORES;
+    }
+
+    int getTotalHits() {
+      return _totalHits;
+    }
+
+    @Override
+    public LeafCollector getLeafCollector(LeafReaderContext context)
+        throws IOException {
+      int leafCount = _weight == null ? -1 : _weight.count(context);
+      if (leafCount != -1) {
+        _totalHits += leafCount;
+        // Nothing to visit in this leaf; Lucene treats this as a clean stop for this leaf only.
+        throw new CollectionTerminatedException();
+      }
+      return new LeafCollector() {
+        private int _numCollected;
+
+        @Override
+        public void setScorer(Scorable scorer) {
+          // Not scoring.
+        }
+
+        @Override
+        public void collect(int doc) {
+          try {
+            QueryThreadContext.checkTerminationAndSampleUsagePeriodically(_numCollected++, "LuceneCountCollector");
+          } catch (RuntimeException e) {
+            throw new CollectionTerminatedException();
+          }
+          _totalHits++;
+        }
+      };
+    }
   }
 }
