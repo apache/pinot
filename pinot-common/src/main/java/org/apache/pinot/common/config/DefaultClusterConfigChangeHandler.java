@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.api.listeners.BatchMode;
 import org.apache.helix.api.listeners.ClusterConfigChangeListener;
@@ -70,7 +71,7 @@ public class DefaultClusterConfigChangeHandler implements ClusterConfigChangeLis
   public synchronized void onClusterConfigChange(ClusterConfig clusterConfig, NotificationContext context) {
     Map<String, String> clusterConfigs = copyWithoutNullValues(clusterConfig.getRecord().getSimpleFields());
     Map<String, String> effectiveConfigs = getEffectiveConfigs(clusterConfigs);
-    Set<String> changedConfigs = getChangedProperties(_effectiveConfigs, effectiveConfigs);
+    Set<String> changedConfigs = getChangedEffectiveProperties(_effectiveConfigs, effectiveConfigs);
     LOGGER.info("Cluster configs changed: {}", changedConfigs);
     _effectiveConfigs = effectiveConfigs;
     for (PinotClusterConfigChangeListener listener : _listeners) {
@@ -99,6 +100,22 @@ public class DefaultClusterConfigChangeHandler implements ClusterConfigChangeLis
       effectiveConfigs.putIfAbsent(entry.getKey(), entry.getValue());
     }
     return Collections.unmodifiableMap(effectiveConfigs);
+  }
+
+  private static Set<String> getChangedEffectiveProperties(Map<String, String> oldConfigs,
+      Map<String, String> newConfigs) {
+    Set<String> changedConfigs = new TreeSet<>(CONFIG_KEY_COMPARATOR);
+    for (Map.Entry<String, String> entry : newConfigs.entrySet()) {
+      if (!entry.getValue().equals(oldConfigs.get(entry.getKey()))) {
+        changedConfigs.add(entry.getKey());
+      }
+    }
+    for (String key : oldConfigs.keySet()) {
+      if (!newConfigs.containsKey(key)) {
+        changedConfigs.add(key);
+      }
+    }
+    return changedConfigs;
   }
 
   private static Map<String, String> snapshot(PinotConfiguration instanceConfig) {
