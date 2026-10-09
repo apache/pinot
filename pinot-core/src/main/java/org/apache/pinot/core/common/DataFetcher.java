@@ -20,9 +20,11 @@ package org.apache.pinot.core.common;
 
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.ObjIntConsumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -33,6 +35,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.MapUtils;
 
 
@@ -52,6 +55,7 @@ public class DataFetcher implements AutoCloseable {
   private final int[] _reusableMVDictIds;
   private final int _maxNumValuesPerMVEntry;
   private final Map<String, String> _queryOptions;
+  private final boolean _bytesBufferEnabled;
 
   /// Constructor for DataFetcher.
   ///
@@ -59,6 +63,8 @@ public class DataFetcher implements AutoCloseable {
   /// @param queryOptions   Query-level options propagated to reader contexts
   public DataFetcher(Map<String, DataSource> dataSourceMap, Map<String, String> queryOptions) {
     _queryOptions = queryOptions;
+    _bytesBufferEnabled =
+        Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_BUFFER_BACKED_DISTINCT_COUNT_BITMAP));
     _columnValueReaderMap = new HashMap<>();
     int maxNumValuesPerMVEntry = 0;
     for (Map.Entry<String, DataSource> entry : dataSourceMap.entrySet()) {
@@ -170,6 +176,14 @@ public class DataFetcher implements AutoCloseable {
   /// @param outValues Buffer for output
   public void fetchStringValues(String column, int[] inDocIds, int length, String[] outValues) {
     _columnValueReaderMap.get(column).readStringValues(inDocIds, length, outValues);
+  }
+
+  public boolean isBytesBufferEnabled() {
+    return _bytesBufferEnabled;
+  }
+
+  public void forEachBytesValue(String column, int[] docIds, int from, int to, ObjIntConsumer<ByteBuffer> consumer) {
+    _columnValueReaderMap.get(column).forEachBytesValue(docIds, from, to, consumer);
   }
 
   /// Fetch byte\[\] values for a single-valued column.
@@ -393,6 +407,19 @@ public class DataFetcher implements AutoCloseable {
         _dictionary.readStringValues(dictIdBuffer, length, valueBuffer);
       } else {
         _reader.readValuesSV(docIds, length, valueBuffer, readerContext);
+      }
+    }
+
+    void forEachBytesValue(int[] docIds, int from, int to, ObjIntConsumer<ByteBuffer> consumer) {
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
+      ForwardIndexReaderContext context = getReaderContext();
+      if (_dictionary != null) {
+        for (int i = from; i < to; i++) {
+          consumer.accept(ByteBuffer.wrap(_dictionary.getBytesValue(_reader.getDictId(docIds[i], context)))
+              .asReadOnlyBuffer(), i);
+        }
+      } else {
+        _reader.readBytesValues(docIds, from, to, consumer, context);
       }
     }
 
