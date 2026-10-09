@@ -1751,64 +1751,45 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertTrue(explain.contains("LogicalJoin"), "expected an ordinary LogicalJoin, got:\n" + explain);
   }
 
-  /// `generateArray` must fold to an array literal so it can be `UNNEST`ed into a dense grid, which is how gap
-  /// filling is expressed in the multi-stage engine. Folding a scalar function returning a primitive array used to
-  /// fail in [org.apache.pinot.calcite.rel.rules.PinotEvaluateLiteralRule], which read the elements by casting to
-  /// `Object[]` -- a cast a `long[]` cannot satisfy.
+  /// `generateArray` on literal arguments must not fold into an array literal. The array would be serialized into the
+  /// plan of every worker, while the workers only need the three arguments to generate it themselves.
   @Test
-  public void testGenerateArrayFoldsIntoAnArrayLiteral() {
+  public void testGenerateArrayIsNotFolded() {
     String explain = _queryEnvironment.explainQuery(
         "EXPLAIN PLAN FOR SELECT grid.ts FROM UNNEST(generateArray(0, 6, 2)) AS grid(ts)",
         RANDOM_REQUEST_ID_GEN.nextLong());
-    //@formatter:off
-    assertEquals(explain,
-        "Execution Plan\n"
-        + "Uncollect\n"
-        + "  LogicalProject(EXPR$0=[ARRAY(0, 2, 4, 6)])\n"
-        + "    LogicalValues(tuples=[[{ 0 }]])\n");
-    //@formatter:on
+    assertTrue(explain.contains("GENERATEARRAY(0, 6, 2)"), "expected an unfolded generateArray call, got:\n" + explain);
+    assertFalse(explain.contains("ARRAY(0, 2, 4, 6)"), "expected no folded array literal, got:\n" + explain);
   }
 
-  /// The omitted increment defaults to 1, or -1 when the sequence counts down.
+  /// Folding a scalar function returning a primitive array used to fail in
+  /// [org.apache.pinot.calcite.rel.rules.PinotEvaluateLiteralRule], which read the elements by casting to `Object[]`
+  /// -- a cast a `long[]` cannot satisfy.
   @Test
-  public void testGenerateArrayDefaultIncrement() {
-    assertTrue(explainGenerateArray("0, 3").contains("ARRAY(0, 1, 2, 3)"));
-    assertTrue(explainGenerateArray("3, 0").contains("ARRAY(3, 2, 1, 0)"));
+  public void testPrimitiveArrayFunctionFoldsIntoAnArrayLiteral() {
+    String explain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT grid.ts FROM UNNEST(generateLongArray(0, 6, 2)) AS grid(ts)",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("ARRAY(0:BIGINT, 2:BIGINT, 4:BIGINT, 6:BIGINT)"),
+        "expected a folded array literal, got:\n" + explain);
   }
 
   /// The element type is the widest of the argument types, so a time grid in epoch millis stays a LONG sequence
   /// instead of overflowing an INT, and a fractional increment makes the whole sequence DOUBLE.
   @Test
   public void testGenerateArrayElementTypeFollowsItsArguments() {
-    assertTrue(explainGenerateArray("0, 6, 2").contains("ARRAY(0, 2, 4, 6)"));
-    assertTrue(explainGenerateArray("1633078800000, 1633080600000, 1800000")
-        .contains("ARRAY(1633078800000:BIGINT, 1633080600000:BIGINT)"));
-    assertTrue(explainGenerateArray("0, 1, 0.5").contains("ARRAY(0.0E0:DOUBLE, 0.5E0:DOUBLE, 1.0E0:DOUBLE)"));
+    assertEquals(generateArrayElementType("0, 6, 2"), SqlTypeName.INTEGER);
+    assertEquals(generateArrayElementType("0, 6"), SqlTypeName.INTEGER);
+    assertEquals(generateArrayElementType("1633078800000, 1633080600000, 1800000"), SqlTypeName.BIGINT);
+    assertEquals(generateArrayElementType("0, 1633080600000, 1800000"), SqlTypeName.BIGINT);
+    assertEquals(generateArrayElementType("CAST(0 AS FLOAT), CAST(1 AS FLOAT), CAST(0.5 AS FLOAT)"),
+        SqlTypeName.REAL);
+    assertEquals(generateArrayElementType("0, 1, 0.5"), SqlTypeName.DOUBLE);
   }
 
-  /// Arguments that cannot produce a sequence are rejected while planning, since the array is built on the broker
-  /// before the query is dispatched.
-  @Test
-  public void testGenerateArrayRejectsUnusableArguments() {
-    assertEquals(expectGenerateArrayFailure("0, 10, 0"), "Increment must not be zero");
-    assertEquals(expectGenerateArrayFailure("0, 10, -1"),
-        "Increment: -1 does not lead from start: 0 to end: 10");
-    assertEquals(expectGenerateArrayFailure("0, 1000000"),
-        "Generating more than 1000000 elements exceeds the maximum of 100000");
-  }
-
-  private String explainGenerateArray(String arguments) {
-    return _queryEnvironment.explainQuery(
-        "EXPLAIN PLAN FOR SELECT grid.ts FROM UNNEST(generateArray(" + arguments + ")) AS grid(ts)",
-        RANDOM_REQUEST_ID_GEN.nextLong());
-  }
-
-  private String expectGenerateArrayFailure(String arguments) {
-    Throwable cause = expectThrows(Throwable.class, () -> explainGenerateArray(arguments));
-    while (cause.getCause() != null) {
-      cause = cause.getCause();
-    }
-    assertTrue(cause instanceof IllegalArgumentException, "expected an IllegalArgumentException, got: " + cause);
-    return cause.getMessage();
+  private SqlTypeName generateArrayElementType(String arguments) {
+    String query = "SELECT grid.ts FROM UNNEST(generateArray(" + arguments + ")) AS grid(ts)";
+    return _queryEnvironment.compile(query).getRelRoot().validatedRowType.getFieldList().get(0).getType()
+        .getSqlTypeName();
   }
 }

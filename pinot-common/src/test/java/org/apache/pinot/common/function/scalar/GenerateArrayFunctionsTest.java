@@ -22,7 +22,6 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
-import static org.testng.Assert.assertTrue;
 
 
 /// Tests the `generate*Array` sequence generators, in particular the bounds that keep a literal call from producing
@@ -121,7 +120,24 @@ public class GenerateArrayFunctionsTest {
   public void testFloatingPointStepDoesNotDrift() {
     // Accumulating the step would leave the last element short of 1.0.
     double[] values = ArrayFunctions.generateDoubleArray(0, 1, 0.1);
-    assertTrue(values.length >= 10, "Expected at least 10 elements, got: " + values.length);
+    assertEquals(values.length, 11);
     assertEquals(values[10], 1.0, 1e-12);
+  }
+
+  @Test
+  public void testFloatingPointStepKeepsInexactEnd() {
+    // (0.3 - 0.1) / 0.1 is 1.9999999999999998, so flooring the step count would drop the end. The single-stage
+    // engine has always kept it, and so does this.
+    assertEquals(ArrayFunctions.generateDoubleArray(0.1, 0.3, 0.1), new double[]{0.1, 0.1 + 0.1, 0.1 + 0.1 * 2});
+    assertEquals(ArrayFunctions.generateDoubleArray(0.3, 0.1, -0.1).length, 3);
+    assertEquals(ArrayFunctions.generateFloatArray(0.1f, 0.3f, 0.1f).length, 3);
+    assertEquals(ArrayFunctions.generateDoubleArray(1e6 + 0.1, 1e6 + 0.3, 0.1).length, 3);
+  }
+
+  @Test
+  public void testFloatingPointEndBetweenStepsIsExcluded() {
+    assertEquals(ArrayFunctions.generateDoubleArray(0, 0.95, 0.1).length, 10);
+    assertEquals(ArrayFunctions.generateDoubleArray(0, 0.2999, 0.1).length, 3);
+    assertEquals(ArrayFunctions.generateFloatArray(0f, 0.95f, 0.1f).length, 10);
   }
 }

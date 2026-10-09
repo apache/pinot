@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar.array;
 
+import java.lang.reflect.Method;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.scalar.ArrayFunctions;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.annotations.FunctionVolatility;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -54,9 +56,9 @@ public class GenerateArrayScalarFunction implements PinotScalarFunction {
   /// The element types a sequence can be generated as, narrowest first. The widest of the argument types wins, so a
   /// single fractional or wide argument decides the whole sequence.
   private static final List<ColumnDataType> ELEMENT_TYPES =
-      List.of(ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.DOUBLE);
+      List.of(ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE);
   private static final List<SqlTypeName> ELEMENT_TYPE_NAMES =
-      List.of(SqlTypeName.INTEGER, SqlTypeName.BIGINT, SqlTypeName.DOUBLE);
+      List.of(SqlTypeName.INTEGER, SqlTypeName.BIGINT, SqlTypeName.REAL, SqlTypeName.DOUBLE);
 
   /// Element type to the [ArrayFunctions] method generating it, by argument count.
   private static final Map<ColumnDataType, Map<Integer, FunctionInfo>> FUNCTION_INFO_MAP =
@@ -65,19 +67,27 @@ public class GenerateArrayScalarFunction implements PinotScalarFunction {
   static {
     register(ColumnDataType.INT, "generateIntArray", int.class);
     register(ColumnDataType.LONG, "generateLongArray", long.class);
+    register(ColumnDataType.FLOAT, "generateFloatArray", float.class);
     register(ColumnDataType.DOUBLE, "generateDoubleArray", double.class);
   }
 
   private static void register(ColumnDataType elementType, String methodName, Class<?> argumentClass) {
     try {
       FUNCTION_INFO_MAP.put(elementType, Map.of(2,
-          new FunctionInfo(ArrayFunctions.class.getMethod(methodName, argumentClass, argumentClass),
-              ArrayFunctions.class, false), 3,
-          new FunctionInfo(ArrayFunctions.class.getMethod(methodName, argumentClass, argumentClass, argumentClass),
-              ArrayFunctions.class, false)));
+          functionInfo(ArrayFunctions.class.getMethod(methodName, argumentClass, argumentClass)), 3,
+          functionInfo(ArrayFunctions.class.getMethod(methodName, argumentClass, argumentClass, argumentClass))));
     } catch (NoSuchMethodException e) {
       throw new IllegalStateException("Failed to find the " + methodName + " implementation of " + NAME, e);
     }
+  }
+
+  /// Marks the function as not deterministic so that neither engine folds a call on literal arguments into an array
+  /// literal at the broker. Folding would serialize the whole sequence, up to the maximum length [ArrayFunctions]
+  /// allows, into the query plan sent to every server, while evaluating it on the server only needs the three
+  /// arguments. The function is still [FunctionVolatility#IMMUTABLE]: the same arguments always generate the same
+  /// sequence, so it stays usable in ingestion transforms.
+  private static FunctionInfo functionInfo(Method method) {
+    return new FunctionInfo(method, ArrayFunctions.class, false, false, FunctionVolatility.IMMUTABLE);
   }
 
   @Override
@@ -95,6 +105,17 @@ public class GenerateArrayScalarFunction implements PinotScalarFunction {
   @Nullable
   @Override
   public FunctionInfo getFunctionInfo(ColumnDataType[] argumentTypes) {
+    ColumnDataType elementType = getElementType(argumentTypes);
+    return elementType != null ? getFunctionInfo(elementType, argumentTypes.length) : null;
+  }
+
+  /// The element type of the sequence generated from arguments of these types: `INT`, `LONG`, `FLOAT` or `DOUBLE`,
+  /// whichever is the widest of the argument types. Returns `null` if a sequence cannot be generated from one of them.
+  ///
+  /// The single-stage `GenerateArrayTransformFunction` uses this too. It also evaluates the multi-stage leaf stage
+  /// projections, so it must generate the same element type as the type the multi-stage planner inferred.
+  @Nullable
+  public static ColumnDataType getElementType(ColumnDataType[] argumentTypes) {
     int width = 0;
     for (ColumnDataType argumentType : argumentTypes) {
       int argumentWidth = width(argumentType);
@@ -103,7 +124,7 @@ public class GenerateArrayScalarFunction implements PinotScalarFunction {
       }
       width = Math.max(width, argumentWidth);
     }
-    return getFunctionInfo(ELEMENT_TYPES.get(width), argumentTypes.length);
+    return ELEMENT_TYPES.get(width);
   }
 
   @Nullable
@@ -136,9 +157,10 @@ public class GenerateArrayScalarFunction implements PinotScalarFunction {
       case LONG:
         return 1;
       case FLOAT:
+        return 2;
       case DOUBLE:
       case BIG_DECIMAL:
-        return 2;
+        return 3;
       default:
         return -1;
     }
@@ -154,8 +176,12 @@ public class GenerateArrayScalarFunction implements PinotScalarFunction {
         return 0;
       case BIGINT:
         return 1;
-      default:
+      case REAL:
+      case FLOAT:
+        // Pinot reads both as its 4 byte FLOAT type.
         return 2;
+      default:
+        return 3;
     }
   }
 }

@@ -453,15 +453,29 @@ public class ArrayFunctions {
     return checkGeneratedArrayLength(span / inc);
   }
 
-  /// Length of the floating point sequence `start, start + inc, ...` bounded by `end`, inclusive.
+  /// Length of the `float` sequence `start, start + inc, ...` bounded by `end`, inclusive. The step count is computed
+  /// in `float` arithmetic, as the single-stage engine always did.
+  private static int generatedArrayLength(float start, float end, float inc) {
+    checkFloatingPointArguments(start, end, inc);
+    // TODO: decimal steps such as 0.1 are not exact in binary, so this can drop the end; see apache/pinot#19814
+    return checkGeneratedArrayLength((long) ((end - start) / inc + 1) - 1);
+  }
+
+  /// Length of the `double` sequence `start, start + inc, ...` bounded by `end`, inclusive.
   private static int generatedArrayLength(double start, double end, double inc) {
+    checkFloatingPointArguments(start, end, inc);
+    // Adding 1 before truncating matches the length the single-stage engine always computed. It absorbs part of the
+    // rounding error of decimal steps, so 0.1 to 0.3 by 0.1 keeps its end.
+    // TODO: it does not absorb all of it, so 0.1 to 0.7 by 0.1 still drops its end; see apache/pinot#19814
+    // A span too wide for a long saturates the cast at Long.MAX_VALUE, which the length check below rejects.
+    return checkGeneratedArrayLength((long) ((end - start) / inc + 1) - 1);
+  }
+
+  private static void checkFloatingPointArguments(double start, double end, double inc) {
     Preconditions.checkArgument(inc != 0 && !Double.isNaN(inc), "Increment must not be zero or NaN, got: %s", inc);
     Preconditions.checkArgument(Double.isFinite(start) && Double.isFinite(end),
         "Range from %s to %s must be finite", start, end);
-    double span = end - start;
-    checkIncrementLeadsToEnd((int) Math.signum(span), (int) Math.signum(inc), start, end, inc);
-    // A span too wide for a long saturates the cast at Long.MAX_VALUE, which the length check below rejects.
-    return checkGeneratedArrayLength((long) Math.floor(span / inc));
+    checkIncrementLeadsToEnd((int) Math.signum(end - start), (int) Math.signum(inc), start, end, inc);
   }
 
   private static void checkIncrementLeadsToEnd(int spanSignum, int incSignum, Number start, Number end, Number inc) {

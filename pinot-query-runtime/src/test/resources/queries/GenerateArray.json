@@ -249,14 +249,14 @@
     },
     "queries": [
       {
-        "description": "a zero increment is rejected while planning instead of dividing by zero",
+        "description": "a zero increment is rejected instead of dividing by zero",
         "sql": "SELECT grid.bucket FROM {sparse} CROSS JOIN UNNEST(generateArray(0, 4, 0)) AS grid(bucket)",
         "expectedException": ".*Increment must not be zero.*",
         "ignoreLiteMode": true,
         "ignoreV2Optimizer": true
       },
       {
-        "description": "a sequence too long to materialize on the broker is rejected while planning",
+        "description": "a sequence too long to materialize is rejected",
         "sql": "SELECT grid.bucket FROM {sparse} CROSS JOIN UNNEST(generateArray(0, 1000000)) AS grid(bucket)",
         "expectedException": ".*exceeds the maximum of 100000.*",
         "ignoreLiteMode": true,
