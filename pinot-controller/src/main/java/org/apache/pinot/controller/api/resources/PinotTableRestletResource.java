@@ -921,8 +921,11 @@ public class PinotTableRestletResource {
           + "maintaining the min available replicas. It may increase the total time of the rebalance, but can be "
           + "useful when servers are low on disk space, and we want to scale up the cluster and rebalance the table to "
           + "more servers.") @DefaultValue("false") @QueryParam("lowDiskMode") boolean lowDiskMode,
-      @ApiParam(value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime "
-          + "contract cannot be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts,
+      @ApiParam(value = "Whether to continue despite ERROR replicas or ExternalView convergence timeouts. May proceed "
+          + "below minAvailableReplicas, but a positive minimum protects the last serving replica and a common serving "
+          + "instance for strict replica group routing. Already unavailable segments and minAvailableReplicas=0 do not "
+          + "block progress; the rebalance fails if no safe move remains")
+      @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts,
       @ApiParam(value = "How many maximum segment adds per server to update in the IdealState in each step. For "
           + "non-strict replica group based assignment, this number will be capped at the batchSizePerServer value "
           + "per rebalance step (some servers may get fewer segments). For strict replica group based assignment, "

@@ -866,6 +866,264 @@ public class TableRebalancerTest {
     assertEquals(nextAssignment, targetAssignment);
   }
 
+  /// Tests the next assignment calculation when the previous step's ExternalView did not converge (best-efforts).
+  /// This simulates relocating segments from a hot tier to a cold tier: the previous step added the cold instances
+  /// ("coldA", "coldB") to the IdealState while keeping one hot instance ("hot1"), but the ExternalView shows that
+  /// the cold instances have not loaded the segments yet (e.g. "coldB" is down and "coldA" is still loading). The
+  /// next assignment should not drop "hot1" (the only instance actually serving the segments) until at least one
+  /// cold instance has the segments ONLINE.
+  @Test
+  public void testNextAssignmentWithNonConvergedExternalView() {
+    // Current assignment (intermediate step of the relocation):
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    currentAssignment.put("segment1",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("hot1", "coldA", "coldB"), ONLINE));
+    currentAssignment.put("segment2",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("hot1", "coldA", "coldB"), ONLINE));
+
+    // Target assignment (cold tier only):
+    Map<String, Map<String, String>> targetAssignment = new TreeMap<>();
+    targetAssignment.put("segment1",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("coldA", "coldB"), ONLINE));
+    targetAssignment.put("segment2",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("coldA", "coldB"), ONLINE));
+
+    // ExternalView: segments are only served by "hot1" ("coldA" is still loading, "coldB" is down with no entries)
+    Map<String, Map<String, String>> externalViewAssignment = new TreeMap<>();
+    externalViewAssignment.put("segment1",
+        SegmentAssignmentUtils.getInstanceStateMap(List.of("hot1"), ONLINE));
+    externalViewAssignment.put("segment2",
+        SegmentAssignmentUtils.getInstanceStateMap(List.of("hot1"), ONLINE));
+
+    for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
+      // Without the ExternalView (previous step converged), the next assignment should reach the target assignment
+      Map<String, Map<String, String>> nextAssignment =
+          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 1, enableStrictReplicaGroup, false,
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
+              DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+      assertEquals(nextAssignment, targetAssignment);
+
+      // With the non-converged ExternalView, the segments should not be moved because the move would drop "hot1",
+      // the only instance actually serving them
+      nextAssignment =
+          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 1, enableStrictReplicaGroup, false,
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
+              DEFAULT_DATA_LOSS_RISK_ASSESSOR, externalViewAssignment);
+      assertEquals(nextAssignment, currentAssignment);
+
+      // Same with server-level segment batching enabled (exercises the batched code paths)
+      nextAssignment =
+          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 1, enableStrictReplicaGroup, false,
+              1, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR,
+              externalViewAssignment);
+      assertEquals(nextAssignment, currentAssignment);
+
+      // Once "coldA" has loaded segment1 (but not segment2), segment1 should be moved while segment2 should not for
+      // non-strict replica group. For strict replica group, segments assigned to the same instances must be moved
+      // together to keep them on the same set of instances (e.g. segments of the same partition must be served from
+      // the same instances for strict replica group routing), so neither segment should be moved.
+      Map<String, Map<String, String>> partiallyLoadedExternalViewAssignment = new TreeMap<>(externalViewAssignment);
+      partiallyLoadedExternalViewAssignment.put("segment1",
+          SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("hot1", "coldA"), ONLINE));
+      nextAssignment =
+          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 1, enableStrictReplicaGroup, false,
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
+              DEFAULT_DATA_LOSS_RISK_ASSESSOR, partiallyLoadedExternalViewAssignment);
+      if (enableStrictReplicaGroup) {
+        assertEquals(nextAssignment, currentAssignment);
+      } else {
+        assertEquals(nextAssignment.get("segment1"), targetAssignment.get("segment1"));
+        assertEquals(nextAssignment.get("segment2"), currentAssignment.get("segment2"));
+      }
+
+      // Same with server-level segment batching enabled (exercises the batched code paths)
+      nextAssignment =
+          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 1, enableStrictReplicaGroup, false,
+              1, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR,
+              partiallyLoadedExternalViewAssignment);
+      if (enableStrictReplicaGroup) {
+        assertEquals(nextAssignment, currentAssignment);
+      } else {
+        assertEquals(nextAssignment.get("segment1"), targetAssignment.get("segment1"));
+        assertEquals(nextAssignment.get("segment2"), currentAssignment.get("segment2"));
+      }
+
+      for (int batchSizePerServer : List.of(RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, 1)) {
+        // Best-efforts may reduce the serving count from two to one even when the configured minimum is two.
+        // It must still retain the last serving replica of segment2.
+        nextAssignment =
+            TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
+                batchSizePerServer, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
+                DEFAULT_DATA_LOSS_RISK_ASSESSOR, partiallyLoadedExternalViewAssignment);
+        if (enableStrictReplicaGroup) {
+          assertEquals(nextAssignment, currentAssignment);
+        } else {
+          assertEquals(nextAssignment.get("segment1"), targetAssignment.get("segment1"));
+          assertEquals(nextAssignment.get("segment2"), currentAssignment.get("segment2"));
+        }
+
+        // Each segment has a loaded target replica, but the only common serving instance is still hot1.
+        // Strict replica groups must retain it until the group shares a loaded target instance.
+        Map<String, Map<String, String>> crossedExternalViewAssignment =
+            new TreeMap<>(partiallyLoadedExternalViewAssignment);
+        crossedExternalViewAssignment.put("segment2",
+            SegmentAssignmentUtils.getInstanceStateMap(List.of("hot1", "coldB"), ONLINE));
+        for (int minAvailableReplicas : List.of(1, 2)) {
+          nextAssignment =
+              TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas,
+                  enableStrictReplicaGroup, false, batchSizePerServer, new Object2IntOpenHashMap<>(),
+                  DUMMY_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR, crossedExternalViewAssignment);
+          assertEquals(nextAssignment, enableStrictReplicaGroup ? currentAssignment : targetAssignment);
+        }
+        if (enableStrictReplicaGroup && batchSizePerServer == 1) {
+          // Different partitions still share a strict replica group; batching must retain its common serving instance.
+          nextAssignment =
+              TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 1, true, false, batchSizePerServer,
+                  new Object2IntOpenHashMap<>(), segmentName -> segmentName.equals("segment1") ? 0 : 1,
+                  DEFAULT_DATA_LOSS_RISK_ASSESSOR, crossedExternalViewAssignment);
+          assertEquals(nextAssignment, currentAssignment);
+        }
+
+        // Once the group has a common loaded target replica, best-efforts can reduce the group from two to one.
+        Map<String, Map<String, String>> commonLoadedExternalViewAssignment =
+            new TreeMap<>(partiallyLoadedExternalViewAssignment);
+        commonLoadedExternalViewAssignment.put("segment2",
+            SegmentAssignmentUtils.getInstanceStateMap(List.of("hot1", "coldA"), ONLINE));
+        nextAssignment =
+            TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
+                batchSizePerServer, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
+                DEFAULT_DATA_LOSS_RISK_ASSESSOR, commonLoadedExternalViewAssignment);
+        assertEquals(nextAssignment, targetAssignment);
+      }
+
+      // Once both cold instances have loaded the segments, the next assignment should reach the target assignment
+      Map<String, Map<String, String>> loadedExternalViewAssignment = new TreeMap<>();
+      loadedExternalViewAssignment.put("segment1",
+          SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("hot1", "coldA", "coldB"), ONLINE));
+      loadedExternalViewAssignment.put("segment2",
+          SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("hot1", "coldA", "coldB"), ONLINE));
+      nextAssignment =
+          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 1, enableStrictReplicaGroup, false,
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
+              DEFAULT_DATA_LOSS_RISK_ASSESSOR, loadedExternalViewAssignment);
+      assertEquals(nextAssignment, targetAssignment);
+
+      // Same with server-level segment batching enabled (exercises the batched code paths)
+      nextAssignment =
+          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 1, enableStrictReplicaGroup, false,
+              1, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR,
+              loadedExternalViewAssignment);
+      assertEquals(nextAssignment, targetAssignment);
+
+      // Segments in ERROR state on the current instances do not block the move because they are not serving anyway
+      // (moving them cannot reduce the number of serving replicas)
+      Map<String, Map<String, String>> errorExternalViewAssignment = new TreeMap<>();
+      errorExternalViewAssignment.put("segment1",
+          SegmentAssignmentUtils.getInstanceStateMap(List.of("hot1"), ERROR));
+      errorExternalViewAssignment.put("segment2",
+          SegmentAssignmentUtils.getInstanceStateMap(List.of("hot1"), ERROR));
+      nextAssignment =
+          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 1, enableStrictReplicaGroup, false,
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
+              DEFAULT_DATA_LOSS_RISK_ASSESSOR, errorExternalViewAssignment);
+      assertEquals(nextAssignment, targetAssignment);
+
+      // Segments missing from the ExternalView entirely do not block the move either
+      nextAssignment =
+          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 1, enableStrictReplicaGroup, false,
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
+              DEFAULT_DATA_LOSS_RISK_ASSESSOR, new TreeMap<>());
+      assertEquals(nextAssignment, targetAssignment);
+
+      // CONSUMING replicas count as serving: segments served by "hot1" in CONSUMING state should not be moved
+      Map<String, Map<String, String>> consumingExternalViewAssignment = new TreeMap<>();
+      consumingExternalViewAssignment.put("segment1",
+          SegmentAssignmentUtils.getInstanceStateMap(List.of("hot1"), CONSUMING));
+      consumingExternalViewAssignment.put("segment2",
+          SegmentAssignmentUtils.getInstanceStateMap(List.of("hot1"), CONSUMING));
+      nextAssignment =
+          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 1, enableStrictReplicaGroup, false,
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
+              DEFAULT_DATA_LOSS_RISK_ASSESSOR, consumingExternalViewAssignment);
+      assertEquals(nextAssignment, currentAssignment);
+    }
+
+    // With minimum available replicas set to 0 (downtime allowed), the non-converged ExternalView should not block
+    // the move, including strict replica groups and server-level batching.
+    for (boolean enableStrictReplicaGroup : List.of(false, true)) {
+      for (int batchSizePerServer : List.of(RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, 1)) {
+        Map<String, Map<String, String>> nextAssignment =
+            TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 0, enableStrictReplicaGroup, false,
+                batchSizePerServer, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
+                DEFAULT_DATA_LOSS_RISK_ASSESSOR, externalViewAssignment);
+        assertEquals(nextAssignment, targetAssignment);
+      }
+    }
+
+    // If the first source instance is in ERROR, retain the serving source while starting the move to disjoint targets.
+    Map<String, Map<String, String>> initialAssignment = new TreeMap<>();
+    Map<String, Map<String, String>> degradedExternalViewAssignment = new TreeMap<>();
+    for (String segment : currentAssignment.keySet()) {
+      initialAssignment.put(segment, SegmentAssignmentUtils.getInstanceStateMap(List.of("hot0", "hot1"), ONLINE));
+      degradedExternalViewAssignment.put(segment, Map.of("hot0", ERROR, "hot1", ONLINE));
+    }
+    for (boolean enableStrictReplicaGroup : List.of(false, true)) {
+      for (int batchSizePerServer : List.of(RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, 1)) {
+        Map<String, Map<String, String>> nextAssignment =
+            TableRebalancer.getNextAssignment(initialAssignment, targetAssignment, 1, enableStrictReplicaGroup, false,
+                batchSizePerServer, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
+                DEFAULT_DATA_LOSS_RISK_ASSESSOR, degradedExternalViewAssignment);
+        assertNotEquals(nextAssignment, initialAssignment);
+        boolean hasTargetReplica = false;
+        for (Map<String, String> instanceStates : nextAssignment.values()) {
+          assertTrue(instanceStates.containsKey("hot1"));
+          hasTargetReplica |= instanceStates.containsKey("coldA") || instanceStates.containsKey("coldB");
+        }
+        assertTrue(hasTargetReplica);
+      }
+    }
+
+    // A stalled existing target must not prevent another target from loading while the source remains serving.
+    Map<String, Map<String, String>> stalledTargetAssignment = new TreeMap<>();
+    for (String segment : currentAssignment.keySet()) {
+      stalledTargetAssignment.put(segment,
+          SegmentAssignmentUtils.getInstanceStateMap(List.of("hot1", "coldA"), ONLINE));
+    }
+    for (boolean enableStrictReplicaGroup : List.of(false, true)) {
+      for (int batchSizePerServer : List.of(RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, 1)) {
+        Map<String, Map<String, String>> nextAssignment =
+            TableRebalancer.getNextAssignment(stalledTargetAssignment, targetAssignment, 1, enableStrictReplicaGroup,
+                false, batchSizePerServer, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
+                DEFAULT_DATA_LOSS_RISK_ASSESSOR, externalViewAssignment);
+        boolean hasNewTargetReplica = false;
+        for (Map<String, String> instanceStates : nextAssignment.values()) {
+          assertTrue(instanceStates.containsKey("hot1"));
+          hasNewTargetReplica |= instanceStates.containsKey("coldB");
+        }
+        assertTrue(hasNewTargetReplica);
+      }
+    }
+
+    // Without a common serving source, a strict group must retain each segment's source while loading targets.
+    for (Map<String, String> instanceStates : initialAssignment.values()) {
+      instanceStates.put("hot2", ONLINE);
+    }
+    Map<String, Map<String, String>> splitServingExternalViewAssignment =
+        Map.of("segment1", Map.of("hot1", ONLINE), "segment2", Map.of("hot0", ONLINE));
+    for (int batchSizePerServer : List.of(RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, 1)) {
+      Map<String, Map<String, String>> nextAssignment =
+          TableRebalancer.getNextAssignment(initialAssignment, targetAssignment, 1, true, false, batchSizePerServer,
+              new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR,
+              splitServingExternalViewAssignment);
+      assertNotEquals(nextAssignment, initialAssignment);
+      for (Map<String, String> instanceStates : nextAssignment.values()) {
+        assertTrue(instanceStates.containsKey("hot0"));
+        assertTrue(instanceStates.containsKey("hot1"));
+        assertTrue(instanceStates.containsKey("coldA") || instanceStates.containsKey("coldB"));
+      }
+    }
+  }
+
   @Test
   public void testAssignmentWithLowDiskMode() {
     // Current assignment:

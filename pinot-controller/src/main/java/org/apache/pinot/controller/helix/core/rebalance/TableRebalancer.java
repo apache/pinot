@@ -601,10 +601,19 @@ public class TableRebalancer {
       }
       // Wait for ExternalView to converge before updating the next IdealState
       IdealState idealState;
+      // Best-efforts accepts ERROR replicas as converged and may continue before the ExternalView converges.
+      // Use the observed serving replicas to avoid removing the last serving replica in either case.
+      Map<String, Map<String, String>> externalViewAssignment = null;
       try {
-        idealState = waitForExternalViewToConverge(tableNameWithType, lowDiskMode, bestEfforts, segmentsToMonitor,
-            externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, estimatedAverageSegmentSizeInBytes,
-            allSegmentsFromIdealState, tableRebalanceLogger);
+        Pair<IdealState, ExternalView> idealStateAndExternalView =
+            waitForExternalViewToConverge(tableNameWithType, lowDiskMode, bestEfforts, segmentsToMonitor,
+                externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs,
+                estimatedAverageSegmentSizeInBytes, allSegmentsFromIdealState, tableRebalanceLogger);
+        idealState = idealStateAndExternalView.getLeft();
+        ExternalView externalView = idealStateAndExternalView.getRight();
+        if (externalView != null) {
+          externalViewAssignment = externalView.getRecord().getMapFields();
+        }
       } catch (Exception e) {
         String errorMsg = "Caught exception while waiting for ExternalView to converge, aborting the rebalance: "
             + e.getMessage();
@@ -710,7 +719,7 @@ public class TableRebalancer {
             nextAssignment =
                 getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
                     lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor,
-                    tableRebalanceLogger);
+                    externalViewAssignment, tableRebalanceLogger);
           } catch (Exception e) {
             String errorMsg =
                 "Caught exception while calculating the next assignment, aborting the rebalance: " + e.getMessage();
@@ -775,11 +784,23 @@ public class TableRebalancer {
         nextAssignment =
             getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
                 lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor,
-                tableRebalanceLogger);
+                externalViewAssignment, tableRebalanceLogger);
       } catch (Exception e) {
         String errorMsg =
             "Caught exception while calculating the next assignment, aborting the rebalance: " + e.getMessage();
         onReturnFailure(errorMsg, e, tableRebalanceLogger);
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
+            tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+      }
+
+      // If no best-efforts move can retain the last serving replicas (including a common serving instance for strict
+      // replica group routing), the rebalance cannot make progress without causing downtime. Abort instead of looping;
+      // retry (e.g. in the next SegmentRelocator run) once the target replicas recover.
+      if (externalViewAssignment != null && nextAssignment.equals(currentAssignment)) {
+        String errorMsg = "Rebalance cannot make progress without dropping the replicas actually serving the "
+            + "segments or their strict replica group (best-efforts), aborting the rebalance. It can be "
+            + "retried once the target replicas are healthy again";
+        onReturnFailure(errorMsg, null, tableRebalanceLogger);
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
             tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       }
@@ -1441,10 +1462,13 @@ public class TableRebalancer {
     }
   }
 
-  private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean lowDiskMode, boolean bestEfforts,
-      Set<String> segmentsToMonitor, long externalViewCheckIntervalInMs, long externalViewStabilizationTimeoutInMs,
-      long estimateAverageSegmentSizeInBytes, Set<String> allSegmentsFromIdealState,
-      Logger tableRebalanceLogger)
+  /// Waits for the ExternalView to converge to the IdealState. Returns the latest IdealState and, for best-efforts,
+  /// the latest ExternalView. Best-efforts may accept ERROR replicas as converged, so the caller must still check
+  /// which replicas are actually serving before calculating the next assignment.
+  private Pair<IdealState, ExternalView> waitForExternalViewToConverge(String tableNameWithType, boolean lowDiskMode,
+      boolean bestEfforts, Set<String> segmentsToMonitor, long externalViewCheckIntervalInMs,
+      long externalViewStabilizationTimeoutInMs, long estimateAverageSegmentSizeInBytes,
+      Set<String> allSegmentsFromIdealState, Logger tableRebalanceLogger)
       throws InterruptedException, TimeoutException {
     long startTimeMs = System.currentTimeMillis();
     long endTimeMs = startTimeMs + externalViewStabilizationTimeoutInMs;
@@ -1481,7 +1505,7 @@ public class TableRebalancer {
               lowDiskMode, bestEfforts, segmentsToMonitor, tableRebalanceLogger)) {
             tableRebalanceLogger.info("ExternalView converged in {}ms, with {} extensions",
                 System.currentTimeMillis() - startTimeMs, extensionCount);
-            return idealState;
+            return Pair.of(idealState, bestEfforts ? externalView : null);
           }
           if (previousRemainingSegments < 0) {
             // initialize previousRemainingSegments
@@ -1515,7 +1539,7 @@ public class TableRebalancer {
           tableRebalanceLogger.warn("ExternalView has not made progress for the last {}ms, stop waiting after "
                   + "spending {}ms waiting ({} extensions), continuing the rebalance (best-efforts)",
               externalViewStabilizationTimeoutInMs, System.currentTimeMillis() - startTimeMs, extensionCount);
-          return idealState;
+          return Pair.of(idealState, externalView);
         }
         throw new TimeoutException(
             String.format("ExternalView has not made progress for the last %dms, timeout after spending %dms "
@@ -1662,7 +1686,20 @@ public class TableRebalancer {
       boolean lowDiskMode, int batchSizePerServer, Object2IntOpenHashMap<String> segmentPartitionIdMap,
       PartitionIdFetcher partitionIdFetcher, DataLossRiskAssessor dataLossRiskAssessor) {
     return getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
-        lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor, LOGGER);
+        lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor, null,
+        LOGGER);
+  }
+
+  /// Uses the default LOGGER
+  @VisibleForTesting
+  static Map<String, Map<String, String>> getNextAssignment(Map<String, Map<String, String>> currentAssignment,
+      Map<String, Map<String, String>> targetAssignment, int minAvailableReplicas, boolean enableStrictReplicaGroup,
+      boolean lowDiskMode, int batchSizePerServer, Object2IntOpenHashMap<String> segmentPartitionIdMap,
+      PartitionIdFetcher partitionIdFetcher, DataLossRiskAssessor dataLossRiskAssessor,
+      @Nullable Map<String, Map<String, String>> externalViewAssignment) {
+    return getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
+        lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor,
+        externalViewAssignment, LOGGER);
   }
 
   /// Returns the next assignment for the table based on the current assignment and the target assignment with regard to
@@ -1684,33 +1721,80 @@ public class TableRebalancer {
   ///       instances. Special handling to check each group of assigned instances can be removed in that case. The
   ///       strict replica group routing can also be utilized for OFFLINE tables, thus StrictRealtimeSegmentAssignment
   ///       also needs to be made more generic for the OFFLINE case.
+  ///
+  /// The `externalViewAssignment` is supplied for best-efforts. An instance in the current assignment may not be
+  /// serving the segment, even when ERROR replicas were accepted as converged. A move must retain at least one
+  /// observed serving replica if there is one and minimum available replicas is positive.
   private static Map<String, Map<String, String>> getNextAssignment(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment, int minAvailableReplicas, boolean enableStrictReplicaGroup,
       boolean lowDiskMode, int batchSizePerServer, Object2IntOpenHashMap<String> segmentPartitionIdMap,
-      PartitionIdFetcher partitionIdFetcher, DataLossRiskAssessor dataLossRiskAssessor, Logger tableRebalanceLogger) {
+      PartitionIdFetcher partitionIdFetcher, DataLossRiskAssessor dataLossRiskAssessor,
+      @Nullable Map<String, Map<String, String>> externalViewAssignment, Logger tableRebalanceLogger) {
     return enableStrictReplicaGroup
         ? getNextStrictReplicaGroupAssignment(currentAssignment, targetAssignment, minAvailableReplicas, lowDiskMode,
-        batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor, tableRebalanceLogger)
+        batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor,
+        externalViewAssignment, tableRebalanceLogger)
         : getNextNonStrictReplicaGroupAssignment(currentAssignment, targetAssignment, minAvailableReplicas,
-            lowDiskMode, batchSizePerServer, dataLossRiskAssessor);
+            lowDiskMode, batchSizePerServer, dataLossRiskAssessor, externalViewAssignment,
+            tableRebalanceLogger);
+  }
+
+  /// Best-efforts may proceed below the configured replica minimum, but must not remove the last observed serving
+  /// replica (ONLINE/CONSUMING). Already unavailable segments and an explicit zero minimum do not block progress.
+  private static boolean isNextSingleSegmentAssignmentSafe(Map<String, String> nextInstanceStateMap,
+      Map<String, String> currentInstanceStateMap, @Nullable Map<String, String> externalViewInstanceStateMap,
+      int minAvailableReplicas) {
+    if (externalViewInstanceStateMap == null) {
+      // The segment does not exist in the ExternalView, so no instance is serving it. Moving it cannot reduce the
+      // number of serving replicas
+      return true;
+    }
+    int numServingReplicas = 0;
+    int numServingReplicasKept = 0;
+    for (String instance : currentInstanceStateMap.keySet()) {
+      String externalViewState = externalViewInstanceStateMap.get(instance);
+      if (SegmentStateModel.ONLINE.equals(externalViewState) || SegmentStateModel.CONSUMING.equals(externalViewState)) {
+        numServingReplicas++;
+        if (nextInstanceStateMap.containsKey(instance)) {
+          numServingReplicasKept++;
+        }
+      }
+    }
+    return minAvailableReplicas <= 0 || numServingReplicas == 0 || numServingReplicasKept > 0;
+  }
+
+  private static void logSegmentsNotMovedDueToNonConvergedExternalView(List<String> segmentsNotMoved,
+      Logger tableRebalanceLogger) {
+    if (!segmentsNotMoved.isEmpty()) {
+      int numSegmentsNotMoved = segmentsNotMoved.size();
+      tableRebalanceLogger.warn("Found {} segments that cannot be moved without dropping the replicas actually "
+              + "serving them because ExternalView has not converged (best-efforts), sampling {}: {}, keeping their "
+              + "current assignment", numSegmentsNotMoved, Math.min(numSegmentsNotMoved, 10),
+          segmentsNotMoved.subList(0, Math.min(numSegmentsNotMoved, 10)));
+    }
   }
 
   private static Map<String, Map<String, String>> getNextStrictReplicaGroupAssignment(
       Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
       int minAvailableReplicas, boolean lowDiskMode, int batchSizePerServer,
       Object2IntOpenHashMap<String> segmentPartitionIdMap, PartitionIdFetcher partitionIdFetcher,
-      DataLossRiskAssessor dataLossRiskAssessor, Logger tableRebalanceLogger) {
+      DataLossRiskAssessor dataLossRiskAssessor,
+      @Nullable Map<String, Map<String, String>> externalViewAssignment, Logger tableRebalanceLogger) {
     Map<String, Map<String, String>> nextAssignment = new TreeMap<>();
     Map<String, Integer> numSegmentsToOffloadMap = getNumSegmentsToOffloadMap(currentAssignment, targetAssignment);
     Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap = new HashMap<>();
     Map<Set<String>, Set<String>> availableInstancesMap = new HashMap<>();
     Map<String, Integer> serverToNumSegmentsAddedSoFar = new HashMap<>();
+    Map<Pair<Set<String>, Set<String>>, Set<String>> servingInstancesToRetain = externalViewAssignment != null
+        ? getStrictReplicaGroupServingInstancesToRetain(currentAssignment, targetAssignment, minAvailableReplicas,
+            lowDiskMode, numSegmentsToOffloadMap, assignmentMap, externalViewAssignment) : Map.of();
 
     if (batchSizePerServer == RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER) {
       // Directly update the nextAssignment with anyServerExhaustedBatchSize = false and return if batching is disabled
       updateNextAssignmentForPartitionIdStrictReplicaGroup(currentAssignment, targetAssignment, nextAssignment,
           false, minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap,
-          availableInstancesMap, serverToNumSegmentsAddedSoFar, dataLossRiskAssessor);
+          availableInstancesMap, serverToNumSegmentsAddedSoFar, dataLossRiskAssessor,
+          servingInstancesToRetain, externalViewAssignment);
       return nextAssignment;
     }
 
@@ -1734,7 +1818,9 @@ public class TableRebalancer {
         Map<String, String> firstEntryInstanceStateMap = firstEntry.getValue();
         SingleSegmentAssignment firstAssignment =
             getNextSingleSegmentAssignment(firstEntryInstanceStateMap, targetAssignment.get(firstEntry.getKey()),
-                minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
+                minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap,
+                servingInstancesToRetain.get(Pair.of(firstEntryInstanceStateMap.keySet(),
+                    targetAssignment.get(firstEntry.getKey()).keySet())));
         Set<String> serversAdded = getServersAddedInSingleSegmentAssignment(firstEntryInstanceStateMap,
             firstAssignment._instanceStateMap);
         boolean anyServerExhaustedBatchSize = false;
@@ -1755,7 +1841,8 @@ public class TableRebalancer {
         }
         updateNextAssignmentForPartitionIdStrictReplicaGroup(curAssignment, targetAssignment, nextAssignment,
             anyServerExhaustedBatchSize, minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap,
-            availableInstancesMap, serverToNumSegmentsAddedSoFar, dataLossRiskAssessor);
+            availableInstancesMap, serverToNumSegmentsAddedSoFar, dataLossRiskAssessor,
+            servingInstancesToRetain, externalViewAssignment);
       }
     }
 
@@ -1764,13 +1851,77 @@ public class TableRebalancer {
     return nextAssignment;
   }
 
+  /// Choose serving replicas to retain before batching, keeping segments sharing the same instance pair together.
+  /// Retain a common serving instance when one serves the group, because individually serving replicas on different
+  /// instances do not suffice for strict replica group routing.
+  private static Map<Pair<Set<String>, Set<String>>, Set<String>> getStrictReplicaGroupServingInstancesToRetain(
+      Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
+      int minAvailableReplicas, boolean lowDiskMode, Map<String, Integer> numSegmentsToOffloadMap,
+      Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap,
+      Map<String, Map<String, String>> externalViewAssignment) {
+    if (minAvailableReplicas <= 0) {
+      return Map.of();
+    }
+    Map<Pair<Set<String>, Set<String>>, Set<String>> instancesToRetain = new HashMap<>();
+    Map<Pair<Set<String>, Set<String>>, Set<String>> commonServingInstancesMap = new HashMap<>();
+    Map<Pair<Set<String>, Set<String>>, Set<String>> segmentServingInstancesMap = new HashMap<>();
+    for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
+      String segmentName = entry.getKey();
+      Map<String, String> currentInstanceStateMap = entry.getValue();
+      Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
+      Pair<Set<String>, Set<String>> assignmentKey =
+          Pair.of(currentInstanceStateMap.keySet(), targetInstanceStateMap.keySet());
+      SingleSegmentAssignment assignment =
+          getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
+              lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
+      Set<String> servingInstances = new TreeSet<>();
+      Map<String, String> externalViewInstanceStateMap = externalViewAssignment.get(segmentName);
+      if (externalViewInstanceStateMap != null) {
+        for (String instance : currentInstanceStateMap.keySet()) {
+          String state = externalViewInstanceStateMap.get(instance);
+          if (SegmentStateModel.ONLINE.equals(state) || SegmentStateModel.CONSUMING.equals(state)) {
+            servingInstances.add(instance);
+          }
+        }
+      }
+      if (!servingInstances.isEmpty()
+          && Collections.disjoint(servingInstances, assignment._instanceStateMap.keySet())) {
+        instancesToRetain.computeIfAbsent(assignmentKey, k -> new TreeSet<>()).add(servingInstances.iterator().next());
+      }
+      if (!servingInstances.isEmpty()) {
+        String servingInstance = servingInstances.stream().filter(targetInstanceStateMap::containsKey).findFirst()
+            .orElse(servingInstances.iterator().next());
+        segmentServingInstancesMap.computeIfAbsent(assignmentKey, k -> new TreeSet<>()).add(servingInstance);
+      }
+      commonServingInstancesMap.merge(assignmentKey, servingInstances, (commonInstances, instances) -> {
+        commonInstances.retainAll(instances);
+        return commonInstances;
+      });
+    }
+    for (Map.Entry<Pair<Set<String>, Set<String>>, Set<String>> entry : commonServingInstancesMap.entrySet()) {
+      Set<String> commonServingInstances = entry.getValue();
+      if (!commonServingInstances.isEmpty()
+          && Collections.disjoint(commonServingInstances, assignmentMap.get(entry.getKey()))) {
+        instancesToRetain.put(entry.getKey(), Set.of(commonServingInstances.iterator().next()));
+      } else if (commonServingInstances.isEmpty() && instancesToRetain.containsKey(entry.getKey())) {
+        // Changing the preferred replica must also protect segments safe under the original candidate.
+        instancesToRetain.put(entry.getKey(), segmentServingInstancesMap.get(entry.getKey()));
+      }
+    }
+    // Recalculate these candidates with serving replicas preferred over non-serving replicas.
+    instancesToRetain.keySet().forEach(assignmentMap::remove);
+    return instancesToRetain;
+  }
+
   private static void updateNextAssignmentForPartitionIdStrictReplicaGroup(
       Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
       Map<String, Map<String, String>> nextAssignment, boolean anyServerExhaustedBatchSize, int minAvailableReplicas,
       boolean lowDiskMode, Map<String, Integer> numSegmentsToOffloadMap,
       Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap,
       Map<Set<String>, Set<String>> availableInstancesMap, Map<String, Integer> serverToNumSegmentsAddedSoFar,
-      DataLossRiskAssessor dataLossRiskAssessor) {
+      DataLossRiskAssessor dataLossRiskAssessor,
+      Map<Pair<Set<String>, Set<String>>, Set<String>> servingInstancesToRetain,
+      @Nullable Map<String, Map<String, String>> externalViewAssignment) {
     if (anyServerExhaustedBatchSize) {
       // Exhausted the batch size for at least 1 server, just copy over the remaining segments as is
       nextAssignment.putAll(currentAssignment);
@@ -1784,7 +1935,14 @@ public class TableRebalancer {
         Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
         SingleSegmentAssignment assignment =
             getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
-                lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
+                lowDiskMode, numSegmentsToOffloadMap, assignmentMap,
+                servingInstancesToRetain.get(
+                    Pair.of(currentInstanceStateMap.keySet(), targetInstanceStateMap.keySet())));
+        if (externalViewAssignment != null) {
+          Preconditions.checkState(isNextSingleSegmentAssignmentSafe(assignment._instanceStateMap,
+              currentInstanceStateMap, externalViewAssignment.get(segmentName), minAvailableReplicas),
+              "Next assignment would remove the last serving replica for segment: %s", segmentName);
+        }
         Set<String> assignedInstances = assignment._instanceStateMap.keySet();
         Set<String> availableInstances = assignment._availableInstances;
         availableInstancesMap.compute(assignedInstances, (k, currentAvailableInstances) -> {
@@ -1998,11 +2156,13 @@ public class TableRebalancer {
   private static Map<String, Map<String, String>> getNextNonStrictReplicaGroupAssignment(
       Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
       int minAvailableReplicas, boolean lowDiskMode, int batchSizePerServer,
-      DataLossRiskAssessor dataLossRiskAssessor) {
+      DataLossRiskAssessor dataLossRiskAssessor,
+      @Nullable Map<String, Map<String, String>> externalViewAssignment, Logger tableRebalanceLogger) {
     Map<String, Integer> serverToNumSegmentsAddedSoFar = new HashMap<>();
     Map<String, Map<String, String>> nextAssignment = new TreeMap<>();
     Map<String, Integer> numSegmentsToOffloadMap = getNumSegmentsToOffloadMap(currentAssignment, targetAssignment);
     Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap = new HashMap<>();
+    List<String> segmentsNotMovedDueToNonConvergedExternalView = new ArrayList<>();
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
       String segmentName = entry.getKey();
       Map<String, String> currentInstanceStateMap = entry.getValue();
@@ -2010,6 +2170,21 @@ public class TableRebalancer {
       Map<String, String> nextInstanceStateMap =
           getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
               lowDiskMode, numSegmentsToOffloadMap, assignmentMap)._instanceStateMap;
+      if (externalViewAssignment != null && !isNextSingleSegmentAssignmentSafe(nextInstanceStateMap,
+          currentInstanceStateMap, externalViewAssignment.get(segmentName), minAvailableReplicas)) {
+        // Recalculate with an observed serving replica preferred over a non-serving replica.
+        String servingInstance = currentInstanceStateMap.keySet().stream().filter(instance -> {
+          String state = externalViewAssignment.get(segmentName).get(instance);
+          return SegmentStateModel.ONLINE.equals(state) || SegmentStateModel.CONSUMING.equals(state);
+        }).sorted().findFirst().orElseThrow();
+        assignmentMap.remove(Pair.of(currentInstanceStateMap.keySet(), targetInstanceStateMap.keySet()));
+        nextInstanceStateMap =
+            getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
+                lowDiskMode, numSegmentsToOffloadMap, assignmentMap, Set.of(servingInstance))._instanceStateMap;
+        if (nextInstanceStateMap.equals(currentInstanceStateMap)) {
+          segmentsNotMovedDueToNonConvergedExternalView.add(segmentName);
+        }
+      }
       Set<String> serversAddedForSegment = getServersAddedInSingleSegmentAssignment(currentInstanceStateMap,
           nextInstanceStateMap);
       boolean anyServerExhaustedBatchSize = false;
@@ -2041,6 +2216,8 @@ public class TableRebalancer {
         }
       }
     }
+    logSegmentsNotMovedDueToNonConvergedExternalView(segmentsNotMovedDueToNonConvergedExternalView,
+        tableRebalanceLogger);
     return nextAssignment;
   }
 
@@ -2089,6 +2266,14 @@ public class TableRebalancer {
   static SingleSegmentAssignment getNextSingleSegmentAssignment(Map<String, String> currentInstanceStateMap,
       Map<String, String> targetInstanceStateMap, int minAvailableReplicas, boolean lowDiskMode,
       Map<String, Integer> numSegmentsToOffloadMap, Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap) {
+    return getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
+        lowDiskMode, numSegmentsToOffloadMap, assignmentMap, null);
+  }
+
+  private static SingleSegmentAssignment getNextSingleSegmentAssignment(Map<String, String> currentInstanceStateMap,
+      Map<String, String> targetInstanceStateMap, int minAvailableReplicas, boolean lowDiskMode,
+      Map<String, Integer> numSegmentsToOffloadMap, Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap,
+      @Nullable Set<String> servingInstancesToRetain) {
     Map<String, String> nextInstanceStateMap = new TreeMap<>();
 
     // Assign the segment the same way as other segments if the current and target instances are the same. We need this
@@ -2123,6 +2308,13 @@ public class TableRebalancer {
       }
     }
 
+    // For best-efforts, retain observed serving replicas before filling the configured minimum from IdealState.
+    if (servingInstancesToRetain != null) {
+      for (String instance : servingInstancesToRetain) {
+        nextInstanceStateMap.putIfAbsent(instance, currentInstanceStateMap.get(instance));
+      }
+    }
+
     // Add current instances until the min available replicas achieved
     int numInstancesToKeep = minAvailableReplicas - nextInstanceStateMap.size();
     if (numInstancesToKeep > 0) {
@@ -2146,6 +2338,16 @@ public class TableRebalancer {
     // there is no guarantee that server process the segment drop before the segment addition.
     if (!lowDiskMode || currentInstanceStateMap.size() == nextInstanceStateMap.size()) {
       int numInstancesToAdd = targetInstanceStateMap.size() - nextInstanceStateMap.size();
+      if (!lowDiskMode && servingInstancesToRetain != null && !servingInstancesToRetain.isEmpty()) {
+        // Temporarily retain serving sources while loading the targets. Otherwise an unready target already in
+        // IdealState can occupy the replica budget and prevent another target from starting to load.
+        numInstancesToAdd = targetInstanceStateMap.size();
+        for (String instance : nextInstanceStateMap.keySet()) {
+          if (targetInstanceStateMap.containsKey(instance)) {
+            numInstancesToAdd--;
+          }
+        }
+      }
       if (numInstancesToAdd > 0) {
         // Sort instances by number of segments to offload, and add the ones with the least segments to offload
         List<Triple<String, String, Integer>> instancesInfo =
