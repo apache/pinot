@@ -349,7 +349,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final CompletionMode _segmentCompletionMode;
   private final List<String> _filteredMessageOffsets = new ArrayList<>();
   private final boolean _trackFilteredMessageOffsets;
-  private final ParallelSegmentConsumptionPolicy _parallelSegmentConsumptionPolicy;
+  protected final ParallelSegmentConsumptionPolicy _parallelSegmentConsumptionPolicy;
 
   private volatile boolean _stopReasonPrinted = false;
 
@@ -1207,9 +1207,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @Nullable
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit)
       throws SegmentBuildFailureException {
-    if (_parallelSegmentConsumptionPolicy.isAllowedDuringBuild()) {
-      closeStreamConsumerAndReleaseSemaphore();
-    }
+    releaseConsumerSemaphoreBeforeBuild();
     // Do not allow building segment when table data manager is already shut down
     if (_realtimeTableDataManager.isShutDown()) {
       _segmentLogger.warn("Table data manager is already shut down");
@@ -1462,6 +1460,22 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       closePartitionGroupConsumer();
       closePartitionMetadataProvider();
       _transformPipeline.reportStats();
+    }
+  }
+
+  /// Releases the consumer semaphore before building the segment, when the policy lets the next segment of the
+  /// partition consume during the build. Subclasses can hold it instead.
+  protected void releaseConsumerSemaphoreBeforeBuild() {
+    if (_parallelSegmentConsumptionPolicy.isAllowedDuringBuild()) {
+      closeStreamConsumerAndReleaseSemaphore();
+    }
+  }
+
+  /// Releases the consumer semaphore before downloading the segment, when the policy lets the next segment of the
+  /// partition consume during the download. Subclasses can hold it instead.
+  protected void releaseConsumerSemaphoreBeforeDownload() {
+    if (_parallelSegmentConsumptionPolicy.isAllowedDuringDownload()) {
+      closeStreamConsumerAndReleaseSemaphore();
     }
   }
 
@@ -1779,9 +1793,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           + "metadata. Its snapshot can miss the rows the revert restores. Use DISALLOW_ALWAYS");
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD, 1L);
     }
-    if (allowedDuringDownload) {
-      closeStreamConsumerAndReleaseSemaphore();
-    }
+    releaseConsumerSemaphoreBeforeDownload();
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
   }
 
