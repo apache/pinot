@@ -33,6 +33,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.docvalsets.DataBlockValSet;
@@ -459,11 +460,30 @@ public class AggregateOperator extends MultiStageOperator {
     return blockValSetMap;
   }
 
-  static Object[] getIntermediateResults(AggregationFunction<?, ?> aggFunction, MseBlock.Data block) {
+  /// Returns the id of the column that holds the intermediate results of `aggFunction` in a merge block.
+  static int getIntermediateResultColId(AggregationFunction<?, ?> aggFunction) {
     ExpressionContext firstArgument = aggFunction.getInputExpressions().get(0);
     Preconditions.checkState(firstArgument.getType() == ExpressionContext.Type.IDENTIFIER,
         "Expected the first argument to be IDENTIFIER, got: %s", firstArgument.getType());
-    int colId = fromIdentifierToColId(firstArgument.getIdentifier());
+    return fromIdentifierToColId(firstArgument.getIdentifier());
+  }
+
+  /// Returns the serialized data block of `block` when the intermediate results of `aggFunction` are serialized
+  /// custom objects in it, or `null` otherwise. Merging such a block with
+  /// `AggregationFunctionUtils.mergeSerialized` skips deserializing each intermediate result into a separate object.
+  @Nullable
+  static DataBlock getSerializedIntermediateResults(AggregationFunction<?, ?> aggFunction, MseBlock.Data block) {
+    if (block.isRowHeap()) {
+      return null;
+    }
+    DataBlock dataBlock = block.asSerialized().getDataBlock();
+    ColumnDataType storedType =
+        dataBlock.getDataSchema().getColumnDataType(getIntermediateResultColId(aggFunction)).getStoredType();
+    return storedType == ColumnDataType.OBJECT ? dataBlock : null;
+  }
+
+  static Object[] getIntermediateResults(AggregationFunction<?, ?> aggFunction, MseBlock.Data block) {
+    int colId = getIntermediateResultColId(aggFunction);
     int numRows = block.getNumRows();
     if (block.isRowHeap()) {
       Object[] values = new Object[numRows];

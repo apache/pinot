@@ -19,6 +19,10 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import java.io.DataOutput;
+import java.io.IOException;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -32,6 +36,7 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.memory.PrimitiveArrayOutput;
 
 
 public class PercentileAggregationFunction extends BaseSingleInputAggregationFunction<DoubleArrayList, Double> {
@@ -207,9 +212,69 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
   }
 
   @Override
+  public DoubleArrayList mergeSerializedIntermediateResult(@Nullable DoubleArrayList intermediateResult,
+      CustomObject serialized) {
+    if (intermediateResult == null) {
+      return deserializeIntermediateResult(serialized);
+    }
+    // Reads the values in bulk straight into the merged list, in the format of
+    // ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE: an int count, then the doubles, in the buffer's byte order. Same
+    // growth as addAll(), without the incoming list.
+    ByteBuffer buffer = serialized.getBuffer();
+    int numValues = buffer.getInt();
+    if (numValues < 0) {
+      throw new IllegalArgumentException("Negative number of values: " + numValues);
+    }
+    if (numValues > buffer.remaining() / Double.BYTES) {
+      throw new BufferUnderflowException();
+    }
+    int size = intermediateResult.size();
+    int capacity = intermediateResult.elements().length;
+    if (size + numValues > capacity) {
+      intermediateResult.ensureCapacity(
+          (int) Math.min(Math.max((long) size + numValues, (long) capacity + (capacity >> 1)), Integer.MAX_VALUE - 8));
+    }
+    // size() zero-fills the new range, so it must run before the values are copied in.
+    intermediateResult.size(size + numValues);
+    buffer.asDoubleBuffer().get(intermediateResult.elements(), size, numValues);
+    buffer.position(buffer.position() + numValues * Double.BYTES);
+    return intermediateResult;
+  }
+
+  @Override
   public SerializedIntermediateResult serializeIntermediateResult(DoubleArrayList doubleArrayList) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(),
-        ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(doubleArrayList));
+    return new SerializedDoubleArrayList(doubleArrayList);
+  }
+
+  /// Serializes a [DoubleArrayList] on demand, with the bytes of ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE: a
+  /// big-endian int count, then the big-endian doubles. [#writeTo] writes the values in bulk straight into the
+  /// destination (see [PrimitiveArrayOutput]), so the builders never hold the full-size byte array. Not thread-safe;
+  /// the list must not change until it is written.
+  private static final class SerializedDoubleArrayList extends SerializedIntermediateResult {
+    private final DoubleArrayList _values;
+
+    SerializedDoubleArrayList(DoubleArrayList values) {
+      super(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue());
+      _values = values;
+    }
+
+    @Override
+    public byte[] getBytes() {
+      return ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(_values);
+    }
+
+    @Override
+    public int getSize() {
+      return Math.toIntExact(Integer.BYTES + (long) _values.size() * Double.BYTES);
+    }
+
+    @Override
+    public void writeTo(DataOutput output)
+        throws IOException {
+      int size = _values.size();
+      output.writeInt(size);
+      PrimitiveArrayOutput.writeDoubles(output, _values.elements(), 0, size);
+    }
   }
 
   @Override
