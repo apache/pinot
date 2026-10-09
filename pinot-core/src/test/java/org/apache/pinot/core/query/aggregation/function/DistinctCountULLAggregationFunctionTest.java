@@ -38,10 +38,22 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
 public class DistinctCountULLAggregationFunctionTest {
+
+  @Test
+  public void testOutOfRangePRejectedAtPlanTime() {
+    // p sizes the off-heap holder's direct-memory slots (1 << p), so it must be validated here at plan time
+    // rather than only inside UltraLogLog.create
+    for (int p : new int[]{-1, 0, 2, 27, 32}) {
+      assertThrows(IllegalArgumentException.class,
+          () -> new DistinctCountULLAggregationFunction(List.of(ExpressionContext.forIdentifier("col"),
+              ExpressionContext.forLiteral(Literal.intValue(p))), false));
+    }
+  }
 
   @Test
   public void testCanUseStarTreeDefaultP() {
