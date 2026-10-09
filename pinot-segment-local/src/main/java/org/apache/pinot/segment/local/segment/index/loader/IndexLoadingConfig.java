@@ -501,8 +501,8 @@ public class IndexLoadingConfig {
     ResolvedIndexState resolvedIndexState = getResolvedIndexState();
     Map<String, FieldIndexConfigs> indexConfigsByColName = resolvedIndexState._indexConfigsByColName;
     Map<String, FieldIndexConfigs> updatedConfigs = null;
-    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
-      String childColumn = entry.getKey();
+    for (ColumnMetadata childMetadata : segmentMetadata.getAllColumnMetadata()) {
+      String childColumn = childMetadata.getColumnName();
       if (!childColumn.contains(OpenStructNaming.SEPARATOR) || indexConfigsByColName.containsKey(childColumn)) {
         continue;
       }
@@ -517,7 +517,7 @@ public class IndexLoadingConfig {
       }
       OpenStructIndexConfig openStructConfig = (OpenStructIndexConfig) osConfig;
       if (OpenStructNaming.isSparseColumn(childColumn)) {
-        FieldIndexConfigs blobConfigs = sparseChildConfigs(openStructConfig, entry.getValue().getFieldSpec());
+        FieldIndexConfigs blobConfigs = sparseChildConfigs(openStructConfig, childMetadata.getFieldSpec());
         if (blobConfigs != null) {
           if (updatedConfigs == null) {
             updatedConfigs = new HashMap<>(indexConfigsByColName);
@@ -531,7 +531,7 @@ public class IndexLoadingConfig {
       if (keyFieldConfig == null) {
         keyFieldConfig = openStructConfig.getDefaultValueFieldConfig();
       }
-      FieldSpec childFieldSpec = entry.getValue().getFieldSpec();
+      FieldSpec childFieldSpec = segmentMetadata.getColumnMetadataFor(childColumn).getFieldSpec();
       boolean enableInverted = openStructConfig.shouldEnableInvertedIndexForKey(key);
       FieldIndexConfigs childConfigs = new FieldIndexConfigs.Builder(
           FieldIndexConfigsUtil.fromFieldConfig(keyFieldConfig, childFieldSpec))

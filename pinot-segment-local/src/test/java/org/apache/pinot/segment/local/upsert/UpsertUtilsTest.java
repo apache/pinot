@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -243,7 +245,10 @@ public class UpsertUtilsTest {
   /// Returns a minimal [ImmutableSegmentImpl] usable for testing the upsert-aware methods.
   /// Mirrors the pattern used in `BasePartitionUpsertMetadataManagerTest#createImmutableSegment`.
   private static ImmutableSegmentImpl newSegment() {
-    return new ImmutableSegmentImpl(
-        mock(SegmentDirectory.class), mock(SegmentMetadataImpl.class), new HashMap<>(), null);
+    SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
+    // The segment reads its columns through these accessors; Mockito has no empty default for a NavigableSet
+    when(segmentMetadata.getAllColumns()).thenReturn(Collections.emptyNavigableSet());
+    when(segmentMetadata.getAllColumnMetadata()).thenReturn(List.of());
+    return new ImmutableSegmentImpl(mock(SegmentDirectory.class), segmentMetadata, new HashMap<>(), null);
   }
 }

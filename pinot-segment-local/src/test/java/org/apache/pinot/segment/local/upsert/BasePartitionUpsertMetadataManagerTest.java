@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -1188,6 +1189,9 @@ public class BasePartitionUpsertMetadataManagerTest {
     SegmentMetadataImpl meta = mock(SegmentMetadataImpl.class);
     when(meta.getName()).thenReturn(segName);
     when(meta.getIndexDir()).thenReturn(segDir);
+    // The segment reads its columns through these accessors; Mockito has no empty default for a NavigableSet
+    when(meta.getAllColumns()).thenReturn(Collections.emptyNavigableSet());
+    when(meta.getAllColumnMetadata()).thenReturn(List.of());
     return new ImmutableSegmentImpl(mock(SegmentDirectory.class), meta, new HashMap<>(), null) {
       public void persistDocIdsSnapshot(String fileName,
           ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIdsSnapshot)
