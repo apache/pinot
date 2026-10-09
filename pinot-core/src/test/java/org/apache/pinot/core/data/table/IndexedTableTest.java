@@ -49,6 +49,8 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+
 
 /// Tests the [Table] operations
 @SuppressWarnings({"rawtypes"})
@@ -56,6 +58,41 @@ public class IndexedTableTest {
   private static final int TRIM_SIZE = 10;
   private static final int TRIM_THRESHOLD = 20;
   private static final int INITIAL_CAPACITY = Server.DEFAULT_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY;
+
+  @Test
+  public void testMergeAndFinalExtractionUseIndexedRecordAccess() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT COUNT(*) FROM testTable GROUP BY d1");
+    DataSchema schema = new DataSchema(new String[]{"d1", "count(*)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.LONG});
+    IndexedTable table = new SimpleIndexedTable(schema, false, queryContext, 10, Integer.MAX_VALUE,
+        Integer.MAX_VALUE, 16, null);
+    Key key = new Key(new Object[]{"native-key"});
+    Record stored = new Record(new Object[0]) {
+      private Object _aggregate = 2L;
+
+      @Override
+      public Object[] getValues() {
+        throw new AssertionError("Merge must not materialize a stored key row");
+      }
+
+      @Override
+      public Object getValue(int index) {
+        return index == 0 ? "native-key" : _aggregate;
+      }
+
+      @Override
+      public void setValue(int index, Object value) {
+        assertEquals(index, 1);
+        _aggregate = value;
+      }
+    };
+    table.upsert(key, stored);
+    table.upsert(new Key(new Object[]{"native-key"}), new Record(new Object[]{"native-key", 3L}));
+    table.finish(false, true);
+
+    assertEquals(table.iterator().next().getValue(1), 5L);
+  }
 
   @Test
   public void testConcurrentIndexedTable()

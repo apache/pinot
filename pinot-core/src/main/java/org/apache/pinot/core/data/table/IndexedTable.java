@@ -119,19 +119,17 @@ public abstract class IndexedTable extends BaseTable {
   }
 
   private Record updateRecord(Record existingRecord, Record newRecord) {
-    Object[] existingValues = existingRecord.getValues();
-    Object[] newValues = newRecord.getValues();
     int numAggregations = _aggregationFunctions.length;
     int index = _numKeyColumns;
     if (!_hasFinalInput) {
       for (int i = 0; i < numAggregations; i++, index++) {
-        existingValues[index] =
-            AggregationFunctionUtils.merge(_aggregationFunctions[i], existingValues[index], newValues[index]);
+        existingRecord.setValue(index, AggregationFunctionUtils.merge(_aggregationFunctions[i],
+            existingRecord.getValue(index), newRecord.getValue(index)));
       }
     } else {
       for (int i = 0; i < numAggregations; i++, index++) {
-        existingValues[index] = AggregationFunctionUtils.mergeFinalResult(_aggregationFunctions[i],
-            (Comparable) existingValues[index], (Comparable) newValues[index]);
+        existingRecord.setValue(index, AggregationFunctionUtils.mergeFinalResult(_aggregationFunctions[i],
+            (Comparable) existingRecord.getValue(index), (Comparable) newRecord.getValue(index)));
       }
     }
     return existingRecord;
@@ -183,10 +181,10 @@ public abstract class IndexedTable extends BaseTable {
                 @Override
                 public Void callJob() {
                   for (int recordIdx = startIdx; recordIdx < endIdx; recordIdx++) {
-                    Object[] values = topRecordsList.get(recordIdx).getValues();
+                    Record record = topRecordsList.get(recordIdx);
                     for (int i = 0; i < numAggregationFunctions; i++) {
                       int colId = i + _numKeyColumns;
-                      values[colId] = _aggregationFunctions[i].extractFinalResult(values[colId]);
+                      record.setValue(colId, _aggregationFunctions[i].extractFinalResult(record.getValue(colId)));
                     }
                   }
                   return null;
@@ -207,10 +205,9 @@ public abstract class IndexedTable extends BaseTable {
         }
       } else {
         for (Record record : _topRecords) {
-          Object[] values = record.getValues();
           for (int i = 0; i < numAggregationFunctions; i++) {
             int colId = i + _numKeyColumns;
-            values[colId] = _aggregationFunctions[i].extractFinalResult(values[colId]);
+            record.setValue(colId, _aggregationFunctions[i].extractFinalResult(record.getValue(colId)));
           }
         }
       }

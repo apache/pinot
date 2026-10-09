@@ -21,6 +21,7 @@ package org.apache.pinot.core.util;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.DataSchema;
@@ -28,16 +29,21 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
+import org.apache.pinot.core.data.table.DeterministicConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
+import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -87,6 +93,68 @@ public class GroupByUtilsTest {
     assertEquals(GroupByUtils.getIndexedTableInitialCapacity(100, 10, 256), HashUtil.getHashMapCapacity(100));
     assertEquals(GroupByUtils.getIndexedTableInitialCapacity(100, 100, 256), HashUtil.getHashMapCapacity(100));
     assertEquals(GroupByUtils.getIndexedTableInitialCapacity(100, 1000, 256), HashUtil.getHashMapCapacity(100));
+  }
+
+  @DataProvider
+  public Object[][] combineTableShapes() {
+    return new Object[][]{
+        {1, false, GroupByUtils.CombineTableKind.SIMPLE, SimpleIndexedTable.class},
+        {1, true, GroupByUtils.CombineTableKind.SIMPLE, SimpleIndexedTable.class},
+        {2, false, GroupByUtils.CombineTableKind.UNBOUNDED_CONCURRENT, UnboundedConcurrentIndexedTable.class},
+        {2, true, GroupByUtils.CombineTableKind.CONCURRENT, ConcurrentIndexedTable.class}
+    };
+  }
+
+  @Test(dataProvider = "combineTableShapes")
+  public void testCombineFactoryPreservesTablePolicy(int numThreads, boolean trim,
+      GroupByUtils.CombineTableKind expectedKind, Class<?> fallbackClass) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(CalciteSqlParser.compileToPinotQuery(
+        "SELECT a, COUNT(*) FROM t GROUP BY a ORDER BY COUNT(*) DESC LIMIT 10"));
+    queryContext.setMinServerGroupTrimSize(trim ? 100 : 0);
+    queryContext.setGroupTrimThreshold(200);
+    queryContext.setMinInitialIndexedTableCapacity(128);
+    DataSchema schema = new DataSchema(new String[]{"a", "count"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.LONG});
+    GroupByResultsBlock block = new GroupByResultsBlock(schema, List.of(), queryContext);
+    ExecutorService executor = mock(ExecutorService.class);
+    IndexedTable customTable = mock(IndexedTable.class);
+    AtomicInteger calls = new AtomicInteger();
+    GroupByUtils.CombineTableFactory factory =
+        (kind, dataSchema, hasFinalInput, context, resultSize, trimSize, threshold, capacity, executorService) -> {
+          calls.incrementAndGet();
+          assertEquals(kind, expectedKind);
+          assertSame(dataSchema, schema);
+          assertSame(context, queryContext);
+          assertEquals(hasFinalInput, false);
+          assertEquals(resultSize, trim ? 100 : Integer.MAX_VALUE);
+          assertEquals(trimSize, trim ? 100 : Integer.MAX_VALUE);
+          assertEquals(threshold, trim ? 200 : Integer.MAX_VALUE);
+          assertEquals(capacity, 128);
+          assertSame(executorService, executor);
+          return calls.get() == 1 ? customTable : null;
+        };
+
+    assertSame(GroupByUtils.createIndexedTableForCombineOperator(block, queryContext, numThreads, executor, factory),
+        customTable);
+    assertEquals(GroupByUtils.createIndexedTableForCombineOperator(block, queryContext, numThreads, executor, factory)
+        .getClass(), fallbackClass);
+    assertEquals(calls.get(), 2);
+  }
+
+  @Test
+  public void testDeterministicCombineBypassesCustomFactory() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        CalciteSqlParser.compileToPinotQuery("SELECT a, COUNT(*) FROM t GROUP BY a"));
+    queryContext.setAccurateGroupByWithoutOrderBy(true);
+    DataSchema schema = new DataSchema(new String[]{"a", "count"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.LONG});
+    GroupByResultsBlock block = new GroupByResultsBlock(schema, List.of(), queryContext);
+    IndexedTable table = GroupByUtils.createIndexedTableForCombineOperator(block, queryContext, 2,
+        mock(ExecutorService.class), (kind, dataSchema, hasFinalInput, context, resultSize, trimSize, threshold,
+            capacity, executor) -> {
+          throw new AssertionError("Deterministic combine must retain its built-in table");
+        });
+    assertEquals(table.getClass(), DeterministicConcurrentIndexedTable.class);
   }
 
   /// Grouping-set queries must keep all groups at the combine and reducer stages (no global ORDER BY trim), so

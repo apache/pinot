@@ -22,7 +22,9 @@ import com.google.common.base.CaseFormat;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -69,12 +71,23 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private final List<AggregationInfo> _aggregationInfos;
   private final long _numTotalDocs;
   private final DataSchema _dataSchema;
+  @Nullable
+  private final Function<BaseProjectOperator<?>, GroupKeyGenerator> _groupKeyGeneratorFactory;
 
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
 
   public FilteredGroupByOperator(QueryContext queryContext, List<AggregationInfo> aggregationInfos, long numTotalDocs) {
+    this(queryContext, aggregationInfos, numTotalDocs, null);
+  }
+
+  /// Optional key-storage hook. The one generator is shared across every aggregate-filter lane; the original
+  /// three-argument constructor keeps the built-in generator selection and result-holder behavior unchanged.
+  /// The factory may return `null` to use the built-in generator. A supplied generator is closed on failure or
+  /// after materializing rows; otherwise ownership transfers to the returned [AggregationGroupByResult].
+  public FilteredGroupByOperator(QueryContext queryContext, List<AggregationInfo> aggregationInfos, long numTotalDocs,
+      @Nullable Function<BaseProjectOperator<?>, GroupKeyGenerator> groupKeyGeneratorFactory) {
     assert queryContext.getAggregationFunctions() != null && queryContext.getFilteredAggregationFunctions() != null
         && queryContext.getGroupByExpressions() != null;
     _queryContext = queryContext;
@@ -82,6 +95,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     _groupByExpressions = queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
     _aggregationInfos = aggregationInfos;
     _numTotalDocs = numTotalDocs;
+    _groupKeyGeneratorFactory = groupKeyGeneratorFactory;
 
     // NOTE: The indexedTable expects that the data schema will have group by columns before aggregation columns
     int numGroupByExpressions = _groupByExpressions.length;
@@ -128,6 +142,36 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       return new GroupByResultsBlock(_dataSchema, List.of(), _queryContext);
     }
 
+    GroupKeyGenerator groupKeyGenerator = _groupKeyGeneratorFactory == null ? null
+        : _groupKeyGeneratorFactory.apply(_aggregationInfos.get(0).getProjectOperator());
+    GroupByResultsBlock result = null;
+    Throwable failure = null;
+    try {
+      result = executeGroupBy(groupKeyGenerator);
+      return result;
+    } catch (RuntimeException | Error e) {
+      failure = e;
+      throw e;
+    } finally {
+      // Raw results transfer generator ownership to the caller; materialized results and failures do not.
+      if (groupKeyGenerator != null && (result == null || result.getAggregationGroupByResult() == null)) {
+        try {
+          groupKeyGenerator.close();
+        } catch (RuntimeException | Error closeFailure) {
+          if (failure == null) {
+            throw closeFailure;
+          }
+          if (failure != closeFailure) {
+            failure.addSuppressed(closeFailure);
+          }
+        }
+      }
+    }
+  }
+
+  private GroupByResultsBlock executeGroupBy(@Nullable GroupKeyGenerator groupKeyGenerator) {
+    // A supplied generator is closed by getNextBlock(), including when close itself fails.
+    boolean closeGroupKeyGenerator = groupKeyGenerator == null;
     int numAggregations = _aggregationFunctions.length;
     GroupByResultHolder[] groupByResultHolders = new GroupByResultHolder[numAggregations];
     IdentityHashMap<AggregationFunction, Integer> resultHolderIndexMap =
@@ -136,7 +180,6 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       resultHolderIndexMap.put(_aggregationFunctions[i], i);
     }
 
-    GroupKeyGenerator groupKeyGenerator = null;
     for (AggregationInfo aggregationInfo : _aggregationInfos) {
       AggregationFunction[] aggregationFunctions = aggregationInfo.getFunctions();
       BaseProjectOperator<?> projectOperator = aggregationInfo.getProjectOperator();
@@ -221,7 +264,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       /// The $groupingId discriminator is the key column immediately after the union group-by columns.
       return GroupByUtils.buildGroupingSetsResultsBlock(_queryContext, _dataSchema, groupKeyGenerator,
           groupByResultHolders, groupKeyGenerator.getNumKeys(), _groupByExpressions.length, numGroupsLimitReached,
-          numGroupsWarningLimitReached);
+          numGroupsWarningLimitReached, closeGroupKeyGenerator);
     }
     // sort and trim segment results if needed
     if (trimSize > 0 && groupKeyGenerator.getNumKeys() > trimSize) {
@@ -229,8 +272,10 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       // get sorted output if sort-aggregate
       List<IntermediateRecord> intermediateRecords =
           tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize, !unsafeTrim);
-      // Release the resources used by the group key generator
-      groupKeyGenerator.close();
+      // Release the resources used by a built-in group key generator.
+      if (closeGroupKeyGenerator) {
+        groupKeyGenerator.close();
+      }
 
       ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
       resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
@@ -249,7 +294,9 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       List<IntermediateRecord> intermediateRecords =
           tableResizer.sortInSegmentResults(groupKeyGenerator,
               groupByResultHolders, trimSize);
-      groupKeyGenerator.close();
+      if (closeGroupKeyGenerator) {
+        groupKeyGenerator.close();
+      }
       resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
     } else {
       AggregationGroupByResult aggGroupByResult =
