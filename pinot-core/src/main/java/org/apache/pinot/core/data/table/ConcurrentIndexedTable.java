@@ -73,7 +73,10 @@ public class ConcurrentIndexedTable extends IndexedTable {
       updateExistingRecord(key, record);
     } else {
       addOrUpdateRecord(key, record);
-      if (_lookupMap.size() >= _resultSize) {
+      // ConcurrentHashMap.size() sums a striped counter-cell array, so calling it per upsert is measurably
+      // expensive under multi-threaded combine. Skip it entirely when the result size is unbounded (e.g. the
+      // grouping-sets derive table): the cap can never engage, so the check is pure overhead.
+      if (_resultSize != Integer.MAX_VALUE && _lookupMap.size() >= _resultSize) {
         _noMoreNewRecords.set(true);
       }
     }

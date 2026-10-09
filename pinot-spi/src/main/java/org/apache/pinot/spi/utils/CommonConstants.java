@@ -900,6 +900,18 @@ public class CommonConstants {
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
         public static final String MSE_MIN_GROUP_TRIM_SIZE = "mseMinGroupTrimSize";
 
+        /// For GROUP BY GROUPING SETS / ROLLUP / CUBE using base aggregation (see
+        /// [#GROUPING_SETS_BASE_AGGREGATION]) WITH an ORDER BY: after deriving the grouping sets on the server,
+        /// keep `max(5 * LIMIT, this value)` groups WITHIN each grouping set (a per-set top-K bucketed by the
+        /// $groupingId discriminator, so a global top-K can never starve a low-magnitude set such as the grand
+        /// total). Like [#MIN_SERVER_GROUP_TRIM_SIZE], the value is a MINIMUM per-set keep, not an exact cap.
+        /// This bounds each server's derived output for high-cardinality unions at the cost of an approximate
+        /// top-K (a group ranked below the keep on one server may still be globally in the top-K once servers
+        /// merge); when it drops groups, the response is flagged as trimmed. The broker still applies the final
+        /// ORDER BY + LIMIT across all sets. Non-positive or unset (default) disables this per-set trim; the
+        /// server's global derived-group cap still applies. Ignored without an ORDER BY.
+        public static final String GROUPING_SETS_MIN_SERVER_TRIM_SIZE = "groupingSetsMinServerTrimSize";
+
         // When safeTrim (ORDER BY groupKeys without HAVING clause), do sort aggregate when LIMIT is below this value
         public static final String SORT_AGGREGATE_LIMIT_THRESHOLD = "sortAggregateLimitThreshold";
 
@@ -911,6 +923,26 @@ public class CommonConstants {
         /// This will help in getting accurate and correct result for queries
         /// with group by and limit but  without order by
         public static final String ACCURATE_GROUP_BY_WITHOUT_ORDER_BY = "accurateGroupByWithoutOrderBy";
+
+        /// For GROUP BY GROUPING SETS / ROLLUP / CUBE: when enabled (OPT-IN, default off), each segment
+        /// aggregates only the base grouping (the union of all grouping-set columns) using the regular group-by
+        /// path and emits the base groups; the combine phase merges them and derives the individual grouping
+        /// sets in parallel. This replaces expanding every input row into one group per grouping set, moving the
+        /// per-set fan-out from O(rows) to O(base groups) and onto the multi-threaded combine. It can help when
+        /// many rows collapse into few base groups with cheap-to-merge aggregations, but can regress for
+        /// expensive-to-merge intermediates (sketches), which is why it is off by default.
+        ///
+        /// Base aggregation is used only when the instance planner can bound every local base group and every
+        /// requested grouping-set group within `numGroupsLimit`, and the per-segment base-group estimate does
+        /// not exceed [#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS]. If the bound cannot be proven, the per-row
+        /// expansion path is used to preserve ordering and group-limit semantics.
+        public static final String GROUPING_SETS_BASE_AGGREGATION = "groupingSetsBaseAggregation";
+
+        /// Secondary per-segment bound on the estimated base-group count (product of the union columns'
+        /// dictionary cardinalities) for [#GROUPING_SETS_BASE_AGGREGATION]. Defaults to `numGroupsLimit`.
+        /// Raising this value cannot bypass the instance planner's hard `numGroupsLimit` bound on all local
+        /// base and derived groups. Ignored when base aggregation is disabled.
+        public static final String GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS = "groupingSetsBaseAggregationMaxGroups";
 
         /// Number of threads used in the final reduce.
         /// This is useful for expensive aggregation functions. E.g. Funnel queries are considered as expensive

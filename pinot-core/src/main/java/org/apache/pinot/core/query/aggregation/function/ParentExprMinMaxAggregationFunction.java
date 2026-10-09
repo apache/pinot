@@ -359,6 +359,14 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
     return exprMinMaxObject;
   }
 
+  /// ExprMinMaxObject deserializes into an immutable form whose subsequent merge/serialization is not supported,
+  /// so the grouping-sets base-aggregation derive (which clones intermediates via a serde round-trip and merges
+  /// them across groups) must not be used for this function.
+  @Override
+  public boolean canMergeIntermediatesAcrossGroups() {
+    return false;
+  }
+
   /// Service registration for the ExprMin parent aggregation.
   public static final class MinProvider implements AggregationFunctionProvider {
     @Override
