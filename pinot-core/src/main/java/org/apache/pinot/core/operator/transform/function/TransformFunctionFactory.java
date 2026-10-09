@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
@@ -89,6 +88,7 @@ import org.apache.pinot.core.operator.transform.function.VectorTransformFunction
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
@@ -135,6 +135,15 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_SCALAR_FORY,
         JsonExtractScalarTransformFunction.Fory.class);
     typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_KEY, JsonExtractKeyTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.VARIANT_GET, VariantGetTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.TRY_VARIANT_GET, VariantGetTransformFunction.Try.class);
+    typeToImplementation.put(TransformFunctionType.VARIANT_EXISTS, VariantExistsTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.IS_VARIANT_NULL, IsVariantNullTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.VARIANT_TYPE_OF, VariantTypeOfTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.VARIANT_TO_JSON, VariantToJsonTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.PARSE_JSON_TO_VARIANT, ParseJsonToVariantTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.TRY_PARSE_JSON_TO_VARIANT,
+        ParseJsonToVariantTransformFunction.Try.class);
     typeToImplementation.put(TransformFunctionType.TIME_CONVERT, TimeConversionTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.DATE_TIME_CONVERT, DateTimeConversionTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.DATE_TIME_CONVERT_WINDOW_HOP,
@@ -312,7 +321,15 @@ public class TransformFunctionFactory {
     switch (expression.getType()) {
       case FUNCTION:
         FunctionContext function = expression.getFunction();
-        String functionName = canonicalize(function.getFunctionName());
+        String originalFunctionName = function.getFunctionName();
+        String functionName = canonicalize(originalFunctionName);
+
+        if (!queryContext.isNullHandlingEnabled()
+            && TransformFunctionType.requiresNullHandling(originalFunctionName)) {
+          throw new BadQueryRequestException(
+              String.format("VARIANT function %s requires query null handling to be enabled; "
+                  + "set enableNullHandling=true", originalFunctionName));
+        }
 
         // Check if the function is ArrayValueConstructor transform function
         if (functionName.equalsIgnoreCase(ArrayLiteralTransformFunction.FUNCTION_NAME)) {
@@ -352,6 +369,14 @@ public class TransformFunctionFactory {
           ColumnDataType[] argumentDataTypes = new ColumnDataType[numArguments];
           for (int i = 0; i < numArguments; i++) {
             TransformResultMetadata resultMetadata = transformFunctionArguments.get(i).getResultMetadata();
+            // Scalar lookup binds by argument count, so a raw envelope would silently bind to a String/byte[]
+            // parameter and be consumed as hex text. The VARIANT functions are transform functions, so they never
+            // reach this branch.
+            if (resultMetadata.getDataType() == DataType.VARIANT) {
+              throw new BadQueryRequestException(String.format(
+                  "Raw VARIANT values do not support function %s; extract a typed path with variantGet first",
+                  originalFunctionName));
+            }
             argumentDataTypes[i] =
                 ColumnDataType.fromDataType(resultMetadata.getDataType(), resultMetadata.isSingleValue());
           }
@@ -419,7 +444,7 @@ public class TransformFunctionFactory {
   /// @param functionName Name of the transform function
   /// @return canonicalized transform function name
   public static String canonicalize(String functionName) {
-    return StringUtils.remove(functionName, '_').toLowerCase();
+    return FunctionRegistry.canonicalize(functionName);
   }
 
   public static Map<String, Class<? extends TransformFunction>> getAllFunctions() {

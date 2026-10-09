@@ -31,6 +31,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// BinaryOperatorTransformFunctionTest abstracts common test methods for EqualsTransformFunctionTest,
@@ -284,6 +285,25 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
       expectedValues[i] = getExpectedValue(UuidUtils.compare(_uuidSVValues[i], _uuidSVValues[0]));
     }
     testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testRawVariantComparisonRejected() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("%s(parseJson('{\"value\":1}'), 1)", getFunctionName()));
+    BadQueryRequestException exception = expectThrows(BadQueryRequestException.class,
+        () -> TransformFunctionFactory.getNullHandlingEnabled(expression, _dataSourceMap));
+    assertTrue(exception.getMessage().contains("Raw VARIANT values do not support comparison"));
+  }
+
+  @Test
+  public void testLeftNullRightLiteral() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("%s(null, 1)", getFunctionName()));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    RoaringBitmap bitmap = new RoaringBitmap();
+    bitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, new boolean[NUM_ROWS], bitmap);
   }
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})

@@ -50,9 +50,14 @@ public class Utils {
 
   public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl)
       throws IOException {
+    return postSqlQuery(query, brokerBaseApiUrl, false);
+  }
+
+  public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl, boolean enableNullHandling)
+      throws IOException {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
-    payload.put("queryOptions", "groupByMode=sql;responseFormat=sql");
+    payload.put("queryOptions", getSingleStageQueryOptions(enableNullHandling));
 
     return JsonUtils.stringToJsonNode(
         ControllerTest.sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString()));
@@ -60,11 +65,26 @@ public class Utils {
 
   public static JsonNode postMultiStageSqlQuery(String query, String brokerBaseApiUrl)
       throws IOException {
+    return postMultiStageSqlQuery(query, brokerBaseApiUrl, false);
+  }
+
+  public static JsonNode postMultiStageSqlQuery(String query, String brokerBaseApiUrl, boolean enableNullHandling)
+      throws IOException {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
-    payload.put("queryOptions", "useMultistageEngine=true");
+    payload.put("queryOptions", getMultiStageQueryOptions(enableNullHandling));
 
     return JsonUtils.stringToJsonNode(
         ControllerTest.sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString()));
+  }
+
+  static String getSingleStageQueryOptions(boolean enableNullHandling) {
+    String queryOptions = "groupByMode=sql;responseFormat=sql";
+    return enableNullHandling ? queryOptions + ";enableNullHandling=true" : queryOptions;
+  }
+
+  static String getMultiStageQueryOptions(boolean enableNullHandling) {
+    String queryOptions = "useMultistageEngine=true";
+    return enableNullHandling ? queryOptions + ";enableNullHandling=true" : queryOptions;
   }
 }
