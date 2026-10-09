@@ -284,6 +284,13 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
       }
     }
 
+    /// Surfaces whether the opt-in base-aggregation plan was admitted for this grouping-set query (opted in and
+    /// the instance planner's bound proof passed). Individual segments can still fall back to per-row expansion
+    /// (e.g. the multi-value carve-out); the GROUPING_SETS_BASE_AGGREGATION server meter tracks actual use.
+    if (_queryContext.isGroupingSets()) {
+      stringBuilder.append(", groupingSetsBaseAggregation:").append(_queryContext.isGroupingSetsBaseAggregation());
+    }
+
     return stringBuilder.append(')').toString();
   }
 
@@ -304,5 +311,9 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
         .map(AggregationFunction::toExplainString)
         .collect(Collectors.toList());
     attributeBuilder.putStringList("aggregations", aggregations);
+
+    if (_queryContext.isGroupingSets()) {
+      attributeBuilder.putBool("groupingSetsBaseAggregation", _queryContext.isGroupingSetsBaseAggregation());
+    }
   }
 }

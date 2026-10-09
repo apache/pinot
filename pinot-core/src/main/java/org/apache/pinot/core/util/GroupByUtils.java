@@ -21,7 +21,6 @@ package org.apache.pinot.core.util;
 import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -129,10 +128,12 @@ public final class GroupByUtils {
   /// O(base groups) and runs it here -- after the row-collapsing base merge -- across the combine's threads,
   /// rather than expanding every scanned row.
   ///
-  /// When the instance planner proved the derived output fits `numGroupsLimit`, the grouping sets are partitioned
+  /// The caller must hold the instance planner's proof that the full derived output fits `numGroupsLimit` (see
+  /// `InstancePlanMakerImplV2#boundGroupingSetsBaseAggregation`); the grouping sets are then partitioned
   /// round-robin across up to `numTasks` workers, each with task-local maps that are unioned without contention.
-  /// Direct callers without that proof still use the conservative base-size-times-set-count bound and cap the
-  /// output when needed.
+  /// The optional per-set server trim ([#trimDerivedGroupingSets]) runs later, in the combine, after
+  /// expansion-path records are merged in -- trimming here would let that merge resurrect a trimmed group with
+  /// only part of its value.
   ///
   /// Clone discipline: a base group's intermediate flows into every grouping set (and is read concurrently by
   /// other tasks), while [AggregationFunction#merge] mutates/returns its arguments. Each derived group's stored
@@ -158,8 +159,8 @@ public final class GroupByUtils {
     // Grouping-set output schema: the base schema with the synthetic $groupingId INT column inserted right after
     // the union group-by columns (mirroring GroupByOperator's grouping-set schema layout).
     DataSchema groupingSetsSchema = insertGroupingIdColumn(baseTable.getDataSchema(), numUnionColumns);
-    // A base group can contribute to every set. Bound the derived groups before materializing them, while
-    // reserving at least one slot per set so a coarse set such as the grand total cannot be starved.
+    // Sizing hint only: the planner's bound proof guarantees the derived output fits numGroupsLimit, so cap the
+    // initial capacity by the smaller of the worst-case fan-out and that limit (floored at one slot per set).
     int derivedUpperBound = (int) Math.min((long) baseTable.size() * numSets, Integer.MAX_VALUE);
     int derivedCap = Math.max(queryContext.getNumGroupsLimit(), numSets);
     int capacityBound = Math.min(derivedUpperBound, derivedCap);
@@ -167,10 +168,6 @@ public final class GroupByUtils {
         queryContext.getMinInitialIndexedTableCapacity());
 
     List<Map.Entry<Key, Record>> baseEntries = new ArrayList<>(baseTable.getRecordEntries());
-    boolean outputFits = queryContext.areGroupingSetsDerivedGroupsBounded() || derivedUpperBound <= derivedCap;
-    if (!outputFits && useDeterministicIndexedTable(queryContext)) {
-      baseEntries.sort(Map.Entry.comparingByKey());
-    }
     // A full-union set (one that contains every union column, i.e. the identity grouping) maps base groups to
     // derived groups 1:1: keys are unique so no merge ever runs on its records, and its stored intermediates can
     // safely be the base objects themselves (after the pre-serialize pass below, no other task touches them).
@@ -192,16 +189,6 @@ public final class GroupByUtils {
     SerializedIntermediateResult[][] serializedIntermediates =
         preSerializeObjectIntermediates(baseEntries, aggregationFunctions, numUnionColumns, numTasks,
             queryContext, executorService);
-
-    // The planner's per-set bound is tighter than baseTable.size() * numSets, which can be much larger even
-    // when no groups can be dropped. Use the parallel path whenever either bound proves the output fits.
-    if (!outputFits) {
-      IndexedTable derivedTable = deriveCappedGroupingSets(baseEntries, serializedIntermediates, setContains,
-          isFullUnionSet, groupingSets, groupingSetsSchema, numUnionColumns, numAggregationFunctions,
-          aggregationFunctions, derivedCap, initialCapacity, queryContext, executorService);
-      return trimDerivedGroupingSets(derivedTable, groupingSetsSchema, queryContext, numUnionColumns, numSets,
-          executorService);
-    }
 
     int numTaskSlots = Math.max(1, Math.min(numTasks, numSets));
     List<Map<Key, Record>[]> taskResults = new ArrayList<>(numTaskSlots);
@@ -265,93 +252,6 @@ public final class GroupByUtils {
           Integer.MAX_VALUE, Integer.MAX_VALUE, mergedMap, executorService);
     }
 
-    return trimDerivedGroupingSets(derivedTable, groupingSetsSchema, queryContext, numUnionColumns, numSets,
-        executorService);
-  }
-
-  /// Projects sets in coarsest-first order directly into one capped map. Even after the cap fills, a partially
-  /// admitted set must keep merging contributions to its existing groups so retained totals stay complete.
-  private static IndexedTable deriveCappedGroupingSets(List<Map.Entry<Key, Record>> baseEntries,
-      @Nullable SerializedIntermediateResult[][] serializedIntermediates, boolean[][] setContains,
-      boolean[] isFullUnionSet, List<int[]> groupingSets, DataSchema groupingSetsSchema, int numUnionColumns,
-      int numAggregationFunctions, AggregationFunction[] aggregationFunctions, int derivedCap, int initialCapacity,
-      QueryContext queryContext, ExecutorService executorService) {
-    Integer[] setOrder = new Integer[groupingSets.size()];
-    for (int s = 0; s < setOrder.length; s++) {
-      setOrder[s] = s;
-    }
-    Arrays.sort(setOrder, (a, b) -> {
-      int lengthCompare = Integer.compare(groupingSets.get(a).length, groupingSets.get(b).length);
-      return lengthCompare != 0 ? lengthCompare : Integer.compare(a, b);
-    });
-    Map<Key, Record> derivedMap = new HashMap<>(initialCapacity);
-    Object[] probeValues = new Object[numUnionColumns + 1];
-    Key probeKey = new Key(probeValues);
-    boolean dropped = false;
-    int numProjections = 0;
-    for (int s : setOrder) {
-      if (derivedMap.size() >= derivedCap) {
-        // Every nonempty base table produces at least one group in each remaining set.
-        dropped |= !baseEntries.isEmpty();
-        break;
-      }
-      boolean[] contains = setContains[s];
-      boolean fullUnion = isFullUnionSet[s];
-      for (int e = 0; e < baseEntries.size(); e++) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numProjections++,
-            "GroupByUtils#deriveCappedGroupingSets");
-        Map.Entry<Key, Record> baseEntry = baseEntries.get(e);
-        Object[] baseKeys = baseEntry.getKey().getValues();
-        Object[] baseValues = baseEntry.getValue().getValues();
-        for (int col = 0; col < numUnionColumns; col++) {
-          probeValues[col] = contains[col] ? baseKeys[col] : null;
-        }
-        probeValues[numUnionColumns] = s;
-        Record existing = fullUnion ? null : derivedMap.get(probeKey);
-        if (existing == null) {
-          if (derivedMap.size() >= derivedCap) {
-            dropped = true;
-            if (fullUnion) {
-              break;
-            }
-            continue;
-          }
-          Object[] keyValues = probeValues.clone();
-          Object[] values = new Object[numUnionColumns + 1 + numAggregationFunctions];
-          System.arraycopy(keyValues, 0, values, 0, numUnionColumns + 1);
-          SerializedIntermediateResult[] serializedRow =
-              serializedIntermediates != null ? serializedIntermediates[e] : null;
-          for (int i = 0; i < numAggregationFunctions; i++) {
-            values[numUnionColumns + 1 + i] = fullUnion ? baseValues[numUnionColumns + i]
-                : cloneIntermediate(aggregationFunctions[i], baseValues, serializedRow, numUnionColumns, i);
-          }
-          derivedMap.put(new Key(keyValues), new Record(values));
-        } else {
-          Object[] values = existing.getValues();
-          SerializedIntermediateResult[] serializedRow =
-              serializedIntermediates != null ? serializedIntermediates[e] : null;
-          for (int i = 0; i < numAggregationFunctions; i++) {
-            int valueIndex = numUnionColumns + 1 + i;
-            values[valueIndex] = AggregationFunctionUtils.merge(aggregationFunctions[i], values[valueIndex],
-                cloneIntermediate(aggregationFunctions[i], baseValues, serializedRow, numUnionColumns, i));
-          }
-        }
-      }
-    }
-    IndexedTable derivedTable;
-    if (useDeterministicIndexedTable(queryContext)) {
-      derivedTable = getTrimDisabledIndexedTable(groupingSetsSchema, false, queryContext, Integer.MAX_VALUE,
-          initialCapacity, 1, executorService);
-      for (Map.Entry<Key, Record> entry : derivedMap.entrySet()) {
-        derivedTable.upsert(entry.getKey(), entry.getValue());
-      }
-    } else {
-      derivedTable = new SimpleIndexedTable(groupingSetsSchema, false, queryContext, Integer.MAX_VALUE,
-          Integer.MAX_VALUE, Integer.MAX_VALUE, derivedMap, executorService);
-    }
-    if (dropped) {
-      derivedTable.markNumGroupsLimitReached();
-    }
     return derivedTable;
   }
 
@@ -359,8 +259,17 @@ public final class GroupByUtils {
   /// within each grouping set (bucketed by $groupingId), bounding this server's derived output for
   /// high-cardinality unions. Bucketing per set means a global top-K cannot starve a low-magnitude set. This
   /// is an approximate top-K (deferred exact ORDER BY + LIMIT still runs at the broker); unset -> keep all.
-  private static IndexedTable trimDerivedGroupingSets(IndexedTable derivedTable, DataSchema groupingSetsSchema,
-      QueryContext queryContext, int numUnionColumns, int numSets, ExecutorService executorService) {
+  ///
+  /// Must run AFTER every record source is merged into `derivedTable` -- in particular after the combine merged
+  /// the expansion-path full-layout records. Trimming earlier lets a later merge re-add a trimmed group with
+  /// only part of its value, and that partial total can then win the broker's ORDER BY.
+  public static IndexedTable trimDerivedGroupingSets(IndexedTable derivedTable, QueryContext queryContext,
+      ExecutorService executorService) {
+    DataSchema groupingSetsSchema = derivedTable.getDataSchema();
+    int numUnionColumns = queryContext.getGroupByExpressions().size();
+    List<int[]> groupingSets = queryContext.getGroupingSets();
+    assert groupingSets != null;
+    int numSets = groupingSets.size();
     int serverTrimSize = queryContext.getGroupingSetServerTrimSize();
     if (serverTrimSize > 0 && derivedTable.size() > (long) serverTrimSize * numSets) {
       derivedTable.finish(false);

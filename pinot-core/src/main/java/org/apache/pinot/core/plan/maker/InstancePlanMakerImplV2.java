@@ -21,8 +21,10 @@ package org.apache.pinot.core.plan.maker;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
@@ -484,16 +486,27 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   }
 
   @VisibleForTesting
-  static boolean fitsGroupingSetsBaseAggregationLimit(List<SegmentContext> segmentContexts, QueryContext queryContext) {
+  static boolean fitsGroupingSetsBaseAggregationLimit(List<SegmentContext> segmentContexts,
+      QueryContext queryContext) {
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     List<int[]> groupingSets = queryContext.getGroupingSets();
     int limit = queryContext.getNumGroupsLimit();
     if (groupByExpressions == null || groupingSets == null || limit <= 0) {
       return false;
     }
+    int numColumns = groupByExpressions.size();
+    for (int[] groupingSet : groupingSets) {
+      for (int columnIndex : groupingSet) {
+        if (columnIndex < 0 || columnIndex >= numColumns) {
+          return false;
+        }
+      }
+    }
 
-    long remainingBase = limit;
-    long remainingDerived = limit;
+    // Collect every nonempty segment's dictionaries once; each eligibility rule must hold for all of them.
+    List<Dictionary[]> segmentDictionaries = new ArrayList<>();
+    List<long[]> segmentCardinalities = new ArrayList<>();
+    boolean[] columnMayBeNull = new boolean[numColumns];
     for (SegmentContext segmentContext : segmentContexts) {
       IndexSegment segment = segmentContext.getIndexSegment();
       if (segment instanceof MutableSegment) {
@@ -504,8 +517,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       if (segment.getSegmentMetadata().getTotalDocs() == 0) {
         continue;
       }
-      long[] cardinalities = new long[groupByExpressions.size()];
-      for (int i = 0; i < cardinalities.length; i++) {
+      Dictionary[] dictionaries = new Dictionary[numColumns];
+      long[] cardinalities = new long[numColumns];
+      for (int i = 0; i < numColumns; i++) {
         ExpressionContext expression = groupByExpressions.get(i);
         if (expression.getType() != ExpressionContext.Type.IDENTIFIER) {
           return false;
@@ -522,13 +536,33 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         long cardinality = dictionary.length();
         if (queryContext.isNullHandlingEnabled() && dataSource.getNullValueVector() != null) {
           cardinality++;
+          columnMayBeNull[i] = true;
         }
         if (cardinality == 0) {
           return false;
         }
+        dictionaries[i] = dictionary;
         cardinalities[i] = cardinality;
       }
+      segmentDictionaries.add(dictionaries);
+      segmentCardinalities.add(cardinalities);
+    }
 
+    // Cheap proof first: sum each segment's dictionary-cardinality products without reading any values. This
+    // multiple-counts keys shared across segments, so when it fails, fall through to the tighter (but costlier)
+    // proof over the per-column UNION of dictionary values.
+    return fitsBySegmentCardinalityProducts(segmentCardinalities, groupingSets, limit)
+        || fitsByColumnUnionCardinalities(segmentDictionaries, columnMayBeNull, groupingSets, numColumns, limit);
+  }
+
+  /// Sums each segment's per-column dictionary-cardinality product, for the BASE grouping and for every derived
+  /// set, against separate `numGroupsLimit` budgets (the base table and the derived table are each capped at the
+  /// limit). Conservative when segments share key values, since the same key is counted once per segment.
+  private static boolean fitsBySegmentCardinalityProducts(List<long[]> segmentCardinalities,
+      List<int[]> groupingSets, int limit) {
+    long remainingBase = limit;
+    long remainingDerived = limit;
+    for (long[] cardinalities : segmentCardinalities) {
       long baseGroups = 1;
       for (long cardinality : cardinalities) {
         if (baseGroups > remainingBase / cardinality) {
@@ -544,17 +578,75 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       for (int[] groupingSet : groupingSets) {
         long derivedGroups = 1;
         for (int columnIndex : groupingSet) {
-          if (columnIndex < 0 || columnIndex >= cardinalities.length
-              || derivedGroups > remainingDerived / cardinalities[columnIndex]) {
+          if (derivedGroups > remainingDerived / cardinalities[columnIndex]) {
             return false;
           }
           derivedGroups *= cardinalities[columnIndex];
         }
+        // An empty grouping set (the grand total) skips the loop above, so re-check the final product.
         if (derivedGroups > remainingDerived) {
           return false;
         }
         remainingDerived -= derivedGroups;
       }
+    }
+    return true;
+  }
+
+  /// Bounds the groups by the per-column UNION of dictionary values across segments: every BASE key is a
+  /// combination of per-column union values, so the product of union cardinalities bounds the base groups (and
+  /// each set's product bounds that set) WITHOUT counting keys shared across segments once per segment. Reading
+  /// dictionary values is plan-time work, so this runs only after the cheap per-segment proof failed, gives up
+  /// on a column once its union alone exceeds the limit (the base product can then never fit), and refuses to
+  /// scan columns whose total dictionary entries dwarf the limit -- their union almost certainly exceeds it.
+  private static boolean fitsByColumnUnionCardinalities(List<Dictionary[]> segmentDictionaries,
+      boolean[] columnMayBeNull, List<int[]> groupingSets, int numColumns, int limit) {
+    long[] unionCardinalities = new long[numColumns];
+    long scanBudget = Math.max(4L * limit, 1 << 16);
+    for (int i = 0; i < numColumns; i++) {
+      long totalEntries = 0;
+      for (Dictionary[] dictionaries : segmentDictionaries) {
+        totalEntries += dictionaries[i].length();
+      }
+      if (totalEntries > scanBudget) {
+        return false;
+      }
+      Set<Object> union = new HashSet<>();
+      for (Dictionary[] dictionaries : segmentDictionaries) {
+        Dictionary dictionary = dictionaries[i];
+        int length = dictionary.length();
+        for (int dictId = 0; dictId < length; dictId++) {
+          // getInternal: BYTES values come back as ByteArray, which supports value-based hashing.
+          union.add(dictionary.getInternal(dictId));
+        }
+        if (union.size() > limit) {
+          return false;
+        }
+      }
+      unionCardinalities[i] = union.size() + (columnMayBeNull[i] ? 1 : 0);
+    }
+
+    long baseGroups = 1;
+    for (long cardinality : unionCardinalities) {
+      if (baseGroups > limit / cardinality) {
+        return false;
+      }
+      baseGroups *= cardinality;
+    }
+    long remainingDerived = limit;
+    for (int[] groupingSet : groupingSets) {
+      long derivedGroups = 1;
+      for (int columnIndex : groupingSet) {
+        if (derivedGroups > remainingDerived / unionCardinalities[columnIndex]) {
+          return false;
+        }
+        derivedGroups *= unionCardinalities[columnIndex];
+      }
+      // An empty grouping set (the grand total) skips the loop above, so re-check the final product.
+      if (derivedGroups > remainingDerived) {
+        return false;
+      }
+      remainingDerived -= derivedGroups;
     }
     return true;
   }
