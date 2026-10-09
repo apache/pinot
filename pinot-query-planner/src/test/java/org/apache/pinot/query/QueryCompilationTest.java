@@ -1776,4 +1776,46 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "usePlannerRules=JoinToEnrichedJoin must be a no-op, got:\n" + explain);
     assertTrue(explain.contains("LogicalJoin"), "expected an ordinary LogicalJoin, got:\n" + explain);
   }
+
+  /// `generateArray` on literal arguments must not fold into an array literal. The array would be serialized into the
+  /// plan of every worker, while the workers only need the three arguments to generate it themselves.
+  @Test
+  public void testGenerateArrayIsNotFolded() {
+    String explain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT grid.ts FROM UNNEST(generateArray(0, 6, 2)) AS grid(ts)",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("GENERATEARRAY(0, 6, 2)"), "expected an unfolded generateArray call, got:\n" + explain);
+    assertFalse(explain.contains("ARRAY(0, 2, 4, 6)"), "expected no folded array literal, got:\n" + explain);
+  }
+
+  /// Folding a scalar function returning a primitive array used to fail in
+  /// [org.apache.pinot.calcite.rel.rules.PinotEvaluateLiteralRule], which read the elements by casting to `Object[]`
+  /// -- a cast a `long[]` cannot satisfy.
+  @Test
+  public void testPrimitiveArrayFunctionFoldsIntoAnArrayLiteral() {
+    String explain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT grid.ts FROM UNNEST(generateLongArray(0, 6, 2)) AS grid(ts)",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("ARRAY(0:BIGINT, 2:BIGINT, 4:BIGINT, 6:BIGINT)"),
+        "expected a folded array literal, got:\n" + explain);
+  }
+
+  /// The element type is the widest of the argument types, so a time grid in epoch millis stays a LONG sequence
+  /// instead of overflowing an INT, and a fractional increment makes the whole sequence DOUBLE.
+  @Test
+  public void testGenerateArrayElementTypeFollowsItsArguments() {
+    assertEquals(generateArrayElementType("0, 6, 2"), SqlTypeName.INTEGER);
+    assertEquals(generateArrayElementType("0, 6"), SqlTypeName.INTEGER);
+    assertEquals(generateArrayElementType("1633078800000, 1633080600000, 1800000"), SqlTypeName.BIGINT);
+    assertEquals(generateArrayElementType("0, 1633080600000, 1800000"), SqlTypeName.BIGINT);
+    assertEquals(generateArrayElementType("CAST(0 AS FLOAT), CAST(1 AS FLOAT), CAST(0.5 AS FLOAT)"),
+        SqlTypeName.REAL);
+    assertEquals(generateArrayElementType("0, 1, 0.5"), SqlTypeName.DOUBLE);
+  }
+
+  private SqlTypeName generateArrayElementType(String arguments) {
+    String query = "SELECT grid.ts FROM UNNEST(generateArray(" + arguments + ")) AS grid(ts)";
+    return _queryEnvironment.compile(query).getRelRoot().validatedRowType.getFieldList().get(0).getType()
+        .getSqlTypeName();
+  }
 }
