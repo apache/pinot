@@ -134,7 +134,9 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
       Pair<Integer, String> response = postRequestWithStatusCode(url,
           JsonUtils.objectToString(Map.of("sql", sql)));
       assertEquals(response.getLeft().intValue(), configValidationFailure ? 400 : 500, response.getRight());
-      assertTrue(response.getRight().contains(message), response.getRight());
+      assertTrue(response.getRight().contains(configValidationFailure
+          ? "Table config validation failed" : "Internal error during table config validation"), response.getRight());
+      assertFalse(response.getRight().contains(message), response.getRight());
       assertNull(DEFAULT_INSTANCE.getHelixResourceManager().getTableConfig(tableNameWithType));
       assertNull(DEFAULT_INSTANCE.getHelixResourceManager().getSchema(tableName));
     } finally {

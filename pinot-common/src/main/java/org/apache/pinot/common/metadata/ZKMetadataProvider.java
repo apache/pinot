@@ -495,10 +495,23 @@ public class ZKMetadataProvider {
   @Nullable
   public static ImmutablePair<TableConfig, Integer> getTableConfigWithVersion(
       ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
+    return getTableConfigWithVersion(propertyStore, tableNameWithType, true, true);
+  }
+
+  /// Get the table config and ZK version from one read.
+  ///
+  /// @param tableNameWithType Table name with type
+  /// @param replaceVariables Whether to replace environment variables and system properties with their actual values
+  /// @param applyDecorator Whether to apply the table config decorator
+  /// @return a pair of table config and current version from the ZNRecord, or null if the table config does not exist
+  @Nullable
+  public static ImmutablePair<TableConfig, Integer> getTableConfigWithVersion(
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType, boolean replaceVariables,
+      boolean applyDecorator) {
     Stat tableConfigStat = new Stat();
-    TableConfig tableConfig = toTableConfig(
-        propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), tableConfigStat,
-            AccessOption.PERSISTENT));
+    TableConfig tableConfig = toTableConfig(propertyStore.get(
+        constructPropertyStorePathForResourceConfig(tableNameWithType), tableConfigStat, AccessOption.PERSISTENT),
+        replaceVariables, applyDecorator);
     if (tableConfig == null) {
       return null;
     }
@@ -604,10 +617,27 @@ public class ZKMetadataProvider {
     try {
       ZNRecord schemaZNRecord =
           propertyStore.get(constructPropertyStorePathForSchema(schemaName), null, AccessOption.PERSISTENT);
+      return schemaZNRecord != null ? SchemaSerDeUtils.fromZNRecord(schemaZNRecord) : null;
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while getting schema: {}", schemaName, e);
+      return null;
+    }
+  }
+
+  /// Get the schema and ZK version from one read.
+  ///
+  /// @return a pair of schema and current version, or null if the schema does not exist
+  @Nullable
+  public static ImmutablePair<Schema, Integer> getSchemaWithVersion(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String schemaName) {
+    try {
+      Stat stat = new Stat();
+      ZNRecord schemaZNRecord = propertyStore.get(
+          constructPropertyStorePathForSchema(schemaName), stat, AccessOption.PERSISTENT);
       if (schemaZNRecord == null) {
         return null;
       }
-      return SchemaSerDeUtils.fromZNRecord(schemaZNRecord);
+      return ImmutablePair.of(SchemaSerDeUtils.fromZNRecord(schemaZNRecord), stat.getVersion());
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting schema: {}", schemaName, e);
       return null;

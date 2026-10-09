@@ -32,6 +32,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.materializedview.analysis.MaterializedViewAnalyzer;
 import org.apache.pinot.materializedview.context.MaterializedViewTaskGeneratorContext;
+import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata;
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadata;
 import org.apache.pinot.materializedview.metadata.PartitionFingerprint;
 import org.apache.pinot.materializedview.metadata.PartitionInfo;
@@ -39,9 +40,12 @@ import org.apache.pinot.materializedview.metadata.PartitionState;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.zookeeper.data.Stat;
+import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -170,6 +174,56 @@ public class MaterializedViewTaskSchedulerTest {
     Optional<Integer> declared = MaterializedViewAnalyzer.tryExtractDeclaredLimit(sql);
     assertTrue(declared.isPresent());
     assertEquals(declared.get().intValue(), 5000);
+  }
+
+  @Test
+  public void testColdStartDefinitionPersistsResolvedExecutableSql() {
+    String viewTable = "mv";
+    String viewTableWithType = "mv_OFFLINE";
+    String sourceTable = "orders";
+    String sourceTableWithType = "orders_OFFLINE";
+    String resolvedSql = "SELECT ts, COUNT(*) AS cnt FROM orders WHERE endpoint = "
+        + "'https://service:runtime-value@example.test/data' GROUP BY ts";
+
+    HelixPropertyStore<ZNRecord> propertyStore = mockPropertyStore();
+    when(propertyStore.create(anyString(), any(ZNRecord.class), eq(AccessOption.PERSISTENT))).thenReturn(true);
+
+    MaterializedViewTaskGeneratorContext context = mock(MaterializedViewTaskGeneratorContext.class);
+    when(context.getPropertyStore()).thenReturn(propertyStore);
+    SegmentZKMetadata sourceSegment = segmentWithStartMs(0L);
+    when(context.getSegmentsZKMetadata(sourceTableWithType)).thenReturn(List.of(sourceSegment));
+
+    TableConfig sourceConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(sourceTable).setTimeColumnName("ts").build();
+    when(context.getTableConfig(sourceTableWithType)).thenReturn(sourceConfig);
+
+    TableConfig resolvedViewConfig = materializedViewConfig(viewTable, resolvedSql);
+    when(context.getTableConfig(viewTableWithType)).thenReturn(resolvedViewConfig);
+
+    Schema sourceSchema = new Schema.SchemaBuilder()
+        .setSchemaName(sourceTable)
+        .addDateTime("ts", FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+        .addSingleValueDimension("endpoint", FieldSpec.DataType.STRING)
+        .build();
+    Schema viewSchema = new Schema.SchemaBuilder()
+        .setSchemaName(viewTable)
+        .addDateTime("ts", FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+        .addMetric("cnt", FieldSpec.DataType.LONG)
+        .build();
+    when(context.getTableSchema(sourceTableWithType)).thenReturn(sourceSchema);
+    when(context.getTableSchema(viewTableWithType)).thenReturn(viewSchema);
+
+    new MaterializedViewTaskScheduler(context).getWatermarkMs(
+        viewTable, sourceTable, 86_400_000L, resolvedSql,
+        resolvedViewConfig.getTaskConfig().getConfigsForTaskType(MaterializedViewTask.TASK_TYPE));
+
+    ArgumentCaptor<ZNRecord> definitionCaptor = ArgumentCaptor.forClass(ZNRecord.class);
+    verify(propertyStore).create(
+        eq(ZKMetadataProvider.constructPropertyStorePathForMaterializedViewDefinition(viewTableWithType)),
+        definitionCaptor.capture(), eq(AccessOption.PERSISTENT));
+    MaterializedViewDefinitionMetadata persisted =
+        MaterializedViewDefinitionMetadata.fromZNRecord(definitionCaptor.getValue());
+    assertEquals(persisted.getDefinedSql(), resolvedSql);
   }
 
   // ---------------------------------------------------------------------------
@@ -303,6 +357,24 @@ public class MaterializedViewTaskSchedulerTest {
     SegmentZKMetadata seg = mock(SegmentZKMetadata.class);
     when(seg.getEndTimeMs()).thenReturn(endTimeMs);
     return seg;
+  }
+
+  private static SegmentZKMetadata segmentWithStartMs(long startTimeMs) {
+    SegmentZKMetadata segment = mock(SegmentZKMetadata.class);
+    when(segment.getStartTimeMs()).thenReturn(startTimeMs);
+    return segment;
+  }
+
+  private static TableConfig materializedViewConfig(String tableName, String definedSql) {
+    TableTaskConfig taskConfig = new TableTaskConfig(Map.of(MaterializedViewTask.TASK_TYPE, Map.of(
+        MaterializedViewTask.DEFINED_SQL_KEY, definedSql,
+        MaterializedViewTask.BUCKET_TIME_PERIOD_KEY, "1d")));
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(tableName)
+        .setTimeColumnName("ts")
+        .setIsMaterializedView(true)
+        .setTaskConfig(taskConfig)
+        .build();
   }
 
   // ---------------------------------------------------------------------------

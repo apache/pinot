@@ -21,10 +21,14 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -35,7 +39,25 @@ public class ZookeeperResourceTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    setupSharedStateAndValidate();
+    startZk();
+    Map<String, Object> configuration = getDefaultControllerConfiguration();
+    configuration.put(ControllerConf.ACCESS_CONTROL_FACTORY_CLASS, BasicAuthAccessControlFactory.class.getName());
+    configuration.put("controller.admin.access.control.principals", "admin");
+    configuration.put("controller.admin.access.control.principals.admin.password", "verysecret");
+    configuration.put("controller.admin.access.control.principals.admin.permissions",
+        "create,read,update,delete,GetZnode");
+    startController(configuration);
+  }
+
+  @AfterClass(alwaysRun = true)
+  public void tearDown() {
+    stopController();
+    stopZk();
+  }
+
+  @Override
+  protected Map<String, String> getAdminClientHeaders() {
+    return Map.of("Authorization", "Basic YWRtaW46dmVyeXNlY3JldA==");
   }
 
   @Test
