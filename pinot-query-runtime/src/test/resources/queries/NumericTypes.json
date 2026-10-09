@@ -113,5 +113,88 @@
         "sql": "SELECT floatv + 1, doublev + 1 FROM {floats}"
       }
     ]
+  },
+  "exact_literals_beyond_int_and_long": {
+    "comment": "Calcite gives an integer literal beyond the BIGINT range, and CAST(... AS DECIMAL(p, 0)), the type DECIMAL(p, 0). 7766279631452241919 is 99999999999999999999 wrapped around to a LONG, and -1294967296 is 3000000000 wrapped around to an INT.",
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"}
+        ],
+        "inputs": [
+          [1, 1],
+          [100, 7766279631452241919],
+          [-1294967296, -2],
+          [2147483647, 5]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "equality with a literal beyond the BIGINT range in the leaf stage",
+        "sql": "SELECT intCol FROM {tbl} WHERE longCol = 99999999999999999999"
+      },
+      {
+        "description": "range filter with a literal beyond the BIGINT range in the leaf stage",
+        "sql": "SELECT intCol FROM {tbl} WHERE longCol < 9223372036854775808"
+      },
+      {
+        "description": "IN filter with a literal beyond the BIGINT range in the leaf stage",
+        "sql": "SELECT intCol FROM {tbl} WHERE longCol IN (1, 99999999999999999999)"
+      },
+      {
+        "description": "range filter with a negative literal beyond the BIGINT range in the leaf stage",
+        "sql": "SELECT intCol FROM {tbl} WHERE longCol > -9223372036854775809"
+      },
+      {
+        "description": "arithmetic with a literal beyond the BIGINT range in the leaf stage",
+        "sql": "SELECT intCol + 99999999999999999999 FROM {tbl}"
+      },
+      {
+        "description": "comparison with a literal beyond the BIGINT range in an intermediate stage",
+        "sql": "SELECT longCol, longCol < 9223372036854775808, longCol = 99999999999999999999 FROM (SELECT longCol FROM {tbl} GROUP BY longCol)"
+      },
+      {
+        "description": "arithmetic with a literal beyond the BIGINT range in an intermediate stage",
+        "sql": "SELECT intCol + 99999999999999999999 FROM (SELECT intCol FROM {tbl} GROUP BY intCol)"
+      },
+      {
+        "description": "arithmetic with a literal beyond the BIGINT range that is evaluated during planning",
+        "sql": "SELECT intCol, 99999999999999999999 + 1, 99999999999999999999 * 2 FROM {tbl}"
+      },
+      {
+        "description": "BIGINT value promoted to DECIMAL(19, 0) keeps its exact value",
+        "sql": "SELECT intCol, COALESCE(longCol, CAST(1 AS DECIMAL(5, 0))) FROM {tbl}"
+      },
+      {
+        "description": "BIGINT value promoted to DECIMAL(19, 0) in an intermediate stage keeps its exact value",
+        "sql": "SELECT longCol, COALESCE(longCol, CAST(1 AS DECIMAL(5, 0))) FROM (SELECT longCol FROM {tbl} GROUP BY longCol)"
+      },
+      {
+        "description": "group by a value that can be a literal beyond the BIGINT range",
+        "sql": "SELECT CASE WHEN intCol > 0 THEN longCol ELSE 99999999999999999999 END AS v, COUNT(*) FROM {tbl} GROUP BY CASE WHEN intCol > 0 THEN longCol ELSE 99999999999999999999 END"
+      },
+      {
+        "description": "equality with a DECIMAL(10, 0) literal beyond the INT range in the leaf stage",
+        "sql": "SELECT longCol FROM {tbl} WHERE intCol = CAST(3000000000 AS DECIMAL(10, 0))"
+      },
+      {
+        "description": "range filter with a DECIMAL(10, 0) literal beyond the INT range in the leaf stage",
+        "sql": "SELECT longCol FROM {tbl} WHERE intCol < CAST(3000000000 AS DECIMAL(10, 0))"
+      },
+      {
+        "description": "comparison with a DECIMAL(10, 0) literal beyond the INT range in an intermediate stage",
+        "sql": "SELECT intCol, intCol < CAST(3000000000 AS DECIMAL(10, 0)), intCol = CAST(3000000000 AS DECIMAL(10, 0)) FROM (SELECT intCol FROM {tbl} GROUP BY intCol)"
+      },
+      {
+        "description": "aggregations of DECIMAL(p, 0) values beyond the INT range",
+        "sql": "SELECT SUM(CAST(intCol AS DECIMAL(10, 0))), SUM(CAST(intCol AS DECIMAL(20, 0))), MAX(CAST(intCol AS DECIMAL(20, 0))) FROM {tbl} WHERE intCol > 0"
+      },
+      {
+        "description": "group by aggregation of DECIMAL(10, 0) values beyond the INT range",
+        "sql": "SELECT intCol > 0, SUM(CAST(intCol AS DECIMAL(10, 0))) FROM {tbl} GROUP BY intCol > 0"
+      }
+    ]
   }
 }
