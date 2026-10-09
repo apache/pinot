@@ -2960,8 +2960,25 @@
                 <!-- Solve NoClassDefFoundError. Borrowed from https://github.com/prometheus/jmx_exporter/issues/802 -->
                 <exclude>META-INF/versions/9/org/yaml/snakeyaml/internal/**</exclude>
 
+                <!-- Use the managed Jackson dependencies for Parquet instead of its embedded copy. -->
+                <exclude>shaded/parquet/com/fasterxml/jackson/**</exclude>
+                <exclude>META-INF/versions/**/shaded/parquet/com/fasterxml/jackson/**</exclude>
+
                 <!-- Exclude NettyInstance because it includes Netty package literals -->
                 <exclude>src/main/java/org/apache/pinot/core/transport/NettyInstance.java</exclude>
+              </excludes>
+            </filter>
+            <filter>
+              <artifact>org.apache.parquet:parquet-jackson</artifact>
+              <excludes>
+                <exclude>META-INF/maven/com.fasterxml.jackson.core/**</exclude>
+              </excludes>
+            </filter>
+            <filter>
+              <!-- Also remove embedded Jackson metadata when consuming an already shaded Parquet plugin. -->
+              <artifact>org.apache.pinot:pinot-parquet</artifact>
+              <excludes>
+                <exclude>META-INF/maven/com.fasterxml.jackson.core/**</exclude>
               </excludes>
             </filter>
             <filter>
@@ -2983,6 +3000,10 @@
             </filter>
           </filters>
           <relocations>
+            <relocation>
+              <pattern>shaded.parquet.com.fasterxml.jackson</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
+            </relocation>
             <relocation>
               <pattern>com.fasterxml.jackson</pattern>
               <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
