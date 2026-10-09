@@ -66,6 +66,11 @@ public class GenericRow implements Serializable {
   private final Set<String> _nullValueFields = new HashSet<>();
   private boolean _incomplete;
   private boolean _sanitized;
+  /// Transient, per-row cache of already-parsed JSON values (column -> {@code Map}/{@code List}/{@code JsonNode}).
+  /// Populated by the DataTypeTransformer for columns that feed a JSON index, so the index can flatten the parsed
+  /// value directly instead of re-parsing the string the document was just serialized into. Not part of the row's
+  /// value, equality, copy, or serialized state - purely an ingestion-time optimization that is cleared per row.
+  private transient Map<String, Object> _parsedJsonCache;
 
   /// Initializes the generic row from the given generic row (shallow copy). The row should be new created or cleared
   /// before calling this method.
@@ -193,22 +198,52 @@ public class GenericRow implements Serializable {
   /// Sets the value for the given field.
   public void putValue(String fieldName, @Nullable Object value) {
     _fieldToValueMap.put(fieldName, value);
+    invalidateParsedJsonValue(fieldName);
   }
 
   /// Sets the values per the given map from fields to values.
   public void putValues(Map<String, Object> fieldToValueMap) {
     _fieldToValueMap.putAll(fieldToValueMap);
+    if (_parsedJsonCache != null) {
+      _parsedJsonCache.keySet().removeAll(fieldToValueMap.keySet());
+    }
   }
 
   /// Removes the value for the given field.
   public Object removeValue(String fieldName) {
+    invalidateParsedJsonValue(fieldName);
     return _fieldToValueMap.remove(fieldName);
+  }
+
+  /// Caches an already-parsed JSON value for the given field so a downstream JSON index can flatten it directly
+  /// instead of re-parsing the serialized string. See {@link #_parsedJsonCache}.
+  public void putParsedJsonValue(String fieldName, Object parsedValue) {
+    if (_parsedJsonCache == null) {
+      _parsedJsonCache = new HashMap<>();
+    }
+    _parsedJsonCache.put(fieldName, parsedValue);
+  }
+
+  /// Returns the cached already-parsed JSON value for the given field, or {@code null} if none was cached.
+  @Nullable
+  public Object getParsedJsonValue(String fieldName) {
+    return _parsedJsonCache != null ? _parsedJsonCache.get(fieldName) : null;
+  }
+
+  /// Drops any cached parsed JSON value for the given field. Invoked whenever the field's value is overwritten or
+  /// removed so a downstream JSON index never flattens a parsed node that no longer matches the serialized value (for
+  /// example after a sanitization transformer trims an over-length JSON string). See {@link #_parsedJsonCache}.
+  private void invalidateParsedJsonValue(String fieldName) {
+    if (_parsedJsonCache != null) {
+      _parsedJsonCache.remove(fieldName);
+    }
   }
 
   /// Sets the `defaultNullValue` for the given `nullField`.
   public void putDefaultNullValue(String fieldName, Object defaultNullValue) {
     _fieldToValueMap.put(fieldName, defaultNullValue);
     _nullValueFields.add(fieldName);
+    invalidateParsedJsonValue(fieldName);
   }
 
   /// Marks a field as `null`.
@@ -235,6 +270,9 @@ public class GenericRow implements Serializable {
   public void clear() {
     _fieldToValueMap.clear();
     _nullValueFields.clear();
+    if (_parsedJsonCache != null) {
+      _parsedJsonCache.clear();
+    }
     _incomplete = false;
     _sanitized = false;
   }

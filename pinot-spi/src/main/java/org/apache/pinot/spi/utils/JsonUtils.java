@@ -27,6 +27,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.cfg.JsonNodeFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -42,6 +44,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -104,6 +108,11 @@ public class JsonUtils {
   // time, and the serializers themselves are stateless.
   private static final JavaTimeModule JAVA_TIME_MODULE = buildJavaTimeModule();
   private static final ObjectMapper DEFAULT_MAPPER = newObjectMapperWithJavaTime();
+  // Keep decimal tokens intact until normalization, and match the forward value's MapUtils key ordering.
+  private static final ObjectMapper PARSED_JSON_MAPPER =
+      newObjectMapperWithJavaTime().configure(JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES, false);
+  private static final ObjectMapper PARSED_JSON_MAP_MAPPER =
+      PARSED_JSON_MAPPER.copy().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
   public static final ObjectReader DEFAULT_READER = DEFAULT_MAPPER.reader();
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
@@ -781,6 +790,150 @@ public class JsonUtils {
         throw e;
       }
     }
+  }
+
+  /// Flattens an already-parsed JSON value ({@link Map} / {@link List} / {@link JsonNode}) for the JSON index, avoiding
+  /// the string tokenization that {@link #flatten(String, JsonIndexConfig)} performs. Used by the realtime JSON index
+  /// when the source value is already a parsed object (e.g. cached on the `GenericRow` before it is serialized to a
+  /// string for the forward index), so the document is parsed once at ingestion instead of being serialized and
+  /// re-parsed here. The result matches flattening the forward value: Maps use {@link MapUtils#toString(Map)}, while
+  /// Lists and JsonNodes use {@link #objectToString(Object)}. A String input uses the existing string path.
+  public static List<Map<String, String>> flattenParsed(Object jsonValue, JsonIndexConfig jsonIndexConfig)
+      throws IOException {
+    if (jsonValue instanceof String) {
+      return flatten((String) jsonValue, jsonIndexConfig);
+    }
+    if (!canFlattenParsedValue(jsonValue)) {
+      // Ingestion excludes these values from the cache, so its index reuses the existing forward string.
+      return flatten(jsonValue instanceof Map ? MapUtils.toString((Map<String, Object>) jsonValue)
+          : objectToString(jsonValue), jsonIndexConfig);
+    }
+    JsonNode jsonNode = jsonValue instanceof JsonNode ? (JsonNode) jsonValue
+        : (jsonValue instanceof Map ? PARSED_JSON_MAP_MAPPER : PARSED_JSON_MAPPER).valueToTree(jsonValue);
+    int classification = classifyForFlatten(jsonNode);
+    try {
+      // A DecimalNode (a BigDecimal float, e.g. from stringToJsonNodeWithBigDecimal) renders its plain value, but the
+      // string path re-parses its serialized token as an integer or double (possibly in scientific notation).
+      // Re-parse just those leaves the same way so flatten matches, without re-tokenizing the
+      // whole document as the serialize+reparse fallback would.
+      JsonNode toFlatten =
+          classification == FLATTEN_SAFE_WITH_BIG_DECIMAL ? normalizeBigDecimalNodes(jsonNode) : jsonNode;
+      return JsonUtils.flatten(toFlatten, jsonIndexConfig);
+    } catch (Exception e) {
+      if (jsonIndexConfig.getSkipInvalidJson()) {
+        return SKIPPED_FLATTENED_RECORD;
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  /// Returns whether a parsed value can use the JSON index cache. Check before converting or caching a tree so
+  /// unsupported leaves (such as Avro Float/binary values) retain the existing forward-string indexing path.
+  public static boolean canFlattenParsedValue(@Nullable Object value) {
+    if (value instanceof JsonNode) {
+      return classifyForFlatten((JsonNode) value) != FLATTEN_UNSAFE;
+    }
+    if (value instanceof Map) {
+      for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
+        if (!(entry.getKey() instanceof String) || !canFlattenParsedValue(entry.getValue())) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (value instanceof List) {
+      for (Object child : (List<?>) value) {
+        if (!canFlattenParsedValue(child)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (value instanceof Object[]) {
+      for (Object child : (Object[]) value) {
+        if (!canFlattenParsedValue(child)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return value == null || value instanceof String || value instanceof Boolean || value instanceof Character
+        || value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long
+        || value instanceof Double || value instanceof BigInteger || value instanceof BigDecimal;
+  }
+
+  private static final int FLATTEN_UNSAFE = 0;
+  private static final int FLATTEN_SAFE = 1;
+  private static final int FLATTEN_SAFE_WITH_BIG_DECIMAL = 2;
+
+  /// Classifies whether a parsed value can be flattened directly so the records are byte-for-byte identical to
+  /// flattening its serialized string (both paths render each leaf via {@link JsonNode#asText()}). {@code Integer},
+  /// {@code Long}, {@code Double} and {@code BigInteger} nodes render identically to the string path
+  /// ({@link #FLATTEN_SAFE}); a {@code DecimalNode} (a {@code BigDecimal} float) renders its plain value while the
+  /// string path re-parses it (an integer token as an int/long, a floating-point token as a double), so it is re-parsed
+  /// the same way first ({@link #FLATTEN_SAFE_WITH_BIG_DECIMAL}), preserving scale-zero integers and tokens like 2.0;
+  /// e.g. {@code "1234567890.5"} -> {@code "1.2345678905E9"}. A {@code FloatNode} or a binary / POJO node does not
+  /// round-trip and forces the serialize+reparse fallback ({@link #FLATTEN_UNSAFE}). The JSON decoders only produce
+  /// String / Integer / Long / Double / BigInteger / BigDecimal, so a parsed {@link JsonNode} is never
+  /// {@code FLATTEN_UNSAFE}; the fallback only applies to Float / byte[] leaves from a non-JSON RecordReader.
+  private static int classifyForFlatten(JsonNode node) {
+    switch (node.getNodeType()) {
+      case NUMBER:
+        if (node.isFloat()) {
+          return FLATTEN_UNSAFE;
+        }
+        return node.isBigDecimal() ? FLATTEN_SAFE_WITH_BIG_DECIMAL : FLATTEN_SAFE;
+      case OBJECT:
+      case ARRAY: {
+        int result = FLATTEN_SAFE;
+        for (JsonNode child : node) {
+          int childClassification = classifyForFlatten(child);
+          if (childClassification == FLATTEN_UNSAFE) {
+            return FLATTEN_UNSAFE;
+          }
+          if (childClassification == FLATTEN_SAFE_WITH_BIG_DECIMAL) {
+            result = FLATTEN_SAFE_WITH_BIG_DECIMAL;
+          }
+        }
+        return result;
+      }
+      case STRING:
+      case BOOLEAN:
+      case NULL:
+        return FLATTEN_SAFE;
+      default:
+        // BINARY, POJO, MISSING
+        return FLATTEN_UNSAFE;
+    }
+  }
+
+  /// Returns a copy of the tree with every {@code DecimalNode} re-parsed the way the string path does (serialize via
+  /// {@code toString}, parse with the default reader), so {@link #flatten}'s {@code asText()} is identical -- whether
+  /// the value renders as an integer, a double, or in scientific notation -- while sharing all other leaf nodes. Only
+  /// called when the tree actually contains a {@code BigDecimal} node. Using {@code doubleValue()} instead would be
+  /// wrong: the serialized token determines whether the result is an integer or double, and integer tokens past
+  /// 2^53 must retain their precision.
+  private static JsonNode normalizeBigDecimalNodes(JsonNode node)
+      throws IOException {
+    if (node.isBigDecimal()) {
+      return stringToJsonNode(node.toString());
+    }
+    if (node.isObject()) {
+      ObjectNode result = JsonNodeFactory.instance.objectNode();
+      for (Map.Entry<String, JsonNode> field : node.properties()) {
+        result.set(field.getKey(), normalizeBigDecimalNodes(field.getValue()));
+      }
+      return result;
+    }
+    if (node.isArray()) {
+      ArrayNode result = JsonNodeFactory.instance.arrayNode(node.size());
+      for (JsonNode child : node) {
+        result.add(normalizeBigDecimalNodes(child));
+      }
+      return result;
+    }
+    return node;
   }
 
   /// Generates the JsonSchemaTreeNode tree from the given json index config indexPaths to represent which path we
