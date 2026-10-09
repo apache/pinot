@@ -246,6 +246,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   public void init(PinotConfiguration pinotConfiguration)
       throws Exception {
     _config = new ControllerConf(pinotConfiguration.toMap());
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler(_config);
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
     _controllerMode = _config.getControllerMode();
@@ -655,7 +656,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     // Initialize cluster config change handler
     LOGGER.info("Initializing cluster config change handler");
-    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
     try {
       // Register cluster config change handler with Helix
       _helixParticipantManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
