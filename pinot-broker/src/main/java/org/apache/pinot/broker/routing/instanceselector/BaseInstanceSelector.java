@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -50,6 +51,8 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID;
 
@@ -90,8 +93,17 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID
 /// which one owns the table's gauges.
 public abstract class BaseInstanceSelector implements InstanceSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseInstanceSelector.class);
+  /// Tags the INFO logs that print the whole new-segment map on every rebuild ("Got N new segments: ..."). To drop
+  /// them without code changes, add to the log4j2 config:
+  /// `<MarkerFilter marker="ROUTING_NEW_SEGMENTS" onMatch="DENY" onMismatch="NEUTRAL"/>`
+  public static final Marker NEW_SEGMENTS_MARKER = MarkerFactory.getMarker("ROUTING_NEW_SEGMENTS");
   // To prevent int overflow, reset the request id once it reaches this value
   protected static final long MAX_REQUEST_ID = 1_000_000_000;
+  /// Maximum number of distinct (ideal state, external view) instance state map pairs whose candidate lists one
+  /// rebuild shares between segments. Past this bound, the remaining segments get their own lists, as if there was no
+  /// sharing. In a realtime table, all the segments of a stream partition usually have the same pair, so the number of
+  /// distinct pairs is close to the number of partitions, far below this bound.
+  static final int MAX_SHARED_CANDIDATE_LISTS = 4096;
 
   protected TableConfig _tableConfig;
   protected String _tableNameWithType;
@@ -126,6 +138,9 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   // computed alongside.
   protected volatile TableReplicaHealth _replicaHealth;
   protected Map<String, ServerInstance> _enabledServerStore;
+  // Only read by the rebuild thread. Not final so that tests can disable or bound the sharing.
+  @VisibleForTesting
+  int _maxSharedCandidateLists = MAX_SHARED_CANDIDATE_LISTS;
 
   @Override
   public void init(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
@@ -235,7 +250,8 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
         newSegmentCreationTimeMap.put(segmentZKMetadata.getSegmentName(), creationTimeMs);
       }
     }
-    LOGGER.info("Got {} new segments: {} for table: {} by reading ZK metadata, current time: {}",
+    LOGGER.info(NEW_SEGMENTS_MARKER,
+        "Got {} new segments: {} for table: {} by reading ZK metadata, current time: {}",
         newSegmentCreationTimeMap.size(), newSegmentCreationTimeMap, _tableNameWithType, currentTimeMs);
     return newSegmentCreationTimeMap;
   }
@@ -279,13 +295,58 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     return onlineInstances;
   }
 
-  /// Converts the given map into a sorted map if needed.
-  static SortedMap<String, String> convertToSortedMap(Map<String, String> map) {
+  /// Returns a map that iterates the entries of the given map in key order: the map itself when it is a
+  /// [SortedMap] or when its iteration order is already sorted, otherwise a sorted copy.
+  ///
+  /// The instance state maps read from ZooKeeper are insertion-ordered, and are usually written in key order, so
+  /// the linear check avoids the copy in the common case.
+  static Map<String, String> sortByKeyIfNeeded(Map<String, String> map) {
     if (map instanceof SortedMap) {
-      return (SortedMap<String, String>) map;
-    } else {
-      return new TreeMap<>(map);
+      return map;
     }
+    String previousKey = null;
+    for (String key : map.keySet()) {
+      if (previousKey != null && previousKey.compareTo(key) > 0) {
+        return new TreeMap<>(map);
+      }
+      previousKey = key;
+    }
+    return map;
+  }
+
+  /// Returns the candidates of an old segment: the instances that are ONLINE/CONSUMING in both the ideal state and
+  /// the external view, in instance order.
+  List<SegmentInstanceCandidate> computeOldSegmentCandidates(Map<String, String> idealStateInstanceStateMap,
+      Map<String, String> externalViewInstanceStateMap) {
+    List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
+    int idealStateReplicaId = 0;
+    for (Map.Entry<String, String> entry : sortByKeyIfNeeded(idealStateInstanceStateMap).entrySet()) {
+      String instance = entry.getKey();
+      // NOTE: DO NOT check if EV matches IS because it is a valid state when EV is CONSUMING while IS is ONLINE
+      if (isOnlineForRouting(entry.getValue()) && isOnlineForRouting(externalViewInstanceStateMap.get(instance))) {
+        candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance), idealStateReplicaId));
+      }
+      idealStateReplicaId++;
+    }
+    return candidates;
+  }
+
+  /// Returns the candidates of a new segment: the instances that are ONLINE/CONSUMING in the ideal state, in instance
+  /// order. A candidate is online when the instance is ONLINE/CONSUMING in the external view.
+  List<SegmentInstanceCandidate> computeNewSegmentCandidates(Map<String, String> idealStateInstanceStateMap,
+      @Nullable Map<String, String> externalViewInstanceStateMap) {
+    List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
+    int idealStateReplicaId = 0;
+    for (Map.Entry<String, String> entry : sortByKeyIfNeeded(idealStateInstanceStateMap).entrySet()) {
+      if (isOnlineForRouting(entry.getValue())) {
+        String instance = entry.getKey();
+        boolean online =
+            externalViewInstanceStateMap != null && isOnlineForRouting(externalViewInstanceStateMap.get(instance));
+        candidates.add(new SegmentInstanceCandidate(instance, online, getPool(instance), idealStateReplicaId));
+      }
+      idealStateReplicaId++;
+    }
+    return candidates;
   }
 
   /// Updates the segment maps based on the given ideal state, external view, online segments (segments with
@@ -301,60 +362,31 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
 
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
+    InstanceStateMapsCache instanceStateMapsCache = new InstanceStateMapsCache(_maxSharedCandidateLists);
     int numSinglePoolSegments = 0;
     Set<Integer> pools = new HashSet<>();
     for (String segment : onlineSegments) {
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
-      // TODO: Verify whether sorting is actually needed
-      Map<String, String> sortedIdealStateMap = convertToSortedMap(idealStateInstanceStateMap);
       Long newSegmentCreationTimeMs = newSegmentCreationTimeMap.get(segment);
       Map<String, String> externalViewInstanceStateMap = externalViewAssignment.get(segment);
 
-      if (externalViewInstanceStateMap == null) {
-        if (newSegmentCreationTimeMs != null) {
-          // New segment
-          List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
-          int idealStateReplicaId = 0;
-          for (Map.Entry<String, String> entry : sortedIdealStateMap.entrySet()) {
-            if (isOnlineForRouting(entry.getValue())) {
-              String instance = entry.getKey();
-              candidates.add(new SegmentInstanceCandidate(instance, false, getPool(instance), idealStateReplicaId));
-            }
-            idealStateReplicaId++;
-          }
-          _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
-        } else {
-          // Old segment
-          putOldSegment(segment, List.of(), idealStateInstanceStateMap);
-        }
+      if (newSegmentCreationTimeMs != null) {
+        // New segment
+        _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs,
+            computeNewSegmentCandidates(idealStateInstanceStateMap, externalViewInstanceStateMap)));
+      } else if (externalViewInstanceStateMap == null) {
+        // Old segment
+        putOldSegment(segment, List.of(), idealStateInstanceStateMap);
       } else {
-        TreeSet<String> onlineInstances = getOnlineInstances(idealStateInstanceStateMap, externalViewInstanceStateMap);
-        if (newSegmentCreationTimeMs != null) {
-          // New segment
-          List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
-          int idealStateReplicaId = 0;
-          for (Map.Entry<String, String> entry : sortedIdealStateMap.entrySet()) {
-            if (isOnlineForRouting(entry.getValue())) {
-              String instance = entry.getKey();
-              candidates.add(
-                  new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance),
-                      idealStateReplicaId));
-            }
-            idealStateReplicaId++;
-          }
-          _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
-        } else {
-          // Old segment
-          List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
-          int idealStateReplicaId = 0;
-          for (String instance : sortedIdealStateMap.keySet()) {
-            if (onlineInstances.contains(instance)) {
-              candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance), idealStateReplicaId));
-            }
-            idealStateReplicaId++;
-          }
-          putOldSegment(segment, candidates, idealStateInstanceStateMap);
+        // Old segment. Segments with the same instance state maps share the candidate list.
+        InstanceStateMaps instanceStateMaps =
+            instanceStateMapsCache.canonicalize(idealStateInstanceStateMap, externalViewInstanceStateMap);
+        List<SegmentInstanceCandidate> candidates = instanceStateMaps._oldSegmentCandidates;
+        if (candidates == null) {
+          candidates = computeOldSegmentCandidates(idealStateInstanceStateMap, externalViewInstanceStateMap);
+          instanceStateMaps._oldSegmentCandidates = candidates;
         }
+        putOldSegment(segment, candidates, idealStateInstanceStateMap);
       }
       if (_emitSinglePoolSegmentsMetric) {
         pools.clear();
@@ -443,10 +475,31 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
         unavailableSegments.size());
   }
 
+  /// Returns the enabled candidates, and adds their instances to the serving instances.
+  ///
+  /// When every candidate is enabled, returns the given list itself rather than a copy. That publishes the list to
+  /// the query path, which is safe because candidate lists are never modified once built. It also keeps the lists
+  /// that [#updateSegmentMaps] shares between segments shared in the published [SegmentStates].
   private List<SegmentInstanceCandidate> getEnabledCandidatesAndAddToServingInstances(
       List<SegmentInstanceCandidate> candidates, Set<String> servingInstances) {
-    List<SegmentInstanceCandidate> enabledCandidates = new ArrayList<>(candidates.size());
-    for (SegmentInstanceCandidate candidate : candidates) {
+    int numCandidates = candidates.size();
+    int numLeadingEnabledCandidates = 0;
+    while (numLeadingEnabledCandidates < numCandidates) {
+      String instance = candidates.get(numLeadingEnabledCandidates).getInstance();
+      if (!_enabledInstances.contains(instance)) {
+        break;
+      }
+      servingInstances.add(instance);
+      numLeadingEnabledCandidates++;
+    }
+    if (numLeadingEnabledCandidates == numCandidates) {
+      return candidates;
+    }
+    List<SegmentInstanceCandidate> enabledCandidates = new ArrayList<>(numCandidates - 1);
+    enabledCandidates.addAll(candidates.subList(0, numLeadingEnabledCandidates));
+    // The candidate at numLeadingEnabledCandidates is disabled
+    for (int i = numLeadingEnabledCandidates + 1; i < numCandidates; i++) {
+      SegmentInstanceCandidate candidate = candidates.get(i);
       String instance = candidate.getInstance();
       if (_enabledInstances.contains(instance)) {
         enabledCandidates.add(candidate);
@@ -505,7 +558,8 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
         }
       }
     }
-    LOGGER.info("Got {} new segments: {} for table: {} by processing existing states, current time: {}",
+    LOGGER.info(NEW_SEGMENTS_MARKER,
+        "Got {} new segments: {} for table: {} by processing existing states, current time: {}",
         newSegmentCreationTimeMap.size(), newSegmentCreationTimeMap, _tableNameWithType, currentTimeMs);
     return newSegmentCreationTimeMap;
   }
@@ -559,4 +613,81 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   /// servers and let servers decide how to handle them.
   protected abstract InstanceMapping select(List<String> segments, int requestId, SegmentStates segmentStates,
       Map<String, String> queryOptions);
+
+  /// The ideal state and external view instance state maps of a segment, compared by content. Within one rebuild,
+  /// segments with equal maps get the same routing candidates, so the canonical instance (see
+  /// [InstanceStateMapsCache]) caches what is derived from the maps, and the segments share it.
+  ///
+  /// Not thread safe. Only used by the rebuild thread, for the duration of one rebuild.
+  static final class InstanceStateMaps {
+    final Map<String, String> _idealStateInstanceStateMap;
+    @Nullable
+    final Map<String, String> _externalViewInstanceStateMap;
+    private final int _hashCode;
+    // Derived from the maps, computed on first use
+    @Nullable
+    Set<String> _onlineInstances;
+    @Nullable
+    List<SegmentInstanceCandidate> _oldSegmentCandidates;
+    // Used by the strict replica-group selector to collect the unavailable instances once per instance state maps
+    boolean _unavailableInstancesCollected;
+
+    InstanceStateMaps(Map<String, String> idealStateInstanceStateMap,
+        @Nullable Map<String, String> externalViewInstanceStateMap) {
+      _idealStateInstanceStateMap = idealStateInstanceStateMap;
+      _externalViewInstanceStateMap = externalViewInstanceStateMap;
+      _hashCode = 31 * idealStateInstanceStateMap.hashCode() + Objects.hashCode(externalViewInstanceStateMap);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof InstanceStateMaps)) {
+        return false;
+      }
+      InstanceStateMaps that = (InstanceStateMaps) o;
+      return _hashCode == that._hashCode && _idealStateInstanceStateMap.equals(that._idealStateInstanceStateMap)
+          && Objects.equals(_externalViewInstanceStateMap, that._externalViewInstanceStateMap);
+    }
+
+    @Override
+    public int hashCode() {
+      return _hashCode;
+    }
+  }
+
+  /// Returns one canonical [InstanceStateMaps] per distinct pair of instance state maps, so that the segments of one
+  /// rebuild with equal maps share what is derived from them.
+  ///
+  /// The cache keeps at most `maxSize` pairs. Past that bound, it returns a new [InstanceStateMaps] for each call,
+  /// which makes each segment compute its own state, as if there was no sharing.
+  ///
+  /// Not thread safe. Only used by the rebuild thread, for the duration of one rebuild.
+  static final class InstanceStateMapsCache {
+    private final int _maxSize;
+    private final Map<InstanceStateMaps, InstanceStateMaps> _cache = new HashMap<>();
+
+    InstanceStateMapsCache(int maxSize) {
+      _maxSize = maxSize;
+    }
+
+    InstanceStateMaps canonicalize(Map<String, String> idealStateInstanceStateMap,
+        @Nullable Map<String, String> externalViewInstanceStateMap) {
+      InstanceStateMaps instanceStateMaps =
+          new InstanceStateMaps(idealStateInstanceStateMap, externalViewInstanceStateMap);
+      if (_maxSize <= 0) {
+        return instanceStateMaps;
+      }
+      InstanceStateMaps canonical = _cache.get(instanceStateMaps);
+      if (canonical != null) {
+        return canonical;
+      }
+      if (_cache.size() < _maxSize) {
+        _cache.put(instanceStateMaps, instanceStateMaps);
+      }
+      return instanceStateMaps;
+    }
+  }
 }
