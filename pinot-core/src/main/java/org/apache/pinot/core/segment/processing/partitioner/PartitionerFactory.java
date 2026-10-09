@@ -20,6 +20,8 @@ package org.apache.pinot.core.segment.processing.partitioner;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 
 
 /// Factory for Partitioner and PartitionFilter
@@ -41,6 +43,11 @@ public final class PartitionerFactory {
 
   /// Construct a Partitioner using the PartitioningConfig
   public static Partitioner getPartitioner(PartitionerConfig config) {
+    return getPartitioner(config,
+        IngestionGroovyPolicy.fromDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled()));
+  }
+
+  public static Partitioner getPartitioner(PartitionerConfig config, IngestionGroovyPolicy ingestionGroovyPolicy) {
 
     Partitioner partitioner = null;
     switch (config.getPartitionerType()) {
@@ -60,7 +67,7 @@ public final class PartitionerFactory {
       case TRANSFORM_FUNCTION:
         Preconditions.checkState(config.getTransformFunction() != null,
             "Must provide transformFunction for TRANSFORM_FUNCTION partitioner");
-        partitioner = new TransformFunctionPartitioner(config.getTransformFunction());
+        partitioner = new TransformFunctionPartitioner(config.getTransformFunction(), ingestionGroovyPolicy);
         break;
       case TABLE_PARTITION_CONFIG:
         Preconditions.checkState(config.getColumnName() != null,
@@ -79,10 +86,16 @@ public final class PartitionerFactory {
   ///
   /// @return Array of partitioners
   public static Partitioner[] getPartitioners(List<PartitionerConfig> partitionerConfigs) {
+    return getPartitioners(partitionerConfigs,
+        IngestionGroovyPolicy.fromDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled()));
+  }
+
+  public static Partitioner[] getPartitioners(List<PartitionerConfig> partitionerConfigs,
+      IngestionGroovyPolicy ingestionGroovyPolicy) {
     int numPartitioners = partitionerConfigs.size();
     Partitioner[] partitioners = new Partitioner[numPartitioners];
     for (int i = 0; i < numPartitioners; i++) {
-      partitioners[i] = PartitionerFactory.getPartitioner(partitionerConfigs.get(i));
+      partitioners[i] = PartitionerFactory.getPartitioner(partitionerConfigs.get(i), ingestionGroovyPolicy);
     }
     return partitioners;
   }

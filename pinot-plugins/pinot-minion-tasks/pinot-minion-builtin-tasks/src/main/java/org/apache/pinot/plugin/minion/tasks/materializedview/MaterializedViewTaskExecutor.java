@@ -726,6 +726,8 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
     FileUtils.forceMkdir(segmentOutputDir);
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setIngestionGroovyDisabled(
+        _minionConf == null || _minionConf.isIngestionGroovyDisabled());
     segmentGeneratorConfig.setTableName(tableName);
     segmentGeneratorConfig.setOutDir(segmentOutputDir.getAbsolutePath());
     segmentGeneratorConfig.setSegmentName(segmentName);

@@ -16,23 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.mergerollup;
+package org.apache.pinot.spi.recordtransformer.enricher;
 
-import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.minion.executor.PinotTaskExecutor;
-import org.apache.pinot.plugin.minion.tasks.BaseTaskExecutorFactory;
-import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
+import java.util.Objects;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 
 
-@TaskExecutorFactory
-public class MergeRollupTaskExecutorFactory extends BaseTaskExecutorFactory {
-  @Override
-  public String getTaskType() {
-    return MinionConstants.MergeRollupTask.TASK_TYPE;
+/// Immutable, thread-safe context supplied when creating a [RecordEnricher].
+///
+/// Factories must honor the contained ingestion policy when constructing policy-sensitive enrichers.
+public final class RecordEnricherCreationContext {
+  private final IngestionGroovyPolicy _ingestionGroovyPolicy;
+
+  public RecordEnricherCreationContext(IngestionGroovyPolicy ingestionGroovyPolicy) {
+    _ingestionGroovyPolicy = Objects.requireNonNull(ingestionGroovyPolicy, "ingestionGroovyPolicy must not be null");
   }
 
-  @Override
-  public PinotTaskExecutor create() {
-    return new MergeRollupTaskExecutor(_minionConf);
+  public IngestionGroovyPolicy getIngestionGroovyPolicy() {
+    return _ingestionGroovyPolicy;
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.helix.HelixAdmin;
@@ -25,14 +26,17 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.model.ClusterConstraints;
 import org.apache.helix.model.ConstraintItem;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.Message;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -272,6 +276,41 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     }, TIMEOUT_IN_MS, "Without live instance, there should be no partition in the external view");
 
     // Stop the Helix-only controller
+    helixOnlyController.stop();
+  }
+
+  @Test
+  public void testPinotOnlyControllerDoesNotRepublishInheritedGroovyOptIn()
+      throws Exception {
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.HELIX_ONLY);
+    ControllerStarter helixOnlyController = new ControllerStarter();
+    helixOnlyController.init(new PinotConfiguration(properties));
+    helixOnlyController.start();
+    HelixManager helixControllerManager = helixOnlyController.getHelixControllerManager();
+    TestUtils.waitForCondition(aVoid -> helixControllerManager.isConnected(), TIMEOUT_IN_MS,
+        "Failed to start the Helix-only controller");
+
+    HelixSetupUtils.reconcileIngestionGroovyPolicy(getZkUrl(), getHelixClusterName(), true, false);
+    properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.PINOT_ONLY);
+    properties.remove(ControllerConf.DISABLE_GROOVY);
+    ControllerStarter pinotOnlyController = new ControllerStarter();
+    pinotOnlyController.init(new PinotConfiguration(properties));
+    Assert.assertFalse(pinotOnlyController.getConfig().isDisableIngestionGroovy());
+
+    HelixConfigScopeBuilder scopeBuilder =
+        new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName());
+    HelixAdmin helixAdmin = helixControllerManager.getClusterManagmentTool();
+    helixAdmin.removeConfig(scopeBuilder.build(), List.of(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY));
+
+    pinotOnlyController.start();
+    Assert.assertEquals(
+        helixAdmin.getConfig(scopeBuilder.build(), List.of(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY))
+            .get(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY),
+        "true");
+
+    pinotOnlyController.stop();
     helixOnlyController.stop();
   }
 

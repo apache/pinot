@@ -24,6 +24,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -48,13 +49,23 @@ public class FunctionPackageCompatibilityTest {
       throws Exception {
     GroovyStaticAnalyzerConfig config = GroovyStaticAnalyzerConfig.createDefault();
     GroovyFunctionEvaluator.setGroovyStaticAnalyzerConfig(config);
+    org.apache.pinot.common.evaluator.FunctionEvaluatorFactory.setIngestionGroovyDisabled(false);
     try {
       GroovyFunctionEvaluator.parseGroovyScript("Groovy({a + 1}, a)");
       FunctionEvaluator evaluator = FunctionEvaluatorFactory.getExpressionEvaluator("Groovy({a + 1}, a)");
       assertTrue(evaluator instanceof org.apache.pinot.common.evaluator.GroovyFunctionEvaluator);
       assertEquals(evaluator.evaluate(new Object[]{1}), 2);
+      assertEquals(new GroovyFunctionEvaluator("Groovy({a + 1}, a)").evaluate(new Object[]{1}), 2);
     } finally {
+      org.apache.pinot.common.evaluator.FunctionEvaluatorFactory.setIngestionGroovyDisabled(true);
       GroovyFunctionEvaluator.setGroovyStaticAnalyzerConfig(null);
     }
+  }
+
+  @Test
+  public void testLegacyGroovyConstructorHonorsIngestionPolicy() {
+    org.apache.pinot.common.evaluator.FunctionEvaluatorFactory.setIngestionGroovyDisabled(true);
+    assertThrows(IllegalStateException.class, () -> new GroovyFunctionEvaluator("Groovy({1})"));
+    assertThrows(IllegalStateException.class, () -> GroovyFunctionEvaluator.parseGroovyScript("Groovy({1})"));
   }
 }

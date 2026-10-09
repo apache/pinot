@@ -22,11 +22,9 @@ import com.google.common.base.Preconditions;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.materializedview.executor.GrpcMaterializedViewQueryExecutor;
 import org.apache.pinot.materializedview.executor.MaterializedViewQueryExecutor;
-import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.MinionContext;
-import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
-import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
+import org.apache.pinot.plugin.minion.tasks.BaseTaskExecutorFactory;
 import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -42,16 +40,8 @@ import org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask;
 /// The executor is then shared across all executor instances for connection
 /// reuse and load balancing.
 @TaskExecutorFactory
-public class MaterializedViewTaskExecutorFactory implements PinotTaskExecutorFactory {
-  private MinionTaskZkMetadataManager _zkMetadataManager;
-  private MinionConf _minionConf;
+public class MaterializedViewTaskExecutorFactory extends BaseTaskExecutorFactory {
   private volatile MaterializedViewQueryExecutor _queryExecutor;
-
-  @Override
-  public void init(MinionTaskZkMetadataManager zkMetadataManager, MinionConf minionConf) {
-    _zkMetadataManager = zkMetadataManager;
-    _minionConf = minionConf;
-  }
 
   @Override
   public String getTaskType() {
