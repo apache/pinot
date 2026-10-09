@@ -82,10 +82,12 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
     // Serialized AvgPair
     byte[][] bytesValues = blockValSet.getBytesValuesSV();
     AvgPair avgPair = new AvgPair();
-    for (int i = 0; i < length; i++) {
-      AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-      avgPair.apply(value);
-    }
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+        avgPair.apply(value);
+      }
+    });
     // Only set the aggregation result when there is at least one non-null input value
     if (avgPair.getCount() != 0) {
       updateAggregationResult(aggregationResultHolder, avgPair.getSum(), avgPair.getCount());
@@ -150,10 +152,12 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
       GroupByResultHolder groupByResultHolder) {
     // Serialized AvgPair
     byte[][] bytesValues = blockValSet.getBytesValuesSV();
-    for (int i = 0; i < length; i++) {
-      AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-      updateGroupByResult(groupKeyArray[i], groupByResultHolder, avgPair.getSum(), avgPair.getCount());
-    }
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+        updateGroupByResult(groupKeyArray[i], groupByResultHolder, avgPair.getSum(), avgPair.getCount());
+      }
+    });
   }
 
   protected void aggregateSVGroupBySV(BlockValSet blockValSet, int length, int[] groupKeyArray,
@@ -207,12 +211,14 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
       GroupByResultHolder groupByResultHolder) {
     // Serialized AvgPair
     byte[][] bytesValues = blockValSet.getBytesValuesSV();
-    for (int i = 0; i < length; i++) {
-      AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-      for (int groupKey : groupKeysArray[i]) {
-        updateGroupByResult(groupKey, groupByResultHolder, avgPair.getSum(), avgPair.getCount());
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+        for (int groupKey : groupKeysArray[i]) {
+          updateGroupByResult(groupKey, groupByResultHolder, avgPair.getSum(), avgPair.getCount());
+        }
       }
-    }
+    });
   }
 
   protected void aggregateSVGroupByMV(BlockValSet blockValSet, int length, int[][] groupKeysArray,

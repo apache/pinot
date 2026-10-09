@@ -335,7 +335,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private long _consumeStartTime = -1;
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
-  private String _stopReason = null;
+  private SegmentCompletionProtocol.ReasonCode _stopReasonCode = null;
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
   /// Whether null handling is enabled by default. This value is only used if
@@ -376,35 +376,35 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                     _startTimeMs, now, _numRowsConsumed, _numRowsIndexed);
             _stopReasonPrinted = true;
           }
-          _stopReason = SegmentCompletionProtocol.REASON_TIME_LIMIT;
+          _stopReasonCode = SegmentCompletionProtocol.ReasonCode.TIME_LIMIT;
           return true;
         } else if (_numRowsIndexed >= _segmentMaxRowCount) {
           _segmentLogger.info("Stopping consumption due to row limit nRows={} numRowsIndexed={}, numRowsConsumed={}",
               _segmentMaxRowCount, _numRowsIndexed, _numRowsConsumed);
-          _stopReason = SegmentCompletionProtocol.REASON_ROW_LIMIT;
+          _stopReasonCode = SegmentCompletionProtocol.ReasonCode.ROW_LIMIT;
           return true;
         } else if (_endOfPartitionGroup) {
           _segmentLogger.info("Stopping consumption due to end of partitionGroup reached nRows={} numRowsIndexed={}, "
               + "numRowsConsumed={}", _segmentMaxRowCount, _numRowsIndexed, _numRowsConsumed);
-          _stopReason = SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP;
+          _stopReasonCode = SegmentCompletionProtocol.ReasonCode.END_OF_PARTITION_GROUP;
           return true;
         } else if (_forceCommitMessageReceived) {
           _segmentLogger.info("Stopping consumption due to force commit - numRowsConsumed={} numRowsIndexed={}",
               _numRowsConsumed, _numRowsIndexed);
-          _stopReason = SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED;
+          _stopReasonCode = SegmentCompletionProtocol.ReasonCode.FORCE_COMMIT_MESSAGE_RECEIVED;
           return true;
         } else if (!canAddMore()) {
           _segmentLogger.info(
               "Stopping consumption as mutable index cannot consume more rows - numRowsConsumed={} "
                   + "numRowsIndexed={}",
               _numRowsConsumed, _numRowsIndexed);
-          _stopReason = SegmentCompletionProtocol.REASON_INDEX_CAPACITY_THRESHOLD_BREACHED;
+          _stopReasonCode = SegmentCompletionProtocol.ReasonCode.INDEX_CAPACITY_THRESHOLD_BREACHED;
           return true;
         }
         return false;
 
       case CATCHING_UP:
-        _stopReason = null;
+        _stopReasonCode = null;
         // We have posted segmentConsumed() at least once, and the controller is asking us to catch up to a certain
         // offset.
         // There is no time limit here, so just check to see that we are still within the offset we need to reach.
@@ -1071,7 +1071,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private boolean startSegmentCommit() {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
-        .withNumRows(_numRowsIndexed).withInstanceId(_instanceId).withReason(_stopReason);
+        .withNumRows(_numRowsIndexed).withInstanceId(_instanceId).withReasonCode(_stopReasonCode);
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
@@ -1373,7 +1373,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
-        .withNumRows(_numRowsIndexed).withInstanceId(_instanceId).withReason(_stopReason)
+        .withNumRows(_numRowsIndexed).withInstanceId(_instanceId).withReasonCode(_stopReasonCode)
         .withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
         .withSegmentSizeBytes(_segmentBuildDescriptor.getSegmentSizeBytes())
         .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
@@ -1547,13 +1547,33 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED) {
         break;
       }
+      // Nothing stops a segment that never started consuming, so re-check the table between retries: once it is
+      // shut down, a retry could be accepted on behalf of a recreated same-name table's segment.
+      if (isTableDataManagerShutDown()) {
+        _segmentLogger.info("Stop retrying segmentStoppedConsuming for segment: {}, table data manager is already "
+            + "shut down", _segmentNameStr);
+        break;
+      }
       Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
       _segmentLogger.info("Retrying after response {}", response.toJsonString());
     } while (!_shouldStop);
   }
 
+  /// Whether the owning table data manager has been shut down (the table was deleted, or the server is stopping).
+  private boolean isTableDataManagerShutDown() {
+    return _realtimeTableDataManager != null && _realtimeTableDataManager.isShutDown();
+  }
+
   @VisibleForTesting
   void postStopConsumedMsgForInitializationError() {
+    if (isTableDataManagerShutDown()) {
+      // The table was shut down after initialization failed. Its Helix state no longer matters, and a recreated table
+      // with the same name may already own this segment name, so asking the controller to mark the segment OFFLINE
+      // could deregister the new table's consuming replica instead.
+      _segmentLogger.info("Skip segmentStoppedConsuming for segment: {}, table data manager is already shut down",
+          _segmentNameStr);
+      return;
+    }
     if (hasDifferentSegmentDataManagerRegistered()) {
       _segmentLogger.info(
           "Skip segmentStoppedConsuming for segment: {}, another segment data manager is already registered",
@@ -1590,7 +1610,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // Retry maybe once if leader is not found.
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withStreamPartitionMsgOffset(_currentOffset.toString()).withSegmentName(_segmentNameStr)
-        .withReason(_stopReason).withNumRows(_numRowsIndexed).withInstanceId(_instanceId);
+        .withReasonCode(_stopReasonCode).withNumRows(_numRowsIndexed).withInstanceId(_instanceId);
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
@@ -1731,7 +1751,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata)
       throws Exception {
-    if (_parallelSegmentConsumptionPolicy.isAllowedDuringDownload()) {
+    boolean allowedDuringDownload = _parallelSegmentConsumptionPolicy.isAllowedDuringDownload();
+    // A local build that failed or mismatched the committed CRC has already released the semaphore when the policy
+    // allows consumption during build, so the next consuming segment can be running during this download as well
+    boolean releasedDuringBuild =
+        _parallelSegmentConsumptionPolicy.isAllowedDuringBuild() && !_consumerSemaphoreAcquired.get();
+    if ((allowedDuringDownload || releasedDuringBuild) && _partitionUpsertMetadataManager != null
+        && _partitionUpsertMetadataManager.shouldRevertMetadataOnInconsistency(_realtimeSegment)) {
+      // Table config validation rejects this in PROTECTED mode. It still happens when the mode is switched after the
+      // table is created, when the server-level default allows partial upsert consumption during commit, or when a
+      // pauseless table falls back to a download after its local build fails.
+      _segmentLogger.error("Next consuming segment can run during download while this replace reverts upsert "
+          + "metadata. Its snapshot can miss the rows the revert restores. Use DISALLOW_ALWAYS");
+      _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD, 1L);
+    }
+    if (allowedDuringDownload) {
       closeStreamConsumerAndReleaseSemaphore();
     }
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
@@ -1816,7 +1850,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   public void stop()
       throws InterruptedException {
     _shouldStop = true;
-    if (Thread.currentThread() != _consumerThread && _consumerThread.isAlive()) {
+    if (_consumerThread != null && Thread.currentThread() != _consumerThread && _consumerThread.isAlive()) {
       _segmentLogger.info("Interrupting the consumer thread and waiting for it to join");
       long startTimeMs = System.currentTimeMillis();
       _consumerThread.interrupt();

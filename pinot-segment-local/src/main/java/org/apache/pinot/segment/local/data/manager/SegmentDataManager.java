@@ -89,7 +89,7 @@ public abstract class SegmentDataManager {
     return List.of(getSegment());
   }
 
-  public String getCrc() {
+  public long getCrc() {
     return getSegment().getSegmentMetadata().getCrc();
   }
 

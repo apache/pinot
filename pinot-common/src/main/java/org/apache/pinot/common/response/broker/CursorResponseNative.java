@@ -30,11 +30,12 @@ import org.apache.pinot.common.response.CursorResponse;
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
     "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs",
     "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit",
-    "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
-    "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "numSegmentsPrunedByValue", "numRemoteAccesses", "remoteAccessBytes", "brokerReduceTimeMs",
+    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
+    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tableQueries",
-    "groupsTrimmed",
+    "groupsTrimmed", "approximateFunctionApplied",
     // Fields specific to CursorResponse
     "offset", "numRows", "cursorResultWriteTimeMs", "cursorFetchTimeMs", "submissionTimeMs", "expirationTimeMs",
     "brokerHost", "brokerPort", "bytesWritten"
@@ -82,6 +83,8 @@ public class CursorResponseNative extends BrokerResponseNative implements Cursor
     setNumSegmentsPrunedInvalid(response.getNumSegmentsPrunedInvalid());
     setNumSegmentsPrunedByLimit(response.getNumSegmentsPrunedByLimit());
     setNumSegmentsPrunedByValue(response.getNumSegmentsPrunedByValue());
+    setNumRemoteAccesses(response.getNumRemoteAccesses());
+    setRemoteAccessBytes(response.getRemoteAccessBytes());
     setBrokerReduceTimeMs(response.getBrokerReduceTimeMs());
     setOfflineThreadCpuTimeNs(response.getOfflineThreadCpuTimeNs());
     setRealtimeThreadCpuTimeNs(response.getRealtimeThreadCpuTimeNs());

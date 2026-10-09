@@ -228,10 +228,11 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     try {
       sqlNodeAndOptions = RequestUtils.parseQuery(query, requestJsonNode);
     } catch (Exception e) {
+      QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.SQL_PARSING);
       BrokerResponse brokerResponse;
       Broker.BrokerResponse errorBlock;
       try {
-        brokerResponse = new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+        brokerResponse = new BrokerResponseNative(errorCode, e.getMessage());
         errorBlock = Broker.BrokerResponse.newBuilder().setPayload(ByteString.copyFrom(
             brokerResponse.toJsonString().getBytes())).build();
       } catch (IOException ex) {

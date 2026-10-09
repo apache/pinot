@@ -210,11 +210,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     long streamStatsDrainMs = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_STREAM_STATS_DRAIN_MS,
         CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS);
+    boolean enableProtoSegmentList = _config.getProperty(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST,
+        CommonConstants.Broker.DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST);
+    int dispatchMaxInboundMessageSizeBytes = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES);
     _mailboxService = new MailboxService(hostname, port, InstanceType.BROKER, config, tlsConfig);
     _queryDispatcher =
         new QueryDispatcher(_mailboxService, failureDetector, tlsConfig, isQueryCancellationEnabled(), cancelTimeout,
             dispatchKeepAliveTimeMs, dispatchKeepAliveTimeoutMs, dispatchKeepAliveWithoutCalls, _streamStatsDefault,
-            streamStatsDrainMs);
+            streamStatsDrainMs, enableProtoSegmentList, dispatchMaxInboundMessageSizeBytes);
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
         _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
@@ -227,10 +232,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         Executors.newFixedThreadPool(
             Math.max(1, Runtime.getRuntime().availableProcessors() / 2),
             new NamedThreadFactory("multi-stage-query-compile-executor")));
-    _defaultDisabledPlannerRules =
-        _config.containsKey(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES) ? Set.copyOf(
-            _config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES, List.of()))
-            : CommonConstants.Broker.DEFAULT_DISABLED_RULES;
+    _defaultDisabledPlannerRules = getDefaultDisabledPlannerRules(_config);
     boolean fingerprintingConfigured = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
         CommonConstants.Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
@@ -255,6 +257,18 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         streamingDistinctFlushThreshold > 0 ? Integer.toString(streamingDistinctFlushThreshold) : null;
   }
 
+  /// Returns the planner rules disabled by default: the comma-separated list in
+  /// [CommonConstants.Broker#CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES], or
+  /// [CommonConstants.Broker#DEFAULT_DISABLED_RULES] when the config is not set. An empty value disables no rules.
+  @VisibleForTesting
+  static Set<String> getDefaultDisabledPlannerRules(PinotConfiguration config) {
+    if (!config.containsKey(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES)) {
+      return CommonConstants.Broker.DEFAULT_DISABLED_RULES;
+    }
+    return Set.copyOf(
+        config.getCommaSeparatedList(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES, List.of()));
+  }
+
   @Override
   public void start() {
     _queryDispatcher.start();
@@ -277,7 +291,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       try (var compiled = exec.submit(() -> warmupEnv.compile("SELECT 1")).get(5, TimeUnit.SECONDS)) {
         // result discarded; compile call is for JVM warmup only
       } finally {
-        exec.shutdownNow();
+        // Do not interrupt a warmup that takes longer than the wait. Planning stops on an interrupt, and then the first
+        // queries pay the rest of the warmup cost.
+        exec.shutdown();
       }
       LOGGER.info("MSE startup warmup completed in {}ms", System.currentTimeMillis() - startMs);
     } catch (Exception e) {
@@ -570,11 +586,20 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int sortExchangeCopyThreshold = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD,
         CommonConstants.Broker.DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD);
+    int sealedInListThreshold = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_SEALED_IN_LIST_THRESHOLD,
+        CommonConstants.Broker.DEFAULT_SEALED_IN_LIST_THRESHOLD);
     boolean defaultUnnestColumnPruning = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_UNNEST_COLUMN_PRUNING,
         CommonConstants.Broker.DEFAULT_UNNEST_COLUMN_PRUNING);
     WorkerManager workerManager = QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
         ? _multiClusterWorkerManager : _workerManager;
+    // Unlike the single-stage engine there is no table-level layer here, because a multi-stage query can span tables.
+    // Precedence is therefore query option > cluster config > broker conf.
+    ApproximateFunctionOverrideProvider.Settings approximateFunctionSettings =
+        _approximateFunctionOverrideProvider.getSettings();
+    boolean useApproximateFunction =
+        approximateFunctionSettings.isEnabled(QueryOptionsUtils.isUseApproximateFunction(queryOptions), null);
     return QueryEnvironment.configBuilder()
         .requestId(requestId)
         .database(database)
@@ -587,6 +612,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultUnnestColumnPruning(defaultUnnestColumnPruning)
         .defaultUseLeafServerForIntermediateStage(defaultUseLeafServerForIntermediateStage)
         .defaultEnableGroupTrim(defaultEnableGroupTrim)
+        .useApproximateFunction(useApproximateFunction)
+        .approximateFunctionDistinctCountParams(approximateFunctionSettings._distinctCountParams)
+        .approximateFunctionPercentileParams(approximateFunctionSettings._percentileParams)
         .defaultEnableDynamicFilteringSemiJoin(defaultEnableDynamicFilteringSemiJoin)
         .defaultUsePhysicalOptimizer(defaultUsePhysicalOptimizer)
         .defaultUseLiteMode(defaultUseLiteMode)
@@ -599,6 +627,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultHashFunction(defaultHashFunction)
         .defaultDisabledPlannerRules(_defaultDisabledPlannerRules)
         .defaultSortExchangeCopyLimit(sortExchangeCopyThreshold)
+        .defaultSealedInListThreshold(sealedInListThreshold)
         .build();
   }
 
@@ -907,6 +936,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
       // set if rls (row level security) filters have been applied on the query
       brokerResponse.setRLSFiltersApplied(rlsFiltersApplied);
+
+      // set if an exact aggregation was rewritten into its approximate counterpart, which makes the result
+      // approximate rather than exact
+      if (query.getPlannerContext().isApproximateFunctionApplied()) {
+        brokerResponse.setApproximateFunctionApplied(true);
+        for (String tableName : tableNames) {
+          _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.APPROXIMATE_FUNCTION_OVERRIDES, 1);
+        }
+      }
 
       // Log query and stats
       _queryLogger.logQueryCompleted(

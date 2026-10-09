@@ -199,7 +199,7 @@ public class OrFilterOperatorTest {
             new MatchAllFilterOperator(numDocs)
         ), null, numDocs, false);
 
-    assertTrue((orFilterOperator.getTrues()).getOptimizedDocIdSet() instanceof MatchAllDocIdSet);
+    assertTrue(orFilterOperator.getTrues() instanceof MatchAllDocIdSet);
   }
 
   @Test
@@ -213,7 +213,7 @@ public class OrFilterOperatorTest {
             new TestFilterOperator(emptyDocIds, numDocs)
         ), null, numDocs, false);
 
-    assertTrue(orFilterOperator.getTrues().getOptimizedDocIdSet() instanceof EmptyDocIdSet);
+    assertTrue(orFilterOperator.getTrues() instanceof EmptyDocIdSet);
   }
 
   @Test

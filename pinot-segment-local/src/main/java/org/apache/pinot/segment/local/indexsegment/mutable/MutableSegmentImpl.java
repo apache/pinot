@@ -176,8 +176,10 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Collection<ComplexFieldSpec> _physicalComplexFieldSpecs;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   private final String _dedupTimeColumn;
+  private final List<String> _dedupPrimaryKeyColumns;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final boolean _isPartialUpsert;
+  private final List<String> _upsertPrimaryKeyColumns;
   private final List<String> _upsertComparisonColumns;
   private final String _deleteRecordColumn;
   private final boolean _upsertDropOutOfOrderRecord;
@@ -382,7 +384,8 @@ public class MutableSegmentImpl implements MutableSegment {
           // See isNoDictionaryColumn to have more context.
           dictionaryIndexConfig = DictionaryIndexConfig.DEFAULT;
         }
-        dictionary = DictionaryIndexType.createMutableDictionary(context, dictionaryIndexConfig);
+        dictionary = ((DictionaryIndexType) StandardIndexes.dictionary()).createMutableDictionary(context,
+            dictionaryIndexConfig);
       } else {
         dictionary = null;
         if (!fieldSpec.isSingleValueField()) {
@@ -456,6 +459,9 @@ public class MutableSegmentImpl implements MutableSegment {
     _dedupTimeColumn =
         _partitionDedupMetadataManager != null ? _partitionDedupMetadataManager.getContext().getDedupTimeColumn()
             : null;
+    _dedupPrimaryKeyColumns =
+        _partitionDedupMetadataManager != null ? _partitionDedupMetadataManager.getContext().getPrimaryKeyColumns()
+            : null;
 
     _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
     if (_partitionUpsertMetadataManager != null) {
@@ -463,6 +469,7 @@ public class MutableSegmentImpl implements MutableSegment {
           "Metrics aggregation and upsert cannot be enabled together");
       UpsertContext upsertContext = _partitionUpsertMetadataManager.getContext();
       _isPartialUpsert = upsertContext.getUpsertMode() == UpsertConfig.Mode.PARTIAL;
+      _upsertPrimaryKeyColumns = upsertContext.getPrimaryKeyColumns();
       _upsertComparisonColumns = upsertContext.getComparisonColumns();
       _deleteRecordColumn = upsertContext.getDeleteRecordColumn();
       _upsertDropOutOfOrderRecord = upsertContext.isDropOutOfOrderRecord();
@@ -476,6 +483,7 @@ public class MutableSegmentImpl implements MutableSegment {
       }
     } else {
       _isPartialUpsert = false;
+      _upsertPrimaryKeyColumns = null;
       _upsertComparisonColumns = null;
       _deleteRecordColumn = null;
       _upsertDropOutOfOrderRecord = false;
@@ -777,7 +785,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private DedupRecordInfo getDedupRecordInfo(GenericRow row) {
-    PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
+    PrimaryKey primaryKey = row.getPrimaryKey(_dedupPrimaryKeyColumns);
     // it is okay not having dedup time column if metadata ttl is not enabled
     if (_dedupTimeColumn == null) {
       return new DedupRecordInfo(primaryKey);
@@ -787,7 +795,10 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private RecordInfo getRecordInfo(GenericRow row, int docId) {
-    PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
+    // Take the key from the metadata manager's context, not this segment's schema: the context is fixed for the
+    // life of the manager, while a new consuming segment picks up the latest schema. Reading the schema here lets
+    // a primary key change desync the two and hash the same row under two different keys.
+    PrimaryKey primaryKey = row.getPrimaryKey(_upsertPrimaryKeyColumns);
     Comparable comparisonValue = getComparisonValue(row);
     boolean deleteRecord = _deleteRecordColumn != null && BooleanUtils.toBoolean(row.getValue(_deleteRecordColumn));
     return new RecordInfo(primaryKey, docId, comparisonValue, deleteRecord);
@@ -1335,18 +1346,6 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  /// Returns the per-column mutable OPEN_STRUCT index, or `null` if the column is not OPEN_STRUCT
-  /// or the index has not been initialized.
-  @Nullable
-  public MutableOpenStructIndex getOpenStructIndex(String column) {
-    IndexContainer container = _indexContainerMap.get(column);
-    if (container == null) {
-      return null;
-    }
-    MutableIndex index = container._mutableIndexes.get(StandardIndexes.openStruct());
-    return index instanceof MutableOpenStructIndex ? (MutableOpenStructIndex) index : null;
-  }
-
   @Override
   public void offload() {
     if (_partitionUpsertMetadataManager != null) {
@@ -1734,6 +1733,8 @@ public class MutableSegmentImpl implements MutableSegment {
     DataSource toDataSource() {
       if (_fieldSpec.getDataType() == DataType.OPEN_STRUCT) {
         MutableIndex idx = _mutableIndexes.get(StandardIndexes.openStruct());
+        Preconditions.checkState(idx instanceof MutableOpenStructIndex,
+            "OPEN_STRUCT column '%s' requires the open_struct_index to be enabled", _fieldSpec.getName());
         return new MutableOpenStructDataSource((ComplexFieldSpec) _fieldSpec, (MutableOpenStructIndex) idx,
             _numDocsIndexed);
       }

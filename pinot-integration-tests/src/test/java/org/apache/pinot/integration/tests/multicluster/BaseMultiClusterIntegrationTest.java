@@ -257,9 +257,11 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     serverConfig.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, cluster._tempDir + "/segmentTar");
     serverConfig.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
     serverConfig.setProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, false);
-    serverConfig.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, findAvailablePort(cluster._serverPort));
-    serverConfig.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, findAvailablePort(cluster._serverPort + 1));
-    serverConfig.setProperty(Server.CONFIG_OF_GRPC_PORT, findAvailablePort(cluster._serverPort + 2));
+    int adminPort = findAvailablePort(cluster._serverPort);
+    int nettyPort = findAvailablePort(adminPort + 1);
+    serverConfig.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, adminPort);
+    serverConfig.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, nettyPort);
+    serverConfig.setProperty(Server.CONFIG_OF_GRPC_PORT, findAvailablePort(nettyPort + 1));
     serverConfig.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
     serverConfig.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     serverConfig.setProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, true);

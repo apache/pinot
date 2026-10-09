@@ -35,6 +35,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetcher;
+import org.apache.pinot.broker.routing.segmentpruner.interval.IntervalTree;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -61,9 +62,14 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotSame;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -501,6 +507,112 @@ public class SegmentPrunerTest extends ControllerTest {
     assertEquals(segmentPruner.prune(brokerRequest9, input), Set.of()); // Query with invalid range
   }
 
+  /// The interval tree is rebuilt over every segment of the table, so it must be rebuilt only when the set of segments
+  /// or a segment's time range actually changes. A refresh onto the same time range (an OFFLINE segment replaced by a
+  /// new build of the same range) and an assignment change that adds and removes no segment must keep the tree as is.
+  @Test
+  public void testTimeSegmentPrunerRebuildsOnlyOnChange() {
+    BrokerRequest selectAll = CalciteSqlCompiler.compileToBrokerRequest(QUERY_1);
+    BrokerRequest between20And30 = CalciteSqlCompiler.compileToBrokerRequest(TIME_QUERY_2);
+
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN).build();
+    DateTimeFieldSpec timeFieldSpec = new DateTimeFieldSpec(TIME_COLUMN, DataType.INT, "EPOCH|DAYS", "1:DAYS");
+    TimeSegmentPruner segmentPruner = new TimeSegmentPruner(tableConfig, timeFieldSpec);
+
+    String segment0 = "segment0";
+    String segment1 = "segment1";
+    Set<String> input = Set.of(segment0, segment1);
+    segmentPruner.init(null, null, List.of(segment0, segment1),
+        List.of(createTimeRangeZNRecord(segment0, 10, 15), createTimeRangeZNRecord(segment1, 25, 35)));
+    assertEquals(segmentPruner.prune(selectAll, input), input);
+    assertEquals(segmentPruner.prune(between20And30, input), Set.of(segment1));
+
+    // Refreshing onto the same time range keeps the tree
+    IntervalTree<String> intervalTree = segmentPruner.getIntervalTree();
+    segmentPruner.refreshSegment(segment0, createTimeRangeZNRecord(segment0, 10, 15));
+    segmentPruner.refreshSegment(segment1, createTimeRangeZNRecord(segment1, 25, 35));
+    assertSame(segmentPruner.getIntervalTree(), intervalTree);
+    assertEquals(segmentPruner.prune(between20And30, input), Set.of(segment1));
+
+    // An assignment change that adds and removes no segment keeps the tree
+    segmentPruner.onAssignmentChange(null, null, input, List.of(), List.of());
+    assertSame(segmentPruner.getIntervalTree(), intervalTree);
+
+    // Refreshing onto a new time range rebuilds the tree
+    segmentPruner.refreshSegment(segment0, createTimeRangeZNRecord(segment0, 20, 22));
+    segmentPruner.refreshSegment(segment1, createTimeRangeZNRecord(segment1, 40, 50));
+    assertNotSame(segmentPruner.getIntervalTree(), intervalTree);
+    assertEquals(segmentPruner.prune(between20And30, input), Set.of(segment0));
+
+    // Adding a segment rebuilds the tree
+    intervalTree = segmentPruner.getIntervalTree();
+    String segment2 = "segment2";
+    Set<String> inputWithSegment2 = Set.of(segment0, segment1, segment2);
+    segmentPruner.onAssignmentChange(null, null, inputWithSegment2, List.of(segment2),
+        List.of(createTimeRangeZNRecord(segment2, 28, 29)));
+    assertNotSame(segmentPruner.getIntervalTree(), intervalTree);
+    assertEquals(segmentPruner.prune(between20And30, inputWithSegment2), Set.of(segment0, segment2));
+
+    // Removing a segment rebuilds the tree, so the removed segment is no longer selected
+    intervalTree = segmentPruner.getIntervalTree();
+    segmentPruner.onAssignmentChange(null, null, input, List.of(), List.of());
+    assertNotSame(segmentPruner.getIntervalTree(), intervalTree);
+    assertEquals(segmentPruner.prune(between20And30, inputWithSegment2), Set.of(segment0));
+
+    // A segment whose ZK metadata went missing falls back to the full time range and is not pruned
+    segmentPruner.refreshSegment(segment1, null);
+    assertEquals(segmentPruner.prune(between20And30, input), Set.of(segment0, segment1));
+
+    // Replacing a segment adds one and removes one, so the segment count stays the same, but the tree must be rebuilt
+    intervalTree = segmentPruner.getIntervalTree();
+    String segment3 = "segment3";
+    segmentPruner.onAssignmentChange(null, null, Set.of(segment0, segment3), List.of(segment3),
+        List.of(createTimeRangeZNRecord(segment3, 24, 26)));
+    assertNotSame(segmentPruner.getIntervalTree(), intervalTree);
+    assertEquals(segmentPruner.prune(between20And30, Set.of(segment0, segment1, segment3)), Set.of(segment0, segment3));
+  }
+
+  /// An update that throws part way (e.g. with an OutOfMemoryError while the broker is under heap pressure) can leave
+  /// the interval map ahead of the tree. The next update must rebuild the tree even when it changes nothing itself,
+  /// or the segments added before the failure stay missing from the tree and are dropped from the routing.
+  @Test
+  public void testTimeSegmentPrunerRecoversFromFailedUpdate() {
+    BrokerRequest between20And30 = CalciteSqlCompiler.compileToBrokerRequest(TIME_QUERY_2);
+
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN).build();
+    DateTimeFieldSpec timeFieldSpec = new DateTimeFieldSpec(TIME_COLUMN, DataType.INT, "EPOCH|DAYS", "1:DAYS");
+    TimeSegmentPruner segmentPruner = new TimeSegmentPruner(tableConfig, timeFieldSpec);
+    String segment0 = "segment0";
+    segmentPruner.init(null, null, List.of(segment0), List.of(createTimeRangeZNRecord(segment0, 20, 22)));
+    ZNRecord brokenZNRecord = mock(ZNRecord.class);
+    when(brokenZNRecord.getLongField(anyString(), anyLong())).thenThrow(new IllegalStateException("broken"));
+    String brokenSegment = "brokenSegment";
+
+    // The update adds segment1, then fails on the broken segment before the tree is rebuilt
+    String segment1 = "segment1";
+    assertThrows(IllegalStateException.class,
+        () -> segmentPruner.onAssignmentChange(null, null, Set.of(segment0, segment1, brokenSegment),
+            List.of(segment1, brokenSegment), List.of(createTimeRangeZNRecord(segment1, 25, 26), brokenZNRecord)));
+    Set<String> input = Set.of(segment0, segment1);
+    assertEquals(segmentPruner.prune(between20And30, input), Set.of(segment0));
+
+    // A refresh onto the same time range changes nothing, but must still rebuild the stale tree
+    segmentPruner.refreshSegment(segment0, createTimeRangeZNRecord(segment0, 20, 22));
+    assertEquals(segmentPruner.prune(between20And30, input), Set.of(segment0, segment1));
+
+    // The same failure again, this time repaired by an assignment change that adds and removes no segment
+    String segment2 = "segment2";
+    assertThrows(IllegalStateException.class,
+        () -> segmentPruner.onAssignmentChange(null, null, Set.of(segment0, segment1, segment2, brokenSegment),
+            List.of(segment2, brokenSegment), List.of(createTimeRangeZNRecord(segment2, 27, 28), brokenZNRecord)));
+    Set<String> inputWithSegment2 = Set.of(segment0, segment1, segment2);
+    assertEquals(segmentPruner.prune(between20And30, inputWithSegment2), Set.of(segment0, segment1));
+    segmentPruner.onAssignmentChange(null, null, inputWithSegment2, List.of(), List.of());
+    assertEquals(segmentPruner.prune(between20And30, inputWithSegment2), Set.of(segment0, segment1, segment2));
+  }
+
   @Test
   public void testTimeSegmentPrunerSimpleDateFormat() {
     BrokerRequest brokerRequest1 = CalciteSqlCompiler.compileToBrokerRequest(SDF_QUERY_1);
@@ -694,6 +806,14 @@ public class SegmentPrunerTest extends ControllerTest {
     segmentZKMetadata.setEndTime(endTime);
     segmentZKMetadata.setTimeUnit(unit);
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
+  }
+
+  private static ZNRecord createTimeRangeZNRecord(String segment, long startTime, long endTime) {
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment);
+    segmentZKMetadata.setStartTime(startTime);
+    segmentZKMetadata.setEndTime(endTime);
+    segmentZKMetadata.setTimeUnit(TimeUnit.DAYS);
+    return segmentZKMetadata.toZNRecord();
   }
 
   private void setSegmentZKTotalDocsMetadata(String tableNameWithType, String segment, long totalDocs) {

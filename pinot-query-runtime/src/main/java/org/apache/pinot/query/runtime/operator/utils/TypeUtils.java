@@ -39,13 +39,13 @@ public class TypeUtils {
   public static Object convert(Object value, ColumnDataType storedType) {
     switch (storedType) {
       case INT:
-        return ((Number) value).intValue();
+        return value instanceof Integer ? value : ((Number) value).intValue();
       case LONG:
-        return ((Number) value).longValue();
+        return value instanceof Long ? value : ((Number) value).longValue();
       case FLOAT:
-        return ((Number) value).floatValue();
+        return value instanceof Float ? value : ((Number) value).floatValue();
       case DOUBLE:
-        return ((Number) value).doubleValue();
+        return value instanceof Double ? value : ((Number) value).doubleValue();
       case BIG_DECIMAL:
         return value instanceof BigDecimal ? value : BigDecimal.valueOf(((Number) value).doubleValue());
       // For AggregationFunctions that return serialized custom object, e.g. DistinctCountRawHLLAggregationFunction

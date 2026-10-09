@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.operator.docidsets.SortedDocIdSet;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.utils.Pairs;
 import org.testng.annotations.Test;
@@ -34,8 +33,7 @@ public class SortedDocIdIteratorTest {
 
   @Test
   public void testPairWithSameStartAndEnd() {
-    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(List.of(new Pairs.IntPair(1, 1)));
-    BlockDocIdIterator iterator = sortedDocIdSet.iterator();
+    BlockDocIdIterator iterator = new SortedDocIdIterator(List.of(new Pairs.IntPair(1, 1)));
     List<Integer> result = new ArrayList<>();
     int docId;
     while ((docId = iterator.next()) != Constants.EOF) {
@@ -47,7 +45,7 @@ public class SortedDocIdIteratorTest {
   @Test
   public void testOneDocIdRange() {
     List<Pairs.IntPair> docIdRanges = List.of(new Pairs.IntPair(5, 15));
-    SortedDocIdIterator docIdIterator = new SortedDocIdSet(docIdRanges).iterator();
+    SortedDocIdIterator docIdIterator = new SortedDocIdIterator(docIdRanges);
     assertEquals(docIdIterator.next(), 5);
     assertEquals(docIdIterator.next(), 6);
     assertEquals(docIdIterator.advance(8), 8);
@@ -60,7 +58,7 @@ public class SortedDocIdIteratorTest {
   @Test
   public void testTwoDocIdRanges() {
     List<Pairs.IntPair> docIdRanges = Arrays.asList(new Pairs.IntPair(20, 25), new Pairs.IntPair(30, 35));
-    SortedDocIdIterator docIdIterator = new SortedDocIdSet(docIdRanges).iterator();
+    SortedDocIdIterator docIdIterator = new SortedDocIdIterator(docIdRanges);
     assertEquals(docIdIterator.advance(15), 20);
     assertEquals(docIdIterator.next(), 21);
     assertEquals(docIdIterator.next(), 22);
@@ -74,7 +72,7 @@ public class SortedDocIdIteratorTest {
   public void testDocIdRangesWithSingleDocument() {
     List<Pairs.IntPair> docIdRanges = Arrays
         .asList(new Pairs.IntPair(3, 3), new Pairs.IntPair(8, 8), new Pairs.IntPair(15, 15), new Pairs.IntPair(20, 20));
-    SortedDocIdIterator docIdIterator = new SortedDocIdSet(docIdRanges).iterator();
+    SortedDocIdIterator docIdIterator = new SortedDocIdIterator(docIdRanges);
     assertEquals(docIdIterator.next(), 3);
     assertEquals(docIdIterator.advance(5), 8);
     assertEquals(docIdIterator.next(), 15);

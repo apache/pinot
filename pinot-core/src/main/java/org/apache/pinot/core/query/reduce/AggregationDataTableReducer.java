@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -211,10 +212,29 @@ public class AggregationDataTableReducer implements DataTableReducer {
   private ResultTable reduceToResultTable(DataSchema dataSchema, Object[] finalResults) {
     PostAggregationHandler postAggregationHandler = new PostAggregationHandler(_queryContext, dataSchema);
     DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
-    Object[] row = postAggregationHandler.getResult(finalResults);
 
-    RewriterResult resultRewriterResult =
-        ResultRewriteUtils.rewriteResult(resultDataSchema, List.<Object[]>of(row));
+    // An aggregation without GROUP BY produces a single group covering the whole table, and HAVING filters that
+    // group away or keeps it. The predicate is evaluated on the row before post-aggregation, the same way
+    // GroupByDataTableReducer does it.
+    //
+    // Null awareness is requested unconditionally rather than from requiresNullAwareKeyEvaluation(): that flag only
+    // reports the query's null-handling option, but this reducer materializes a null final result whichever way the
+    // option is set, because an aggregation over an empty whole-table group has no value to report. The flag only
+    // gates the "a null never matches" early return in PredicateRowMatcher, so without it a null result would be
+    // unboxed and throw.
+    List<Object[]> matchedRows;
+    FilterContext havingFilter = _queryContext.getHavingFilter();
+    if (havingFilter != null && !new HavingFilterHandler(havingFilter, postAggregationHandler, true).isMatch(
+        finalResults)) {
+      matchedRows = List.of();
+    } else {
+      matchedRows = List.<Object[]>of(postAggregationHandler.getResult(finalResults));
+    }
+
+    // The result rewriters may replace the DataSchema (ParentAggregationResultRewriter drops the internal parent
+    // columns), so they have to run even when HAVING filtered the single row away. Otherwise the same query would
+    // report a different schema depending on its data.
+    RewriterResult resultRewriterResult = ResultRewriteUtils.rewriteResult(resultDataSchema, matchedRows);
     resultDataSchema = resultRewriterResult.getDataSchema();
     List<Object[]> rows = resultRewriterResult.getRows();
 
