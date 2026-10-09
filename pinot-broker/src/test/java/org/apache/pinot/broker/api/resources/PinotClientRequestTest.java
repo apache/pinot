@@ -23,15 +23,25 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.AsyncResponse;
+import javax.ws.rs.container.CompletionCallback;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.pinot.broker.broker.BrokerDrainManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -131,15 +141,15 @@ public class PinotClientRequestTest {
     AsyncResponse asyncResponse = mock(AsyncResponse.class);
     Request request = mock(Request.class);
     when(request.getRequestURL()).thenReturn(new StringBuilder());
-    when(_requestHandler.handleRequest(any(), any(), any(), any(), any()))
+    when(_requestHandler.handleRequestWithPreAcquiredPermit(any(), any(), any(), any(), any()))
         .thenReturn(BrokerResponseNative.EMPTY_RESULT);
     _pinotClientRequest.processSqlQueryWithBothEnginesAndCompareResults("{\"sql\": \"SELECT * FROM mytable\"}",
         asyncResponse, request, null);
 
     ArgumentCaptor<JsonNode> requestCaptor = ArgumentCaptor.forClass(JsonNode.class);
     ArgumentCaptor<SqlNodeAndOptions> sqlNodeAndOptionsCaptor = ArgumentCaptor.forClass(SqlNodeAndOptions.class);
-    verify(_requestHandler, times(2)).handleRequest(requestCaptor.capture(), sqlNodeAndOptionsCaptor.capture(),
-        any(), any(), any());
+    verify(_requestHandler, times(2)).handleRequestWithPreAcquiredPermit(requestCaptor.capture(),
+        sqlNodeAndOptionsCaptor.capture(), any(), any(), any());
     verify(asyncResponse, times(1)).resume(any(Response.class));
 
     assertEquals(requestCaptor.getAllValues().size(), 2);
@@ -158,18 +168,86 @@ public class PinotClientRequestTest {
     AsyncResponse asyncResponse = mock(AsyncResponse.class);
     Request request = mock(Request.class);
     when(request.getRequestURL()).thenReturn(new StringBuilder());
-    when(_requestHandler.handleRequest(any(), any(), any(), any(), any()))
+    when(_requestHandler.handleRequestWithPreAcquiredPermit(any(), any(), any(), any(), any()))
         .thenReturn(BrokerResponseNative.EMPTY_RESULT);
     _pinotClientRequest.processSqlQueryWithBothEnginesAndCompareResults("{\"sqlV1\": \"SELECT v1 FROM mytable\","
             + "\"sqlV2\": \"SELECT v2 FROM mytable\"}", asyncResponse, request, null);
 
     ArgumentCaptor<JsonNode> requestCaptor = ArgumentCaptor.forClass(JsonNode.class);
-    verify(_requestHandler, times(2)).handleRequest(requestCaptor.capture(), any(), any(), any(), any());
+    verify(_requestHandler, times(2))
+        .handleRequestWithPreAcquiredPermit(requestCaptor.capture(), any(), any(), any(), any());
     verify(asyncResponse, times(1)).resume(any(Response.class));
 
     assertEquals(requestCaptor.getAllValues().size(), 2);
     assertEquals(requestCaptor.getAllValues().get(0).get("sql").asText(), "SELECT v1 FROM mytable");
     assertEquals(requestCaptor.getAllValues().get(1).get("sql").asText(), "SELECT v2 FROM mytable");
+  }
+
+  @Test
+  public void testCompareQueryWaitsForAcceptedTaskWhenSecondSubmissionIsRejected()
+      throws Exception {
+    BrokerDrainManager drainManager = newDrainManager();
+    setDrainManager(drainManager);
+    CountDownLatch errorResponseResumed = new CountDownLatch(1);
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    when(asyncResponse.resume(any(Throwable.class))).thenAnswer(invocation -> {
+      errorResponseResumed.countDown();
+      return true;
+    });
+    when(_requestHandler.handleRequestWithPreAcquiredPermit(any(), any(), any(), any(), any()))
+        .thenReturn(BrokerResponseNative.EMPTY_RESULT);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    CountDownLatch firstTaskStarted = new CountDownLatch(1);
+    CountDownLatch releaseFirstTask = new CountDownLatch(1);
+    CountDownLatch secondSubmissionRejected = new CountDownLatch(1);
+    AtomicInteger submissionCount = new AtomicInteger();
+    doAnswer(invocation -> {
+      Runnable task = invocation.getArgument(0);
+      if (submissionCount.getAndIncrement() == 0) {
+        Thread thread = new Thread(() -> {
+          firstTaskStarted.countDown();
+          try {
+            releaseFirstTask.await();
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+          }
+          task.run();
+        });
+        thread.setDaemon(true);
+        thread.start();
+        return null;
+      }
+      secondSubmissionRejected.countDown();
+      throw new RejectedExecutionException("executor saturated");
+    }).when(_executor).execute(any(Runnable.class));
+
+    CompletableFuture<Void> requestProcessing = CompletableFuture.runAsync(
+        () -> _pinotClientRequest.processSqlQueryWithBothEnginesAndCompareResults(
+            "{\"sql\": \"SELECT * FROM mytable\"}", asyncResponse, request, _httpHeaders));
+    try {
+      Assert.assertTrue(firstTaskStarted.await(10, TimeUnit.SECONDS));
+      Assert.assertTrue(secondSubmissionRejected.await(10, TimeUnit.SECONDS));
+      assertFalse(requestProcessing.isDone(),
+          "Request must wait for the accepted comparison task before resuming an error response");
+      assertFalse(errorResponseResumed.await(1, TimeUnit.SECONDS),
+          "Error response must not be resumed while an accepted comparison task is still running");
+      verify(asyncResponse, never()).resume(any(Throwable.class));
+      assertEquals(drainManager.getStatus().getInFlightQueries(), 1);
+    } finally {
+      releaseFirstTask.countDown();
+    }
+
+    requestProcessing.get(10, TimeUnit.SECONDS);
+    verify(asyncResponse).resume(any(Throwable.class));
+    assertEquals(drainManager.getStatus().getInFlightQueries(), 1,
+        "Permit must remain held until the error response transport completes");
+    ArgumentCaptor<Object> callbackCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(asyncResponse).register(callbackCaptor.capture());
+    ((CompletionCallback) callbackCaptor.getValue()).onComplete(null);
+    assertEquals(drainManager.getStatus().getInFlightQueries(), 0);
   }
 
   @Test
@@ -524,5 +602,210 @@ public class PinotClientRequestTest {
     verify(_brokerMetrics).addMeteredGlobalValue(eq(BrokerMeter.QUERY_RESPONSE_SIZE_BYTES), sizeCaptor.capture());
     assertEquals(sizeCaptor.getValue().longValue(), expectedSize,
         "Metric should record the actual response size in bytes");
+  }
+
+  @Test
+  public void testQueryPermitHeldThroughDeferredResponseSerialization()
+      throws Exception {
+    BrokerDrainManager drainManager = newDrainManager();
+    setDrainManager(drainManager);
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    when(asyncResponse.resume(any(Object.class))).thenReturn(true);
+    when(_requestHandler.handleRequestWithPreAcquiredPermit(any(), any(), any(), any(), any()))
+        .thenReturn(BrokerResponseNative.EMPTY_RESULT);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    _pinotClientRequest.processSqlQueryGet("SELECT * FROM myTable", null, asyncResponse, request, _httpHeaders);
+
+    ArgumentCaptor<Object> callbackCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(asyncResponse).register(callbackCaptor.capture());
+    CompletionCallback completionCallback = (CompletionCallback) callbackCaptor.getValue();
+    ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(asyncResponse).resume(responseCaptor.capture());
+    Response response = (Response) responseCaptor.getValue();
+    ((StreamingOutput) response.getEntity()).write(new ByteArrayOutputStream());
+
+    assertEquals(drainManager.getStatus().getInFlightQueries(), 1,
+        "Permit must remain held after deferred response serialization and before transport completion");
+    completionCallback.onComplete(null);
+    assertEquals(drainManager.getStatus().getInFlightQueries(), 0);
+  }
+
+  @Test
+  public void testQueryPermitReleasedWhenResponseSerializationFails()
+      throws Exception {
+    BrokerDrainManager drainManager = newDrainManager();
+    setDrainManager(drainManager);
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    when(asyncResponse.resume(any(Object.class))).thenReturn(true);
+    when(_requestHandler.handleRequestWithPreAcquiredPermit(any(), any(), any(), any(), any()))
+        .thenReturn(BrokerResponseNative.EMPTY_RESULT);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    _pinotClientRequest.processSqlQueryGet("SELECT * FROM myTable", null, asyncResponse, request, _httpHeaders);
+
+    ArgumentCaptor<Object> callbackCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(asyncResponse).register(callbackCaptor.capture());
+    assertEquals(drainManager.getStatus().getInFlightQueries(), 1);
+    ((CompletionCallback) callbackCaptor.getValue()).onComplete(new IOException("serialization failed"));
+    assertEquals(drainManager.getStatus().getInFlightQueries(), 0);
+  }
+
+  @Test
+  public void testRejectedSqlQueryKeepsBrokerResponseContract()
+      throws Exception {
+    BrokerDrainManager drainManager = newDrainManager();
+    drainManager.drain(0L, false);
+    setDrainManager(drainManager);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    AsyncResponse defaultStatusResponse = mock(AsyncResponse.class);
+    when(defaultStatusResponse.resume(any(Object.class))).thenReturn(true);
+    _pinotClientRequest.processSqlQueryGet("SELECT * FROM myTable", null, defaultStatusResponse, request,
+        _httpHeaders);
+
+    Response response = captureResumedResponse(defaultStatusResponse);
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    assertEquals(response.getHeaders().getFirst(PINOT_QUERY_ERROR_CODE_HEADER),
+        QueryErrorCode.BROKER_SHUTTING_DOWN.getId());
+    assertEquals(readResponseJson(response).get("exceptions").get(0).get("errorCode").asInt(),
+        QueryErrorCode.BROKER_SHUTTING_DOWN.getId());
+    verify(defaultStatusResponse, never()).register(any(Object.class));
+
+    when(_httpHeaders.getHeaderString(CommonConstants.Broker.USE_HTTP_STATUS_FOR_ERRORS_HEADER)).thenReturn("true");
+    AsyncResponse errorStatusResponse = mock(AsyncResponse.class);
+    when(errorStatusResponse.resume(any(Object.class))).thenReturn(true);
+    _pinotClientRequest.processSqlQueryGet("SELECT * FROM myTable", null, errorStatusResponse, request, _httpHeaders);
+
+    response = captureResumedResponse(errorStatusResponse);
+    assertEquals(response.getStatus(), Response.Status.SERVICE_UNAVAILABLE.getStatusCode());
+    assertEquals(response.getHeaders().getFirst(PINOT_QUERY_ERROR_CODE_HEADER),
+        QueryErrorCode.BROKER_SHUTTING_DOWN.getId());
+    assertEquals(readResponseJson(response).get("exceptions").get(0).get("errorCode").asInt(),
+        QueryErrorCode.BROKER_SHUTTING_DOWN.getId());
+    verify(errorStatusResponse, never()).register(any(Object.class));
+    verify(_requestHandler, never()).handleRequestWithPreAcquiredPermit(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  public void testRejectedDmlKeepsServiceUnavailableResponse()
+      throws Exception {
+    BrokerDrainManager drainManager = newDrainManager();
+    drainManager.drain(0L, false);
+    setDrainManager(drainManager);
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    when(asyncResponse.resume(any(Throwable.class))).thenReturn(true);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    _pinotClientRequest.processSqlQueryPost(
+        "{\"sql\":\"INSERT INTO db.tbl FROM FILE 'file:///tmp/file'\"}", asyncResponse, false, 0, request,
+        _httpHeaders);
+
+    ArgumentCaptor<Throwable> responseCaptor = ArgumentCaptor.forClass(Throwable.class);
+    verify(asyncResponse).resume(responseCaptor.capture());
+    WebApplicationException exception = (WebApplicationException) responseCaptor.getValue();
+    assertEquals(exception.getResponse().getStatus(), Response.Status.SERVICE_UNAVAILABLE.getStatusCode());
+    assertEquals(exception.getResponse().getEntity(), drainManager.getRejectMessage());
+    verify(asyncResponse, never()).register(any(Object.class));
+    verify(_sqlQueryExecutor, never()).executeDMLStatement(any(), any());
+  }
+
+  @Test
+  public void testRejectedTimeSeriesQueryKeepsQueryExceptionResponse()
+      throws Exception {
+    BrokerDrainManager drainManager = newDrainManager();
+    drainManager.drain(0L, false);
+    setDrainManager(drainManager);
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    when(asyncResponse.resume(any(Object.class))).thenReturn(true);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    _pinotClientRequest.processTimeSeriesQueryEngine(
+        JsonUtils.stringToJsonNode("{\"query\":\"myQuery\",\"language\":\"m3ql\"}"), asyncResponse, request,
+        _httpHeaders);
+
+    BrokerResponse response = (BrokerResponse) captureResumedObject(asyncResponse);
+    assertEquals(response.getExceptions().get(0).getErrorCode(), QueryErrorCode.BROKER_SHUTTING_DOWN.getId());
+    verify(asyncResponse, never()).register(any(Object.class));
+    verify(_requestHandler, never()).handleTimeSeriesRequestWithPreAcquiredPermit(any(), any(), any(), any(), any(),
+        any());
+  }
+
+  @Test
+  public void testTimeSeriesExplainRemainsAvailableWhileDraining()
+      throws Exception {
+    BrokerDrainManager drainManager = newDrainManager();
+    drainManager.drain(0L, false);
+    setDrainManager(drainManager);
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    when(asyncResponse.resume(any(Object.class))).thenReturn(true);
+    BrokerResponse explainResponse = BrokerResponseNative.EMPTY_RESULT;
+    when(_requestHandler.handleExplainTimeSeriesRequest(any(), any(), any())).thenReturn(explainResponse);
+
+    _pinotClientRequest.processTimeSeriesQueryEngine(
+        JsonUtils.stringToJsonNode("{\"query\":\"myQuery\",\"language\":\"m3ql\",\"mode\":\"explain\"}"),
+        asyncResponse, mock(Request.class), _httpHeaders);
+
+    Assert.assertSame(captureResumedObject(asyncResponse), explainResponse);
+    verify(asyncResponse, never()).register(any(Object.class));
+    verify(_requestHandler).handleExplainTimeSeriesRequest(eq("m3ql"), eq("myQuery"), any());
+  }
+
+  @Test
+  public void testResumeFailureAndCompletionCallbackClosePermitOnlyOnce()
+      throws Exception {
+    BrokerDrainManager drainManager = newDrainManager();
+    setDrainManager(drainManager);
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    when(asyncResponse.resume(any(Object.class))).thenReturn(false);
+    when(_requestHandler.handleRequestWithPreAcquiredPermit(any(), any(), any(), any(), any()))
+        .thenReturn(BrokerResponseNative.EMPTY_RESULT);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    _pinotClientRequest.processSqlQueryGet("SELECT * FROM myTable", null, asyncResponse, request, _httpHeaders);
+
+    ArgumentCaptor<Object> callbackCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(asyncResponse).register(callbackCaptor.capture());
+    assertEquals(drainManager.getStatus().getInFlightQueries(), 0);
+    CompletionCallback completionCallback = (CompletionCallback) callbackCaptor.getValue();
+    completionCallback.onComplete(null);
+    completionCallback.onComplete(new IOException("late completion"));
+    assertEquals(drainManager.getStatus().getInFlightQueries(), 0);
+  }
+
+  private static Response captureResumedResponse(AsyncResponse asyncResponse) {
+    return (Response) captureResumedObject(asyncResponse);
+  }
+
+  private static Object captureResumedObject(AsyncResponse asyncResponse) {
+    ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(asyncResponse).resume(responseCaptor.capture());
+    return responseCaptor.getValue();
+  }
+
+  private static JsonNode readResponseJson(Response response)
+      throws IOException {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    ((StreamingOutput) response.getEntity()).write(outputStream);
+    return JsonUtils.stringToJsonNode(outputStream.toString(StandardCharsets.UTF_8));
+  }
+
+  private static BrokerDrainManager newDrainManager() {
+    return BrokerDrainManager.localOnly("Broker_localhost_8099", () -> {
+    }, () -> {
+    }, 10_000L);
+  }
+
+  private void setDrainManager(BrokerDrainManager drainManager)
+      throws ReflectiveOperationException {
+    Field field = PinotClientRequest.class.getDeclaredField("_brokerDrainManager");
+    field.setAccessible(true);
+    field.set(_pinotClientRequest, drainManager);
   }
 }
