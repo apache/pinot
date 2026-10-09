@@ -97,6 +97,7 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
     if (stepEvents == null || stepEvents.isEmpty()) {
       return new DoubleArrayList();
     }
+    stepEvents = new PriorityQueue<>(stepEvents);
     Map<Integer, List<Object>> stepValueAggregators = initValueAggregator();
     boolean hasMatchedFunnel = false;
     ArrayDeque<FunnelStepEvent> slidingWindow = new ArrayDeque<>();

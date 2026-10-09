@@ -192,7 +192,7 @@ public class MultistageGroupByExecutor {
     }
   }
 
-  /// Select up to `maxRows` groups using `collations`, preserving all intermediate groups when trim is unsafe.
+  /// Select up to `maxRows` groups using `collations` and native final aggregate values for intermediate rows.
   public List<Object[]> getResult(List<RelFieldCollation> collations, int maxRows) {
     int numKeys = _groupKeyIds.length;
     int numCollations = collations.size();
@@ -210,19 +210,6 @@ public class MultistageGroupByExecutor {
         AggregationFunction aggFunction = _aggFunctions[index - numKeys];
         if (aggFunction.getIntermediateResultColumnType().getStoredType() != ColumnDataType.OBJECT) {
           continue;
-        }
-        // These intermediate objects already compare by the aggregate's numeric value.
-        switch (aggFunction.getType()) {
-          case AVG, AVGMV, MINMAXRANGE, MINMAXRANGEMV, SUMPRECISION:
-            continue;
-          default:
-            break;
-        }
-        // Serialized sketches and array results lack a safe scalar trim order. Funnel finalization consumes events.
-        // Preserve every group for the downstream aggregate and sort instead of finalizing these intermediates.
-        if (!aggFunction.getFinalResultColumnType().getStoredType().isNumber()
-            || aggFunction.getType().name().startsWith("FUNNEL")) {
-          return getResult(Integer.MAX_VALUE);
         }
         sortFunctions[i] = aggFunction;
         finalizeSortValues = true;
@@ -308,7 +295,8 @@ public class MultistageGroupByExecutor {
       @Nullable AggregationFunction aggFunction) {
     if (row.sortKeys()[sortIndex] == UNINITIALIZED_SORT_VALUE) {
       Object value = row.row()[columnIndex];
-      // Finalize only when this ORDER BY key is compared, and cache null results as well as non-null results.
+      // Like SSE, compare native final objects before output conversion (e.g. BigDecimal, SerializedHLL, lists).
+      // Extract lazily and retain the intermediate row for merging. Cache null results as well as non-null results.
       row.sortKeys()[sortIndex] = aggFunction != null ? aggFunction.extractFinalResult(value) : value;
     }
   }

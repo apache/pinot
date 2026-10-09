@@ -41,11 +41,12 @@ class BitmapMergeStrategy implements MergeStrategy<List<RoaringBitmap>> {
   @Override
   public LongArrayList extractFinalResult(List<RoaringBitmap> stepsBitmaps) {
     long[] result = new long[_numSteps];
-    result[0] = stepsBitmaps.get(0).getCardinality();
+    RoaringBitmap intersection = stepsBitmaps.get(0).clone();
+    result[0] = intersection.getCardinality();
     for (int i = 1; i < _numSteps; i++) {
       // intersect this step with previous step
-      stepsBitmaps.get(i).and(stepsBitmaps.get(i - 1));
-      result[i] = stepsBitmaps.get(i).getCardinality();
+      intersection.and(stepsBitmaps.get(i));
+      result[i] = intersection.getCardinality();
     }
     return LongArrayList.wrap(result);
   }

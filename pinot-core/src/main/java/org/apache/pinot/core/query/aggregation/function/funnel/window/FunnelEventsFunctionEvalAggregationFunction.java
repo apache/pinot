@@ -490,6 +490,7 @@ public class FunnelEventsFunctionEvalAggregationFunction
     if (stepEvents == null || stepEvents.isEmpty()) {
       return finalResults;
     }
+    stepEvents = new PriorityQueue<>(stepEvents);
     ArrayDeque<FunnelStepEventWithExtraFields> slidingWindow = new ArrayDeque<>();
     while (!stepEvents.isEmpty()) {
       fillWindow(stepEvents, slidingWindow);

@@ -468,27 +468,32 @@ public class AggregateOperatorTest {
             OperatorTestUtil.block(inputSchema, new Object[]{1, 1L, 1}, new Object[]{2, 2L, 1}, new Object[]{3, 3L, 1},
                 new Object[]{4, 4L, 1}, new Object[]{5, 5L, 1}, new Object[]{6, 6L, 1})),
         new AggregateNode(-1, intermediateSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
-            AggType.LEAF, false, List.of(new RelFieldCollation(1)), 1));
+            AggType.LEAF, false, List.of(new RelFieldCollation(1), new RelFieldCollation(0)), 1));
     DataSchema resultSchema = new DataSchema(new String[]{"group", "funnel"}, new ColumnDataType[]{INT, INT});
     AggregateOperator result = new AggregateOperator(context, leaf,
         new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
             AggType.FINAL, false, null, 0));
 
     List<Object[]> rows = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
-    assertEquals(rows.stream().map(row -> row[0]).sorted().toList(), List.of(1, 2, 3, 4, 5, 6));
+    assertEquals(rows.stream().map(row -> row[0]).sorted().toList(), List.of(1, 2, 3, 4, 5));
     rows.forEach(row -> assertEquals(row[1], 1));
     assertTrue(result.nextBlock().isSuccess());
   }
 
   @Test
-  public void testOrderedRawHllGroupTrimPreservesAllIntermediateSketches() {
+  public void testOrderedRawHllGroupTrimUsesNativeCardinalities() {
     OpChainExecutionContext context =
         OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "1"));
     DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
-    MseBlock.Data input = OperatorTestUtil.block(inputSchema, new Object[]{1, 1}, new Object[]{2, 2},
-        new Object[]{3, 3}, new Object[]{4, 4}, new Object[]{5, 5}, new Object[]{6, 6});
+    BlockListMultiStageOperator.Builder inputBuilder = new BlockListMultiStageOperator.Builder(context, inputSchema);
+    for (int group = 1; group <= 6; group++) {
+      for (int value = 0; value < group; value++) {
+        inputBuilder.addRow(group, group * 10 + value);
+      }
+    }
+    MseBlock.Data input = (MseBlock.Data) inputBuilder.buildWithEos().nextBlock();
     List<RexExpression.FunctionCall> aggCalls = List.of(new RexExpression.FunctionCall(STRING, "DISTINCTCOUNTRAWHLL",
-        List.of(new RexExpression.InputRef(1), new RexExpression.Literal(INT, 4))));
+        List.of(new RexExpression.InputRef(1), new RexExpression.Literal(INT, 12))));
     List<RelFieldCollation> collations =
         List.of(new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING), new RelFieldCollation(0));
     DataSchema resultSchema = new DataSchema(new String[]{"group", "hll"}, new ColumnDataType[]{INT, STRING});
@@ -504,16 +509,17 @@ public class AggregateOperatorTest {
         new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
             AggType.FINAL, false, null, 0));
 
-    List<Object[]> expected = ((MseBlock.Data) direct.nextBlock()).asRowHeap().getRows();
+    List<Object[]> expected = ((MseBlock.Data) direct.nextBlock()).asRowHeap().getRows().stream()
+        .filter(row -> !row[0].equals(1)).toList();
     List<Object[]> actual = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
-    assertEquals(actual.size(), 6, "Intermediate serialized sketches must remain available for the final merge");
+    assertEquals(actual.stream().map(row -> row[0]).sorted().toList(), List.of(2, 3, 4, 5, 6));
     assertEqualsNoOrder(actual.stream().map(row -> List.of(row)).toArray(),
         expected.stream().map(row -> List.of(row)).toArray());
     assertTrue(result.nextBlock().isSuccess());
   }
 
   @Test
-  public void testOrderedHistogramGroupTrimPreservesAllIntermediateResults() {
+  public void testOrderedHistogramGroupTrimUsesNativeLists() {
     OpChainExecutionContext context =
         OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "1"));
     DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
@@ -522,15 +528,25 @@ public class AggregateOperatorTest {
             new RexExpression.Literal(DOUBLE, 10.0), new RexExpression.Literal(INT, 10))));
     DataSchema intermediateSchema =
         new DataSchema(new String[]{"group", "histogram"}, new ColumnDataType[]{INT, ColumnDataType.OBJECT});
-    AggregateOperator leaf = new AggregateOperator(context,
-        new BlockListMultiStageOperator(context, OperatorTestUtil.block(inputSchema, new Object[]{1, 1},
-            new Object[]{2, 2}, new Object[]{3, 3}, new Object[]{4, 4}, new Object[]{5, 5}, new Object[]{6, 6})),
+    BlockListMultiStageOperator.Builder input = new BlockListMultiStageOperator.Builder(context, inputSchema);
+    for (int group = 1; group <= 6; group++) {
+      for (int value = 0; value < group; value++) {
+        input.addRow(group, 1);
+      }
+    }
+    AggregateOperator leaf = new AggregateOperator(context, input.buildWithEos(),
         new AggregateNode(-1, intermediateSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
-            AggType.LEAF, false, List.of(new RelFieldCollation(1)), 1));
+            AggType.LEAF, false, List.of(new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING)), 1));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "histogram"}, new ColumnDataType[]{INT, ColumnDataType.DOUBLE_ARRAY});
+    AggregateOperator result = new AggregateOperator(context, leaf,
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.FINAL, false, null, 0));
 
-    List<Object[]> rows = ((MseBlock.Data) leaf.nextBlock()).asRowHeap().getRows();
-    assertEquals(rows.stream().map(row -> row[0]).sorted().toList(), List.of(1, 2, 3, 4, 5, 6));
-    assertTrue(leaf.nextBlock().isSuccess());
+    List<Object[]> rows = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.stream().map(row -> row[0]).sorted().toList(), List.of(2, 3, 4, 5, 6));
+    rows.forEach(row -> assertEquals(((double[]) row[1])[1], ((Integer) row[0]).doubleValue()));
+    assertTrue(result.nextBlock().isSuccess());
   }
 
   private AggregateOperator getAggregateOperator(OpChainExecutionContext context, PlanNode.NodeHint nodeHint, int limit,
