@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.routing.timeboundary;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -224,6 +225,81 @@ public class TimeBoundaryManagerTest extends ControllerTest {
     idealState.getRecord().getSimpleFields().remove(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY);
     timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), expectedTimeValue);
+  }
+
+  /// The ZK metadata of the segments added by an assignment change must be read in one batch, and removing a segment
+  /// must only move the time boundary back when that segment held the max end time.
+  @Test
+  public void testBatchedReadsAndIncrementalMaxEndTime() {
+    String rawTableName = "testTableBatchedReads";
+    TableConfig tableConfig = getTableConfig(rawTableName, "DAILY");
+    TimeUnit timeUnit = TimeUnit.DAYS;
+    setSchemaTimeFieldSpec(rawTableName, timeUnit);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = Mockito.spy(_propertyStore);
+    TimeBoundaryManager timeBoundaryManager =
+        new TimeBoundaryManager(tableConfig, propertyStore, Mockito.mock(BrokerMetrics.class));
+
+    ExternalView externalView = new ExternalView(tableConfig.getTableName());
+    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
+    Map<String, String> onlineInstanceStateMap = Map.of("server", ONLINE);
+    Set<String> onlineSegments = new HashSet<>();
+    IdealState idealState = new IdealState("");
+    String segment0 = "batchedSegment0";
+    onlineSegments.add(segment0);
+    segmentAssignment.put(segment0, onlineInstanceStateMap);
+    setSegmentZKMetadata(rawTableName, segment0, 3, timeUnit);
+    timeBoundaryManager.init(idealState, externalView, onlineSegments);
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), 2);
+
+    // Adding 2 segments reads their ZK metadata in one batch
+    String segment1 = "batchedSegment1";
+    String segment2 = "batchedSegment2";
+    setSegmentZKMetadata(rawTableName, segment1, 4, timeUnit);
+    setSegmentZKMetadata(rawTableName, segment2, 6, timeUnit);
+    onlineSegments.add(segment1);
+    onlineSegments.add(segment2);
+    segmentAssignment.put(segment1, onlineInstanceStateMap);
+    segmentAssignment.put(segment2, onlineInstanceStateMap);
+    Mockito.clearInvocations(propertyStore);
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), 5);
+    Mockito.verify(propertyStore).get(Mockito.argThat((List<String> paths) -> paths.size() == 2), Mockito.any(),
+        Mockito.anyInt(), Mockito.anyBoolean());
+    Mockito.verifyNoMoreInteractions(propertyStore);
+
+    // An assignment change without new segment does not read ZK metadata
+    Mockito.clearInvocations(propertyStore);
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), 5);
+    Mockito.verifyNoInteractions(propertyStore);
+
+    // Removing a segment that does not hold the max end time keeps the time boundary
+    onlineSegments.remove(segment1);
+    segmentAssignment.remove(segment1);
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), 5);
+
+    // Removing the segment that holds the max end time moves the time boundary back
+    onlineSegments.remove(segment2);
+    segmentAssignment.remove(segment2);
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), 2);
+    Mockito.verifyNoInteractions(propertyStore);
+
+    // Refreshing the segment holding the max end time to a smaller end time moves the time boundary back
+    setSegmentZKMetadata(rawTableName, segment0, 2, timeUnit);
+    timeBoundaryManager.refreshSegment(segment0);
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), 1);
+
+    // A new segment whose ZK metadata cannot be read is read again on the next change
+    String segment3 = "batchedSegment3";
+    onlineSegments.add(segment3);
+    segmentAssignment.put(segment3, onlineInstanceStateMap);
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), 1);
+    setSegmentZKMetadata(rawTableName, segment3, 8, timeUnit);
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), 7);
   }
 
   private TableConfig getTableConfig(String rawTableName, String pushFrequency) {

@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.timeboundary;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -63,6 +64,9 @@ public class TimeBoundaryManager {
   private final DateTimeFormatSpec _timeFormatSpec;
   private final long _timeOffsetMs;
   private final Map<String, Long> _endTimeMsMap = new HashMap<>();
+  // Max value in _endTimeMsMap, or INVALID_TIME_MS when it is empty. Kept in sync with the map so that an assignment
+  // change does not scan all the segments.
+  private long _maxEndTimeMs = INVALID_TIME_MS;
 
   private long _explicitlySetTimeBoundaryMs = INVALID_TIME_MS;
   private volatile TimeBoundaryInfo _timeBoundaryInfo;
@@ -120,14 +124,12 @@ public class TimeBoundaryManager {
       segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
     }
     List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
-    long maxEndTimeMs = INVALID_TIME_MS;
     for (int i = 0; i < numSegments; i++) {
       String segment = segments.get(i);
-      long endTimeMs = extractEndTimeMsFromSegmentZKMetadataZNRecord(segment, znRecords.get(i));
-      _endTimeMsMap.put(segment, endTimeMs);
-      maxEndTimeMs = Math.max(maxEndTimeMs, endTimeMs);
+      _endTimeMsMap.put(segment, extractEndTimeMsFromSegmentZKMetadataZNRecord(segment, znRecords.get(i)));
     }
-    updateTimeBoundaryInfo(maxEndTimeMs);
+    _maxEndTimeMs = computeMaxEndTimeMs();
+    updateTimeBoundaryInfo(_maxEndTimeMs);
   }
 
   private void updateExplicitlySetTimeBoundary(IdealState idealState) {
@@ -206,20 +208,59 @@ public class TimeBoundaryManager {
       Set<String> onlineSegments) {
     updateExplicitlySetTimeBoundary(idealState);
 
+    // Read the ZK metadata of the new segments in one batch
+    List<String> newSegments = new ArrayList<>();
+    List<String> newSegmentZKMetadataPaths = new ArrayList<>();
     for (String segment : onlineSegments) {
       // NOTE: Only update the segment end time when there are ONLINE instances in the external view to prevent moving
       //       the time boundary before the new segment is picked up by the servers
-      Map<String, String> instanceStateMap = externalView.getStateMap(segment);
-      if (instanceStateMap != null && instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
-        _endTimeMsMap.computeIfAbsent(segment, k -> extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
-            _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
+      if (!_endTimeMsMap.containsKey(segment)) {
+        Map<String, String> instanceStateMap = externalView.getStateMap(segment);
+        if (instanceStateMap != null && instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
+          newSegments.add(segment);
+          newSegmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
+        }
       }
     }
-    _endTimeMsMap.keySet().retainAll(onlineSegments);
-    updateTimeBoundaryInfo(getMaxEndTimeMs());
+    boolean recomputeMaxEndTime = false;
+    // NOTE: Removing a segment can only lower the max end time, so a full scan is needed only when a removed segment
+    //       holds the current max end time.
+    Iterator<Map.Entry<String, Long>> iterator = _endTimeMsMap.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<String, Long> entry = iterator.next();
+      if (!onlineSegments.contains(entry.getKey())) {
+        if (entry.getValue() >= _maxEndTimeMs) {
+          recomputeMaxEndTime = true;
+        }
+        iterator.remove();
+      }
+    }
+    if (recomputeMaxEndTime) {
+      _maxEndTimeMs = computeMaxEndTimeMs();
+    }
+    if (!newSegments.isEmpty()) {
+      List<ZNRecord> znRecords =
+          _propertyStore.get(newSegmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
+      int numNewSegments = newSegments.size();
+      for (int i = 0; i < numNewSegments; i++) {
+        String segment = newSegments.get(i);
+        ZNRecord znRecord = znRecords.get(i);
+        if (znRecord == null) {
+          // NOTE: The batched read returns null for a missing node and for a failed read. Do not record the segment, so
+          //       that the next assignment change reads it again.
+          LOGGER.warn("Failed to read segment ZK metadata for segment: {}, table: {}, will retry on next change",
+              segment, _offlineTableName);
+          continue;
+        }
+        long endTimeMs = extractEndTimeMsFromSegmentZKMetadataZNRecord(segment, znRecord);
+        _endTimeMsMap.put(segment, endTimeMs);
+        _maxEndTimeMs = Math.max(_maxEndTimeMs, endTimeMs);
+      }
+    }
+    updateTimeBoundaryInfo(_maxEndTimeMs);
   }
 
-  private long getMaxEndTimeMs() {
+  private long computeMaxEndTimeMs() {
     long maxEndTimeMs = INVALID_TIME_MS;
     for (long endTimeMs : _endTimeMsMap.values()) {
       maxEndTimeMs = Math.max(maxEndTimeMs, endTimeMs);
@@ -229,9 +270,16 @@ public class TimeBoundaryManager {
 
   /// Refreshes the metadata for the given segment (called when segment is getting refreshed).
   public synchronized void refreshSegment(String segment) {
-    _endTimeMsMap.put(segment, extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
-        _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
-    updateTimeBoundaryInfo(getMaxEndTimeMs());
+    long endTimeMs = extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
+        _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT));
+    Long previousEndTimeMs = _endTimeMsMap.put(segment, endTimeMs);
+    if (previousEndTimeMs != null && previousEndTimeMs >= _maxEndTimeMs && endTimeMs < previousEndTimeMs) {
+      // The refreshed segment held the max end time and moved it back
+      _maxEndTimeMs = computeMaxEndTimeMs();
+    } else {
+      _maxEndTimeMs = Math.max(_maxEndTimeMs, endTimeMs);
+    }
+    updateTimeBoundaryInfo(_maxEndTimeMs);
   }
 
   @Nullable
