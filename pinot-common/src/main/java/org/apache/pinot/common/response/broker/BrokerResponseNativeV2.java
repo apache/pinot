@@ -53,9 +53,10 @@ import org.apache.pinot.common.response.ProcessingException;
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
-    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes", "pools",
-    "rlsFiltersApplied", "approximateFunctionApplied", "groupsTrimmed", "mseLiteLeafStageLimitReached",
-    "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied", "responseMetadata"
+    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
+    "totalMemAllocatedBytes", "pools", "rlsFiltersApplied", "approximateFunctionApplied", "groupsTrimmed",
+    "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied",
+    "responseMetadata"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
@@ -81,6 +82,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   /// virtual rows can be generated. For example, in a join query, the number of rows can be more than the number of
   /// rows in the table.
   private long _maxRowsInOperator;
+  private long _totalMemAllocatedBytes;
   private String _requestId;
   private String _clientRequestId;
   private String _brokerId;
@@ -270,6 +272,17 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void mergeMaxRowsInOperator(long maxRows) {
     _maxRowsInOperator = Math.max(_maxRowsInOperator, maxRows);
+  }
+
+  /// Returns the heap bytes allocated by the query across all its stages and workers, as reported in the stage stats.
+  /// This is the total allocated (including short-lived objects), not the peak heap used. It is 0 unless thread
+  /// allocated bytes measurement is enabled on the brokers and servers.
+  public long getTotalMemAllocatedBytes() {
+    return _totalMemAllocatedBytes;
+  }
+
+  public void addTotalMemAllocatedBytes(long bytes) {
+    _totalMemAllocatedBytes += bytes;
   }
 
   @Override
