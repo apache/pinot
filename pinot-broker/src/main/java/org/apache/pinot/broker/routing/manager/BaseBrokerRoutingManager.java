@@ -77,6 +77,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -391,6 +392,7 @@ public abstract class BaseBrokerRoutingManager
     if (idealStateVersion != routingEntry.getLastUpdateIdealStateVersion()
         || externalViewVersion != routingEntry.getLastUpdateExternalViewVersion()) {
       String tableNameWithType = routingEntry.getTableNameWithType();
+      long startTimeNs = System.nanoTime();
       try {
         IdealState idealState = getIdealState(routingEntry._idealStatePath);
         if (idealState == null) {
@@ -403,10 +405,19 @@ public abstract class BaseBrokerRoutingManager
           return true;
         }
         routingEntry.onAssignmentChange(idealState, externalView);
+        // Only successful updates are timed and counted, so that a table whose update keeps failing does not look
+        // like a table with many assignment changes
+        long updateTimeNs = System.nanoTime() - startTimeNs;
+        _brokerMetrics.addTimedTableValue(tableNameWithType, BrokerTimer.ROUTING_TABLE_UPDATE_TIME, updateTimeNs,
+            TimeUnit.NANOSECONDS);
+        _brokerMetrics.addTimedValue(BrokerTimer.ROUTING_TABLE_UPDATE_TIME, updateTimeNs, TimeUnit.NANOSECONDS);
+        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.ROUTING_TABLE_UPDATES, 1L);
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry on segment assignment change for "
             + "table: {}", tableNameWithType, e);
+        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURES, 1L);
       }
+      updateRoutingSegmentsMetric(routingEntry);
       updateReplicaHealthMetrics(routingEntry);
       return true;
     }
@@ -781,6 +792,12 @@ public abstract class BaseBrokerRoutingManager
         replicaHealth.getNumUnavailableSegments());
   }
 
+  /// Reports the number of segments the routing entry tracks. Callers must hold the table's routing build lock.
+  private void updateRoutingSegmentsMetric(RoutingEntry routingEntry) {
+    _brokerMetrics.setValueOfTableGauge(routingEntry.getTableNameWithType(), BrokerGauge.ROUTING_TABLE_SEGMENTS,
+        routingEntry.getNumSegments());
+  }
+
   /// Stops reporting the table's replica health gauges, so that they do not keep being exported frozen at a
   /// value that no longer describes the table.
   private void removeReplicaHealthMetrics(String tableNameWithType) {
@@ -980,7 +997,7 @@ public abstract class BaseBrokerRoutingManager
           new RoutingEntry(tableNameWithType, idealStatePath, externalViewPath, segmentPreSelector, segmentSelector,
               segmentPruners, instanceSelector, idealStateVersion, externalViewVersion, segmentZkMetadataFetcher,
               timeBoundaryManager, partitionMetadataManager, queryTimeoutMs, samplerInfos,
-              !idealState.isEnabled());
+              !idealState.isEnabled(), preSelectedOnlineSegments.size());
       if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
         LOGGER.info("Built routing for table: {}", tableNameWithType);
       } else {
@@ -989,6 +1006,7 @@ public abstract class BaseBrokerRoutingManager
       // Reported only once the entry is stored, so that a build that failed earlier cannot leave gauges
       // behind with no routing entry to ever clean them up. The IS / EV re-check below reports again if it
       // ends up updating the entry.
+      updateRoutingSegmentsMetric(routingEntry);
       updateReplicaHealthMetrics(routingEntry);
 
       // Check for updates to the IS / EV after adding the routing entry, as it is possible that the
@@ -1074,6 +1092,7 @@ public abstract class BaseBrokerRoutingManager
         // Stop reporting the table level gauges owned by the routing, otherwise they keep being exported
         // for a table this broker no longer serves
         removeReplicaHealthMetrics(tableNameWithType);
+        _brokerMetrics.removeTableGauge(tableNameWithType, BrokerGauge.ROUTING_TABLE_SEGMENTS);
 
         // Remove time boundary manager for the offline part routing if the removed routing is the real-time part of a
         // hybrid table
@@ -1427,12 +1446,15 @@ public abstract class BaseBrokerRoutingManager
 
     transient boolean _disabled;
 
+    // Number of pre-selected online segments at the last build or assignment change
+    transient int _numSegments;
+
     RoutingEntry(String tableNameWithType, String idealStatePath, String externalViewPath,
         SegmentPreSelector segmentPreSelector, SegmentSelector segmentSelector, List<SegmentPruner> segmentPruners,
         InstanceSelector instanceSelector, int lastUpdateIdealStateVersion, int lastUpdateExternalViewVersion,
         SegmentZkMetadataFetcher segmentZkMetadataFetcher, @Nullable TimeBoundaryManager timeBoundaryManager,
         @Nullable SegmentPartitionMetadataManager partitionMetadataManager, @Nullable Long queryTimeoutMs,
-        Map<String, SamplerInfo> samplerInfos, boolean disabled) {
+        Map<String, SamplerInfo> samplerInfos, boolean disabled, int numSegments) {
       _tableNameWithType = tableNameWithType;
       _idealStatePath = idealStatePath;
       _externalViewPath = externalViewPath;
@@ -1448,6 +1470,7 @@ public abstract class BaseBrokerRoutingManager
       _samplerInfos = samplerInfos;
       _segmentZkMetadataFetcher = segmentZkMetadataFetcher;
       _disabled = disabled;
+      _numSegments = numSegments;
     }
 
     String getTableNameWithType() {
@@ -1482,6 +1505,10 @@ public abstract class BaseBrokerRoutingManager
 
     boolean isDisabled() {
       return _disabled;
+    }
+
+    int getNumSegments() {
+      return _numSegments;
     }
 
     private void updateSamplerInfos(IdealState idealState, ExternalView externalView,
@@ -1528,6 +1555,7 @@ public abstract class BaseBrokerRoutingManager
       _disabled = !idealState.isEnabled();
       Set<String> onlineSegments = getOnlineSegments(idealState);
       Set<String> preSelectedOnlineSegments = _segmentPreSelector.preSelect(onlineSegments);
+      _numSegments = preSelectedOnlineSegments.size();
       _segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
       _segmentSelector.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
       _instanceSelector.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);

@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
@@ -51,6 +52,7 @@ import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
@@ -525,13 +527,14 @@ public class BrokerRoutingManagerTest {
     Constructor<?> constructor = routingEntryClass.getDeclaredConstructor(String.class, String.class, String.class,
         SegmentPreSelector.class, SegmentSelector.class, List.class, InstanceSelector.class, int.class, int.class,
         SegmentZkMetadataFetcher.class, TimeBoundaryManager.class, SegmentPartitionMetadataManager.class, Long.class,
-        Map.class, boolean.class);
+        Map.class, boolean.class, int.class);
     constructor.setAccessible(true);
+    SegmentPreSelector segmentPreSelector = onlineSegments -> onlineSegments;
     return constructor.newInstance(tableNameWithType, "/IDEALSTATES/" + tableNameWithType,
-        "/EXTERNALVIEW/" + tableNameWithType, mock(SegmentPreSelector.class), segmentSelector, segmentPruners,
+        "/EXTERNALVIEW/" + tableNameWithType, segmentPreSelector, segmentSelector, segmentPruners,
         instanceSelector, 1, 1,
         mock(SegmentZkMetadataFetcher.class), timeBoundaryManager, partitionMetadataManager, null, samplerInfos,
-        disabled);
+        disabled, 0);
   }
 
   private static Object createSamplerInfo(InstanceSelector instanceSelector)
@@ -573,6 +576,52 @@ public class BrokerRoutingManagerTest {
     _routingManager.removeRouting(TEST_TABLE);
 
     verifyReplicaHealthGaugesRemoved();
+    verify(_brokerMetrics).removeTableGauge(TEST_TABLE, BrokerGauge.ROUTING_TABLE_SEGMENTS);
+  }
+
+  @Test
+  public void testAssignmentChangeReportsRebuildMetrics()
+      throws Exception {
+    // Every rebuild triggered by an ideal state or external view change is timed, counted and reports the
+    // number of segments the routing tracks
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    IdealState idealState = createIdealState(true);
+    idealState.getRecord().setMapField("seg0", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
+    idealState.getRecord().setMapField("seg1", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
+    idealState.getRecord().setMapField("offlineSeg", Map.of(SERVER_INSTANCE_ID, "OFFLINE"));
+    stubSegmentAssignmentChange(idealState);
+
+    _routingManager.processSegmentAssignmentChangeInternal();
+
+    verify(_brokerMetrics).addTimedTableValue(eq(TEST_TABLE), eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME), anyLong(),
+        eq(TimeUnit.NANOSECONDS));
+    verify(_brokerMetrics).addTimedValue(eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME), anyLong(),
+        eq(TimeUnit.NANOSECONDS));
+    verify(_brokerMetrics).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATES, 1L);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.ROUTING_TABLE_SEGMENTS, 2L);
+    verify(_brokerMetrics, never()).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURES, 1L);
+  }
+
+  @Test
+  public void testFailedAssignmentChangeReportsFailureMetric()
+      throws Exception {
+    // A failed update is counted as a failure, not as an update, and is not timed, so that a table whose update
+    // keeps failing does not look like a table with many assignment changes
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    doThrow(new RuntimeException("test")).when(instanceSelector).onAssignmentChange(any(), any(), any());
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    IdealState idealState = createIdealState(true);
+    idealState.getRecord().setMapField("seg0", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
+    stubSegmentAssignmentChange(idealState);
+
+    _routingManager.processSegmentAssignmentChangeInternal();
+
+    verify(_brokerMetrics).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURES, 1L);
+    verify(_brokerMetrics, never()).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATES, 1L);
+    verify(_brokerMetrics, never()).addTimedTableValue(eq(TEST_TABLE), eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME),
+        anyLong(), any());
+    verify(_brokerMetrics, never()).addTimedValue(eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME), anyLong(), any());
   }
 
   @Test
@@ -657,6 +706,7 @@ public class BrokerRoutingManagerTest {
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.PERCENT_OF_REPLICAS, 100);
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS, 0);
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.UNAVAILABLE_SEGMENTS, 0);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.ROUTING_TABLE_SEGMENTS, 0);
   }
 
   @Test
