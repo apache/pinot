@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +50,6 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
-import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
@@ -88,10 +86,8 @@ public class AggregateOperator extends MultiStageOperator {
 
   // trimming - related members
   private final int _groupTrimSize;
-  /// Comparator is used in priority queue, and the order is reversed so that peek() returns the smallest row to be
-  /// compared with other rows.
   @Nullable
-  private final Comparator<Object[]> _comparator;
+  private final List<RelFieldCollation> _collations;
 
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator input, AggregateNode node) {
     super(context);
@@ -114,7 +110,7 @@ public class AggregateOperator extends MultiStageOperator {
     _input = input;
 
     int groupTrimSize = Integer.MAX_VALUE;
-    Comparator<Object[]> comparator = null;
+    List<RelFieldCollation> trimCollations = null;
     int limit = node.getLimit();
     int minGroupTrimSize = getMinGroupTrimSize(node.getNodeHint(), context.getOpChainMetadata());
     if (limit > 0 && minGroupTrimSize > 0) {
@@ -127,12 +123,12 @@ public class AggregateOperator extends MultiStageOperator {
       } else {
         groupTrimSize = GroupByUtils.getTableCapacity(limit, minGroupTrimSize);
         if (groupTrimSize < Integer.MAX_VALUE) {
-          comparator = new SortUtils.SortComparator(collations, true);
+          trimCollations = collations;
         }
       }
     }
     _groupTrimSize = groupTrimSize;
-    _comparator = comparator;
+    _collations = trimCollations;
 
     _errorOnNumGroupsLimit = getErrorOnNumGroupsLimit(node.getNodeHint(), context.getOpChainMetadata());
 
@@ -244,8 +240,8 @@ public class AggregateOperator extends MultiStageOperator {
     } else {
       assert _groupByExecutor != null;
       List<Object[]> rows;
-      if (_comparator != null) {
-        rows = _groupByExecutor.getResult(_comparator, _groupTrimSize);
+      if (_collations != null) {
+        rows = _groupByExecutor.getResult(_collations, _groupTrimSize);
       } else {
         rows = _groupByExecutor.getResult(_groupTrimSize);
       }

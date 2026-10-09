@@ -56,6 +56,7 @@ public class FunnelMatchStepAggregationFunction extends FunnelBaseAggregationFun
     if (stepEvents == null || stepEvents.isEmpty()) {
       return result;
     }
+    stepEvents = new PriorityQueue<>(stepEvents);
     ArrayDeque<FunnelStepEvent> slidingWindow = new ArrayDeque<>();
     while (!stepEvents.isEmpty()) {
       fillWindow(stepEvents, slidingWindow);

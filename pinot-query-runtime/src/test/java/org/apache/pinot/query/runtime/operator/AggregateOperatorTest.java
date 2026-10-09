@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +45,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.BOOLEAN;
@@ -55,6 +57,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertEqualsNoOrder;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -349,6 +352,201 @@ public class AggregateOperatorTest {
     OpChainExecutionContext context =
         OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "100"));
     assertEquals(getAggregateOperator(context, nodeHint, 5, List.of(new RelFieldCollation(1))).getGroupTrimSize(), 30);
+  }
+
+  @DataProvider
+  public Object[][] orderedGroupTrimCases() {
+    return new Object[][]{
+        {"COUNT", null, false, 1},
+        {"COUNT", null, true, 1},
+        {"DISTINCTCOUNT", null, false, 1},
+        {"DISTINCTCOUNT", null, true, 1},
+        {"DISTINCTCOUNTHLL", null, false, 1},
+        {"DISTINCTCOUNTHLL", null, true, 1},
+        {"DISTINCTCOUNTSMARTHLL", null, false, 1},
+        {"DISTINCTCOUNTSMARTHLL", null, true, 1},
+        {"DISTINCTCOUNTSMARTHLL", "threshold=1", false, 1},
+        {"DISTINCTCOUNTSMARTHLL", "threshold=1", true, 1},
+        {"DISTINCTCOUNTHLL", null, false, 10}
+    };
+  }
+
+  @Test(dataProvider = "orderedGroupTrimCases")
+  public void testOrderedGroupTrimPreservesIntermediateResults(String functionName, @Nullable String parameters,
+      boolean leafReturnFinalResult, int minGroupTrimSize) {
+    OpChainExecutionContext context = OperatorTestUtil.getContext(
+        Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, Integer.toString(minGroupTrimSize)));
+    ColumnDataType finalType = functionName.equals("DISTINCTCOUNTHLL") || functionName.equals("COUNT")
+        ? ColumnDataType.LONG
+        : INT;
+    List<RexExpression> operands = parameters == null
+        ? List.of(new RexExpression.InputRef(1))
+        : List.of(new RexExpression.InputRef(1), new RexExpression.Literal(STRING, parameters));
+    List<RexExpression.FunctionCall> aggCalls =
+        List.of(new RexExpression.FunctionCall(finalType, functionName, operands));
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING), new RelFieldCollation(0));
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "distinctCount"}, new ColumnDataType[]{INT, finalType});
+    ColumnDataType intermediateType = leafReturnFinalResult || functionName.equals("COUNT")
+        ? finalType
+        : ColumnDataType.OBJECT;
+    DataSchema intermediateSchema =
+        new DataSchema(new String[]{"group", "distinctCount"}, new ColumnDataType[]{INT, intermediateType});
+    BlockListMultiStageOperator.Builder partials = new BlockListMultiStageOperator.Builder(context, intermediateSchema);
+    // Each leaf has six groups with cardinalities 1..6. Disjoint partials must merge to cardinalities 2..12.
+    for (int partition = 0; partition < 2; partition++) {
+      BlockListMultiStageOperator.Builder input = new BlockListMultiStageOperator.Builder(context, inputSchema);
+      for (int group = 1; group <= 6; group++) {
+        for (int value = 0; value < group; value++) {
+          input.addRow(group, partition * 10 + value);
+        }
+      }
+      AggregateOperator leaf = new AggregateOperator(context, input.buildWithEos(),
+          new AggregateNode(-1, intermediateSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1),
+              List.of(0), AggType.LEAF, leafReturnFinalResult, collations, 1));
+      partials.addBlock(leaf.nextBlock());
+      assertTrue(leaf.nextBlock().isSuccess());
+    }
+    AggregateOperator result = new AggregateOperator(context, partials.buildWithEos(),
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.FINAL, leafReturnFinalResult, null, 0));
+
+    List<Object[]> rows = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.size(), minGroupTrimSize == 1 ? 5 : 6);
+    Map<Integer, Long> counts = new HashMap<>();
+    for (Object[] row : rows) {
+      counts.put((Integer) row[0], ((Number) row[1]).longValue());
+    }
+    assertEquals(counts, minGroupTrimSize == 1
+        ? Map.of(2, 4L, 3, 6L, 4, 8L, 5, 10L, 6, 12L)
+        : Map.of(1, 2L, 2, 4L, 3, 6L, 4, 8L, 5, 10L, 6, 12L));
+    assertTrue(result.nextBlock().isSuccess());
+  }
+
+  @Test
+  public void testOrderedSumPrecisionGroupTrimUsesNumericResults() {
+    OpChainExecutionContext context =
+        OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "1"));
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    List<RexExpression.FunctionCall> aggCalls = List.of(new RexExpression.FunctionCall(ColumnDataType.BIG_DECIMAL,
+        "SUMPRECISION", List.of(new RexExpression.InputRef(1))));
+    DataSchema intermediateSchema =
+        new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, ColumnDataType.OBJECT});
+    AggregateOperator leaf = new AggregateOperator(context,
+        new BlockListMultiStageOperator(context, OperatorTestUtil.block(inputSchema, new Object[]{1, 5},
+            new Object[]{2, 6}, new Object[]{3, 7}, new Object[]{4, 8}, new Object[]{5, 9}, new Object[]{6, 100})),
+        new AggregateNode(-1, intermediateSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.LEAF, false, List.of(new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING)), 1));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, ColumnDataType.BIG_DECIMAL});
+    AggregateOperator result = new AggregateOperator(context, leaf,
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.FINAL, false, null, 0));
+
+    List<Object[]> rows = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.size(), 5);
+    assertEquals(rows.stream().map(row -> row[0]).sorted().toList(), List.of(2, 3, 4, 5, 6));
+    assertEquals(rows.stream().filter(row -> row[0].equals(6)).findFirst().orElseThrow()[1], BigDecimal.valueOf(100));
+    assertTrue(result.nextBlock().isSuccess());
+  }
+
+  @Test
+  public void testOrderedGroupTrimPreservesFunnelEvents() {
+    OpChainExecutionContext context =
+        OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "1"));
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "timestamp", "step"},
+        new ColumnDataType[]{INT, ColumnDataType.LONG, BOOLEAN});
+    List<RexExpression.FunctionCall> aggCalls = List.of(new RexExpression.FunctionCall(INT, "FUNNELMAXSTEP",
+        List.of(new RexExpression.InputRef(1), new RexExpression.Literal(ColumnDataType.LONG, 1000L),
+            new RexExpression.Literal(INT, 1), new RexExpression.InputRef(2))));
+    DataSchema intermediateSchema =
+        new DataSchema(new String[]{"group", "funnel"}, new ColumnDataType[]{INT, ColumnDataType.OBJECT});
+    AggregateOperator leaf = new AggregateOperator(context,
+        new BlockListMultiStageOperator(context,
+            OperatorTestUtil.block(inputSchema, new Object[]{1, 1L, 1}, new Object[]{2, 2L, 1}, new Object[]{3, 3L, 1},
+                new Object[]{4, 4L, 1}, new Object[]{5, 5L, 1}, new Object[]{6, 6L, 1})),
+        new AggregateNode(-1, intermediateSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.LEAF, false, List.of(new RelFieldCollation(1), new RelFieldCollation(0)), 1));
+    DataSchema resultSchema = new DataSchema(new String[]{"group", "funnel"}, new ColumnDataType[]{INT, INT});
+    AggregateOperator result = new AggregateOperator(context, leaf,
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.FINAL, false, null, 0));
+
+    List<Object[]> rows = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.stream().map(row -> row[0]).sorted().toList(), List.of(1, 2, 3, 4, 5));
+    rows.forEach(row -> assertEquals(row[1], 1));
+    assertTrue(result.nextBlock().isSuccess());
+  }
+
+  @Test
+  public void testOrderedRawHllGroupTrimUsesNativeCardinalities() {
+    OpChainExecutionContext context =
+        OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "1"));
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    BlockListMultiStageOperator.Builder inputBuilder = new BlockListMultiStageOperator.Builder(context, inputSchema);
+    for (int group = 1; group <= 6; group++) {
+      for (int value = 0; value < group; value++) {
+        inputBuilder.addRow(group, group * 10 + value);
+      }
+    }
+    MseBlock.Data input = (MseBlock.Data) inputBuilder.buildWithEos().nextBlock();
+    List<RexExpression.FunctionCall> aggCalls = List.of(new RexExpression.FunctionCall(STRING, "DISTINCTCOUNTRAWHLL",
+        List.of(new RexExpression.InputRef(1), new RexExpression.Literal(INT, 12))));
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING), new RelFieldCollation(0));
+    DataSchema resultSchema = new DataSchema(new String[]{"group", "hll"}, new ColumnDataType[]{INT, STRING});
+    AggregateOperator direct = new AggregateOperator(context, new BlockListMultiStageOperator(context, input),
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.DIRECT, false, null, 0));
+    DataSchema intermediateSchema =
+        new DataSchema(new String[]{"group", "hll"}, new ColumnDataType[]{INT, ColumnDataType.OBJECT});
+    AggregateOperator leaf = new AggregateOperator(context, new BlockListMultiStageOperator(context, input),
+        new AggregateNode(-1, intermediateSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.LEAF, false, collations, 1));
+    AggregateOperator result = new AggregateOperator(context, leaf,
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.FINAL, false, null, 0));
+
+    List<Object[]> expected = ((MseBlock.Data) direct.nextBlock()).asRowHeap().getRows().stream()
+        .filter(row -> !row[0].equals(1)).toList();
+    List<Object[]> actual = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
+    assertEquals(actual.stream().map(row -> row[0]).sorted().toList(), List.of(2, 3, 4, 5, 6));
+    assertEqualsNoOrder(actual.stream().map(row -> List.of(row)).toArray(),
+        expected.stream().map(row -> List.of(row)).toArray());
+    assertTrue(result.nextBlock().isSuccess());
+  }
+
+  @Test
+  public void testOrderedHistogramGroupTrimUsesNativeLists() {
+    OpChainExecutionContext context =
+        OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "1"));
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    List<RexExpression.FunctionCall> aggCalls = List.of(new RexExpression.FunctionCall(ColumnDataType.DOUBLE_ARRAY,
+        "HISTOGRAM", List.of(new RexExpression.InputRef(1), new RexExpression.Literal(DOUBLE, 0.0),
+            new RexExpression.Literal(DOUBLE, 10.0), new RexExpression.Literal(INT, 10))));
+    DataSchema intermediateSchema =
+        new DataSchema(new String[]{"group", "histogram"}, new ColumnDataType[]{INT, ColumnDataType.OBJECT});
+    BlockListMultiStageOperator.Builder input = new BlockListMultiStageOperator.Builder(context, inputSchema);
+    for (int group = 1; group <= 6; group++) {
+      for (int value = 0; value < group; value++) {
+        input.addRow(group, 1);
+      }
+    }
+    AggregateOperator leaf = new AggregateOperator(context, input.buildWithEos(),
+        new AggregateNode(-1, intermediateSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.LEAF, false, List.of(new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING)), 1));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "histogram"}, new ColumnDataType[]{INT, ColumnDataType.DOUBLE_ARRAY});
+    AggregateOperator result = new AggregateOperator(context, leaf,
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.FINAL, false, null, 0));
+
+    List<Object[]> rows = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.stream().map(row -> row[0]).sorted().toList(), List.of(2, 3, 4, 5, 6));
+    rows.forEach(row -> assertEquals(((double[]) row[1])[1], ((Integer) row[0]).doubleValue()));
+    assertTrue(result.nextBlock().isSuccess());
   }
 
   private AggregateOperator getAggregateOperator(OpChainExecutionContext context, PlanNode.NodeHint nodeHint, int limit,
