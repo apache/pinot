@@ -107,10 +107,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   public void testHardcodedQueries()
       throws Exception {
     testHardcodedQueriesCommon();
+    testHardcodedIdSetQueries();
     if (useMultiStageQueryEngine()) {
       testHardcodedQueriesV2();
-    } else {
-      testHardCodedQueriesV1();
     }
   }
 
@@ -361,9 +360,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testQuery(query, h2Query);
   }
 
-  private void testHardCodedQueriesV1()
+  /// Tests IN_ID_SET and IN_SUBQUERY, which are not standard SQL.
+  private void testHardcodedIdSetQueries()
       throws Exception {
-    // Non-Standard SQL syntax:
     // IN_ID_SET
     {
       IdSet idSet = IdSets.create(FieldSpec.DataType.LONG);

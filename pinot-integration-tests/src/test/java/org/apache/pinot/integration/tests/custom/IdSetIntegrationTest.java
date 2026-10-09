@@ -32,6 +32,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -55,6 +56,10 @@ public class IdSetIntegrationTest extends CustomDataQueryClusterIntegrationTest 
   private static final String BLOOM_FILTER_PARAMS = "expectedInsertions=1000;fpp=0.0001";
   // A Bloom filter sized for 10M ids, which serializes to a literal of about 16 MB
   private static final String LARGE_BLOOM_FILTER_PARAMS = "expectedInsertions=10000000;fpp=0.01";
+  // A Bloom filter sized for 20M ids, which serializes to a literal of about 32 MB
+  private static final String HUGE_BLOOM_FILTER_PARAMS = "expectedInsertions=20000000;fpp=0.01";
+  // The number of rows whose value is in the sets built from the rows with id < NUM_SET_VALUES, without false positives
+  private static final long NUM_ROWS_IN_SET = (long) NUM_SET_VALUES * (NUM_ROWS / NUM_VALUES);
 
   @Override
   protected long getCountStarResult() {
@@ -99,15 +104,93 @@ public class IdSetIntegrationTest extends CustomDataQueryClusterIntegrationTest 
   @Test
   public void testScalarSubquery()
       throws Exception {
-    // The set argument is a scalar subquery, so IN_ID_SET runs as a scalar function above the join that supplies it
+    // The subquery is not correlated, so it runs before the query, like the subquery of an IN_SUBQUERY
     setUseMultiStageQueryEngine(true);
     for (String column : List.of(INT_COL, LONG_COL, STR_COL, BYTES_COL)) {
       String idSetQuery = "SELECT " + idSetExpression(column) + " FROM " + getTableName() + " WHERE " + SET_FILTER;
-      String query =
-          "SELECT COUNT(*) FROM " + getTableName() + " WHERE IN_ID_SET(" + column + ", (" + idSetQuery + ")) = 1";
       IdSet idSet = IdSets.fromBase64String(getSingleValue(postQuery(idSetQuery)).asText());
-      assertEquals(getSingleValue(postQuery(query)).asLong(), getExpectedCount(column, idSet), column);
+      assertEquals(getCount("IN_ID_SET(" + column + ", (" + idSetQuery + ")) = 1"), getExpectedCount(column, idSet),
+          column);
     }
+
+    // So the filter runs in the leaf stage, without a join. EXPLAIN does not run the subquery, and says so.
+    JsonNode response = postQuery("EXPLAIN PLAN FOR SELECT COUNT(*) FROM " + getTableName() + " WHERE IN_ID_SET("
+        + INT_COL + ", (SELECT IDSET(" + INT_COL + ") FROM " + getTableName() + " WHERE " + SET_FILTER + ")) = 1");
+    assertTrue(response.get("exceptions").isEmpty(), response.get("exceptions").toString());
+    JsonNode resultTable = response.get("resultTable");
+    String plan = resultTable.get("rows").get(0).get(1).asText();
+    assertFalse(plan.contains("Join"), plan);
+    assertTrue(resultTable.get("dataSchema").get("columnNames").toString().contains("SUBQUERIES"),
+        resultTable.toString());
+
+    // A correlated subquery runs as part of the query
+    assertEquals(getSingleValue(postQuery("SELECT COUNT(*) FROM " + getTableName() + " t1 WHERE IN_ID_SET(t1."
+        + INT_COL + ", (SELECT IDSET(t2." + INT_COL + ") FROM " + getTableName() + " t2 WHERE t2." + SET_FILTER
+        + " AND t2." + LONG_COL + " = t1." + LONG_COL + ")) = 1")).asLong(), NUM_ROWS_IN_SET);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testInSubquery(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    for (String column : List.of(INT_COL, LONG_COL, STR_COL, BYTES_COL)) {
+      String idSetQuery = "SELECT " + idSetExpression(column) + " FROM " + getTableName() + " WHERE " + SET_FILTER;
+      long expectedCount =
+          getExpectedCount(column, IdSets.fromBase64String(getSingleValue(postQuery(idSetQuery)).asText()));
+      String inSubquery = "IN_SUBQUERY(" + column + ", " + quote(idSetQuery) + ")";
+      assertEquals(getCount(inSubquery + " = 1"), expectedCount, column);
+      assertEquals(getCount(inSubquery + " = 0"), NUM_ROWS - expectedCount, column);
+    }
+  }
+
+  @Test
+  public void testInSubqueryOutsideFilters()
+      throws Exception {
+    // Only the multi-stage engine runs IN_SUBQUERY outside the WHERE clause
+    setUseMultiStageQueryEngine(true);
+    String subquery = quote("SELECT IDSET(" + INT_COL + ") FROM " + getTableName() + " WHERE " + SET_FILTER);
+    String inSubquery = "IN_SUBQUERY(" + INT_COL + ", " + subquery + ") = 1";
+    assertEquals(getSingleValue(postQuery(
+            "SELECT SUM(CASE WHEN " + inSubquery + " THEN 1 ELSE 0 END) FROM " + getTableName())).asLong(),
+        NUM_ROWS_IN_SET);
+    JsonNode response = postQuery("SELECT " + INT_COL + ", COUNT(*) FROM " + getTableName() + " GROUP BY " + INT_COL
+        + " HAVING " + inSubquery + " LIMIT " + NUM_VALUES);
+    assertTrue(response.get("exceptions").isEmpty(), response.get("exceptions").toString());
+    assertEquals(response.get("resultTable").get("rows").size(), NUM_SET_VALUES);
+    assertEquals(getSingleValue(postQuery("SELECT COUNT(*) FROM " + getTableName() + " t1 JOIN " + getTableName()
+        + " t2 ON t1." + ID + " = t2." + ID + " WHERE IN_SUBQUERY(t2." + INT_COL + ", " + subquery + ") = 1"))
+        .asLong(), NUM_ROWS_IN_SET);
+
+    // A subquery can have IN_SUBQUERY too
+    String nestedInSubquery = "IN_SUBQUERY(" + ID + ", " + quote(
+        "SELECT IDSET(" + ID + ") FROM " + getTableName() + " WHERE " + SET_FILTER) + ") = 1";
+    assertEquals(getCount("IN_SUBQUERY(" + INT_COL + ", " + quote(
+        "SELECT IDSET(" + INT_COL + ") FROM " + getTableName() + " WHERE " + nestedInSubquery) + ") = 1"),
+        NUM_ROWS_IN_SET);
+  }
+
+  @Test
+  public void testFailsOnPartialSubqueryResult()
+      throws Exception {
+    // The subquery stops at 10 groups, so its IdSet would miss ids
+    setUseMultiStageQueryEngine(true);
+    String subquery = "SET numGroupsLimit = 10; SELECT IDSET(" + INT_COL + ") FROM (SELECT " + INT_COL + " FROM "
+        + getTableName() + " GROUP BY " + INT_COL + ")";
+    JsonNode response = postQuery("SELECT COUNT(*) FROM " + getTableName() + " WHERE IN_SUBQUERY(" + INT_COL + ", "
+        + quote(subquery) + ") = 1");
+    String exceptions = response.get("exceptions").toString();
+    assertTrue(exceptions.contains("Subquery returned a partial result [numGroupsLimitReached]"), exceptions);
+  }
+
+  @Test
+  public void testHugeIdSetInSubquery()
+      throws Exception {
+    // The set never reaches the client or the parser, so it can be larger than the 20M chars a JSON request can hold
+    setUseMultiStageQueryEngine(true);
+    String idSetQuery = "SELECT IDSET(" + STR_COL + ", '" + HUGE_BLOOM_FILTER_PARAMS + "') FROM " + getTableName()
+        + " WHERE " + SET_FILTER;
+    // With 60 of the 20M ids it is sized for, the Bloom filter has practically no false positives
+    assertEquals(getCount("IN_SUBQUERY(" + STR_COL + ", " + quote(idSetQuery) + ") = 1"), NUM_ROWS_IN_SET);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -179,6 +262,17 @@ public class IdSetIntegrationTest extends CustomDataQueryClusterIntegrationTest 
 
   private static String stringValue(int value) {
     return "value_" + value;
+  }
+
+  /// Returns the SQL string literal for the given string.
+  private static String quote(String string) {
+    return "'" + string.replace("'", "''") + "'";
+  }
+
+  /// Returns the number of rows that pass the filter.
+  private long getCount(String filter)
+      throws Exception {
+    return getSingleValue(postQuery("SELECT COUNT(*) FROM " + getTableName() + " WHERE " + filter)).asLong();
   }
 
   private static JsonNode getSingleValue(JsonNode response) {

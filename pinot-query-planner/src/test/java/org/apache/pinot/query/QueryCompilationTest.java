@@ -1689,6 +1689,18 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return false;
   }
 
+  @Test
+  public void testCompilesInSubquery() {
+    // The broker runs the subquery before it compiles the query, but the paths that only compile queries accept
+    // IN_SUBQUERY too. They see the tables outside the subquery only.
+    try (QueryEnvironment.CompiledQuery compiledQuery = _queryEnvironment.compile(
+        "SELECT COUNT(*) FROM a WHERE IN_SUBQUERY(col1, 'SELECT IDSET(col1) FROM b') = 1")) {
+      assertEquals(compiledQuery.getTableNames(), Set.of("a"));
+    }
+    assertTrue(_queryEnvironment.canCompileQuery(
+        "SELECT inSubquery(col3, 'SELECT IDSET(col3) FROM b') FROM a WHERE INSUBQUERY(col2, 'SELECT 1') = 0"));
+  }
+
   @DataProvider(name = "testQueryExceptionDataProvider")
   private Object[][] provideQueriesWithException() {
     return new Object[][]{
