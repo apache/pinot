@@ -95,7 +95,9 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   /// The limit sums compressed archive bytes for active, live completed segments, counted once regardless of
   /// replication. Live-segment lineage filtering excludes sources of COMPLETED entries and destinations of other
   /// entries to avoid counting shadow copies. OFFLINE APPEND and REALTIME limits are enforced independently, including
-  /// hybrid tables.
+  /// hybrid tables. Each typed table expires its own oldest eligible data without consulting the OFFLINE routing
+  /// time boundary. REALTIME size retention can therefore expire data newer than that boundary; hybrid time
+  /// retention continues to use its existing boundary rules.
   ///
   /// Segments are ordered ascending by the first nonnegative end time, creation time, or push time, in that priority,
   /// then by segment name. Eviction removes only an old prefix before the first active segment listed as a source or
@@ -113,9 +115,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   /// or longer.
   ///
   /// The newest OFFLINE segment, highest-sequence DONE LLC segment per REALTIME partition group, and undated segments
-  /// are preserved. Consuming segments are neither counted nor removed. When hybrid retention is enabled and an
-  /// OFFLINE counterpart exists, REALTIME eviction requires an end time strictly below the OFFLINE time boundary;
-  /// an unavailable boundary prevents REALTIME size retention. These protections can leave the table above its cap.
+  /// are preserved. Consuming segments are neither counted nor removed. These protections can leave the table above
+  /// its cap.
   ///
   /// Size retention rechecks the complete lineage entry snapshot under the local updater lock before deletion,
   /// regardless of the lineage-exclusive deletion setting. A changed snapshot aborts the batch for retry next cycle.

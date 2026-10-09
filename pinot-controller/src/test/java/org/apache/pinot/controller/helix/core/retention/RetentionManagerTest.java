@@ -1455,7 +1455,7 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testSizeRetentionHybridProtectionCannotHideLineageBarrier() {
+  public void testSizeRetentionForHybridStopsAtLineageBarrier() {
     TableConfig tableConfig = createSizeRetentionTableConfig(TableType.REALTIME, "1B");
     long boundary = System.currentTimeMillis();
     SegmentZKMetadata source = createSizeRetentionSegment("source", 80, -1);
@@ -1471,13 +1471,15 @@ public class RetentionManagerTest {
     conf.setProperty(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY, true);
     RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager, metrics,
         conf, brokerServiceHelper);
-    setupSizeRetentionHybridTable(resourceManager, brokerServiceHelper, Long.toString(boundary));
+    setupSizeRetentionOfflineCounterpart(resourceManager);
     setupSizeRetentionLineage(resourceManager, REALTIME_TABLE_NAME, "source", "destination",
         LineageEntryState.IN_PROGRESS);
 
     retentionManager.manageSizeBasedRetention(tableConfig);
 
     verify(resourceManager).deleteSegments(REALTIME_TABLE_NAME, List.of("oldest"));
+    verify(resourceManager, never()).getOfflineTableConfig(anyString());
+    verify(brokerServiceHelper, never()).getTimeBoundaryInfo(any(TableConfig.class));
     verifySizeRetentionGauge(metrics, REALTIME_TABLE_NAME, 1);
   }
 
@@ -1639,75 +1641,61 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testSizeRetentionForHybridProtectsSegmentsAtOrAboveBoundaryAndInvalidEndTimes() {
-    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.REALTIME, "30B");
+  public void testSizeRetentionForHybridEvictsOldestWithoutOfflineCoverage() {
+    TableConfig tableConfig = createSizeRetentionTableConfig(TableType.REALTIME, "20B");
     long boundary = System.currentTimeMillis();
     SegmentZKMetadata invalidEndTime = createSizeRetentionSegment("invalidEndTime", 20, -1);
     invalidEndTime.setCreationTime(boundary - 2);
     List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("before", 20, boundary - 1),
         createSizeRetentionSegment("at", 20, boundary), createSizeRetentionSegment("after", 20, boundary + 1),
-        invalidEndTime);
+        createSizeRetentionSegment("newest", 20, boundary + 2), invalidEndTime);
     PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
     ControllerMetrics metrics = mock(ControllerMetrics.class);
     BrokerServiceHelper brokerServiceHelper = mock(BrokerServiceHelper.class);
+    when(brokerServiceHelper.getTimeBoundaryInfo(any(TableConfig.class)))
+        .thenReturn(new TimeBoundaryInfo("ms", Long.toString(boundary)));
     ControllerConf conf = new ControllerConf();
     conf.setProperty(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY, true);
     RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager, metrics,
         conf, brokerServiceHelper);
-    setupSizeRetentionHybridTable(resourceManager, brokerServiceHelper, Long.toString(boundary));
+    setupSizeRetentionOfflineCounterpart(resourceManager);
 
     retentionManager.manageSizeBasedRetention(tableConfig);
 
-    verify(resourceManager).deleteSegments(REALTIME_TABLE_NAME, List.of("before"));
-    verifySizeRetentionGauge(metrics, REALTIME_TABLE_NAME, 1);
+    verify(resourceManager).deleteSegments(REALTIME_TABLE_NAME, List.of("invalidEndTime", "before", "at", "after"));
+    verify(resourceManager, never()).getOfflineTableConfig(anyString());
+    verify(brokerServiceHelper, never()).getTimeBoundaryInfo(any(TableConfig.class));
+    verifySizeRetentionGauge(metrics, REALTIME_TABLE_NAME, 0);
   }
 
   @Test
-  public void testSizeRetentionForHybridSkipsMissingOrInvalidTimeBoundary() {
-    for (String boundary : Arrays.asList(null, "0", "-1", "invalid")) {
-      TableConfig tableConfig = createSizeRetentionTableConfig(TableType.REALTIME, "50B");
-      long now = System.currentTimeMillis();
-      List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", 60, now - 1),
-          createSizeRetentionSegment("newest", 60, now));
-      PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-      ControllerMetrics metrics = mock(ControllerMetrics.class);
-      BrokerServiceHelper brokerServiceHelper = mock(BrokerServiceHelper.class);
-      ControllerConf conf = new ControllerConf();
-      conf.setProperty(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY, true);
-      RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager, metrics,
-          conf, brokerServiceHelper);
-      setupSizeRetentionHybridTable(resourceManager, brokerServiceHelper, boundary);
+  public void testSizeRetentionDoesNotConsultOfflineTimeBoundary() {
+    for (boolean hybridStrategy : List.of(true, false)) {
+      for (boolean offlineCounterpart : List.of(true, false)) {
+        TableConfig tableConfig = createSizeRetentionTableConfig(TableType.REALTIME, "20B");
+        long now = System.currentTimeMillis();
+        List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", 20, now - 1),
+            createSizeRetentionSegment("newest", 20, now));
+        PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+        ControllerMetrics metrics = mock(ControllerMetrics.class);
+        BrokerServiceHelper brokerServiceHelper = mock(BrokerServiceHelper.class);
+        when(brokerServiceHelper.getTimeBoundaryInfo(any(TableConfig.class)))
+            .thenThrow(new IllegalStateException("Time boundary unavailable"));
+        ControllerConf conf = new ControllerConf();
+        conf.setProperty(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY, hybridStrategy);
+        RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager, metrics,
+            conf, brokerServiceHelper);
+        if (offlineCounterpart) {
+          setupSizeRetentionOfflineCounterpart(resourceManager);
+        }
 
-      retentionManager.manageSizeBasedRetention(tableConfig);
+        retentionManager.manageSizeBasedRetention(tableConfig);
 
-      verify(resourceManager, never()).deleteSegments(anyString(), anyList());
-      verifySizeRetentionGauge(metrics, REALTIME_TABLE_NAME, 1);
-    }
-  }
-
-  @Test
-  public void testSizeRetentionWithoutHybridStrategyDoesNotApplyTimeBoundary() {
-    for (boolean offlineCounterpart : List.of(true, false)) {
-      TableConfig tableConfig = createSizeRetentionTableConfig(TableType.REALTIME, "20B");
-      long now = System.currentTimeMillis();
-      List<SegmentZKMetadata> segments = List.of(createSizeRetentionSegment("oldest", 20, now - 1),
-          createSizeRetentionSegment("newest", 20, now));
-      PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-      ControllerMetrics metrics = mock(ControllerMetrics.class);
-      BrokerServiceHelper brokerServiceHelper = mock(BrokerServiceHelper.class);
-      ControllerConf conf = new ControllerConf();
-      conf.setProperty(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY, !offlineCounterpart);
-      RetentionManager retentionManager = createSizeRetentionManager(tableConfig, segments, resourceManager, metrics,
-          conf, brokerServiceHelper);
-      if (offlineCounterpart) {
-        setupSizeRetentionHybridTable(resourceManager, brokerServiceHelper, "1");
+        verify(resourceManager).deleteSegments(REALTIME_TABLE_NAME, List.of("oldest"));
+        verify(resourceManager, never()).getOfflineTableConfig(anyString());
+        verify(brokerServiceHelper, never()).getTimeBoundaryInfo(any(TableConfig.class));
+        verifySizeRetentionGauge(metrics, REALTIME_TABLE_NAME, 0);
       }
-
-      retentionManager.manageSizeBasedRetention(tableConfig);
-
-      verify(resourceManager).deleteSegments(REALTIME_TABLE_NAME, List.of("oldest"));
-      verify(brokerServiceHelper, never()).getTimeBoundaryInfo(any(TableConfig.class));
-      verifySizeRetentionGauge(metrics, REALTIME_TABLE_NAME, 0);
     }
   }
 
@@ -1852,20 +1840,9 @@ public class RetentionManagerTest {
         metrics, brokerServiceHelper);
   }
 
-  private void setupSizeRetentionHybridTable(PinotHelixResourceManager resourceManager,
-      BrokerServiceHelper brokerServiceHelper, String boundary) {
-    TableConfig offlineConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME)
-        .setTimeColumnName("ms").build();
+  private void setupSizeRetentionOfflineCounterpart(PinotHelixResourceManager resourceManager) {
+    TableConfig offlineConfig = createSizeRetentionTableConfig(TableType.OFFLINE, "1B");
     when(resourceManager.getOfflineTableConfig(TEST_TABLE_NAME)).thenReturn(offlineConfig);
-    Schema schema = new Schema();
-    schema.setSchemaName(TEST_TABLE_NAME);
-    schema.addField(new DateTimeFieldSpec("ms", FieldSpec.DataType.LONG, "EPOCH|MILLISECONDS|1", "MILLISECONDS|1"));
-    ZNRecord schemaRecord = new ZNRecord(TEST_TABLE_NAME);
-    schemaRecord.setSimpleField("schemaJSON", schema.toSingleLineJsonString());
-    when(resourceManager.getPropertyStore().get("/SCHEMAS/" + TEST_TABLE_NAME, null, AccessOption.PERSISTENT))
-        .thenReturn(schemaRecord);
-    when(brokerServiceHelper.getTimeBoundaryInfo(offlineConfig))
-        .thenReturn(boundary == null ? null : new TimeBoundaryInfo("ms", boundary));
   }
 
   private void setupSizeRetentionLineage(PinotHelixResourceManager resourceManager, String tableName,

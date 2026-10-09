@@ -135,7 +135,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   /// Enforces the optional compressed-segment size limit on live data independently of time retention. Replaced
   /// segments are excluded from accounting. Eviction proceeds oldest first and stops before the first active segment
   /// listed on either side of any lineage entry, including replacement copies excluded from accounting. The newest
-  /// OFFLINE segment and realtime recovery segments are preserved; hybrid realtime eviction requires offline coverage.
+  /// OFFLINE segment and realtime recovery segments are preserved. Each typed table uses its own size limit and
+  /// eviction order without consulting the OFFLINE time boundary.
   /// Unknown sizes or missing metadata disable this pass; consuming segments are excluded from accounting and eviction.
   @VisibleForTesting
   protected void manageSizeBasedRetention(TableConfig tableConfig) {
@@ -237,21 +238,6 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       Set<String> lastCompletedSegments =
           new HashSet<>(_pinotHelixResourceManager.getLastLLCCompletedSegments(metadataList));
       completedSegments.removeIf(metadata -> lastCompletedSegments.contains(metadata.getSegmentName()));
-      if (_isHybridTableRetentionStrategyEnabled) {
-        TableConfig offlineTableConfig =
-            _pinotHelixResourceManager.getOfflineTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType));
-        if (offlineTableConfig != null) {
-          long timeBoundaryMs;
-          try {
-            timeBoundaryMs = getHybridTimeBoundaryMs(offlineTableConfig);
-          } catch (Exception e) {
-            LOGGER.warn("Cannot determine offline coverage for table: {}, skip size retention", tableNameWithType, e);
-            return false;
-          }
-          completedSegments.removeIf(metadata -> metadata.getEndTimeMs() < 0
-              || metadata.getEndTimeMs() >= timeBoundaryMs);
-        }
-      }
     } else {
       // A size typo must not remove the entire OFFLINE table, even if its newest segment exceeds the cap alone.
       completedSegments.stream().max(evictionOrder).ifPresent(completedSegments::remove);
