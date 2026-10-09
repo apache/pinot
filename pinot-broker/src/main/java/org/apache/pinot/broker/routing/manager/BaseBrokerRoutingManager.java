@@ -80,6 +80,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
@@ -365,7 +366,8 @@ public abstract class BaseBrokerRoutingManager
     ZNRecord znRecord = _zkDataAccessor.get(idealStatePath, stat, AccessOption.PERSISTENT);
     if (znRecord != null) {
       znRecord.setVersion(stat.getVersion());
-      return new IdealState(znRecord);
+      // Skips the copy of the outer segment map when the record comes from the compact reader
+      return HelixHelper.toIdealState(znRecord);
     } else {
       return null;
     }
@@ -377,7 +379,7 @@ public abstract class BaseBrokerRoutingManager
     ZNRecord znRecord = _zkDataAccessor.get(externalViewPath, stat, AccessOption.PERSISTENT);
     if (znRecord != null) {
       znRecord.setVersion(stat.getVersion());
-      return new ExternalView(znRecord);
+      return HelixHelper.toExternalView(znRecord);
     } else {
       return null;
     }

@@ -33,6 +33,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.HelixProperty;
 import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
@@ -81,6 +82,46 @@ public class HelixHelper {
   public static IdealState cloneIdealState(IdealState idealState) {
     return new IdealState(
         (ZNRecord) ZN_RECORD_SERIALIZER.deserialize(ZN_RECORD_SERIALIZER.serialize(idealState.getRecord())));
+  }
+
+  /// Returns whether the given record came from the compact parser of [CompactZNRecordSerializer], that is, its map
+  /// fields are an [ImmutableSortedArrayMap]. A record from [ZNRecordSerializer] returns false, including the records
+  /// that the compact serializer delegates to it (plain znodes and the fallback).
+  public static boolean isCompact(ZNRecord record) {
+    return record.getMapFields() instanceof ImmutableSortedArrayMap;
+  }
+
+  /// Returns an [IdealState] for the given record. When the record [is compact][#isCompact], the ideal state takes
+  /// over the maps of the record instead of copying them (see `adoptRecord`), so the caller must own the record and
+  /// must not use it afterwards. Otherwise this is `new IdealState(record)`.
+  public static IdealState toIdealState(ZNRecord record) {
+    return isCompact(record) ? adoptRecord(record, new IdealState(record.getId())) : new IdealState(record);
+  }
+
+  /// Returns an [ExternalView] for the given record. Same contract as [#toIdealState].
+  public static ExternalView toExternalView(ZNRecord record) {
+    return isCompact(record) ? adoptRecord(record, new ExternalView(record.getId())) : new ExternalView(record);
+  }
+
+  /// Makes the empty record of the given property hold the content of the source record, as
+  /// `ZNRecord(ZNRecord, String)` (called by `HelixProperty(ZNRecord)`) does, but by reference instead of by copy:
+  /// the simple, list and map fields and the raw payload are shared. The scalar fields that the copy constructor
+  /// copies (version, creation time, modified time, ephemeral owner) are copied, and the property [HelixProperty.Stat]
+  /// is set from them, as `HelixProperty(ZNRecord)` does. Like the copy constructor, the delta list is not copied.
+  /// Returns the given property.
+  private static <T extends HelixProperty> T adoptRecord(ZNRecord source, T property) {
+    ZNRecord target = property.getRecord();
+    target.setSimpleFields(source.getSimpleFields());
+    target.setListFields(source.getListFields());
+    target.setMapFields(source.getMapFields());
+    target.setRawPayload(source.getRawPayload());
+    target.setVersion(source.getVersion());
+    target.setCreationTime(source.getCreationTime());
+    target.setModifiedTime(source.getModifiedTime());
+    target.setEphemeralOwner(source.getEphemeralOwner());
+    property.setStat(new HelixProperty.Stat(source.getVersion(), source.getCreationTime(), source.getModifiedTime(),
+        source.getEphemeralOwner()));
+    return property;
   }
 
   public static IdealState updateIdealState(HelixManager helixManager, String resourceName,
