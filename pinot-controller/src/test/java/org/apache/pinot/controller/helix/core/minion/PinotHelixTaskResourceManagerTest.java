@@ -637,6 +637,22 @@ public class PinotHelixTaskResourceManagerTest {
     PinotHelixTaskResourceManager.TaskDebugInfo result2 =
         mgr.getTaskDebugInfo(taskName, otherTableNameWithType, 1);
     verifyResultFilteredByTable(result2, "task2", TaskPartitionState.COMPLETED, otherTableNameWithType);
+
+    // A subtask whose Helix task config is missing has no determinable table, so a requested table filter must drop
+    // it rather than report it. The filter is part of the authorization boundary for table-scoped principals on
+    // GET /tasks/task/{taskName}/debug, so including it would disclose another table's subtasks.
+    when(jobConfig.getTaskConfig("task2")).thenReturn(null);
+    PinotHelixTaskResourceManager.TaskDebugInfo filtered =
+        mgr.getTaskDebugInfo(taskName, tableNameWithType, 1);
+    verifyResultFilteredByTable(filtered, "task1", TaskPartitionState.RUNNING, tableNameWithType);
+    assertEquals(filtered.getSubtaskCount().getTotal(), 1);
+
+    // ... and it must not leak through a filter naming the table whose config went missing.
+    PinotHelixTaskResourceManager.TaskDebugInfo noneMatching =
+        mgr.getTaskDebugInfo(taskName, otherTableNameWithType, 1);
+    assertTrue(noneMatching == null || noneMatching.getSubtaskInfos() == null
+            || noneMatching.getSubtaskInfos().isEmpty(),
+        "a subtask with no resolvable table must not be reported under a table filter");
   }
 
   private static void verifyResultFilteredByTable(PinotHelixTaskResourceManager.TaskDebugInfo taskDebugInfo,

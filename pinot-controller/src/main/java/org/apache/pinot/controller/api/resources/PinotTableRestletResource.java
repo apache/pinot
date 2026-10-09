@@ -285,7 +285,7 @@ public class PinotTableRestletResource {
 
   @POST
   @Path("/tables/{tableName}/copy")
-  @Authorize(targetType = TargetType.TABLE, action = Actions.Table.CREATE_TABLE)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.CREATE_TABLE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Copy a table's schema and config from another cluster", notes = "Non upsert table only")
   public CopyTableResponse copyTable(
