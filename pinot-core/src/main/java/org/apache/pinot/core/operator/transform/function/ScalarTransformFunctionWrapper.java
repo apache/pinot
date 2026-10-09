@@ -50,6 +50,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   private int _numNonLiteralArguments;
   private int[] _nonLiteralIndices;
   private TransformFunction[] _nonLiteralFunctions;
+  private PinotDataType[] _nonLiteralTypes;
   private Object[][] _nonLiteralValues;
 
   public ScalarTransformFunctionWrapper(FunctionInfo functionInfo) {
@@ -91,6 +92,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     _scalarArguments = new Object[numArguments];
     _nonLiteralIndices = new int[numArguments];
     _nonLiteralFunctions = new TransformFunction[numArguments];
+    _nonLiteralTypes = new PinotDataType[numArguments];
     for (int i = 0; i < numArguments; i++) {
       TransformFunction transformFunction = arguments.get(i);
       if (transformFunction instanceof LiteralTransformFunction) {
@@ -146,6 +148,8 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       } else {
         _nonLiteralIndices[_numNonLiteralArguments] = i;
         _nonLiteralFunctions[_numNonLiteralArguments] = transformFunction;
+        _nonLiteralTypes[_numNonLiteralArguments] = parameterTypes[i] != PinotDataType.OBJECT ? parameterTypes[i]
+            : getObjectArgumentType(transformFunction.getResultMetadata());
         _numNonLiteralArguments++;
       }
     }
@@ -374,11 +378,46 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     return _stringValuesMV;
   }
 
-  /// Helper method to fetch values for the non-literal transform functions based on the parameter types.
+  /// Returns the type to read an argument for an `Object` parameter, so that the function gets the external Java value
+  /// of the argument result type, the same as `ColumnDataType.toExternal()` in the multi-stage engine `FunctionOperand`
+  /// for that type. Complex types such as MAP are not supported.
+  private PinotDataType getObjectArgumentType(TransformResultMetadata argumentMetadata) {
+    DataType dataType = argumentMetadata.getDataType();
+    boolean singleValue = argumentMetadata.isSingleValue();
+    switch (dataType) {
+      case INT:
+        return singleValue ? PinotDataType.INT : PinotDataType.PRIMITIVE_INT_ARRAY;
+      case LONG:
+        return singleValue ? PinotDataType.LONG : PinotDataType.PRIMITIVE_LONG_ARRAY;
+      case FLOAT:
+        return singleValue ? PinotDataType.FLOAT : PinotDataType.PRIMITIVE_FLOAT_ARRAY;
+      case DOUBLE:
+        return singleValue ? PinotDataType.DOUBLE : PinotDataType.PRIMITIVE_DOUBLE_ARRAY;
+      case BIG_DECIMAL:
+        return singleValue ? PinotDataType.BIG_DECIMAL : PinotDataType.BIG_DECIMAL_ARRAY;
+      case BOOLEAN:
+        return singleValue ? PinotDataType.BOOLEAN : PinotDataType.PRIMITIVE_BOOLEAN_ARRAY;
+      case TIMESTAMP:
+        return singleValue ? PinotDataType.TIMESTAMP : PinotDataType.TIMESTAMP_ARRAY;
+      case STRING:
+      case JSON:
+        return singleValue ? PinotDataType.STRING : PinotDataType.STRING_ARRAY;
+      case BYTES:
+        return singleValue ? PinotDataType.BYTES : PinotDataType.BYTES_ARRAY;
+      case UUID:
+        return singleValue ? PinotDataType.UUID : PinotDataType.UUID_ARRAY;
+      default:
+        throw new IllegalArgumentException(
+            String.format("Unsupported argument type: %s for Object parameter of method: %s", dataType,
+                _functionInvoker.getMethod()));
+    }
+  }
+
+  /// Helper method to fetch values for the non-literal transform functions based on the parameter types. For an
+  /// `Object` parameter, the values are read based on the argument result type (see [#getObjectArgumentType]).
   private void getNonLiteralValues(ValueBlock valueBlock) {
-    PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
     for (int i = 0; i < _numNonLiteralArguments; i++) {
-      PinotDataType parameterType = parameterTypes[_nonLiteralIndices[i]];
+      PinotDataType parameterType = _nonLiteralTypes[i];
       TransformFunction transformFunction = _nonLiteralFunctions[i];
       switch (parameterType) {
         case INT:
@@ -485,6 +524,22 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case BYTES_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToBytesValuesMV(valueBlock);
           break;
+        case UUID_ARRAY: {
+          byte[][][] bytesValuesMV = transformFunction.transformToBytesValuesMV(valueBlock);
+          int numRows = bytesValuesMV.length;
+          UUID[][] uuidValuesMV = new UUID[numRows][];
+          for (int j = 0; j < numRows; j++) {
+            byte[][] bytesValues = bytesValuesMV[j];
+            int numValues = bytesValues.length;
+            UUID[] uuidValues = new UUID[numValues];
+            for (int k = 0; k < numValues; k++) {
+              uuidValues[k] = UuidUtils.toUUID(bytesValues[k]);
+            }
+            uuidValuesMV[j] = uuidValues;
+          }
+          _nonLiteralValues[i] = uuidValuesMV;
+          break;
+        }
         default:
           throw new IllegalStateException("Unsupported parameter type: " + parameterType);
       }
