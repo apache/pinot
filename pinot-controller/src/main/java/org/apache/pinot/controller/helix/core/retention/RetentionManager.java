@@ -211,6 +211,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         LOGGER.warn("Unknown size for segment: {} in table: {}, skip size retention", segmentName, tableNameWithType);
         return false;
       }
+      // Plain addition assumes realistic table sizes; corrupt totals above Long.MAX_VALUE may wrap and report healthy.
       retainedBytes += size;
       completedSegments.add(metadata);
       completedSegmentSizes.put(segmentName, size);
