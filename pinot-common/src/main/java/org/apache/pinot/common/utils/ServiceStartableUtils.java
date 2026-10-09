@@ -18,14 +18,21 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
@@ -134,6 +141,66 @@ public class ServiceStartableUtils {
       LOGGER.info("Setting forward index default target docs per chunk to: {}", defaultTargetDocsPerChunk);
       ForwardIndexConfig.setDefaultTargetDocsPerChunk(Integer.parseInt(defaultTargetDocsPerChunk));
     }
+    String defaultCompressionCodec =
+        instanceConfig.getProperty(CommonConstants.ForwardIndexConfigs.CONFIG_OF_DEFAULT_COMPRESSION_CODEC);
+    if (defaultCompressionCodec != null) {
+      setDefaultCompressionCodec(defaultCompressionCodec);
+    }
+  }
+
+  /// Applies the cluster-wide default compression codec for raw forward indexes.
+  ///
+  /// The value is a [CompressionCodec], the same spelling used by `compressionCodec` in a table config,
+  /// so that an operator setting a cluster default and a table author setting a column override write the
+  /// same word. Codecs that are not applicable to a raw forward index -- the CLP family, `MV_ENTRY_DICT`,
+  /// `DELTA` -- are rejected rather than applied, since they describe whole-index or dictionary formats
+  /// that cannot stand in for a chunk codec.
+  ///
+  /// Unlike the numeric defaults above, an unusable value is logged and ignored instead of failing
+  /// startup: this one is routinely set as a *cluster* config, where throwing would take down every
+  /// component that restarts after the bad value is saved. The warning names the codecs that are
+  /// accepted, so a rejected value is self-correcting from the log.
+  ///
+  /// Scope, which this being a *cluster* config does not make as wide as it sounds:
+  ///
+  /// - It is read once per JVM at startup, so after changing it a rolling restart leaves restarted
+  ///   instances writing the new codec while the rest keep the old one until they restart too. Each
+  ///   segment records the codec it was written with, so this mixes formats without breaking reads.
+  /// - It reaches only components that call [#applyClusterConfig]: the controller, broker, server and
+  ///   minion. Segments built outside the cluster -- standalone, Spark or Hadoop batch ingestion, and
+  ///   `pinot-admin CreateSegment` -- keep the compiled-in default, and because a reload ignores
+  ///   defaults, nothing later reconciles the two.
+  /// - It is a process-global default, so in a single-JVM multi-role deployment the last role to start
+  ///   wins for the whole process.
+  ///
+  /// These all hold for the three forward index defaults above as well; they are spelled out here
+  /// because this is the first of them an operator is routinely expected to set.
+  @VisibleForTesting
+  static void setDefaultCompressionCodec(String defaultCompressionCodec) {
+    CompressionCodec codec;
+    try {
+      codec = CompressionCodec.valueOf(defaultCompressionCodec.trim().toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      LOGGER.warn("Unknown forward index default compression codec: {}, expected one of: {}, keeping: {}",
+          defaultCompressionCodec, rawIndexCompressionCodecs(), ForwardIndexConfig.getDefaultCompressionType());
+      return;
+    }
+    if (!codec.isApplicableToRawIndex()) {
+      LOGGER.warn("Forward index default compression codec: {} is not applicable to raw forward indexes, expected "
+              + "one of: {}, keeping: {}", codec, rawIndexCompressionCodecs(),
+          ForwardIndexConfig.getDefaultCompressionType());
+      return;
+    }
+    // Every raw-applicable codec has a same-named ChunkCompressionType; if that ever stops holding, this
+    // should fail loudly rather than silently keep the old default.
+    ChunkCompressionType compressionType = ChunkCompressionType.valueOf(codec.name());
+    LOGGER.info("Setting forward index default compression codec to: {}", compressionType);
+    ForwardIndexConfig.setDefaultCompressionType(compressionType);
+  }
+
+  private static List<CompressionCodec> rawIndexCompressionCodecs() {
+    return Arrays.stream(CompressionCodec.values()).filter(CompressionCodec::isApplicableToRawIndex)
+        .collect(Collectors.toList());
   }
 
   public static void initFieldSpecConfig(PinotConfiguration instanceConfig) {
