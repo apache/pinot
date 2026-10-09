@@ -25,7 +25,9 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -85,6 +87,38 @@ public class SegmentDeletionManagerTest {
   protected SegmentDeletionManager createDeletionManager(String dataDir, HelixAdmin helixAdmin, String clusterName,
       ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
     return new SegmentDeletionManager(dataDir, helixAdmin, clusterName, propertyStore, deletedSegmentsRetentionInDays);
+  }
+
+  private static final String METADATA_TAR_GZ_EXT = Constants.METADATA_TAR_GZ_FILE_EXT;
+
+  private SegmentDeletionManager newManagerWithLocalFs(File dataDir) {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class",
+        LocalPinotFS.class.getName());
+    PinotFSFactory.init(new PinotConfiguration(properties));
+    return createDeletionManager(dataDir.getAbsolutePath(), makeHelixAdmin(), CLUSTER_NAME, makePropertyStore(), 7);
+  }
+
+  private File createLiveSegment(File dataDir, String segmentId, boolean withSegment, boolean withSidecar)
+      throws Exception {
+    File tableDir = new File(dataDir, TABLE_NAME);
+    tableDir.mkdirs();
+    if (withSegment) {
+      createTestFileWithAge(new File(tableDir, segmentId).getAbsolutePath(), 30);
+    }
+    if (withSidecar) {
+      createTestFileWithAge(new File(tableDir, segmentId + METADATA_TAR_GZ_EXT).getAbsolutePath(), 30);
+    }
+    return tableDir;
+  }
+
+  private static List<String> sortedNames(File dir) {
+    String[] names = dir.list();
+    if (names == null) {
+      return List.of();
+    }
+    Arrays.sort(names);
+    return Arrays.asList(names);
   }
 
   HelixAdmin makeHelixAdmin() {
@@ -435,7 +469,8 @@ public class SegmentDeletionManagerTest {
     TestUtils.waitForCondition(aVoid -> {
       try {
         Assert.assertEquals(tableDir.listFiles().length, 0);
-        Assert.assertEquals(deletedTableDir.listFiles().length, segments.size());
+        // each segment and its metadata sidecar are moved
+        Assert.assertEquals(deletedTableDir.listFiles().length, segments.size() * 2);
         return true;
       } catch (Throwable t) {
         return false;
@@ -504,7 +539,8 @@ public class SegmentDeletionManagerTest {
     TestUtils.waitForCondition(aVoid -> {
       try {
         Assert.assertEquals(tableDir.listFiles().length, 0);
-        Assert.assertEquals(deletedTableDir.listFiles().length, segments.size());
+        // each segment and its metadata sidecar are moved
+        Assert.assertEquals(deletedTableDir.listFiles().length, segments.size() * 2);
         return true;
       } catch (Throwable t) {
         return false;
@@ -546,6 +582,120 @@ public class SegmentDeletionManagerTest {
         return false;
       }
     }, 2000L, 10_000L, "Unable to verify table deletion with retention");
+  }
+
+  @Test
+  public void testSidecarMovedAndRenamedWithMatchingSuffix()
+      throws Exception {
+    File dataDir = Files.createTempDirectory("pinot-test-").toFile();
+    dataDir.deleteOnExit();
+    SegmentDeletionManager manager = newManagerWithLocalFs(dataDir);
+    File tableDir = createLiveSegment(dataDir, "seg1", true, true);
+    File deletedTableDir = new File(dataDir, SegmentDeletionManager.DELETED_SEGMENTS + File.separator + TABLE_NAME);
+
+    manager.removeSegmentsFromStoreInBatch(TABLE_NAME, Collections.singletonList("seg1"), TimeUnit.DAYS.toMillis(1));
+
+    Assert.assertEquals(tableDir.list().length, 0);
+    List<String> names = sortedNames(deletedTableDir);
+    Assert.assertEquals(names.size(), 2);
+    // sorted: "seg1.metadata__..." < "seg1__..." ('.' < '_')
+    String sidecar = names.get(0);
+    String segment = names.get(1);
+    Assert.assertTrue(sidecar.startsWith("seg1.metadata" + RETENTION_UNTIL_SEPARATOR), sidecar);
+    Assert.assertTrue(segment.startsWith("seg1" + RETENTION_UNTIL_SEPARATOR), segment);
+    Assert.assertFalse(sidecar.contains(".tar.gz"), sidecar);
+    String sidecarTs = StringUtils.substringAfter(sidecar, RETENTION_UNTIL_SEPARATOR);
+    String segmentTs = StringUtils.substringAfter(segment, RETENTION_UNTIL_SEPARATOR);
+    Assert.assertEquals(sidecarTs.length(), RETENTION_DATE_FORMAT_STR.length());
+    Assert.assertEquals(sidecarTs, segmentTs);
+  }
+
+  @Test
+  public void testSidecarDeletedWhenRetentionIsZero()
+      throws Exception {
+    File dataDir = Files.createTempDirectory("pinot-test-").toFile();
+    dataDir.deleteOnExit();
+    SegmentDeletionManager manager = newManagerWithLocalFs(dataDir);
+    File tableDir = createLiveSegment(dataDir, "seg1", true, true);
+    File deletedTableDir = new File(dataDir, SegmentDeletionManager.DELETED_SEGMENTS + File.separator + TABLE_NAME);
+
+    manager.removeSegmentsFromStoreInBatch(TABLE_NAME, Collections.singletonList("seg1"), 0L);
+
+    Assert.assertEquals(tableDir.list().length, 0);
+    Assert.assertTrue(!deletedTableDir.exists() || deletedTableDir.list().length == 0);
+  }
+
+  @Test
+  public void testSidecarMovedWithoutSuffixAndTouchedWhenRetentionNull()
+      throws Exception {
+    File dataDir = Files.createTempDirectory("pinot-test-").toFile();
+    dataDir.deleteOnExit();
+    SegmentDeletionManager manager = newManagerWithLocalFs(dataDir);
+    File tableDir = createLiveSegment(dataDir, "seg1", true, true);
+    File deletedTableDir = new File(dataDir, SegmentDeletionManager.DELETED_SEGMENTS + File.separator + TABLE_NAME);
+
+    manager.removeSegmentsFromStoreInBatch(TABLE_NAME, Collections.singletonList("seg1"), null);
+
+    Assert.assertEquals(tableDir.list().length, 0);
+    Assert.assertEquals(sortedNames(deletedTableDir), Arrays.asList("seg1", "seg1.metadata"));
+    // Files were created 30 days old; touch() must have refreshed them so the default retention applies from now.
+    long oneMinuteAgo = System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(1);
+    Assert.assertTrue(new File(deletedTableDir, "seg1").lastModified() > oneMinuteAgo);
+    Assert.assertTrue(new File(deletedTableDir, "seg1.metadata").lastModified() > oneMinuteAgo);
+  }
+
+  @Test
+  public void testSegmentWithoutSidecarIsUnchanged()
+      throws Exception {
+    File dataDir = Files.createTempDirectory("pinot-test-").toFile();
+    dataDir.deleteOnExit();
+    SegmentDeletionManager manager = newManagerWithLocalFs(dataDir);
+    createLiveSegment(dataDir, "seg1", true, false);
+    File deletedTableDir = new File(dataDir, SegmentDeletionManager.DELETED_SEGMENTS + File.separator + TABLE_NAME);
+
+    manager.removeSegmentsFromStoreInBatch(TABLE_NAME, Collections.singletonList("seg1"), TimeUnit.DAYS.toMillis(1));
+
+    List<String> names = sortedNames(deletedTableDir);
+    Assert.assertEquals(names.size(), 1);
+    Assert.assertTrue(names.get(0).startsWith("seg1" + RETENTION_UNTIL_SEPARATOR));
+  }
+
+  @Test
+  public void testSweeperExpiresSidecarWithItsSegment()
+      throws Exception {
+    File dataDir = Files.createTempDirectory("pinot-test-").toFile();
+    dataDir.deleteOnExit();
+    FakeDeletionManager manager =
+        new FakeDeletionManager(dataDir.getAbsolutePath(), makeHelixAdmin(), makePropertyStore(), 7);
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class",
+        LocalPinotFS.class.getName());
+    PinotFSFactory.init(new PinotConfiguration(properties));
+    LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
+    when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+
+    File deletedDir = new File(dataDir, SegmentDeletionManager.DELETED_SEGMENTS);
+    File expiredTable = new File(deletedDir, "expiredTable");
+    File liveTable = new File(deletedDir, "liveTable");
+    expiredTable.mkdirs();
+    liveTable.mkdirs();
+    // age 2 days with 1 day retention: expired. age 0 with 1 day retention: still retained.
+    createTestFileWithAge(new File(expiredTable, genDeletedSegmentName("seg1", 2, 1)).getAbsolutePath(), 2);
+    createTestFileWithAge(new File(expiredTable, genDeletedSegmentName("seg1.metadata", 2, 1)).getAbsolutePath(), 2);
+    createTestFileWithAge(new File(liveTable, genDeletedSegmentName("seg2", 0, 1)).getAbsolutePath(), 0);
+    createTestFileWithAge(new File(liveTable, genDeletedSegmentName("seg2.metadata", 0, 1)).getAbsolutePath(), 0);
+
+    manager.removeAgedDeletedSegments(leadControllerManager);
+
+    // Both expired objects are removed asynchronously by the same sweep; the now-empty table dir is only removed by the
+    // next sweep.
+    TestUtils.waitForCondition(aVoid -> expiredTable.exists() && expiredTable.list().length == 0, 100L, 10_000L,
+        "Unable to verify aged segment and sidecar expiry");
+    Assert.assertEquals(liveTable.list().length, 2);
+    manager.removeAgedDeletedSegments(leadControllerManager);
+    TestUtils.waitForCondition(aVoid -> !expiredTable.exists(), 100L, 10_000L,
+        "Unable to verify empty table dir removal");
+    Assert.assertEquals(liveTable.list().length, 2);
   }
 
   public void createTableAndSegmentFiles(File tempDir, List<String> segmentIds)

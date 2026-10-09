@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.slf4j.Logger;
@@ -28,8 +29,8 @@ import org.slf4j.Logger;
 public class PauselessSegmentCommitter extends SplitSegmentCommitter {
   public PauselessSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
       SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader,
-      @Nullable String peerDownloadScheme) {
-    super(segmentLogger, protocolHandler, params, segmentUploader, peerDownloadScheme);
+      @Nullable String peerDownloadScheme, ServerMetrics serverMetrics) {
+    super(segmentLogger, protocolHandler, params, segmentUploader, peerDownloadScheme, false, serverMetrics);
   }
 
   /// Commits a built segment without executing the segmentCommitStart step. This method assumes that

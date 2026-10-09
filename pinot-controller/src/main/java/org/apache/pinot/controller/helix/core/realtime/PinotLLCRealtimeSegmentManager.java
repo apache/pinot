@@ -174,6 +174,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   public static final String COMMITTING_SEGMENTS = "committingSegments";
   private static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
+  // Not imported: the controller's own Constants class is already imported here.
+  private static final String METADATA_TAR_GZ_FILE_EXT =
+      org.apache.pinot.spi.ingestion.batch.spec.Constants.METADATA_TAR_GZ_FILE_EXT;
 
   // Max time to wait for all LLC segments to complete committing their metadata while stopping the controller.
   private static final long MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS = 30_000L;
@@ -601,11 +604,14 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
     PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
     String uriToMoveTo = moveSegmentFile(rawTableName, segmentName, segmentLocation, pinotFS);
+    moveMetadataTarFile(realtimeTableName, rawTableName, segmentName,
+        committingSegmentDescriptor.getMetadataTarLocation(), pinotFS);
 
     if (!isTmpSegmentAsyncDeletionEnabled()) {
       try {
         for (String uri : pinotFS.listFiles(tableDirURI, false)) {
-          if (uri.contains(SegmentCompletionUtils.getTmpSegmentNamePrefix(segmentName))) {
+          if (uri.contains(SegmentCompletionUtils.getTmpSegmentNamePrefix(segmentName))
+              || uri.contains(SegmentCompletionUtils.getTmpSegmentNamePrefix(segmentName + METADATA_TAR_GZ_FILE_EXT))) {
             LOGGER.warn("Deleting temporary segment file: {}", uri);
             Preconditions.checkState(pinotFS.delete(new URI(uri), true), "Failed to delete file: %s", uri);
           }
@@ -620,6 +626,31 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   private boolean isPeerUrl(String segmentLocation) {
     return segmentLocation.regionMatches(true, 0, CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME, 0,
         CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME.length());
+  }
+
+  /// Moves the metadata sidecar the server uploaded under a tmp name to `<segment>.metadata.tar.gz`, like
+  /// [#moveSegmentFile] does for the segment file. Best effort: a failure is logged and counted, and never fails the
+  /// commit.
+  private void moveMetadataTarFile(String realtimeTableName, String rawTableName, String segmentName,
+      @Nullable String metadataTarLocation, PinotFS pinotFS) {
+    if (metadataTarLocation == null) {
+      return;
+    }
+    URI uriToMoveTo = createSegmentPath(rawTableName, segmentName + METADATA_TAR_GZ_FILE_EXT);
+    try {
+      if (pinotFS.move(URIUtils.getUri(metadataTarLocation), uriToMoveTo, true)) {
+        LOGGER.info("Moved metadata tar of segment: {} from: {} to: {}", segmentName, metadataTarLocation,
+            uriToMoveTo);
+        return;
+      }
+      LOGGER.warn("Failed to move metadata tar of segment: {} from: {} to: {}", segmentName, metadataTarLocation,
+          uriToMoveTo);
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while moving metadata tar of segment: {} from: {} to: {}", segmentName,
+          metadataTarLocation, uriToMoveTo, e);
+    }
+    _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.REALTIME_METADATA_TAR_MOVE_FAILURE,
+        1L);
   }
 
   /// This method is invoked after the realtime segment is uploaded but before a response is sent to the server.
