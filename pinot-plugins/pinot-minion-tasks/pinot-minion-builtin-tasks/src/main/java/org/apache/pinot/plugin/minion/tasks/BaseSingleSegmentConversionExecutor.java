@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -31,11 +32,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHeaders;
-import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.pinot.common.auth.AuthProviderUtils;
-import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -74,12 +73,6 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
   /// Converts the segment based on the given task config and returns the conversion result.
   protected abstract SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
       throws Exception;
-
-  /// Returns whether this task can update only ZK metadata when conversion leaves the segment unchanged. Tasks must
-  /// explicitly opt in so custom executors retain the existing tar-and-upload behavior.
-  protected boolean shouldUpdateZKMetadataWithoutUpload() {
-    return false;
-  }
 
   @Override
   public SegmentConversionResult executeTask(PinotTaskConfig pinotTaskConfig)
@@ -139,6 +132,9 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
         return segmentConversionResult;
       }
 
+      // Publish metrics related to segment upload
+      reportSegmentUploadMetrics(workingDir, tableNameWithType, taskType);
+
       // Collect the task processing metrics from various single segment executors and publish them here.
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
       Object numRecordsPurged = segmentConversionResult.getCustomProperty(PurgeTaskExecutor.NUM_RECORDS_PURGED_KEY);
@@ -149,49 +145,19 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
         reportTaskProcessingMetrics(tableNameWithType, taskType, segmentMetadata.getTotalDocs());
       }
 
-      SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
-          getSegmentZKMetadataCustomMapModifier(pinotTaskConfig, segmentConversionResult);
-      if (shouldUpdateZKMetadataWithoutUpload()
-          && convertedSegmentDir.getCanonicalFile().equals(indexDir.getCanonicalFile())) {
-        checkCancelled(taskType, tableNameWithType, segmentName);
-        _eventObserver.notifyProgress(_pinotTaskConfig,
-            "Updating ZK metadata without uploading unchanged segment: " + segmentName);
-        try {
-          SegmentConversionUtils.updateSegmentZKMetadata(configs, tableNameWithType, segmentName, uploadURL,
-              originalSegmentCrc, segmentZKMetadataCustomMapModifier, authProvider);
-          LOGGER.info("Updated ZK metadata without uploading unchanged segment: {} of table: {}", segmentName,
-              tableNameWithType);
-          return segmentConversionResult;
-        } catch (HttpErrorStatusException e) {
-          if (e.getStatusCode() != HttpStatus.SC_NOT_FOUND
-              && e.getStatusCode() != HttpStatus.SC_METHOD_NOT_ALLOWED) {
-            _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_UPLOAD_FAIL_COUNT, 1L);
-            _eventObserver.notifyTaskError(_pinotTaskConfig, e);
-            throw e;
-          }
-          // Older controllers return 405 because this path only supports GET. Controllers without the path return 404.
-          // A missing segment can also return 404 and is rejected by the refresh-only upload fallback.
-          LOGGER.info("Segment ZK metadata update API is unavailable for segment: {} of table: {}, falling back to "
-              + "segment upload", segmentName, tableNameWithType);
-        } catch (Exception e) {
-          _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_UPLOAD_FAIL_COUNT, 1L);
-          _eventObserver.notifyTaskError(_pinotTaskConfig, e);
-          throw e;
-        }
-      }
-
-      // Publish metrics related to segment upload
-      reportSegmentUploadMetrics(workingDir, tableNameWithType, taskType);
-
       BatchConfigProperties.SegmentPushType pushType = getSegmentPushType(configs);
       boolean copyToDeepStore =
           pushType == BatchConfigProperties.SegmentPushType.METADATA && isCopyToDeepStoreForMetadataPush();
-      // Controller-copy pushes send only metadata.properties and creation.meta, built from the local converted
-      // segment. An unchanged segment (same CRC) skips the tar and the staging and only re-registers its metadata.
+      // METADATA pushes send only metadata.properties and creation.meta, built here from the local converted segment
+      // so the staged tar is never downloaded back. A controller-copy push of an unchanged segment (same CRC) skips
+      // the tar and the staging and only re-registers its metadata.
       File segmentMetadataTarFile = null;
       boolean reuseExistingSegment = false;
+      if (pushType == BatchConfigProperties.SegmentPushType.METADATA) {
+        segmentMetadataTarFile =
+            SegmentPushUtils.generateSegmentMetadataFile(convertedSegmentDir, tempDataDir, segmentName);
+      }
       if (copyToDeepStore) {
-        segmentMetadataTarFile = createSegmentMetadataTarFile(convertedSegmentDir, tempDataDir, segmentName);
         long convertedSegmentCrc = new SegmentMetadataImpl(convertedSegmentDir).getCrc();
         reuseExistingSegment =
             convertedSegmentCrc == Long.parseLong(originalSegmentCrc) && StringUtils.isNotEmpty(downloadURL);
@@ -215,7 +181,12 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
         LOGGER.warn("Failed to delete input segment: {}", indexDir.getAbsolutePath());
       }
 
-      checkCancelled(taskType, tableNameWithType, segmentName);
+      // Check whether the task get cancelled before uploading the segment
+      if (_cancelled) {
+        LOGGER.info("{} on table: {}, segment: {} got cancelled", taskType, tableNameWithType, segmentName);
+        throw new TaskCancelledException(
+            taskType + " on table: " + tableNameWithType + ", segment: " + segmentName + " got cancelled");
+      }
 
       // Set original segment CRC into HTTP IF-MATCH header to check whether the original segment get refreshed, so that
       // the newer segment won't get override
@@ -225,6 +196,10 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       Header refreshOnlyHeader = new BasicHeader(FileUploadDownloadClient.CustomHeaders.REFRESH_ONLY, "true");
 
       // Set segment ZK metadata custom map modifier into HTTP header to modify the segment ZK metadata
+      // NOTE: even segment is not changed, still need to upload the segment to update the segment ZK metadata so that
+      // segment will not be submitted again
+      SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
+          getSegmentZKMetadataCustomMapModifier(pinotTaskConfig, segmentConversionResult);
       Header segmentZKMetadataCustomMapModifierHeader =
           new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
               segmentZKMetadataCustomMapModifier.toJsonString());
@@ -254,7 +229,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
                   uploadURL, downloadURL, convertedTarredSegmentFile, segmentMetadataTarFile);
             } else {
               uploadSegmentWithMetadata(configs, pinotTaskConfig, segmentConversionResult, authProvider, parameters,
-                  tableNameWithType, convertedTarredSegmentFile);
+                  tableNameWithType, convertedTarredSegmentFile, segmentMetadataTarFile);
             }
             break;
           default:
@@ -281,14 +256,6 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
     }
   }
 
-  private void checkCancelled(String taskType, String tableNameWithType, String segmentName) {
-    if (_cancelled) {
-      LOGGER.info("{} on table: {}, segment: {} got cancelled", taskType, tableNameWithType, segmentName);
-      throw new TaskCancelledException(
-          taskType + " on table: " + tableNameWithType + ", segment: " + segmentName + " got cancelled");
-    }
-  }
-
   /// Opt-in for tasks that refresh a segment under its own name: stage under a task-unique name, keep the TAR guards
   /// and let the controller copy the tar into the segment's deep store location. Default false keeps current behavior.
   protected boolean isCopyToDeepStoreForMetadataPush() {
@@ -300,7 +267,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
   /// [BatchConfigProperties#PUSH_CONTROLLER_URI] in configs.
   private void uploadSegmentWithMetadata(Map<String, String> configs, PinotTaskConfig pinotTaskConfig,
       SegmentConversionResult segmentConversionResult, AuthProvider authProvider, List<NameValuePair> parameters,
-      String tableNameWithType, File convertedTarredSegmentFile)
+      String tableNameWithType, File convertedTarredSegmentFile, File segmentMetadataTarFile)
       throws Exception {
     if (!configs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
       throw new RuntimeException("Output dir URI missing for metadata push. Set "
@@ -320,9 +287,10 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
     try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(configs, outputSegmentDirURI)) {
       Map<String, String> segmentUriToTarPathMap = SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI,
           pushJobSpec, new String[]{outputSegmentTarURI.toString()});
+      Map<String, File> segmentUriToMetadataFileMap = new HashMap<>();
+      segmentUriToTarPathMap.keySet().forEach(uri -> segmentUriToMetadataFileMap.put(uri, segmentMetadataTarFile));
       try {
-        SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap, metadataHeaders,
-            parameters);
+        SegmentPushUtils.sendSegmentUriAndMetadata(spec, segmentUriToMetadataFileMap, metadataHeaders, parameters);
       } catch (Exception e) {
         // The tar was already staged to the output PinotFS before this failure. If the task is retried, the next
         // moveSegmentToOutputPinotFS() would fail with "Output file already exists" (overwriteOutput defaults to

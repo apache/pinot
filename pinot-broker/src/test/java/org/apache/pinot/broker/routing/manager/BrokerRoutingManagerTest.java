@@ -31,6 +31,7 @@ import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
+import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
@@ -46,6 +47,7 @@ import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelector;
 import org.apache.pinot.broker.routing.tablesampler.TableSampler;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -73,6 +75,8 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -804,6 +808,35 @@ public class BrokerRoutingManagerTest {
     // Routable map contains the server again.
     assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
     assertTrue(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+  }
+
+  @Test
+  public void testPartitionPruningThresholdUpdates()
+      throws Exception {
+    String key = CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD;
+    _routingManager = spy(_routingManager);
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of()));
+    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    ClusterConfig config = new ClusterConfig("testCluster");
+    config.getRecord().setSimpleField(key, "128");
+    handler.onClusterConfigChange(config, null);
+    handler.registerClusterConfigChangeListener(_routingManager);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(), 128);
+
+    config.getRecord().setSimpleField(key, "-1");
+    handler.onClusterConfigChange(config, null);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(), -1);
+
+    config.getRecord().setSimpleField(key, "invalid");
+    handler.onClusterConfigChange(config, null);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(),
+        DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD);
+
+    config.getRecord().getSimpleFields().clear();
+    handler.onClusterConfigChange(config, null);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(),
+        DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD);
+    verify(_routingManager, never()).buildRouting(TEST_TABLE);
   }
 
   /// Creates a ZNRecord representing an enabled server instance.

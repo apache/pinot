@@ -19,6 +19,7 @@
 package org.apache.pinot.query.service.server;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import io.grpc.Server;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
@@ -86,10 +87,6 @@ import org.slf4j.LoggerFactory;
 public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryServer.class);
 
-  // TODO: Inbound messages can get quite large because we send the entire stage metadata map in each call.
-  // See https://github.com/apache/pinot/issues/10331
-  private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
-
   private final String _instanceId;
   private final int _port;
   private final QueryRunner _queryRunner;
@@ -100,6 +97,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private final ThreadAccountant _threadAccountant;
   private final int _permitKeepAliveTimeMs;
   private final boolean _permitKeepAliveWithoutCalls;
+  // TODO: Inbound messages can get quite large because we send the entire stage metadata map in each call.
+  // See https://github.com/apache/pinot/issues/10331
+  private final int _maxInboundMessageSizeBytes;
 
   // query submission service is only used for plan submission for now.
   // TODO: with complex query submission logic we should allow asynchronous query submission return instead of
@@ -162,6 +162,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     _permitKeepAliveWithoutCalls = serverConf.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS);
+    _maxInboundMessageSizeBytes = serverConf.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES);
+    Preconditions.checkArgument(_maxInboundMessageSizeBytes > 0, "%s must be positive, got: %s",
+        CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES,
+        _maxInboundMessageSizeBytes);
 
     ExecutorService baseExecutorService =
         ExecutorServiceUtils.create(serverConf, CommonConstants.Server.MULTISTAGE_SUBMISSION_EXEC_CONFIG_PREFIX,
@@ -193,8 +199,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         }
         _server = buildGrpcServer(serverBuilder);
         LOGGER.info(
-            "Initialized QueryServer on port: {} with permitKeepAliveTimeMs: {}, permitKeepAliveWithoutCalls: {}",
-            _port, _permitKeepAliveTimeMs, _permitKeepAliveWithoutCalls);
+            "Initialized QueryServer on port: {} with permitKeepAliveTimeMs: {}, permitKeepAliveWithoutCalls: {}, "
+                + "maxInboundMessageSizeBytes: {}", _port, _permitKeepAliveTimeMs, _permitKeepAliveWithoutCalls,
+            _maxInboundMessageSizeBytes);
       }
       _queryRunner.start();
       _server.start();
@@ -213,6 +220,11 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     return _permitKeepAliveWithoutCalls;
   }
 
+  @VisibleForTesting
+  int getMaxInboundMessageSizeBytes() {
+    return _maxInboundMessageSizeBytes;
+  }
+
   private Server buildGrpcServer(NettyServerBuilder builder) {
     // By using directExecutor, GRPC doesn't need to manage its own thread pool
     builder.directExecutor();
@@ -225,7 +237,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       builder.permitKeepAliveTime(_permitKeepAliveTimeMs, TimeUnit.MILLISECONDS);
     }
     builder.permitKeepAliveWithoutCalls(_permitKeepAliveWithoutCalls);
-    return builder.addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
+    return builder.addService(this).maxInboundMessageSize(_maxInboundMessageSizeBytes).build();
   }
 
   public void shutdown() {

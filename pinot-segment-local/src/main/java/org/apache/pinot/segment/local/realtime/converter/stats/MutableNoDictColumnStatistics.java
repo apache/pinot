@@ -45,6 +45,11 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
   protected final boolean _isSortedColumn;
   protected final MutableForwardIndex _forwardIndex;
 
+  @Nullable
+  private final Comparable<?> _minValue;
+  @Nullable
+  private final Comparable<?> _maxValue;
+
   // Lazily computed because it may require a full scan of the forward index, and it is queried multiple times per
   // column during segment creation. Left unsynchronized: an instance describes a single column and is reached only
   // through the per-column stats map, so it is confined to whichever thread creates that column. Even if that ever
@@ -53,6 +58,13 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
   private Boolean _sorted;
 
   public MutableNoDictColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn) {
+    this(dataSource, sortedDocIds, isSortedColumn, true);
+  }
+
+  /// @param recoverMinMax whether to scan for min/max missing from the metadata. Subclasses that compute their own
+  ///                      bounds over a subset of docs pass false to skip the scan.
+  protected MutableNoDictColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn,
+      boolean recoverMinMax) {
     _dataSourceMetadata = dataSource.getDataSourceMetadata();
     _fieldSpec = _dataSourceMetadata.getFieldSpec();
     Preconditions.checkState(_dataSourceMetadata.getNumDocs() > 0,
@@ -62,6 +74,55 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
     _forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();
     Preconditions.checkState(_forwardIndex != null, "Failed to find forward index for column: %s",
         _fieldSpec.getName());
+
+    // Ingestion-aggregated metric columns mutate in place during consumption, so the mutable segment does not track
+    // min/max for them. Recover the bounds for single-value INT/LONG columns, the only types whose BitSliced range
+    // index needs them, and record sortedness in the same scan. Other types keep null bounds (unchanged behavior).
+    Comparable<?> minValue = (Comparable<?>) _dataSourceMetadata.getMinValue();
+    Comparable<?> maxValue = (Comparable<?>) _dataSourceMetadata.getMaxValue();
+    if (recoverMinMax && (minValue == null || maxValue == null) && isSingleValue()) {
+      int numDocs = _dataSourceMetadata.getNumDocs();
+      switch (getStoredType()) {
+        case INT: {
+          int min = _forwardIndex.getInt(docId(0));
+          int max = min;
+          int prev = min;
+          boolean sorted = true;
+          for (int i = 1; i < numDocs; i++) {
+            int curr = _forwardIndex.getInt(docId(i));
+            min = Math.min(min, curr);
+            max = Math.max(max, curr);
+            sorted &= curr >= prev;
+            prev = curr;
+          }
+          minValue = min;
+          maxValue = max;
+          _sorted = _isSortedColumn || sorted;
+          break;
+        }
+        case LONG: {
+          long min = _forwardIndex.getLong(docId(0));
+          long max = min;
+          long prev = min;
+          boolean sorted = true;
+          for (int i = 1; i < numDocs; i++) {
+            long curr = _forwardIndex.getLong(docId(i));
+            min = Math.min(min, curr);
+            max = Math.max(max, curr);
+            sorted &= curr >= prev;
+            prev = curr;
+          }
+          minValue = min;
+          maxValue = max;
+          _sorted = _isSortedColumn || sorted;
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    _minValue = minValue;
+    _maxValue = maxValue;
   }
 
   @Override
@@ -76,12 +137,16 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
 
   @Override
   public Comparable<?> getMinValue() {
-    return (Comparable<?>) _dataSourceMetadata.getMinValue();
+    return _minValue;
   }
 
   @Override
   public Comparable<?> getMaxValue() {
-    return (Comparable<?>) _dataSourceMetadata.getMaxValue();
+    return _maxValue;
+  }
+
+  private int docId(int index) {
+    return _sortedDocIds != null ? _sortedDocIds[index] : index;
   }
 
   @Nullable

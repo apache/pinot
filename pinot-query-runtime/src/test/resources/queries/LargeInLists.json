@@ -1,0 +1,602 @@
+{
+  "large_in_lists": {
+    "comment": "IN lists with at least 20 values, which the multi-stage planner seals during optimization",
+    "tables": {
+      "facts": {
+        "schema": [
+          {
+            "name": "id",
+            "type": "INT"
+          },
+          {
+            "name": "grp",
+            "type": "STRING"
+          },
+          {
+            "name": "val",
+            "type": "LONG"
+          },
+          {
+            "name": "amt",
+            "type": "DOUBLE"
+          },
+          {
+            "name": "dim_id",
+            "type": "INT"
+          }
+        ],
+        "inputs": [
+          [
+            1,
+            "g1",
+            3,
+            1.5,
+            2
+          ],
+          [
+            2,
+            "g2",
+            6,
+            2.5,
+            3
+          ],
+          [
+            3,
+            "g3",
+            9,
+            3.5,
+            4
+          ],
+          [
+            4,
+            "g4",
+            12,
+            4.5,
+            5
+          ],
+          [
+            5,
+            "g5",
+            15,
+            5.5,
+            6
+          ],
+          [
+            6,
+            "g6",
+            18,
+            6.5,
+            7
+          ],
+          [
+            7,
+            "g7",
+            21,
+            7.5,
+            8
+          ],
+          [
+            8,
+            "g8",
+            24,
+            8.5,
+            9
+          ],
+          [
+            9,
+            "g9",
+            27,
+            9.5,
+            10
+          ],
+          [
+            10,
+            "g10",
+            30,
+            10.5,
+            11
+          ],
+          [
+            11,
+            "g11",
+            33,
+            11.5,
+            12
+          ],
+          [
+            12,
+            "g12",
+            36,
+            12.5,
+            13
+          ],
+          [
+            13,
+            "g13",
+            39,
+            13.5,
+            14
+          ],
+          [
+            14,
+            "g14",
+            42,
+            14.5,
+            15
+          ],
+          [
+            15,
+            "g15",
+            45,
+            15.5,
+            16
+          ],
+          [
+            16,
+            "g16",
+            48,
+            16.5,
+            17
+          ],
+          [
+            17,
+            "g17",
+            51,
+            17.5,
+            1
+          ],
+          [
+            18,
+            "g18",
+            54,
+            18.5,
+            2
+          ],
+          [
+            19,
+            "g19",
+            57,
+            19.5,
+            3
+          ],
+          [
+            20,
+            "g20",
+            60,
+            20.5,
+            4
+          ],
+          [
+            21,
+            "g21",
+            63,
+            21.5,
+            5
+          ],
+          [
+            22,
+            "g22",
+            66,
+            22.5,
+            6
+          ],
+          [
+            23,
+            "g23",
+            69,
+            23.5,
+            7
+          ],
+          [
+            24,
+            "g24",
+            72,
+            24.5,
+            8
+          ],
+          [
+            25,
+            "g25",
+            75,
+            25.5,
+            9
+          ],
+          [
+            26,
+            "g26",
+            78,
+            26.5,
+            10
+          ],
+          [
+            27,
+            "g27",
+            81,
+            27.5,
+            11
+          ],
+          [
+            28,
+            "g28",
+            84,
+            28.5,
+            12
+          ],
+          [
+            29,
+            "g29",
+            87,
+            29.5,
+            13
+          ],
+          [
+            30,
+            "g0",
+            90,
+            30.5,
+            14
+          ],
+          [
+            31,
+            "g1",
+            93,
+            31.5,
+            15
+          ],
+          [
+            32,
+            "g2",
+            96,
+            32.5,
+            16
+          ],
+          [
+            33,
+            "g3",
+            99,
+            33.5,
+            17
+          ],
+          [
+            34,
+            "g4",
+            102,
+            34.5,
+            1
+          ],
+          [
+            35,
+            "g5",
+            105,
+            35.5,
+            2
+          ],
+          [
+            36,
+            "g6",
+            108,
+            36.5,
+            3
+          ],
+          [
+            37,
+            "g7",
+            111,
+            37.5,
+            4
+          ],
+          [
+            38,
+            "g8",
+            114,
+            38.5,
+            5
+          ],
+          [
+            39,
+            "g9",
+            117,
+            39.5,
+            6
+          ],
+          [
+            40,
+            "g10",
+            120,
+            40.5,
+            7
+          ]
+        ]
+      },
+      "dims": {
+        "schema": [
+          {
+            "name": "dim_id",
+            "type": "INT"
+          },
+          {
+            "name": "name",
+            "type": "STRING"
+          },
+          {
+            "name": "cat",
+            "type": "INT"
+          }
+        ],
+        "inputs": [
+          [
+            1,
+            "name1",
+            2
+          ],
+          [
+            2,
+            "name2",
+            4
+          ],
+          [
+            3,
+            "name3",
+            6
+          ],
+          [
+            4,
+            "name4",
+            8
+          ],
+          [
+            5,
+            "name5",
+            10
+          ],
+          [
+            6,
+            "name6",
+            12
+          ],
+          [
+            7,
+            "name7",
+            14
+          ],
+          [
+            8,
+            "name8",
+            16
+          ],
+          [
+            9,
+            "name9",
+            18
+          ],
+          [
+            10,
+            "name10",
+            20
+          ],
+          [
+            11,
+            "name11",
+            22
+          ],
+          [
+            12,
+            "name12",
+            24
+          ],
+          [
+            13,
+            "name13",
+            26
+          ],
+          [
+            14,
+            "name14",
+            28
+          ],
+          [
+            15,
+            "name15",
+            30
+          ],
+          [
+            16,
+            "name16",
+            32
+          ],
+          [
+            17,
+            "name17",
+            34
+          ],
+          [
+            18,
+            "name18",
+            36
+          ]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "where in",
+        "sql": "SELECT id, grp FROM {facts} WHERE id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59)"
+      },
+      {
+        "description": "where not in",
+        "sql": "SELECT COUNT(*) FROM {facts} WHERE id NOT IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59)"
+      },
+      {
+        "description": "in or range on another column",
+        "sql": "SELECT COUNT(*) FROM {facts} WHERE id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) OR val > 90"
+      },
+      {
+        "description": "in or range on the same column",
+        "sql": "SELECT id FROM {facts} WHERE id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) OR id > 35"
+      },
+      {
+        "description": "not in and range on the same column",
+        "sql": "SELECT id FROM {facts} WHERE id NOT IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) AND id > 5"
+      },
+      {
+        "description": "in or between on the same column",
+        "sql": "SELECT id FROM {facts} WHERE id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) OR id BETWEEN 10 AND 14"
+      },
+      {
+        "description": "case and filter",
+        "sql": "SELECT SUM(CASE WHEN id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) THEN 1 ELSE 0 END), COUNT(*) FILTER (WHERE id NOT IN (2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59)) FROM {facts}"
+      },
+      {
+        "description": "select list",
+        "sql": "SELECT id, id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) FROM {facts}"
+      },
+      {
+        "description": "group by case",
+        "sql": "SELECT CASE WHEN id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) THEN 'odd' ELSE 'even' END AS k, COUNT(*) FROM {facts} GROUP BY CASE WHEN id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) THEN 'odd' ELSE 'even' END"
+      },
+      {
+        "description": "having",
+        "sql": "SELECT grp, COUNT(*) FROM {facts} GROUP BY grp HAVING SUM(val) IN (2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59, 3, 6, 9, 36, 99)"
+      },
+      {
+        "description": "join on",
+        "sql": "SELECT f.id, d.name FROM {facts} f JOIN {dims} d ON f.dim_id = d.dim_id AND d.cat IN (2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59)"
+      },
+      {
+        "description": "left join on left column",
+        "sql": "SELECT f.id, d.name FROM {facts} f LEFT JOIN {dims} d ON f.dim_id = d.dim_id AND f.id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59)"
+      },
+      {
+        "description": "left join where right in",
+        "sql": "SELECT f.id, d.name FROM {facts} f LEFT JOIN {dims} d ON f.dim_id = d.dim_id WHERE d.cat IN (2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59)"
+      },
+      {
+        "description": "left join where right not in or null",
+        "sql": "SELECT f.id, d.name FROM {facts} f LEFT JOIN {dims} d ON f.dim_id = d.dim_id AND d.cat < 20 WHERE d.cat NOT IN (2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59) OR d.cat IS NULL"
+      },
+      {
+        "description": "join key",
+        "sql": "SELECT f.id, d.name FROM {facts} f JOIN {dims} d ON f.dim_id = d.dim_id WHERE f.dim_id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59)"
+      },
+      {
+        "description": "strings",
+        "sql": "SELECT id FROM {facts} WHERE grp IN ('g0', 'g2', 'g4', 'g6', 'g8', 'g10', 'g12', 'g14', 'g16', 'g18', 'g20', 'g22', 'g24', 'g26', 'g28', 'g30', 'g32', 'g34', 'g36', 'g38', 'g40', 'g42', 'g44', 'g46', 'g48')"
+      },
+      {
+        "description": "expression",
+        "sql": "SELECT id FROM {facts} WHERE UPPER(grp) IN ('G0', 'G2', 'G4', 'G6', 'G8', 'G10', 'G12', 'G14', 'G16', 'G18', 'G20', 'G22', 'G24', 'G26', 'G28', 'G30', 'G32', 'G34', 'G36', 'G38', 'G40', 'G42', 'G44', 'G46', 'G48')"
+      },
+      {
+        "description": "cte twice",
+        "sql": "WITH t AS (SELECT id, dim_id FROM {facts} WHERE id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59)) SELECT COUNT(*) FROM t t1 JOIN t t2 ON t1.dim_id = t2.dim_id"
+      },
+      {
+        "description": "union all",
+        "sql": "SELECT id FROM {facts} WHERE id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) UNION ALL SELECT dim_id FROM {dims} WHERE cat NOT IN (2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59)"
+      },
+      {
+        "description": "window",
+        "sql": "SELECT id, ROW_NUMBER() OVER (PARTITION BY CASE WHEN id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) THEN 1 ELSE 0 END ORDER BY id) FROM {facts}"
+      },
+      {
+        "description": "null in list",
+        "sql": "SELECT COUNT(*) FROM {facts} WHERE id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59, NULL)"
+      },
+      {
+        "description": "not in with null in list",
+        "sql": "SELECT COUNT(*) FROM {facts} WHERE id NOT IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59, NULL)"
+      },
+      {
+        "description": "column in list",
+        "sql": "SELECT COUNT(*) FROM {facts} WHERE id IN (dim_id, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59)"
+      },
+      {
+        "description": "long column",
+        "sql": "SELECT COUNT(*) FROM {facts} WHERE val IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59)"
+      },
+      {
+        "description": "double column",
+        "sql": "SELECT COUNT(*) FROM {facts} WHERE amt IN (1.5, 3.5, 5.5, 7.5, 9.5, 11.5, 13.5, 15.5, 17.5, 19.5, 21.5, 23.5, 25.5, 27.5, 29.5, 31.5, 33.5, 35.5, 37.5, 39.5, 41.5, 43.5, 45.5, 47.5, 49.5)"
+      },
+      {
+        "description": "equality and list",
+        "sql": "SELECT COUNT(*) FROM {facts} WHERE id = 3 AND id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59)"
+      },
+      {
+        "description": "contradicting equality and list",
+        "sql": "SELECT COUNT(*) FROM {facts} WHERE id = 4 AND id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59)"
+      },
+      {
+        "description": "literal operand",
+        "sql": "SELECT COUNT(*) FROM (SELECT 5 AS x, id FROM {facts}) t WHERE t.x IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59)"
+      },
+      {
+        "description": "in sub-query",
+        "sql": "SELECT id FROM {facts} WHERE dim_id IN (SELECT dim_id FROM {dims} WHERE cat IN (2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59))"
+      },
+      {
+        "description": "correlated exists",
+        "sql": "SELECT COUNT(*) FROM {facts} f WHERE EXISTS (SELECT 1 FROM {dims} d WHERE d.dim_id = f.dim_id AND d.cat IN (2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59))"
+      },
+      {
+        "description": "two lists on one column",
+        "sql": "SELECT id FROM {facts} WHERE id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) AND id IN (2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59)"
+      },
+      {
+        "description": "user written or chain",
+        "sql": "SELECT id FROM {facts} WHERE id = 1 OR id = 3 OR id = 5 OR id = 7 OR id = 9 OR id = 11 OR id = 13 OR id = 15 OR id = 17 OR id = 19 OR id = 21 OR id = 23 OR id = 25 OR id = 27 OR id = 29 OR id = 31 OR id = 33 OR id = 35 OR id = 37 OR id = 39 OR id = 41 OR id = 43 OR id = 45 OR id = 47 OR id = 49 OR id = 51 OR id = 53 OR id = 55 OR id = 57 OR id = 59"
+      },
+      {
+        "description": "null handling: not in over a nullable column",
+        "sql": "SET enableNullHandling = TRUE; WITH t AS (SELECT id, CASE WHEN MOD(id, 5) = 0 THEN NULL ELSE id END AS nid FROM {facts}) SELECT COUNT(*) FROM t WHERE nid NOT IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59)",
+        "h2Sql": "WITH t AS (SELECT id, CASE WHEN MOD(id, 5) = 0 THEN NULL ELSE id END AS nid FROM {facts}) SELECT COUNT(*) FROM t WHERE nid NOT IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59)"
+      },
+      {
+        "description": "null handling: in over a nullable column in the select list",
+        "sql": "SET enableNullHandling = TRUE; WITH t AS (SELECT id, CASE WHEN MOD(id, 5) = 0 THEN NULL ELSE id END AS nid FROM {facts}) SELECT id, nid IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) FROM t",
+        "h2Sql": "WITH t AS (SELECT id, CASE WHEN MOD(id, 5) = 0 THEN NULL ELSE id END AS nid FROM {facts}) SELECT id, nid IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) FROM t"
+      },
+      {
+        "description": "null handling: not in with null in the list, in the select list",
+        "sql": "SET enableNullHandling = TRUE; WITH t AS (SELECT id, CASE WHEN MOD(id, 5) = 0 THEN NULL ELSE id END AS nid FROM {facts}) SELECT id, nid NOT IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59, NULL) FROM t",
+        "h2Sql": "WITH t AS (SELECT id, CASE WHEN MOD(id, 5) = 0 THEN NULL ELSE id END AS nid FROM {facts}) SELECT id, nid NOT IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59, NULL) FROM t"
+      },
+      {
+        "description": "null handling: in result is null",
+        "sql": "SET enableNullHandling = TRUE; WITH t AS (SELECT id, CASE WHEN MOD(id, 5) = 0 THEN NULL ELSE id END AS nid FROM {facts}) SELECT COUNT(*) FROM t WHERE (nid IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59)) IS NULL",
+        "h2Sql": "WITH t AS (SELECT id, CASE WHEN MOD(id, 5) = 0 THEN NULL ELSE id END AS nid FROM {facts}) SELECT COUNT(*) FROM t WHERE (nid IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59)) IS NULL"
+      },
+      {
+        "description": "null handling: in or is null over a nullable column",
+        "sql": "SET enableNullHandling = TRUE; WITH t AS (SELECT id, CASE WHEN MOD(id, 5) = 0 THEN NULL ELSE id END AS nid FROM {facts}) SELECT COUNT(*) FROM t WHERE nid IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) OR nid IS NULL",
+        "h2Sql": "WITH t AS (SELECT id, CASE WHEN MOD(id, 5) = 0 THEN NULL ELSE id END AS nid FROM {facts}) SELECT COUNT(*) FROM t WHERE nid IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) OR nid IS NULL"
+      },
+      {
+        "description": "null handling: left join where right column in list",
+        "sql": "SET enableNullHandling = TRUE; SELECT f.id, d.name FROM {facts} f LEFT JOIN {dims} d ON f.dim_id = d.dim_id AND d.cat < 20 WHERE d.cat IN (2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40)",
+        "h2Sql": "SELECT f.id, d.name FROM {facts} f LEFT JOIN {dims} d ON f.dim_id = d.dim_id AND d.cat < 20 WHERE d.cat IN (2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40)"
+      },
+      {
+        "description": "null handling: left join where right column not in list",
+        "sql": "SET enableNullHandling = TRUE; SELECT f.id, d.name FROM {facts} f LEFT JOIN {dims} d ON f.dim_id = d.dim_id AND d.cat < 20 WHERE d.cat NOT IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39)",
+        "h2Sql": "SELECT f.id, d.name FROM {facts} f LEFT JOIN {dims} d ON f.dim_id = d.dim_id AND d.cat < 20 WHERE d.cat NOT IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39)"
+      },
+      {
+        "description": "mixed sarg without points in the select list",
+        "sql": "SELECT id, CASE WHEN id BETWEEN 0 AND 10 AND id NOT IN (3, 5) THEN 1 ELSE 0 END FROM {facts}"
+      },
+      {
+        "description": "mixed sarg without points in having",
+        "sql": "SELECT grp, COUNT(*) FROM {facts} GROUP BY grp HAVING COUNT(*) BETWEEN 0 AND 10 AND COUNT(*) NOT IN (3, 5)"
+      },
+      {
+        "description": "large list or range above a limit",
+        "sql": "SELECT id FROM (SELECT id, val FROM {facts} ORDER BY id LIMIT 30) t WHERE id IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) OR id > 100"
+      },
+      {
+        "description": "large list and range on an aggregate",
+        "sql": "SELECT grp, SUM(val) FROM {facts} GROUP BY grp HAVING SUM(val) NOT IN (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59) AND SUM(val) > 0"
+      }
+    ]
+  }
+}

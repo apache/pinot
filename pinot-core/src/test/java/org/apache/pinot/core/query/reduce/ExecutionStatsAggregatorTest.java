@@ -29,6 +29,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -164,5 +165,28 @@ public class ExecutionStatsAggregatorTest {
     assertTrue(flags[0]);
     assertFalse(flags[1]);
     assertFalse(flags[2]);
+  }
+
+  @Test
+  public void testRemoteAccessesSumAcrossServersAndRoundTrip() {
+    DataTable table1 = emptyServerTable();
+    table1.getMetadata().put(MetadataKey.NUM_REMOTE_ACCESSES.getName(), "3");
+    table1.getMetadata().put(MetadataKey.REMOTE_ACCESS_BYTES.getName(), "300");
+    DataTable table2 = emptyServerTable();
+    table2.getMetadata().put(MetadataKey.NUM_REMOTE_ACCESSES.getName(), "4");
+    table2.getMetadata().put(MetadataKey.REMOTE_ACCESS_BYTES.getName(), "400");
+    ExecutionStatsAggregator aggregator = new ExecutionStatsAggregator(false);
+    aggregator.aggregate(SERVER, table1);
+    aggregator.aggregate(SERVER, table2);
+    aggregator.aggregate(SERVER, emptyServerTable());
+    BrokerResponseNative response = new BrokerResponseNative();
+    aggregator.setStats("testTable", response, mock(BrokerMetrics.class));
+    assertEquals(response.getNumRemoteAccesses(), 7L);
+    assertEquals(response.getRemoteAccessBytes(), 700L);
+
+    DataTable merged = emptyServerTable();
+    aggregator.setStatsOnMergedDataTable(merged);
+    assertEquals(merged.getMetadata().get(MetadataKey.NUM_REMOTE_ACCESSES.getName()), "7");
+    assertEquals(merged.getMetadata().get(MetadataKey.REMOTE_ACCESS_BYTES.getName()), "700");
   }
 }

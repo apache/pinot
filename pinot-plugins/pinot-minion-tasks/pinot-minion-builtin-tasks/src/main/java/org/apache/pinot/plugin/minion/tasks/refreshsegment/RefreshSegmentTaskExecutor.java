@@ -53,11 +53,6 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
 
   private long _taskStartTime;
 
-  @Override
-  protected boolean shouldUpdateZKMetadataWithoutUpload() {
-    return true;
-  }
-
   /// The code here currently covers segment refresh for the following cases:
   /// 1. Process newly added columns.
   /// 2. Addition/removal of indexes.

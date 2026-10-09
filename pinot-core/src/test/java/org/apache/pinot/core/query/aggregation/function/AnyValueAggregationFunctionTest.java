@@ -18,12 +18,71 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
+import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.queries.FluentQueryTest;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+
 public class AnyValueAggregationFunctionTest extends AbstractAggregationFunctionTest {
+  @DataProvider(name = "bytesValueSources")
+  Object[][] bytesValueSources() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "bytesValueSources")
+  void testBytesIntermediateResultRoundTrip(boolean dictionaryEncoded) {
+    ExpressionContext expression = ExpressionContext.forIdentifier("myField");
+    AnyValueAggregationFunction function = new AnyValueAggregationFunction(List.of(expression), true);
+    byte[] original = new byte[]{1, 2, 3};
+    ByteArray expected = new ByteArray(original);
+    BlockValSet valueSet = mock(BlockValSet.class);
+    when(valueSet.getValueType()).thenReturn(DataType.BYTES);
+    if (dictionaryEncoded) {
+      Dictionary dictionary = mock(Dictionary.class);
+      when(dictionary.getByteArrayValue(0)).thenReturn(expected);
+      when(valueSet.isDictionaryEncoded()).thenReturn(true);
+      when(valueSet.getDictionary()).thenReturn(dictionary);
+      when(valueSet.getDictionaryIdsSV()).thenReturn(new int[]{0});
+    } else {
+      when(valueSet.getBytesValuesSV()).thenReturn(new byte[][]{original});
+    }
+    Map<ExpressionContext, BlockValSet> values = Map.of(expression, valueSet);
+
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    function.aggregate(1, holder, values);
+    Object intermediate = function.extractAggregationResult(holder);
+    assertEquals(intermediate, expected);
+    assertEquals(function.extractFinalResult(intermediate), expected);
+
+    GroupByResultHolder groupHolder = function.createGroupByResultHolder(1, 2);
+    function.aggregateGroupBySV(1, new int[]{0}, groupHolder, values);
+    groupHolder.ensureCapacity(2);
+    function.aggregateGroupByMV(1, new int[][]{{1}}, groupHolder, values);
+    assertEquals(function.extractGroupByResult(groupHolder, 0), expected);
+    assertEquals(function.extractGroupByResult(groupHolder, 1), expected);
+
+    AggregationFunction.SerializedIntermediateResult serialized = function.serializeIntermediateResult(intermediate);
+    Object restored = function.deserializeIntermediateResult(
+        new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes())));
+
+    assertEquals(restored, expected);
+    assertEquals(function.extractFinalResult(restored), expected);
+    assertEquals(function.serializeIntermediateResult(restored).getBytes(), serialized.getBytes());
+  }
 
   // Constants for standardized test queries and expected results
   private static final String STANDARD_GROUP_BY_QUERY_TEMPLATE =

@@ -250,6 +250,54 @@ public class PinotSegmentRestletResourceTest {
   }
 
   @Test
+  public void testUpdateSegmentZKMetadataCustomMapRejectsUploadLock() {
+    String tableNameWithType = "testTable_OFFLINE";
+    String segmentName = "testSegment";
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+    segmentZKMetadata.setCrc(123L);
+    segmentZKMetadata.setSegmentUploadStartTime(42L);
+    ZNRecord segmentMetadataRecord = segmentZKMetadata.toZNRecord();
+    segmentMetadataRecord.setVersion(7);
+    when(_pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, segmentName))
+        .thenReturn(segmentMetadataRecord);
+    String modifier = new SegmentZKMetadataCustomMapModifier(
+        SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Map.of("task.lastProcessedTime", "1234"))
+        .toJsonString();
+
+    ControllerApplicationException exception = expectThrows(ControllerApplicationException.class,
+        () -> _pinotSegmentRestletResource.updateSegmentZKMetadataCustomMap(tableNameWithType, segmentName, "123",
+            new ByteArrayInputStream(modifier.getBytes(StandardCharsets.UTF_8)), null));
+
+    assertEquals(exception.getResponse().getStatus(), 409);
+    verify(_pinotHelixResourceManager, never()).updateZkMetadataWithoutDataChange(eq(tableNameWithType), any(), eq(7));
+  }
+
+  @Test
+  public void testUpdateSegmentZKMetadataCustomMapRejectsConcurrentLockAcquisition() {
+    String tableNameWithType = "testTable_OFFLINE";
+    String segmentName = "testSegment";
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+    segmentZKMetadata.setCrc(123L);
+    ZNRecord segmentMetadataRecord = segmentZKMetadata.toZNRecord();
+    segmentMetadataRecord.setVersion(7);
+    when(_pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, segmentName))
+        .thenReturn(segmentMetadataRecord);
+    // The uploader acquires its lock after this request reads the record, causing the versioned write to fail.
+    when(_pinotHelixResourceManager.updateZkMetadataWithoutDataChange(eq(tableNameWithType), any(), eq(7)))
+        .thenReturn(false);
+    String modifier = new SegmentZKMetadataCustomMapModifier(
+        SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Map.of("task.lastProcessedTime", "1234"))
+        .toJsonString();
+
+    ControllerApplicationException exception = expectThrows(ControllerApplicationException.class,
+        () -> _pinotSegmentRestletResource.updateSegmentZKMetadataCustomMap(tableNameWithType, segmentName, "123",
+            new ByteArrayInputStream(modifier.getBytes(StandardCharsets.UTF_8)), null));
+
+    assertEquals(exception.getResponse().getStatus(), 409);
+    verify(_pinotHelixResourceManager).updateZkMetadataWithoutDataChange(eq(tableNameWithType), any(), eq(7));
+  }
+
+  @Test
   public void testUpdateSegmentZKMetadataCustomMapRejectsOversizedRecord() {
     String tableNameWithType = "testTable_OFFLINE";
     String segmentName = "testSegment";

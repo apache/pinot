@@ -16,27 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.util;
+package org.apache.pinot.core.startree.v2;
 
-import java.util.function.Function;
-import java.util.function.Supplier;
+import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 
-/// Creates a function which associates generic values with a class and memoizes this association atomically.
-/// @param <T>
-public class MemoizedClassAssociation<T> extends ClassValue<T> {
 
-  public static <T> Function<Class<?>, T> of(Supplier<T> supplier) {
-    return new MemoizedClassAssociation<>(supplier)::get;
-  }
-
-  private final Supplier<T> _supplier;
-
-  private MemoizedClassAssociation(Supplier<T> supplier) {
-    _supplier = supplier;
-  }
+/// Runs [DistinctCountHLLStarTreeV2Test] with the on-heap builder pinned, so that its pass that serializes
+/// variable-length metrics before the forward indexes are sized is always covered for an aggregator other than the
+/// bitmap one. The parent class keeps drawing the build mode at random.
+public class DistinctCountHLLOnHeapStarTreeV2Test extends DistinctCountHLLStarTreeV2Test {
 
   @Override
-  protected T computeValue(Class<?> type) {
-    return _supplier.get();
+  MultipleTreesBuilder.BuildMode getBuildMode() {
+    return MultipleTreesBuilder.BuildMode.ON_HEAP;
   }
 }

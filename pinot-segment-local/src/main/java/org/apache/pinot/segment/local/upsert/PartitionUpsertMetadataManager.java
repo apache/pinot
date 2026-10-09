@@ -74,6 +74,11 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   /// Replaces the upsert metadata for the old segment with the new immutable segment.
   void replaceSegment(ImmutableSegment segment, IndexSegment oldSegment);
 
+  /// Returns true when replacing the given segment reverts its keys to their previous locations.
+  default boolean shouldRevertMetadataOnInconsistency(IndexSegment oldSegment) {
+    return false;
+  }
+
   /// Removes the upsert metadata for the given segment.
   void removeSegment(IndexSegment segment);
 
@@ -83,6 +88,20 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   /// Takes snapshot for all the tracked immutable segments when snapshot is enabled. This method should be invoked
   /// before a new consuming segment starts consuming.
   void takeSnapshot();
+
+  /// Returns what the last finished snapshot pass covered, or null if no pass has finished yet.
+  @Nullable
+  default SnapshotPass getLastSnapshotPass() {
+    return null;
+  }
+
+  // Two replicas whose last passes are consistent and cover the same sealed segments, by name and data CRC, took their
+  // snapshots from the same inputs, so those snapshots can be compared. Consistent means no segment was added,
+  // replaced or removed while the pass ran, every changed segment got its snapshot file written, and no earlier
+  // consuming segment was still waiting to be sealed. A later segment change either drops a segment's snapshot file or
+  // leaves it alone, so the files left on disk stay as of the pass.
+  record SnapshotPass(long segmentsCrc, int numSegments, boolean consistent, long finishedAtMs) {
+  }
 
   /// Remove the expired primary keys from the metadata when TTL is enabled.
   void removeExpiredPrimaryKeys();

@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
@@ -249,6 +250,32 @@ public class PinotSegmentRestletResourceTest {
     response = ControllerTest.getHttpClient().sendJsonPutRequest(URI.create(endpoint + "-missing"), modifier,
         Map.of(HttpHeaders.IF_MATCH, Long.toString(originalCrc)));
     assertEquals(response.getStatusCode(), 404);
+
+    // Reproduce the upload interleaving: the uploader has acquired the ZK lock but has not yet replaced the segment.
+    PinotHelixResourceManager resourceManager = TEST_INSTANCE.getHelixResourceManager();
+    ZNRecord metadataRecord = resourceManager.getSegmentMetadataZnRecord(offlineTableName, segmentName);
+    SegmentZKMetadata lockedMetadata = new SegmentZKMetadata(metadataRecord);
+    lockedMetadata.setSegmentUploadStartTime(System.currentTimeMillis());
+    assertTrue(resourceManager.updateZkMetadataWithoutDataChange(offlineTableName, lockedMetadata,
+        metadataRecord.getVersion()));
+
+    String conflictingModifier = new SegmentZKMetadataCustomMapModifier(
+        SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Map.of("task.lastProcessedTime", "blocked"))
+        .toJsonString();
+    try {
+      response = ControllerTest.getHttpClient().sendJsonPutRequest(endpoint, conflictingModifier,
+          Map.of(HttpHeaders.IF_MATCH, Long.toString(originalCrc)));
+      assertEquals(response.getStatusCode(), 409);
+      SegmentZKMetadata afterRejectedUpdate = resourceManager.getSegmentZKMetadata(offlineTableName, segmentName);
+      assertEquals(afterRejectedUpdate.getSegmentUploadStartTime(), lockedMetadata.getSegmentUploadStartTime());
+      assertEquals(afterRejectedUpdate.getCustomMap(), updatedMetadata.getCustomMap());
+    } finally {
+      ZNRecord lockedRecord = resourceManager.getSegmentMetadataZnRecord(offlineTableName, segmentName);
+      SegmentZKMetadata unlockedMetadata = new SegmentZKMetadata(lockedRecord);
+      unlockedMetadata.setSegmentUploadStartTime(-1);
+      assertTrue(resourceManager.updateZkMetadataWithoutDataChange(offlineTableName, unlockedMetadata,
+          lockedRecord.getVersion()));
+    }
   }
 
   @Test

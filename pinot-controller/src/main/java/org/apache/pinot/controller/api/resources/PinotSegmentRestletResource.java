@@ -389,6 +389,11 @@ public class PinotSegmentRestletResource {
           String.format("Failed to find segment: %s in table: %s", segmentName, tableNameWithType), Status.NOT_FOUND);
     }
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadataRecord);
+    if (segmentZKMetadata.getSegmentUploadStartTime() > 0) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Segment upload is in progress for segment: %s in table: %s", segmentName,
+              tableNameWithType), Status.CONFLICT);
+    }
     if (segmentZKMetadata.getCrc() != expectedCrc) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Segment CRC does not match for segment: %s in table: %s", segmentName, tableNameWithType),

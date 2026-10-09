@@ -238,18 +238,26 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     // column other documents already wrote to.
     boolean multiValueKey;
     boolean firstSighting = false;
+    // Held onto rather than recomputed: on an undeclared key's first sighting the same call both decides the
+    // shape and supplies the elements, and asMultiValue allocates an array, so evaluating it twice allocates
+    // twice for every new key.
+    Object[] inferredElements = null;
     if (_presenceBitmaps.containsKey(key)) {
       multiValueKey = _multiValueKeys.contains(key);
     } else {
       // A declaration decides the shape in both directions -- a key declared single-value stays single-value
       // even when its values are collections, because the declaration is what the user asked for. Only an
       // undeclared key takes its shape from the data.
-      multiValueKey = keySpec != null
-          ? !keySpec.isSingleValueField()
-          : OpenStructTypeInference.asMultiValue(rawValue) != null;
+      if (keySpec != null) {
+        multiValueKey = !keySpec.isSingleValueField();
+      } else {
+        inferredElements = OpenStructTypeInference.asMultiValue(rawValue);
+        multiValueKey = inferredElements != null;
+      }
       firstSighting = true;
     }
-    Object[] elements = multiValueKey ? OpenStructTypeInference.asMultiValue(rawValue) : null;
+    Object[] elements = !multiValueKey ? null
+        : inferredElements != null ? inferredElements : OpenStructTypeInference.asMultiValue(rawValue);
     if (elements != null && elements.length == 0) {
       // No elements, so no value and nothing to infer a type from. A materialized multi-value column has no
       // empty state, so treating this as present would mean inventing one; the key is simply not in this
@@ -493,13 +501,19 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         keySpec.getDefaultNullValue());
   }
 
+  /// The type a key resolves to, whichever tier it ends up on: a declaration when there is one, else what the
+  /// values inferred. This is the single source both [#writeDenseKeyColumn] and the sparse type manifest read, so
+  /// the two tiers cannot report different types for the same key.
+  private DataType resolvedKeyType(String key) {
+    FieldSpec keySpec = _childFieldSpecs.get(key);
+    return keySpec != null ? keySpec.getDataType() : _inferredTypes.getOrDefault(key, DataType.STRING);
+  }
+
   private void writeDenseKeyColumn(String key)
       throws IOException {
     String materializedCol = OpenStructNaming.materializedColumnName(_columnName, key);
     FieldSpec keySpec = _childFieldSpecs.get(key);
-    DataType valueType = keySpec != null
-        ? keySpec.getDataType()
-        : _inferredTypes.getOrDefault(key, DataType.STRING);
+    DataType valueType = resolvedKeyType(key);
     DataType storedType = valueType.getStoredType();
     RoaringBitmap presence = _presenceBitmaps.get(key);
     List<Object> values = _values.get(key);
@@ -847,6 +861,23 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
               JsonUtils.objectToString(sparseMultiValueKeys));
         } catch (IOException e) {
           throw new RuntimeException("Failed to serialize sparse multi-value key manifest", e);
+        }
+      }
+      // Type, for the same reason as shape: the dense/sparse split is a tuning decision and must not change how a
+      // key reads. A dense key carries its type in its own column metadata; the blob a sparse key lives in is JSON
+      // and carries none, so without this the same key read as INT on a segment that materialized it and STRING on
+      // one that did not, and a query fanning out over both saw two types for one column.
+      Map<String, DataType> sparseKeyTypes = new LinkedHashMap<>();
+      for (String key : sparseKeys) {
+        sparseKeyTypes.put(key, resolvedKeyType(key).getStoredType());
+      }
+      if (!sparseKeyTypes.isEmpty()) {
+        try {
+          props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(_columnName,
+              V1Constants.MetadataKeys.Column.SPARSE_KEY_TYPES),
+              JsonUtils.objectToString(sparseKeyTypes));
+        } catch (IOException e) {
+          throw new RuntimeException("Failed to serialize sparse key type manifest", e);
         }
       }
     }

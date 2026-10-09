@@ -440,6 +440,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _serverRoutingStatsManager = new ServerRoutingStatsManager(_brokerConf, _brokerMetrics);
     _serverRoutingStatsManager.init();
     initRoutingManager();
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_routingManager);
 
     final PinotConfiguration factoryConf = _brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX);
     // Adding cluster name to the config so that it can be used by the AccessControlFactory

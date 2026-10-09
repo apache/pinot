@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.segment.spi.creator.name;
 
+import java.util.List;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.fail;
 
 
@@ -50,6 +52,16 @@ public class InputFileSegmentNameGeneratorTest {
     String template = "${filePathPattern:\\1}";
     validateName("file:///my/path/to/segmentname.csv", "segmentname", pattern, template);
     validateName("file:///my/path/to/segmentname", "segmentname", pattern, template);
+  }
+
+  @Test
+  public void testTemplateWithoutMatchGroup() {
+    String pattern = ".+/(.+)\\.csv";
+    String inputFileUri = "file:///my/path/to/segmentname.csv";
+    for (String template : List.of("\\1", "segmentname", "${filePathPattern:\\2}")) {
+      assertThrows(IllegalArgumentException.class,
+          () -> new InputFileSegmentNameGenerator(pattern, template, inputFileUri));
+    }
   }
 
   private void validateCSVFileName(String inputFileUriAsStr, String segmentName) {

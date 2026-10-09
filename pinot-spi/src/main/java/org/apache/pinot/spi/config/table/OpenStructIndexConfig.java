@@ -56,9 +56,18 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// **Per-key index settings** are specified via `valueFieldConfigs` — each entry is a standard
 /// [FieldConfig] (modern `indexes` format) for one materialized OPEN_STRUCT key. Keys without an
 /// entry fall back to `defaultValueFieldConfig`. When neither is set, the built-in default is
-/// DICTIONARY encoding with an inverted index. A per-key config selects the dictionary vs raw
-/// encoding and the dictionary, inverted, range and bloom filter indexes; forward-index tuning is not
-/// configurable per key (a raw key always uses LZ4 compression), and a per-key `codecSpec` is rejected.
+/// DICTIONARY encoding with an inverted index. A per-key config honors only:
+/// - `encodingType`: DICTIONARY (the default) builds a dictionary-encoded key, and RAW builds a raw
+///   forward index with LZ4 compression, unless the key's inverted index is enabled, which requires a
+///   dictionary and makes the key dictionary-encoded.
+/// - The `inverted`, `range` and `bloom` entries under `indexes`. A per-key config without an
+///   `inverted` entry builds no inverted index.
+///
+/// `indexes.forward` and `indexes.dictionary` may only restate how the key is built: its forward
+/// encoding and whether it has a dictionary. Table-config validation rejects every other per-key
+/// setting, which a materialized key would silently ignore:
+/// forward-index tuning (such as `codecSpec`, `compressionCodec` or chunk sizes), dictionary tuning, and
+/// the `indexTypes`, `properties`, `timestampConfig` and `tierOverwrites` fields.
 public class OpenStructIndexConfig extends IndexConfig {
   public static final OpenStructIndexConfig DISABLED = new OpenStructIndexConfig(false);
   public static final OpenStructIndexConfig DEFAULT = new OpenStructIndexConfig(true);
@@ -76,6 +85,9 @@ public class OpenStructIndexConfig extends IndexConfig {
   private final double _denseKeyMinFillRate;
   private final List<FieldConfig> _valueFieldConfigs;
   private final boolean _sparseJsonIndex;
+  /// Index settings for the shared sparse blob column, shaped like a [FieldConfig] for any other column.
+  @Nullable
+  private final FieldConfig _sparseFieldConfig;
   private final boolean _perKeyMetricsEnabled;
   private final Set<String> _ignoredKeys;
   private final int _maxNestedKeyDepth;
@@ -129,6 +141,18 @@ public class OpenStructIndexConfig extends IndexConfig {
         sparseJsonIndex, perKeyMetricsEnabled, ignoredKeys, null);
   }
 
+  /// @deprecated Use the 11-arg constructor accepting `sparseFieldConfig`. Kept for binary compatibility with
+  /// callers built against the pre-`sparseFieldConfig` signature.
+  @Deprecated
+  public OpenStructIndexConfig(Boolean disabled, @Nullable FieldConfig defaultValueFieldConfig,
+      @Nullable Integer maxDenseKeys, @Nullable Set<String> denseKeys, @Nullable Double denseKeyMinFillRate,
+      @Nullable List<FieldConfig> valueFieldConfigs, @Nullable Boolean sparseJsonIndex,
+      @Nullable Boolean perKeyMetricsEnabled, @Nullable Set<String> ignoredKeys,
+      @Nullable Integer maxNestedKeyDepth) {
+    this(disabled, defaultValueFieldConfig, maxDenseKeys, denseKeys, denseKeyMinFillRate, valueFieldConfigs,
+        sparseJsonIndex, perKeyMetricsEnabled, ignoredKeys, maxNestedKeyDepth, null);
+  }
+
   @JsonCreator
   public OpenStructIndexConfig(
       @JsonProperty("disabled") Boolean disabled,
@@ -140,8 +164,10 @@ public class OpenStructIndexConfig extends IndexConfig {
       @JsonProperty("sparseJsonIndex") @Nullable Boolean sparseJsonIndex,
       @JsonProperty("perKeyMetricsEnabled") @Nullable Boolean perKeyMetricsEnabled,
       @JsonProperty("ignoredKeys") @Nullable Set<String> ignoredKeys,
-      @JsonProperty("maxNestedKeyDepth") @Nullable Integer maxNestedKeyDepth) {
+      @JsonProperty("maxNestedKeyDepth") @Nullable Integer maxNestedKeyDepth,
+      @JsonProperty("sparseFieldConfig") @Nullable FieldConfig sparseFieldConfig) {
     super(disabled);
+    _sparseFieldConfig = sparseFieldConfig;
     _defaultValueFieldConfig = defaultValueFieldConfig;
     _maxDenseKeys = maxDenseKeys != null ? maxDenseKeys : DEFAULT_MAX_DENSE_KEYS;
     _denseKeys = denseKeys;
@@ -239,6 +265,17 @@ public class OpenStructIndexConfig extends IndexConfig {
   /// Default `false`.
   public boolean isSparseJsonIndex() {
     return _sparseJsonIndex;
+  }
+
+  /// Index settings for the shared sparse blob column, or null when the table asked for none.
+  ///
+  /// The blob is a single-value STRING column holding each row's unshredded keys as a JSON document, so any index
+  /// that reads JSON out of a STRING column applies to it. `sparseJsonIndex: true` is the older spelling of
+  /// asking for a JSON index here and still works.
+  @JsonProperty("sparseFieldConfig")
+  @Nullable
+  public FieldConfig getSparseFieldConfig() {
+    return _sparseFieldConfig;
   }
 
   /// When `true`, `OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT` is emitted for every key present in the
