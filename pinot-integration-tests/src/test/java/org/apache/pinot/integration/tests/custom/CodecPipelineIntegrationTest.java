@@ -92,10 +92,8 @@ import static org.testng.Assert.assertTrue;
 /// one whole-table query per (data type, engine) rather than one query per column, so the matrix can
 /// stay wide while the query count stays small.
 ///
-/// `FieldConfig.encodingType` + `indexes.forward.targetDocsPerChunk` is set on every matrix column
-/// and `compressionCodec` is set at the `FieldConfig` level, which also exercises the deserializer
-/// branch in `ForwardIndexType` that reconciles the legacy column-level signal with the modern
-/// `indexes.forward` block.
+/// `indexes.forward.encodingType` + `indexes.forward.targetDocsPerChunk` is set on every matrix column
+/// and `compressionCodec` is set in the `indexes.forward` block.
 ///
 /// Codec arithmetic, corrupt input, and the V7 writer/reader round trip are unit tested in
 /// `pinot-segment-local`; what only an integration test can cover is that the configuration survives
@@ -555,31 +553,25 @@ public class CodecPipelineIntegrationTest extends CustomDataQueryClusterIntegrat
     for (MatrixColumn column : MATRIX) {
       fieldConfigs.add(rawFieldConfig(column));
     }
-    fieldConfigs.add(new FieldConfig.Builder(DICT_STR_COL)
-        .withEncodingType(FieldConfig.EncodingType.DICTIONARY)
-        .build());
+    fieldConfigs.add(fieldConfigBuilderWithForwardEncoding(DICT_STR_COL, FieldConfig.EncodingType.DICTIONARY).build());
     return fieldConfigs;
   }
 
-  /// A RAW `FieldConfig` for one matrix column. `codecSpec` only exists in the modern
-  /// `indexes.forward` block (there is no top-level `FieldConfig.codecSpec`), while the legacy codec
-  /// is set at the `FieldConfig` level; both carry `targetDocsPerChunk` in `indexes.forward` so every
-  /// column has chunk boundaries inside every segment.
+  /// A RAW `FieldConfig` for one matrix column. Both `codecSpec` and `compressionCodec` live in
+  /// `indexes.forward`, alongside `targetDocsPerChunk` so every column has chunk boundaries inside
+  /// every segment.
   private static FieldConfig rawFieldConfig(MatrixColumn column) {
     ObjectNode forward = JsonUtils.newObjectNode();
+    forward.put("encodingType", FieldConfig.EncodingType.RAW.name());
     forward.put("targetDocsPerChunk", TARGET_DOCS_PER_CHUNK);
     if (column.isCodecPipeline()) {
       forward.put("codecSpec", column._codecSpec._configured);
+    } else if (column._compressionCodec != null) {
+      forward.put("compressionCodec", column._compressionCodec.name());
     }
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("forward", forward);
-    FieldConfig.Builder builder = new FieldConfig.Builder(column._column)
-        .withEncodingType(FieldConfig.EncodingType.RAW)
-        .withIndexes(indexes);
-    if (!column.isCodecPipeline()) {
-      builder.withCompressionCodec(column._compressionCodec);
-    }
-    return builder.build();
+    return new FieldConfig.Builder(column._column).withIndexes(indexes).build();
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -945,12 +937,13 @@ public class CodecPipelineIntegrationTest extends CustomDataQueryClusterIntegrat
     for (MatrixColumn column : MATRIX) {
       FieldConfig fieldConfig = storedFieldConfigs.get(column._column);
       assertNotNull(fieldConfig, "Stored table config has no FieldConfig for " + column);
-      assertEquals(fieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW, column + " must stay RAW");
       assertTrue(noDictionaryColumns.contains(column._column),
           "Expected " + column._column + " in the stored noDictionaryColumns");
       JsonNode indexes = fieldConfig.getIndexes();
       JsonNode forward = indexes == null ? null : indexes.get("forward");
       assertNotNull(forward, "Stored FieldConfig for " + column + " lost its indexes.forward block");
+      assertEquals(forward.path("encodingType").asText(), FieldConfig.EncodingType.RAW.name(),
+          column + " must stay RAW");
       if (column.isCodecPipeline()) {
         assertTrue(forward.hasNonNull("codecSpec"), "Stored FieldConfig for " + column + " lost its codecSpec");
         assertEquals(forward.get("codecSpec").asText(), column._codecSpec._configured,
@@ -959,14 +952,16 @@ public class CodecPipelineIntegrationTest extends CustomDataQueryClusterIntegrat
             column + " must not gain a compressionCodec; it is mutually exclusive with codecSpec");
       } else {
         assertFalse(forward.hasNonNull("codecSpec"), column + " must not gain a codecSpec");
-        assertEquals(fieldConfig.getCompressionCodec(), column._compressionCodec,
+        assertEquals(forward.path("compressionCodec").asText(null),
+            column._compressionCodec != null ? column._compressionCodec.name() : null,
             "compressionCodec for " + column + " did not survive the table config round trip");
       }
     }
 
     FieldConfig dictionaryFieldConfig = storedFieldConfigs.get(DICT_STR_COL);
     assertNotNull(dictionaryFieldConfig, "Stored table config has no FieldConfig for " + DICT_STR_COL);
-    assertEquals(dictionaryFieldConfig.getEncodingType(), FieldConfig.EncodingType.DICTIONARY);
+    assertEquals(dictionaryFieldConfig.getIndexes().path("forward").path("encodingType").asText(),
+        FieldConfig.EncodingType.DICTIONARY.name());
     assertFalse(noDictionaryColumns.contains(DICT_STR_COL),
         DICT_STR_COL + " must not be in the stored noDictionaryColumns");
   }

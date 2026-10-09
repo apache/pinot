@@ -19,11 +19,11 @@
 package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -69,21 +69,20 @@ public class IvfFlatConsolidatedVectorTest extends CustomDataQueryClusterIntegra
 
   @Override
   public TableConfig createOfflineTableConfig() {
+    ObjectNode indexes = indexesWithForwardEncoding(FieldConfig.EncodingType.RAW);
+    ObjectNode vector = indexes.putObject("vector");
+    vector.put("vectorIndexType", "IVF_FLAT");
+    vector.put("vectorDimension", VECTOR_DIM_SIZE);
+    vector.put("vectorDistanceFunction", "EUCLIDEAN");
+    vector.put("version", 1);
+    vector.putObject("properties")
+        .put("nlist", String.valueOf(NLIST))
+        .put("storeInSegmentFile", "true");
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(getTableName())
         .setFieldConfigList(List.of(
             new FieldConfig.Builder(VECTOR_COL)
-                .withIndexTypes(List.of(FieldConfig.IndexType.VECTOR))
-                .withEncodingType(FieldConfig.EncodingType.RAW)
-                .withProperties(Map.of(
-                    "vectorIndexType", "IVF_FLAT",
-                    "vectorDimension", String.valueOf(VECTOR_DIM_SIZE),
-                    "vectorDistanceFunction", "EUCLIDEAN",
-                    "nlist", String.valueOf(NLIST),
-                    "version", "1",
-                    // Consolidation: the IVF payload is moved into columns.psf as a typed entry
-                    // after the offline build, instead of remaining as a sibling combined file.
-                    "storeInSegmentFile", "true"))
+                .withIndexes(indexes)
                 .build()
         ))
         .build();

@@ -96,6 +96,31 @@ public class FieldIndexConfigsUtilTest {
     assertFalse(dictConfig.isDisabled(), "null => dictionary enabled");
   }
 
+  @Test
+  public void testExplicitDictionaryOverridesModernRawEncoding()
+      throws Exception {
+    JsonNode indexes = JsonUtils.stringToJsonNode("{\"forward\":{\"encodingType\":\"RAW\"},\"dictionary\":{}}");
+    FieldConfig fieldConfig = new FieldConfig.Builder("x").withIndexes(indexes).build();
+    FieldIndexConfigs configs = FieldIndexConfigsUtil.fromFieldConfig(fieldConfig, INT_SPEC);
+    assertFalse(configs.getConfig(_dictType).isDisabled(), "Explicit dictionary must survive modern RAW encoding");
+  }
+
+  // Exercises compatibility with the deprecated field-level encoding setting.
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testLegacyRawEncodingWithForwardBlockMissingEncodingType()
+      throws Exception {
+    JsonNode indexes = JsonUtils.stringToJsonNode("{\"forward\": {\"compressionCodec\": \"LZ4\"}}");
+    FieldConfig fieldConfig = new FieldConfig.Builder("x")
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
+
+    FieldIndexConfigs configs = FieldIndexConfigsUtil.fromFieldConfig(fieldConfig, INT_SPEC);
+    assertTrue(configs.getConfig(_dictType).isDisabled(),
+        "A forward block without encodingType must preserve legacy RAW encoding");
+  }
+
   private void installIndexService(StubIndexType... types) {
     Set<IndexPlugin<?>> plugins = new HashSet<>();
     int priority = 0;

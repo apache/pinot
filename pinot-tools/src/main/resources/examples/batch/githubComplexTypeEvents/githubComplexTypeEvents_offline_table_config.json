@@ -1,8 +1,7 @@
 {
   "tableName": "githubComplexTypeEvents",
   "tableType": "OFFLINE",
-  "tenants": {
-  },
+  "tenants": {},
   "segmentsConfig": {
     "segmentPushType": "REFRESH",
     "replication": "1",
@@ -14,11 +13,13 @@
   "fieldConfigList": [
     {
       "name": "commits_url",
-      "encodingType": "RAW",
       "indexes": {
         "dictionary": {},
         "inverted": {
           "enabled": "true"
+        },
+        "forward": {
+          "encodingType": "RAW"
         }
       }
     }
@@ -49,7 +50,6 @@
     }
   },
   "metadata": {
-    "customConfigs": {
-    }
+    "customConfigs": {}
   }
 }
