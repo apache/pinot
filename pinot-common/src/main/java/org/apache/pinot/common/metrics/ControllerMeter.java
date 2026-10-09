@@ -96,7 +96,16 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   QUERY_WORKLOAD_REQUEST_DROPPED("count", true),
   QUERY_WORKLOAD_HTTP_CALLBACK_DROPPED("count", true),
   // Number of segment-delete requests rejected because the targets participate in a live segment lineage entry.
-  LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false);
+  LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false),
+
+  // Insert statement metrics — naming convention: PascalCase string, mirroring the older meter
+  // names in this enum (e.g. "PinotControllerHealthCheckStatus"). Once shipped, these strings
+  // are externally consumed by dashboards/alerts and cannot be renamed without coordinated
+  // operator migration; see InsertStatementState's wire-compatibility note for the same constraint.
+  INSERT_STATEMENTS_SUBMITTED("InsertStatementsSubmitted", true),
+  INSERT_STATEMENTS_ABORTED("InsertStatementsAborted", true),
+  INSERT_STATEMENTS_VISIBLE("InsertStatementsVisible", true);
+
 
   private final String _brokerMeterName;
   private final String _unit;
