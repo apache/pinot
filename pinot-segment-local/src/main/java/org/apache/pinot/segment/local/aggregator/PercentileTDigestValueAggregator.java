@@ -255,6 +255,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
         finiteMax = Double.isFinite(encodedMax) ? encodedMax : finiteMax;
         finiteDigest.addCentroids(finiteMeans, finiteWeights, finiteCount, finiteMin, finiteMax, true);
       }
+      validated.recordHistoricalFractionalBoundaries(finiteDigest);
       NonFiniteAwareTDigest wrapped =
           new NonFiniteAwareTDigest(finiteDigest, negativeInfinityWeight, positiveInfinityWeight);
       if (metadata.fractionalWeights()) {
@@ -356,6 +357,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
         ((PercentileTDigestAccumulator) _finiteDigest).addCentroids(
             finiteMeans, finiteWeights, finiteCount, finiteMin, finiteMax, false);
       }
+      ((PercentileTDigestAccumulator) _finiteDigest).inheritHistoricalFractionalBoundaries(other);
       _negativeInfinityWeight += negativeInfinityWeight;
       _positiveInfinityWeight += positiveInfinityWeight;
       mutated();
@@ -398,6 +400,11 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
     @Override
     public double getTotalWeight() {
       return _finiteDigest.getTotalWeight() + _negativeInfinityWeight + _positiveInfinityWeight;
+    }
+
+    @Override
+    public double getHistoricalFractionalBoundaryMean(boolean lowerBoundary) {
+      return _finiteDigest.getHistoricalFractionalBoundaryMean(lowerBoundary);
     }
 
     @Override
@@ -462,6 +469,13 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
     public int maxSerializedByteSize() {
       // The owned finite digest's bound includes compact-to-verbose expansion before tail encoding.
       int finiteByteSize = _finiteDigest.maxSerializedByteSize();
+      PercentileTDigestAccumulator finiteDigest = (PercentileTDigestAccumulator) _finiteDigest;
+      if ((_negativeInfinityWeight != 0.0 || _positiveInfinityWeight != 0.0)
+          && finiteDigest.hasOriginalFractionalPayload()) {
+        // Infinite tails can make retained fractional boundaries interior; their finite view may split endpoints.
+        finiteByteSize = Math.max(finiteByteSize, Math.toIntExact(Math.addExact(TDigestUtils.VERBOSE_HEADER_SIZE,
+            Math.multiplyExact(TDigestUtils.VERBOSE_CENTROID_SIZE, finiteDigest.getCentroidCountUpperBound()))));
+      }
       boolean hasFiniteValues = _finiteDigest.getTotalWeight() > 0.0;
       int negativeInfinityCount = getInfinityCentroidCount(_negativeInfinityWeight, true,
           !hasFiniteValues && _positiveInfinityWeight == 0.0);
@@ -529,6 +543,10 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
     private List<Centroid> getFiniteCentroids() {
       if (_finiteCentroids == null) {
+        // Match the wire view without serializing finite-only fractional boundaries surrounded by infinite tails.
+        PercentileTDigestAccumulator finiteDigest = (PercentileTDigestAccumulator) _finiteDigest;
+        finiteDigest.prepareCentroidsForSerialization();
+        invalidateCaches();
         _finiteCentroids = new ArrayList<>(_finiteDigest.centroids());
       }
       return _finiteCentroids;
@@ -543,6 +561,23 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       centroids.addAll(finiteCentroids);
       appendInfinityCentroids(centroids, Double.POSITIVE_INFINITY, _positiveInfinityWeight,
           !hasFiniteValues && _negativeInfinityWeight == 0L, true);
+      if (centroids.size() > 1
+          && (centroids.getFirst().weight() > 1.0 || centroids.getLast().weight() > 1.0)) {
+        int count = centroids.size();
+        double[] means = new double[Math.addExact(count, 2)];
+        double[] weights = new double[means.length];
+        for (int i = 0; i < count; i++) {
+          Centroid centroid = centroids.get(i);
+          means[i] = centroid.mean();
+          weights[i] = centroid.weight();
+        }
+        count = PercentileTDigestAccumulator.normalizeSerializedBoundaries(
+            means, weights, count, getMin(), getMax());
+        centroids.clear();
+        for (int i = 0; i < count; i++) {
+          centroids.add(new Centroid(means[i], weights[i]));
+        }
+      }
       return centroids;
     }
 
@@ -555,7 +590,8 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
           _serializedBytes = getFiniteSerializedBytes();
           return _serializedBytes;
         }
-        _finiteDigest.compress();
+        PercentileTDigestAccumulator finiteDigest = (PercentileTDigestAccumulator) _finiteDigest;
+        finiteDigest.prepareCentroidsForSerialization();
         invalidateCaches();
         int finiteCentroidCount = _finiteDigest.centroidCount();
         boolean hasFiniteValues = _finiteDigest.getTotalWeight() > 0.0;
@@ -565,16 +601,21 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
             !hasFiniteValues && _negativeInfinityWeight == 0.0, true);
         int centroidCount = Math.addExact(finiteCentroidCount,
             Math.addExact(negativeInfinityCentroidCount, positiveInfinityCentroidCount));
-        double[] means = new double[centroidCount];
-        double[] weights = new double[centroidCount];
-        ((PercentileTDigestAccumulator) _finiteDigest).copyCentroids(means, weights, negativeInfinityCentroidCount);
+        double[] means = new double[Math.addExact(centroidCount, 2)];
+        double[] weights = new double[means.length];
+        finiteDigest.copyCentroids(means, weights, negativeInfinityCentroidCount);
         appendInfinityCentroids(means, weights, 0, Double.NEGATIVE_INFINITY, _negativeInfinityWeight, true,
             !hasFiniteValues && _positiveInfinityWeight == 0.0);
         appendInfinityCentroids(means, weights, negativeInfinityCentroidCount + finiteCentroidCount,
             Double.POSITIVE_INFINITY, _positiveInfinityWeight,
             !hasFiniteValues && _negativeInfinityWeight == 0.0, true);
-        _serializedBytes = TDigestUtils.makeLegacyCompatible(
-            TDigestUtils.serializeCentroids(compression(), getMin(), getMax(), means, weights, centroidCount));
+        centroidCount = PercentileTDigestAccumulator.normalizeSerializedBoundaries(
+            means, weights, centroidCount, getMin(), getMax());
+        byte[] verbose =
+            TDigestUtils.serializeCentroids(compression(), getMin(), getMax(), means, weights, centroidCount);
+        _serializedBytes = TDigestUtils.makeLegacyCompatible(verbose,
+            TDigestUtils.inspectSerialized(ByteBuffer.wrap(verbose), false),
+            finiteDigest.hasInheritedFractionalBoundaryEncoding(means, weights, centroidCount));
       }
       return _serializedBytes;
     }

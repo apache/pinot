@@ -27,6 +27,7 @@ import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.local.utils.TDigestUtils.SerializedTDigestMetadata;
 
 
+
 /// Accumulates raw values and serialized TDigests into primitive centroids using Pinot's K1 weight-limit rule.
 ///
 /// Raw values are sorted in small batches; serialized centroids retain their existing sorted order. Both are
@@ -39,6 +40,10 @@ import org.apache.pinot.segment.local.utils.TDigestUtils.SerializedTDigestMetada
 /// Historical corrupted payloads remain opaque and byte-exact, with NaN statistics. Their reported historical mass
 /// may be invalid; they cannot be mutated or mixed with another distribution. Such an operation fails before
 /// changing aggregate mass, because neither invented statistics nor synthetic NaN bytes are safe for old readers.
+/// Unchanged historical fractional boundaries retain their original bytes, including when configured compression
+/// differs. After a merge, inherited fractional endpoints retain precise verbose weights and finite statistics when
+/// unit endpoints cannot preserve their mass. These keep the historical t-digest 3.3 assertion-enabled reader and
+/// recompression limitation. Newly introduced unsupported fractional endpoints are rejected.
 ///
 /// Instances are externally serialized per aggregation or group key and are not safe for concurrent mutation.
 public final class PercentileTDigestAccumulator extends TDigest {
@@ -67,6 +72,8 @@ public final class PercentileTDigestAccumulator extends TDigest {
   private SerializedTDigestInput _serializedTDigestInput;
   private byte[] _pendingSerializedTDigest;
   private byte[] _originalFractionalBytes;
+  private double _historicalFractionalMinMean = Double.NaN;
+  private double _historicalFractionalMaxMean = Double.NaN;
   private SerializedTDigestMetadata _pendingSerializedMetadata;
   private boolean _legacyDegraded;
   private byte[] _serializedBytesForWrite;
@@ -323,6 +330,7 @@ public final class PercentileTDigestAccumulator extends TDigest {
     if (otherWeight != 0.0) {
       _min = Math.min(_min, other.getMin());
       _max = Math.max(_max, other.getMax());
+      inheritHistoricalFractionalBoundaries(other);
     }
   }
 
@@ -344,7 +352,7 @@ public final class PercentileTDigestAccumulator extends TDigest {
           _numCentroids, _min, _max, false);
       return;
     }
-    if (other._originalFractionalBytes != null && _compression == other._compression && getTotalWeight() == 0.0) {
+    if (other._originalFractionalBytes != null && getTotalWeight() == 0.0) {
       materializePendingSerializedTDigest();
       SerializedTDigestInput input = getSerializedTDigestInput();
       input.reset(other._originalFractionalBytes);
@@ -371,6 +379,7 @@ public final class PercentileTDigestAccumulator extends TDigest {
     materializePendingSerializedTDigest();
     checkTotalWeight(_totalWeight + _incomingWeight + _numRawValues + other._totalWeight);
     _hasFractionalWeights |= other._hasFractionalWeights;
+    inheritHistoricalFractionalBoundaries(other._historicalFractionalMinMean, other._historicalFractionalMaxMean);
     preserveSerializedCapacity(other._serializedMainCapacity, other._serializedBufferCapacity);
     bufferIncomingCentroids(other._centroidMeans, other._centroidWeights, other._numCentroids);
     if (other._totalWeight > 0.0) {
@@ -381,6 +390,12 @@ public final class PercentileTDigestAccumulator extends TDigest {
   }
 
   public void addSerializedTDigest(byte[] bytes) {
+    if (_legacyDegraded) {
+      SerializedTDigestInput input = getSerializedTDigestInput();
+      input.reset(bytes);
+      addSerializedTDigest(input);
+      return;
+    }
     requireMutable();
     materializePendingSerializedTDigest();
     SerializedTDigestInput input = getSerializedTDigestInput();
@@ -396,6 +411,9 @@ public final class PercentileTDigestAccumulator extends TDigest {
   }
 
   public void addSerializedTDigest(SerializedTDigestInput input) {
+    if (ignoreEmptyInputForDegradedState(input)) {
+      return;
+    }
     requireMutable();
     if (prepareSerializedTDigest(input)) {
       mergeSerializedTDigest(input, false);
@@ -403,10 +421,21 @@ public final class PercentileTDigestAccumulator extends TDigest {
   }
 
   public void addSerializedTDigestDirect(SerializedTDigestInput input) {
+    if (ignoreEmptyInputForDegradedState(input)) {
+      return;
+    }
     requireMutable();
     if (prepareSerializedTDigest(input)) {
       mergeSerializedTDigest(input, true);
     }
+  }
+
+  private boolean ignoreEmptyInputForDegradedState(SerializedTDigestInput input) {
+    if (!_legacyDegraded) {
+      return false;
+    }
+    input.inspectMetadata();
+    return !input._metadata.needsLegacyFallback() && input._metadata.totalWeight() == 0.0;
   }
 
   private boolean prepareSerializedTDigest(SerializedTDigestInput input) {
@@ -415,7 +444,7 @@ public final class PercentileTDigestAccumulator extends TDigest {
       _hasFractionalWeights |= input._metadata.fractionalWeights();
       _pendingSerializedTDigest = input.retainBytes();
       _pendingSerializedMetadata = input._metadata;
-      if (input.hasUnrepresentableBoundaryMass() && _compression == input._metadata.compression()) {
+      if (input.recordHistoricalFractionalBoundaries(this)) {
         // Alias the retained snapshot; historical fractional bytes remain byte-exact after read-only materialization.
         _originalFractionalBytes = _pendingSerializedTDigest;
       }
@@ -436,6 +465,7 @@ public final class PercentileTDigestAccumulator extends TDigest {
       throw corruptedMutation();
     }
     checkTotalWeight(_totalWeight + _incomingWeight + _numRawValues + input._metadata.totalWeight());
+    input.recordHistoricalFractionalBoundaries(this);
     if (input._metadata.totalWeight() > 0.0) {
       _originalFractionalBytes = null;
     }
@@ -451,7 +481,9 @@ public final class PercentileTDigestAccumulator extends TDigest {
     if (input._metadata.totalWeight() == 0.0) {
       return;
     }
-    preserveSerializedCapacity(input._metadata.mainCapacity(), input._metadata.bufferCapacity());
+    if (input._metadata.encoding() == TDigestUtils.SMALL_ENCODING) {
+      preserveSerializedCapacity(input._metadata.mainCapacity(), input._metadata.bufferCapacity());
+    }
     if (hasNoInputs()) {
       if (input._metadata.totalWeight() != 0.0) {
         ensureCentroidCapacity(input._numCentroids);
@@ -811,7 +843,8 @@ public final class PercentileTDigestAccumulator extends TDigest {
         Math.multiplyExact(TDigestUtils.VERBOSE_CENTROID_SIZE, centroidCount)));
   }
 
-  /// Returns the small-encoding size unless float narrowing would overflow, in which case verbose bytes are used.
+  /// Returns the small-encoding size unless float narrowing loses a field or an inherited fractional endpoint needs
+  /// exact verbose bytes.
   /// Historical degraded state retains its original encoding and rejects mutation.
   @Override
   public int smallByteSize() {
@@ -821,10 +854,10 @@ public final class PercentileTDigestAccumulator extends TDigest {
     compress();
     normalizeBoundaryCentroids();
     checkFractionalBoundaryEncoding();
-    checkCapacityPreservingCentroidCount();
     if (!canUseSmallEncoding()) {
       return byteSize();
     }
+    checkCapacityPreservingCentroidCount();
     return Math.addExact(TDigestUtils.SMALL_HEADER_SIZE,
         Math.multiplyExact(TDigestUtils.SMALL_CENTROID_SIZE, _numCentroids));
   }
@@ -848,7 +881,6 @@ public final class PercentileTDigestAccumulator extends TDigest {
     compress();
     normalizeBoundaryCentroids();
     checkFractionalBoundaryEncoding();
-    checkCapacityPreservingCentroidCount();
     if (canUseSmallEncoding()) {
       buffer.put(toCapacityPreservingBytes());
     } else {
@@ -886,6 +918,13 @@ public final class PercentileTDigestAccumulator extends TDigest {
     return _max;
   }
 
+  /// Prepares finite centroid views for inclusion inside a larger serialized digest, repairing weighted boundaries.
+  /// The enclosing digest owns the complete endpoint check; fractional finite boundaries can be interior there.
+  public void prepareCentroidsForSerialization() {
+    compress();
+    normalizeBoundaryCentroids();
+  }
+
   public byte[] serialize() {
     if (_legacyDegraded) {
       return _pendingSerializedTDigest.clone();
@@ -894,7 +933,8 @@ public final class PercentileTDigestAccumulator extends TDigest {
       return _originalFractionalBytes.clone();
     }
     if (_pendingSerializedTDigest != null) {
-      if (_pendingSerializedMetadata.weightedBoundaries() || _pendingSerializedMetadata.hasZeroWeightCentroids()
+      if (_pendingSerializedMetadata.weightedBoundaries() || _pendingSerializedMetadata.unorderedMeans()
+          || _pendingSerializedMetadata.hasZeroWeightCentroids()
           || !Double.isNaN(_pendingSerializedMetadata.recoveredInfinityMean())) {
         materializePendingSerializedTDigest();
       } else {
@@ -953,15 +993,15 @@ public final class PercentileTDigestAccumulator extends TDigest {
         TDigestUtils.getLegacyDefaultCentroidCapacity(_compression)), 0,
         TDigestUtils.VERBOSE_HEADER_SIZE, TDigestUtils.VERBOSE_CENTROID_SIZE, buffer.capacity(), encodedWeight,
         hasNonFiniteMeans, false, false, fractionalWeights, weightedBoundaries, false, _compression, Double.NaN);
-    return TDigestUtils.makeLegacyCompatible(buffer.array(), metadata);
+    return TDigestUtils.makeLegacyCompatible(buffer.array(), metadata, hasInheritedFractionalBoundaryEncoding());
   }
 
   private boolean canUseSmallEncoding() {
-    if (!Float.isFinite((float) _compression)) {
+    if (hasInheritedFractionalBoundaryEncoding() || !Float.isFinite((float) _compression)) {
       return false;
     }
     for (int i = 0; i < _numCentroids; i++) {
-      if (!Float.isFinite((float) _centroidWeights[i])
+      if (!Float.isFinite((float) _centroidWeights[i]) || (float) _centroidWeights[i] == 0.0f
           || Double.isFinite(_centroidMeans[i]) && !Float.isFinite((float) _centroidMeans[i])) {
         return false;
       }
@@ -1000,8 +1040,48 @@ public final class PercentileTDigestAccumulator extends TDigest {
   }
 
   private void checkFractionalBoundaryEncoding() {
-    if (_numCentroids > 0) {
+    if (_numCentroids > 0 && !hasInheritedFractionalBoundaryEncoding()) {
       TDigestUtils.checkLegacyBoundaryWeights(_numCentroids, _centroidWeights[0], _centroidWeights[_numCentroids - 1]);
+    }
+  }
+
+  private boolean hasInheritedFractionalBoundaryEncoding() {
+    return hasInheritedFractionalBoundaryEncoding(_centroidMeans, _centroidWeights, _numCentroids);
+  }
+
+  /// Applies the canonical inherited-endpoint check to a complete digest's sorted centroid view. Enclosing writers
+  /// use this after adding their infinity tails; unsupported fresh global endpoints never inherit permission.
+  public boolean hasInheritedFractionalBoundaryEncoding(double[] means, double[] weights, int count) {
+    if (count < 0 || count > 0 && (count > means.length || count > weights.length)) {
+      throw new IllegalArgumentException("Invalid TDigest centroid count: " + count);
+    }
+    if (count == 0) {
+      return false;
+    }
+    return TDigestUtils.hasInheritedFractionalBoundaryEncoding(this, count, means[0], weights[0],
+        means[count - 1], weights[count - 1]);
+  }
+
+  @Override
+  public double getHistoricalFractionalBoundaryMean(boolean lowerBoundary) {
+    return lowerBoundary ? _historicalFractionalMinMean : _historicalFractionalMaxMean;
+  }
+
+  /// Propagates provenance from a validated source without exposing arbitrary endpoint setters.
+  public void inheritHistoricalFractionalBoundaries(TDigest source) {
+    requireMutable();
+    inheritHistoricalFractionalBoundaries(source.getHistoricalFractionalBoundaryMean(true),
+        source.getHistoricalFractionalBoundaryMean(false));
+  }
+
+  private void inheritHistoricalFractionalBoundaries(double minMean, double maxMean) {
+    if (!Double.isNaN(minMean)) {
+      _historicalFractionalMinMean = Double.isNaN(_historicalFractionalMinMean) ? minMean
+          : Math.min(_historicalFractionalMinMean, minMean);
+    }
+    if (!Double.isNaN(maxMean)) {
+      _historicalFractionalMaxMean = Double.isNaN(_historicalFractionalMaxMean) ? maxMean
+          : Math.max(_historicalFractionalMaxMean, maxMean);
     }
   }
 
@@ -1332,6 +1412,17 @@ public final class PercentileTDigestAccumulator extends TDigest {
     _numCentroids = normalizeBoundaries(_centroidMeans, _centroidWeights, _numCentroids, _min, _max);
   }
 
+  /// Repairs unit endpoints in an enclosing serialized distribution using the same kernel as native digests.
+  /// The caller owns sorted, numerically validated arrays, their exact extrema, and at least two spare entries.
+  /// Returns the new live count; fractional endpoints below one remain unchanged and require the normal provenance
+  /// check at the complete writer. This can split a fractional singleton when a surrounding tail provides mass.
+  public static int normalizeSerializedBoundaries(double[] means, double[] weights, int count, double min, double max) {
+    if (count < 0 || Math.addExact(count, 2) > means.length || count + 2 > weights.length) {
+      throw new IllegalArgumentException("TDigest boundary repair requires two spare centroid entries");
+    }
+    return normalizeBoundaries(means, weights, count, min, max);
+  }
+
   private static int normalizeBoundaries(double[] means, double[] weights, int count, double min, double max) {
     if (count == 0 || (weights[0] == 1.0 && weights[count - 1] == 1.0)) {
       return count;
@@ -1575,32 +1666,45 @@ public final class PercentileTDigestAccumulator extends TDigest {
       }
     }
 
-    private boolean hasUnrepresentableBoundaryMass() {
+    /// Propagates endpoint provenance from this complete, numerically validated serialized distribution.
+    /// The scan uses encoded counts even when a previous fanout decode has split boundary centroids.
+    public boolean recordHistoricalFractionalBoundaries(PercentileTDigestAccumulator target) {
+      inspectMetadata();
       if (!_metadata.fractionalWeights() || _metadata.needsLegacyFallback()) {
         return false;
       }
-      // Sorting unchanged unordered inputs can expose a fractional boundary that was interior on the wire.
-      if (_metadata.unorderedMeans()) {
-        return true;
-      }
+      target.requireMutable();
       ByteBuffer encoded = ByteBuffer.wrap(_bytes);
       encoded.position(_metadata.centroidOffset());
       double firstWeight = 0.0;
       double lastWeight = 0.0;
+      double firstMean = Double.POSITIVE_INFINITY;
+      double lastMean = Double.NEGATIVE_INFINITY;
       int positiveCount = 0;
       for (int i = 0; i < _metadata.centroidCount(); i++) {
         double weight = _metadata.centroidSize() == TDigestUtils.VERBOSE_CENTROID_SIZE ? encoded.getDouble()
             : encoded.getFloat();
-        encoded.position(encoded.position() + _metadata.centroidSize() / 2);
+        double mean = _metadata.centroidSize() == TDigestUtils.VERBOSE_CENTROID_SIZE ? encoded.getDouble()
+            : encoded.getFloat();
         if (weight > 0.0) {
-          if (positiveCount++ == 0) {
+          mean = Double.isNaN(mean) ? _metadata.recoveredInfinityMean() : clamp(mean, _metadata.min(), _metadata.max());
+          if (firstWeight == 0.0 || mean < firstMean) {
             firstWeight = weight;
+            firstMean = mean;
           }
-          lastWeight = weight;
+          if (lastWeight == 0.0 || mean >= lastMean) {
+            lastWeight = weight;
+            lastMean = mean;
+          }
+          positiveCount++;
         }
       }
-      return positiveCount == 1 ? firstWeight < 2.0 && firstWeight != 1.0
-          : positiveCount > 1 && (firstWeight < 1.0 || lastWeight < 1.0);
+      boolean singleton = positiveCount == 1 && firstWeight != 1.0 && firstWeight < 2.0;
+      boolean firstUnsupported = firstWeight < 1.0 || singleton;
+      boolean lastUnsupported = lastWeight < 1.0 || singleton;
+      target.inheritHistoricalFractionalBoundaries(firstUnsupported ? firstMean : Double.NaN,
+          lastUnsupported ? lastMean : Double.NaN);
+      return firstUnsupported || lastUnsupported;
     }
 
     private byte[] retainBytes() {

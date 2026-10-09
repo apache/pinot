@@ -36,7 +36,7 @@ public class LegacyTDigestCompatibilityTest {
   @Test
   public void testExportLegacyReaderFixtures()
       throws Exception {
-    Path directory = Path.of(System.getProperty("basedir"), "target", "tdigest-compat-fixtures");
+    Path directory = Path.of(System.getProperty("basedir", "."), "target", "tdigest-compat-fixtures");
     Files.createDirectories(directory);
     StringBuilder manifest = new StringBuilder();
     int count = 0;

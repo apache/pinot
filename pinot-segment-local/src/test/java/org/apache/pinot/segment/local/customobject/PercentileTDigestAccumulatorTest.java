@@ -106,9 +106,20 @@ public class PercentileTDigestAccumulatorTest {
       stored.quantile(0.5);
       stored.centroids();
       assertEquals(stored.serialize(), historical, "Read-only materialization preserves unsupported original bytes");
-      PercentileTDigestAccumulator copy = PercentileTDigestAccumulator.forReduction(stored.compression());
-      copy.add(stored);
-      assertEquals(copy.serialize(), historical, "Copying a queried source retains its original encoding");
+      for (double compression : new double[]{stored.compression(), 500}) {
+        PercentileTDigestAccumulator copy = PercentileTDigestAccumulator.forReduction(compression);
+        copy.add(stored);
+        assertEquals(copy.serialize(), historical, "Copying a queried source retains its original encoding");
+        copy.quantile(0.5);
+        copy.compress();
+        assertEquals(copy.serialize(), historical,
+            "Configured compression cannot rewrite an unchanged fractional input");
+        PercentileTDigestAccumulator adopted = PercentileTDigestAccumulator.forReduction(compression);
+        adopted.addSerializedTDigest(historical);
+        assertEquals(adopted.serialize(), historical);
+        adopted.quantile(0.5);
+        assertEquals(adopted.serialize(), historical);
+      }
       expectThrows(IllegalArgumentException.class, () -> stored.add(Double.NaN));
       expectThrows(IllegalArgumentException.class,
           () -> stored.add(fromBytes(verbose(new double[]{Double.NaN}, new double[]{1}))));
@@ -125,6 +136,77 @@ public class PercentileTDigestAccumulatorTest {
     singleton.add(1);
     assertFalse(singleton.hasOriginalFractionalPayload());
     assertEquals(TDigestUtils.deserialize(singleton.serialize()).getTotalWeight(), 2.5);
+  }
+
+  @Test
+  public void testMixedHistoricalFractionalBoundariesPreserveMassAndFiniteStatistics() {
+    byte[] historical = verbose(new double[]{0, 5, 10}, new double[]{0.5, 4, 1});
+    for (boolean historyFirst : new boolean[]{false, true}) {
+      for (boolean direct : new boolean[]{false, true}) {
+        PercentileTDigestAccumulator digest = PercentileTDigestAccumulator.forReduction(200);
+        if (!historyFirst) {
+          digest.add(7);
+        }
+        if (direct) {
+          var input = new PercentileTDigestAccumulator.SerializedTDigestInput();
+          input.reset(historical);
+          digest.addSerializedTDigestDirect(input);
+        } else {
+          digest.addSerializedTDigest(historical);
+        }
+        if (historyFirst) {
+          digest.add(7);
+        }
+        assertEquals(digest.getTotalWeight(), 6.5);
+        double median = digest.quantile(0.5);
+        assertTrue(Double.isFinite(median));
+        assertTrue(Double.isFinite(digest.cdf(5)));
+        byte[] bytes = digest.serialize();
+        assertEquals(ByteBuffer.wrap(bytes).getInt(0), TDigestUtils.VERBOSE_ENCODING);
+        assertEquals(ByteBuffer.wrap(bytes).getDouble(32), 0.5);
+        PercentileTDigestAccumulator restored = fromBytes(bytes);
+        assertEquals(restored.getTotalWeight(), 6.5);
+        assertEquals(restored.quantile(0.5), median);
+        assertEquals(restored.getMin(), 0.0);
+        assertEquals(restored.getMax(), 10.0);
+        ByteBuffer small = ByteBuffer.allocate(digest.smallByteSize());
+        digest.asSmallBytes(small);
+        assertEquals(small.getInt(0), TDigestUtils.VERBOSE_ENCODING);
+        assertEquals(fromBytes(small.array()).getTotalWeight(), 6.5);
+
+        PercentileTDigestAccumulator copy = PercentileTDigestAccumulator.forReduction(500);
+        copy.add(digest);
+        assertEquals(fromBytes(copy.serialize()).getTotalWeight(), 6.5);
+        // Historical provenance may not authorize a newly added unsupported global endpoint.
+        copy.add(-1, 0.1);
+        expectThrows(IllegalArgumentException.class, copy::serialize);
+        expectThrows(IllegalArgumentException.class, copy::smallByteSize);
+      }
+    }
+    for (boolean historyFirst : new boolean[]{false, true}) {
+      PercentileTDigestAccumulator fractional = PercentileTDigestAccumulator.forReduction(100);
+      if (!historyFirst) {
+        fractional.add(10);
+      }
+      fractional.add(fromBytes(verbose(new double[]{0}, new double[]{0.5})));
+      if (historyFirst) {
+        fractional.add(10);
+      }
+      assertEquals(fractional.getTotalWeight(), 1.5);
+      assertTrue(Double.isFinite(fractional.quantile(0.5)));
+      assertEquals(fromBytes(fractional.serialize()).getTotalWeight(), 1.5);
+      for (boolean newExtrema : new boolean[]{false, true}) {
+        PercentileTDigestAccumulator representable = fromBytes(historical);
+        representable.add(newExtrema ? -1 : 0);
+        ByteBuffer bytes = ByteBuffer.wrap(representable.serialize());
+        assertEquals(bytes.getDouble(32), 1.0, "Representable historical boundaries use the normal unit repair");
+        assertEquals(fromBytes(bytes.array()).getTotalWeight(), 6.5);
+      }
+    }
+    PercentileTDigestAccumulator fresh = PercentileTDigestAccumulator.forReduction(100);
+    fresh.add(0, 0.5);
+    fresh.add(10);
+    expectThrows(IllegalArgumentException.class, fresh::serialize);
   }
 
   @Test
@@ -160,6 +242,23 @@ public class PercentileTDigestAccumulatorTest {
     assertEquals(digest.getTotalWeight(), 6.0);
     assertEquals(digest.quantile(0), 5.0);
     assertEquals(digest.quantile(1), 30.0);
+    PercentileTDigestAccumulator pending = PercentileTDigestAccumulator.forReduction(100);
+    pending.addSerializedTDigest(TDigestUtils.serializeCentroids(100, 1, 9,
+        new double[]{5, 1, 9}, new double[]{1, 4, 1}, 3));
+    ByteBuffer ordered = ByteBuffer.wrap(pending.serialize());
+    ordered.position(28);
+    int count = ordered.getInt();
+    double previous = Double.NEGATIVE_INFINITY;
+    for (int i = 0; i < count; i++) {
+      double weight = ordered.getDouble();
+      double mean = ordered.getDouble();
+      assertTrue(mean >= previous);
+      if (i == 0 || i == count - 1) {
+        assertEquals(weight, 1.0);
+      }
+      previous = mean;
+    }
+    assertEquals(pending.getTotalWeight(), 6.0);
   }
 
   @Test
@@ -234,10 +333,32 @@ public class PercentileTDigestAccumulatorTest {
       assertEquals(digest.quantile(0), 10.0);
       assertEquals(digest.quantile(1), 20.0);
     }
+    byte[] poison = verbose(new double[]{Double.NaN}, new double[]{1});
+    for (boolean emptyFirst : new boolean[]{false, true}) {
+      for (boolean direct : new boolean[]{false, true}) {
+        PercentileTDigestAccumulator digest = PercentileTDigestAccumulator.forReduction(100);
+        for (byte[] bytes : emptyFirst ? new byte[][]{empty, poison} : new byte[][]{poison, empty}) {
+          if (direct) {
+            PercentileTDigestAccumulator.SerializedTDigestInput input =
+                new PercentileTDigestAccumulator.SerializedTDigestInput();
+            input.reset(bytes);
+            digest.addSerializedTDigestDirect(input);
+          } else {
+            digest.addSerializedTDigest(bytes);
+          }
+        }
+        assertFalse(digest.hasValidStatistics());
+        assertTrue(Double.isNaN(digest.quantile(0.5)));
+        assertEquals(digest.serialize(), poison);
+        assertEquals(digest.getTotalWeight(), 1.0);
+        byte[] cancelledCorruption = verbose(new double[]{0, 1}, new double[]{1, -1});
+        expectThrows(IllegalArgumentException.class, () -> digest.addSerializedTDigest(cancelledCorruption));
+      }
+    }
   }
 
   @Test
-  public void testSmallEncodingRetainsFieldsThatOverflowFloat() {
+  public void testSmallEncodingRetainsFieldsThatOverflowOrUnderflowFloat() {
     for (double[] centroid : new double[][]{{1e39, 1}, {1, 1e39}, {-1e39, 1}}) {
       PercentileTDigestAccumulator digest = PercentileTDigestAccumulator.forReduction(100);
       digest.add(centroid[0], centroid[1]);
@@ -251,6 +372,42 @@ public class PercentileTDigestAccumulatorTest {
       assertEquals(restored.getMin(), centroid[0]);
       assertEquals(restored.getMax(), centroid[0]);
     }
+    PercentileTDigestAccumulator tiny = PercentileTDigestAccumulator.forReduction(100);
+    tiny.add(0);
+    tiny.add(1, 1e-46);
+    tiny.add(2);
+    ByteBuffer encoded = ByteBuffer.allocate(tiny.smallByteSize());
+    tiny.asSmallBytes(encoded);
+    assertEquals(encoded.getInt(0), TDigestUtils.VERBOSE_ENCODING);
+    TDigest restored = TDigestUtils.deserialize(encoded.array());
+    assertEquals(List.copyOf(restored.centroids()).get(1).weight(), 1e-46,
+        "A positive interior mass must not narrow to compact zero");
+  }
+
+  @Test
+  public void testCompactCapacityOnlyPreservesDeclaredSmallHeaders() {
+    byte[] verbose = TDigestUtils.serializeCentroids(1000, 0, 2,
+        new double[]{0, 1, 2}, new double[]{1, 1, 1}, 3);
+    PercentileTDigestAccumulator digest = PercentileTDigestAccumulator.forReduction(100);
+    digest.addSerializedTDigest(verbose);
+    ByteBuffer compact = ByteBuffer.allocate(digest.smallByteSize());
+    digest.asSmallBytes(compact);
+    assertEquals((int) compact.getShort(24), TDigestUtils.getDefaultCentroidCapacity(100));
+    assertEquals((int) compact.getShort(26), 5 * TDigestUtils.getDefaultCentroidCapacity(100));
+
+    ByteBuffer declared = ByteBuffer.allocate(30 + 8 * 3);
+    declared.putInt(2).putDouble(0).putDouble(2).putFloat(1000);
+    declared.putShort((short) 4096).putShort((short) 8192).putShort((short) 3);
+    for (int i = 0; i < 3; i++) {
+      declared.putFloat(1).putFloat(i);
+    }
+    digest = PercentileTDigestAccumulator.forReduction(100);
+    digest.addSerializedTDigest(declared.array());
+    compact = ByteBuffer.allocate(digest.smallByteSize());
+    digest.asSmallBytes(compact);
+    assertEquals((int) compact.getShort(24), 4096);
+    assertEquals((int) compact.getShort(26), 5 * 4096);
+    assertEquals(TDigestUtils.deserialize(compact.array()).getTotalWeight(), 3.0);
   }
 
   @Test

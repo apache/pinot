@@ -103,6 +103,13 @@ public abstract class TDigest {
 
   public abstract double getMax();
 
+  /// Returns the mean of an unsupported fractional endpoint inherited from validated legacy bytes, or NaN when
+  /// none is known. The lower or upper boundary is selected by `lowerBoundary`. Producers of fresh values retain
+  /// this default; mergers propagate the provenance without granting permission to new fractional extrema.
+  public double getHistoricalFractionalBoundaryMean(boolean lowerBoundary) {
+    return Double.NaN;
+  }
+
   /// Immutable centroid value preserving fractional and large mass.
   public static final class Centroid {
     private final double _mean;

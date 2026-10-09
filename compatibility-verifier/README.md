@@ -67,7 +67,16 @@ corrupted payloads retain their original bytes and return NaN statistics, includ
 and null handling is enabled; they no longer appear empty or return SQL NULL. Mixing them with additional input fails
 instead of subtracting invalid mass from a healthy distribution. Fresh fractional boundary mass below one, or a
 fractional singleton below two, cannot satisfy legacy unit-endpoint requirements and is rejected on serialization;
-unchanged historical encodings remain readable and can be retained byte-for-byte.
+unchanged historical encodings remain readable and can be retained byte-for-byte, even at a different configured
+compression. When healthy input leaves an inherited fractional boundary unrepresentable, Pinot writes its exact
+merged mass in the historical verbose form rather than failing intermediate-result serialization. This retains
+the existing legacy limitation: assertion-enabled t-digest 3.3 can fail when recompressing these fractional forms,
+including during the old Pinot wrapper's initial deserialization. Fresh unsupported boundaries remain rejected.
+
+Release note: `percentileSmartTDigest` over multi-value columns with null handling enabled now respects each
+non-null row range. Previously, a batch containing null rows replayed all rows for every non-null range,
+including null rows and duplicating values across ranges. Queries now include each non-null row once and skip null
+rows; this correction can change percentile results independently of the digest migration.
 
 After the affected tests generate fixtures, run `compatibility-verifier/tdigest-compatibility/run.sh` to exercise
 the real 3.2 and 3.3 readers, and `compatibility-verifier/tdigest-compatibility/generate-rank-errors.sh` to verify

@@ -26,7 +26,11 @@ export MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.wagon.httpconnectionManager.ttlSecond
 TDIGEST_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TDIGEST_FIXTURES="$TDIGEST_ROOT/pinot-segment-local/target/tdigest-compat-fixtures"
 TDIGEST_WORK="$TDIGEST_ROOT/pinot-segment-local/target/tdigest-legacy-reader"
-test -s "$TDIGEST_FIXTURES/manifest.tsv"
+if [[ ! -s "$TDIGEST_FIXTURES/manifest.tsv" ]]; then
+  printf 'Missing or empty t-digest fixture manifest: %s. Run LegacyTDigestCompatibilityTest first.\n' \
+    "$TDIGEST_FIXTURES/manifest.tsv" >&2
+  exit 1
+fi
 mkdir -p "$TDIGEST_WORK"
 for TDIGEST_VERSION in 3.2 3.3; do
   TDIGEST_JAR="$TDIGEST_WORK/t-digest-$TDIGEST_VERSION.jar"

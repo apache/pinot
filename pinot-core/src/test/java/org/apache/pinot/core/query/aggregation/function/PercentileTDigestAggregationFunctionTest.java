@@ -1092,6 +1092,27 @@ public class PercentileTDigestAggregationFunctionTest {
       TDigest merged = fractionalFirst ? function.merge(half, singleton) : function.merge(singleton, half);
       assertEquals(merged.getTotalWeight(), 1.5);
       assertEquals(function.extractFinalResult(merged), 42.0);
+      TDigest roundTrip =
+          ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(merged));
+      assertEquals(roundTrip.getTotalWeight(), 1.5);
+      assertEquals(function.extractFinalResult(roundTrip), 42.0);
+
+      TDigest healthy = TDigestUtils.createMergingDigest(100.0);
+      healthy.add(43.0);
+      byte[] healthyBytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(healthy);
+      byte[][] inputs = fractionalFirst ? new byte[][]{fractionalBytes.array(), healthyBytes}
+          : new byte[][]{healthyBytes, fractionalBytes.array()};
+      TDigest leaf = aggregateSerialized(inputs, null, false);
+      GroupByResultHolder groups = function.createGroupByResultHolder(1, 1);
+      function.aggregateGroupBySV(2, new int[]{0, 0}, groups, Map.of(EXPRESSION, bytesBlockValSet(inputs, null)));
+      for (TDigest result : List.of(leaf, function.extractGroupByResult(groups, 0))) {
+        TDigest reread = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(result));
+        assertEquals(reread.getTotalWeight(), 1.5);
+        assertEquals(reread.getMin(), 42.0);
+        assertEquals(reread.getMax(), 43.0);
+        assertTrue(Double.isFinite(reread.quantile(0.5)));
+        assertEquals(reread.quantile(0.5), result.quantile(0.5));
+      }
     }
 
     ByteBuffer poisonedBytes = ByteBuffer.allocate(64);
@@ -1109,6 +1130,19 @@ public class PercentileTDigestAggregationFunctionTest {
         assertNull(extraction.extractFinalResult(empty));
       } else {
         assertTrue(Double.isNaN(extraction.extractFinalResult(empty)));
+      }
+      byte[] emptyBytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(empty);
+      for (boolean poisonedFirst : new boolean[]{true, false}) {
+        byte[][] inputs = poisonedFirst ? new byte[][]{poisonedBytes.array(), emptyBytes}
+            : new byte[][]{emptyBytes, poisonedBytes.array()};
+        TDigest aggregate = aggregateSerialized(inputs, null, nullHandlingEnabled);
+        GroupByResultHolder groups = extraction.createGroupByResultHolder(1, 1);
+        extraction.aggregateGroupBySV(2, new int[]{0, 0}, groups,
+            Map.of(EXPRESSION, bytesBlockValSet(inputs, null)));
+        for (TDigest result : List.of(aggregate, extraction.extractGroupByResult(groups, 0))) {
+          assertTrue(Double.isNaN(extraction.extractFinalResult(result)));
+          assertEquals(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(result), poisonedBytes.array());
+        }
       }
       TDigest singleton = TDigestUtils.createMergingDigest(100.0);
       singleton.add(42.0);

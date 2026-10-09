@@ -113,20 +113,33 @@ public final class TDigestUtils {
       byte[] verboseBytes = new byte[verboseBuffer.position()];
       verboseBuffer.flip();
       verboseBuffer.get(verboseBytes);
-      if (ByteBuffer.wrap(verboseBytes).getInt() == VERBOSE_ENCODING) {
-        return makeLegacyCompatible(verboseBytes);
-      }
       SerializedTDigestMetadata metadata = inspectSerialized(ByteBuffer.wrap(verboseBytes), false);
+      boolean inherited = hasInheritedFractionalBoundaryEncoding(tDigest, verboseBytes, metadata);
+      if (metadata.encoding() == VERBOSE_ENCODING
+          && (!metadata.hasZeroWeightCentroids() || Double.isNaN(tDigest.getHistoricalFractionalBoundaryMean(true))
+          && Double.isNaN(tDigest.getHistoricalFractionalBoundaryMean(false)))) {
+        return makeLegacyCompatible(verboseBytes, metadata, inherited);
+      }
       if (!metadata.needsLegacyFallback()) {
-        if (metadata.hasZeroWeightCentroids() || !Double.isNaN(metadata.recoveredInfinityMean())) {
+        if (metadata.hasZeroWeightCentroids() || !Double.isNaN(metadata.recoveredInfinityMean()) || inherited) {
           double[] means = new double[metadata.centroidCount()];
           double[] weights = new double[means.length];
           inspectSerialized(ByteBuffer.wrap(verboseBytes), metadata, means, weights);
-          if (!Double.isNaN(metadata.recoveredInfinityMean())) {
-            return serializeRecoveredCentroids(metadata, means, weights);
+          int count = 0;
+          for (int i = 0; i < means.length; i++) {
+            if (weights[i] > 0.0) {
+              means[count] = means[i];
+              weights[count++] = weights[i];
+            }
           }
-          return makeLegacyCompatible(serializeCentroids(metadata.compression(), metadata.min(), metadata.max(),
-              means, weights, means.length));
+          inherited = count > 0 && hasInheritedFractionalBoundaryEncoding(tDigest, count, means[0], weights[0],
+              means[count - 1], weights[count - 1]);
+          if (!Double.isNaN(metadata.recoveredInfinityMean()) && !inherited) {
+            return serializeRecoveredCentroids(metadata, Arrays.copyOf(means, count), Arrays.copyOf(weights, count));
+          }
+          byte[] repaired = serializeCentroids(metadata.compression(), metadata.min(), metadata.max(),
+              means, weights, count);
+          return makeLegacyCompatible(repaired, inspectSerialized(ByteBuffer.wrap(repaired), false), inherited);
         }
         checkSerializedBoundaryWeights(verboseBytes, metadata);
       }
@@ -174,6 +187,44 @@ public final class TDigestUtils {
     }
   }
 
+  /// Allows only unsupported endpoint means inherited from a validated legacy source. This is shared by native,
+  /// enclosing and generic writers; new fractional global extrema do not receive the historical exception.
+  public static boolean hasInheritedFractionalBoundaryEncoding(TDigest source, int count, double firstMean,
+      double firstWeight, double lastMean, double lastWeight) {
+    if (count <= 0 || !source.hasValidStatistics() || !(firstWeight > 0.0) || !(lastWeight > 0.0)
+        || !Double.isFinite(firstWeight) || !Double.isFinite(lastWeight)) {
+      return false;
+    }
+    boolean singleton = count == 1 && firstWeight != 1.0 && firstWeight < 2.0;
+    boolean firstUnsupported = firstWeight < 1.0 || singleton;
+    boolean lastUnsupported = lastWeight < 1.0 || singleton;
+    return (firstUnsupported || lastUnsupported)
+        && (!firstUnsupported || firstMean == source.getHistoricalFractionalBoundaryMean(true))
+        && (!lastUnsupported || lastMean == source.getHistoricalFractionalBoundaryMean(false));
+  }
+
+  private static boolean hasInheritedFractionalBoundaryEncoding(TDigest source, byte[] bytes,
+      SerializedTDigestMetadata metadata) {
+    int count = metadata.centroidCount();
+    if (count == 0 || metadata.needsLegacyFallback()) {
+      return false;
+    }
+    ByteBuffer encoded = ByteBuffer.wrap(bytes);
+    int firstOffset = metadata.centroidOffset();
+    int lastOffset = firstOffset + (count - 1) * metadata.centroidSize();
+    encoded.position(firstOffset);
+    double firstWeight = metadata.encoding() == VERBOSE_ENCODING ? encoded.getDouble() : encoded.getFloat();
+    double firstMean = metadata.encoding() == VERBOSE_ENCODING ? encoded.getDouble() : encoded.getFloat();
+    encoded.position(lastOffset);
+    double lastWeight = metadata.encoding() == VERBOSE_ENCODING ? encoded.getDouble() : encoded.getFloat();
+    double lastMean = metadata.encoding() == VERBOSE_ENCODING ? encoded.getDouble() : encoded.getFloat();
+    firstMean = Double.isNaN(firstMean) ? metadata.recoveredInfinityMean()
+        : Math.max(metadata.min(), Math.min(firstMean, metadata.max()));
+    lastMean = Double.isNaN(lastMean) ? metadata.recoveredInfinityMean()
+        : Math.max(metadata.min(), Math.min(lastMean, metadata.max()));
+    return hasInheritedFractionalBoundaryEncoding(source, count, firstMean, firstWeight, lastMean, lastWeight);
+  }
+
   private static void checkSerializedBoundaryWeights(byte[] bytes, SerializedTDigestMetadata metadata) {
     int count = metadata.centroidCount();
     if (count > 0) {
@@ -204,6 +255,14 @@ public final class TDigestUtils {
   ///
   /// The metadata must describe these exact bytes. This avoids another centroid validation walk for lazy digests.
   public static byte[] makeLegacyCompatible(byte[] verboseBytes, SerializedTDigestMetadata metadata) {
+    return makeLegacyCompatible(verboseBytes, metadata, false);
+  }
+
+  /// Retains exact verbose weights for inherited historical fractional endpoints that cannot become unit endpoints.
+  /// All other compatibility checks apply. These payloads keep their historical assertion-enabled 3.3 read/merge
+  /// limitation; callers must establish inherited endpoint provenance before enabling this exception.
+  public static byte[] makeLegacyCompatible(byte[] verboseBytes, SerializedTDigestMetadata metadata,
+      boolean inheritedFractionalBoundaries) {
     if (metadata.encoding() != VERBOSE_ENCODING) {
       throw new IllegalArgumentException("Expected verbose TDigest encoding");
     }
@@ -214,13 +273,20 @@ public final class TDigestUtils {
       double[] means = new double[metadata.centroidCount()];
       double[] weights = new double[means.length];
       decodeSerializedCentroids(ByteBuffer.wrap(verboseBytes), metadata, means, weights);
-      return serializeRecoveredCentroids(metadata, means, weights);
+      if (!inheritedFractionalBoundaries) {
+        return serializeRecoveredCentroids(metadata, means, weights);
+      }
+      verboseBytes = serializeCentroids(metadata.compression(), metadata.min(), metadata.max(), means, weights,
+          means.length);
+      metadata = inspectSerialized(ByteBuffer.wrap(verboseBytes), false);
     }
     if (metadata.hasZeroWeightCentroids()) {
       verboseBytes = removeZeroWeightCentroids(verboseBytes, metadata);
       metadata = inspectSerialized(ByteBuffer.wrap(verboseBytes), false);
     }
-    checkSerializedBoundaryWeights(verboseBytes, metadata);
+    if (!inheritedFractionalBoundaries) {
+      checkSerializedBoundaryWeights(verboseBytes, metadata);
+    }
     double compression = metadata.compression();
     if (metadata.encodedCompression() != compression) {
       verboseBytes = verboseBytes.clone();
@@ -234,7 +300,7 @@ public final class TDigestUtils {
     }
     int mainCapacity = Math.max(getDefaultCentroidCapacity(compression), centroidCount);
     long bufferCapacity = DEFAULT_MERGE_BUFFER_MULTIPLIER * (long) mainCapacity;
-    if ((double) (float) compression != compression || centroidCount > Short.MAX_VALUE
+    if (inheritedFractionalBoundaries || (double) (float) compression != compression || centroidCount > Short.MAX_VALUE
         || mainCapacity > Short.MAX_VALUE || bufferCapacity > Short.MAX_VALUE) {
       return reduceVerboseCentroids(verboseBytes, legacyCapacity);
     }
