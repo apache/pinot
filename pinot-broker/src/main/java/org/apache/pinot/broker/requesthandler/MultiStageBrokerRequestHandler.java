@@ -1022,6 +1022,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
         if (stageStats != null) { // for example pipeline breaker may not have stats
           stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
+          if (!stageStats.isEmpty()) {
+            // The stage root's allocation covers all the operators of its op chain
+            brokerResponse.addTotalMemAllocatedBytes(
+                stageStats.getLastOperatorStats().getUnsafe("ALLOCATED_MEMORY_BYTES", 0L));
+          }
         }
       }
       // Broker-pruned segments are computed during routing in WorkerManager, not reported by servers.

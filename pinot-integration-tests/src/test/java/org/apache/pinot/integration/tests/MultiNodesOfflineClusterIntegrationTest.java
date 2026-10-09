@@ -326,6 +326,35 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     assertEquals(result.get("numServersQueried").intValue(), 1);
   }
 
+  @Test
+  public void testMultiStageTotalMemAllocatedBytes()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+
+    // The semi-join query uses a pipeline breaker
+    for (String query : List.of("SELECT Carrier, COUNT(*) FROM mytable GROUP BY Carrier",
+        "SELECT Carrier FROM mytable WHERE Origin IN (SELECT Origin FROM mytable WHERE ArrDelay > 0) LIMIT 10")) {
+      JsonNode result = postQuery(query);
+      long totalMemAllocatedBytes = result.path("totalMemAllocatedBytes").asLong();
+      assertTrue(totalMemAllocatedBytes > 0);
+      assertEquals(totalMemAllocatedBytes, sumAllocatedBytes(result.get("stageStats"), true));
+    }
+  }
+
+  /// Sums the allocation of each op chain root (the top node, each MAILBOX_SEND and each pipeline breaker, which is
+  /// rendered as the child of its LEAF) and of the single-stage threads of each LEAF.
+  private static long sumAllocatedBytes(JsonNode node, boolean isOpChainRoot) {
+    long bytes = node.path("threadMemAllocatedBytes").asLong();
+    if (isOpChainRoot) {
+      bytes += node.path("allocatedMemoryBytes").asLong();
+    }
+    boolean isLeaf = node.path("type").asText().equals("LEAF");
+    for (JsonNode child : node.path("children")) {
+      bytes += sumAllocatedBytes(child, isLeaf || child.path("type").asText().equals("MAILBOX_SEND"));
+    }
+    return bytes;
+  }
+
   // Disabled because segments might not be server partitioned with multiple servers
   @Test(enabled = false)
   @Override
