@@ -25,10 +25,12 @@ import java.util.List;
 import java.util.SplittableRandom;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.segment.local.customobject.SerializedTDigest;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.spi.customobject.TDigest;
 import org.apache.pinot.segment.spi.customobject.TDigest.Centroid;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -518,20 +520,28 @@ public class PercentileTDigestValueAggregatorTest {
   }
 
   @Test
-  public void testHistoricalFractionalInfinityBytesSurviveViewsCopyAndReturnedByteMutation() {
+  public void testHistoricalFractionalBytesSurviveAllSerializationPathsAndReturnedByteMutation() {
     PercentileTDigestValueAggregator aggregator = newAggregator(100);
-    byte[] original = createVerboseEncoding(new double[]{Double.NEGATIVE_INFINITY, 2.0, Double.POSITIVE_INFINITY},
-        new double[]{0.5, 0.3, 0.5});
-    TDigest digest = aggregator.deserializeAggregatedValue(original);
-    digest.centroids();
-    digest.quantile(0.5);
-    digest.compress();
-    TDigest copy = aggregator.cloneAggregatedValue(digest);
-    byte[] returned = aggregator.serializeAggregatedValue(digest);
-    assertEquals(returned, original);
-    returned[0] = 0;
-    assertEquals(aggregator.serializeAggregatedValue(digest), original);
-    assertEquals(aggregator.serializeAggregatedValue(copy), original);
+    for (byte[] original : new byte[][]{
+        createVerboseEncoding(new double[]{Double.NEGATIVE_INFINITY, 2.0, Double.POSITIVE_INFINITY},
+            new double[]{0.5, 0.3, 0.5}), createVerboseEncoding(new double[]{42.0}, new double[]{1.5})}) {
+      TDigest digest = aggregator.deserializeAggregatedValue(original);
+      digest.centroids();
+      digest.quantile(0.5);
+      digest.compress();
+      TDigest copy = aggregator.cloneAggregatedValue(digest);
+      assertEquals(TDigestUtils.serialize(digest), original);
+      assertEquals(CustomSerDeUtils.TDIGEST_SER_DE.serialize(digest), original);
+      assertEquals(new SerializedTDigest(digest, 50).toString(), BytesUtils.toHexString(original));
+      byte[] returned = TDigestUtils.serialize(digest);
+      returned[0] = 0;
+      assertEquals(TDigestUtils.serialize(digest), original);
+      assertEquals(aggregator.serializeAggregatedValue(digest), original);
+      assertEquals(TDigestUtils.serialize(copy), original);
+      digest.add(Double.NEGATIVE_INFINITY, 0.5);
+      assertThrows(IllegalArgumentException.class, () -> TDigestUtils.serialize(digest));
+      assertEquals(digest.getTotalWeight(), TDigestUtils.validateSerialized(original) + 0.5);
+    }
 
     TDigest fresh = aggregator.deserializeAggregatedValue(createVerboseEncoding(
         new double[]{Double.NEGATIVE_INFINITY, 1.0, 2.0, Double.POSITIVE_INFINITY},

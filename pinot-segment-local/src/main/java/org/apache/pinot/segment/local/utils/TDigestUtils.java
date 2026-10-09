@@ -22,6 +22,7 @@ import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator.SerializedTDigestInput;
 import org.apache.pinot.segment.spi.customobject.TDigest;
@@ -93,6 +94,10 @@ public final class TDigestUtils {
         // this count from cached metadata, so stored reads do not acquire an extra lossy compression pass.
         tDigest.centroidCount();
         return ((PercentileTDigestAccumulator) tDigest).serialize();
+      }
+      byte[] retained = PercentileTDigestValueAggregator.getRetainedHistoricalBytes(tDigest);
+      if (retained != null) {
+        return retained;
       }
       // Keep room for boundary repair as well as any additional buffered state declared by the implementation.
       // Compression and total weight are not allocation sizes, so extreme settings need no enormous scratch array.

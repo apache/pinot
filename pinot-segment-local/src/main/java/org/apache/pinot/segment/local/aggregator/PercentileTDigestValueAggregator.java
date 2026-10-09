@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
 import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator.SerializedTDigestInput;
@@ -135,6 +136,24 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
   public TDigest deserializeAggregatedValue(byte[] bytes) {
     _maxByteSize = Math.max(_maxByteSize, bytes.length);
     return NonFiniteAwareTDigest.fromBytes(bytes);
+  }
+
+  /// Returns an independently owned historical payload only for an unchanged, privately owned wrapper.
+  /// Fresh digests and other implementations return null and follow the shared codec's normal validation.
+  @Nullable
+  public static byte[] getRetainedHistoricalBytes(TDigest value) {
+    if (!(value instanceof NonFiniteAwareTDigest)) {
+      return null;
+    }
+    NonFiniteAwareTDigest wrapped = (NonFiniteAwareTDigest) value;
+    if (wrapped._originalFractionalBytes != null) {
+      return wrapped._originalFractionalBytes.clone();
+    }
+    if (wrapped._negativeInfinityWeight == 0.0 && wrapped._positiveInfinityWeight == 0.0
+        && ((PercentileTDigestAccumulator) wrapped._finiteDigest).hasOriginalFractionalPayload()) {
+      return TDigestUtils.serialize(wrapped._finiteDigest);
+    }
+    return null;
   }
 
   private static NonFiniteAwareTDigest asNonFiniteAware(TDigest value) {
