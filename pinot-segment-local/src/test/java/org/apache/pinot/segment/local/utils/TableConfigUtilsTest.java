@@ -2697,6 +2697,7 @@ public class TableConfigUtilsTest {
         ConsumingSegmentConsistencyModeListener.getInstance();
     try {
       // Without PROTECTED mode nothing is reverted, so every policy is allowed
+      consistencyModeListener.setMode(ConsumingSegmentConsistencyModeListener.Mode.RESTRICTED);
       checkConsumptionDuringUpsertRevert(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, false);
 
       consistencyModeListener.setMode(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED);
