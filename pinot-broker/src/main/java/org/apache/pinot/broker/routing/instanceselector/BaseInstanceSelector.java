@@ -121,6 +121,9 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
 
   // _segmentStates is needed for instance selection (multi-threaded), so it is made volatile.
   protected volatile SegmentStates _segmentStates;
+  // Includes disabled instances assigned to ONLINE/CONSUMING segments. Published atomically with each assignment
+  // update so the routing manager can scope server-readiness acknowledgement to relevant tables.
+  protected volatile Set<String> _assignedInstances = Set.of();
   // Published together with _segmentStates and read back by the routing manager to report the table's
   // gauges. Volatile so that a reader on another thread cannot see it lagging the segment states it was
   // computed alongside.
@@ -301,10 +304,16 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
 
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
+    Set<String> assignedInstances = new HashSet<>();
     int numSinglePoolSegments = 0;
     Set<Integer> pools = new HashSet<>();
     for (String segment : onlineSegments) {
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      for (Map.Entry<String, String> entry : idealStateInstanceStateMap.entrySet()) {
+        if (isOnlineForRouting(entry.getValue())) {
+          assignedInstances.add(entry.getKey());
+        }
+      }
       // TODO: Verify whether sorting is actually needed
       Map<String, String> sortedIdealStateMap = convertToSortedMap(idealStateInstanceStateMap);
       Long newSegmentCreationTimeMs = newSegmentCreationTimeMap.get(segment);
@@ -369,6 +378,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     if (_emitSinglePoolSegmentsMetric) {
       _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.SINGLE_POOL_SEGMENTS, numSinglePoolSegments);
     }
+    _assignedInstances = Set.copyOf(assignedInstances);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Got _newSegmentStateMap: {}, _oldSegmentCandidatesMap: {}", _newSegmentStateMap.keySet(),
           _oldSegmentCandidatesMap.keySet());
@@ -538,6 +548,11 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   @Override
   public Set<String> getServingInstances() {
     return _segmentStates.getServingInstances();
+  }
+
+  @Override
+  public boolean isServerAssigned(String instanceId) {
+    return _assignedInstances.contains(instanceId);
   }
 
   @VisibleForTesting
