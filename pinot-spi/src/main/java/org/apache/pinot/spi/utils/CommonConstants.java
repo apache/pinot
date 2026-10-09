@@ -1306,7 +1306,8 @@ public class CommonConstants {
         // Do not detect any failure
         NO_OP,
 
-        // Detect connection failures
+        // Detect connection failures, and optionally servers that leave a query unanswered and then fail a ping (see
+        // CONFIG_OF_ENABLE_PING_ON_TIMEOUT)
         CONNECTION,
 
         // Use the custom failure detector of the configured class name
@@ -1325,6 +1326,23 @@ public class CommonConstants {
       public static final double DEFAULT_RETRY_DELAY_FACTOR = 2.0;
       public static final String CONFIG_OF_MAX_RETRIES = "pinot.broker.failure.detector.max.retries";
       public static final int DEFAULT_MAX_RETRIES = 10;
+
+      /// When a single-stage query times out on a server, ping the server and mark it unhealthy if the ping goes
+      /// unanswered. Unhealthy servers are then retried with a ping too, instead of a TCP connect. This is how a server
+      /// whose node is gone or whose JVM is frozen is detected, since such a server keeps its connection open and
+      /// raises no connection failure. A server that is merely busy still answers the ping, so it is left alone.
+      ///
+      /// Enable only once every server runs a version that answers pings. An older server runs a ping like a query,
+      /// behind the queries already queued on it, so a busy one can miss the ping timeout and be taken out of routing.
+      public static final String CONFIG_OF_ENABLE_PING_ON_TIMEOUT =
+          "pinot.broker.failure.detector.enable.ping.on.timeout";
+      public static final boolean DEFAULT_ENABLE_PING_ON_TIMEOUT = false;
+
+      /// With pings enabled, how long to wait for a server to answer one before treating it as unhealthy, both when
+      /// checking a server after a query timeout and when retrying an unhealthy one. Keep it above the longest
+      /// stop-the-world GC pause expected on a server, or a pause will briefly take that server out of routing.
+      public static final String CONFIG_OF_PING_TIMEOUT_MS = "pinot.broker.failure.detector.ping.timeout.ms";
+      public static final long DEFAULT_PING_TIMEOUT_MS = 5_000L;
     }
 
     // Configs related to AdaptiveServerSelection.
