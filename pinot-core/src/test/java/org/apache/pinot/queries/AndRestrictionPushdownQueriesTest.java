@@ -60,8 +60,11 @@ public class AndRestrictionPushdownQueriesTest extends BaseSingleValueQueriesTes
 
   @Test
   public void testAutoLeavesSelectionQueriesAlone() {
-    BrokerResponseNative auto = getBrokerResponse(withMode("auto", SELECTION + FILTER));
-    BrokerResponseNative disabled = getBrokerResponse(withMode("never", SELECTION + FILTER));
+    // A selection query stops at its LIMIT, so with several threads the number of segments it scans depends on timing.
+    // One thread makes the entries scanned in the filter deterministic.
+    String query = "SET " + QueryOptionKey.MAX_EXECUTION_THREADS + " = 1; " + SELECTION + FILTER;
+    BrokerResponseNative auto = getBrokerResponse(withMode("auto", query));
+    BrokerResponseNative disabled = getBrokerResponse(withMode("never", query));
 
     assertRowsEqual(auto, disabled);
     assertEquals(auto.getNumEntriesScannedInFilter(), disabled.getNumEntriesScannedInFilter(),
