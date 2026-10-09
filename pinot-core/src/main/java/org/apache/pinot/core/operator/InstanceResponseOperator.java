@@ -99,6 +99,16 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
         String.valueOf(_threadMemAllocatedBytes));
     instanceResponseBlock.addMetadata(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(),
         String.valueOf(_systemActivitiesCpuTimeNs));
+    long numRemoteAccesses = 0;
+    long remoteAccessBytes = 0;
+    for (FetchContext fetchContext : _fetchContexts) {
+      numRemoteAccesses += fetchContext.getNumRemoteAccesses();
+      remoteAccessBytes += fetchContext.getRemoteAccessBytes();
+    }
+    if (numRemoteAccesses > 0) {
+      instanceResponseBlock.addMetadata(MetadataKey.NUM_REMOTE_ACCESSES.getName(), Long.toString(numRemoteAccesses));
+      instanceResponseBlock.addMetadata(MetadataKey.REMOTE_ACCESS_BYTES.getName(), Long.toString(remoteAccessBytes));
+    }
     Integer implicitLimit = QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(
         _queryContext.getQueryOptions());
     // false-positive when table has exactly implicitLimit rows

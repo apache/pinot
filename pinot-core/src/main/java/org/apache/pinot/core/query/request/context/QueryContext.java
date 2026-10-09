@@ -40,7 +40,6 @@ import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.core.util.MemoizedClassAssociation;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -80,7 +79,9 @@ public class QueryContext {
   private final Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
   private final ExplainMode _explain;
 
-  private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
+  // Values that the segments of the query share, by value type. The query context owns the map, so the values can be
+  // collected with it. A ClassValue would keep each value in its type's cache until later queries clear it.
+  private final ConcurrentHashMap<Class<?>, ConcurrentHashMap<?, ?>> _sharedValues = new ConcurrentHashMap<>();
 
   // Pre-calculate the aggregation functions and columns for the query so that it can be shared across all the segments
   private AggregationFunction[] _aggregationFunctions;
@@ -574,7 +575,8 @@ public class QueryContext {
   /// @param <V> the value type
   /// @return the shared value
   public <K, V> V getOrComputeSharedValue(Class<V> type, K key, Function<K, V> mapper) {
-    return ((ConcurrentHashMap<K, V>) _sharedValues.apply(type)).computeIfAbsent(key, mapper);
+    return ((ConcurrentHashMap<K, V>) _sharedValues.computeIfAbsent(type, k -> new ConcurrentHashMap<>()))
+        .computeIfAbsent(key, mapper);
   }
 
   public int getEffectiveSegmentGroupTrimSize() {

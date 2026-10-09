@@ -866,7 +866,7 @@ in:
   transform: "org.apache.pinot.core.operator.transform.function.InTransformFunction"
   udf: null
 inidset:
-  scalar: null
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.core.function.scalar.IdSetFunctions.inIdSet}"
   transform: "org.apache.pinot.core.operator.transform.function.InIdSetTransformFunction"
   udf: null
 innerproduct:

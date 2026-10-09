@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.*;
@@ -32,6 +33,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
@@ -118,6 +120,16 @@ public class QueryOptionsUtilsTest {
     assertNull(QueryOptionsUtils.getInPredicatePruningThreshold(Map.of()));
   }
 
+  @Test
+  public void shouldReadPartitionPruningPreparationThresholdOption() {
+    assertEquals(QueryOptionsUtils.getPartitionPruningPreparationThreshold(
+        Map.of(PARTITION_PRUNING_PREPARATION_THRESHOLD, "20")), 20);
+    assertEquals(QueryOptionsUtils.getPartitionPruningPreparationThreshold(
+        Map.of(PARTITION_PRUNING_PREPARATION_THRESHOLD, "-1")), -1);
+    assertNull(QueryOptionsUtils.getPartitionPruningPreparationThreshold(Map.of()));
+    assertNull(QueryOptionsUtils.getPartitionPruningPreparationThreshold(null));
+  }
+
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void shouldRejectInvalidInPredicatePruningThreshold() {
     QueryOptionsUtils.getInPredicatePruningThreshold(Map.of(IN_PREDICATE_PRUNING_THRESHOLD, "invalid"));
@@ -132,11 +144,43 @@ public class QueryOptionsUtilsTest {
     assertEquals(skipIndexes.get("col2"), Set.of(FieldConfig.IndexType.SORTED));
   }
 
+  /// Asserts that spaces around column names and index types are ignored.
+  @Test(dataProvider = "skipIndexesWithSpaces")
+  public void testSkipIndexesParsingWithSpaces(String skipIndexesStr) {
+    Map<String, Set<FieldConfig.IndexType>> skipIndexes =
+        QueryOptionsUtils.getSkipIndexes(Map.of(SKIP_INDEXES, skipIndexesStr));
+    assertEquals(skipIndexes, Map.of("col1", Set.of(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE),
+        "col2", Set.of(FieldConfig.IndexType.SORTED)));
+  }
+
+  @DataProvider
+  public Object[][] skipIndexesWithSpaces() {
+    return new Object[][]{
+        {"col1=inverted, range&col2=sorted"},
+        {"col1=inverted,range& col2=sorted"},
+        {" col1 = inverted , range & col2 = sorted "}
+    };
+  }
+
   @Test(expectedExceptions = RuntimeException.class)
   public void testSkipIndexesParsingInvalid() {
     String skipIndexesStr = "col1=inverted,range&col2";
     Map<String, String> queryOptions = Map.of(SKIP_INDEXES, skipIndexesStr);
     QueryOptionsUtils.getSkipIndexes(queryOptions);
+  }
+
+  @Test
+  public void testPlannerRulesParsing() {
+    // Rule names are trimmed, and empty names are dropped
+    Map<String, String> queryOptions = Map.of(USE_PLANNER_RULES, "SortJoinTranspose, AggregateJoinTransposeExtended, ",
+        SKIP_PLANNER_RULES, " FilterIntoJoin ,,FilterAggregateTranspose");
+    assertEquals(QueryOptionsUtils.getUsePlannerRules(queryOptions),
+        Set.of("SortJoinTranspose", "AggregateJoinTransposeExtended"));
+    assertEquals(QueryOptionsUtils.getSkipPlannerRules(queryOptions),
+        Set.of("FilterIntoJoin", "FilterAggregateTranspose"));
+
+    assertEquals(QueryOptionsUtils.getUsePlannerRules(Map.of()), Set.of());
+    assertEquals(QueryOptionsUtils.getSkipPlannerRules(Map.of()), Set.of());
   }
 
   @Test
@@ -376,5 +420,29 @@ public class QueryOptionsUtilsTest {
     // Zero
     queryOptions.put(LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT, "0");
     assertEquals(QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(queryOptions), Integer.valueOf(0));
+  }
+
+  @Test
+  public void testGetSealedInListThreshold() {
+    Map<String, String> queryOptions = new HashMap<>();
+
+    // Absent → default
+    assertEquals(QueryOptionsUtils.getSealedInListThreshold(queryOptions, 20), 20);
+
+    // Present → parsed value
+    queryOptions.put(SEALED_IN_LIST_THRESHOLD, " 100 ");
+    assertEquals(QueryOptionsUtils.getSealedInListThreshold(queryOptions, 20), 100);
+
+    // Zero or negative → returned as is, which turns sealing off
+    queryOptions.put(SEALED_IN_LIST_THRESHOLD, "0");
+    assertEquals(QueryOptionsUtils.getSealedInListThreshold(queryOptions, 20), 0);
+    queryOptions.put(SEALED_IN_LIST_THRESHOLD, "-1");
+    assertEquals(QueryOptionsUtils.getSealedInListThreshold(queryOptions, 20), -1);
+
+    // Not an integer → error that names the option
+    queryOptions.put(SEALED_IN_LIST_THRESHOLD, "twenty");
+    IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
+        () -> QueryOptionsUtils.getSealedInListThreshold(queryOptions, 20));
+    assertTrue(e.getMessage().contains(SEALED_IN_LIST_THRESHOLD), e.getMessage());
   }
 }

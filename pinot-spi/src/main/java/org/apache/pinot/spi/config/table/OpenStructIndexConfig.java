@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.OpenStructKeyFlattener;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -43,10 +44,30 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// dense keys entirely (all keys go to the sparse column). Use `denseKeys` to pin specific keys
 /// regardless of fill rate ranking.
 ///
+/// **Nested keys:** `maxNestedKeyDepth` (default `1`) controls whether a value inside a nested
+/// object gets a key of its own. At `1` a nested object is a single key, so nothing inside it can be
+/// materialized or filtered. Raising it makes the path the key -- `{"device":{"os":"ios"}}` yields
+/// `device.os` alongside `device`, which keeps answering with the whole object as JSON. The value
+/// counts path segments, so `2` reaches `a.b` and `3` reaches `a.b.c`; an object at the limit is
+/// still stored whole, so a limit that is too low costs addressability, not data. Containers are
+/// held out of automatic dense selection (their leaves are separate keys already) unless named in
+/// `denseKeys`. See `OpenStructKeyFlattener`.
+///
 /// **Per-key index settings** are specified via `valueFieldConfigs` — each entry is a standard
 /// [FieldConfig] (modern `indexes` format) for one materialized OPEN_STRUCT key. Keys without an
 /// entry fall back to `defaultValueFieldConfig`. When neither is set, the built-in default is
-/// DICTIONARY encoding with an inverted index.
+/// DICTIONARY encoding with an inverted index. A per-key config honors only:
+/// - `encodingType`: DICTIONARY (the default) builds a dictionary-encoded key, and RAW builds a raw
+///   forward index with LZ4 compression, unless the key's inverted index is enabled, which requires a
+///   dictionary and makes the key dictionary-encoded.
+/// - The `inverted`, `range` and `bloom` entries under `indexes`. A per-key config without an
+///   `inverted` entry builds no inverted index.
+///
+/// `indexes.forward` and `indexes.dictionary` may only restate how the key is built: its forward
+/// encoding and whether it has a dictionary. Table-config validation rejects every other per-key
+/// setting, which a materialized key would silently ignore:
+/// forward-index tuning (such as `codecSpec`, `compressionCodec` or chunk sizes), dictionary tuning, and
+/// the `indexTypes`, `properties`, `timestampConfig` and `tierOverwrites` fields.
 public class OpenStructIndexConfig extends IndexConfig {
   public static final OpenStructIndexConfig DISABLED = new OpenStructIndexConfig(false);
   public static final OpenStructIndexConfig DEFAULT = new OpenStructIndexConfig(true);
@@ -54,6 +75,8 @@ public class OpenStructIndexConfig extends IndexConfig {
   public static final double DEFAULT_DENSE_KEY_MIN_FILL_RATE = 0.5;
   /// Default `maxDenseKeys`. `-1` means unlimited.
   public static final int DEFAULT_MAX_DENSE_KEYS = -1;
+  /// Default `maxNestedKeyDepth`. `1` leaves nested objects untouched.
+  public static final int DEFAULT_MAX_NESTED_KEY_DEPTH = OpenStructKeyFlattener.NO_FLATTENING;
   private static final String INVERTED_INDEX_KEY = "inverted";
 
   private final FieldConfig _defaultValueFieldConfig;
@@ -62,8 +85,12 @@ public class OpenStructIndexConfig extends IndexConfig {
   private final double _denseKeyMinFillRate;
   private final List<FieldConfig> _valueFieldConfigs;
   private final boolean _sparseJsonIndex;
+  /// Index settings for the shared sparse blob column, shaped like a [FieldConfig] for any other column.
+  @Nullable
+  private final FieldConfig _sparseFieldConfig;
   private final boolean _perKeyMetricsEnabled;
   private final Set<String> _ignoredKeys;
+  private final int _maxNestedKeyDepth;
   // Eager lookup from key name → FieldConfig for O(1) per-key access. Built in constructor
   // so the config is fully immutable and safe to share across threads.
   private final Map<String, FieldConfig> _valueFieldConfigIndex;
@@ -103,6 +130,29 @@ public class OpenStructIndexConfig extends IndexConfig {
         sparseJsonIndex, perKeyMetricsEnabled, null);
   }
 
+  /// @deprecated Use the 10-arg constructor accepting `maxNestedKeyDepth`. Kept for binary
+  /// compatibility with existing callers built against the pre-`maxNestedKeyDepth` signature.
+  @Deprecated
+  public OpenStructIndexConfig(Boolean disabled, @Nullable FieldConfig defaultValueFieldConfig,
+      @Nullable Integer maxDenseKeys, @Nullable Set<String> denseKeys, @Nullable Double denseKeyMinFillRate,
+      @Nullable List<FieldConfig> valueFieldConfigs, @Nullable Boolean sparseJsonIndex,
+      @Nullable Boolean perKeyMetricsEnabled, @Nullable Set<String> ignoredKeys) {
+    this(disabled, defaultValueFieldConfig, maxDenseKeys, denseKeys, denseKeyMinFillRate, valueFieldConfigs,
+        sparseJsonIndex, perKeyMetricsEnabled, ignoredKeys, null);
+  }
+
+  /// @deprecated Use the 11-arg constructor accepting `sparseFieldConfig`. Kept for binary compatibility with
+  /// callers built against the pre-`sparseFieldConfig` signature.
+  @Deprecated
+  public OpenStructIndexConfig(Boolean disabled, @Nullable FieldConfig defaultValueFieldConfig,
+      @Nullable Integer maxDenseKeys, @Nullable Set<String> denseKeys, @Nullable Double denseKeyMinFillRate,
+      @Nullable List<FieldConfig> valueFieldConfigs, @Nullable Boolean sparseJsonIndex,
+      @Nullable Boolean perKeyMetricsEnabled, @Nullable Set<String> ignoredKeys,
+      @Nullable Integer maxNestedKeyDepth) {
+    this(disabled, defaultValueFieldConfig, maxDenseKeys, denseKeys, denseKeyMinFillRate, valueFieldConfigs,
+        sparseJsonIndex, perKeyMetricsEnabled, ignoredKeys, maxNestedKeyDepth, null);
+  }
+
   @JsonCreator
   public OpenStructIndexConfig(
       @JsonProperty("disabled") Boolean disabled,
@@ -113,8 +163,11 @@ public class OpenStructIndexConfig extends IndexConfig {
       @JsonProperty("valueFieldConfigs") @Nullable List<FieldConfig> valueFieldConfigs,
       @JsonProperty("sparseJsonIndex") @Nullable Boolean sparseJsonIndex,
       @JsonProperty("perKeyMetricsEnabled") @Nullable Boolean perKeyMetricsEnabled,
-      @JsonProperty("ignoredKeys") @Nullable Set<String> ignoredKeys) {
+      @JsonProperty("ignoredKeys") @Nullable Set<String> ignoredKeys,
+      @JsonProperty("maxNestedKeyDepth") @Nullable Integer maxNestedKeyDepth,
+      @JsonProperty("sparseFieldConfig") @Nullable FieldConfig sparseFieldConfig) {
     super(disabled);
+    _sparseFieldConfig = sparseFieldConfig;
     _defaultValueFieldConfig = defaultValueFieldConfig;
     _maxDenseKeys = maxDenseKeys != null ? maxDenseKeys : DEFAULT_MAX_DENSE_KEYS;
     _denseKeys = denseKeys;
@@ -123,6 +176,11 @@ public class OpenStructIndexConfig extends IndexConfig {
     _sparseJsonIndex = sparseJsonIndex != null && sparseJsonIndex;
     _perKeyMetricsEnabled = perKeyMetricsEnabled != null && perKeyMetricsEnabled;
     _ignoredKeys = ignoredKeys;
+    // Clamped rather than rejected: a depth below 1 has no meaning, and the only sane reading of it
+    // is "do not flatten", which is exactly what 1 does.
+    _maxNestedKeyDepth = maxNestedKeyDepth != null
+        ? Math.max(OpenStructKeyFlattener.NO_FLATTENING, maxNestedKeyDepth)
+        : DEFAULT_MAX_NESTED_KEY_DEPTH;
     if (valueFieldConfigs == null || valueFieldConfigs.isEmpty()) {
       _valueFieldConfigIndex = Map.of();
     } else {
@@ -209,6 +267,17 @@ public class OpenStructIndexConfig extends IndexConfig {
     return _sparseJsonIndex;
   }
 
+  /// Index settings for the shared sparse blob column, or null when the table asked for none.
+  ///
+  /// The blob is a single-value STRING column holding each row's unshredded keys as a JSON document, so any index
+  /// that reads JSON out of a STRING column applies to it. `sparseJsonIndex: true` is the older spelling of
+  /// asking for a JSON index here and still works.
+  @JsonProperty("sparseFieldConfig")
+  @Nullable
+  public FieldConfig getSparseFieldConfig() {
+    return _sparseFieldConfig;
+  }
+
   /// When `true`, `OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT` is emitted for every key present in the
   /// sealed segment — dense, sparse, configured, or discovered. The cost is that the number of
   /// metrics-registry entries follows the ingested key space, and table deletion can only sweep keys
@@ -223,6 +292,12 @@ public class OpenStructIndexConfig extends IndexConfig {
   /// keys that shouldn't be persisted at all (e.g. debug/internal fields). Not retroactive —
   /// changing this only affects data ingested after the change; already-sealed segments are
   /// unaffected.
+  /// Maximum number of path segments a nested key is flattened to. `1` (the default) leaves a
+  /// nested object as a single key; see [OpenStructKeyFlattener].
+  public int getMaxNestedKeyDepth() {
+    return _maxNestedKeyDepth;
+  }
+
   public Set<String> getIgnoredKeys() {
     return _ignoredKeys != null ? _ignoredKeys : Set.of();
   }

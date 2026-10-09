@@ -127,6 +127,12 @@ public class RequestUtilsTest {
     assertEquals(RequestUtils.getBytesArrayValue(expression.getLiteral()), expected);
 
     expression = CalciteSqlParser.compileToPinotQuery(
+        "SELECT ARRAY['\\x00'::bytea, CAST('\\xDEADBEEF' AS BYTEA)] FROM myTable").getSelectList().get(0);
+    assertTrue(expression.isSetLiteral());
+    assertTrue(expression.getLiteral().isSetBytesArrayValue());
+    assertEquals(RequestUtils.getBytesArrayValue(expression.getLiteral()), expected);
+
+    expression = CalciteSqlParser.compileToPinotQuery(
         "SELECT ARRAYS_OVERLAP(ARRAY[X'00', X'0102'], ARRAY[X'03', X'0102'])").getSelectList().get(0);
     assertTrue(expression.isSetLiteral());
     assertTrue(expression.getLiteral().getBoolValue());

@@ -25,7 +25,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public class NotDocIdSet implements BlockDocIdSet {
+public final class NotDocIdSet implements BlockDocIdSet {
   private final BlockDocIdSet _childDocIdSet;
   private final int _numDocs;
 

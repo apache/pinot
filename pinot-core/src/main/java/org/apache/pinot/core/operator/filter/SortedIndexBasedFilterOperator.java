@@ -66,7 +66,7 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
       int startDocId = _sortedIndexReader.getDocIds(rangePredicateEvaluator.getStartDictId()).getLeft();
       // NOTE: End dictionary id is exclusive in OfflineDictionaryBasedRangePredicateEvaluator.
       int endDocId = _sortedIndexReader.getDocIds(rangePredicateEvaluator.getEndDictId() - 1).getRight();
-      return new SortedDocIdSet(List.of(new IntPair(startDocId, endDocId)));
+      return SortedDocIdSet.create(List.of(new IntPair(startDocId, endDocId)));
     } else {
       boolean exclusive = _predicateEvaluator.isExclusive();
       int[] dictIds =
@@ -87,9 +87,9 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
           if (lastDocId < _numDocs - 1) {
             docIdRanges.add(new IntPair(lastDocId + 1, _numDocs - 1));
           }
-          return new SortedDocIdSet(docIdRanges);
+          return SortedDocIdSet.create(docIdRanges);
         } else {
-          return new SortedDocIdSet(List.of(docIdRange));
+          return SortedDocIdSet.create(List.of(docIdRange));
         }
       } else {
         // Merge adjacent docIdRanges (dictIds are already sorted)
@@ -127,7 +127,7 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
           docIdRanges = invertedDocIdRanges;
         }
 
-        return new SortedDocIdSet(docIdRanges);
+        return SortedDocIdSet.create(docIdRanges);
       }
     }
   }

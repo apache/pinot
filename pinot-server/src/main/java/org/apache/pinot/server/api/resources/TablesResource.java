@@ -104,6 +104,9 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.upsert.DocIdsSnapshot;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager.SnapshotPass;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -252,7 +255,9 @@ public class TablesResource {
 
             Set<String> allSegmentColumns = segmentMetadata.getAllColumns();
             if (columnSet == null) {
-              columnSet = allSegmentColumns;
+              // Copy: getAllColumns() is a view of the segment's own columns, and retainAll below would otherwise
+              // narrow the first segment's metadata rather than the running intersection.
+              columnSet = new HashSet<>(allSegmentColumns);
             } else {
               columnSet.retainAll(allSegmentColumns);
             }
@@ -554,7 +559,7 @@ public class TablesResource {
     try {
       Map<String, String> segmentCrcForTable = new HashMap<>();
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        segmentCrcForTable.put(segmentDataManager.getSegmentName(), segmentDataManager.getCrc());
+        segmentCrcForTable.put(segmentDataManager.getSegmentName(), Long.toString(segmentDataManager.getCrc()));
       }
       return ResourceUtils.convertToJsonString(segmentCrcForTable);
     } catch (Exception e) {
@@ -660,10 +665,11 @@ public class TablesResource {
       }
       ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
 
-      final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdsSnapshotPair =
+      final Pair<ValidDocIdsType, DocIdsSnapshot> validDocIdsSnapshotPair =
           getValidDocIds(indexSegment, validDocIdsType);
       ValidDocIdsType finalValidDocIdsType = validDocIdsSnapshotPair.getLeft();
-      MutableRoaringBitmap validDocIdSnapshot = validDocIdsSnapshotPair.getRight();
+      MutableRoaringBitmap validDocIdSnapshot =
+          validDocIdsSnapshotPair.getRight() != null ? validDocIdsSnapshotPair.getRight().docIds() : null;
 
       if (validDocIdSnapshot == null) {
         String msg = String.format(
@@ -674,7 +680,7 @@ public class TablesResource {
         throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
       }
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
-      return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
+      return new ValidDocIdsBitmapResponse(segmentName, Long.toString(indexSegment.getSegmentMetadata().getCrc()),
           toReportableDataCrc(indexSegment.getSegmentMetadata().getDataCrc()), finalValidDocIdsType, validDocIdsBytes,
           _serverInstance.getInstanceDataManager().getInstanceId(), status);
     } finally {
@@ -743,10 +749,11 @@ public class TablesResource {
           continue;
         }
 
-        final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdSnapshotPair =
+        final Pair<ValidDocIdsType, DocIdsSnapshot> validDocIdSnapshotPair =
             getValidDocIds(indexSegment, validDocIdsType);
         String finalValidDocIdsType = validDocIdSnapshotPair.getLeft().toString();
-        MutableRoaringBitmap validDocIdsSnapshot = validDocIdSnapshotPair.getRight();
+        DocIdsSnapshot snapshot = validDocIdSnapshotPair.getRight();
+        MutableRoaringBitmap validDocIdsSnapshot = snapshot != null ? snapshot.docIds() : null;
         if (validDocIdsSnapshot == null) {
           if (LOGGER.isDebugEnabled()) {
             String msg = String.format(
@@ -760,6 +767,9 @@ public class TablesResource {
         }
 
         Map<String, Object> validDocIdsMetadata = new HashMap<>();
+        if (snapshot.metadata() != null) {
+          validDocIdsMetadata.put("diagnostics", snapshot.metadata().toResponse(System.currentTimeMillis()));
+        }
         int totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
         int totalValidDocs = validDocIdsSnapshot.getCardinality();
         int totalInvalidDocs = totalDocs - totalValidDocs;
@@ -767,7 +777,7 @@ public class TablesResource {
         validDocIdsMetadata.put("totalDocs", totalDocs);
         validDocIdsMetadata.put("totalValidDocs", totalValidDocs);
         validDocIdsMetadata.put("totalInvalidDocs", totalInvalidDocs);
-        validDocIdsMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
+        validDocIdsMetadata.put("segmentCrc", Long.toString(indexSegment.getSegmentMetadata().getCrc()));
         String reportableDataCrc = toReportableDataCrc(indexSegment.getSegmentMetadata().getDataCrc());
         if (reportableDataCrc != null) {
           validDocIdsMetadata.put("segmentDataCrc", reportableDataCrc);
@@ -780,6 +790,20 @@ public class TablesResource {
               ((ImmutableSegment) segmentDataManager.getSegment()).getSegmentSizeBytes());
         }
         validDocIdsMetadata.put("segmentCreationTimeMillis", indexSegment.getSegmentMetadata().getIndexCreationTime());
+        ValidDocIdsType resolvedValidDocIdsType = validDocIdSnapshotPair.getLeft();
+        if (resolvedValidDocIdsType == ValidDocIdsType.SNAPSHOT
+            || resolvedValidDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
+          // Lets a caller tell whether two replicas' snapshot files of this partition can be compared
+          PartitionUpsertMetadataManager partitionUpsertMetadataManager =
+              ((ImmutableSegmentImpl) indexSegment).getPartitionUpsertMetadataManager();
+          SnapshotPass snapshotPass =
+              partitionUpsertMetadataManager != null ? partitionUpsertMetadataManager.getLastSnapshotPass() : null;
+          if (snapshotPass != null) {
+            validDocIdsMetadata.put("snapshotPass", Map.of("segmentsCrc", snapshotPass.segmentsCrc(),
+                "numSegments", snapshotPass.numSegments(), "consistent", snapshotPass.consistent(), "finishedAtMs",
+                snapshotPass.finishedAtMs()));
+          }
+        }
         allValidDocIdsMetadata.add(validDocIdsMetadata);
       }
       if (nonImmutableSegmentCount > 0) {
@@ -801,36 +825,38 @@ public class TablesResource {
 
   /// The segment's data CRC to report, or null when unavailable (negative).
   @Nullable
-  private static String toReportableDataCrc(String dataCrc) {
-    return dataCrc != null && Long.parseLong(dataCrc) >= 0 ? dataCrc : null;
+  private static String toReportableDataCrc(long dataCrc) {
+    return dataCrc >= 0 ? Long.toString(dataCrc) : null;
   }
 
-  private Pair<ValidDocIdsType, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment,
+  private Pair<ValidDocIdsType, DocIdsSnapshot> getValidDocIds(IndexSegment indexSegment,
       String validDocIdsTypeStr) {
     if (validDocIdsTypeStr == null) {
       // By default, we read the valid doc ids from snapshot.
       return Pair.of(ValidDocIdsType.SNAPSHOT,
-          ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+          ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     }
     ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
     switch (validDocIdsType) {
       case SNAPSHOT:
         return Pair.of(validDocIdsType,
-            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
       case SNAPSHOT_WITH_DELETE:
         return Pair.of(validDocIdsType,
-            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(
                 V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
       case IN_MEMORY:
-        return Pair.of(validDocIdsType, indexSegment.getValidDocIds().getMutableRoaringBitmap());
+        return Pair.of(validDocIdsType,
+            new DocIdsSnapshot(indexSegment.getValidDocIds().getMutableRoaringBitmap(), null));
       case IN_MEMORY_WITH_DELETE:
-        return Pair.of(validDocIdsType, indexSegment.getQueryableDocIds().getMutableRoaringBitmap());
+        return Pair.of(validDocIdsType,
+            new DocIdsSnapshot(indexSegment.getQueryableDocIds().getMutableRoaringBitmap(), null));
       default:
         // By default, we read the valid doc ids from snapshot.
         LOGGER.warn("Invalid validDocIdsType: {}. Using default validDocIdsType: {}", validDocIdsType,
             ValidDocIdsType.SNAPSHOT);
         return Pair.of(ValidDocIdsType.SNAPSHOT,
-            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     }
   }
 
@@ -973,8 +999,8 @@ public class TablesResource {
       String downloadUrl = uploadSegment(segmentTarFile, realtimeTableNameWithType, segmentName, timeoutMs);
       return new TableLLCSegmentUploadResponse(
           segmentName,
-          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getCrc()),
-          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getDataCrc()),
+          segmentDataManager.getSegment().getSegmentMetadata().getCrc(),
+          segmentDataManager.getSegment().getSegmentMetadata().getDataCrc(),
           downloadUrl);
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
@@ -1202,7 +1228,7 @@ public class TablesResource {
                 String invalidReason = String.format(
                     "Segment %s is in ONLINE state, but segmentDataManager is null", segmentName);
                 return new TableSegmentValidationInfo(false, invalidReason, -1);
-              } else if (!segmentDataManager.getCrc().equals(String.valueOf(zkMetadata.getCrc()))) {
+              } else if (segmentDataManager.getCrc() != zkMetadata.getCrc()) {
                 String invalidReason = String.format(
                     "Segment %s is in ONLINE state, but has CRC mismatch. "
                         + "zk_metadata_crc=%s, segment_data_manager_crc=%s",

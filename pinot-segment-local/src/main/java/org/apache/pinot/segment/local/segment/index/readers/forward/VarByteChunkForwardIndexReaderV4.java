@@ -290,7 +290,8 @@ public class VarByteChunkForwardIndexReaderV4
     }
 
     public byte[] getValue(int docId) {
-      if (docId >= _docIdOffset && docId < _nextDocIdOffset) {
+      // A huge chunk holds a single value without the regular chunk header, so it is read again on every access
+      if (_regularChunk && docId >= _docIdOffset && docId < _nextDocIdOffset) {
         return readSmallUncompressedValue(docId);
       } else {
         try {

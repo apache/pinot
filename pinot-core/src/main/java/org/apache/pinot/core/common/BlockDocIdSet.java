@@ -38,6 +38,10 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 /// The `BlockDocIdSet` contains the matching document ids returned by the
 /// [org.apache.pinot.core.operator.blocks.FilterBlock].
+///
+/// A result known to be empty is represented as an [EmptyDocIdSet], so that a parent can recognize it by type and
+/// short-circuit. The index-based implementations are built only through a `create` factory, which returns one for
+/// an empty input.
 public interface BlockDocIdSet {
 
   /// Returns an iterator of the matching document ids. The document ids returned from the iterator should be in
@@ -47,14 +51,6 @@ public interface BlockDocIdSet {
   /// Returns the number of entries (SV value contains one entry, MV value contains multiple entries) scanned in the
   /// filtering phase. This method should be called after the filtering is done.
   long getNumEntriesScannedInFilter();
-
-
-
-  /// Returns an optimized version of this DocIdSet, potentially returning EmptyDocIdSet or MatchAllDocIdSet
-  /// when appropriate, following the same pattern as filter operators.
-  default BlockDocIdSet getOptimizedDocIdSet() {
-    return this;
-  }
 
   /// Returns whether evaluating this DocIdSet costs time proportional to the number of documents it is asked about,
   /// i.e. whether the subtree still has a scan- or expression-based predicate left to evaluate.
@@ -146,19 +142,19 @@ public interface BlockDocIdSet {
     // TODO: This scan is not counted in the execution stats
     if (docIdIterator instanceof ScanBasedDocIdIterator || docIdIterator instanceof AndDocIdIterator
         || docIdIterator instanceof OrDocIdIterator) {
-      return new RangelessBitmapDocIdSet(collect(docIdIterator));
+      return RangelessBitmapDocIdSet.create(collect(docIdIterator));
     }
 
     // NOTE: AND and OR DocIdSet might return BitmapBasedDocIdIterator after processing the iterators. Create a new
     //       DocIdSet to prevent processing the iterators again
     if (docIdIterator instanceof RangelessBitmapDocIdIterator) {
-      return new RangelessBitmapDocIdSet((RangelessBitmapDocIdIterator) docIdIterator);
+      return RangelessBitmapDocIdSet.create((RangelessBitmapDocIdIterator) docIdIterator);
     }
     if (docIdIterator instanceof BitmapDocIdIterator) {
-      return new BitmapDocIdSet((BitmapDocIdIterator) docIdIterator);
+      return BitmapDocIdSet.create((BitmapDocIdIterator) docIdIterator);
     }
     if (docIdIterator instanceof EmptyDocIdIterator) {
-      return EmptyDocIdSet.getInstance();
+      return EmptyDocIdSet.unscanned();
     }
 
     return this;

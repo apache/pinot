@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import java.nio.ByteBuffer;
 import java.util.Base64;
-import java.util.BitSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
@@ -34,8 +33,6 @@ import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.MessageIdAdv;
 import org.apache.pulsar.client.api.SubscriptionInitialPosition;
-import org.apache.pulsar.client.impl.BatchMessageIdImpl;
-import org.apache.pulsar.client.impl.MessageIdImpl;
 
 
 public class PulsarUtils {
@@ -121,14 +118,13 @@ public class PulsarUtils {
     int batchSize = messageIdAdv.getBatchSize();
     if (batchSize > 0) {
       int batchIndex = messageIdAdv.getBatchIndex();
-      BitSet ackSet = messageIdAdv.getAckSet();
       if (batchIndex < batchSize - 1) {
-        return new BatchMessageIdImpl(ledgerId, entryId, partitionIndex, batchIndex + 1, batchSize, ackSet);
+        return new PulsarMessageId(ledgerId, entryId, partitionIndex, batchIndex + 1, batchSize);
       } else {
-        return new BatchMessageIdImpl(ledgerId, entryId + 1, partitionIndex, 0, batchSize, ackSet);
+        return new PulsarMessageId(ledgerId, entryId + 1, partitionIndex, 0, batchSize);
       }
     } else {
-      return new MessageIdImpl(ledgerId, entryId + 1, partitionIndex);
+      return new PulsarMessageId(ledgerId, entryId + 1, partitionIndex);
     }
   }
 

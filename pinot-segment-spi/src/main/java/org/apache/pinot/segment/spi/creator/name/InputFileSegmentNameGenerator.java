@@ -31,13 +31,10 @@ import org.slf4j.LoggerFactory;
 
 
 /// Segment name generator that supports defining the segment name based on the input file name and path, via a pattern
-/// (matched against the input file URI) and a template (currently only supports ${filePathPattern:\N}, where N is the
-/// group match number from the regex).
-@SuppressWarnings("serial")
+/// (matched against the input file URI) and a template (currently only supports `${filePathPattern:\N}`, where N is the
+/// group match number from the regex). The template must reference at least one match group of the pattern.
 public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(InputFileSegmentNameGenerator.class);
-
   private static final String PARAMETER_TEMPLATE = "${filePathPattern:\\%d}";
 
   private final Pattern _filePathPattern;
@@ -59,8 +56,12 @@ public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
       throw new IllegalArgumentException(
           String.format("Invalid filePathPattern: %s for InputFileSegmentNameGenerator", filePathPattern), e);
     }
-    Preconditions
-        .checkArgument(segmentNameTemplate != null, "Missing segmentNameTemplate for InputFileSegmentNameGenerator");
+    Preconditions.checkArgument(segmentNameTemplate != null,
+        "Missing segmentNameTemplate for InputFileSegmentNameGenerator");
+    Preconditions.checkArgument(referencesMatchGroup(segmentNameTemplate, _filePathPattern),
+        "Invalid segmentNameTemplate: %s for InputFileSegmentNameGenerator, it must reference a match group of "
+            + "filePathPattern: %s via ${filePathPattern:\\N} (in a table config, escape it as $${filePathPattern:\\N} "
+            + "to skip environment variable resolution)", segmentNameTemplate, filePathPattern);
     _segmentNameTemplate = segmentNameTemplate;
     try {
       _inputFileUri = new URI(inputFileUri);
@@ -72,13 +73,23 @@ public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
     _segmentName = makeSegmentName();
   }
 
+  private static boolean referencesMatchGroup(String segmentNameTemplate, Pattern filePathPattern) {
+    int groupCount = filePathPattern.matcher("").groupCount();
+    for (int i = 1; i <= groupCount; i++) {
+      if (segmentNameTemplate.contains(String.format(PARAMETER_TEMPLATE, i))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private String makeSegmentName() {
     String inputFilePath = _inputFileUri.getPath();
     Matcher m = _filePathPattern.matcher(inputFilePath);
     String segmentName;
 
     if (!m.matches()) {
-      LOGGER.warn(String.format("No match for pattern '%s' in '%s'", _filePathPattern, inputFilePath));
+      LOGGER.warn("No match for pattern '{}' in '{}'", _filePathPattern, inputFilePath);
       segmentName = safeConvertPathToFilename(inputFilePath);
     } else {
       segmentName = _segmentNameTemplate;
@@ -99,10 +110,10 @@ public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
   }
 
   private String safeConvertPathToFilename(String inputFilePath) {
-    // Strip of leading '/' characters
-    inputFilePath = inputFilePath.replaceFirst("^[/]+", "");
-    // Try to create a valid filename by removing any '/' or '.' chars with '_'
-    return inputFilePath.replaceAll("[/\\.]", "_");
+    // Strip off leading '/' characters
+    inputFilePath = inputFilePath.replaceFirst("^/+", "");
+    // Try to create a valid filename by replacing any '/' or '.' chars with '_'
+    return inputFilePath.replaceAll("[/.]", "_");
   }
 
   @Override

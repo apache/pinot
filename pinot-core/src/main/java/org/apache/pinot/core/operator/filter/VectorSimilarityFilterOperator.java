@@ -225,7 +225,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     if (_matches == null) {
       _matches = executeSearch();
     }
-    return new BitmapDocIdSet(_matches, _numDocs);
+    return BitmapDocIdSet.create(_matches, _numDocs);
   }
 
   @Override

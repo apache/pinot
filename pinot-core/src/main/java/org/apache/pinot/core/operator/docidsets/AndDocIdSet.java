@@ -274,7 +274,7 @@ public final class AndDocIdSet implements BlockDocIdSet {
       return new MutableRoaringBitmap();
     }
     List<BlockDocIdSet> docIdSetsWithCandidates = new ArrayList<>(docIdSets.size() + 1);
-    docIdSetsWithCandidates.add(new RangelessBitmapDocIdSet(docIds));
+    docIdSetsWithCandidates.add(RangelessBitmapDocIdSet.create(docIds));
     docIdSetsWithCandidates.addAll(docIdSets);
     BlockDocIdIterator docIdIterator = buildIterator(docIdSetsWithCandidates);
     // buildIterator() returns the merged document ids directly whenever it has no lazy child left, which is the usual
@@ -303,10 +303,5 @@ public final class AndDocIdSet implements BlockDocIdSet {
         docIdSet.release();
       }
     }
-  }
-
-  @Override
-  public BlockDocIdSet getOptimizedDocIdSet() {
-    return this;
   }
 }

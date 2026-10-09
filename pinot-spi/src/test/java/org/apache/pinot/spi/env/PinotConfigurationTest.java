@@ -124,6 +124,36 @@ public class PinotConfigurationTest {
   }
 
   @Test
+  public void assertCommaSeparatedList() {
+    // Unlike values loaded from a map or a file, a value set with setProperty is not split on commas
+    PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty("config.list", "val1, val2,, ,val3,");
+    Assert.assertEquals(pinotConfiguration.getProperty("config.list", List.of()), List.of("val1, val2,, ,val3,"));
+    Assert.assertEquals(pinotConfiguration.getCommaSeparatedList("config.list", List.of()),
+        List.of("val1", "val2", "val3"));
+    // Scalar getters are not affected
+    Assert.assertEquals(pinotConfiguration.getProperty("config.list"), "val1, val2,, ,val3,");
+    Assert.assertEquals(pinotConfiguration.getRawProperty("config.list"), "val1, val2,, ,val3,");
+
+    pinotConfiguration = new PinotConfiguration(Map.of("config.list", "val1, val2,val3"));
+    Assert.assertEquals(pinotConfiguration.getProperty("config.list", List.of()), List.of("val1", "val2", "val3"));
+    Assert.assertEquals(pinotConfiguration.getCommaSeparatedList("config.list", List.of()),
+        List.of("val1", "val2", "val3"));
+
+    pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty("config.list", List.of("val1", "val2, val3"));
+    Assert.assertEquals(pinotConfiguration.getCommaSeparatedList("config.list", List.of()),
+        List.of("val1", "val2", "val3"));
+
+    // The default values are returned when the property is missing or has no values
+    pinotConfiguration.setProperty("config.empty", " , ");
+    Assert.assertEquals(pinotConfiguration.getCommaSeparatedList("config.empty", List.of("default")),
+        List.of("default"));
+    Assert.assertEquals(pinotConfiguration.getCommaSeparatedList("config.missing", List.of("default")),
+        List.of("default"));
+  }
+
+  @Test
   public void assertPropertyPriorities()
       throws IOException {
     Map<String, Object> baseProperties = new HashMap<>();

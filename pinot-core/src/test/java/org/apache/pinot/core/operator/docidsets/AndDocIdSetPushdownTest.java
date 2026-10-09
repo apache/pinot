@@ -96,7 +96,7 @@ public class AndDocIdSetPushdownTest {
 
     CountingScanDocIdSet scan = new CountingScanDocIdSet(scanMatches);
     BlockDocIdSet docIdSet = new AndDocIdSet(
-        List.of(new BitmapDocIdSet(selective, NUM_DOCS), new NotDocIdSet(scan, NUM_DOCS)), null, true);
+        List.of(BitmapDocIdSet.create(selective, NUM_DOCS), new NotDocIdSet(scan, NUM_DOCS)), null, true);
 
     assertEquals(collectDocIds(docIdSet), expected.toArray());
     assertEquals(scan.getNumEntriesScannedInFilter(), selective.getCardinality(),
@@ -117,7 +117,7 @@ public class AndDocIdSetPushdownTest {
 
     // One scan-based branch keeps the OR deferrable, and without an index-based child the outer AND has no seed
     BlockDocIdSet or = new OrDocIdSet(
-        List.of(new BitmapDocIdSet(firstBranch, NUM_DOCS), new CountingScanDocIdSet(secondBranch)), NUM_DOCS);
+        List.of(BitmapDocIdSet.create(firstBranch, NUM_DOCS), new CountingScanDocIdSet(secondBranch)), NUM_DOCS);
     assertTrue(or.isApplyAndDeferrable());
     BlockDocIdSet docIdSet = new AndDocIdSet(List.of(new CountingScanDocIdSet(scanMatches), or), null, true);
 
@@ -144,7 +144,7 @@ public class AndDocIdSetPushdownTest {
     // The candidate bitmap deliberately reaches past numDocs, as a live mutable-segment bitmap can
     MutableRoaringBitmap candidates = new MutableRoaringBitmap();
     candidates.add(0L, 150L);
-    BlockDocIdSet child = new BitmapDocIdSet(MutableRoaringBitmap.bitmapOf(1, 2, 3), numDocs);
+    BlockDocIdSet child = BitmapDocIdSet.create(MutableRoaringBitmap.bitmapOf(1, 2, 3), numDocs);
 
     ImmutableRoaringBitmap docIds = new NotDocIdSet(child, numDocs).applyAnd(candidates);
 
@@ -153,8 +153,8 @@ public class AndDocIdSetPushdownTest {
     assertEquals(docIds.getCardinality(), numDocs - 3);
     // The iterator path is the reference implementation: both must agree
     assertEquals(docIds.toArray(), collectDocIds(new AndDocIdSet(
-        List.of(new BitmapDocIdSet(candidates, numDocs), new NotDocIdSet(
-            new BitmapDocIdSet(MutableRoaringBitmap.bitmapOf(1, 2, 3), numDocs), numDocs)), null, false)));
+        List.of(BitmapDocIdSet.create(candidates, numDocs), new NotDocIdSet(
+            BitmapDocIdSet.create(MutableRoaringBitmap.bitmapOf(1, 2, 3), numDocs), numDocs)), null, false)));
   }
 
   @Test
@@ -177,7 +177,7 @@ public class AndDocIdSetPushdownTest {
     // The first branch matches every candidate, so the second is never evaluated
     ReleaseTrackingDocIdSet skipped = new ReleaseTrackingDocIdSet(range(0, 100));
     BlockDocIdSet or =
-        new OrDocIdSet(List.of(new BitmapDocIdSet(range(0, 100), NUM_DOCS), skipped), NUM_DOCS);
+        new OrDocIdSet(List.of(BitmapDocIdSet.create(range(0, 100), NUM_DOCS), skipped), NUM_DOCS);
 
     or.applyAnd(candidates);
 
@@ -193,14 +193,14 @@ public class AndDocIdSetPushdownTest {
     candidates.add(0L, 150L);
 
     ImmutableRoaringBitmap docIds = new OrDocIdSet(
-        List.of(new BitmapDocIdSet(range(90, 150), numDocs), new CountingScanDocIdSet(range(0, 10))), numDocs)
+        List.of(BitmapDocIdSet.create(range(90, 150), numDocs), new CountingScanDocIdSet(range(0, 10))), numDocs)
         .applyAnd(candidates);
 
     assertTrue(docIds.last() < numDocs, "OR must not emit document ids at or beyond numDocs, but emitted "
         + docIds.last());
     // The iterator path is the reference implementation: both must agree
-    assertEquals(docIds.toArray(), collectDocIds(new AndDocIdSet(List.of(new BitmapDocIdSet(candidates, numDocs),
-        new OrDocIdSet(List.of(new BitmapDocIdSet(range(90, 150), numDocs), new CountingScanDocIdSet(range(0, 10))),
+    assertEquals(docIds.toArray(), collectDocIds(new AndDocIdSet(List.of(BitmapDocIdSet.create(candidates, numDocs),
+        new OrDocIdSet(List.of(BitmapDocIdSet.create(range(90, 150), numDocs), new CountingScanDocIdSet(range(0, 10))),
             numDocs)), null, false)));
   }
 
@@ -259,29 +259,30 @@ public class AndDocIdSetPushdownTest {
   @Test
   public void testOnlyScanBearingSubtreesAreDeferred() {
     BlockDocIdSet indexOnlyOr = new OrDocIdSet(
-        List.of(new BitmapDocIdSet(range(0, 10), NUM_DOCS), new BitmapDocIdSet(range(20, 30), NUM_DOCS)), NUM_DOCS);
+        List.of(BitmapDocIdSet.create(range(0, 10), NUM_DOCS), BitmapDocIdSet.create(range(20, 30), NUM_DOCS)),
+        NUM_DOCS);
     assertFalse(indexOnlyOr.isApplyAndDeferrable(), "An index-only OR gains nothing from a candidate set");
 
     BlockDocIdSet scanBearingOr = new OrDocIdSet(
-        List.of(new BitmapDocIdSet(range(0, 10), NUM_DOCS), new CountingScanDocIdSet(range(20, 30))), NUM_DOCS);
+        List.of(BitmapDocIdSet.create(range(0, 10), NUM_DOCS), new CountingScanDocIdSet(range(20, 30))), NUM_DOCS);
     assertTrue(scanBearingOr.isApplyAndDeferrable());
 
     // The scan two levels down still counts: that is the shape from the issue
-    BlockDocIdSet nested = new OrDocIdSet(List.of(new BitmapDocIdSet(range(0, 10), NUM_DOCS),
-        new AndDocIdSet(List.of(new BitmapDocIdSet(range(20, 30), NUM_DOCS),
+    BlockDocIdSet nested = new OrDocIdSet(List.of(BitmapDocIdSet.create(range(0, 10), NUM_DOCS),
+        new AndDocIdSet(List.of(BitmapDocIdSet.create(range(20, 30), NUM_DOCS),
             new CountingScanDocIdSet(range(20, 30))), null, true)), NUM_DOCS);
     assertTrue(nested.isApplyAndDeferrable());
 
-    assertFalse(new NotDocIdSet(new BitmapDocIdSet(range(0, 10), NUM_DOCS), NUM_DOCS).isApplyAndDeferrable());
+    assertFalse(new NotDocIdSet(BitmapDocIdSet.create(range(0, 10), NUM_DOCS), NUM_DOCS).isApplyAndDeferrable());
     assertTrue(new NotDocIdSet(new CountingScanDocIdSet(range(0, 10)), NUM_DOCS).isApplyAndDeferrable());
   }
 
   private static BlockDocIdSet orBranchTree(boolean pushdownEnabled, BlockDocIdSet scan,
       ImmutableRoaringBitmap selective, ImmutableRoaringBitmap indexedInBranch, ImmutableRoaringBitmap otherBranch) {
     BlockDocIdSet branch =
-        new AndDocIdSet(List.of(new BitmapDocIdSet(indexedInBranch, NUM_DOCS), scan), null, pushdownEnabled);
-    BlockDocIdSet or = new OrDocIdSet(List.of(branch, new BitmapDocIdSet(otherBranch, NUM_DOCS)), NUM_DOCS);
-    return new AndDocIdSet(List.of(new BitmapDocIdSet(selective, NUM_DOCS), or), null, pushdownEnabled);
+        new AndDocIdSet(List.of(BitmapDocIdSet.create(indexedInBranch, NUM_DOCS), scan), null, pushdownEnabled);
+    BlockDocIdSet or = new OrDocIdSet(List.of(branch, BitmapDocIdSet.create(otherBranch, NUM_DOCS)), NUM_DOCS);
+    return new AndDocIdSet(List.of(BitmapDocIdSet.create(selective, NUM_DOCS), or), null, pushdownEnabled);
   }
 
   /// Builds a random filter tree. Two calls with equally seeded [Random] instances build the same tree, which is what
@@ -322,7 +323,7 @@ public class AndDocIdSetPushdownTest {
       case 0:
         return new MatchAllDocIdSet(NUM_DOCS);
       case 1:
-        return EmptyDocIdSet.getInstance();
+        return EmptyDocIdSet.unscanned();
       case 2:
       case 3: {
         // Sorted leaf: inclusive ranges, which applyAnd has to convert to an exclusive upper bound
@@ -334,13 +335,13 @@ public class AndDocIdSetPushdownTest {
           docIdRanges.add(new IntPair(start, end));
           start = end + 2 + random.nextInt(500);
         }
-        return new SortedDocIdSet(docIdRanges);
+        return SortedDocIdSet.create(docIdRanges);
       }
       case 4:
       case 5:
         return new CountingScanDocIdSet(randomBitmap(random));
       default:
-        return new BitmapDocIdSet(randomBitmap(random), NUM_DOCS);
+        return BitmapDocIdSet.create(randomBitmap(random), NUM_DOCS);
     }
   }
 
@@ -358,7 +359,7 @@ public class AndDocIdSetPushdownTest {
   /// conversion in [BlockDocIdSet#applyAnd] against an off-by-one.
   @Test
   public void testSortedLeafRangeBoundariesAreInclusive() {
-    BlockDocIdSet sorted = new SortedDocIdSet(List.of(new IntPair(10, 20), new IntPair(30, 30)));
+    BlockDocIdSet sorted = SortedDocIdSet.create(List.of(new IntPair(10, 20), new IntPair(30, 30)));
     MutableRoaringBitmap candidates = MutableRoaringBitmap.bitmapOf(9, 10, 20, 21, 29, 30, 31);
 
     assertEquals(sorted.applyAnd(candidates).toArray(), new int[]{10, 20, 30});

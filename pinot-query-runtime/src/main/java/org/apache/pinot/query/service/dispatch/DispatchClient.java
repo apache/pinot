@@ -37,6 +37,7 @@ import org.apache.pinot.query.grpc.GrpcKeepAliveConfig;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.service.dispatch.streaming.StreamingDispatchObserver;
 import org.apache.pinot.query.service.dispatch.streaming.StreamingQuerySession;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /// Dispatches a query plan to given a [QueryServerInstance]. Each [DispatchClient] has its own gRPC Channel
@@ -48,11 +49,6 @@ class DispatchClient {
   /// Shared buffer allocator configured to prefer direct (off-heap) buffers for better performance.
   /// Using a static allocator allows for better memory pooling across all DispatchClient instances.
   private static final PooledByteBufAllocator BUF_ALLOCATOR = new PooledByteBufAllocator(true);
-  /// Max size of an inbound message on the broker's dispatch channel. The default gRPC limit is 4 MB, but a single
-  /// `SubmitWithStream` `OpChainComplete` can carry a large [Worker.MultiStageStatsTree] (wide/deep
-  /// plans, large STRING stats), and exceeding the limit fails the whole query with `RESOURCE_EXHAUSTED` even
-  /// though the query results are already in hand. Matches the server's inbound limit (`QueryServer`).
-  private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
 
   private final ManagedChannel _channel;
   private final PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
@@ -67,11 +63,21 @@ class DispatchClient {
 
   DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig, @Nullable SslContext sslContext,
       GrpcKeepAliveConfig keepAliveConfig) {
+    this(host, port, tlsConfig, sslContext, keepAliveConfig,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES);
+  }
+
+  /// @param maxInboundMessageSizeBytes Max size of an inbound message on the broker's dispatch channel. The default
+  ///     gRPC limit is 4 MB, but a single `SubmitWithStream` `OpChainComplete` can carry a large
+  ///     [Worker.MultiStageStatsTree] (wide/deep plans, large STRING stats), and the plans servers return for
+  ///     `EXPLAIN` carry the query's literals. Exceeding the limit fails the whole query with `RESOURCE_EXHAUSTED`.
+  DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig, @Nullable SslContext sslContext,
+      GrpcKeepAliveConfig keepAliveConfig, int maxInboundMessageSizeBytes) {
     // Always use NettyChannelBuilder to allow setting Netty-specific channel options like the buffer allocator.
     // This ensures we can explicitly configure direct (off-heap) buffers for better performance.
     NettyChannelBuilder channelBuilder = NettyChannelBuilder.forAddress(host, port)
         .withOption(ChannelOption.ALLOCATOR, BUF_ALLOCATOR)
-        .maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE);
+        .maxInboundMessageSize(maxInboundMessageSizeBytes);
     if (tlsConfig == null) {
       channelBuilder.usePlaintext();
     } else {

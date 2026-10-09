@@ -28,11 +28,18 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
+import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
 
 
 public class ArrayAggDistinctBigDecimalFunction extends BaseArrayAggBigDecimalFunction<ObjectSet<BigDecimal>> {
   public ArrayAggDistinctBigDecimalFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
+  }
+
+  @Override
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    return true;
   }
 
   @Override
@@ -42,6 +49,18 @@ public class ArrayAggDistinctBigDecimalFunction extends BaseArrayAggBigDecimalFu
     ObjectOpenHashSet<BigDecimal> valueSet =
         aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult()
             : new ObjectOpenHashSet<>(length);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set to merge in.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueSet.addAll(ObjectSerDeUtils.BIG_DECIMAL_SET_SER_DE.deserialize(starTreeSetPayload(bytesValues[i],
+              ElementType.BIG_DECIMAL)));
+        }
+      });
+      aggregationResultHolder.setValue(valueSet);
+      return;
+    }
     if (blockValSet.isSingleValue()) {
       BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {

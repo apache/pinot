@@ -218,9 +218,4 @@ public final class OrDocIdSet implements BlockDocIdSet {
       }
     }
   }
-
-  @Override
-  public BlockDocIdSet getOptimizedDocIdSet() {
-    return this;
-  }
 }

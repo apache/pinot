@@ -159,8 +159,8 @@ public class BenchmarkAndRestrictionPushdown {
   private BlockDocIdSet buildFilter() {
     BlockDocIdSet orDocIdSet;
     if ("INDEXED_OR".equals(_shape)) {
-      orDocIdSet = new OrDocIdSet(List.of(new BitmapDocIdSet(_firstBranchDocIds, NUM_DOCS),
-          new BitmapDocIdSet(_secondBranchDocIds, NUM_DOCS)), NUM_DOCS);
+      orDocIdSet = new OrDocIdSet(List.of(BitmapDocIdSet.create(_firstBranchDocIds, NUM_DOCS),
+          BitmapDocIdSet.create(_secondBranchDocIds, NUM_DOCS)), NUM_DOCS);
     } else if ("SCAN_ONLY_OR".equals(_shape)) {
       // No index-based sibling inside the branches, so without the push-down the OR stays lazy and a LIMIT really
       // does stop early. This is the shape AUTO exists to protect.
@@ -168,11 +168,11 @@ public class BenchmarkAndRestrictionPushdown {
     } else {
       // The reported shape: a scan sits next to an index-based predicate inside an OR branch
       BlockDocIdSet branch = new AndDocIdSet(
-          List.of(new BitmapDocIdSet(_firstBranchDocIds, NUM_DOCS), newScanDocIdSet()), null, _pushdown);
+          List.of(BitmapDocIdSet.create(_firstBranchDocIds, NUM_DOCS), newScanDocIdSet()), null, _pushdown);
       orDocIdSet =
-          new OrDocIdSet(List.of(branch, new BitmapDocIdSet(_secondBranchDocIds, NUM_DOCS)), NUM_DOCS);
+          new OrDocIdSet(List.of(branch, BitmapDocIdSet.create(_secondBranchDocIds, NUM_DOCS)), NUM_DOCS);
     }
-    return new AndDocIdSet(List.of(new BitmapDocIdSet(_candidateDocIds, NUM_DOCS), orDocIdSet), null, _pushdown);
+    return new AndDocIdSet(List.of(BitmapDocIdSet.create(_candidateDocIds, NUM_DOCS), orDocIdSet), null, _pushdown);
   }
 
   private BlockDocIdSet newScanDocIdSet() {

@@ -72,15 +72,15 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   @Override
   protected BlockDocIdSet getTrues() {
     if (_exclusive) {
-      return new BitmapDocIdSet(ImmutableRoaringBitmap.flip(_docIds, 0L, _numDocs), _numDocs);
+      return BitmapDocIdSet.create(ImmutableRoaringBitmap.flip(_docIds, 0L, _numDocs), _numDocs);
     } else {
-      return new BitmapDocIdSet(_docIds, _numDocs);
+      return BitmapDocIdSet.create(_docIds, _numDocs);
     }
   }
 
   @Override
   protected BlockDocIdSet getNulls() {
-    return _nullBitmap != null ? new BitmapDocIdSet(_nullBitmap, _numDocs) : EmptyDocIdSet.getInstance();
+    return _nullBitmap != null ? BitmapDocIdSet.create(_nullBitmap, _numDocs) : EmptyDocIdSet.unscanned();
   }
 
   @Override

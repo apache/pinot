@@ -339,6 +339,10 @@ public class CommonConstants {
   }
 
   public static class Broker {
+    /// Minimum candidate segments for preparing a partition-pruning predicate. A negative value disables preparation.
+    public static final String CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD =
+        "pinot.broker.partition.pruning.preparation.threshold";
+    public static final int DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD = 32;
     public static final String ROUTING_TABLE_CONFIG_PREFIX = "pinot.broker.routing.table";
     public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
     /// Namespace for service credentials used by the broker when invoking Server admin APIs.
@@ -668,6 +672,21 @@ public class CommonConstants {
     public static final String CONFIG_OF_STREAM_STATS_DRAIN_MS = "pinot.broker.mse.stream.stats.drain.ms";
     public static final long DEFAULT_STREAM_STATS_DRAIN_MS = 50L;
 
+    /// Whether a multi-stage query ships its leaf-stage segment lists as native protobuf fields of the worker
+    /// metadata, which skips a JSON encode per leaf-stage worker on the broker and a JSON parse per worker on the
+    /// server, instead of the legacy JSON string custom property.
+    ///
+    /// Ships disabled, and must stay disabled until every server the broker dispatches to runs a version that
+    /// understands the proto fields, including the servers of remote clusters when multi-cluster routing is used: an
+    /// older server finds no segments under them, concludes the worker is not a leaf-stage worker and fails the leaf
+    /// stage. Turn it on once the rolling upgrade has finished.
+    ///
+    /// Read from cluster config as well as from the static broker config, cluster config winning and taking effect on
+    /// the next query, so it can be turned on, and off again, without restarting the brokers. Anything in cluster
+    /// config other than `true` — the key cleared, or a value that is not a boolean — disables it.
+    public static final String CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST = "pinot.broker.mse.enable.proto.segment.list";
+    public static final boolean DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST = false;
+
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
 
@@ -782,6 +801,26 @@ public class CommonConstants {
         "pinot.broker.multistage.sort.exchange.copy.threshold";
     // TODO: Change this default to something very high, as this _optimnization_ is usually not beneficial.
     public static final int DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD = 10_000;
+
+    /// Config for the smallest IN list that the multi-stage planner hides from Calcite's optimizer.
+    ///
+    /// Calcite keeps an IN list as one `SEARCH` call over a sorted range set. Many planner rules and metadata
+    /// handlers rebuild that range set every time they touch the predicate, so planning time grows with the list size
+    /// times the number of touches. IN lists (and `OR` chains of equalities in a filter) with at least this many values
+    /// are sealed into an opaque predicate during optimization and restored afterwards.
+    ///
+    /// Predicates in the same filter or join condition still fold into the list first, as without sealing. Sealed lists
+    /// lose Calcite's value-level reasoning across plan nodes: a predicate that a rule moves next to a sealed list on
+    /// the same column is not merged into it. Null checks keep their meaning: without null handling, Calcite cannot see
+    /// into Pinot's `IS NULL` and `IS NOT NULL` operators, and with null handling the servers apply SQL null semantics.
+    ///
+    /// A value of 0 or less disables sealing. Planning outside the broker's multi-stage request handler (for example
+    /// for the controller `/sql` endpoint) does not read this broker config and uses the default. The query option
+    /// works everywhere.
+    public static final String CONFIG_OF_SEALED_IN_LIST_THRESHOLD = "pinot.broker.multistage.sealed.in.list.threshold";
+    /// Same as the default of Calcite's `SqlToRelConverter.Config#getInSubQueryThreshold()`: the size from which
+    /// Calcite itself stops treating an IN list as a scalar predicate.
+    public static final int DEFAULT_SEALED_IN_LIST_THRESHOLD = 20;
 
     public static class Request {
       public static final String SQL = "sql";
@@ -997,6 +1036,10 @@ public class CommonConstants {
         /// Query-level override for `inpredicate.threshold`. Negative means always prune.
         public static final String IN_PREDICATE_PRUNING_THRESHOLD = "inPredicatePruningThreshold";
 
+        /// Query-level override for the minimum candidate segments needed to prepare the partition-pruning predicate.
+        /// A negative value disables preparation, but does not disable partition pruning itself.
+        public static final String PARTITION_PRUNING_PREPARATION_THRESHOLD = "partitionPruningPreparationThreshold";
+
         // When evaluating REGEXP_LIKE predicate on a dictionary encoded column:
         // - If dictionary size is smaller than this threshold, scan the dictionary to get the matching dictionary ids
         //   first, where inverted index can be applied if exists
@@ -1135,6 +1178,9 @@ public class CommonConstants {
 
         /// Option to customize the value of [Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
         public static final String SORT_EXCHANGE_COPY_THRESHOLD = "sortExchangeCopyThreshold";
+
+        /// Option to customize the value of [Broker#CONFIG_OF_SEALED_IN_LIST_THRESHOLD]
+        public static final String SEALED_IN_LIST_THRESHOLD = "sealedInListThreshold";
 
         // Vector search query options
 
@@ -2942,6 +2988,20 @@ public class CommonConstants {
     public static final String KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS =
         "pinot.query.multistage.query.server.permit.keep.alive.without.calls";
     public static final boolean DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS = false;
+
+    /// Maximum size, in bytes, of a gRPC message the MSE [org.apache.pinot.query.service.server.QueryServer] accepts.
+    /// Must be positive. A message carries the stage plans a broker dispatches to the server, literals included, so
+    /// queries with large literals (e.g. an `IN_ID_SET` IdSet of millions of ids) can need more than the default.
+    public static final String KEY_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES =
+        "pinot.query.multistage.query.server.max.inbound.message.size.bytes";
+    public static final int DEFAULT_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES = 64 * 1024 * 1024;
+
+    /// Maximum size, in bytes, of a gRPC message the broker dispatch channels accept from the MSE query servers, such
+    /// as query stats, or the plans the servers return for `EXPLAIN`, which carry the query's literals. Must be
+    /// positive. See [#KEY_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES] for the messages the servers accept.
+    public static final String KEY_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES =
+        "pinot.query.multistage.dispatch.channel.max.inbound.message.size.bytes";
+    public static final int DEFAULT_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES = 64 * 1024 * 1024;
   }
 
   public static class NullValuePlaceHolder {

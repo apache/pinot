@@ -108,7 +108,7 @@ public class SegmentMetadataImplTest {
 
     JsonNode jsonMeta = metadata.toJson(null);
     assertEquals(jsonMeta.get("segmentName").asText(), metadata.getName());
-    Assert.assertEquals(jsonMeta.get("crc").asLong(), Long.valueOf(metadata.getCrc()).longValue());
+    Assert.assertEquals(jsonMeta.get("crc").asLong(), metadata.getCrc());
     Assert.assertTrue(jsonMeta.get("creatorName").isNull());
     assertEquals(jsonMeta.get("creationTimeMillis").asLong(), metadata.getIndexCreationTime());
     assertEquals(jsonMeta.get("timeColumn").asText(), metadata.getTimeColumn());
@@ -272,8 +272,7 @@ public class SegmentMetadataImplTest {
     assertSame(second.getSchema().getFieldSpecFor(column), second.getColumnMetadataFor(column).getFieldSpec());
   }
 
-  /// A COMPLEX parent is not interned (ComplexFieldSpec does not override equals, so two structs with different
-  /// children would alias), but its children and the materialized child columns are.
+  /// A COMPLEX parent retains its own child map, but its children and the materialized child columns are interned.
   @Test
   public void testOpenStructChildSpecsSharedButParentIsNot()
       throws Exception {

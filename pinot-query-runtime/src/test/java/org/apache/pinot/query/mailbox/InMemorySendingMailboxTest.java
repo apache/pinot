@@ -19,19 +19,57 @@
 package org.apache.pinot.query.mailbox;
 
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.exception.TerminationException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.mockito.Mockito;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
 public class InMemorySendingMailboxTest {
+
+  @Test(dataProvider = "cancellationErrors")
+  public void cancelPreservesQueryErrorCode(Exception exception, QueryErrorCode expectedCode, String expectedMessage) {
+    ReceivingMailbox receivingMailbox = new ReceivingMailbox("test-mailbox", 1);
+    receivingMailbox.registeredReader(mock(ReceivingMailbox.Reader.class));
+    MailboxService mailboxService = mock(MailboxService.class);
+    when(mailboxService.getReceivingMailbox("test-mailbox")).thenReturn(receivingMailbox);
+    InMemorySendingMailbox mailbox = new InMemorySendingMailbox("test-mailbox", mailboxService, Long.MAX_VALUE,
+        new StatMap<>(MailboxSendOperator.StatKey.class));
+
+    mailbox.cancel(exception);
+
+    ErrorMseBlock errorBlock = (ErrorMseBlock) receivingMailbox.poll().getBlock();
+    assertEquals(errorBlock.getErrorMessages(), Map.of(expectedCode, expectedMessage));
+  }
+
+  @DataProvider(name = "cancellationErrors")
+  public Object[][] cancellationErrors() {
+    return new Object[][]{
+        {new QueryException(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED, "CPU limit"),
+            QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED, "CPU limit"},
+        {new TerminationException(QueryErrorCode.EXECUTION_TIMEOUT, "execution timed out"),
+            QueryErrorCode.EXECUTION_TIMEOUT, "execution timed out"},
+        {new QueryException(QueryErrorCode.EXECUTION_TIMEOUT, (String) null),
+            QueryErrorCode.EXECUTION_TIMEOUT, "Unknown"},
+        {new RuntimeException("ordinary cancellation"), QueryErrorCode.QUERY_CANCELLATION,
+            "Cancelled by sender with exception: ordinary cancellation"},
+        {null, QueryErrorCode.QUERY_CANCELLATION, "Cancelled by sender with exception: Unknown"}
+    };
+  }
 
   @Test
   public void sendDataThrowsWhenQueryTerminated() {
@@ -48,5 +86,17 @@ public class InMemorySendingMailboxTest {
       Assert.assertThrows(TerminationException.class, () -> mailbox.send(block));
       Mockito.verifyNoInteractions(mailboxService);
     }
+  }
+
+  @Test
+  public void deliversBlocksByReference() {
+    InMemorySendingMailbox mailbox =
+        new InMemorySendingMailbox("test-mailbox", Mockito.mock(MailboxService.class), Long.MAX_VALUE,
+            new StatMap<>(MailboxSendOperator.StatKey.class));
+
+    // Blocks are offered to the receiving mailbox as they are, so senders that share one block between mailboxes
+    // must give this one a copy. See BroadcastExchange.
+    Assert.assertTrue(mailbox.deliversByReference());
+    Assert.assertTrue(mailbox.isLocal());
   }
 }
