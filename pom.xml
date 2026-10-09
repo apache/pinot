@@ -258,7 +258,13 @@
     <tyrus-standalone-client.version>2.2.2</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
 
+    <!-- DEPRECATED: pinot-spark-3-connector and pinot-batch-ingestion-spark-3 are slated for
+         removal in the next minor release. New users should adopt pinot-spark-4-connector.
+         Spark modules inherit the Java 25 build and runtime baseline; see their READMEs. -->
     <spark3.version>3.5.9</spark3.version>
+    <!-- Spark 4 modules inherit release=${jdk.version} and build unconditionally in the
+         default reactor. Scala 2.13 is required by their module-level enforcer rules. -->
+    <spark4.version>4.1.1</spark4.version>
     <kafka3.version>3.9.2</kafka3.version>
     <kafka4.version>4.2.0</kafka4.version>
     <confluent.version>8.2.0</confluent.version>
