@@ -273,6 +273,23 @@ public class PinotSegmentRestletResourceTest {
   }
 
   @Test
+  public void testUpdateSegmentZKMetadataCustomMapRejectsNestedPath() {
+    String modifier = new SegmentZKMetadataCustomMapModifier(
+        SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Map.of("key", "value")).toJsonString();
+    for (String segmentName : List.of("nested%2Fsegment", "nested%5Csegment", "")) {
+      ControllerApplicationException exception = expectThrows(ControllerApplicationException.class,
+          () -> _pinotSegmentRestletResource.updateSegmentZKMetadataCustomMap("testTable_OFFLINE", segmentName,
+              "123", new ByteArrayInputStream(modifier.getBytes(StandardCharsets.UTF_8)), null));
+      assertEquals(exception.getResponse().getStatus(), 400);
+    }
+    ControllerApplicationException invalidTable = expectThrows(ControllerApplicationException.class,
+        () -> _pinotSegmentRestletResource.updateSegmentZKMetadataCustomMap("nested/table_OFFLINE", "segment",
+            "123", new ByteArrayInputStream(modifier.getBytes(StandardCharsets.UTF_8)), null));
+    assertEquals(invalidTable.getResponse().getStatus(), 400);
+    verify(_pinotHelixResourceManager, never()).getSegmentMetadataZnRecord(any(), any());
+  }
+
+  @Test
   public void testUpdateSegmentZKMetadataCustomMapRejectsConcurrentLockAcquisition() {
     String tableNameWithType = "testTable_OFFLINE";
     String segmentName = "testSegment";

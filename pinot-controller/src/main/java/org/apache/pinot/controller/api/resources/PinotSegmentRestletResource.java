@@ -360,6 +360,10 @@ public class PinotSegmentRestletResource {
       @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     segmentName = decodePathSegment(segmentName);
+    if (tableNameWithType.contains("/") || tableNameWithType.contains("\\") || segmentName.isEmpty()
+        || segmentName.contains("/") || segmentName.contains("\\")) {
+      throw new ControllerApplicationException(LOGGER, "Invalid table or segment path", Status.BAD_REQUEST);
+    }
     if (TableNameBuilder.getTableTypeFromTableName(tableNameWithType) == null) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Table type not provided with table name: %s", tableNameWithType), Status.BAD_REQUEST);
