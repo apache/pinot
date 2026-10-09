@@ -357,24 +357,25 @@ public class AggregateOperatorTest {
   @DataProvider
   public Object[][] orderedGroupTrimCases() {
     return new Object[][]{
-        {"COUNT", null, false},
-        {"COUNT", null, true},
-        {"DISTINCTCOUNT", null, false},
-        {"DISTINCTCOUNT", null, true},
-        {"DISTINCTCOUNTHLL", null, false},
-        {"DISTINCTCOUNTHLL", null, true},
-        {"DISTINCTCOUNTSMARTHLL", null, false},
-        {"DISTINCTCOUNTSMARTHLL", null, true},
-        {"DISTINCTCOUNTSMARTHLL", "threshold=1", false},
-        {"DISTINCTCOUNTSMARTHLL", "threshold=1", true}
+        {"COUNT", null, false, 1},
+        {"COUNT", null, true, 1},
+        {"DISTINCTCOUNT", null, false, 1},
+        {"DISTINCTCOUNT", null, true, 1},
+        {"DISTINCTCOUNTHLL", null, false, 1},
+        {"DISTINCTCOUNTHLL", null, true, 1},
+        {"DISTINCTCOUNTSMARTHLL", null, false, 1},
+        {"DISTINCTCOUNTSMARTHLL", null, true, 1},
+        {"DISTINCTCOUNTSMARTHLL", "threshold=1", false, 1},
+        {"DISTINCTCOUNTSMARTHLL", "threshold=1", true, 1},
+        {"DISTINCTCOUNTHLL", null, false, 10}
     };
   }
 
   @Test(dataProvider = "orderedGroupTrimCases")
   public void testOrderedGroupTrimPreservesIntermediateResults(String functionName, @Nullable String parameters,
-      boolean leafReturnFinalResult) {
-    OpChainExecutionContext context =
-        OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "1"));
+      boolean leafReturnFinalResult, int minGroupTrimSize) {
+    OpChainExecutionContext context = OperatorTestUtil.getContext(
+        Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, Integer.toString(minGroupTrimSize)));
     ColumnDataType finalType = functionName.equals("DISTINCTCOUNTHLL") || functionName.equals("COUNT")
         ? ColumnDataType.LONG
         : INT;
@@ -413,12 +414,14 @@ public class AggregateOperatorTest {
             AggType.FINAL, leafReturnFinalResult, null, 0));
 
     List<Object[]> rows = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
-    assertEquals(rows.size(), 5);
+    assertEquals(rows.size(), minGroupTrimSize == 1 ? 5 : 6);
     Map<Integer, Long> counts = new HashMap<>();
     for (Object[] row : rows) {
       counts.put((Integer) row[0], ((Number) row[1]).longValue());
     }
-    assertEquals(counts, Map.of(2, 4L, 3, 6L, 4, 8L, 5, 10L, 6, 12L));
+    assertEquals(counts, minGroupTrimSize == 1
+        ? Map.of(2, 4L, 3, 6L, 4, 8L, 5, 10L, 6, 12L)
+        : Map.of(1, 2L, 2, 4L, 3, 6L, 4, 8L, 5, 10L, 6, 12L));
     assertTrue(result.nextBlock().isSuccess());
   }
 

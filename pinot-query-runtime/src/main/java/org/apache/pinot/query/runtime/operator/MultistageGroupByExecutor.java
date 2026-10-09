@@ -233,12 +233,15 @@ public class MultistageGroupByExecutor {
           Function.identity());
     }
     SortUtils.SortComparator[] comparators = new SortUtils.SortComparator[numCollations];
+    int[] sortColumnIndexes = new int[numCollations];
     for (int i = 0; i < numCollations; i++) {
-      comparators[i] = new SortUtils.SortComparator(List.of(collations.get(i).withFieldIndex(i)), true);
+      RelFieldCollation collation = collations.get(i);
+      sortColumnIndexes[i] = collation.getFieldIndex();
+      comparators[i] = new SortUtils.SortComparator(List.of(collation.withFieldIndex(i)), true);
     }
     Comparator<SortedRow> comparator = (r1, r2) -> {
       for (int i = 0; i < numCollations; i++) {
-        int index = collations.get(i).getFieldIndex();
+        int index = sortColumnIndexes[i];
         cacheSortValue(r1, i, index, sortFunctions[i]);
         cacheSortValue(r2, i, index, sortFunctions[i]);
         int result = comparators[i].compare(r1.sortKeys(), r2.sortKeys());
