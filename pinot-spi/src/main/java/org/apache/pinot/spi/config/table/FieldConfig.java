@@ -70,6 +70,9 @@ public class FieldConfig extends BaseJsonConfig {
   public static final String TEXT_INDEX_LUCENE_REUSE_MUTABLE_INDEX = "reuseMutableIndex";
   public static final String TEXT_INDEX_LUCENE_NRT_CACHING_DIRECTORY_BUFFER_SIZE =
       "luceneNRTCachingDirectoryMaxBufferSizeMB";
+  // When true, the Lucene text index is built over the column dictionary (one document per distinct value) instead of
+  // one document per row. Requires a dictionary-encoded column; applied to immutable segments only. Defaults to false.
+  public static final String TEXT_INDEX_BUILD_ON_DICTIONARY = "buildOnDictionary";
 
   private final String _name;
   private final EncodingType _encodingType;

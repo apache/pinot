@@ -97,6 +97,11 @@ public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {
       if (textIndexProperties.get("storeInSegmentFile") != null) {
         withStoreInSegmentFile(Boolean.parseBoolean(textIndexProperties.get("storeInSegmentFile")));
       }
+
+      if (textIndexProperties.get(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY) != null) {
+        withBuildOnDictionary(
+            Boolean.parseBoolean(textIndexProperties.get(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY)));
+      }
     }
     return this;
   }
