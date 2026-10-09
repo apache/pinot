@@ -769,6 +769,11 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
+  public static boolean isWindowKWayMerge(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.WINDOW_K_WAY_MERGE);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
   /// Reads the `streamStats` query option that opts a single query into the `SubmitWithStream`
   /// dispatch path. See [QueryOptionKey#STREAM_STATS].
   public static boolean isStreamStats(Map<String, String> queryOptions, boolean defaultValue) {

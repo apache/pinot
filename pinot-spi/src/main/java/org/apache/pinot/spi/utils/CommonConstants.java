@@ -822,6 +822,12 @@ public class CommonConstants {
     /// Calcite itself stops treating an IN list as a scalar predicate.
     public static final int DEFAULT_SEALED_IN_LIST_THRESHOLD = 20;
 
+    /// Whether global ordered windows sort on each sender and merge the ordered streams at the receiver.
+    /// Sender sorting also requires a homogeneous broker/server release build; snapshots retain receiver sorting.
+    public static final String CONFIG_OF_WINDOW_K_WAY_MERGE =
+        "pinot.broker.multistage.window.k.way.merge";
+    public static final boolean DEFAULT_WINDOW_K_WAY_MERGE = false;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String SQL_V1 = "sqlV1";
@@ -1178,6 +1184,9 @@ public class CommonConstants {
 
         /// Option to customize the value of [Broker#CONFIG_OF_SEALED_IN_LIST_THRESHOLD]
         public static final String SEALED_IN_LIST_THRESHOLD = "sealedInListThreshold";
+
+        /// Per-query override of [Broker#CONFIG_OF_WINDOW_K_WAY_MERGE].
+        public static final String WINDOW_K_WAY_MERGE = "windowKWayMerge";
 
         // Vector search query options
 

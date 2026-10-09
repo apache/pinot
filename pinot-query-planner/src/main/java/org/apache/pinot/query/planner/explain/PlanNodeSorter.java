@@ -30,6 +30,7 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -97,6 +98,11 @@ public class PlanNodeSorter {
 
     @Override
     public PlanNode visitMailboxReceive(MailboxReceiveNode node, Comparator<PlanNode> comparator) {
+      return defaultNode(node, comparator);
+    }
+
+    @Override
+    public PlanNode visitMailboxMergeReceive(MailboxMergeReceiveNode node, Comparator<PlanNode> comparator) {
       return defaultNode(node, comparator);
     }
 

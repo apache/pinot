@@ -29,11 +29,13 @@ import org.apache.pinot.core.routing.LogicalTableRouteInfo;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -131,6 +133,13 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   }
 
   @Override
+  public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, DispatchablePlanContext context) {
+    node.getSender().visit(this, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
+    return null;
+  }
+
+  @Override
   public Void visitMailboxSend(MailboxSendNode node, DispatchablePlanContext context) {
     if (_visited.add(node)) {
       node.getInputs().get(0).visit(this, context);
@@ -153,7 +162,7 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
     node.getInputs().get(0).visit(this, context);
     DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
     // Final sort (receives from sort exchange) needs singleton worker
-    boolean isFinalSort = node.getInputs().get(0) instanceof MailboxReceiveNode;
+    boolean isFinalSort = node.getInputs().get(0) instanceof BaseMailboxReceiveNode;
     dispatchablePlanMetadata.setRequireSingleton(isFinalSort);
     return null;
   }

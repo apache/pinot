@@ -56,6 +56,12 @@ public abstract class DefaultPostOrderTraversalVisitor<T, C> implements PlanNode
   }
 
   @Override
+  public T visitMailboxMergeReceive(MailboxMergeReceiveNode node, C context) {
+    node.getSender().visit(this, context);
+    return process(node, context);
+  }
+
+  @Override
   public T visitMailboxSend(MailboxSendNode node, C context) {
     node.getInputs().get(0).visit(this, context);
     return process(node, context);

@@ -36,6 +36,7 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -292,6 +293,17 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
 
   @Override
   public ObjectNode visitMailboxReceive(MailboxReceiveNode node, Context context) {
+    ObjectNode json = selfNode(MultiStageOperator.Type.MAILBOX_RECEIVE, context);
+
+    ArrayNode children = JsonUtils.newArrayNode();
+    int senderStageId = node.getSenderStageId();
+    children.add(_jsonStatsByStage.apply(senderStageId));
+    json.set(CHILDREN_KEY, children);
+    return json;
+  }
+
+  @Override
+  public ObjectNode visitMailboxMergeReceive(MailboxMergeReceiveNode node, Context context) {
     ObjectNode json = selfNode(MultiStageOperator.Type.MAILBOX_RECEIVE, context);
 
     ArrayNode children = JsonUtils.newArrayNode();
