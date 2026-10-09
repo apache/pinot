@@ -47,6 +47,7 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
@@ -501,15 +502,18 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   private void manageSegmentLineageCleanupForTable(TableConfig tableConfig) {
     String tableNameWithType = tableConfig.getTableName();
     List<String> segmentsToDelete = new ArrayList<>();
+    int[] cleanupLineageVersion = {-1};
     long cleanupStartTime = System.currentTimeMillis();
     synchronized (_pinotHelixResourceManager.getLineageUpdaterLock(tableNameWithType)) {
       try {
         DEFAULT_RETRY_POLICY.attempt(() -> {
+          List<String> segmentsToDeleteForAttempt = new ArrayList<>();
           // Fetch segment lineage
           ZNRecord segmentLineageZNRecord =
               SegmentLineageAccessHelper.getSegmentLineageZNRecord(_pinotHelixResourceManager.getPropertyStore(),
                   tableNameWithType);
           if (segmentLineageZNRecord == null) {
+            segmentsToDelete.clear();
             return true;
           }
           LOGGER.info("Start cleaning up segment lineage for table: {}", tableNameWithType);
@@ -518,12 +522,18 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
           List<String> segmentsForTable = _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false);
           _pinotHelixResourceManager.getLineageManager()
-              .updateLineageForRetention(tableConfig, segmentLineage, segmentsForTable, segmentsToDelete,
+              .updateLineageForRetention(tableConfig, segmentLineage, segmentsForTable, segmentsToDeleteForAttempt,
                   _pinotHelixResourceManager.getConsumingSegments(tableNameWithType));
 
           // Write back to the lineage entry
           if (SegmentLineageAccessHelper.writeSegmentLineage(_pinotHelixResourceManager.getPropertyStore(),
               segmentLineage, expectedVersion)) {
+            // Only publish delete candidates derived from the lineage version that was successfully written.
+            // A failed optimistic write can mean another controller added a lineage reference that protects one
+            // of the candidates, so carrying candidates across attempts could delete a now-live segment.
+            segmentsToDelete.clear();
+            segmentsToDelete.addAll(segmentsToDeleteForAttempt);
+            cleanupLineageVersion[0] = expectedVersion + 1;
             return true;
           } else {
             LOGGER.warn("Failed to write segment lineage back when cleaning up segment lineage for table: {}",
@@ -543,9 +553,15 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
     // Delete segments based on the segment lineage
     if (!segmentsToDelete.isEmpty()) {
-      _pinotHelixResourceManager.deleteSegmentsForLineageCleanup(tableNameWithType, segmentsToDelete);
-      LOGGER.info("Finished cleaning up segment lineage for table: {} in {}ms, deleted segments: {}",
-          tableNameWithType, (System.currentTimeMillis() - cleanupStartTime), segmentsToDelete);
+      PinotResourceManagerResponse cleanupResponse = _pinotHelixResourceManager.deleteSegmentsForLineageCleanup(
+          tableNameWithType, segmentsToDelete, cleanupLineageVersion[0]);
+      if (cleanupResponse.isSuccessful()) {
+        LOGGER.info("Finished cleaning up segment lineage for table: {} in {}ms, deleted segments: {}",
+            tableNameWithType, (System.currentTimeMillis() - cleanupStartTime), segmentsToDelete);
+      } else {
+        LOGGER.warn("Skipped segment deletion after lineage cleanup for table: {}. {}", tableNameWithType,
+            cleanupResponse.getMessage());
+      }
     }
     LOGGER.info("Segment lineage metadata clean-up is successfully processed for table: {}", tableNameWithType);
   }

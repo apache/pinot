@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -209,6 +210,7 @@ import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
+import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1136,21 +1138,81 @@ public class PinotHelixResourceManager {
   /// @return Request response
   public PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames,
       @Nullable String retentionPeriod) {
-    return deleteSegmentsInternal(tableNameWithType, segmentNames, retentionPeriod, false);
+    return deleteSegmentsInternal(tableNameWithType, segmentNames, retentionPeriod);
   }
 
-  /// Lineage-aware delete path that skips the cross-check against the live lineage entries. Reserved for callers
-  /// that have already coordinated with the lineage lifecycle: proactive cleanup in `startReplaceSegments`,
-  /// post-revert cleanup in `revertReplaceSegments`, and `RetentionManager`'s lineage-cleanup pass.
+  /// Lineage-aware delete path for callers that have already derived an authorized cleanup batch from a specific
+  /// lineage version. The lineage znode is version-bumped in the same ZooKeeper transaction that removes the
+  /// segments from IdealState. This fences every concurrent lineage mutation: either it commits first and this
+  /// delete is rejected, or this delete commits first and the mutation must retry against the updated lineage and
+  /// IdealState.
+  ///
   /// External call sites (REST handlers, retention based on table config, minion task generators, push-failure
   /// cleanup) must continue to use the public [#deleteSegments] overloads.
+  ///
+  /// @param expectedLineageVersion lineage version used to derive `segmentNames`
   public PinotResourceManagerResponse deleteSegmentsForLineageCleanup(String tableNameWithType,
-      List<String> segmentNames) {
-    return deleteSegmentsInternal(tableNameWithType, segmentNames, null, true);
+      List<String> segmentNames, int expectedLineageVersion) {
+    if (segmentNames.isEmpty()) {
+      return PinotResourceManagerResponse.success("No segments to delete");
+    }
+    try {
+      Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
+          "Table name: %s is not a valid table name with type suffix", tableNameWithType);
+
+      String lineagePath = ZKMetadataProvider.constructPropertyStorePathForSegmentLineage(tableNameWithType);
+      String fullLineagePath = PropertyPathBuilder.propertyStore(_helixClusterName) + lineagePath;
+      PropertyKey idealStateKey = _helixDataAccessor.keyBuilder().idealStates(tableNameWithType);
+
+      for (int attempt = 0; attempt < DEFAULT_SEGMENT_LINEAGE_UPDATE_NUM_RETRY; attempt++) {
+        ZNRecord lineageRecord =
+            SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
+        if (lineageRecord == null || lineageRecord.getVersion() != expectedLineageVersion) {
+          return PinotResourceManagerResponse.failure(
+              "Segment lineage changed before cleanup for table: " + tableNameWithType);
+        }
+
+        IdealState idealState = _helixDataAccessor.getProperty(idealStateKey);
+        if (idealState == null) {
+          return PinotResourceManagerResponse.failure("IdealState does not exist for table: " + tableNameWithType);
+        }
+        IdealState updatedIdealState = HelixHelper.cloneIdealState(idealState);
+        boolean idealStateChanged = updatedIdealState.getPartitionSet().removeAll(segmentNames);
+
+        try {
+          // This transaction deliberately spans the property-store and IdealState roots, so both paths are absolute.
+          ZkMultiWriteBuilder builder = new ZkMultiWriteBuilder(getOrBuildMultiWriteZkClient(), "")
+              .set(fullLineagePath, lineageRecord, expectedLineageVersion);
+          if (idealStateChanged) {
+            builder.set(idealStateKey.getPath(), updatedIdealState.getRecord(), idealState.getRecord().getVersion());
+          }
+          builder.execute();
+
+          TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+          _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames, tableConfig);
+          return PinotResourceManagerResponse.success("Segment " + segmentNames + " deleted");
+        } catch (KeeperException.BadVersionException e) {
+          ZNRecord currentLineage =
+              SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
+          if (currentLineage == null || currentLineage.getVersion() != expectedLineageVersion) {
+            return PinotResourceManagerResponse.failure(
+                "Segment lineage changed before cleanup for table: " + tableNameWithType);
+          }
+          // IdealState changed concurrently while lineage stayed stable. Retry the atomic transaction with a fresh
+          // IdealState snapshot; the lineage version remains the fence for the authorized cleanup batch.
+        }
+      }
+      return PinotResourceManagerResponse.failure(
+          "Failed to atomically update IdealState for lineage cleanup of table: " + tableNameWithType);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception during lineage cleanup of segments: {} from table: {}", segmentNames,
+          tableNameWithType, e);
+      return PinotResourceManagerResponse.failure(e.getMessage());
+    }
   }
 
   private PinotResourceManagerResponse deleteSegmentsInternal(String tableNameWithType, List<String> segmentNames,
-      @Nullable String retentionPeriod, boolean bypassLineageCheck) {
+      @Nullable String retentionPeriod) {
     if (segmentNames.isEmpty()) {
       return PinotResourceManagerResponse.success("No segments to delete");
     }
@@ -1158,7 +1220,7 @@ public class PinotHelixResourceManager {
       LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
       Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
           "Table name: %s is not a valid table name with type suffix", tableNameWithType);
-      if (!bypassLineageCheck && isLineageExclusiveDeleteEnabled()) {
+      if (isLineageExclusiveDeleteEnabled()) {
         // Reject the whole batch if any target segment participates in a live lineage entry.
         rejectIfTargetsLineageLockedSegments(tableNameWithType, segmentNames);
       }
@@ -4407,11 +4469,28 @@ public class PinotHelixResourceManager {
           segment, tableNameWithType);
     }
     List<String> segmentsToCleanUp = new ArrayList<>();
+    int[] cleanupLineageVersion = {-1};
     int attemptCount;
     synchronized (getLineageUpdaterLock(tableNameWithType)) {
       try {
         attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> {
           long startReplaceSegmentsTsForAttempt = System.currentTimeMillis();
+          Set<String> segmentsToCleanUpForAttempt = new LinkedHashSet<>();
+          Map<String, Integer> authorizedCleanupReferenceCounts = new HashMap<>();
+
+          // Revalidate against the current IdealState on every optimistic-write attempt. A version-fenced lineage
+          // cleanup bumps the lineage version in the same transaction that removes segments from IdealState, so a
+          // concurrent cleanup either makes this validation fail or makes the lineage write retry.
+          Set<String> segmentsForTableForAttempt = new HashSet<>(getSegmentsFor(tableNameWithType, true));
+          for (String segment : segmentsFrom) {
+            Preconditions.checkState(segmentsForTableForAttempt.contains(segment),
+                "Segment: %s from 'segmentsFrom' does not exist in table: %s", segment, tableNameWithType);
+          }
+          for (String segment : segmentsTo) {
+            Preconditions.checkState(!segmentsForTableForAttempt.contains(segment),
+                "Segment: %s from 'segmentsTo' exists in table: %s", segment, tableNameWithType);
+          }
+
           // Fetch table config
           TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
           Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
@@ -4445,7 +4524,8 @@ public class PinotHelixResourceManager {
             if (lineageEntry.getState() == LineageEntryState.REVERTED) {
               // When 'forceCleanup' is enabled, proactively clean up 'segmentsTo' since it's safe to do so.
               if (forceCleanup) {
-                segmentsToCleanUp.addAll(lineageEntry.getSegmentsTo());
+                addAuthorizedCleanupSegments(segmentsToCleanUpForAttempt, authorizedCleanupReferenceCounts,
+                    lineageEntry.getSegmentsTo());
               }
               continue;
             }
@@ -4491,7 +4571,8 @@ public class PinotHelixResourceManager {
                 }
 
                 // Add segments for proactive clean-up.
-                segmentsToCleanUp.addAll(segmentsToForEntryToRevert);
+                addAuthorizedCleanupSegments(segmentsToCleanUpForAttempt, authorizedCleanupReferenceCounts,
+                    segmentsToForEntryToRevert);
               } else if (lineageEntry.getState() == LineageEntryState.COMPLETED && "REFRESH".equalsIgnoreCase(
                   IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig)) && CollectionUtils.isEqualCollection(
                   segmentsFrom, lineageEntry.getSegmentsTo())) {
@@ -4510,7 +4591,8 @@ public class PinotHelixResourceManager {
                     "Proactively deleting the replaced segments for REFRESH table to avoid the excessive disk waste. "
                         + "tableNameWithType={}, segmentsToCleanUp={}", tableNameWithType,
                     lineageEntry.getSegmentsFrom());
-                segmentsToCleanUp.addAll(lineageEntry.getSegmentsFrom());
+                addAuthorizedCleanupSegments(segmentsToCleanUpForAttempt, authorizedCleanupReferenceCounts,
+                    lineageEntry.getSegmentsFrom());
               }
             } else {
               // Check that any segment from 'segmentsFrom' does not appear twice.
@@ -4544,8 +4626,16 @@ public class PinotHelixResourceManager {
 
           _lineageManager.updateLineageForStartReplaceSegments(tableConfig, segmentLineageEntryId, customMap,
               segmentLineage);
+          // A cleanup authorization only covers the exact reference that produced it. If the same segment is also
+          // referenced by another entry (including the new entry above or an entry added by the lineage manager), it
+          // must not be deleted.
+          removeCleanupCandidatesReferencedOutsideAuthorization(segmentLineage, segmentsToCleanUpForAttempt,
+              authorizedCleanupReferenceCounts);
           // Write back to the lineage entry to the property store
           if (SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion)) {
+            segmentsToCleanUp.clear();
+            segmentsToCleanUp.addAll(segmentsToCleanUpForAttempt);
+            cleanupLineageVersion[0] = expectedVersion + 1;
             LOGGER.info("startReplaceSegments completed in {} ms.",
                 System.currentTimeMillis() - startReplaceSegmentsTsForAttempt);
             return true;
@@ -4566,7 +4656,12 @@ public class PinotHelixResourceManager {
     // is safe to physically delete segments.
     if (!segmentsToCleanUp.isEmpty()) {
       LOGGER.info("Cleaning up the segments while startReplaceSegments: {}", segmentsToCleanUp);
-      deleteSegmentsForLineageCleanup(tableNameWithType, segmentsToCleanUp);
+      PinotResourceManagerResponse cleanupResponse =
+          deleteSegmentsForLineageCleanup(tableNameWithType, segmentsToCleanUp, cleanupLineageVersion[0]);
+      if (!cleanupResponse.isSuccessful()) {
+        LOGGER.warn("Skipped proactive cleanup while startReplaceSegments for table: {}. {}", tableNameWithType,
+            cleanupResponse.getMessage());
+      }
     }
 
     // Only successful attempt can reach here
@@ -4575,6 +4670,29 @@ public class PinotHelixResourceManager {
         System.currentTimeMillis() - startReplaceSegmentsTs, attemptCount + 1, tableNameWithType, segmentsFrom,
         segmentsTo, segmentLineageEntryId);
     return segmentLineageEntryId;
+  }
+
+  private static void addAuthorizedCleanupSegments(Set<String> cleanupCandidates,
+      Map<String, Integer> authorizedReferenceCounts, List<String> segments) {
+    for (String segment : new HashSet<>(segments)) {
+      cleanupCandidates.add(segment);
+      authorizedReferenceCounts.merge(segment, 1, Integer::sum);
+    }
+  }
+
+  private static void removeCleanupCandidatesReferencedOutsideAuthorization(SegmentLineage segmentLineage,
+      Set<String> cleanupCandidates, Map<String, Integer> authorizedReferenceCounts) {
+    Map<String, Integer> referenceCounts = new HashMap<>();
+    for (LineageEntry entry : segmentLineage.getLineageEntries().values()) {
+      for (String segment : new HashSet<>(entry.getSegmentsFrom())) {
+        referenceCounts.merge(segment, 1, Integer::sum);
+      }
+      for (String segment : new HashSet<>(entry.getSegmentsTo())) {
+        referenceCounts.merge(segment, 1, Integer::sum);
+      }
+    }
+    cleanupCandidates.removeIf(segment -> referenceCounts.getOrDefault(segment, 0)
+        > authorizedReferenceCounts.getOrDefault(segment, 0));
   }
 
   /// Computes the end segment replace phase
@@ -4667,8 +4785,9 @@ public class PinotHelixResourceManager {
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
         Map<String, String> customMap =
             endReplaceSegmentsRequest == null ? null : endReplaceSegmentsRequest.getCustomMap();
-        if (writeLineageEntryWithLock(tableConfig, segmentLineageEntryId, lineageEntryToUpdate, lineageEntry,
-            _propertyStore, LineageUpdateType.END, customMap)) {
+        int writtenLineageVersion = writeLineageEntryWithLock(tableConfig, segmentLineageEntryId,
+            lineageEntryToUpdate, lineageEntry, _propertyStore, LineageUpdateType.END, customMap);
+        if (writtenLineageVersion >= 0) {
           // If the segment lineage metadata is successfully updated, we need to trigger brokers to rebuild the
           // routing table because it is possible that there has been no EV change but the routing result may be
           // different after updating the lineage entry.
@@ -4803,8 +4922,9 @@ public class PinotHelixResourceManager {
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
         Map<String, String> customMap =
             revertReplaceSegmentsRequest == null ? null : revertReplaceSegmentsRequest.getCustomMap();
-        if (writeLineageEntryWithLock(tableConfig, segmentLineageEntryId, lineageEntryToUpdate, lineageEntry,
-            _propertyStore, LineageUpdateType.REVERT, customMap)) {
+        int writtenLineageVersion = writeLineageEntryWithLock(tableConfig, segmentLineageEntryId,
+            lineageEntryToUpdate, lineageEntry, _propertyStore, LineageUpdateType.REVERT, customMap);
+        if (writtenLineageVersion >= 0) {
           // If the segment lineage metadata is successfully updated, we need to trigger brokers to rebuild the
           // routing table because it is possible that there has been no EV change but the routing result may be
           // different after updating the lineage entry.
@@ -4812,7 +4932,25 @@ public class PinotHelixResourceManager {
 
           // Invoke the proactive clean-up for segments that we no longer needs
           if (!segmentsTo.isEmpty()) {
-            deleteSegmentsForLineageCleanup(tableNameWithType, segmentsTo);
+            ZNRecord writtenLineageRecord =
+                SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
+            if (writtenLineageRecord != null && writtenLineageRecord.getVersion() == writtenLineageVersion) {
+              Set<String> cleanupCandidates = new LinkedHashSet<>();
+              Map<String, Integer> authorizedReferenceCounts = new HashMap<>();
+              addAuthorizedCleanupSegments(cleanupCandidates, authorizedReferenceCounts, segmentsTo);
+              removeCleanupCandidatesReferencedOutsideAuthorization(
+                  SegmentLineage.fromZNRecord(writtenLineageRecord), cleanupCandidates,
+                  authorizedReferenceCounts);
+              PinotResourceManagerResponse cleanupResponse = deleteSegmentsForLineageCleanup(tableNameWithType,
+                  new ArrayList<>(cleanupCandidates), writtenLineageVersion);
+              if (!cleanupResponse.isSuccessful()) {
+                LOGGER.warn("Skipped proactive cleanup while revertReplaceSegments for table: {}. {}",
+                    tableNameWithType, cleanupResponse.getMessage());
+              }
+            } else {
+              LOGGER.warn("Skipped proactive cleanup while revertReplaceSegments because lineage changed for table: "
+                  + "{}", tableNameWithType);
+            }
           }
           return true;
         } else {
@@ -4841,7 +4979,7 @@ public class PinotHelixResourceManager {
   /// @param propertyStore property store
   /// @param lineageUpdateType
   /// @param customMap
-  private boolean writeLineageEntryWithLock(TableConfig tableConfig, String lineageEntryId,
+  private int writeLineageEntryWithLock(TableConfig tableConfig, String lineageEntryId,
       LineageEntry lineageEntryToUpdate, LineageEntry lineageEntryToMatch, ZkHelixPropertyStore<ZNRecord> propertyStore,
       LineageUpdateType lineageUpdateType, Map<String, String> customMap) {
     String tableNameWithType = tableConfig.getTableName();
@@ -4882,11 +5020,11 @@ public class PinotHelixResourceManager {
 
         // Write back to the lineage entry
         if (SegmentLineageAccessHelper.writeSegmentLineage(propertyStore, segmentLineageToUpdate, expectedVersion)) {
-          return true;
+          return expectedVersion + 1;
         }
       }
     }
-    return false;
+    return -1;
   }
 
   private boolean waitForSegmentsBecomeOnline(String tableNameWithType, List<String> segmentsToCheck)

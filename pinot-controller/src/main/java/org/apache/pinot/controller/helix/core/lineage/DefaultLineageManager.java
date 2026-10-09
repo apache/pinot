@@ -81,6 +81,7 @@ public class DefaultLineageManager implements LineageManager {
     long lineageCleanupRetentionMs = getRetentionMsFromConfig(
         tableConfig.getValidationConfig().getLineageEntryCleanupRetentionPeriod(),
         LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS, tableNameWithType, "lineageEntryCleanupRetentionPeriod");
+    long lineageCleanupThresholdMs = System.currentTimeMillis() - lineageCleanupRetentionMs;
     // When replacedSegmentsRetentionPeriod is configured it is honored as-is for every table type. When it is
     // absent we fall back to a longer default for REFRESH tables (their replaced segments back a potential
     // lineage rollback) and a shorter default for other table types (only a broker-catchup window is needed).
@@ -91,6 +92,20 @@ public class DefaultLineageManager implements LineageManager {
         tableConfig.getValidationConfig().getReplacedSegmentsRetentionPeriod(),
         defaultReplacedSegmentsRetentionMs, tableNameWithType, "replacedSegmentsRetentionPeriod");
     Set<String> segmentsForTable = new HashSet<>(allSegments);
+
+    // Cleanup owns only the references it retires in this pass. Protect all source segments and every destination
+    // referenced by an entry that will survive, so an expired zombie entry cannot delete a segment reused by another
+    // replacement. Build the set before mutating lineage to keep the result independent of HashMap iteration order.
+    Set<String> protectedSegments = new HashSet<>();
+    for (LineageEntry lineageEntry : lineage.getLineageEntries().values()) {
+      // Zombie cleanup only owns destination segments. Source segments must remain available for a retry even when
+      // their own lineage entry has also expired.
+      protectedSegments.addAll(lineageEntry.getSegmentsFrom());
+      if (!isZombieEntryEligibleForCleanup(lineageEntry, lineageCleanupThresholdMs)) {
+        protectedSegments.addAll(lineageEntry.getSegmentsTo());
+      }
+    }
+
     Iterator<LineageEntry> lineageEntryIterator = lineage.getLineageEntries().values().iterator();
     while (lineageEntryIterator.hasNext()) {
       LineageEntry lineageEntry = lineageEntryIterator.next();
@@ -107,29 +122,36 @@ public class DefaultLineageManager implements LineageManager {
             segmentsToDelete.addAll(sourceSegments);
           }
         }
-      } else if (lineageEntry.getState() == LineageEntryState.REVERTED || (
-          lineageEntry.getState() == LineageEntryState.IN_PROGRESS && lineageEntry.getTimestamp()
-              < System.currentTimeMillis() - lineageCleanupRetentionMs)) {
+      } else if (isZombieEntryEligibleForCleanup(lineageEntry, lineageCleanupThresholdMs)) {
         // If the lineage state is 'IN_PROGRESS' or 'REVERTED', we need to clean up the zombie lineage
         // entry and its segments
         Set<String> destinationSegments = new HashSet<>(lineageEntry.getSegmentsTo());
-        destinationSegments.retainAll(segmentsForTable);
-        if (destinationSegments.isEmpty()) {
+        destinationSegments.removeAll(protectedSegments);
+        Set<String> liveDestinationSegments = new HashSet<>(destinationSegments);
+        liveDestinationSegments.retainAll(segmentsForTable);
+        if (liveDestinationSegments.isEmpty()) {
           // If the lineage state is 'IN_PROGRESS or REVERTED' and the destination segments are no longer in the
           // ideal state, it is safe to clean up the lineage entry. Deleting lineage will allow the task scheduler
           // to re-schedule the source segments to be merged again.
           // A destination segment may still have a znode lingering in the property store even though it never
           // reached (or has already left) the ideal state — e.g. a crash between creating the destination metadata
           // and the ideal-state update. Schedule the destination segments for deletion so such orphans are reaped
-          // along with the lineage entry. Names that have no znode are a no-op in the deletion path.
-          segmentsToDelete.addAll(lineageEntry.getSegmentsTo());
+          // along with the lineage entry. Names protected by another lineage entry have already been removed, and
+          // names that have no znode are a no-op in the deletion path.
+          segmentsToDelete.addAll(destinationSegments);
           lineageEntryIterator.remove();
         } else {
-          // If the lineage state is 'IN_PROGRESS', it is safe to delete all segments from 'segmentsTo'
-          segmentsToDelete.addAll(destinationSegments);
+          // Keep the lineage entry until its unprotected live destination segments have been deleted.
+          segmentsToDelete.addAll(liveDestinationSegments);
         }
       }
     }
+  }
+
+  private static boolean isZombieEntryEligibleForCleanup(LineageEntry lineageEntry, long cleanupThresholdMs) {
+    LineageEntryState state = lineageEntry.getState();
+    return (state == LineageEntryState.IN_PROGRESS || state == LineageEntryState.REVERTED)
+        && lineageEntry.getTimestamp() < cleanupThresholdMs;
   }
 
 

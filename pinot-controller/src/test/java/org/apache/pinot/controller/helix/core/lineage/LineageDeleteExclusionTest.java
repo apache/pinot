@@ -164,9 +164,26 @@ public class LineageDeleteExclusionTest {
     addSegments("byA1", "byB1");
     writeLineageEntry("e1", List.of("byA1"), List.of("byB1"),
         LineageEntryState.IN_PROGRESS);
+    int lineageVersion = SegmentLineageAccessHelper.getSegmentLineageZNRecord(_resourceManager.getPropertyStore(),
+        OFFLINE_TABLE_NAME).getVersion();
     PinotResourceManagerResponse response =
-        _resourceManager.deleteSegmentsForLineageCleanup(OFFLINE_TABLE_NAME, List.of("byA1"));
+        _resourceManager.deleteSegmentsForLineageCleanup(OFFLINE_TABLE_NAME, List.of("byA1"), lineageVersion);
     assertTrue(response.isSuccessful(), response.getMessage());
+  }
+
+  @Test
+  public void testLineageCleanupRejectsStaleVersion() {
+    addSegments("fenceA1", "fenceB1");
+    writeLineageEntry("reverted", List.of("fenceA1"), List.of("fenceB1"), LineageEntryState.REVERTED);
+    int staleVersion = SegmentLineageAccessHelper.getSegmentLineageZNRecord(_resourceManager.getPropertyStore(),
+        OFFLINE_TABLE_NAME).getVersion();
+    writeLineageEntry("completed", List.of("fenceA1"), List.of("fenceB1"), LineageEntryState.COMPLETED);
+
+    PinotResourceManagerResponse response =
+        _resourceManager.deleteSegmentsForLineageCleanup(OFFLINE_TABLE_NAME, List.of("fenceB1"), staleVersion);
+
+    assertFalse(response.isSuccessful());
+    assertTrue(_resourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false).contains("fenceB1"));
   }
 
   @Test
