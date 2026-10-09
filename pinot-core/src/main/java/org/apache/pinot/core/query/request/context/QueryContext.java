@@ -91,7 +91,6 @@ public class QueryContext {
   private boolean _hasFilteredAggregations;
   // Set by the instance planner after bounding all local BASE and derived grouping-set keys.
   private boolean _groupingSetsBaseAggregationAllowed = true;
-  private boolean _groupingSetsDerivedGroupsBounded;
   private Set<String> _columns;
 
   // Other properties to be shared across all the segments
@@ -301,12 +300,6 @@ public class QueryContext {
   /// Called before building segment operators; a false value makes every local segment use per-row expansion.
   public void setGroupingSetsBaseAggregationAllowed(boolean allowed) {
     _groupingSetsBaseAggregationAllowed = allowed;
-    _groupingSetsDerivedGroupsBounded = allowed;
-  }
-
-  /// Whether the instance planner proved the full derived output fits `numGroupsLimit`.
-  public boolean areGroupingSetsDerivedGroupsBounded() {
-    return _groupingSetsDerivedGroupsBounded;
   }
 
   /// Returns the total number of group-by key columns in the server result / reducer row layout: the union

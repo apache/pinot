@@ -137,48 +137,21 @@ public class DeriveGroupingSetsTest {
   }
 
   @Test
-  public void testDerivedOutputCappedCoarsestFirst() {
-    // The derived group count (baseGroups * numSets) can exceed numGroupsLimit even when the base grouping is
-    // well within it. The derive caps its output at numGroupsLimit like the expansion path's combine table, but
-    // admits COARSEST sets first so a low-magnitude set (the grand total, the subtotals) is never starved by
-    // the fine sets; the trim is surfaced via the table's trimmed flag.
+  public void testDeriveDoesNotCapOrTrim() {
+    // The instance planner only admits base aggregation after proving the full derived output fits
+    // numGroupsLimit, so the derive itself never drops groups: capping here would be redundant, and the per-set
+    // server trim must run in the combine AFTER expansion-path records are merged (trimming inside the derive
+    // could let that merge resurrect a trimmed group with a partial value).
     QueryContext queryContext = rollupQueryContext();
-    queryContext.setNumGroupsLimit(10);
-    // 24 base groups (a0..a3 x b0..b6 gives 28 combos, i<24 -> 24 distinct). Grouping sets: {d1,d2}, {d1}, {}.
-    // Coarsest-first admission: grand total (1) + all {d1} subtotals (4) + 5 of the 24 fine groups = 10.
     IndexedTable derived =
         GroupByUtils.deriveGroupingSetsFromMergedBaseTable(buildBaseTable(24), queryContext, 8, _executorService);
-    assertTrue(derived.isTrimmed(), "capping the derived output must mark the table trimmed");
-    assertTrue(derived.isNumGroupsLimitReached(), "capping derived groups must report the group limit");
-    Map<String, Double> first = toMap(derived);
-    assertEquals(first.size(), 10, "derived output must be capped at numGroupsLimit");
-    assertTrue(first.keySet().stream().anyMatch(k -> k.startsWith("null|null|")),
-        "grand-total grouping set must survive the cap");
-    assertEquals(first.get("null|null|2"), 552.0, "the grand total must include every base group");
-    long numD1Subtotals = first.keySet().stream().filter(k -> k.endsWith("|1") && !k.startsWith("null|")).count();
-    assertEquals(numD1Subtotals, 4, "every {d1} subtotal must survive the cap");
+    Map<String, Double> result = toMap(derived);
+    // 24 fine groups + 4 {d1} subtotals + 1 grand total, all retained with complete values.
+    assertEquals(result.size(), 29);
+    assertEquals(result.get("null|null|2"), 552.0, "the grand total must include every base group");
     for (int i = 0; i < 4; i++) {
-      assertEquals(first.get("a" + i + "|null|1"), 120.0 + 12.0 * i,
-          "a retained subtotal must include every matching base group");
-    }
-    // Deterministic across parallel runs.
-    for (int i = 0; i < 4; i++) {
-      Map<String, Double> again =
-          toMap(GroupByUtils.deriveGroupingSetsFromMergedBaseTable(buildBaseTable(24), queryContext, 8,
-              _executorService));
-      assertEquals(again, first, "parallel derive must be deterministic");
-    }
-    queryContext.setAccurateGroupByWithoutOrderBy(true);
-    Map<String, Double> accurate =
-        toMap(GroupByUtils.deriveGroupingSetsFromMergedBaseTable(buildBaseTable(24), queryContext, 8,
-            _executorService));
-    assertEquals(accurate.get("null|null|2"), 552.0);
-    assertEquals(accurate.size(), 10);
-    for (int i = 0; i < 2; i++) {
-      Map<String, Double> again =
-          toMap(GroupByUtils.deriveGroupingSetsFromMergedBaseTable(buildBaseTable(24), queryContext, 8,
-              _executorService));
-      assertEquals(again, accurate, "accurate group-by must retain a stable capped result");
+      assertEquals(result.get("a" + i + "|null|1"), 120.0 + 12.0 * i,
+          "a subtotal must include every matching base group");
     }
   }
 

@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.GroupingSetsBaseIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
@@ -289,6 +291,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     /// grouping-set key space, so this is a plain aggregate merge.
     GroupingSetsBaseIndexedTable baseIndexedTable = _baseIndexedTable;
     if (baseIndexedTable != null) {
+      // Surface that the opt-in base-aggregation path actually ran, so users who opt in can verify it applied.
+      ServerMetrics.get().addMeteredGlobalValue(ServerMeter.GROUPING_SETS_BASE_AGGREGATION, 1);
       // Concurrent inserts can race at the final slot before either observes the cap. Reject that overshoot
       // after all workers finish, before a bounded-output proof is used for derivation.
       if (baseIndexedTable.size() > _queryContext.getNumGroupsLimit()) {
@@ -309,8 +313,12 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           }
         }
       }
-      // The per-set server trim (groupingSetsMinServerTrimSize) and the derived-output cap drop groups;
-      // propagate the trimmed flag so the broker response reports the approximation.
+      // The optional per-set server trim (groupingSetsMinServerTrimSize) runs only now, after BOTH layouts are
+      // merged, so every retained group carries its complete value. Trimming inside the derive would let the
+      // full-layout merge above resurrect a trimmed group with only its expansion-path share.
+      derivedTable = GroupByUtils.trimDerivedGroupingSets(derivedTable, _queryContext, _executorService);
+      // The per-set server trim and the derived-output cap drop groups; propagate the trimmed flag so the
+      // broker response reports the approximation.
       if (derivedTable.isTrimmed()) {
         _groupsTrimmed = true;
       }

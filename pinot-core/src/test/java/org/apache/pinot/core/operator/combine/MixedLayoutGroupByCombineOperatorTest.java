@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.combine;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -36,6 +37,7 @@ import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
@@ -183,6 +185,61 @@ public class MixedLayoutGroupByCombineOperatorTest {
       }
     }
     assertTrue(foundGrandTotal);
+  }
+
+  @Test
+  public void testPerSetTrimRunsAfterFullLayoutMerge()
+      throws Exception {
+    // The per-set server trim must run AFTER expansion-path (full-layout) records are merged into the derived
+    // table. If the derive trimmed first, the merge below would re-add the trimmed group "x" with only its
+    // expansion-path share (100.0) instead of its complete total (101.0) -- a wrong row that can win the
+    // broker's ORDER BY.
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT d1, SUM(m1) FROM t GROUP BY GROUPING SETS ((d1), ()) ORDER BY SUM(m1) DESC LIMIT 1");
+    queryContext.setEndTimeMs(System.currentTimeMillis() + 60_000);
+    // LIMIT 1 with trim size 1 resolves to an effective per-set trim of max(5 * LIMIT, 1) = 5 groups; with 2
+    // grouping sets the trim triggers once the derived table exceeds 10 groups.
+    queryContext.getQueryOptions().put(QueryOptionKey.GROUPING_SETS_MIN_SERVER_TRIM_SIZE, "1");
+
+    // Base layout: group "x" with a LOW base-path share (1.0, trimmed away under a derive-first trim) plus 11
+    // groups worth 11..21, so the derived table holds 12 set-0 groups + the grand total = 13 > 10.
+    DataSchema baseSchema = new DataSchema(new String[]{"d1", "sum(m1)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.DOUBLE});
+    List<IntermediateRecord> baseRecords = new ArrayList<>();
+    baseRecords.add(
+        IntermediateRecord.withoutOrderByValues(new Key(new Object[]{"x"}), new Record(new Object[]{"x", 1.0})));
+    for (int i = 1; i <= 11; i++) {
+      String d1 = String.format("g%02d", i);
+      double value = 10.0 + i;
+      baseRecords.add(IntermediateRecord.withoutOrderByValues(new Key(new Object[]{d1}),
+          new Record(new Object[]{d1, value})));
+    }
+    // Full layout: an expansion-path segment carrying the HIGH share of "x" and its own grand total.
+    DataSchema fullSchema = new DataSchema(new String[]{"d1", "$groupingId", "sum(m1)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE});
+    List<IntermediateRecord> fullRecords = List.of(
+        IntermediateRecord.withoutOrderByValues(new Key(new Object[]{"x", 0}),
+            new Record(new Object[]{"x", 0, 100.0})),
+        IntermediateRecord.withoutOrderByValues(new Key(new Object[]{null, 1}),
+            new Record(new Object[]{null, 1, 100.0})));
+    GroupByCombineOperator combineOperator = new GroupByCombineOperator(List.of(
+        mockOperator(new GroupByResultsBlock(baseSchema, baseRecords, queryContext)),
+        mockOperator(new GroupByResultsBlock(fullSchema, fullRecords, queryContext))), queryContext,
+        _executorService);
+
+    GroupByResultsBlock mergedBlock = (GroupByResultsBlock) combineOperator.nextBlock();
+    assertTrue(mergedBlock.isGroupsTrimmed(), "the per-set trim must flag the response as trimmed");
+    IndexedTable table = (IndexedTable) mergedBlock.getTable();
+    Map<String, Double> result = new HashMap<>();
+    Iterator<Record> iterator = table.iterator();
+    while (iterator.hasNext()) {
+      Object[] values = iterator.next().getValues();
+      result.put(values[0] + "|" + values[1], ((Number) values[2]).doubleValue());
+    }
+    // Top-5 of set 0 by SUM DESC (x=101, g11=21, g10=20, g09=19, g08=18) plus the grand total.
+    assertEquals(result.size(), 6);
+    assertEquals(result.get("x|0"), 101.0, "a retained group must carry its COMPLETE merged value");
+    assertEquals(result.get("null|1"), 277.0, "the grand total must include both layouts");
   }
 
   @Test

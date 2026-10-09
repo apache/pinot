@@ -35,6 +35,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -126,11 +127,29 @@ public class InstancePlanMakerImplV2Test {
     queryContext.setNumGroupsLimit(7);
     assertTrue(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(List.of(segment), queryContext));
 
-    // The bounds add across segments, even when each segment fits by itself.
+    // The bounds add across segments with DISJOINT value spaces, even when each segment fits by itself: with
+    // unions of 4 values per column, ROLLUP can produce 16 + 4 + 1 derived groups, but the per-segment products
+    // (summing to 8 base and 14 derived) prove a limit of 14.
+    SegmentContext other = segmentWithTwoColumns(2, 2, false, "other");
     queryContext.setNumGroupsLimit(13);
-    assertFalse(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(List.of(segment, segment), queryContext));
+    assertFalse(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(List.of(segment, other), queryContext));
     queryContext.setNumGroupsLimit(14);
-    assertTrue(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(List.of(segment, segment), queryContext));
+    assertTrue(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(List.of(segment, other), queryContext));
+  }
+
+  @Test
+  public void testUnionBoundAdmitsSegmentsSharingValues() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT a, b, COUNT(*) FROM t GROUP BY ROLLUP(a, b)");
+    // Ten segments over the SAME value space: per-segment products sum to 40 base and 70 derived groups, but the
+    // per-column unions prove the real bound of 4 base and 7 derived groups.
+    SegmentContext segment = segmentWithTwoColumns(2, 2);
+    List<SegmentContext> segments = List.of(segment, segment, segment, segment, segment, segment, segment, segment,
+        segment, segment);
+    queryContext.setNumGroupsLimit(7);
+    assertTrue(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(segments, queryContext));
+    queryContext.setNumGroupsLimit(6);
+    assertFalse(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(segments, queryContext));
   }
 
   @Test
@@ -157,12 +176,12 @@ public class InstancePlanMakerImplV2Test {
 
     // The mutable segment's current cardinalities fit with plenty of headroom, but new keys indexed between
     // planning and execution could still push the base groups past the limit, so the proof must fail.
-    SegmentContext mutableSegment = segmentWithTwoColumns(2, 2, true);
+    SegmentContext mutableSegment = segmentWithTwoColumns(2, 2, true, "");
     assertFalse(
         InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(List.of(mutableSegment), queryContext));
 
     // One mutable segment disables the proof for the whole query, even next to immutable segments.
-    SegmentContext immutableSegment = segmentWithTwoColumns(2, 2, false);
+    SegmentContext immutableSegment = segmentWithTwoColumns(2, 2);
     assertTrue(
         InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(List.of(immutableSegment), queryContext));
     assertFalse(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(
@@ -170,24 +189,27 @@ public class InstancePlanMakerImplV2Test {
   }
 
   private static SegmentContext segmentWithTwoColumns(int aCardinality, int bCardinality) {
-    return segmentWithTwoColumns(aCardinality, bCardinality, false);
+    return segmentWithTwoColumns(aCardinality, bCardinality, false, "");
   }
 
-  private static SegmentContext segmentWithTwoColumns(int aCardinality, int bCardinality, boolean mutable) {
+  /// `valuePrefix` namespaces the mocked dictionary values, so segments built with the same prefix share a value
+  /// space (their unions dedup) and segments built with different prefixes are disjoint.
+  private static SegmentContext segmentWithTwoColumns(int aCardinality, int bCardinality, boolean mutable,
+      String valuePrefix) {
     SegmentContext segmentContext = mock(SegmentContext.class);
     IndexSegment segment = mutable ? mock(MutableSegment.class) : mock(IndexSegment.class);
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentContext.getIndexSegment()).thenReturn(segment);
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
     when(segmentMetadata.getTotalDocs()).thenReturn(10);
-    DataSource a = dataSource(aCardinality);
-    DataSource b = dataSource(bCardinality);
+    DataSource a = dataSource(aCardinality, valuePrefix + "a");
+    DataSource b = dataSource(bCardinality, valuePrefix + "b");
     when(segment.getDataSourceNullable("a")).thenReturn(a);
     when(segment.getDataSourceNullable("b")).thenReturn(b);
     return segmentContext;
   }
 
-  private static DataSource dataSource(int cardinality) {
+  private static DataSource dataSource(int cardinality, String valuePrefix) {
     DataSource dataSource = mock(DataSource.class);
     DataSourceMetadata metadata = mock(DataSourceMetadata.class);
     Dictionary dictionary = mock(Dictionary.class);
@@ -196,6 +218,8 @@ public class InstancePlanMakerImplV2Test {
     when(metadata.isSingleValue()).thenReturn(true);
     when(dataSource.getDictionary()).thenReturn(dictionary);
     when(dictionary.length()).thenReturn(cardinality);
+    when(dictionary.getInternal(anyInt())).thenAnswer(
+        invocation -> valuePrefix + ":" + invocation.getArgument(0, Integer.class));
     doReturn(forwardIndex).when(dataSource).getForwardIndex();
     when(forwardIndex.isDictionaryEncoded()).thenReturn(true);
     return dataSource;
