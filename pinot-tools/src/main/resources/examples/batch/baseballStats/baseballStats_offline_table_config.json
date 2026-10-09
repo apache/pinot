@@ -2,11 +2,9 @@
   "tableName": "baseballStats",
   "tableType": "OFFLINE",
   "segmentsConfig": {
-    "segmentPushType": "APPEND",
     "replication": "1"
   },
-  "tenants": {
-  },
+  "tenants": {},
   "tableIndexConfig": {
     "loadMode": "HEAP",
     "invertedIndexColumns": [
@@ -15,7 +13,11 @@
     ]
   },
   "metadata": {
-    "customConfigs": {
+    "customConfigs": {}
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
     }
   }
 }

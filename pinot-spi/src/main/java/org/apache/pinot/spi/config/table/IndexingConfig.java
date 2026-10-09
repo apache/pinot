@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashSet;
 import java.util.List;
@@ -26,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.DeprecatedConfig;
 
 
 public class IndexingConfig extends BaseJsonConfig {
@@ -133,6 +135,8 @@ public class IndexingConfig extends BaseJsonConfig {
     _rangeIndexVersion = rangeIndexVersion;
   }
 
+  @Deprecated
+  @DeprecatedConfig(replacement = "Use 'tableIndexConfig.jsonIndexConfigs' instead.", since = "0.12.0")
   public List<String> getJsonIndexColumns() {
     return _jsonIndexColumns;
   }
@@ -158,6 +162,8 @@ public class IndexingConfig extends BaseJsonConfig {
   }
 
   @Deprecated
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @DeprecatedConfig(replacement = "Remove this field; it is ignored.", since = "1.6.0")
   public boolean isCreateInvertedIndexDuringSegmentGeneration() {
     return _createInvertedIndexDuringSegmentGeneration;
   }
@@ -206,6 +212,9 @@ public class IndexingConfig extends BaseJsonConfig {
   /// @deprecated Use `List<Map<String, String>> streamConfigs` from
   /// [org.apache.pinot.spi.config.table.ingestion.IngestionConfig#getStreamIngestionConfig()]
   @Nullable
+  @Deprecated
+  @DeprecatedConfig(replacement = "Use 'ingestionConfig.streamIngestionConfig.streamConfigMaps' instead.",
+      since = "0.7.1")
   public Map<String, String> getStreamConfigs() {
     return _streamConfigs;
   }
