@@ -61,11 +61,10 @@ public class CombinedFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getTrues() {
     Tracing.activeRecording().setNumChildren(2);
     BlockDocIdSet mainFilterDocIdSet = _mainFilterOperator.nextBlock().getNonScanFilterBLockDocIdSet();
-    BlockDocIdSet optimizedMainFilterDocIdSet = mainFilterDocIdSet.getOptimizedDocIdSet();
-    if (optimizedMainFilterDocIdSet instanceof EmptyDocIdSet) {
-      return EmptyDocIdSet.getInstance();
+    if (mainFilterDocIdSet instanceof EmptyDocIdSet) {
+      return EmptyDocIdSet.unscanned();
     }
     BlockDocIdSet subFilterDocIdSet = _subFilterOperator.nextBlock().getBlockDocIdSet();
-    return new AndDocIdSet(Arrays.asList(optimizedMainFilterDocIdSet, subFilterDocIdSet), _queryOptions);
+    return new AndDocIdSet(Arrays.asList(mainFilterDocIdSet, subFilterDocIdSet), _queryOptions);
   }
 }

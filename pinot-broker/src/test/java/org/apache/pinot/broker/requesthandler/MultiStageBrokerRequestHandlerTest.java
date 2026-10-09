@@ -211,6 +211,16 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
   }
 
   @Test
+  public void testDispatchMaxInboundMessageSizeFromConfig()
+      throws Exception {
+    assertEquals(newHandler(new PinotConfiguration()).getQueryDispatcher().getDispatchMaxInboundMessageSizeBytes(),
+        MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES);
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES, "12345678");
+    assertEquals(newHandler(config).getQueryDispatcher().getDispatchMaxInboundMessageSizeBytes(), 12_345_678);
+  }
+
+  @Test
   public void testDefaultDisabledPlannerRulesFromClusterConfig() {
     // ServiceStartableUtils.applyClusterConfig applies cluster configs with setProperty, which doesn't split lists
     PinotConfiguration config = new PinotConfiguration();
@@ -247,8 +257,6 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
       @Nullable String streamingGroupByFlushThreshold, @Nullable String streamingDistinctFlushThreshold)
       throws Exception {
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
-    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, Integer.toString(NetUtils.findOpenPort()));
     if (streamingGroupByFlushThreshold != null) {
       config.setProperty(CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD,
           streamingGroupByFlushThreshold);
@@ -257,6 +265,13 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
       config.setProperty(CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD,
           streamingDistinctFlushThreshold);
     }
+    return newHandler(config);
+  }
+
+  private static MultiStageBrokerRequestHandler newHandler(PinotConfiguration config)
+      throws Exception {
+    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
+    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, Integer.toString(NetUtils.findOpenPort()));
     BrokerQueryEventListenerFactory.init(config);
     BrokerMetrics.register(mock(BrokerMetrics.class));
 

@@ -353,6 +353,14 @@ public class QueryOptionsUtils {
         queryOptions.get(QueryOptionKey.IN_PREDICATE_PRUNING_THRESHOLD));
   }
 
+  /// Query-level override for the minimum candidate segments needed to prepare the partition-pruning predicate.
+  /// A negative value disables preparation.
+  @Nullable
+  public static Integer getPartitionPruningPreparationThreshold(@Nullable Map<String, String> queryOptions) {
+    return queryOptions != null ? uncheckedParseInt(QueryOptionKey.PARTITION_PRUNING_PREPARATION_THRESHOLD,
+        queryOptions.get(QueryOptionKey.PARTITION_PRUNING_PREPARATION_THRESHOLD)) : null;
+  }
+
   /// Returns whether materialized-view rewrite is allowed for this query. Defaults to `true`
   /// (absence ⇒ rewrite allowed) for backward compatibility with the pre-option behavior; the
   /// MV minion executor sets it to `false` so a materialization query is never rewritten back
@@ -443,12 +451,12 @@ public class QueryOptionsUtils {
         throw new RuntimeException("Invalid format for " + QueryOptionKey.SKIP_INDEXES
             + ". Example of valid format: SET skipIndexes='col1=inverted,range&col2=inverted'");
       }
-      String columnName = conf[0];
+      String columnName = conf[0].trim();
       String[] indexTypes = StringUtils.split(conf[1], ',');
 
       for (String indexType : indexTypes) {
         skipIndexes.computeIfAbsent(columnName, k -> new HashSet<>())
-            .add(FieldConfig.IndexType.valueOf(indexType.toUpperCase()));
+            .add(FieldConfig.IndexType.valueOf(indexType.trim().toUpperCase(Locale.ROOT)));
       }
     }
 
@@ -1034,5 +1042,13 @@ public class QueryOptionsUtils {
       }
     }
     return i;
+  }
+
+  /// Returns the [QueryOptionKey#SEALED_IN_LIST_THRESHOLD] option, or `defaultValue` when the option is not set.
+  public static int getSealedInListThreshold(Map<String, String> options, int defaultValue) {
+    String threshold = options.get(QueryOptionKey.SEALED_IN_LIST_THRESHOLD);
+    Integer value =
+        uncheckedParseInt(QueryOptionKey.SEALED_IN_LIST_THRESHOLD, threshold != null ? threshold.trim() : null);
+    return value != null ? value : defaultValue;
   }
 }

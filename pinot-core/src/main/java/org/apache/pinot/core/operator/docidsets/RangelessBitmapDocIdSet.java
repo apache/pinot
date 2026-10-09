@@ -23,14 +23,24 @@ import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterato
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-public class RangelessBitmapDocIdSet implements BlockDocIdSet {
+public final class RangelessBitmapDocIdSet implements BlockDocIdSet {
   private final RangelessBitmapDocIdIterator _iterator;
 
-  public RangelessBitmapDocIdSet(ImmutableRoaringBitmap docIds) {
+  /// Returns a doc id set over the given documents, or [EmptyDocIdSet] when there is none.
+  public static BlockDocIdSet create(ImmutableRoaringBitmap docIds) {
+    return docIds.isEmpty() ? EmptyDocIdSet.unscanned() : new RangelessBitmapDocIdSet(docIds);
+  }
+
+  /// Returns a doc id set over the documents of the given iterator, or [EmptyDocIdSet] when there is none.
+  public static BlockDocIdSet create(RangelessBitmapDocIdIterator iterator) {
+    return iterator.getDocIds().isEmpty() ? EmptyDocIdSet.unscanned() : new RangelessBitmapDocIdSet(iterator);
+  }
+
+  private RangelessBitmapDocIdSet(ImmutableRoaringBitmap docIds) {
     this(new RangelessBitmapDocIdIterator(docIds));
   }
 
-  public RangelessBitmapDocIdSet(RangelessBitmapDocIdIterator iterator) {
+  private RangelessBitmapDocIdSet(RangelessBitmapDocIdIterator iterator) {
     _iterator = iterator;
   }
 
@@ -42,13 +52,5 @@ public class RangelessBitmapDocIdSet implements BlockDocIdSet {
   @Override
   public long getNumEntriesScannedInFilter() {
     return 0L;
-  }
-
-  @Override
-  public BlockDocIdSet getOptimizedDocIdSet() {
-    if (_iterator.getDocIds().isEmpty()) {
-      return EmptyDocIdSet.getInstance();
-    }
-    return this;
   }
 }

@@ -329,6 +329,7 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendRequest(ClassicHttpRequest request, long socketTimeoutMs,
       long connectionRequestTimeoutMs, int maxResponseLength)
       throws IOException {
+    Preconditions.checkArgument(maxResponseLength >= 0, "Maximum response length must be non-negative");
 
     // Besides the per-request response (socket) timeout, explicitly bound the connection-request
     // (pool checkout) wait instead of silently inheriting the Apache HttpClient default, so a
@@ -425,7 +426,6 @@ public class HttpClient implements AutoCloseable {
 
   private static BoundedResponseContent readResponseContent(HttpEntity httpEntity, int maxResponseLength)
       throws IOException {
-    Preconditions.checkArgument(maxResponseLength >= 0, "Maximum response length must be non-negative");
     if (httpEntity == null) {
       return new BoundedResponseContent(null, false);
     }

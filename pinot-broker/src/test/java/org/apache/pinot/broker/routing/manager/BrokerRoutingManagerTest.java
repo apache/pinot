@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.apache.helix.AccessOption;
@@ -37,6 +38,7 @@ import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
+import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
@@ -52,6 +54,7 @@ import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelector;
 import org.apache.pinot.broker.routing.tablesampler.TableSampler;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -80,6 +83,8 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -957,6 +962,140 @@ public class BrokerRoutingManagerTest {
   }
 
   @Test
+  public void testRetryPreservesCompletedTableAcknowledgements()
+      throws Exception {
+    InstanceSelector firstSelector = mock(InstanceSelector.class);
+    when(firstSelector.isServerAssigned(SERVER_INSTANCE_ID)).thenReturn(true);
+    AtomicBoolean failFirstSelector = new AtomicBoolean();
+    doAnswer(invocation -> {
+      if (failFirstSelector.get()) {
+        throw new RuntimeException("simulated first table failure");
+      }
+      return null;
+    }).when(firstSelector).onInstancesChange(any(), any());
+    putRoutingEntry("first_OFFLINE",
+        createRoutingEntry("first_OFFLINE", null, null, Map.of(), firstSelector, false));
+
+    InstanceSelector secondSelector = mock(InstanceSelector.class);
+    when(secondSelector.isServerAssigned(SERVER_INSTANCE_ID)).thenReturn(true);
+    AtomicInteger secondAttempts = new AtomicInteger();
+    doAnswer(invocation -> {
+      if (secondAttempts.getAndIncrement() == 0) {
+        throw new RuntimeException("simulated second table failure");
+      }
+      return null;
+    }).when(secondSelector).onInstancesChange(any(), any());
+    putRoutingEntry("second_OFFLINE",
+        createRoutingEntry("second_OFFLINE", null, null, Map.of(), secondSelector, false));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertFalse(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+    verify(firstSelector).onInstancesChange(any(), any());
+    verify(secondSelector).onInstancesChange(any(), any());
+
+    // A table built while the server is pending sees the already published routable snapshot. It can route the
+    // server immediately, without resetting acknowledgements completed by the earlier tables.
+    String newTable = "newTable_OFFLINE";
+    TableConfig newTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("newTable").build();
+    when(_propertyStore.get(eq("/CONFIGS/TABLE/" + newTable), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(newTableConfig));
+    IdealState idealState = new IdealState(newTable);
+    idealState.enable(true);
+    idealState.getRecord().setMapField("segment", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
+    ExternalView externalView = new ExternalView(newTable);
+    externalView.getRecord().setMapField("segment", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
+    when(_zkDataAccessor.get(eq("/IDEALSTATES/" + newTable), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(idealState.getRecord());
+    when(_zkDataAccessor.get(eq("/EXTERNALVIEW/" + newTable), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(externalView.getRecord());
+    _routingManager.buildRouting(newTable);
+    RoutingTable newTableRouting = _routingManager.getRoutingTable(brokerRequest(newTable), 0);
+    assertEquals(newTableRouting.getServerInstanceToSegmentsMap().size(), 1);
+    assertEquals(newTableRouting.getServerInstanceToSegmentsMap().keySet().iterator().next().getInstanceId(),
+        SERVER_INSTANCE_ID);
+
+    // If the first table is touched again, this retry would fail in the opposite order.
+    failFirstSelector.set(true);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertTrue(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+    verify(firstSelector).onInstancesChange(any(), any());
+    verify(secondSelector, times(2)).onInstancesChange(any(), any());
+
+    // Re-inclusion is a new routing change and must collect fresh acknowledgements from both tables.
+    failFirstSelector.set(false);
+    _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
+    failFirstSelector.set(true);
+    _routingManager.includeServerToRouting(SERVER_INSTANCE_ID);
+    assertFalse(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+    verify(firstSelector, times(3)).onInstancesChange(any(), any());
+    verify(secondSelector, times(4)).onInstancesChange(any(), any());
+
+    failFirstSelector.set(false);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertTrue(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+    verify(firstSelector, times(4)).onInstancesChange(any(), any());
+    verify(secondSelector, times(4)).onInstancesChange(any(), any());
+  }
+
+  @Test
+  public void testInstanceConfigRetryRecoversBeforeFirstTablePass()
+      throws Exception {
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.isServerAssigned(SERVER_INSTANCE_ID))
+        .thenThrow(new RuntimeException("simulated assignment lookup failure"))
+        .thenReturn(true);
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+
+    assertThrows(RuntimeException.class, () -> _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG));
+    TestUtils.waitForCondition(aVoid -> _routingManager.isServerRoutable(SERVER_INSTANCE_ID), 50L, 5_000L,
+        "Server was not acknowledged after retrying an aborted instance config callback");
+    verify(instanceSelector, times(2)).isServerAssigned(SERVER_INSTANCE_ID);
+    verify(instanceSelector).onInstancesChange(any(), any());
+  }
+
+  @Test
+  public void testRemovingRoutingAfterAbortedInstanceConfigChangeKeepsPublicationMarker()
+      throws Exception {
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.isServerAssigned(SERVER_INSTANCE_ID))
+        .thenThrow(new RuntimeException("simulated assignment lookup failure"));
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+
+    assertThrows(RuntimeException.class, () -> _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG));
+    // The callback left its immutable empty marker. Removing the table must not try to mutate that marker.
+    _routingManager.removeRouting(TEST_TABLE);
+    TestUtils.waitForCondition(aVoid -> _routingManager.isServerRoutable(SERVER_INSTANCE_ID), 50L, 5_000L,
+        "Server was not acknowledged after removing routing during an aborted instance config callback");
+  }
+
+  @Test
+  public void testReincludedServerRetriesWhenAssignmentLookupFails()
+      throws Exception {
+    enableTestServer();
+    _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.isServerAssigned(SERVER_INSTANCE_ID))
+        .thenThrow(new RuntimeException("simulated assignment lookup failure"))
+        .thenReturn(true);
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+
+    assertThrows(RuntimeException.class, () -> _routingManager.includeServerToRouting(SERVER_INSTANCE_ID));
+    TestUtils.waitForCondition(aVoid -> _routingManager.isServerRoutable(SERVER_INSTANCE_ID), 50L, 5_000L,
+        "Re-included server was not acknowledged after retrying an aborted assignment lookup");
+    verify(instanceSelector, times(2)).isServerAssigned(SERVER_INSTANCE_ID);
+    verify(instanceSelector).onInstancesChange(any(), any());
+  }
+
+  @Test
   public void testReincludedServerWaitsForRelevantTableRetry()
       throws Exception {
     enableTestServer();
@@ -1033,6 +1172,35 @@ public class BrokerRoutingManagerTest {
         "Disabled-server routing update was not retried");
     verify(instanceSelector, times(2)).onInstancesChange(any(), any());
     assertEquals(_routingManager.getInstanceConfigRetryDelayMs(), 1_000L);
+  }
+
+  @Test
+  public void testPartitionPruningThresholdUpdates()
+      throws Exception {
+    String key = CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD;
+    _routingManager = spy(_routingManager);
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of()));
+    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    ClusterConfig config = new ClusterConfig("testCluster");
+    config.getRecord().setSimpleField(key, "128");
+    handler.onClusterConfigChange(config, null);
+    handler.registerClusterConfigChangeListener(_routingManager);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(), 128);
+
+    config.getRecord().setSimpleField(key, "-1");
+    handler.onClusterConfigChange(config, null);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(), -1);
+
+    config.getRecord().setSimpleField(key, "invalid");
+    handler.onClusterConfigChange(config, null);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(),
+        DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD);
+
+    config.getRecord().getSimpleFields().clear();
+    handler.onClusterConfigChange(config, null);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(),
+        DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD);
+    verify(_routingManager, never()).buildRouting(TEST_TABLE);
   }
 
   /// Creates a ZNRecord representing an enabled server instance.

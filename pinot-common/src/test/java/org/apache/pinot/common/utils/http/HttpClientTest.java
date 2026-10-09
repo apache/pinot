@@ -46,6 +46,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -108,6 +109,11 @@ public class HttpClientTest {
       assertTrue(error.getResponse().contains("x".repeat(32)));
       assertFalse(error.getResponse().contains("x".repeat(33)));
       assertTrue(error.getResponse().length() < 512);
+
+      assertThrows(IllegalArgumentException.class,
+          () -> client.sendGetRequest(URI.create(baseUrl + "/success"), List.of(), 5_000L, 5_000L, -1));
+      assertThrows(IllegalArgumentException.class,
+          () -> client.sendGetRequest(URI.create(baseUrl + "/error"), List.of(), 5_000L, 5_000L, -1));
     } finally {
       server.stop(0);
     }

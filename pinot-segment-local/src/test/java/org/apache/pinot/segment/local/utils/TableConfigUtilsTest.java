@@ -64,6 +64,7 @@ import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
@@ -83,6 +84,7 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotDataType;
@@ -1812,11 +1814,23 @@ public class TableConfigUtilsTest {
         fieldConfigWithCodecSpec("intCol", FieldConfig.EncodingType.RAW, "DELTA,LZ4"),
         fieldConfigWithCodecSpec("longCol", FieldConfig.EncodingType.RAW, "ZSTD(3)")));
     TableConfigUtils.validate(tableConfig, schema);
+    // Chained value transforms, a value transform feeding a packing transform, and transform chains on LONG.
+    assertCodecSpecValidationPasses(schema, "intCol", "DELTA,ZSTD(3)");
+    assertCodecSpecValidationPasses(schema, "intCol", "DELTA,DELTADELTA,LZ4");
+    assertCodecSpecValidationPasses(schema, "intCol", "DELTA,T64,LZ4");
+    assertCodecSpecValidationPasses(schema, "longCol", "DELTADELTA,LZ4");
 
     assertCodecSpecValidationFails(schema, "intCol", FieldConfig.EncodingType.RAW, "LZ4,UNKNOWN", "Unknown codec");
     assertCodecSpecValidationFails(schema, "intCol", FieldConfig.EncodingType.RAW, "LZ4,DELTA",
         "all transforms must precede any compression stage");
+    // T64 output is not a typed value array, so a value transform cannot follow it.
+    assertCodecSpecValidationFails(schema, "intCol", FieldConfig.EncodingType.RAW, "T64,DELTA,LZ4",
+        "must operate on column values");
+    // Every codecSpec, compression-only or transform, uses the V7 writer, which only supports single-value
+    // INT/LONG columns.
     assertCodecSpecValidationFails(schema, "mvIntCol", FieldConfig.EncodingType.RAW, "LZ4",
+        "only supports single-value columns");
+    assertCodecSpecValidationFails(schema, "mvIntCol", FieldConfig.EncodingType.RAW, "DELTA,LZ4",
         "only supports single-value columns");
     assertCodecSpecValidationFails(schema, "stringCol", FieldConfig.EncodingType.RAW, "SNAPPY",
         "only supports INT and LONG columns");
@@ -1860,6 +1874,12 @@ public class TableConfigUtilsTest {
     assertTrue(Throwables.getRootCause(exception).getMessage()
             .contains("codecSpec cannot be configured when the forward index is disabled"),
         exception.getMessage());
+  }
+
+  private static void assertCodecSpecValidationPasses(Schema schema, String column, String codecSpec) {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfig.setFieldConfigList(List.of(fieldConfigWithCodecSpec(column, FieldConfig.EncodingType.RAW, codecSpec)));
+    TableConfigUtils.validate(tableConfig, schema);
   }
 
   private static void assertCodecSpecValidationFails(Schema schema, String column,
@@ -2662,6 +2682,92 @@ public class TableConfigUtilsTest {
       assertEquals(e.getMessage(),
           "MetadataTTL must have time column: timeColumn in numeric type, found: STRING");
     }
+  }
+
+  @Test
+  public void testRejectConsumptionDuringDownloadWhenUpsertMetadataReverts() {
+    UpsertConfig partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    UpsertConfig allowDuringCommitConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    allowDuringCommitConfig.setAllowPartialUpsertConsumptionDuringCommit(true);
+    UpsertConfig dropOutOfOrderConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    dropOutOfOrderConfig.setDropOutOfOrderRecord(true);
+    UpsertConfig fullUpsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+
+    ConsumingSegmentConsistencyModeListener consistencyModeListener =
+        ConsumingSegmentConsistencyModeListener.getInstance();
+    try {
+      // Without PROTECTED mode nothing is reverted, so every policy is allowed
+      checkConsumptionDuringUpsertRevert(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, false);
+
+      consistencyModeListener.setMode(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED);
+      checkConsumptionDuringUpsertRevert(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, true);
+      checkConsumptionDuringUpsertRevert(partialUpsertConfig,
+          ParallelSegmentConsumptionPolicy.ALLOW_DURING_DOWNLOAD_ONLY, true);
+      checkConsumptionDuringUpsertRevert(dropOutOfOrderConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, true);
+      checkConsumptionDuringUpsertRevert(allowDuringCommitConfig, null, true);
+      // A local build that fails or mismatches the committed CRC falls back to a download after releasing the semaphore
+      checkConsumptionDuringUpsertRevert(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY,
+          true);
+      checkConsumptionDuringUpsertRevert(partialUpsertConfig, ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS, false);
+      checkConsumptionDuringUpsertRevert(partialUpsertConfig, null, false);
+      // An explicit policy wins over the deprecated flag, and full upsert without out-of-order handling never reverts
+      checkConsumptionDuringUpsertRevert(allowDuringCommitConfig, ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS,
+          false);
+      checkConsumptionDuringUpsertRevert(fullUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS, false);
+      // Pauseless tables consume during build by design, so they keep ALLOW_DURING_BUILD_ONLY but not download overlap
+      TableConfigUtils.validateConsumptionDuringUpsertRevert(createTableConfigWithConsumptionPolicy(partialUpsertConfig,
+          ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY, true));
+      expectThrows(IllegalStateException.class, () -> TableConfigUtils.validateConsumptionDuringUpsertRevert(
+          createTableConfigWithConsumptionPolicy(partialUpsertConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS,
+              true)));
+
+      // The check is part of the upsert validation
+      Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+          .addSingleValueDimension("myCol", DataType.STRING)
+          .setPrimaryKeyColumns(List.of("myCol"))
+          .build();
+      TableConfig tableConfig =
+          createTableConfigWithConsumptionPolicy(dropOutOfOrderConfig, ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
+      IllegalStateException e = expectThrows(IllegalStateException.class,
+          () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema));
+      assertTrue(e.getMessage().endsWith("Set parallelSegmentConsumptionPolicy to DISALLOW_ALWAYS"), e.getMessage());
+    } finally {
+      consistencyModeListener.reset();
+    }
+  }
+
+  private void checkConsumptionDuringUpsertRevert(UpsertConfig upsertConfig, ParallelSegmentConsumptionPolicy policy,
+      boolean expectRejected) {
+    TableConfig tableConfig = createTableConfigWithConsumptionPolicy(upsertConfig, policy);
+    if (expectRejected) {
+      IllegalStateException e = expectThrows(IllegalStateException.class,
+          () -> TableConfigUtils.validateConsumptionDuringUpsertRevert(tableConfig));
+      assertTrue(e.getMessage().endsWith("Set parallelSegmentConsumptionPolicy to DISALLOW_ALWAYS"), e.getMessage());
+      assertTrue(e.getMessage().startsWith(
+          policy != null ? "parallelSegmentConsumptionPolicy " + policy : "allowPartialUpsertConsumptionDuringCommit"),
+          e.getMessage());
+    } else {
+      TableConfigUtils.validateConsumptionDuringUpsertRevert(tableConfig);
+    }
+  }
+
+  private TableConfig createTableConfigWithConsumptionPolicy(UpsertConfig upsertConfig,
+      ParallelSegmentConsumptionPolicy policy) {
+    return createTableConfigWithConsumptionPolicy(upsertConfig, policy, false);
+  }
+
+  private TableConfig createTableConfigWithConsumptionPolicy(UpsertConfig upsertConfig,
+      ParallelSegmentConsumptionPolicy policy, boolean pauseless) {
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(getStreamConfigs()));
+    streamIngestionConfig.setParallelSegmentConsumptionPolicy(policy);
+    streamIngestionConfig.setPauselessConsumptionEnabled(pauseless);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
+        .setIngestionConfig(ingestionConfig)
+        .build();
   }
 
   @Test

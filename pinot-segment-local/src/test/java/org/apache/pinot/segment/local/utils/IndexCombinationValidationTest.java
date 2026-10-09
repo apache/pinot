@@ -20,13 +20,17 @@ package org.apache.pinot.segment.local.utils;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.FieldConfig.IndexType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -659,5 +663,118 @@ public class IndexCombinationValidationTest {
       assertTrue(msg.contains(STR_COL), "Error should name the column");
       assertTrue(msg.contains("without dictionary"), "Error should explain the problem");
     }
+  }
+
+  // ============================================================
+  // 13. BitSliced range index (version 2) on ingestion-aggregated columns
+  //     Ingestion-time metrics aggregation forces its aggregated metric columns to be no-dictionary and does not
+  //     track their min/max during consumption. The value domain is recovered by scanning the sealed forward index
+  //     at segment build time (see MutableNoDictColumnStatistics), so the combination is supported and must pass
+  //     table-config validation.
+  // ============================================================
+
+  private static final String AGG_METRIC_COL = "m1";     // LONG metric, aggregation destination
+  private static final String AGG_SOURCE_COL = "s1";     // INT dimension, aggregation source
+  private static final String TIME_COL = "ts";           // realtime tables require a time column
+
+  /// Schema with a metric (aggregation destination), a dimension source column, and a time column.
+  private static Schema aggregationSchema() {
+    return new Schema.SchemaBuilder()
+        .setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(AGG_SOURCE_COL, DataType.INT)
+        .addMetric(AGG_METRIC_COL, DataType.LONG)
+        .addDateTime(TIME_COL, DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+  }
+
+  private static Map<String, String> streamConfigs() {
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("streamType", "kafka");
+    streamConfigs.put("stream.kafka.topic.name", "test");
+    streamConfigs.put("stream.kafka.decoder.class.name",
+        "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
+    return streamConfigs;
+  }
+
+  /// REALTIME table builder wired with a stream config and time column so full validation can run.
+  private static TableConfigBuilder realtimeBuilder() {
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COL)
+        .setStreamConfigs(streamConfigs());
+  }
+
+  /// IngestionConfig that aggregates `SUM(s1)` into the no-dictionary metric column `m1`.
+  private static IngestionConfig sumAggregationIngestionConfig() {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setAggregationConfigs(
+        List.of(new AggregationConfig(AGG_METRIC_COL, "SUM(" + AGG_SOURCE_COL + ")")));
+    return ingestionConfig;
+  }
+
+  private static void assertValid(TableConfig tableConfig, Schema schema) {
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      fail("Expected validation to pass but got: " + e.getMessage(), e);
+    }
+  }
+
+  @Test
+  public void testRangeIndexOnIngestionAggregatedColumnPasses() {
+    // aggregationConfigs (SUM into a no-dictionary metric column) + BitSliced range index on that metric column.
+    // Min/max are recovered at segment build time, so this combination is accepted.
+    TableConfig tc = realtimeBuilder()
+        .setIngestionConfig(sumAggregationIngestionConfig())
+        .setNoDictionaryColumns(List.of(AGG_METRIC_COL))
+        .setRangeIndexColumns(List.of(AGG_METRIC_COL))
+        .build();
+    assertValid(tc, aggregationSchema());
+  }
+
+  @Test
+  public void testRangeIndexOnAggregateMetricsColumnPasses() {
+    // Legacy aggregateMetrics flag (implicitly SUMs every metric) + BitSliced range index on the no-dictionary
+    // metric column. Also accepted for the same reason.
+    TableConfig tc = realtimeBuilder()
+        .setAggregateMetrics(true)
+        .setNoDictionaryColumns(List.of(AGG_METRIC_COL))
+        .setRangeIndexColumns(List.of(AGG_METRIC_COL))
+        .build();
+    assertValid(tc, aggregationSchema());
+  }
+
+  @Test
+  public void testRangeIndexV1OnIngestionAggregatedColumnPasses() {
+    // Version 1 (legacy) range index does not read min/max, so it is safe on an aggregated no-dictionary column.
+    TableConfig tc = realtimeBuilder()
+        .setIngestionConfig(sumAggregationIngestionConfig())
+        .setNoDictionaryColumns(List.of(AGG_METRIC_COL))
+        .setRangeIndexColumns(List.of(AGG_METRIC_COL))
+        .build();
+    tc.getIndexingConfig().setRangeIndexVersion(1);
+    assertValid(tc, aggregationSchema());
+  }
+
+  @Test
+  public void testRangeIndexOnNonAggregatedNoDictNumericColumnPasses() {
+    // A plain no-dictionary numeric column (not an aggregation destination) still supports the range index.
+    TableConfig tc = realtimeBuilder()
+        .setIngestionConfig(sumAggregationIngestionConfig())
+        .setNoDictionaryColumns(List.of(AGG_METRIC_COL, AGG_SOURCE_COL))
+        .setRangeIndexColumns(List.of(AGG_SOURCE_COL))
+        .build();
+    assertValid(tc, aggregationSchema());
+  }
+
+  @Test
+  public void testRangeIndexOnAggregatedColumnOfflineTablePasses() {
+    // Ingestion aggregation is inert for OFFLINE tables (min/max are computed normally), so the range index is
+    // allowed there - the validation is scoped to REALTIME to avoid over-rejecting inert offline configs.
+    TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIngestionConfig(sumAggregationIngestionConfig())
+        .setNoDictionaryColumns(List.of(AGG_METRIC_COL))
+        .setRangeIndexColumns(List.of(AGG_METRIC_COL))
+        .build();
+    assertValid(tc, aggregationSchema());
   }
 }

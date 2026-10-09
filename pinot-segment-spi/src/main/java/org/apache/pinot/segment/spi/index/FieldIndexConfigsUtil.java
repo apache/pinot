@@ -58,26 +58,72 @@ public class FieldIndexConfigsUtil {
   }
 
   /// Builds a [FieldIndexConfigs] for a single column directly from one [FieldConfig], without a
-  /// `TableConfig` or `Schema`. The dictionary entry is derived from `fieldConfig.getEncodingType()`
-  /// (RAW => disabled, otherwise default-enabled); every other index type is read from the modern
-  /// `fieldConfig.getIndexes()` JSON (keyed by index pretty name), falling back to each type's default config.
-  /// A `null` fieldConfig yields built-in defaults (dictionary enabled).
+  /// `TableConfig` or `Schema`. The dictionary and forward entries are both derived from
+  /// `fieldConfig.getEncodingType()` (RAW => dictionary disabled and a raw forward index, otherwise
+  /// dictionary default-enabled and a dict-encoded forward index); every other index type is read from the
+  /// modern `fieldConfig.getIndexes()` JSON (keyed by index pretty name), falling back to each type's default
+  /// config. A `null` fieldConfig yields built-in defaults (dictionary enabled).
   ///
   /// This reads only the modern `indexes` format and never legacy `IndexingConfig` lists, so it suits
   /// synthetic columns (e.g. OPEN_STRUCT materialized children) that exist in no schema.
   public static FieldIndexConfigs fromFieldConfig(@Nullable FieldConfig fieldConfig, FieldSpec fieldSpec) {
     FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder();
-    boolean rawEncoded = fieldConfig != null && fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW;
-    builder.add(StandardIndexes.dictionary(),
-        rawEncoded ? DictionaryIndexConfig.DISABLED : DictionaryIndexConfig.DEFAULT);
+    FieldConfig.EncodingType declaredEncoding =
+        fieldConfig != null && fieldConfig.getEncodingType() != null ? fieldConfig.getEncodingType()
+            : FieldConfig.EncodingType.DICTIONARY;
     JsonNode indexes = fieldConfig != null ? fieldConfig.getIndexes() : null;
+    // `indexes.dictionary` decides when it is there, and the column-level encoding decides otherwise. Both spellings
+    // have to work: every other column turns a dictionary on through `indexes`, and a reader who has learned that
+    // will write it here too -- silently ignoring it leaves them with a raw column and no clue why.
+    boolean dictionaryEncoded =
+        declaredEncoding != FieldConfig.EncodingType.RAW || dictionaryEnabledByIndexes(indexes);
+    builder.add(StandardIndexes.dictionary(),
+        dictionaryEncoded ? DictionaryIndexConfig.DEFAULT : DictionaryIndexConfig.DISABLED);
+    // The forward index follows the dictionary decision, not the declared encoding: a key declared RAW whose
+    // dictionary was turned on through `indexes` needs a dict-encoded forward index, or a reload rebuilds one over
+    // a dictionary that is not there ("Dictionary should still exist after rebuilding dict-encoded forward index").
+    FieldConfig.EncodingType encodingType =
+        dictionaryEncoded ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW;
     for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
       if (indexType.getId().equals(StandardIndexes.DICTIONARY_ID)) {
+        continue;
+      }
+      if (indexType.getId().equals(StandardIndexes.FORWARD_ID)) {
+        // The forward index carries an encoding of its own, and [ForwardIndexConfig]'s JSON default is
+        // DICTIONARY whatever the column-level encoding says. Left alone, a RAW column would ask for a
+        // dict-encoded forward index over the dictionary disabled above -- which a reload tries to honour and
+        // fails on ("Dictionary should still exist after rebuilding dict-encoded forward index"). Keep the two
+        // in step.
+        builder.add(StandardIndexes.forward(), forwardConfig(indexType, indexes, encodingType));
         continue;
       }
       addConfigFromIndexes(builder, indexType, indexes);
     }
     return builder.build();
+  }
+
+  /// Whether `indexes.dictionary` asks for a dictionary. It can only turn one *on*: that is how a dictionary is
+  /// enabled on every other kind of column, and a reader who has learned that spelling will use it here too.
+  /// Turning one off is left to `encodingType`, so a `disabled` entry that contradicts the column's own encoding
+  /// stays a contradiction rather than silently winning.
+  private static boolean dictionaryEnabledByIndexes(@Nullable JsonNode indexes) {
+    JsonNode dictionary = indexes != null ? indexes.get(StandardIndexes.DICTIONARY_ID) : null;
+    return dictionary != null && dictionary.isObject() && !dictionary.path("disabled").asBoolean(false);
+  }
+
+  private static ForwardIndexConfig forwardConfig(IndexType<?, ?, ?> forwardIndexType, @Nullable JsonNode indexes,
+      FieldConfig.EncodingType encodingType) {
+    JsonNode node = indexes != null ? indexes.get(forwardIndexType.getPrettyName()) : null;
+    if (node == null) {
+      return ForwardIndexConfig.getDefault(encodingType);
+    }
+    ForwardIndexConfig configured;
+    try {
+      configured = JsonUtils.jsonNodeToObject(node, ForwardIndexConfig.class);
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Failed to parse 'forward' index config from FieldConfig", e);
+    }
+    return new ForwardIndexConfig.Builder(configured, encodingType).build();
   }
 
   private static <C extends IndexConfig> void addConfigFromIndexes(FieldIndexConfigs.Builder builder,

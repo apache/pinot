@@ -86,9 +86,12 @@ public final class ListenerConfigUtil {
       return new ArrayList<>();
     }
 
+    // Trim each protocol and skip empty ones. Cluster configs are applied with setProperty(), which keeps the raw
+    // value, so a value like "http, https" is not split or trimmed by the config.
     String[] protocols = config.getProperty(namespace + DOT_ACCESS_PROTOCOLS).split(",");
 
-    return Arrays.stream(protocols).map(protocol -> buildListenerConfig(config, namespace, protocol, tlsDefaults))
+    return Arrays.stream(protocols).map(String::trim).filter(protocol -> !protocol.isEmpty())
+        .map(protocol -> buildListenerConfig(config, namespace, protocol, tlsDefaults))
         .collect(Collectors.toList());
   }
 

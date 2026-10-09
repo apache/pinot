@@ -95,6 +95,7 @@ import org.apache.pinot.core.routing.timeboundary.TimeBoundaryStrategy;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryStrategyService;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -132,7 +133,8 @@ import org.slf4j.LoggerFactory;
 ///
 /// TODO: Expose RoutingEntry class to get a consistent view in the broker request handler and save the redundant map
 ///       lookups.
-public abstract class BaseBrokerRoutingManager implements RoutingManager, ClusterChangeHandler {
+public abstract class BaseBrokerRoutingManager
+    implements RoutingManager, ClusterChangeHandler, PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRoutingManager.class);
   private static final long INITIAL_INSTANCE_CONFIG_RETRY_DELAY_MS = 1_000L;
   private static final long MAX_INSTANCE_CONFIG_RETRY_DELAY_MS = 30_000L;
@@ -141,11 +143,14 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   protected final BrokerMetrics _brokerMetrics;
   protected final Map<String, RoutingEntry> _routingEntryMap = new ConcurrentHashMap<>();
   private final Map<String, ServerInstance> _enabledServerInstanceMap = new ConcurrentHashMap<>();
+  // Broker tracking stays active while the server-side readiness flag is off, allowing the server gate to be enabled
+  // after brokers have the acknowledgement state. Each instance change scans routing entries for newly pending
+  // servers, and retries retain only the unacknowledged per-table work.
   // A server is inserted with an empty marker before it is published in _enabledServerInstanceMap. Before it is
   // published in the routable map, the marker is replaced with the tables that can route to that server. Each table is
   // removed only after its selector processes the change, so a failure for an unrelated table does not block the
-  // server's readiness acknowledgement. Values are immutable snapshots because the readiness path reads this map
-  // without taking the global lock.
+  // server's readiness acknowledgement. Table sets are installed under the global write lock and removals are
+  // serialized by ConcurrentHashMap.computeIfPresent; the lock-free readiness path checks map membership only.
   private final Map<String, Set<String>> _serversPendingRoutingUpdate = new ConcurrentHashMap<>();
   // Failed instance changes retained per table. This is separate from server readiness because removals and failures
   // for unrelated tables still need retrying even though they must not hold a server's readiness acknowledgement.
@@ -191,6 +196,9 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   private String _instanceConfigsPath;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
+  private volatile int _partitionPruningPreparationThreshold =
+      CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD;
+
   /// Snapshot of `_enabledServerInstanceMap` restricted to enabled-minus-excluded servers. Replaced atomically under
   /// `_globalLock.writeLock()` whenever routing membership changes. Serves as the single source of truth for routable
   /// servers: its `keySet()` is passed to `InstanceSelector` for per-table selection, and callers that pick workers
@@ -230,6 +238,25 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     _idealStatePathPrefix = helixDataAccessor.keyBuilder().idealStates().getPath() + "/";
     _instanceConfigsPath = helixDataAccessor.keyBuilder().instanceConfigs().getPath();
     _propertyStore = helixManager.getHelixPropertyStore();
+  }
+
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    String key = CommonConstants.Broker.CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD;
+    int updatedThreshold = CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD;
+    String value = clusterConfigs.get(key);
+    if (value != null) {
+      try {
+        updatedThreshold = Integer.parseInt(value);
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Ignoring invalid partition pruning threshold: {}={}", key, value);
+      }
+    }
+    _partitionPruningPreparationThreshold = updatedThreshold;
+  }
+
+  int getPartitionPruningPreparationThreshold() {
+    return _partitionPruningPreparationThreshold;
   }
 
   /// Sets a callback to be invoked when a server is re-enabled after being excluded.
@@ -416,6 +443,13 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     _globalLock.writeLock().lock();
     try {
       processInstanceConfigChangeInternal();
+    } catch (RuntimeException e) {
+      // A callback can fail before the first table pass (for example while finding relevant tables). Keep the
+      // publication marker and arrange another pass even when no per-table failure has been recorded yet.
+      if (!_serversPendingRoutingUpdate.isEmpty() || !_pendingRoutingUpdatesByTable.isEmpty()) {
+        scheduleInstanceConfigRetry();
+      }
+      throw e;
     } finally {
       _globalLock.writeLock().unlock();
     }
@@ -479,16 +513,16 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       }
     }
 
-    // Calculate the routable servers and the changed routable servers. Include servers left pending by an aborted prior
-    // refresh so the next callback retries their routing publication.
+    // Calculate the routable servers and the changed routable servers. Already pending servers are retried only for
+    // their unacknowledged tables, so a failed table cannot repeatedly rebuild selectors that already succeeded.
     List<String> pendingEnabledServers = new ArrayList<>();
     for (String server : enabledServers) {
       if (_serversPendingRoutingUpdate.containsKey(server)) {
         pendingEnabledServers.add(server);
       }
     }
-    List<String> changedServers = new ArrayList<>(pendingEnabledServers.size() + newDisabledServers.size());
-    changedServers.addAll(pendingEnabledServers);
+    List<String> changedServers = new ArrayList<>(newEnabledServers.size() + newDisabledServers.size());
+    changedServers.addAll(newEnabledServers);
     // A disabled server must reach every selector regardless of whether a different server is excluded. Otherwise the
     // disabled server can remain in the selectors indefinitely.
     changedServers.addAll(newDisabledServers);
@@ -499,7 +533,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     long calculateChangedServersEndTimeMs = System.currentTimeMillis();
 
     // Early terminate only when there is neither a new change nor failed per-table work to retry.
-    if (changedServers.isEmpty() && _pendingRoutingUpdatesByTable.isEmpty()) {
+    if (changedServers.isEmpty() && _pendingRoutingUpdatesByTable.isEmpty()
+        && _serversPendingRoutingUpdate.isEmpty()) {
       _instanceConfigRetryDelayMs.set(INITIAL_INSTANCE_CONFIG_RETRY_DELAY_MS);
       LOGGER.info("Processed instance config change in {}ms "
               + "(fetch {} instance configs: {}ms, calculate changed servers: {}ms) without instance change",
@@ -512,14 +547,12 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     updateRoutingEntriesOnInstancesChange(changedServers);
     long updateRoutingEntriesEndTimeMs = System.currentTimeMillis();
 
-    if (_pendingRoutingUpdatesByTable.isEmpty()) {
-      _instanceConfigRetryDelayMs.set(INITIAL_INSTANCE_CONFIG_RETRY_DELAY_MS);
-    } else {
+    if (!_pendingRoutingUpdatesByTable.isEmpty()) {
       logInstanceConfigRetryFailure(
           "Keeping failed per-table instance changes pending for retry: {}", null,
           _pendingRoutingUpdatesByTable.keySet());
-      scheduleInstanceConfigRetry();
     }
+    updateInstanceConfigRetrySchedule();
 
     // Remove new disabled servers from _enabledServerInstanceMap after updating all routing entries to ensure it
     // always contains the selected servers
@@ -537,19 +570,22 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
         newDisabledServers, _excludedServers);
   }
 
-  /// Replaces each server's publication marker with the exact tables whose primary selector can route to it. Must run
-  /// before the server is published in `_routableServerInstanceMap` so the lock-free readiness check cannot observe a
-  /// routable server without also observing its pending acknowledgements.
+  /// Initializes an empty publication marker with the tables whose primary selector can route to the server. A
+  /// nonempty marker belongs to an earlier pass and retains its completed acknowledgements across retries. Must run
+  /// before publishing the routable map so the lock-free readiness check observes the pending marker first.
   @GuardedBy("_globalLock.writeLock()")
   private void markServersPendingRelevantTableUpdates(List<String> servers) {
     for (String server : servers) {
+      if (!_serversPendingRoutingUpdate.get(server).isEmpty()) {
+        continue;
+      }
       Set<String> relevantTables = new HashSet<>();
       for (RoutingEntry routingEntry : _routingEntryMap.values()) {
         if (routingEntry.isServerAssigned(server)) {
           relevantTables.add(routingEntry.getTableNameWithType());
         }
       }
-      _serversPendingRoutingUpdate.put(server, Set.copyOf(relevantTables));
+      _serversPendingRoutingUpdate.put(server, relevantTables);
     }
   }
 
@@ -557,9 +593,23 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   /// acknowledge only the servers they can route; failed tables retain their complete change set for the retry.
   @GuardedBy("_globalLock.writeLock()")
   private void updateRoutingEntriesOnInstancesChange(List<String> changedServers) {
+    Map<String, List<String>> pendingServersByTable = new HashMap<>();
+    _serversPendingRoutingUpdate.forEach((server, tables) -> {
+      for (String table : tables) {
+        pendingServersByTable.computeIfAbsent(table, ignored -> new ArrayList<>()).add(server);
+      }
+    });
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       String tableNameWithType = routingEntry.getTableNameWithType();
       List<String> tableChangedServers = new ArrayList<>(changedServers);
+      List<String> pendingAcknowledgements = pendingServersByTable.get(tableNameWithType);
+      if (pendingAcknowledgements != null) {
+        for (String pendingServer : pendingAcknowledgements) {
+          if (!tableChangedServers.contains(pendingServer)) {
+            tableChangedServers.add(pendingServer);
+          }
+        }
+      }
       Set<String> pendingServers = _pendingRoutingUpdatesByTable.get(tableNameWithType);
       if (pendingServers != null) {
         for (String pendingServer : pendingServers) {
@@ -589,7 +639,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
 
     // A table can disappear after work was retained but before a retry. It can no longer route to any server, so it
     // must neither be retried forever nor keep a readiness acknowledgement pending.
-    for (String tableNameWithType : Set.copyOf(_pendingRoutingUpdatesByTable.keySet())) {
+    for (String tableNameWithType : _pendingRoutingUpdatesByTable.keySet()) {
       if (!_routingEntryMap.containsKey(tableNameWithType)) {
         _pendingRoutingUpdatesByTable.remove(tableNameWithType);
         acknowledgeRoutingUpdate(tableNameWithType);
@@ -602,15 +652,23 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   }
 
   private void acknowledgeRoutingUpdate(String tableNameWithType) {
-    for (String server : Set.copyOf(_serversPendingRoutingUpdate.keySet())) {
+    for (String server : _serversPendingRoutingUpdate.keySet()) {
       _serversPendingRoutingUpdate.computeIfPresent(server, (key, pendingTables) -> {
         if (!pendingTables.contains(tableNameWithType)) {
           return pendingTables;
         }
-        Set<String> remainingTables = new HashSet<>(pendingTables);
-        remainingTables.remove(tableNameWithType);
-        return remainingTables.isEmpty() ? null : Set.copyOf(remainingTables);
+        pendingTables.remove(tableNameWithType);
+        return pendingTables.isEmpty() ? null : pendingTables;
       });
+    }
+  }
+
+  @GuardedBy("_globalLock.writeLock()")
+  private void updateInstanceConfigRetrySchedule() {
+    if (_pendingRoutingUpdatesByTable.isEmpty()) {
+      _instanceConfigRetryDelayMs.set(INITIAL_INSTANCE_CONFIG_RETRY_DELAY_MS);
+    } else {
+      scheduleInstanceConfigRetry();
     }
   }
 
@@ -717,11 +775,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     _serversPendingRoutingUpdate.remove(instanceId);
     List<String> changedServers = List.of(instanceId);
     updateRoutingEntriesOnInstancesChange(changedServers);
-    if (_pendingRoutingUpdatesByTable.isEmpty()) {
-      _instanceConfigRetryDelayMs.set(INITIAL_INSTANCE_CONFIG_RETRY_DELAY_MS);
-    } else {
-      scheduleInstanceConfigRetry();
-    }
+    updateInstanceConfigRetrySchedule();
     LOGGER.info("Excluded server: {} from routing in {}ms (updated {} routing entries)", instanceId,
         System.currentTimeMillis() - startTimeMs, _routingEntryMap.size());
   }
@@ -731,6 +785,13 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     _globalLock.writeLock().lock();
     try {
       includeServerToRoutingInternal(instanceId);
+    } catch (RuntimeException e) {
+      // A failure while finding relevant tables happens before per-table retries are recorded. The exclusion has
+      // already been removed, so another include call would be a no-op; let the instance refresh finish publication.
+      if (_serversPendingRoutingUpdate.containsKey(instanceId)) {
+        scheduleInstanceConfigRetry();
+      }
+      throw e;
     } finally {
       _globalLock.writeLock().unlock();
     }
@@ -760,11 +821,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     _routableServerInstanceMap = routableServerInstanceMap;
     List<String> changedServers = List.of(instanceId);
     updateRoutingEntriesOnInstancesChange(changedServers);
-    if (_pendingRoutingUpdatesByTable.isEmpty()) {
-      _instanceConfigRetryDelayMs.set(INITIAL_INSTANCE_CONFIG_RETRY_DELAY_MS);
-    } else {
-      scheduleInstanceConfigRetry();
-    }
+    updateInstanceConfigRetrySchedule();
     LOGGER.info("Included server: {} to routing in {}ms (updated {} routing entries)", instanceId,
         System.currentTimeMillis() - startTimeMs, _routingEntryMap.size());
   }
@@ -965,7 +1022,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       segmentSelector.init(idealState, externalView, preSelectedOnlineSegments);
 
       // Register segment pruners and initialize segment zk metadata fetcher.
-      List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+      List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore,
+          this::getPartitionPruningPreparationThreshold);
 
       AdaptiveServerSelector adaptiveServerSelector =
           AdaptiveServerSelectorFactory.getAdaptiveServerSelector(_serverRoutingStatsManager, _pinotConfig);

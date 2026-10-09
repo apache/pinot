@@ -65,6 +65,20 @@
         ]
       },
       {
+        "description": "Inner join with an IN_ID_SET filter on one table, which is pushed into the leaf stage",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE IN_ID_SET(a.col3, 'ATowAAABAAAAAAACABAAAAACAAQABgA=') = 1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalJoin(condition=[=($0, $10)], joinType=[inner])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    LogicalFilter(condition=[INIDSET($2, _UTF-8'ATowAAABAAAAAAACABAAAAACAAQABgA=')])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalExchange(distribution=[hash[1]])",
+          "\n    PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
         "description": "SELECT * inner join with filter",
         "sql": "EXPLAIN PLAN FOR SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND a.col3 > b.col3",
         "output": [
