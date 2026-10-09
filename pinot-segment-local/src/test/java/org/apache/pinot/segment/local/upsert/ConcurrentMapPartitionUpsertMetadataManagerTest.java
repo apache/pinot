@@ -358,7 +358,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap snapshot = new ThreadSafeMutableRoaringBitmap();
     snapshot.add(0);
     snapshot.add(2);
-    segment2.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, snapshot.getBytesAndCardinality());
+    segment2.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, snapshot.getBytesAndCardinality(),
+        null);
 
     upsertMetadataManager.replaceSegment(segment2, segment1);
 

@@ -831,13 +831,23 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         //   persisted.
         // Take upsert snapshot before starting consuming events
         if (_partitionUpsertMetadataManager != null) {
+          // If the previous consuming segment released the semaphore to build or download in parallel, it can still be
+          // mutable in the metadata, so this replica's snapshot covers its rows up to where it stopped. Only use a
+          // record left by the segment right before this one. An older segment's offset would make this replica look
+          // far behind, although it consumed every segment since.
+          ConsumerCoordinator.UnsealedRelease unsealedRelease = _consumerCoordinator.getUnsealedRelease();
+          LLCSegmentName releasedSegment =
+              unsealedRelease != null ? LLCSegmentName.of(unsealedRelease.segmentName()) : null;
+          String consumedUpToOffset =
+              releasedSegment != null && releasedSegment.getSequenceNumber() == _llcSegmentName.getSequenceNumber() - 1
+                  ? unsealedRelease.stoppedAtOffset().toString() : _startOffset.toString();
           if (_partitionUpsertMetadataManager.getContext().getMetadataTTL() > 0) {
             // If upsertMetadataTTL is enabled, we will remove expired primary keys from upsertMetadata
             // AFTER taking a snapshot. Taking the snapshot first is crucial to capture the final
             // state of each key before it exits the TTL window. Out-of-TTL segments are skipped in
             // the doAddSegment flow, and the snapshot is used to enableUpsert on the immutable out-of-TTL segment.
             // If no snapshot is found, the entire segment is marked as valid and queryable.
-            _partitionUpsertMetadataManager.takeSnapshot();
+            _partitionUpsertMetadataManager.takeSnapshot(_segmentNameStr, consumedUpToOffset);
             _partitionUpsertMetadataManager.removeExpiredPrimaryKeys();
           } else {
             // We should remove deleted-keys first and then take a snapshot. This is because the deletedKeysTTL
@@ -845,7 +855,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             // after this process, we save one commit cycle, ensuring that the deletion of valid doc IDs is reflected
             // immediately
             _partitionUpsertMetadataManager.removeExpiredPrimaryKeys();
-            _partitionUpsertMetadataManager.takeSnapshot();
+            _partitionUpsertMetadataManager.takeSnapshot(_segmentNameStr, consumedUpToOffset);
           }
         }
 
@@ -1461,7 +1471,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @VisibleForTesting
   void closeStreamConsumerAndReleaseSemaphore() {
     closeStreamConsumer();
-    releaseConsumerSemaphore();
+    if (_consumerSemaphoreAcquired.compareAndSet(true, false)) {
+      _segmentLogger.info("Releasing consumer semaphore before the segment is sealed, stopped at offset: {}",
+          _currentOffset);
+      _consumerCoordinator.releaseUnsealed(_segmentNameStr, _currentOffset);
+    }
   }
 
   private void closePartitionGroupConsumer() {
@@ -1821,6 +1835,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _realtimeSegment.offload();
     } finally {
       releaseConsumerSemaphore();
+      _consumerCoordinator.clearUnsealedRelease(_segmentNameStr);
       cleanupMetrics();
     }
   }

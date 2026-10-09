@@ -58,6 +58,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -78,9 +79,11 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.mockito.InOrder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -92,11 +95,13 @@ import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
 // TODO Re-write this test using the stream abstraction
@@ -286,6 +291,78 @@ public class RealtimeSegmentDataManagerTest {
   public void tearDown() {
     FileUtils.deleteQuietly(TEMP_DIR);
     SegmentBuildTimeLeaseExtender.shutdownExecutor();
+  }
+
+  @Test
+  public void testSnapshotTriggerContextBeforeConsumption()
+      throws Exception {
+    for (double metadataTtl : new double[]{0, 1}) {
+      try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+        PartitionUpsertMetadataManager manager = mockUpsertMetadataManager(segmentDataManager, metadataTtl);
+        doAnswer(invocation -> {
+          assertEquals(segmentDataManager.getCurrentOffset().toString(), START_OFFSET.toString());
+          return null;
+        }).when(manager).takeSnapshot(SEGMENT_NAME_STR, START_OFFSET.toString());
+        segmentDataManager._consumeOffsets.add(new LongMsgOffset(START_OFFSET_VALUE + 1));
+        segmentDataManager.createPartitionConsumer().run();
+        InOrder order = inOrder(manager);
+        if (metadataTtl > 0) {
+          order.verify(manager).takeSnapshot(SEGMENT_NAME_STR, START_OFFSET.toString());
+          order.verify(manager).removeExpiredPrimaryKeys();
+        } else {
+          order.verify(manager).removeExpiredPrimaryKeys();
+          order.verify(manager).takeSnapshot(SEGMENT_NAME_STR, START_OFFSET.toString());
+        }
+      }
+    }
+  }
+
+  @DataProvider
+  public Object[][] unsealedReleases() {
+    long ahead = START_OFFSET_VALUE + 50;
+    long behind = START_OFFSET_VALUE - 50;
+    return new Object[][]{
+        // The previous segment discarded its copy after consuming past this segment's start offset.
+        {SEQUENCE_ID - 1, ahead, ahead},
+        // The previous segment could not catch up and is downloading, so its rows end before this segment's start.
+        {SEQUENCE_ID - 1, behind, behind},
+        // An older segment was never offloaded, but this replica consumed the segments after it.
+        {SEQUENCE_ID - 2, behind, START_OFFSET_VALUE}
+    };
+  }
+
+  @Test(dataProvider = "unsealedReleases")
+  public void testSnapshotTriggerUsesWhereUnsealedPreviousSegmentStopped(int releasedSequence, long stoppedAt,
+      long expectedConsumedUpTo)
+      throws Exception {
+    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      // The released segment is still mutable in the upsert metadata when this segment starts consuming.
+      ConsumerCoordinator consumerCoordinator = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID);
+      Assert.assertTrue(consumerCoordinator.getSemaphore().tryAcquire());
+      String releasedSegment =
+          new LLCSegmentName(RAW_TABLE_NAME, PARTITION_GROUP_ID, releasedSequence, SEG_TIME_MS).getSegmentName();
+      consumerCoordinator.releaseUnsealed(releasedSegment, new LongMsgOffset(stoppedAt));
+      PartitionUpsertMetadataManager manager = mockUpsertMetadataManager(segmentDataManager, 0);
+      segmentDataManager._consumeOffsets.add(new LongMsgOffset(START_OFFSET_VALUE + 1));
+      segmentDataManager.createPartitionConsumer().run();
+      verify(manager).takeSnapshot(SEGMENT_NAME_STR, Long.toString(expectedConsumedUpTo));
+    } finally {
+      _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    }
+  }
+
+  private static PartitionUpsertMetadataManager mockUpsertMetadataManager(
+      FakeRealtimeSegmentDataManager segmentDataManager, double metadataTtl)
+      throws Exception {
+    PartitionUpsertMetadataManager manager = mock(PartitionUpsertMetadataManager.class);
+    UpsertContext context = mock(UpsertContext.class);
+    when(manager.getContext()).thenReturn(context);
+    when(context.getMetadataTTL()).thenReturn(metadataTtl);
+    Field managerField = RealtimeSegmentDataManager.class.getDeclaredField("_partitionUpsertMetadataManager");
+    managerField.setAccessible(true);
+    managerField.set(segmentDataManager, manager);
+    return manager;
   }
 
   // Test that we are in HOLDING state as long as the controller responds HOLD to our segmentConsumed() message.
@@ -765,6 +842,11 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertEquals(semaphore.availablePermits(), 1,
           "Consumer semaphore must be released for parallel consumption");
       Assert.assertFalse(segmentDataManager.getConsumerSemaphoreAcquired().get());
+      ConsumerCoordinator.UnsealedRelease unsealedRelease =
+          _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getUnsealedRelease();
+      Assert.assertNotNull(unsealedRelease, "The next consumer must see where this still mutable segment stopped");
+      Assert.assertEquals(unsealedRelease.segmentName(), SEGMENT_NAME_STR);
+      Assert.assertEquals(unsealedRelease.stoppedAtOffset().toString(), START_OFFSET.toString());
 
       MutableSegmentImpl realtimeSegment = spy((MutableSegmentImpl) segmentDataManager.getSegment());
       doAnswer(invocation -> null).when(realtimeSegment).offload();
@@ -774,6 +856,8 @@ public class RealtimeSegmentDataManagerTest {
 
       verify(realtimeSegment).offload();
       Assert.assertEquals(semaphore.availablePermits(), 1, "Offload must not release the consumer semaphore twice");
+      Assert.assertNull(_partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getUnsealedRelease(),
+          "Offload must clear the unsealed release");
     }
   }
 
