@@ -142,10 +142,10 @@ public class CalciteSqlParser {
       // add legacy OPTIONS keyword-based options
       if (!options.isEmpty()) {
         if (legacyOptionSyntaxMode == SqlOptionsMode.IGNORE) {
-          // Dropping a DELETE option (e.g. dryRun) would change its effect.
-          if (sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
+          // Dropping a DML option (e.g. the dryRun of a DELETE, the taskName of an INSERT) would change its effect.
+          if (sqlNodeAndOptions.getSqlType() == PinotSqlType.DML) {
             throw new SqlCompilationException("Legacy OPTION(...) options are ignored on this cluster, use "
-                + "'SET <key> = <value>;' statements to configure DELETE: " + options);
+                + "'SET <key> = <value>;' statements to configure a DML statement (INSERT, DELETE): " + options);
           }
         } else {
           Map<String, String> optionMap = extractOptionsMap(options);
@@ -169,6 +169,10 @@ public class CalciteSqlParser {
     SqlNode statementNode = null;
     Map<String, String> options = new HashMap<>();
     for (SqlNode sqlNode : sqlNodeList) {
+      if (sqlNode instanceof SqlExplain && ((SqlExplain) sqlNode).getExplicandum() instanceof SqlDelete) {
+        // Otherwise classified as a query, which fails later with a cast error when the DELETE is compiled
+        throw new SqlCompilationException("EXPLAIN is not supported for DELETE");
+      }
       if (sqlNode instanceof SqlInsertFromFile || sqlNode instanceof SqlDelete) {
         // extract DML statement (execution statement)
         if (sqlType == null) {

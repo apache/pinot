@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.annotations.VisibleForTesting;
 import io.swagger.annotations.ApiOperation;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -225,9 +226,11 @@ public class PinotQueryResource {
       sqlQueries.add(sql);
     }
     for (String sqlQuery : sqlQueries) {
-      Map<String, String> queryOptionsMap = RequestUtils.parseQuery(sqlQuery).getOptions();
-      String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
       try {
+        // Parsed inside the try, so that a query that does not parse (e.g. one using the legacy OPTION(...) syntax
+        // while the cluster rejects it) reports a failed compilation for that query rather than failing the request
+        Map<String, String> queryOptionsMap = RequestUtils.parseQuery(sqlQuery).getOptions();
+        String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
         TableCache tableCache;
         if (CollectionUtils.isNotEmpty(request.getTableConfigs()) && CollectionUtils.isNotEmpty(request.getSchemas())) {
           tableCache =
@@ -447,14 +450,17 @@ public class PinotQueryResource {
   /// The caller is first checked without a table (the `READ` access type with the `/sql` endpoint, as for a
   /// multi-stage query), before the statement is parsed and its table looked up: with basic auth, an unauthenticated
   /// caller gets HTTP 401 here, before the table cache is consulted. The table is then resolved, with the database of
-  /// the request and in the case it is defined with, the caller authorized to delete rows from it, and only then is
-  /// the table checked to exist, so that the existence of a table is not leaked to a caller who is not authorized for
-  /// it. The executor deletes rows from that exact table.
+  /// the request and in the case it is defined with, and the caller authorized to delete rows from the resolved
+  /// table. Only then is the table checked not to be a logical table and to exist, and every error message names the
+  /// table as the caller wrote it, so that a caller who is not authorized for a table learns neither whether it exists
+  /// nor the case it is defined with, nor whether the name is a logical table. The executor deletes rows from the
+  /// exact resolved table.
   ///
   /// The executor runs before the response streams, so that an exception it lets escape is mapped to an error
   /// response by [#executeSqlQueryCatching] rather than failing the request with HTTP 500.
   ///
   /// @throws QueryException with [QueryErrorCode#ACCESS_DENIED] if the caller is not authorized, with
+  ///                        [QueryErrorCode#QUERY_VALIDATION] if the table is a logical table, with
   ///                        [QueryErrorCode#TABLE_DOES_NOT_EXIST] if the table does not exist, and with the errors of
   ///                        [DataManipulationStatementParser#parse] and [DeleteStatement#resolveTableName]
   private StreamingOutput executeDelete(SqlNodeAndOptions sqlNodeAndOptions, HttpHeaders httpHeaders) {
@@ -462,15 +468,19 @@ public class PinotQueryResource {
     if (!accessControl.hasAccess(AccessType.READ, httpHeaders, SQL_ENDPOINT)) {
       throw QueryErrorCode.ACCESS_DENIED.asException("Permission denied to delete rows");
     }
-    DeleteStatement statement = ((DeleteStatement) DataManipulationStatementParser.parse(sqlNodeAndOptions))
-        .resolveTableName(httpHeaders.getHeaderString(CommonConstants.DATABASE),
-            _pinotHelixResourceManager.getTableCache());
-    authorizeDelete(accessControl, statement.getTableName(), httpHeaders);
-    if (!statement.tableExists()) {
-      throw QueryErrorCode.TABLE_DOES_NOT_EXIST.asException("Table does not exist: " + statement.getTableName());
+    DeleteStatement parsed = (DeleteStatement) DataManipulationStatementParser.parse(sqlNodeAndOptions);
+    DeleteStatement statement = parsed.resolveTableName(httpHeaders.getHeaderString(CommonConstants.DATABASE),
+        _pinotHelixResourceManager.getTableCache());
+    // Authorized on the resolved table, reported with the name as written
+    String writtenTableName = parsed.getTableName();
+    authorizeDelete(accessControl, statement.getTableName(), writtenTableName, httpHeaders);
+    if (statement.isLogicalTable()) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException("DELETE does not support logical tables: " + writtenTableName);
     }
-    LOGGER.info("Executing DELETE on table: {}, predicate: {}, options: {}, client: {}", statement.getTableName(),
-        statement.getPredicate(), statement.getOptions().keySet(), getClientIp(httpHeaders));
+    if (!statement.tableExists()) {
+      throw QueryErrorCode.TABLE_DOES_NOT_EXIST.asException("Table does not exist: " + writtenTableName);
+    }
+    LOGGER.info(deleteLogMessage(statement, httpHeaders));
     BrokerResponse response = _sqlQueryExecutor.executeStatement(statement, extractHeaders(httpHeaders));
     return output -> {
       try (OutputStream os = output) {
@@ -479,14 +489,41 @@ public class PinotQueryResource {
     };
   }
 
-  /// Client of the request for the log, from the proxy headers as `HttpRequesterIdentity#getClientIp` reads them.
+  /// Formats the log line of a `DELETE` the executor is about to run: the resolved table, the predicate, the option
+  /// keys and the client of the request, in the format of the broker's line so that it parses the same way in the
+  /// logs of both roles. The predicate, the option keys and the client are kept on a single line (see
+  /// [#toSingleLine]), so that a line ending in the statement, in a request option or in a proxy header cannot forge
+  /// a log record.
+  @VisibleForTesting
+  static String deleteLogMessage(DeleteStatement statement, HttpHeaders httpHeaders) {
+    return "Executing DELETE on table: " + statement.getTableName() + ", predicate: "
+        + toSingleLine(statement.getPredicate()) + ", options: "
+        + toSingleLine(statement.getOptions().keySet().toString()) + ", client: "
+        + toSingleLine(getClientIp(httpHeaders));
+  }
+
+  /// Client of the request for the log: the `X-Forwarded-For` header, else the `X-Real-IP` header, else
+  /// [CommonConstants#UNKNOWN]. The addresses of a comma-separated `X-Forwarded-For` value are joined with `;`, the
+  /// format the broker's `HttpRequesterIdentity#getClientIp` logs, so that the field parses the same way in the logs
+  /// of both roles. Both headers are set by the caller unless a proxy overwrites them.
   private static String getClientIp(HttpHeaders httpHeaders) {
     String forwardedFor = httpHeaders.getHeaderString("X-Forwarded-For");
     if (forwardedFor != null) {
-      return forwardedFor;
+      return forwardedFor.replace(',', ';');
     }
     String realIp = httpHeaders.getHeaderString("X-Real-IP");
     return realIp != null ? realIp : CommonConstants.UNKNOWN;
+  }
+
+  /// Escapes backslashes, CR and LF as `\\`, `\r` and `\n`, as the broker's query log does, so that a value the
+  /// caller controls (a string literal or a quoted identifier of the predicate, an option key from `SET`, the legacy
+  /// `OPTION(...)` suffix or the request `queryOptions`, a proxy header) cannot split a log record or append a line
+  /// that looks like a log entry.
+  private static String toSingleLine(String value) {
+    if (value.indexOf('\\') < 0 && value.indexOf('\n') < 0 && value.indexOf('\r') < 0) {
+      return value;
+    }
+    return value.replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n");
   }
 
   /// Authorizes the caller, who passed the caller-level check of [#executeDelete], to delete rows from the table.
@@ -502,14 +539,19 @@ public class PinotQueryResource {
   /// it by default, an access control that does not tell access types apart and allows every fine-grained action
   /// lets every reader of the table delete rows, as it lets them delete segments.
   ///
+  /// @param tableName resolved table name the caller is authorized on
+  /// @param writtenTableName table name as the caller wrote it, which the denial names so that the denial does not
+  ///                         reveal the case the table is defined with (i.e. that it exists)
   /// @throws QueryException with [QueryErrorCode#ACCESS_DENIED] if the caller is not authorized, as for queries
-  private void authorizeDelete(AccessControl accessControl, String tableName, HttpHeaders httpHeaders) {
+  private void authorizeDelete(AccessControl accessControl, String tableName, String writtenTableName,
+      HttpHeaders httpHeaders) {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, SQL_ENDPOINT)
         || !accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.QUERY)
         || !accessControl.hasAccess(rawTableName, AccessType.DELETE, httpHeaders, SQL_ENDPOINT)
         || !accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.DELETE_ROWS)) {
-      throw QueryErrorCode.ACCESS_DENIED.asException("Permission denied to delete rows from table: " + tableName);
+      throw QueryErrorCode.ACCESS_DENIED.asException(
+          "Permission denied to delete rows from table: " + writtenTableName);
     }
   }
 

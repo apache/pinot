@@ -714,11 +714,12 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // max.segment.completion.time.millis is seeded from cluster config before serving requests.
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_pinotLLCRealtimeSegmentManager);
     LOGGER.info("Registered PinotLLCRealtimeSegmentManager as cluster config change listener");
-    // Keeps the query option cluster configs in effect for the statements the controller parses on /sql, as the broker
-    // does: the legacy OPTION(...) syntax mode for every statement, including the DML it executes itself (a DELETE
-    // carrying legacy options fails in IGNORE and REJECT mode), and the validation mode for the queries it parses
-    // before forwarding them
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(new QueryOptionConfigListener());
+    // Keeps the legacy OPTION(...) syntax mode cluster config in effect for the statements the controller parses on
+    // /sql, including the DML it executes itself (a DELETE carrying legacy options fails in IGNORE and REJECT mode).
+    // The query option validation mode is not applied here: the broker validates every query the controller forwards,
+    // and the REJECT allowlist of registered SET keys is per JVM (broker plugins register their keys in the broker
+    // only), so applying it here would reject options the broker accepts
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(QueryOptionConfigListener.legacySyntaxModeOnly());
 
     LOGGER.info("Init controller periodic tasks scheduler");
     _periodicTaskScheduler = new PeriodicTaskScheduler();

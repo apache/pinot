@@ -3400,6 +3400,15 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testExplainDeleteIsRejected() {
+    // EXPLAIN PLAN FOR accepts a DELETE, which has no query plan: rejected at parse time rather than classified as a
+    // query, which fails with a cast error when its plan is compiled
+    SqlCompilationException e = Assert.expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToSqlNodeAndOptions("EXPLAIN PLAN FOR DELETE FROM myTable WHERE a = 1"));
+    Assert.assertTrue(e.getMessage().contains("EXPLAIN is not supported for DELETE"), e.getMessage());
+  }
+
+  @Test
   public void testCompileToExpressionFromSqlNodeNormalizesLikeFromString()
       throws Exception {
     // Both overloads apply the PostgreSQL cast rewrite, so a node parsed by the caller compiles like its SQL text
