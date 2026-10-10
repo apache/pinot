@@ -26,9 +26,14 @@ import org.slf4j.Logger;
 
 public class ControllerApplicationException extends WebApplicationException {
 
-  /// Controls whether server logs include the supplied exception details or only its type.
+  /// Controls whether server logs include the supplied exception details or only its type, and whether the response
+  /// includes its cause chain.
   public enum ExceptionLogMode {
+    /// Logs the exception and includes its cause chain in the response.
     FULL,
+    /// Logs the exception but keeps its cause chain out of the response.
+    LOG_ONLY,
+    /// Logs only the exception type and keeps its cause chain out of the response.
     TYPE_ONLY
   }
 
@@ -55,12 +60,14 @@ public class ControllerApplicationException extends WebApplicationException {
 
   private ControllerApplicationException(Logger logger, String message, int status, @Nullable Throwable e,
       ExceptionLogMode exceptionLogMode) {
-    super(message, status);
+    super(message, exceptionLogMode == ExceptionLogMode.FULL ? e : null, status);
     if (status >= 300 && status < 500) {
       if (e == null) {
         logger.info(message);
       } else if (exceptionLogMode == ExceptionLogMode.TYPE_ONLY) {
         logger.info("{} exception type: {}", message, e.getClass().getName());
+      } else if (message != null && e.getMessage() != null && message.contains(e.getMessage())) {
+        logger.info(message);
       } else {
         logger.info("{} exception: {}", message, e.getMessage());
       }

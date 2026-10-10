@@ -200,7 +200,7 @@ public class PinotTableInstances {
     try {
       tableName = DatabaseUtils.translateTableName(tableName, headers);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, TableType.REALTIME, LOGGER)
@@ -234,7 +234,7 @@ public class PinotTableInstances {
           HttpClient.wrapAndThrowHttpException(HttpClient.getInstance().sendDeleteRequest(URI.create(fullUrl), Map.of(),
               _pinotHelixResourceManager.getServerAdminAuthProvider()));
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
     return new SuccessResponse(simpleHttpResponse.getResponse());
   }
