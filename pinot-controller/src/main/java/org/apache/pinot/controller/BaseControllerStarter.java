@@ -83,6 +83,7 @@ import org.apache.pinot.common.minion.TaskManagerStatusCache;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.config.QueryOptionConfigListener;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -669,8 +670,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new SegmentCompletionManager(_helixParticipantManager, _pinotLLCRealtimeSegmentManager, _controllerMetrics,
             _leadControllerManager, _config.getSegmentCommitTimeoutSeconds(), segmentCompletionConfig);
 
-    _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
-
     _connectionManager = PoolingHttpClientConnectionManagerHelper.createWithSocketFactory();
     _connectionManager.setDefaultSocketConfig(
         SocketConfig.custom()
@@ -715,6 +714,12 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // max.segment.completion.time.millis is seeded from cluster config before serving requests.
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_pinotLLCRealtimeSegmentManager);
     LOGGER.info("Registered PinotLLCRealtimeSegmentManager as cluster config change listener");
+    // Keeps the legacy OPTION(...) syntax mode cluster config in effect for the statements the controller parses on
+    // /sql, including the DML it executes itself (a DELETE carrying legacy options fails in IGNORE and REJECT mode).
+    // The query option validation mode is not applied here: the broker validates every query the controller forwards,
+    // and the REJECT allowlist of registered SET keys is per JVM (broker plugins register their keys in the broker
+    // only), so applying it here would reject options the broker accepts
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(QueryOptionConfigListener.legacySyntaxModeOnly());
 
     LOGGER.info("Init controller periodic tasks scheduler");
     _periodicTaskScheduler = new PeriodicTaskScheduler();
@@ -739,6 +744,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     final MetadataEventNotifierFactory metadataEventNotifierFactory =
         MetadataEventNotifierFactory.loadFactory(_config.subset(METADATA_EVENT_NOTIFIER_PREFIX), _helixResourceManager);
+
+    // Created once the components an executor may use exist, see the Javadoc of the hook
+    _sqlQueryExecutor = createSqlQueryExecutor();
 
     LOGGER.info("Controller download url base: {}", _config.generateVipUrl());
     LOGGER.info("Injecting configuration and resource managers to the API context");
@@ -824,6 +832,21 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   protected PinotLLCRealtimeSegmentManager createPinotLLCRealtimeSegmentManager() {
     return new PinotLLCRealtimeSegmentManager(_helixResourceManager, _config, _controllerMetrics);
+  }
+
+  /// Creates the executor of the DML statements sent to the controller `/sql` endpoint. Override it to execute the
+  /// statements that Pinot parses but does not execute itself, e.g. `DELETE` (see `SqlQueryExecutor#executeDelete`).
+  ///
+  /// It runs once the components an executor may rely on are initialized: `_config`, `_controllerMetrics`,
+  /// `_executorService`, `_leadControllerManager` (started), `_helixResourceManager` (started),
+  /// `_helixTaskResourceManager`, `_pinotLLCRealtimeSegmentManager`, `_connectionManager`, `_taskManager` and the
+  /// other periodic tasks (created, their scheduler started). The admin application is not started yet.
+  ///
+  /// The broker has the same hook, `BaseBrokerStarter#createSqlQueryExecutor`: a statement is executed by the role
+  /// that receives it, so both hooks must be overridden for a DELETE to be executed consistently whichever role it is
+  /// sent to.
+  protected SqlQueryExecutor createSqlQueryExecutor() {
+    return new SqlQueryExecutor(_config.generateVipUrl());
   }
 
   /// Scan all table resources in the cluster and ensure table config and schema exist for each table.

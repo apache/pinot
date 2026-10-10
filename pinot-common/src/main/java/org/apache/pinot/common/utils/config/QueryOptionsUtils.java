@@ -68,7 +68,8 @@ public class QueryOptionsUtils {
   public enum SqlOptionsMode {
     /// The options are applied. Default.
     ALLOW,
-    /// The options are dropped.
+    /// The options are dropped, except that a DML statement (INSERT, DELETE) carrying any fails, since its options
+    /// configure it.
     IGNORE,
     /// The statement fails.
     REJECT

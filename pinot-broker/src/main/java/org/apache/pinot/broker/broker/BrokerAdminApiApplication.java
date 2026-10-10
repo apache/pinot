@@ -27,6 +27,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.io.SocketConfig;
@@ -36,6 +37,7 @@ import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.audit.AuditLogFilter;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -75,11 +77,21 @@ public class BrokerAdminApiApplication extends ResourceConfig {
 
   private HttpServer _httpServer;
 
+  /// Keeps existing broker extensions working. Without a table cache, this application cannot execute DELETE.
   public BrokerAdminApiApplication(BrokerRoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
       BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor,
       ServerRoutingStatsManager serverRoutingStatsManager, AccessControlFactory accessFactory,
       HelixManager helixManager, QueryQuotaManager queryQuotaManager, ThreadAccountant threadAccountant,
       AbstractResponseStore responseStore) {
+    this(routingManager, brokerRequestHandler, brokerMetrics, brokerConf, sqlQueryExecutor, serverRoutingStatsManager,
+        accessFactory, helixManager, queryQuotaManager, threadAccountant, responseStore, null);
+  }
+
+  public BrokerAdminApiApplication(BrokerRoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
+      BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor,
+      ServerRoutingStatsManager serverRoutingStatsManager, AccessControlFactory accessFactory,
+      HelixManager helixManager, QueryQuotaManager queryQuotaManager, ThreadAccountant threadAccountant,
+      AbstractResponseStore responseStore, @Nullable TableCache tableCache) {
     _brokerResourcePackages = brokerConf.getProperty(CommonConstants.Broker.BROKER_RESOURCE_PACKAGES,
         CommonConstants.Broker.DEFAULT_BROKER_RESOURCE_PACKAGES);
     String[] pkgs = _brokerResourcePackages.split(",");
@@ -123,6 +135,9 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(threadAccountant).to(ThreadAccountant.class);
         bind(responseStore).to(AbstractResponseStore.class);
         bind(brokerConf).to(PinotConfiguration.class);
+        if (tableCache != null) {
+          bind(tableCache).to(TableCache.class);
+        }
       }
     });
     boolean enableBoundedJerseyThreadPoolExecutor =

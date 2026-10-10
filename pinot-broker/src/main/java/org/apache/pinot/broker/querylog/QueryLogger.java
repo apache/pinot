@@ -208,7 +208,16 @@ public class QueryLogger {
   }
 
   public String redactQuery(String query, @Nullable QueryFingerprint queryFingerprint) {
-    switch (_sqlRedactionMode) {
+    return redactQuery(query, _sqlRedactionMode, queryFingerprint);
+  }
+
+  /// Redacts the query as the redaction mode says: `FULL` replaces it with a fixed marker, `LITERAL_VALUES` logs the
+  /// fingerprint, or a fixed marker when no fingerprint could be generated, and `NONE` logs the query escaped on a
+  /// single line (see [#toSingleLine]). Callers that log SQL outside this logger (e.g. a DML statement) apply the
+  /// mode of the query log with this method rather than building a logger of their own.
+  public static String redactQuery(String query, SqlRedactionMode sqlRedactionMode,
+      @Nullable QueryFingerprint queryFingerprint) {
+    switch (sqlRedactionMode) {
       case FULL:
         return FULLY_REDACTED;
       case LITERAL_VALUES:

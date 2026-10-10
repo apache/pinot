@@ -37,6 +37,7 @@ import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlJoin;
@@ -122,19 +123,14 @@ public class CalciteSqlParser {
     sql = ParserUtils.sanitizeSql(sql);
 
     // extract and remove OPTIONS string
-    List<String> options = List.of();
     SqlOptionsMode legacyOptionSyntaxMode = QueryOptionsUtils.getLegacyOptionSyntaxMode();
-    if (legacyOptionSyntaxMode == SqlOptionsMode.IGNORE) {
-      sql = removeOptionsFromSql(sql);
-    } else {
-      options = extractOptionsFromSql(sql);
-      if (!options.isEmpty()) {
-        if (legacyOptionSyntaxMode == SqlOptionsMode.REJECT) {
-          throw new SqlCompilationException("Legacy OPTION(...) query options are not allowed on this cluster, use "
-              + "'SET <key> = <value>;' statements instead: " + options);
-        }
-        sql = removeOptionsFromSql(sql);
+    List<String> options = extractOptionsFromSql(sql);
+    if (!options.isEmpty()) {
+      if (legacyOptionSyntaxMode == SqlOptionsMode.REJECT) {
+        throw new SqlCompilationException("Legacy OPTION(...) query options are not allowed on this cluster, use "
+            + "'SET <key> = <value>;' statements instead: " + options);
       }
+      sql = removeOptionsFromSql(sql);
     }
 
     try {
@@ -145,13 +141,21 @@ public class CalciteSqlParser {
       SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
       // add legacy OPTIONS keyword-based options
       if (!options.isEmpty()) {
-        Map<String, String> optionMap = extractOptionsMap(options);
-        if (sqlNodeAndOptions.getSqlType() == PinotSqlType.DQL) {
-          // No-op unless the broker enables query option validation. DML (e.g.
-          // INSERT INTO FILE OPTION(taskName=...)) carries free-form task/FS properties, like DML SET.
-          QueryOptionsUtils.validateSqlQueryOptions(optionMap);
+        if (legacyOptionSyntaxMode == SqlOptionsMode.IGNORE) {
+          // Dropping a DML option (e.g. the dryRun of a DELETE, the taskName of an INSERT) would change its effect.
+          if (sqlNodeAndOptions.getSqlType() == PinotSqlType.DML) {
+            throw new SqlCompilationException("Legacy OPTION(...) options are ignored on this cluster, use "
+                + "'SET <key> = <value>;' statements to configure a DML statement (INSERT, DELETE): " + options);
+          }
+        } else {
+          Map<String, String> optionMap = extractOptionsMap(options);
+          if (sqlNodeAndOptions.getSqlType() == PinotSqlType.DQL) {
+            // No-op unless the broker enables query option validation. DML (e.g.
+            // INSERT INTO FILE OPTION(taskName=...)) carries free-form task/FS properties, like DML SET.
+            QueryOptionsUtils.validateSqlQueryOptions(optionMap);
+          }
+          sqlNodeAndOptions.setExtraOptions(optionMap);
         }
-        sqlNodeAndOptions.setExtraOptions(optionMap);
       }
       sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parseStartTimeNs);
       return sqlNodeAndOptions;
@@ -165,8 +169,12 @@ public class CalciteSqlParser {
     SqlNode statementNode = null;
     Map<String, String> options = new HashMap<>();
     for (SqlNode sqlNode : sqlNodeList) {
-      if (sqlNode instanceof SqlInsertFromFile) {
-        // extract insert statement (execution statement)
+      if (sqlNode instanceof SqlExplain && ((SqlExplain) sqlNode).getExplicandum() instanceof SqlDelete) {
+        // Otherwise classified as a query, which fails later with a cast error when the DELETE is compiled
+        throw new SqlCompilationException("EXPLAIN is not supported for DELETE");
+      }
+      if (sqlNode instanceof SqlInsertFromFile || sqlNode instanceof SqlDelete) {
+        // extract DML statement (execution statement)
         if (sqlType == null) {
           sqlType = PinotSqlType.DML;
           statementNode = sqlNode;
@@ -676,6 +684,17 @@ public class CalciteSqlParser {
     // Outside the try: the rewriter already throws SqlCompilationException, and wrapping it would drop its message.
     sqlNode = PostgreSqlCastRewriter.rewrite(sqlNode);
     return toExpression(sqlNode);
+  }
+
+  /// Compiles an expression that is already parsed, e.g. the condition of a parsed statement, into [Expression].
+  ///
+  /// The node is normalized like the String expression of [#compileToExpression(String)] (PostgreSQL `::` casts are
+  /// rewritten in place, see `PostgreSqlCastRewriter`), so both overloads compile the same SQL into the same
+  /// [Expression]. The rewrite is idempotent, so a node from [#compileToSqlNodeAndOptions] is left unchanged.
+  ///
+  /// @throws SqlCompilationException if the node is not a supported expression.
+  public static Expression compileToExpression(SqlNode sqlNode) {
+    return toExpression(PostgreSqlCastRewriter.rewrite(sqlNode));
   }
 
   @VisibleForTesting

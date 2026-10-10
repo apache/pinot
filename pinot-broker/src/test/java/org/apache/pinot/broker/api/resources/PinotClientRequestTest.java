@@ -24,27 +24,54 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
+import javax.annotation.Nullable;
+import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.broker.api.HttpRequesterIdentity;
+import org.apache.pinot.broker.broker.AccessControlFactory;
+import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
+import org.apache.pinot.broker.broker.BasicAuthAccessControlFactory;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
+import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
+import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.TableRowColAccessResult;
+import org.apache.pinot.spi.auth.TableRowColAccessResultImpl;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.dml.DataManipulationStatement;
+import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
+import org.apache.pinot.sql.parsers.dml.DeleteStatement;
 import org.glassfish.grizzly.http.server.Request;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -52,13 +79,16 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.PINOT_QUERY_ERROR_CODE_HEADER;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class PinotClientRequestTest {
@@ -75,6 +105,12 @@ public class PinotClientRequestTest {
   private HttpClientConnectionManager _httpConnMgr;
   @Mock
   private HttpHeaders _httpHeaders;
+  @Mock
+  private AccessControlFactory _accessControlFactory;
+  @Mock
+  private TableCache _tableCache;
+  @Mock
+  private PinotConfiguration _brokerConf;
   @InjectMocks
   private PinotClientRequest _pinotClientRequest;
 
@@ -86,6 +122,11 @@ public class PinotClientRequestTest {
       runnable.run();
       return null;
     }).when(_executor).execute(any(Runnable.class));
+    // The log line of a DELETE redacts the predicate with the SQL redaction mode of the query log, which the mock
+    // configuration must answer (the mock answers null for a String property)
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_LOG_SQL_REDACTION,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_LOG_SQL_REDACTION))
+        .thenReturn(CommonConstants.Broker.DEFAULT_BROKER_QUERY_LOG_SQL_REDACTION);
   }
 
   @Test
@@ -364,6 +405,638 @@ public class PinotClientRequestTest {
     assertEquals(captor.getValue().getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
     verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
     verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+  }
+
+  @Test
+  public void testDmlOnGetQueryEndpointReturnsError()
+      throws Exception {
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+    when(request.getHeaderNames()).thenReturn(List.of());
+
+    // A GET must not modify data, e.g. when a browser holding credentials follows a link
+    _pinotClientRequest.processSqlQueryGet("DELETE FROM myTable WHERE col1 = 'a'", null, asyncResponse, request,
+        _httpHeaders);
+
+    ArgumentCaptor<Response> captor = ArgumentCaptor.forClass(Response.class);
+    verify(asyncResponse).resume(captor.capture());
+    assertEquals(captor.getValue().getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0),
+        QueryErrorCode.SQL_PARSING.getId());
+    verify(_sqlQueryExecutor, never()).executeDMLStatement(any(), any());
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+    verify(_requestHandler, never()).handleRequest(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  public void testDeleteIsExecutedOnTheAuthorizedTable()
+      throws Exception {
+    RecordingAccessControl accessControl = new RecordingAccessControl();
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+    // Table names are case-insensitive: the DELETE is authorized and executed on the table as it is defined
+    when(_httpHeaders.getHeaderString(CommonConstants.DATABASE)).thenReturn("db1");
+    when(_tableCache.isIgnoreCase()).thenReturn(true);
+    when(_tableCache.getActualTableName("db1.MYTABLE")).thenReturn("db1.myTable");
+    when(_sqlQueryExecutor.executeStatement(any(), any())).thenReturn(new BrokerResponseNative());
+
+    AsyncResponse asyncResponse = postSql("DELETE FROM MYTABLE WHERE col1 = 'a'");
+
+    assertSucceeded(asyncResponse);
+    // The checks of a query on the table, then the right to delete rows
+    assertEquals(accessControl._checks, List.of("broker", "tables []", "tables [db1.myTable]",
+        Actions.Table.QUERY + " TABLE db1.myTable", Actions.Table.DELETE_ROWS + " TABLE db1.myTable",
+        "deleteRows db1.myTable"));
+    // The executor receives the table the caller is authorized for, and the headers to forward to the APIs it calls
+    DeleteStatement statement = executedDelete(Map.of("Authorization", "Basic abc"));
+    assertEquals(statement.getTableName(), "db1.myTable");
+    assertEquals(statement.getPredicate(), "col1 = 'a'");
+    verify(_sqlQueryExecutor, never()).executeDMLStatement(any(), any());
+    verify(_requestHandler, never()).handleRequest(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  public void testDeleteOnTheMultiStageEndpointIsAuthorized()
+      throws Exception {
+    RecordingAccessControl accessControl = new RecordingAccessControl();
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+    knownTable("myTable");
+    when(_sqlQueryExecutor.executeStatement(any(), any())).thenReturn(new BrokerResponseNative());
+
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    _pinotClientRequest.processSqlWithMultiStageQueryEnginePost(
+        JsonUtils.newObjectNode().put("sql", "DELETE FROM myTable WHERE col1 = 'a'").toString(), asyncResponse, false,
+        0, mockRequest(), _httpHeaders);
+
+    assertSucceeded(asyncResponse);
+    assertEquals(accessControl._checks, List.of("broker", "tables []", "tables [myTable]",
+        Actions.Table.QUERY + " TABLE myTable",
+        Actions.Table.DELETE_ROWS + " TABLE myTable", "deleteRows myTable"));
+    assertEquals(executedDelete(Map.of("Authorization", "Basic abc")).getTableName(), "myTable");
+  }
+
+  @Test
+  public void testDeleteIsExecutedWithTheAllowAllAccessControl()
+      throws Exception {
+    when(_accessControlFactory.create()).thenReturn(new AllowAllAccessControlFactory().create());
+    knownTable("myTable");
+    when(_sqlQueryExecutor.executeStatement(any(), any())).thenReturn(new BrokerResponseNative());
+
+    assertSucceeded(postSql("DELETE FROM myTable WHERE col1 = 'a'"));
+    assertEquals(executedDelete(Map.of("Authorization", "Basic abc")).getTableName(), "myTable");
+  }
+
+  @Test
+  public void testDeleteFromAnUnknownTableIsNotExecuted()
+      throws Exception {
+    // A table the table cache does not know fails as for a query, but only once the caller is authorized for it
+    RecordingAccessControl accessControl = new RecordingAccessControl();
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+
+    assertErrorCode(postSql("DELETE FROM unknownTable WHERE col1 = 'a'"), QueryErrorCode.TABLE_DOES_NOT_EXIST);
+    assertEquals(accessControl._checks, List.of("broker", "tables []", "tables [unknownTable]",
+        Actions.Table.QUERY + " TABLE unknownTable", Actions.Table.DELETE_ROWS + " TABLE unknownTable",
+        "deleteRows unknownTable"));
+
+    // A caller who is not authorized for the table does not learn that it does not exist
+    when(_accessControlFactory.create()).thenReturn(new RecordingAccessControl(null, "deleteRows"));
+    assertForbidden(postSql("DELETE FROM unknownTable WHERE col1 = 'a'"), "unknownTable", "deleteRows denied");
+  }
+
+  @Test
+  public void testDeleteWithoutAWhereClauseIsAParsingError()
+      throws Exception {
+    when(_accessControlFactory.create()).thenReturn(new AllowAllAccessControlFactory().create());
+
+    assertErrorCode(postSql("DELETE FROM myTable"), QueryErrorCode.SQL_PARSING);
+  }
+
+  @Test
+  public void testDeleteFromALogicalTableIsAValidationError()
+      throws Exception {
+    // DELETE does not support logical tables, but the caller is authorized for the table before learning that it is
+    // one, as for a table that does not exist
+    when(_tableCache.getActualLogicalTableName("myLogicalTable")).thenReturn("myLogicalTable");
+    RecordingAccessControl accessControl = new RecordingAccessControl();
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+
+    assertErrorCode(postSql("DELETE FROM myLogicalTable WHERE col1 = 'a'"), QueryErrorCode.QUERY_VALIDATION);
+    assertEquals(accessControl._checks, List.of("broker", "tables []", "tables [myLogicalTable]",
+        Actions.Table.QUERY + " TABLE myLogicalTable", Actions.Table.DELETE_ROWS + " TABLE myLogicalTable",
+        "deleteRows myLogicalTable"));
+
+    // A caller who is not authorized for the table does not learn that it is a logical table
+    when(_accessControlFactory.create()).thenReturn(new RecordingAccessControl(null, "deleteRows"));
+    String message = assertForbidden(postSql("DELETE FROM myLogicalTable WHERE col1 = 'a'"), "myLogicalTable",
+        "deleteRows denied");
+    assertFalse(message.contains("does not support logical tables"), message);
+  }
+
+  @Test
+  public void testDeleteDenialNamesTheTableAsWritten()
+      throws Exception {
+    // Table names are case-insensitive: the caller is authorized for the table as it is defined, but a denial names
+    // it as written, and does not echo the reason of the access control when it names the table it denied, which is
+    // the name as defined, so that a caller who is not authorized for the table does not learn its name as defined
+    when(_tableCache.getActualTableName("mytable")).thenReturn("MyTable");
+    RecordingAccessControl accessControl = new RecordingAccessControl(null, "tables");
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+
+    String message = assertForbidden(postSql("DELETE FROM mytable WHERE col1 = 'a'"), "mytable", null);
+    assertEquals(message, "Permission denied to delete rows from table: mytable");
+    assertEquals(accessControl._checks, List.of("broker", "tables []", "tables [MyTable]"));
+
+    // The denial of a table the table cache does not know is the same message, so that the caller does not learn
+    // whether the table exists either
+    clearInvocations(_brokerMetrics);
+    accessControl._checks.clear();
+    when(_tableCache.getActualTableName("mytable")).thenReturn(null);
+
+    assertEquals(assertForbidden(postSql("DELETE FROM mytable WHERE col1 = 'a'"), "mytable", null), message);
+    assertEquals(accessControl._checks, List.of("broker", "tables []", "tables [mytable]"));
+  }
+
+  @Test
+  public void testDeleteIsForbiddenByAnAccessControlWrittenForBrokerRequestsOnly()
+      throws Exception {
+    // An access control that only implements the deprecated broker request check authorizes single-stage queries
+    // (see AccessControlBackwardCompatibleTest), while its default table check throws UnsupportedOperationException:
+    // it cannot authorize a DELETE, which is denied rather than failed as an uncaught error
+    when(_accessControlFactory.create()).thenReturn(new AccessControl() {
+      @Override
+      public AuthorizationResult authorize(RequesterIdentity requesterIdentity) {
+        return BasicAuthorizationResultImpl.success();
+      }
+
+      @Override
+      public AuthorizationResult authorize(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
+        return BasicAuthorizationResultImpl.success();
+      }
+    });
+
+    assertForbidden(postSql("DELETE FROM myTable WHERE col1 = 'a'"), null,
+        "The access control of the broker cannot authorize a DELETE: it implements the broker-request check only");
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+    verify(_tableCache, never()).getActualTableName(any());
+  }
+
+  @Test
+  public void testDeleteWithAConflictingDatabaseHeaderIsAValidationError()
+      throws Exception {
+    when(_accessControlFactory.create()).thenReturn(new AllowAllAccessControlFactory().create());
+    when(_httpHeaders.getHeaderString(CommonConstants.DATABASE)).thenReturn("db2");
+
+    assertErrorCode(postSql("DELETE FROM db1.myTable WHERE col1 = 'a'"), QueryErrorCode.QUERY_VALIDATION);
+  }
+
+  @Test
+  public void testDeleteWithoutTableCacheIsNotExecuted()
+      throws Exception {
+    // Broker applications using the legacy constructor do not bind a table cache.
+    FieldUtils.writeField(_pinotClientRequest, "_tableCache", null, true);
+    when(_accessControlFactory.create()).thenReturn(new AllowAllAccessControlFactory().create());
+
+    AsyncResponse asyncResponse = postSql("DELETE FROM myTable WHERE col1 = 'a'");
+
+    ArgumentCaptor<Response> captor = ArgumentCaptor.forClass(Response.class);
+    verify(asyncResponse).resume(captor.capture());
+    assertEquals(captor.getValue().getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0),
+        QueryErrorCode.QUERY_VALIDATION.getId());
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  @Test
+  public void testDeleteIsForbiddenByDefault()
+      throws Exception {
+    // An access control written before DELETE existed allows queries, but not deleting rows
+    when(_accessControlFactory.create()).thenReturn(new AccessControl() {
+      @Override
+      public TableAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
+        return TableAuthorizationResult.success();
+      }
+    });
+
+    assertForbidden(postSql("DELETE FROM myTable WHERE col1 = 'a'"), "myTable",
+        "The access control of the broker does not allow deleting rows");
+  }
+
+  @DataProvider
+  public Object[][] deleteChecks() {
+    List<String> checks = List.of("broker", "tables []", "tables [myTable]", Actions.Table.QUERY + " TABLE myTable",
+        Actions.Table.DELETE_ROWS + " TABLE myTable", "deleteRows myTable");
+    return new Object[][]{
+        // The probe without a table passes, as a denial names the tables it denies: the table check denies
+        {"tables", checks.subList(0, 3)},
+        {Actions.Table.QUERY, checks.subList(0, 4)},
+        {Actions.Table.DELETE_ROWS, checks.subList(0, 5)},
+        {"deleteRows", checks}
+    };
+  }
+
+  @Test(dataProvider = "deleteChecks")
+  public void testDeleteIsForbiddenByEachCheck(String deniedCheck, List<String> expectedChecks)
+      throws Exception {
+    RecordingAccessControl accessControl = new RecordingAccessControl(null, deniedCheck);
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+
+    AsyncResponse asyncResponse = postSql("DELETE FROM myTable WHERE col1 = 'a'");
+
+    // The table check names the table it denied ("Authorization Failed for tables: [myTable]"), as the basic auth
+    // does: its reason is not sent to the caller, see testDeleteDenialNamesTheTableAsWritten
+    String message = assertForbidden(asyncResponse, "myTable",
+        deniedCheck.equals("tables") ? null : deniedCheck + " denied");
+    if (deniedCheck.equals("tables")) {
+      assertEquals(message, "Permission denied to delete rows from table: myTable");
+    }
+    assertEquals(accessControl._checks, expectedChecks);
+  }
+
+  @Test
+  public void testDeleteFromATableWithATypeIsAuthorizedOnItsNameAndItsRawName()
+      throws Exception {
+    RecordingAccessControl accessControl = new RecordingAccessControl();
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+    knownTable("myTable_OFFLINE");
+    when(_sqlQueryExecutor.executeStatement(any(), any())).thenReturn(new BrokerResponseNative());
+
+    assertSucceeded(postSql("DELETE FROM myTable_OFFLINE WHERE col1 = 'a'"));
+    // The right to delete rows is checked on the table name, then on its raw name, which the controller checks
+    assertEquals(accessControl._checks, List.of("broker", "tables []", "tables [myTable_OFFLINE]",
+        Actions.Table.QUERY + " TABLE myTable_OFFLINE", Actions.Table.DELETE_ROWS + " TABLE myTable_OFFLINE",
+        Actions.Table.DELETE_ROWS + " TABLE myTable", "deleteRows myTable_OFFLINE"));
+    assertEquals(executedDelete(Map.of("Authorization", "Basic abc")).getTableName(), "myTable_OFFLINE");
+  }
+
+  @Test
+  public void testDeleteFromATableWithATypeIsForbiddenByTheDeleteRowsActionOnItsName()
+      throws Exception {
+    RecordingAccessControl accessControl =
+        new RecordingAccessControl(null, Actions.Table.DELETE_ROWS + " TABLE myTable_OFFLINE");
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+
+    // The reason of the access control names the table it denied: it is not sent to the caller, see
+    // testDeleteDenialNamesTheTableAsWritten
+    String message =
+        assertForbidden(postSql("DELETE FROM myTable_OFFLINE WHERE col1 = 'a'"), "myTable_OFFLINE", null);
+    assertEquals(message, "Permission denied to delete rows from table: myTable_OFFLINE");
+    assertEquals(accessControl._checks, List.of("broker", "tables []", "tables [myTable_OFFLINE]",
+        Actions.Table.QUERY + " TABLE myTable_OFFLINE", Actions.Table.DELETE_ROWS + " TABLE myTable_OFFLINE"));
+  }
+
+  @Test
+  public void testDeleteFromATableWithATypeIsForbiddenByTheDeleteRowsActionOnItsRawName()
+      throws Exception {
+    RecordingAccessControl accessControl =
+        new RecordingAccessControl(null, Actions.Table.DELETE_ROWS + " TABLE myTable");
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+
+    // The reason of the access control names the raw name it denied, which is the name as defined too: it is not
+    // sent to the caller either
+    String message =
+        assertForbidden(postSql("DELETE FROM myTable_OFFLINE WHERE col1 = 'a'"), "myTable_OFFLINE", null);
+    assertEquals(message, "Permission denied to delete rows from table: myTable_OFFLINE");
+    assertEquals(accessControl._checks, List.of("broker", "tables []", "tables [myTable_OFFLINE]",
+        Actions.Table.QUERY + " TABLE myTable_OFFLINE", Actions.Table.DELETE_ROWS + " TABLE myTable_OFFLINE",
+        Actions.Table.DELETE_ROWS + " TABLE myTable"));
+  }
+
+  @Test
+  public void testDeleteIsForbiddenByTheFirstStepAccessControlBeforeLookingUpTheTable()
+      throws Exception {
+    // As for queries, a caller denied by the first-step access control does not learn about the tables, e.g. which
+    // names are logical tables
+    when(_tableCache.getActualLogicalTableName("myLogicalTable")).thenReturn("myLogicalTable");
+    RecordingAccessControl accessControl = new RecordingAccessControl(null, "broker");
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+
+    assertForbidden(postSql("DELETE FROM myLogicalTable WHERE col1 = 'a'"), null, "broker denied");
+    assertEquals(accessControl._checks, List.of("broker"));
+    verify(_tableCache, never()).getActualTableName(any());
+    verify(_tableCache, never()).getActualLogicalTableName(any());
+  }
+
+  @DataProvider(name = "typedDeleteRlsTables")
+  public Object[][] typedDeleteRlsTables() {
+    return new Object[][]{
+        {"myTable", List.of("rowFilters myTable_OFFLINE", "rowFilters myTable")},
+        {"myTable_OFFLINE", List.of("rowFilters myTable_OFFLINE")}
+    };
+  }
+
+  @Test(dataProvider = "typedDeleteRlsTables")
+  public void testDeleteFromTypedTableIsForbiddenWhenRowLevelSecurityApplies(String filteredTable,
+      List<String> expectedFilterLookups)
+      throws Exception {
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
+        CommonConstants.Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH)).thenReturn(true);
+    RecordingAccessControl accessControl = new RecordingAccessControl() {
+      @Override
+      public TableRowColAccessResult getRowColFilters(RequesterIdentity requesterIdentity, String table) {
+        super.getRowColFilters(requesterIdentity, table);
+        return table.equals(filteredTable)
+            ? new TableRowColAccessResultImpl(List.of("region = 'US'"))
+            : TableRowColAccessResultImpl.unrestricted();
+      }
+    };
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+
+    assertForbidden(postSql("DELETE FROM myTable_OFFLINE WHERE region = 'EU'"), "myTable_OFFLINE",
+        "Row-level security");
+    assertEquals(accessControl._checks.stream().filter(check -> check.startsWith("rowFilters ")).toList(),
+        expectedFilterLookups);
+  }
+
+  @Test
+  public void testDeleteIsExecutedWhenNoRowLevelSecurityFilterApplies()
+      throws Exception {
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
+        CommonConstants.Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH)).thenReturn(true);
+    RecordingAccessControl accessControl = new RecordingAccessControl();
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+    knownTable("myTable");
+    when(_sqlQueryExecutor.executeStatement(any(), any())).thenReturn(new BrokerResponseNative());
+
+    assertSucceeded(postSql("DELETE FROM myTable WHERE col1 = 'a'"));
+    assertEquals(accessControl._checks, List.of("broker", "tables []", "tables [myTable]",
+        Actions.Table.QUERY + " TABLE myTable", Actions.Table.DELETE_ROWS + " TABLE myTable", "deleteRows myTable",
+        "rowFilters myTable"));
+  }
+
+  @Test
+  public void testDeleteFromTypedTableOfATypedBasicAuthPrincipalWithRowLevelSecurityEnabled()
+      throws Exception {
+    // A basic auth principal whose `tables` list the typed name only cannot access the raw name: the row-level
+    // security lookup must not consult it, as the access control refuses to answer for it
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
+        CommonConstants.Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH)).thenReturn(true);
+    Map<String, Object> config = new HashMap<>();
+    config.put("principals", "typedDeleter,filteredDeleter");
+    config.put("principals.typedDeleter.password", "typedsecret");
+    config.put("principals.typedDeleter.tables", "myTable_OFFLINE");
+    config.put("principals.typedDeleter.permissions", "read,delete");
+    config.put("principals.filteredDeleter.password", "filteredsecret");
+    config.put("principals.filteredDeleter.tables", "myTable_OFFLINE");
+    config.put("principals.filteredDeleter.permissions", "read,delete");
+    config.put("principals.filteredDeleter.myTable_OFFLINE.rls", "region = 'US'");
+    BasicAuthAccessControlFactory accessControlFactory = new BasicAuthAccessControlFactory();
+    accessControlFactory.init(new PinotConfiguration(config));
+    when(_accessControlFactory.create()).thenReturn(accessControlFactory.create());
+    knownTable("myTable_OFFLINE");
+    when(_sqlQueryExecutor.executeStatement(any(), any())).thenReturn(new BrokerResponseNative());
+
+    // A filter on the typed name refuses the statement
+    assertForbidden(postSql("DELETE FROM myTable_OFFLINE WHERE col1 = 'a'",
+        BasicAuthTokenUtils.toBasicAuthToken("filteredDeleter", "filteredsecret")), "myTable_OFFLINE",
+        "Row-level security");
+
+    // Without a filter, the statement is executed rather than failed by the lookup of the raw name
+    String token = BasicAuthTokenUtils.toBasicAuthToken("typedDeleter", "typedsecret");
+    assertSucceeded(postSql("DELETE FROM myTable_OFFLINE WHERE col1 = 'a'", token));
+    assertEquals(executedDelete(Map.of(AccessControlFactory.HEADER_AUTHORIZATION, token)).getTableName(),
+        "myTable_OFFLINE");
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+  }
+
+  @Test
+  public void testDeleteOfAnUnauthenticatedCallerIsUnauthorized()
+      throws Exception {
+    // An access control that authenticates the caller in its first step answers HTTP 401 before the table is looked
+    // up, rather than the validation error of a logical table, which would tell the caller that it exists
+    when(_tableCache.getActualLogicalTableName("myLogicalTable")).thenReturn("myLogicalTable");
+    when(_accessControlFactory.create()).thenReturn(new AccessControl() {
+      @Override
+      public AuthorizationResult authorize(RequesterIdentity requesterIdentity) {
+        throw new NotAuthorizedException("Basic");
+      }
+    });
+
+    AsyncResponse asyncResponse = postSql("DELETE FROM myLogicalTable WHERE col1 = 'a'");
+
+    ArgumentCaptor<WebApplicationException> captor = ArgumentCaptor.forClass(WebApplicationException.class);
+    verify(asyncResponse).resume(captor.capture());
+    assertEquals(captor.getValue().getResponse().getStatus(), Response.Status.UNAUTHORIZED.getStatusCode());
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  @Test
+  public void testDeleteLogMessageRedactsThePredicateAsTheQueryLog()
+      throws Exception {
+    // The literals of the predicate are the values a privacy-driven delete removes: the SQL redaction mode of the
+    // query log applies to them. The client comes from headers the caller controls, and is only logged when the query
+    // log logs client IPs
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_LOG_SQL_REDACTION,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_LOG_SQL_REDACTION)).thenReturn("full");
+    SqlNodeAndOptions sqlNodeAndOptions =
+        RequestUtils.parseQuery("DELETE FROM myTable WHERE email = 'alice@example.com'");
+    DeleteStatement statement = resolvedDelete(sqlNodeAndOptions);
+    HttpRequesterIdentity identity = PinotClientRequest.makeHttpIdentity(mockRequest("X-Forwarded-For", "10.0.0.1"));
+
+    String message = _pinotClientRequest.deleteLogMessage(statement, sqlNodeAndOptions, identity);
+
+    assertEquals(message, "Executing DELETE on table: myTable, predicate: REDACTED, options: [], client: unknown");
+  }
+
+  @Test
+  public void testDeleteLogMessageFingerprintsTheStatementWhenTheQueryLogRedactsLiteralValues()
+      throws Exception {
+    // The literal_values mode keeps the shape of the statement, as it keeps the shape of a query, rather than
+    // reporting a fingerprint that failed
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_LOG_SQL_REDACTION,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_LOG_SQL_REDACTION)).thenReturn("literal_values");
+    SqlNodeAndOptions sqlNodeAndOptions =
+        RequestUtils.parseQuery("DELETE FROM myTable WHERE email = 'alice@example.com'");
+    DeleteStatement statement = resolvedDelete(sqlNodeAndOptions);
+    HttpRequesterIdentity identity = PinotClientRequest.makeHttpIdentity(mockRequest("X-Forwarded-For", "10.0.0.1"));
+
+    String message = _pinotClientRequest.deleteLogMessage(statement, sqlNodeAndOptions, identity);
+
+    assertEquals(message, "Executing DELETE on table: myTable, predicate: DELETE FROM `myTable` WHERE `email` = ?, "
+        + "options: [], client: unknown");
+    assertFalse(message.contains("FINGERPRINT_FAILED"), message);
+  }
+
+  @Test
+  public void testDeleteLogMessageIsASingleLine()
+      throws Exception {
+    // A line ending in a string literal or in a header is escaped, as in a logged query, so that it cannot forge a
+    // log record
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING,
+        CommonConstants.Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING)).thenReturn(true);
+    SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery("DELETE FROM myTable WHERE col1 = 'a\nb'");
+    DeleteStatement statement = resolvedDelete(sqlNodeAndOptions);
+    HttpRequesterIdentity identity =
+        PinotClientRequest.makeHttpIdentity(mockRequest("X-Forwarded-For", "10.0.0.1\r\nforged log record"));
+
+    String message = _pinotClientRequest.deleteLogMessage(statement, sqlNodeAndOptions, identity);
+
+    assertEquals(message, "Executing DELETE on table: myTable, predicate: col1 = 'a\\nb', options: [], "
+        + "client: 10.0.0.1\\r\\nforged log record");
+  }
+
+  @Test
+  public void testInsertIntoFileIsNotAuthorizedAsADelete()
+      throws Exception {
+    when(_sqlQueryExecutor.executeDMLStatement(any(), any())).thenReturn(new BrokerResponseNative());
+
+    postSql("INSERT INTO myTable FROM FILE 'file:///tmp/data'");
+
+    // Executed as before: the minion task API that runs it authorizes the caller
+    verify(_sqlQueryExecutor).executeDMLStatement(any(SqlNodeAndOptions.class),
+        eq(Map.of("Authorization", "Basic abc")));
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+    verify(_accessControlFactory, never()).create();
+  }
+
+  /// Posts the SQL to `POST /query/sql` with basic auth credentials, and returns the response of the request.
+  private AsyncResponse postSql(String sql)
+      throws Exception {
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    _pinotClientRequest.processSqlQueryPost(JsonUtils.newObjectNode().put("sql", sql).toString(), asyncResponse,
+        false, 0, mockRequest(), _httpHeaders);
+    return asyncResponse;
+  }
+
+  /// Posts the statement with the basic auth token, under the lower-case header name the access controls read.
+  private AsyncResponse postSql(String sql, String authorization)
+      throws Exception {
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    _pinotClientRequest.processSqlQueryPost(JsonUtils.newObjectNode().put("sql", sql).toString(), asyncResponse,
+        false, 0, mockRequest(AccessControlFactory.HEADER_AUTHORIZATION, authorization), _httpHeaders);
+    return asyncResponse;
+  }
+
+  /// Makes the table cache know the table, under the name it is given.
+  private void knownTable(String tableName) {
+    when(_tableCache.getActualTableName(tableName)).thenReturn(tableName);
+  }
+
+  /// Resolves the table of the parsed `DELETE` with the table cache, as the query endpoint does.
+  private DeleteStatement resolvedDelete(SqlNodeAndOptions sqlNodeAndOptions) {
+    return ((DeleteStatement) DataManipulationStatementParser.parse(sqlNodeAndOptions))
+        .resolveTableName(null, _tableCache);
+  }
+
+  private static Request mockRequest() {
+    return mockRequest("Authorization", "Basic abc");
+  }
+
+  private static Request mockRequest(String headerName, String authorization) {
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+    when(request.getHeaderNames()).thenReturn(List.of(headerName));
+    when(request.getHeaders(headerName)).thenReturn(List.of(authorization));
+    return request;
+  }
+
+  private DeleteStatement executedDelete(Map<String, String> expectedHeaders) {
+    ArgumentCaptor<DataManipulationStatement> captor = ArgumentCaptor.forClass(DataManipulationStatement.class);
+    verify(_sqlQueryExecutor).executeStatement(captor.capture(), eq(expectedHeaders));
+    DeleteStatement statement = (DeleteStatement) captor.getValue();
+    assertTrue(statement.isResolved());
+    return statement;
+  }
+
+  private static void assertSucceeded(AsyncResponse asyncResponse) {
+    ArgumentCaptor<Response> captor = ArgumentCaptor.forClass(Response.class);
+    verify(asyncResponse).resume(captor.capture());
+    assertEquals(captor.getValue().getStatus(), Response.Status.OK.getStatusCode());
+    assertEquals(captor.getValue().getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0), -1);
+  }
+
+  /// Asserts that the `DELETE` is answered with the error code, as a query is, rather than executed or failed with the
+  /// generic HTTP 500 of an uncaught exception.
+  private void assertErrorCode(AsyncResponse asyncResponse, QueryErrorCode expectedErrorCode) {
+    ArgumentCaptor<Response> captor = ArgumentCaptor.forClass(Response.class);
+    verify(asyncResponse).resume(captor.capture());
+    assertEquals(captor.getValue().getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0), expectedErrorCode.getId());
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+  }
+
+  /// Asserts that the `DELETE` is denied with HTTP 403, and returns the message of the error. The message names the
+  /// table (`null` if not expected) once the caller passed the first-step access control, and gives the reason of
+  /// the access control (`null` if no reason is expected, e.g. one that names the table).
+  private String assertForbidden(AsyncResponse asyncResponse, @Nullable String tableName, @Nullable String reason) {
+    ArgumentCaptor<WebApplicationException> captor = ArgumentCaptor.forClass(WebApplicationException.class);
+    verify(asyncResponse).resume(captor.capture());
+    WebApplicationException e = captor.getValue();
+    assertEquals(e.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
+    if (tableName != null) {
+      assertTrue(e.getMessage().contains("Permission denied to delete rows from table: " + tableName),
+          e.getMessage());
+    } else {
+      assertTrue(e.getMessage().startsWith("Permission denied to delete rows. Reason: "), e.getMessage());
+    }
+    if (reason != null) {
+      assertTrue(e.getMessage().contains(reason), e.getMessage());
+    } else {
+      assertFalse(e.getMessage().contains("Reason:"), e.getMessage());
+    }
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1L);
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+    return e.getMessage();
+  }
+
+  /// Access control that records its checks, denies the ones it is given by name ("broker", "tables", an action, or
+  /// "deleteRows") or by description (e.g. an action on a table), and returns the row-level security filters it is
+  /// given.
+  private static class RecordingAccessControl implements AccessControl {
+    private final List<String> _checks = new ArrayList<>();
+    @Nullable
+    private final List<String> _rowFilters;
+    private final Set<String> _deniedChecks;
+
+    RecordingAccessControl() {
+      this(null);
+    }
+
+    RecordingAccessControl(@Nullable List<String> rowFilters, String... deniedChecks) {
+      _rowFilters = rowFilters;
+      _deniedChecks = Set.of(deniedChecks);
+    }
+
+    /// Denies the check if it is given by name (e.g. an action) or by description (e.g. an action on a table).
+    private AuthorizationResult check(String check, String description) {
+      _checks.add(description);
+      if (_deniedChecks.contains(check)) {
+        return new BasicAuthorizationResultImpl(false, check + " denied");
+      }
+      return _deniedChecks.contains(description)
+          ? new BasicAuthorizationResultImpl(false, description + " denied")
+          : BasicAuthorizationResultImpl.success();
+    }
+
+    @Override
+    public AuthorizationResult authorize(RequesterIdentity requesterIdentity) {
+      return check("broker", "broker");
+    }
+
+    @Override
+    public TableAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
+      _checks.add("tables " + tables);
+      return _deniedChecks.contains("tables")
+          ? new TableAuthorizationResult(tables)
+          : TableAuthorizationResult.success();
+    }
+
+    @Override
+    public AuthorizationResult authorize(HttpHeaders httpHeaders, TargetType targetType, String targetId,
+        String action) {
+      return check(action, action + " " + targetType + " " + targetId);
+    }
+
+    @Override
+    public TableRowColAccessResult getRowColFilters(RequesterIdentity requesterIdentity, String table) {
+      _checks.add("rowFilters " + table);
+      return _rowFilters != null
+          ? new TableRowColAccessResultImpl(_rowFilters)
+          : TableRowColAccessResultImpl.unrestricted();
+    }
+
+    @Override
+    public AuthorizationResult authorizeDeleteRows(RequesterIdentity requesterIdentity,
+        @Nullable HttpHeaders httpHeaders, String tableName) {
+      return check("deleteRows", "deleteRows " + tableName);
+    }
   }
 
   @Test
