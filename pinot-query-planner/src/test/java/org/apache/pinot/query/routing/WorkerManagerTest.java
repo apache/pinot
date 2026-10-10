@@ -51,8 +51,10 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.sql.parsers.parser.TableNameExtractor;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyString;
@@ -2941,6 +2943,10 @@ public class WorkerManagerTest {
 
     @Override
     public Set<String> getServingInstances(String tableNameWithType) {
+     if(tableNameWithType!=null){
+       RoutingTable rt = _routingTableByName.get(tableNameWithType);
+       rt.getServerInstanceToSegmentsMap().keySet().iterator().next();
+     }
       return new HashSet<>(_serverInstanceMap.keySet());
     }
 
@@ -3113,6 +3119,135 @@ public class WorkerManagerTest {
     @Override
     public boolean isTableDisabled(String tableNameWithType) {
       return false;
+    }
+  }
+
+  @Test
+  public void testNonPartitionedLeafPropagatesOptionalSegmentsToWorkerMetadata() {
+    Schema tableWithOptionalSegmentsSchema = getSchemaBuilder("tableWithOptionalSegments").build();
+
+    // Create server instance
+    ServerInstance server = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = new HashMap<>();
+    serverInstanceMap.put(server.getInstanceId(), server);
+
+    // Create a routing table with both optional and normal segments
+    RoutingTable routingTable =
+        new RoutingTable(Map.of(server, new SegmentsToQuery(List.of("seg"), List.of("optSeg"))),
+            List.of("unavailableSeg"), 0);
+
+    // Create mock routing manager
+    CapturingRoutingManager routingManager = new CapturingRoutingManager(serverInstanceMap,
+        Map.of("tableWithOptionalSegments_OFFLINE", routingTable));
+
+    // Create mock table cache
+    Map<String, String> tableNameMap = new HashMap<>();
+    tableNameMap.put("tableWithOptionalSegments_OFFLINE", "tableWithOptionalSegments_OFFLINE");
+    tableNameMap.put("tableWithOptionalSegments", "tableWithOptionalSegments");
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
+    when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
+    when(tableCache.getSchema(anyString())).thenReturn(tableWithOptionalSegmentsSchema);
+    when(tableCache.getTableConfig("tableWithOptionalSegments_OFFLINE")).thenReturn(mock(TableConfig.class));
+
+    WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
+    QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
+        workerManager);
+
+    String query = "SELECT * FROM tableWithOptionalSegments LIMIT 10";
+
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+      assertEquals(List.of("unavailableSeg"),
+          dispatchableSubPlan.getTableToUnavailableSegmentsMap().get("tableWithOptionalSegments"));
+      // This stage should handle basic data reads
+      DispatchablePlanFragment dataReadPlanFragment = dispatchableSubPlan.getQueryStages().getLast();
+      List<WorkerMetadata> workerMetadataList = dataReadPlanFragment.getWorkerMetadataList();
+      assertNotNull(workerMetadataList.getFirst().getOptionalTableSegmentsMap());
+      assertEquals(workerMetadataList.getFirst().getOptionalTableSegmentsMap().size(), 1);
+      assertTrue(workerMetadataList.getFirst().getOptionalTableSegmentsMap().containsKey("OFFLINE"));
+      assertEquals(List.of("optSeg"), workerMetadataList.getFirst().getOptionalTableSegmentsMap().get("OFFLINE"));
+      assertNotNull(workerMetadataList.getFirst().getTableSegmentsMap());
+      assertEquals(workerMetadataList.getFirst().getTableSegmentsMap().size(), 1);
+      assertTrue(workerMetadataList.getFirst().getTableSegmentsMap().containsKey("OFFLINE"));
+      assertEquals(List.of("seg"), workerMetadataList.getFirst().getTableSegmentsMap().get("OFFLINE"));
+    }
+  }
+
+  @Test
+  public void testWorkerAssignmentForNonPartitionedLeadSegmentsWhenNoServersHaveSegments() {
+    Schema tableWithNoServersHavingSegmentsSchema = getSchemaBuilder("tableWithNoServersHavingSegments").build();
+    Schema anotherTableSchema = getSchemaBuilder("anotherTable").build();
+
+    // Create server instance to server the table have no segments
+    ServerInstance server = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = new HashMap<>();
+    serverInstanceMap.put(server.getInstanceId(), server);
+
+    // Create server instance to server the other normal table
+    ServerInstance server2 = getServerInstance("localhost", 2);
+    serverInstanceMap.put(server2.getInstanceId(), server2);
+
+    // Create a routing table for the table with unavailable segments
+    RoutingTable routingTable = new RoutingTable(Map.of(), List.of("seg", "seg2"), 0);
+
+    // Create a routing table for the other normal table
+    RoutingTable otherRoutingTable =
+        new RoutingTable(Map.of(server2, new SegmentsToQuery(List.of("seg3"), List.of())), List.of(), 0);
+
+    // Create mock routing manager
+    CapturingRoutingManager routingManager = new CapturingRoutingManager(serverInstanceMap,
+        Map.of("tableWithNoServersHavingSegments_OFFLINE", routingTable, "anotherTable_OFFLINE", otherRoutingTable));
+
+    // Create mock table cache
+    Map<String, String> tableNameMap = new HashMap<>();
+    tableNameMap.put("tableWithNoServersHavingSegments_OFFLINE", "tableWithNoServersHavingSegments_OFFLINE");
+    tableNameMap.put("tableWithNoServersHavingSegments", "tableWithNoServersHavingSegments");
+    tableNameMap.put("anotherTable_OFFLINE", "anotherTable_OFFLINE");
+    tableNameMap.put("anotherTable", "anotherTable");
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
+    when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
+    when(tableCache.getSchema("tableWithNoServersHavingSegments")).thenReturn(tableWithNoServersHavingSegmentsSchema);
+    when(tableCache.getSchema("anotherTable")).thenReturn(anotherTableSchema);
+    when(tableCache.getTableConfig("tableWithNoServersHavingSegments_OFFLINE")).thenReturn(mock(TableConfig.class));
+    when(tableCache.getTableConfig("anotherTableSchema_OFFLINE")).thenReturn(mock(TableConfig.class));
+
+    WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
+    QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
+        workerManager);
+
+    String query = "SELECT * FROM tableWithNoServersHavingSegments LIMIT 10";
+
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+      // This stage should handle basic data reads
+      DispatchablePlanFragment dataReadPlanFragment = dispatchableSubPlan.getQueryStages().getLast();
+      List<WorkerMetadata> workerMetadataList = dataReadPlanFragment.getWorkerMetadataList();
+      QueryServerInstance queryServerInstance = new QueryServerInstance(server);
+      List<Integer> workerIds = dataReadPlanFragment.getServerInstanceToWorkerIdMap().get(queryServerInstance);
+      assertEquals(workerIds.size(), 1);
+      assertEquals(workerMetadataList.getFirst().getWorkerId(), workerIds.getFirst());
+    }
+
+    query = "SELECT * FROM anotherTable LIMIT 10";
+
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+      // This stage should handle basic data reads
+      DispatchablePlanFragment dataReadPlanFragment = dispatchableSubPlan.getQueryStages().getLast();
+      List<WorkerMetadata> workerMetadataList = dataReadPlanFragment.getWorkerMetadataList();
+      QueryServerInstance queryServerInstance = new QueryServerInstance(server2);
+      List<Integer> workerIds = dataReadPlanFragment.getServerInstanceToWorkerIdMap().get(queryServerInstance);
+      assertEquals(workerIds.size(), 1);
+      assertEquals(workerMetadataList.getFirst().getWorkerId(), workerIds.getFirst());
+      assertEquals(List.of("seg3"),
+          dataReadPlanFragment.getWorkerIdToSegmentsMap().get(workerIds.getFirst()).get("OFFLINE"));
     }
   }
 }

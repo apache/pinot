@@ -65,6 +65,8 @@ public class WorkerMetadata {
   private volatile Map<String, List<String>> _tableSegmentsMap;
   @Nullable
   private volatile Map<String, List<String>> _logicalTableSegmentsMap;
+  @Nullable
+  private volatile Map<String, List<String>> _optionalTableSegmentsMap;
   /// The legacy JSON encoding of [#_tableSegmentsMap] as received from the broker, parsed on first access.
   @Nullable
   private String _tableSegmentsMapJson;
@@ -154,5 +156,14 @@ public class WorkerMetadata {
     } catch (IOException e) {
       throw new RuntimeException("Unable to deserialize segments map: " + segmentsMapJson, e);
     }
+  }
+
+  @Nullable
+  public Map<String, List<String>> getOptionalTableSegmentsMap() {
+    return _optionalTableSegmentsMap;
+  }
+
+  public void setOptionalTableSegmentsMap(Map<String, List<String>> optionalTableSegmentsMap) {
+    _optionalTableSegmentsMap = optionalTableSegmentsMap;
   }
 }

@@ -66,7 +66,6 @@ public class DispatchablePlanContext {
   private int _leafStagesAssigned;
   private int _leafStagesEmpty;
 
-
   public DispatchablePlanContext(WorkerManager workerManager, long requestId, PlannerContext plannerContext,
       PairList<Integer, String> resultFields, Set<String> tableNames) {
     _workerManager = workerManager;
@@ -191,6 +190,10 @@ public class DispatchablePlanContext {
           dispatchablePlanMetadata.getWorkerIdToMailboxesMap();
       Preconditions.checkArgument(workerIdToSegmentsMap == null || workerIdToTableNameSegmentsMap == null,
           "Both workerIdToSegmentsMap and workerIdToTableNameSegmentsMap cannot be set at the same time");
+      Map<Integer, Map<String, List<String>>> workerIdToOptionalSegmentsMap =
+          dispatchablePlanMetadata.getWorkerIdToOptionalSegmentsMap();
+      Map<Integer, Map<String, List<String>>> workerIdToOptionalTableSegmentsMap =
+          dispatchablePlanMetadata.getWorkerIdToOptionalTableSegmentsMap();
       Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdsMap = new HashMap<>();
       WorkerMetadata[] workerMetadataArray = new WorkerMetadata[workerIdToServerInstanceMap.size()];
       for (Map.Entry<Integer, QueryServerInstance> serverEntry : workerIdToServerInstanceMap.entrySet()) {
@@ -207,12 +210,24 @@ public class DispatchablePlanContext {
           Map<String, List<String>> segmentsMap = workerIdToSegmentsMap.get(workerId);
           Preconditions.checkNotNull(segmentsMap, "Missing segments map for worker id: %s", workerId);
           workerMetadata.setTableSegmentsMap(segmentsMap);
+          if (workerIdToOptionalSegmentsMap != null) {
+            Map<String, List<String>> optionalForWorker = workerIdToOptionalSegmentsMap.get(workerId);
+            if (optionalForWorker != null && !optionalForWorker.isEmpty()) {
+              workerMetadata.setOptionalTableSegmentsMap(optionalForWorker);
+            }
+          }
         }
         if (workerIdToTableNameSegmentsMap != null) {
           Map<String, List<String>> tableNameSegmentsMap = workerIdToTableNameSegmentsMap.get(workerId);
           Preconditions.checkNotNull(tableNameSegmentsMap, "Missing logical table segments map for worker id: %s",
               workerId);
           workerMetadata.setLogicalTableSegmentsMap(tableNameSegmentsMap);
+          if (workerIdToOptionalTableSegmentsMap != null) {
+            Map<String, List<String>> optionalLogical = workerIdToOptionalTableSegmentsMap.get(workerId);
+            if (optionalLogical != null && !optionalLogical.isEmpty()) {
+              workerMetadata.setOptionalTableSegmentsMap(optionalLogical);
+            }
+          }
         }
         workerMetadataArray[workerId] = workerMetadata;
       }

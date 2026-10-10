@@ -24,6 +24,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 
+
 /// A block that contains data in serialized format.
 ///
 /// This class is a subclass of [MseBlock.Data] and is used to store data in serialized format.

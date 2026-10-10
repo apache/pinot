@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
@@ -912,6 +913,8 @@ public class WorkerManager {
 
     // extract all the instances associated to each table type
     Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap = new HashMap<>();
+    Map<ServerInstance, Map<String, List<String>>> serverInstanceToOptionalSegmentsMap = new HashMap<>();
+
     for (Map.Entry<String, RoutingTable> routingEntry : routingTableMap.entrySet()) {
       String tableType = routingEntry.getKey();
       RoutingTable routingTable = routingEntry.getValue();
@@ -920,9 +923,13 @@ public class WorkerManager {
       for (Map.Entry<ServerInstance, SegmentsToQuery> serverEntry : segmentsMap.entrySet()) {
         Map<String, List<String>> tableTypeToSegmentListMap =
             serverInstanceToSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
-        // TODO: support optional segments for multi-stage engine.
         Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, serverEntry.getValue().getSegments()) == null,
             "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
+        List<String> optionalSegments = serverEntry.getValue().getOptionalSegments();
+        if (CollectionUtils.isNotEmpty(optionalSegments)) {
+          serverInstanceToOptionalSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>())
+              .put(tableType, new ArrayList<>(optionalSegments));
+        }
       }
 
       // attach unavailable segments to metadata
@@ -933,6 +940,7 @@ public class WorkerManager {
         context.addNumSegmentsPrunedByBroker(routingTable.getNumPrunedSegments());
       }
     }
+
     // Sort server instances to ensure deterministic worker ID assignment.
     // This is critical for pre-partitioned exchanges where worker ID N on one stage
     // must map to the same physical server as worker ID N on another stage.
@@ -944,6 +952,7 @@ public class WorkerManager {
     int numWorkers = sortedServerInstanceToSegmentsMap.size();
     Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = Maps.newHashMapWithExpectedSize(numWorkers);
     Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = Maps.newHashMapWithExpectedSize(numWorkers);
+    Map<Integer, Map<String, List<String>>> workerIdToOptionalSegmentMap = Maps.newHashMapWithExpectedSize(numWorkers);
 
     for (int workerId = 0; workerId < numWorkers; workerId++) {
       Map.Entry<ServerInstance, Map<String, List<String>>> serverEntry =
@@ -953,10 +962,19 @@ public class WorkerManager {
 
       workerIdToServerInstanceMap.put(workerId, server);
       workerIdToSegmentsMap.put(workerId, segmentsMap);
+      if (serverInstanceToOptionalSegmentsMap.containsKey(serverEntry.getKey())) {
+        Map<String, List<String>> optionalSegmentMap = serverInstanceToOptionalSegmentsMap.get(serverEntry.getKey());
+        if (MapUtils.isNotEmpty(optionalSegmentMap)) {
+          workerIdToOptionalSegmentMap.put(workerId, optionalSegmentMap);
+        }
+      }
     }
 
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
+    if (MapUtils.isNotEmpty(workerIdToOptionalSegmentMap)) {
+      metadata.setWorkerIdToOptionalSegmentsMap(workerIdToOptionalSegmentMap);
+    }
   }
 
   /// Acquire routing table for items listed in [org.apache.pinot.query.planner.plannode.TableScanNode].
@@ -1169,9 +1187,17 @@ public class WorkerManager {
       }
     }
 
-    // TODO: Support unavailable segments and optional segments for replicated leaf stage
     metadata.setReplicatedSegments(segmentsMap);
     filterReplicatedLeafStageSegments(context, metadata);
+
+    Map<String, RoutingTable> routingTableMap =
+        getRoutingTable(tableName, context.getRequestId(), context.getPlannerContext().getOptions());
+    for (Map.Entry<String, RoutingTable> routingEntry : routingTableMap.entrySet()) {
+      RoutingTable routingTable = routingEntry.getValue();
+      if (!routingTable.getUnavailableSegments().isEmpty()) {
+        metadata.addUnavailableSegments(tableName, routingTable.getUnavailableSegments());
+      }
+    }
   }
 
   /// Extension point to filter the non-replicated leaf-stage per-worker segment assignment; no-op by default.
@@ -1301,13 +1327,16 @@ public class WorkerManager {
       DispatchablePlanMetadata metadata) {
     Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap =
         new HashMap<>();
+    Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalOptionalSegmentsMap =
+        new HashMap<>();
 
     if (logicalTableRouteInfo.getOfflineTables() != null) {
       for (TableRouteInfo physicalTableRoute : logicalTableRouteInfo.getOfflineTables()) {
         // Routing table maybe null if no routing table is found OR there are no segments.
         if (physicalTableRoute.getOfflineRoutingTable() != null) {
           transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getOfflineTableName(),
-              physicalTableRoute.getOfflineRoutingTable(), serverInstanceToLogicalSegmentsMap);
+              physicalTableRoute.getOfflineRoutingTable(), serverInstanceToLogicalSegmentsMap,
+              serverInstanceToLogicalOptionalSegmentsMap);
         }
       }
     }
@@ -1317,7 +1346,8 @@ public class WorkerManager {
         // Routing table maybe null if no routing table is found OR there are no segments.
         if (physicalTableRoute.getRealtimeRoutingTable() != null) {
           transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getRealtimeTableName(),
-              physicalTableRoute.getRealtimeRoutingTable(), serverInstanceToLogicalSegmentsMap);
+              physicalTableRoute.getRealtimeRoutingTable(), serverInstanceToLogicalSegmentsMap,
+              serverInstanceToLogicalOptionalSegmentsMap);
         }
       }
     }
@@ -1334,6 +1364,8 @@ public class WorkerManager {
     Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = Maps.newHashMapWithExpectedSize(numWorkers);
     Map<Integer, Map<String, List<String>>> workerIdToLogicalTableSegmentsMap =
         Maps.newHashMapWithExpectedSize(numWorkers);
+    Map<Integer, Map<String, List<String>>> workerIdTOptionalLogicalTableSegmentsMap =
+        Maps.newHashMapWithExpectedSize(numWorkers);
 
     for (int workerId = 0; workerId < numWorkers; workerId++) {
       Map.Entry<ServerInstance, Map<String, List<String>>> serverEntry =
@@ -1343,22 +1375,38 @@ public class WorkerManager {
 
       workerIdToServerInstanceMap.put(workerId, server);
       workerIdToLogicalTableSegmentsMap.put(workerId, segmentsMap);
+
+      if (serverInstanceToLogicalOptionalSegmentsMap.containsKey(server)) {
+        Map<String, List<String>> optionalSegmentsMap = serverInstanceToLogicalOptionalSegmentsMap.get(server);
+        if (MapUtils.isNotEmpty(optionalSegmentsMap)) {
+          workerIdTOptionalLogicalTableSegmentsMap.put(workerId,
+              optionalSegmentsMap);
+        }
+      }
     }
 
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
     metadata.setWorkerIdToTableSegmentsMap(workerIdToLogicalTableSegmentsMap);
+    if (MapUtils.isNotEmpty(workerIdTOptionalLogicalTableSegmentsMap)) {
+      metadata.setWorkerIdToOptionalSegmentsMap(workerIdTOptionalLogicalTableSegmentsMap);
+    }
   }
 
   private static void transferToServerInstanceLogicalSegmentsMap(String physicalTableName,
       Map<ServerInstance, SegmentsToQuery> segmentsMap,
-      Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap) {
+      Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap,
+      Map<ServerInstance, Map<String, List<String>>> serverInstanceToOptionalLogicalSegmentsMap) {
     for (Map.Entry<ServerInstance, SegmentsToQuery> serverEntry : segmentsMap.entrySet()) {
       Map<String, List<String>> tableNameToSegmentsMap =
           serverInstanceToLogicalSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
-      // TODO: support optional segments for multi-stage engine.
       Preconditions.checkState(
           tableNameToSegmentsMap.put(physicalTableName, serverEntry.getValue().getSegments()) == null,
           "Entry for server {} and physical table: {} already exist!", serverEntry.getKey(), physicalTableName);
+      List<String> optionalSegments = serverEntry.getValue().getOptionalSegments();
+      if (CollectionUtils.isNotEmpty(optionalSegments)) {
+        serverInstanceToOptionalLogicalSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>())
+            .put(physicalTableName, new ArrayList<>(optionalSegments));
+      }
     }
   }
 
