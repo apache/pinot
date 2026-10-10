@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +32,7 @@ import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils.SqlOptionsMode;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -45,6 +47,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatement;
+import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
 import org.apache.pinot.sql.parsers.dml.DeleteStatement;
 import org.mockito.AdditionalAnswers;
 import org.mockito.ArgumentCaptor;
@@ -227,7 +230,7 @@ public class PinotQueryResourceTest {
   }
 
   @Test
-  public void testDeleteFromALogicalTableIsAValidationError() {
+  public void testDeleteFromALogicalTableIsAValidationErrorAfterAuthorization() {
     RecordingAccessControl accessControl = allowEveryCheck();
     when(_tableCache.getActualTableName("lt")).thenReturn(null);
     when(_tableCache.getActualLogicalTableName("lt")).thenReturn("lt");
@@ -235,16 +238,65 @@ public class PinotQueryResourceTest {
     String response = postSql("DELETE FROM lt WHERE a = 1", null);
 
     assertTrue(response.contains(String.valueOf(QueryErrorCode.QUERY_VALIDATION.getId())), response);
-    assertTrue(response.contains("does not support logical tables"), response);
-    // Rejected while resolving the table, before the table-level authorization: a logical table has no single
-    // physical table to authorize
-    assertEquals(accessControl._checks, List.of("READ null"));
+    assertTrue(response.contains("DELETE does not support logical tables: lt"), response);
+    // Rejected only once the caller is authorized on the name, like an unknown table, so that the names of the
+    // logical tables are not leaked to a caller who is not authorized for them
+    assertEquals(accessControl._checks, List.of("READ null", "READ lt", Actions.Table.QUERY + " TABLE lt",
+        "DELETE lt", Actions.Table.DELETE_ROWS + " TABLE lt"));
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  @Test
+  public void testDeleteFromALogicalTableDoesNotLeakItToAnUnauthorizedCaller() {
+    RecordingAccessControl accessControl = new RecordingAccessControl(Actions.Table.DELETE_ROWS + " TABLE lt");
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+    when(_tableCache.getActualTableName("lt")).thenReturn(null);
+    when(_tableCache.getActualLogicalTableName("lt")).thenReturn("lt");
+
+    String response = postSql("DELETE FROM lt WHERE a = 1", null);
+
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.ACCESS_DENIED.getId())), response);
+    assertFalse(response.contains("logical"), response);
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  @Test
+  public void testDeleteDenialNamesTheTableAsWritten() {
+    // The cache resolves the name to the case the table is defined with: the checks run on that name, while the
+    // denial names the table as written, so that it does not reveal that the table exists
+    RecordingAccessControl accessControl = new RecordingAccessControl("DELETE SecretTable");
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+    when(_tableCache.isIgnoreCase()).thenReturn(true);
+    when(_tableCache.getActualTableName("secrettable")).thenReturn("SecretTable");
+
+    String response = postSql("DELETE FROM secrettable WHERE a = 1", null);
+
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.ACCESS_DENIED.getId())), response);
+    assertTrue(response.contains("Permission denied to delete rows from table: secrettable"), response);
+    assertFalse(response.contains("SecretTable"), response);
+    assertEquals(accessControl._checks, List.of("READ null", "READ SecretTable",
+        Actions.Table.QUERY + " TABLE SecretTable", "DELETE SecretTable"));
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  @Test
+  public void testDeleteFromAnUnknownTableNamesItAsWritten() {
+    allowEveryCheck();
+    when(_tableCache.getActualTableName("db1.unknown")).thenReturn(null);
+
+    String response = postSql("DELETE FROM unknown WHERE a = 1", "db1");
+
+    // The name as written, not the one qualified with the database of the request
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.TABLE_DOES_NOT_EXIST.getId())), response);
+    assertTrue(response.contains("Table does not exist: unknown"), response);
+    assertFalse(response.contains("db1.unknown"), response);
     verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
   }
 
   @Test(dataProvider = "legacyOptionModes")
   public void testDeleteWithLegacyOptionsFollowsTheClusterLegacySyntaxMode(SqlOptionsMode mode, String expectedError) {
-    // The controller registers the query option config listener, so the cluster mode applies to the DML it executes
+    // The controller registers the legacy-syntax-mode-only query option config listener, so the cluster mode applies
+    // to the DML it executes
     allowEveryCheck();
     SqlOptionsMode previousMode = QueryOptionsUtils.getLegacyOptionSyntaxMode();
     QueryOptionsUtils.setLegacyOptionSyntaxMode(mode);
@@ -322,6 +374,42 @@ public class PinotQueryResourceTest {
     assertTrue(response.contains("executor failed"), response);
   }
 
+  @DataProvider
+  public Object[][] clientHeaders() {
+    return new Object[][]{
+        // The addresses of X-Forwarded-For are joined with ';', the format the broker logs
+        {"203.0.113.7, 10.0.0.1", null, "203.0.113.7; 10.0.0.1"},
+        {"203.0.113.7, 10.0.0.1", "10.0.0.2", "203.0.113.7; 10.0.0.1"},
+        {null, "10.0.0.2", "10.0.0.2"},
+        {null, null, CommonConstants.UNKNOWN}
+    };
+  }
+
+  @Test(dataProvider = "clientHeaders")
+  public void testDeleteLogMessageLogsTheClientAsTheBroker(@Nullable String forwardedFor, @Nullable String realIp,
+      String expectedClient) {
+    DeleteStatement statement = resolvedDelete("DELETE FROM myTable WHERE a = 1", null);
+
+    String message = PinotQueryResource.deleteLogMessage(statement, headersWithClient(forwardedFor, realIp));
+
+    assertEquals(message,
+        "Executing DELETE on table: myTable, predicate: a = 1, options: [], client: " + expectedClient);
+  }
+
+  @Test
+  public void testDeleteLogMessageIsASingleLine() {
+    // A line ending in a string literal of the predicate, in a key of the request options or in a proxy header is
+    // escaped, as in a query logged by the broker, so that it cannot forge a log record
+    DeleteStatement statement = resolvedDelete("DELETE FROM myTable WHERE col1 = 'a\nb'", "x\ny=1");
+
+    String message = PinotQueryResource.deleteLogMessage(statement,
+        headersWithClient("10.0.0.1,\r\n2026-10-10 INFO forged log record", null));
+
+    assertEquals(message, "Executing DELETE on table: myTable, predicate: col1 = 'a\\nb', options: [x\\ny], "
+        + "client: 10.0.0.1;\\r\\n2026-10-10 INFO forged log record");
+    assertFalse(message.contains("\n") || message.contains("\r"), message);
+  }
+
   @Test
   public void testInsertIntoFileIsNotAuthorizedAsADelete() {
     when(_sqlQueryExecutor.executeDMLStatement(any(), any())).thenReturn(new BrokerResponseNative());
@@ -349,12 +437,38 @@ public class PinotQueryResourceTest {
     when(_tableCache.getActualTableName("lt")).thenReturn(null);
     when(_tableCache.getActualLogicalTableName("lt")).thenReturn("lt");
 
-    // The caller is checked before the table cache is consulted, so that the logical-table rejection (a validation
-    // error) does not tell an unauthenticated caller which names are logical tables
+    // The caller is checked before the table cache is consulted, so that an unauthenticated caller does not even
+    // reach the table lookup that tells logical tables and unknown tables apart
     expectThrows(NotAuthorizedException.class, () -> postSql("DELETE FROM lt WHERE a = 1", null));
     verify(_tableCache, never()).getActualTableName(any());
     verify(_tableCache, never()).getActualLogicalTableName(any());
     verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  @Test
+  public void testValidateMultiStageQueryReportsAQueryThatDoesNotParseWithoutFailingTheRequest() {
+    SqlOptionsMode previousMode = QueryOptionsUtils.getLegacyOptionSyntaxMode();
+    QueryOptionsUtils.setLegacyOptionSyntaxMode(SqlOptionsMode.REJECT);
+    try {
+      PinotQueryResource.MultiStageQueryValidationRequest request =
+          new PinotQueryResource.MultiStageQueryValidationRequest(null, null, null, null,
+              List.of("SELECT * FROM a OPTION(timeoutMs=1000)", "SELECT * FROM a"), false);
+
+      List<PinotQueryResource.MultiStageQueryValidationResponse> responses =
+          _pinotQueryResource.validateMultiStageQuery(request, mock(HttpHeaders.class));
+
+      // The query the cluster rejects at parse time is one failed entry, and the next query is still validated
+      assertEquals(responses.size(), 2);
+      PinotQueryResource.MultiStageQueryValidationResponse rejected = responses.get(0);
+      assertFalse(rejected.isCompiledSuccessfully());
+      assertEquals(rejected.getErrorCode(), QueryErrorCode.SQL_PARSING);
+      assertTrue(rejected.getErrorMessage().contains("Legacy OPTION(...) query options are not allowed"),
+          rejected.getErrorMessage());
+      assertEquals(rejected.getSql(), "SELECT * FROM a OPTION(timeoutMs=1000)");
+      assertEquals(responses.get(1).getSql(), "SELECT * FROM a");
+    } finally {
+      QueryOptionsUtils.setLegacyOptionSyntaxMode(previousMode);
+    }
   }
 
   /// Stubs an access control that allows every check, and an executor that answers every DELETE, as a deployment
@@ -382,6 +496,26 @@ public class PinotQueryResourceTest {
     when(httpHeaders.getHeaderString(CommonConstants.DATABASE)).thenReturn(database);
     return streamingOutputToString(
         _pinotQueryResource.handlePostSql(JsonUtils.newObjectNode().put("sql", sql).toString(), httpHeaders));
+  }
+
+  /// Parses the `DELETE` with the `queryOptions` of the request payload, if any, and resolves its table with the table
+  /// cache, as the query endpoint does.
+  private DeleteStatement resolvedDelete(String sql, @Nullable String queryOptions) {
+    ObjectNode request = JsonUtils.newObjectNode();
+    if (queryOptions != null) {
+      request.put(CommonConstants.Broker.Request.QUERY_OPTIONS, queryOptions);
+    }
+    return ((DeleteStatement) DataManipulationStatementParser.parse(RequestUtils.parseQuery(sql, request)))
+        .resolveTableName(null, _tableCache);
+  }
+
+  /// Mocks the headers of a request with the given `X-Forwarded-For` and `X-Real-IP` values, `null` leaving a header
+  /// unset.
+  private static HttpHeaders headersWithClient(@Nullable String forwardedFor, @Nullable String realIp) {
+    HttpHeaders httpHeaders = mock(HttpHeaders.class);
+    when(httpHeaders.getHeaderString("X-Forwarded-For")).thenReturn(forwardedFor);
+    when(httpHeaders.getHeaderString("X-Real-IP")).thenReturn(realIp);
+    return httpHeaders;
   }
 
   /// Returns the `DELETE` handed to the executor, checking that the executor also gets the request headers, which the

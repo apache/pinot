@@ -40,7 +40,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.calcite.sql.SqlDelete;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
@@ -67,6 +66,7 @@ import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
@@ -103,7 +103,7 @@ public class RequestUtils {
 
   /// Merges the request payload options (`queryOptions` and `trace`) into the options parsed from the SQL. The SQL
   /// options take precedence, unless the request sets [Request.QueryOptionKey#SQL_OPTIONS_MODE] to `IGNORE` (the SQL
-  /// options are dropped, or a DELETE statement fails when it carries any) or `REJECT` (the query fails when it carries
+  /// options are dropped, or a DML statement fails when it carries any) or `REJECT` (the query fails when it carries
   /// any).
   @VisibleForTesting
   public static void setOptions(SqlNodeAndOptions sqlNodeAndOptions, JsonNode jsonRequest) {
@@ -126,10 +126,10 @@ public class RequestUtils {
         throw QueryErrorCode.QUERY_VALIDATION.asException(
             "Query options are not allowed in the SQL for this request, found: " + sqlOptions.keySet());
       }
-      // Dropping a DELETE option (e.g. dryRun) would change its effect.
-      if (sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
+      // Dropping a DML option (e.g. the dryRun of a DELETE, the taskName of an INSERT) would change its effect.
+      if (sqlNodeAndOptions.getSqlType() == PinotSqlType.DML) {
         throw QueryErrorCode.QUERY_VALIDATION.asException(
-            "SQL options cannot be ignored for DELETE, found: " + sqlOptions.keySet());
+            "SQL options cannot be ignored for a DML statement (INSERT, DELETE), found: " + sqlOptions.keySet());
       }
       sqlOptions.clear();
     }

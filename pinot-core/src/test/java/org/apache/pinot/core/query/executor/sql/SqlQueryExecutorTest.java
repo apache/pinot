@@ -34,6 +34,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
@@ -53,8 +54,8 @@ public class SqlQueryExecutorTest {
 
   @Test
   public void testDeleteFromSqlIsNotExecuted() {
-    // The SQL entry point cannot authorize the caller, so it does not execute a DELETE, even when the executor
-    // implements it
+    // The SQL entry point parses an unresolved statement, which did not come through a query endpoint that resolves
+    // its table and authorizes the caller, so it does not execute a DELETE, even when the executor implements it
     AtomicReference<DeleteStatement> executedStatement = new AtomicReference<>();
     SqlQueryExecutor sqlQueryExecutor = new SqlQueryExecutor(CONTROLLER_URL) {
       @Override
@@ -73,7 +74,8 @@ public class SqlQueryExecutorTest {
 
   @Test
   public void testUnresolvedDeleteIsNotExecuted() {
-    // A DELETE whose table is not resolved has not been authorized either
+    // A DELETE whose table is not resolved did not come through a query endpoint, which resolves it before
+    // authorizing the caller
     AtomicReference<DeleteStatement> executedStatement = new AtomicReference<>();
     SqlQueryExecutor sqlQueryExecutor = new SqlQueryExecutor(CONTROLLER_URL) {
       @Override
@@ -114,7 +116,7 @@ public class SqlQueryExecutorTest {
     };
 
     DeleteStatement resolvedStatement =
-        resolvedDelete("SET database = 'db1'; SET taskName = 'purge'; DELETE FROM myTable WHERE col1 = 'a'");
+        resolvedDelete("SET database = 'db1'; SET taskName = 'purge'; DELETE FROM myTable WHERE col1 = 'a'", "db1");
     BrokerResponse response =
         sqlQueryExecutor.executeStatement(resolvedStatement, Map.of("Authorization", "Basic abc"));
 
@@ -163,6 +165,25 @@ public class SqlQueryExecutorTest {
   }
 
   @Test
+  public void testDeleteExceptionWithoutMessageIsReturnedAsExecutionError() {
+    // An exception without a message, e.g. from a failed Preconditions.checkState, is reported with its class name:
+    // the response constructor would otherwise print "null"
+    SqlQueryExecutor sqlQueryExecutor = new SqlQueryExecutor(CONTROLLER_URL) {
+      @Override
+      protected BrokerResponse executeDelete(DeleteStatement statement, @Nullable Map<String, String> headers) {
+        throw new IllegalStateException();
+      }
+    };
+
+    BrokerResponse response =
+        sqlQueryExecutor.executeStatement(resolvedDelete("DELETE FROM myTable WHERE col1 = 'a'"), null);
+
+    assertError(response, QueryErrorCode.QUERY_EXECUTION, "IllegalStateException");
+    String message = response.getExceptions().get(0).getMessage();
+    assertFalse(message.contains("null"), message);
+  }
+
+  @Test
   public void testUnknownExecutorStatementIsNotSupported() {
     // A DELETE is dispatched by its EXECUTOR execution type: any other statement of that type has no hook to execute
     // it
@@ -178,8 +199,13 @@ public class SqlQueryExecutorTest {
   /// A DELETE with its table resolved, as the broker and the controller hand it to the executor once they authorized
   /// the caller.
   private static DeleteStatement resolvedDelete(String sql) {
+    return resolvedDelete(sql, null);
+  }
+
+  /// A DELETE with its table resolved with the given `database` request header, see [#resolvedDelete(String)].
+  private static DeleteStatement resolvedDelete(String sql, @Nullable String databaseHeader) {
     return DeleteStatement.parse(CalciteSqlParser.compileToSqlNodeAndOptions(sql))
-        .resolveTableName(null, mock(TableCache.class));
+        .resolveTableName(databaseHeader, mock(TableCache.class));
   }
 
   private static void assertError(BrokerResponse response, QueryErrorCode expectedErrorCode,

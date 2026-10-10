@@ -40,12 +40,19 @@ import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatement;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
 import org.apache.pinot.sql.parsers.dml.DeleteStatement;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// SqlQueryExecutor executes all SQL queries including DQL, DML, DCL, DDL.
 public class SqlQueryExecutor {
-  public static final String UNAUTHORIZED_DELETE_MESSAGE = "DELETE is only executed once its table is resolved and "
-      + "the caller authorized to delete rows from it: send it to the query endpoint of a broker or a controller";
+  private static final Logger LOGGER = LoggerFactory.getLogger(SqlQueryExecutor.class);
+
+  /// Error of a `DELETE` that did not come through the query endpoint of a broker or a controller, which resolves its
+  /// table and authorizes the caller before handing it to the executor, see [#executeStatement].
+  public static final String UNAUTHORIZED_DELETE_MESSAGE = "DELETE is only executed when it comes through the query "
+      + "endpoint of a broker or a controller, which resolves its table and authorizes the caller: send it to that "
+      + "endpoint";
 
   private final String _controllerUrl;
   private final HelixManager _helixManager;
@@ -88,9 +95,10 @@ public class SqlQueryExecutor {
 
   /// Parses and executes a DML statement.
   ///
-  /// A `DELETE` is refused by [#executeStatement] with a [QueryErrorCode#ACCESS_DENIED] error, since this method
-  /// cannot authorize the caller: it is executed once its table is resolved and the caller authorized to delete rows
-  /// from it, as the query endpoints of the broker and the controller do.
+  /// A `DELETE` is refused by [#executeStatement] with a [QueryErrorCode#ACCESS_DENIED] error, since the statement
+  /// it parses is not resolved: a `DELETE` comes through the query endpoint of a broker or a controller, which resolves
+  /// its table, authorizes the caller to delete rows from it and then hands the resolved statement to
+  /// [#executeStatement].
   ///
   /// @param sqlNodeAndOptions Parsed DML object
   /// @param headers extra headers map for minion task submission
@@ -112,13 +120,16 @@ public class SqlQueryExecutor {
   /// executor for the statement ([DataManipulationStatement.ExecutionType#EXECUTOR]), e.g. [#executeDelete] for a
   /// [DeleteStatement].
   ///
-  /// It does not authorize the caller. The table of a [DeleteStatement] must be resolved with
-  /// [DeleteStatement#resolveTableName] and the caller authorized to delete rows from it before it is executed, as the
-  /// query endpoints of the broker and the controller do: an unresolved `DELETE` is refused with a
-  /// [QueryErrorCode#ACCESS_DENIED] error.
+  /// It does not authorize the caller: the query endpoints of the broker and the controller resolve the table of a
+  /// [DeleteStatement] with [DeleteStatement#resolveTableName] and authorize the caller to delete rows from it before
+  /// calling this method. A `DELETE` that is not resolved ([DeleteStatement#isResolved()]) did not come through such
+  /// an endpoint and is refused with a [QueryErrorCode#ACCESS_DENIED] error, [#UNAUTHORIZED_DELETE_MESSAGE]. This
+  /// guard is a wiring check, not an authorization check: a resolved statement is executed as is, so a new entry point
+  /// must authorize the caller as the query endpoints do.
   ///
   /// Execution failures are returned in the response, never thrown: a [QueryException] thrown by the executing hook
-  /// is returned with its error code and message, any other exception as a [QueryErrorCode#QUERY_EXECUTION] error.
+  /// is returned with its error code and message and logged without its stack trace, any other exception is logged
+  /// with its stack trace and returned as a [QueryErrorCode#QUERY_EXECUTION] error.
   ///
   /// @param statement parsed statement
   /// @param headers headers of the original request, e.g. for minion task submission
@@ -135,9 +146,16 @@ public class SqlQueryExecutor {
           try {
             return executeDelete(deleteStatement, headers);
           } catch (QueryException e) {
-            return new BrokerResponseNative(e.getErrorCode(), e.getMessage());
+            // Reported by the executing hook with the error code to surface, e.g. a validation failure
+            String message = errorMessage(e);
+            LOGGER.warn("DELETE from table: {} failed with {}: {}", deleteStatement.getTableName(), e.getErrorCode(),
+                message);
+            return new BrokerResponseNative(e.getErrorCode(), message);
           } catch (Exception e) {
-            return new BrokerResponseNative(QueryErrorCode.QUERY_EXECUTION, e.getMessage());
+            // Unexpected, and the DELETE may have partly run: keep the stack trace, the response only carries the
+            // message
+            LOGGER.error("DELETE from table: {} failed", deleteStatement.getTableName(), e);
+            return new BrokerResponseNative(QueryErrorCode.QUERY_EXECUTION, errorMessage(e));
           }
         }
         result.addException(
@@ -180,13 +198,16 @@ public class SqlQueryExecutor {
   /// The query endpoints of the broker and the controller (`PinotClientRequest`, `PinotQueryResource`) resolve the
   /// table of the statement with [DeleteStatement#resolveTableName] and authorize the caller to delete rows from it
   /// before calling it (through [#executeStatement]): implementations delete rows from that exact table,
-  /// [DeleteStatement#getTableName()]. Neither applies quotas nor logs the statement as a query.
+  /// [DeleteStatement#getTableName()]. Neither applies quotas nor logs the statement as a query. [#executeStatement]
+  /// only checks that the statement is resolved, see [DeleteStatement#isResolved()], not that the caller is
+  /// authorized: an entry point other than those endpoints must authorize the caller itself.
   ///
   /// Implementations validate the predicate (see [DeleteStatement#getPredicate()]) and the options they read (see
   /// [DeleteStatement#getOptions()]) before deleting rows, and forward the request headers to the APIs they call, which
   /// authorize the caller again. They report a validation or execution failure either in the response they return or
   /// by throwing a [QueryException] with the [QueryErrorCode] to surface, which [#executeStatement] returns as the
-  /// error of the response; any other exception is returned as a [QueryErrorCode#QUERY_EXECUTION] error.
+  /// error of the response; any other exception is logged with its stack trace and returned as a
+  /// [QueryErrorCode#QUERY_EXECUTION] error.
   ///
   /// @param statement parsed statement, with its table resolved
   /// @param headers headers of the original request, e.g. to authorize the caller
@@ -194,6 +215,13 @@ public class SqlQueryExecutor {
   /// @throws QueryException to report a failure with its error code, see above
   protected BrokerResponse executeDelete(DeleteStatement statement, @Nullable Map<String, String> headers) {
     return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, DeleteStatement.NOT_SUPPORTED_MESSAGE);
+  }
+
+  /// Message of an exception for the error of a response: its message, or, when it has none, its string form (its
+  /// class name), as the response constructor would otherwise print `null`.
+  private static String errorMessage(Exception e) {
+    String message = e.getMessage();
+    return message != null ? message : e.toString();
   }
 
   private MinionClient getMinionClient() {
