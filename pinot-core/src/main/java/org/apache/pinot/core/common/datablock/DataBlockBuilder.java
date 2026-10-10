@@ -149,6 +149,7 @@ public class DataBlockBuilder {
               fixedSize.putInt(dictId);
               break;
             case BYTES:
+              value = value instanceof ByteArray ? value : new ByteArray((byte[]) value);
               setColumn(fixedSize, varSize, (ByteArray) value);
               break;
             case MAP:
@@ -722,7 +723,8 @@ public class DataBlockBuilder {
   /// Iterate using two loops.
   /// The outer loop will iterate over a maximum of configurable step rows and check for the interruption flag,
   /// calling the inner loop to process the rows without checking the interruption flag.
-  static void interruptableLoop(int start, int max, int step, InnerLoop loop) throws IOException {
+  static void interruptableLoop(int start, int max, int step, InnerLoop loop)
+      throws IOException {
     for (int i = start; i < max; i += step) {
       if (Thread.currentThread().isInterrupted()) {
         throw new RuntimeException("Thread interrupted while processing rows. Rows processed so far: " + i);
@@ -733,6 +735,7 @@ public class DataBlockBuilder {
   }
 
   private interface InnerLoop {
-    void run(int from, int to) throws IOException;
+    void run(int from, int to)
+        throws IOException;
   }
 }
