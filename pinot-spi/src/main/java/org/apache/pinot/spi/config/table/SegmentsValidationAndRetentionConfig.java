@@ -98,6 +98,9 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   /// hybrid tables. Each typed table expires its own oldest eligible data without consulting the OFFLINE routing
   /// time boundary. REALTIME size retention can therefore expire data newer than that boundary; hybrid time
   /// retention continues to use its existing boundary rules.
+  /// For hybrid tables, size the REALTIME cap to comfortably retain all data newer than the routing boundary.
+  /// Otherwise size retention can delete input before RealtimeToOffline migrates it, and queries for that time
+  /// range can return no rows from either typed table without an error.
   ///
   /// Segments are ordered ascending by the first nonnegative end time, creation time, or push time, in that priority,
   /// then by segment name. Eviction removes only an old prefix before the first active segment listed as a source or
