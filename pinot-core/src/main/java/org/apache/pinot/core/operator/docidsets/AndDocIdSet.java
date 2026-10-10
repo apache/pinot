@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
@@ -172,11 +173,7 @@ public final class AndDocIdSet implements BlockDocIdSet {
           // TODO: Optimize this
           docIdRanges = SortedRangeIntersection.intersectSortedRangeSets(docIdRangesList);
         }
-        MutableRoaringBitmap mutableDocIds = new MutableRoaringBitmap();
-        for (IntPair docIdRange : docIdRanges) {
-          // NOTE: docIdRange has inclusive start and end.
-          mutableDocIds.add(docIdRange.getLeft(), docIdRange.getRight() + 1L);
-        }
+        MutableRoaringBitmap mutableDocIds = RoaringBitmapUtils.fromInclusiveRanges(docIdRanges);
         for (BitmapBasedDocIdIterator bitmapBasedDocIdIterator : bitmapBasedDocIdIterators) {
           mutableDocIds.and(bitmapBasedDocIdIterator.getDocIds());
         }

@@ -48,6 +48,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.startree.StarTree;
 import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
+import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -194,7 +195,12 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   /// filter operator is empty).
   @Nullable
   private StarTreeResult traverseStarTree() {
-    MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
+    // NOTE: Collect the leaf ranges in a separate RoaringBitmap and convert it once. A MutableRoaringBitmap regrows an
+    //       array container to its exact new size on every range added, which is quadratic in the number of short leaf
+    //       ranges sharing a container. Aggregated document ids are added one at a time, which is not affected, so they
+    //       go directly into a MutableRoaringBitmap that is returned as is when no leaf range is added.
+    MutableRoaringBitmap aggregatedDocIds = new MutableRoaringBitmap();
+    RoaringBitmap leafDocIds = null;
     Set<String> globalRemainingPredicateColumns = null;
 
     StarTree starTree = _starTreeV2.getStarTree();
@@ -233,7 +239,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
       // If all predicate columns and group-by columns are matched, we can use aggregated document
       if (remainingPredicateColumns.isEmpty() && remainingGroupByColumns.isEmpty()) {
-        matchingDocIds.add(starTreeNode.getAggregatedDocId());
+        aggregatedDocIds.add(starTreeNode.getAggregatedDocId());
         continue;
       }
 
@@ -241,7 +247,10 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       // the aggregated document. Add the range of documents for this node to the bitmap, and keep track of the
       // remaining predicate columns for this node
       if (starTreeNode.isLeaf()) {
-        matchingDocIds.add((long) starTreeNode.getStartDocId(), starTreeNode.getEndDocId());
+        if (leafDocIds == null) {
+          leafDocIds = new RoaringBitmap();
+        }
+        leafDocIds.add((long) starTreeNode.getStartDocId(), starTreeNode.getEndDocId());
         continue;
       }
 
@@ -342,6 +351,13 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       }
     }
 
+    MutableRoaringBitmap matchingDocIds;
+    if (leafDocIds != null) {
+      matchingDocIds = leafDocIds.toMutableRoaringBitmap();
+      matchingDocIds.or(aggregatedDocIds);
+    } else {
+      matchingDocIds = aggregatedDocIds;
+    }
     return new StarTreeResult(matchingDocIds,
         globalRemainingPredicateColumns != null ? globalRemainingPredicateColumns : Set.of());
   }

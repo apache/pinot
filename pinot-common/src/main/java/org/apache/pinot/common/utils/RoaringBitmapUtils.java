@@ -20,9 +20,12 @@ package org.apache.pinot.common.utils;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
+import org.apache.pinot.spi.utils.Pairs.IntPair;
 import org.roaringbitmap.ImmutableBitmapDataProvider;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class RoaringBitmapUtils {
@@ -60,6 +63,27 @@ public class RoaringBitmapUtils {
   /// `RoaringBitmapUnion.takeOwnership(deserialize(bytes))`.
   public static RoaringBitmapUnion deserializeToUnion(byte[] bytes) {
     return RoaringBitmapUnion.deserialize(ByteBuffer.wrap(bytes));
+  }
+
+  /// Returns a new bitmap of the values in the given ranges, each with inclusive start and end. The ranges may come in
+  /// any order and overlap.
+  public static MutableRoaringBitmap fromInclusiveRanges(List<IntPair> ranges) {
+    int numRanges = ranges.size();
+    if (numRanges == 0) {
+      return new MutableRoaringBitmap();
+    }
+    if (numRanges == 1) {
+      IntPair range = ranges.get(0);
+      return MutableRoaringBitmap.bitmapOfRange(range.getLeft(), range.getRight() + 1L);
+    }
+    // NOTE: Collect the ranges in a RoaringBitmap and convert it once. A MutableRoaringBitmap regrows an array
+    //       container to its exact new size on every range added, which is quadratic in the number of short ranges
+    //       sharing a container.
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (IntPair range : ranges) {
+      bitmap.add(range.getLeft(), range.getRight() + 1L);
+    }
+    return bitmap.toMutableRoaringBitmap();
   }
 
   /// Iterates over the ranges of unset bits and calls the consumer for each range. This is more performant to
