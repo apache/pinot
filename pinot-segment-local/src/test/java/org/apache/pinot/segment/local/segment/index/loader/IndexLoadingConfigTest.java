@@ -24,7 +24,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -210,9 +209,10 @@ public class IndexLoadingConfigTest {
         .setFieldConfigList(List.of(fieldConfig)).build();
     IndexLoadingConfig base = new IndexLoadingConfig(tableConfig, schema);
     ColumnMetadata child = mock(ColumnMetadata.class);
+    when(child.getColumnName()).thenReturn("event$key");
     when(child.getFieldSpec()).thenReturn(new DimensionFieldSpec("event$key", DataType.INT, true));
     SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);
-    when(metadata.getAllColumns()).thenReturn(new TreeSet<>(Set.of("event$key")));
+    when(metadata.getAllColumnMetadata()).thenReturn(List.of(child));
     when(metadata.getColumnMetadataFor("event$key")).thenReturn(child);
 
     IndexLoadingConfig derived = base.withOpenStructChildConfigs(metadata);
