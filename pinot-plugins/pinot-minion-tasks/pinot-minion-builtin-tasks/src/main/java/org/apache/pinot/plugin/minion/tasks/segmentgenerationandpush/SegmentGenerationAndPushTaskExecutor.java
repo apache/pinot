@@ -315,8 +315,12 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       segmentNameGeneratorSpec.setType(taskConfigs.get(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE));
       segmentNameGeneratorSpec.setConfigs(IngestionConfigUtils.getConfigMapWithPrefix(taskConfigs,
           BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX));
-      segmentNameGeneratorSpec.addConfig(SegmentGenerationTaskRunner.APPEND_UUID_TO_SEGMENT_NAME,
-          taskConfigs.getOrDefault(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, Boolean.toString(false)));
+      // An explicit segmentNameGenerator.configs.append.uuid.to.segment.name takes precedence over the top-level key
+      if (!segmentNameGeneratorSpec.getConfigs()
+          .containsKey(SegmentGenerationTaskRunner.APPEND_UUID_TO_SEGMENT_NAME)) {
+        segmentNameGeneratorSpec.addConfig(SegmentGenerationTaskRunner.APPEND_UUID_TO_SEGMENT_NAME,
+            taskConfigs.getOrDefault(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, Boolean.toString(false)));
+      }
       taskSpec.setSegmentNameGeneratorSpec(segmentNameGeneratorSpec);
       taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
 
