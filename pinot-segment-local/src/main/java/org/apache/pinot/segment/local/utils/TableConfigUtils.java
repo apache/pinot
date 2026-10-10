@@ -301,6 +301,7 @@ public final class TableConfigUtils {
   /// Validates retention config. Checks for following things:
   /// - Valid segmentPushType
   /// - Valid retentionTimeUnit
+  /// - Positive retentionSize in bytes, when configured
   private static void validateRetentionConfig(TableConfig tableConfig) {
     SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
     String tableName = tableConfig.getTableName();
@@ -326,6 +327,17 @@ public final class TableConfigUtils {
       } catch (Exception e) {
         throw new IllegalStateException(
             String.format("Table: %s, invalid retention time unit: %s", tableName, retentionTimeUnitString));
+      }
+    }
+
+    String retentionSize = segmentsConfig.getRetentionSize();
+    if (retentionSize != null) {
+      try {
+        Preconditions.checkArgument(DataSizeUtils.toBytes(retentionSize) > 0, "Retention size must be positive");
+      } catch (IllegalArgumentException e) {
+        throw new IllegalStateException(
+            String.format("Table: %s, invalid retention size: %s; must be a positive size in bytes", tableName,
+                retentionSize), e);
       }
     }
 

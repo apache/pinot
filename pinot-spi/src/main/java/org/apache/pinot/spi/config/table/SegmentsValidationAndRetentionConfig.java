@@ -27,6 +27,7 @@ import org.apache.pinot.spi.utils.TimeUtils;
 public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
+  private String _retentionSize;
   private String _deletedSegmentsRetentionPeriod;
   private String _replacedSegmentsRetentionPeriod;
   private String _lineageEntryCleanupRetentionPeriod;
@@ -88,6 +89,59 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _retentionTimeValue = retentionTimeValue;
   }
 
+  /// Returns the size retention limit, expressed as a positive size understood by
+  /// [DataSizeUtils#toBytes(String)], for example `"100G"`.
+  ///
+  /// The limit sums compressed archive bytes for active, live completed segments, counted once regardless of
+  /// replication. Live-segment lineage filtering excludes sources of COMPLETED entries and destinations of other
+  /// entries to avoid counting shadow copies. OFFLINE APPEND and REALTIME limits are enforced independently, including
+  /// hybrid tables. Each typed table expires its own oldest eligible data without consulting the OFFLINE routing
+  /// time boundary. REALTIME size retention can therefore expire data newer than that boundary; hybrid time
+  /// retention continues to use its existing boundary rules.
+  /// For hybrid tables, size the REALTIME cap to comfortably retain all data newer than the routing boundary.
+  /// Otherwise size retention can delete input before RealtimeToOffline migrates it, and queries for that time
+  /// range can return no rows from either typed table without an error.
+  ///
+  /// Segments are ordered ascending by the first nonnegative end time, creation time, or push time, in that priority,
+  /// then by segment name. Eviction removes only an old prefix before the first active segment listed as a source or
+  /// destination in any retained lineage entry. Every listed segment is protected until its lineage entry is removed,
+  /// regardless of entry state, age, or the lineage-exclusive deletion setting. Listed shadow copies remain stop
+  /// positions even when their bytes are excluded. Missing live metadata or unknown live completed-segment sizes cause
+  /// the pass to skip safely. Missing metadata or timestamps for an active lineage stop prevent eviction when over cap.
+  ///
+  /// With the default lineage manager, COMPLETED sources wait for [#getReplacedSegmentsRetentionPeriod()] (4h for
+  /// APPEND, 24h for REFRESH) before deletion. The entry is removed on a subsequent cleanup pass after sources leave
+  /// IdealState. The retention schedule (6h by default) also delays release of the boundary. Stale IN_PROGRESS entries
+  /// use [#getLineageEntryCleanupRetentionPeriod()] (1d by default); REVERTED entries are eligible immediately.
+  /// These are cleanup eligibility windows, not deadlines for meeting the size cap. Continuous merge or rollup
+  /// activity can keep a lineage boundary present and leave an over-cap table at `sizeRetentionBlocked=1` for hours
+  /// or longer.
+  ///
+  /// The newest OFFLINE segment, highest-sequence DONE LLC segment per REALTIME partition group, and undated segments
+  /// are preserved. Consuming segments are neither counted nor removed. These protections can leave the table above
+  /// its cap.
+  ///
+  /// Size retention rechecks the complete lineage entry snapshot under the local updater lock before deletion,
+  /// regardless of the lineage-exclusive deletion setting. A changed snapshot aborts the batch for retry next cycle.
+  /// This deliberately includes timestamp-only changes and entries wholly newer than the boundary, even when the
+  /// selected prefix is unaffected.
+  /// The check and deletion are not a global transaction across controllers.
+  ///
+  /// This is an asynchronous, best-effort retention policy, not a limit on decompressed server disk usage,
+  /// memory usage, or ingestion. When time retention is also configured, a segment can be deleted by either criterion.
+  /// The table-scoped `sizeRetentionBlocked` controller gauge is 1 after an unsafe, failed, or still-over-cap pass,
+  /// 0 after a successful pass, and absent when the policy is disabled or unsupported.
+  /// A null value disables size retention.
+  public String getRetentionSize() {
+    return _retentionSize;
+  }
+
+  /// Sets the compressed segment archive size retention limit described by [#getRetentionSize()].
+  /// Set to null to disable size retention.
+  public void setRetentionSize(String retentionSize) {
+    _retentionSize = retentionSize;
+  }
+
   public String getDeletedSegmentsRetentionPeriod() {
     return _deletedSegmentsRetentionPeriod;
   }
@@ -96,12 +150,12 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _deletedSegmentsRetentionPeriod = deletedSegmentsRetentionPeriod;
   }
 
-  /// Returns the retention period for segments replaced by a REFRESH ingestion job. Only applies to tables with
-  /// REFRESH ingestion type; for APPEND tables this setting is ignored and replaced segments are deleted immediately.
+  /// Returns the retention period for source segments replaced by a COMPLETED lineage entry. Applies to all ingestion
+  /// types, including APPEND and REFRESH.
   ///
   /// When a lineage entry transitions to COMPLETED state, source segments are preserved for this duration before
-  /// being scheduled for deletion, providing a rollback window. Consumers of this config (e.g. the lineage manager)
-  /// treat a null or unparseable value as a 1 day default.
+  /// being scheduled for deletion. The default lineage manager uses 4 hours for APPEND and other ingestion types,
+  /// and 24 hours for REFRESH, when the value is unset, empty, or unparseable.
   ///
   /// Accepts a human-readable period string (e.g. `"7d"`, `"12h"`) as understood by
   /// `TimeUtils.convertPeriodToMillis`. Setting this value too low (e.g. `"0d"`) eliminates the rollback
@@ -114,9 +168,10 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _replacedSegmentsRetentionPeriod = replacedSegmentsRetentionPeriod;
   }
 
-  /// Returns the retention period before stale IN_PROGRESS or REVERTED lineage entries and their destination segments
-  /// are cleaned up. Consumers of this config (e.g. the lineage manager) treat a null or unparseable value as a
-  /// 1 day default.
+  /// Returns the retention period before stale IN_PROGRESS lineage entries and their destination segments become
+  /// eligible for cleanup. The default lineage manager uses 1 day when the value is unset, empty, or unparseable.
+  /// REVERTED entries are eligible immediately. This period does not apply to COMPLETED entries: those are removed
+  /// on a cleanup pass after their source segments leave IdealState.
   ///
   /// Accepts a human-readable period string (e.g. `"7d"`, `"12h"`) as understood by
   /// `TimeUtils.convertPeriodToMillis`.
