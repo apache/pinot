@@ -51,8 +51,10 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.sql.parsers.parser.TableNameExtractor;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyString;
@@ -2941,6 +2943,10 @@ public class WorkerManagerTest {
 
     @Override
     public Set<String> getServingInstances(String tableNameWithType) {
+     if(tableNameWithType!=null){
+       RoutingTable rt = _routingTableByName.get(tableNameWithType);
+       rt.getServerInstanceToSegmentsMap().keySet().iterator().next();
+     }
       return new HashSet<>(_serverInstanceMap.keySet());
     }
 
@@ -3182,7 +3188,7 @@ public class WorkerManagerTest {
 
     // Create server instance to server the other normal table
     ServerInstance server2 = getServerInstance("localhost", 2);
-    serverInstanceMap.put(server2.getInstanceId(), server);
+    serverInstanceMap.put(server2.getInstanceId(), server2);
 
     // Create a routing table for the table with unavailable segments
     RoutingTable routingTable = new RoutingTable(Map.of(), List.of("seg", "seg2"), 0);
