@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.common;
 
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
@@ -30,7 +31,6 @@ import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.RangelessBitmapDocIdSet;
 import org.apache.pinot.segment.spi.Constants;
-import org.apache.pinot.spi.utils.Pairs.IntPair;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -101,13 +101,10 @@ public interface BlockDocIdSet {
       return ImmutableRoaringBitmap.and(((BitmapBasedDocIdIterator) docIdIterator).getDocIds(), docIds);
     }
     if (docIdIterator instanceof SortedDocIdIterator) {
-      MutableRoaringBitmap docIdsFromRanges = new MutableRoaringBitmap();
-      for (IntPair docIdRange : ((SortedDocIdIterator) docIdIterator).getDocIdRanges()) {
-        // NOTE: docIdRange has inclusive start and end.
-        docIdsFromRanges.add(docIdRange.getLeft(), docIdRange.getRight() + 1L);
-      }
-      docIdsFromRanges.and(docIds);
-      return docIdsFromRanges;
+      MutableRoaringBitmap matchingDocIds =
+          RoaringBitmapUtils.fromInclusiveRanges(((SortedDocIdIterator) docIdIterator).getDocIdRanges());
+      matchingDocIds.and(docIds);
+      return matchingDocIds;
     }
     // Generic fallback: drive the iterator from the candidate set so that it is only asked about candidate documents
     return collect(new AndDocIdIterator(
