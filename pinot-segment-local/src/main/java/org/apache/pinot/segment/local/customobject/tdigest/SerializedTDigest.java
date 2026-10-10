@@ -16,9 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.customobject;
+package org.apache.pinot.segment.local.customobject.tdigest;
 
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -42,6 +41,6 @@ public class SerializedTDigest implements Comparable<SerializedTDigest> {
 
   @Override
   public String toString() {
-    return BytesUtils.toHexString(CustomSerDeUtils.TDIGEST_SER_DE.serialize(_tDigest));
+    return BytesUtils.toHexString(_tDigest.serialize());
   }
 }

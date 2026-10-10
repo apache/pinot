@@ -19,7 +19,7 @@
 package org.apache.pinot.perf.aggregation;
 
 import java.nio.ByteBuffer;
-import org.apache.pinot.segment.local.utils.TDigestUtils;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec;
 
 /// Creates deterministic legacy TDigest inputs for benchmarks.
 final class TDigestBenchmarkUtils {
@@ -39,8 +39,8 @@ final class TDigestBenchmarkUtils {
     }
     int numCentroids = Math.min(sortedValues.length, Math.max(2, (int) Math.ceil(compression * 1.28)));
     ByteBuffer buffer = ByteBuffer.allocate(
-        TDigestUtils.VERBOSE_HEADER_SIZE + numCentroids * TDigestUtils.VERBOSE_CENTROID_SIZE);
-    buffer.putInt(TDigestUtils.VERBOSE_ENCODING);
+        TDigestCodec.VERBOSE_HEADER_SIZE + numCentroids * TDigestCodec.VERBOSE_CENTROID_SIZE);
+    buffer.putInt(TDigestCodec.VERBOSE_ENCODING);
     buffer.putDouble(sortedValues[0]);
     buffer.putDouble(sortedValues[sortedValues.length - 1]);
     buffer.putDouble(compression);
@@ -63,7 +63,7 @@ final class TDigestBenchmarkUtils {
       double mean = sortedValues[start];
       for (int valueId = start + 1; valueId < end; valueId++) {
         int weight = valueId - start;
-        mean = TDigestUtils.weightedMean(mean, weight, sortedValues[valueId], 1.0, weight + 1.0, false);
+        mean = TDigestCodec.weightedMean(mean, weight, sortedValues[valueId], 1.0, weight + 1.0, false);
       }
       buffer.putDouble(end - start);
       buffer.putDouble(mean);

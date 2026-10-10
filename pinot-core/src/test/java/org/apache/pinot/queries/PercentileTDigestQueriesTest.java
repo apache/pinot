@@ -20,7 +20,6 @@ package org.apache.pinot.queries;
 
 import it.unimi.dsi.fastutil.doubles.DoubleList;
 import java.io.File;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -42,11 +41,11 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -138,17 +137,16 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
       row.putValue(DOUBLE_COLUMN, value);
 
       TDigest tDigest =
-          TDigestUtils.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+          PercentileTDigestAccumulator.forLegacyAggregation(
+              PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
       tDigest.add(value);
-      ByteBuffer byteBuffer = ByteBuffer.allocate(tDigest.byteSize());
-      tDigest.asBytes(byteBuffer);
-      row.putValue(TDIGEST_COLUMN, byteBuffer.array());
+      byte[] digestBytes = tDigest.serialize();
+      row.putValue(TDIGEST_COLUMN, digestBytes);
 
-      TDigest tDigestCustom = TDigestUtils.createMergingDigest(CUSTOM_COMPRESSION);
+      TDigest tDigestCustom = PercentileTDigestAccumulator.forLegacyAggregation(CUSTOM_COMPRESSION);
       tDigestCustom.add(value);
-      ByteBuffer byteBufferCustom = ByteBuffer.allocate(tDigestCustom.byteSize());
-      tDigestCustom.asBytes(byteBufferCustom);
-      row.putValue(TDIGEST_CUSTOM_COMPRESSION_COLUMN, byteBufferCustom.array());
+      byte[] customDigestBytes = tDigestCustom.serialize();
+      row.putValue(TDIGEST_CUSTOM_COMPRESSION_COLUMN, customDigestBytes);
 
       String group = GROUPS[RANDOM.nextInt(GROUPS.length)];
       row.putValue(GROUP_BY_COLUMN, group);

@@ -44,9 +44,9 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction.Seri
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.segment.local.customobject.TDigest;
-import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
-import org.apache.pinot.segment.local.utils.TDigestUtils;
+import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -273,7 +273,7 @@ public class BenchmarkPercentileTDigestCombine {
     for (int sourceId = 0; sourceId < _fanIn; sourceId++) {
       TDigest nativeDigest = null;
       if (_sourceLayout == SourceLayout.NATIVE) {
-        nativeDigest = TDigestUtils.createMergingDigest(_compression);
+        nativeDigest = PercentileTDigestAccumulator.forLegacyAggregation(_compression);
       }
       double[] sourceValues = new double[VALUES_PER_DIGEST];
       SplittableRandom random = new SplittableRandom(0x6A09E667F3BCC909L + sourceId);
@@ -819,23 +819,8 @@ public class BenchmarkPercentileTDigestCombine {
     }
 
     @Override
-    public int byteSize() {
-      return _bytes.length;
-    }
-
-    @Override
-    public int smallByteSize() {
-      return toTDigest().smallByteSize();
-    }
-
-    @Override
-    public void asBytes(ByteBuffer buffer) {
-      buffer.put(_bytes);
-    }
-
-    @Override
-    public void asSmallBytes(ByteBuffer buffer) {
-      toTDigest().asSmallBytes(buffer);
+    public byte[] serialize() {
+      return _bytes.clone();
     }
 
     @Override
@@ -849,7 +834,7 @@ public class BenchmarkPercentileTDigestCombine {
     }
 
     private TDigest toTDigest() {
-      return TDigestUtils.deserialize(ByteBuffer.wrap(_bytes));
+      return PercentileTDigestAccumulator.fromBytes(ByteBuffer.wrap(_bytes));
     }
   }
 
@@ -918,7 +903,7 @@ public class BenchmarkPercentileTDigestCombine {
       if (pending.isEmpty()) {
         return;
       }
-      TDigest batch = TDigestUtils.createMergingDigest(_compressionFactor);
+      TDigest batch = PercentileTDigestAccumulator.forLegacyAggregation(_compressionFactor);
       batch.add(pending);
       pending.clear();
       target.add(batch);

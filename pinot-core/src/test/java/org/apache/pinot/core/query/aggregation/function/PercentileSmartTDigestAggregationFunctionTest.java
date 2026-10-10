@@ -30,10 +30,9 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.segment.local.customobject.PercentileTDigestAccumulator;
-import org.apache.pinot.segment.local.customobject.TDigest;
-import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
-import org.apache.pinot.segment.local.utils.TDigestUtils;
+import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
@@ -85,7 +84,7 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     assertEquals(serialized.getType(), ObjectSerDeUtils.ObjectType.TDigest.getValue());
     assertEquals(serialized.getBytes(), small, "Untouched legacy state must retain its original bytes");
     PercentileRawTDigestAggregationFunctionTest.assertLegacyCompatibleShape(serialized.getBytes(), 20.0);
-    TDigest roundTripped = TDigestUtils.deserialize(ByteBuffer.wrap(serialized.getBytes()));
+    TDigest roundTripped = PercentileTDigestAccumulator.fromBytes(ByteBuffer.wrap(serialized.getBytes()));
     assertEquals(roundTripped.size(), numCentroids);
     assertEquals(roundTripped.quantile(0.5), (numCentroids - 1.0) / 2.0, 1.0);
 
@@ -99,19 +98,19 @@ public class PercentileSmartTDigestAggregationFunctionTest {
 
     byte[] mergedBytes = function.serializeIntermediateResult(merged).getBytes();
     PercentileRawTDigestAggregationFunctionTest.assertLegacyCompatibleShape(mergedBytes, 20.0);
-    TDigest mergedRoundTripped = TDigestUtils.deserialize(ByteBuffer.wrap(mergedBytes));
+    TDigest mergedRoundTripped = PercentileTDigestAccumulator.fromBytes(ByteBuffer.wrap(mergedBytes));
     assertEquals(mergedRoundTripped.size(), 2L * numCentroids);
     assertEquals(mergedRoundTripped.quantile(0.5), (numCentroids - 1.0) / 2.0, 1.0);
   }
 
-  /// Materialized (non-pass-through) capacity-preserving state must also serialize into legacy-compatible bytes
-  /// through the generic serde, with `byteSize()` agreeing with the serialized length.
+  /// Materialized historical compact state must also serialize into legacy-compatible bytes
+  /// through the generic serde, with its owned serialization length matching the generic result.
   @Test
   public void testMaterializedCapacityPreservingStateSerializesLegacyCompatible() {
     int numCentroids = 51;
     byte[] small =
         PercentileRawTDigestAggregationFunctionTest.createSmallUnitCentroidDigest(numCentroids, 20.0, 60, 100);
-    byte[] empty = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(TDigestUtils.createMergingDigest(20.0));
+    byte[] empty = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(PercentileTDigestAccumulator.forLegacyAggregation(20.0));
     PercentileSmartTDigestAggregationFunction function = newFunction();
 
     Object merged = function.merge(
@@ -121,8 +120,8 @@ public class PercentileSmartTDigestAggregationFunctionTest {
             new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(empty))));
     byte[] serialized = function.serializeIntermediateResult(merged).getBytes();
     PercentileRawTDigestAggregationFunctionTest.assertLegacyCompatibleShape(serialized, 20.0);
-    assertEquals(((TDigest) merged).byteSize(), serialized.length);
-    TDigest roundTripped = TDigestUtils.deserialize(ByteBuffer.wrap(serialized));
+    assertEquals(((TDigest) merged).serialize().length, serialized.length);
+    TDigest roundTripped = PercentileTDigestAccumulator.fromBytes(ByteBuffer.wrap(serialized));
     assertEquals(roundTripped.size(), numCentroids);
     assertEquals(roundTripped.quantile(0.5), (numCentroids - 1.0) / 2.0, 1.0);
   }
@@ -145,7 +144,7 @@ public class PercentileSmartTDigestAggregationFunctionTest {
       assertTrue(merged instanceof PercentileTDigestAccumulator);
       assertEquals(((TDigest) merged).size(), numCentroids + 3L);
       assertEquals(((TDigest) merged).quantile(0.5), (numCentroids - 1.0) / 2.0, 1.0);
-      TDigest roundTripped = TDigestUtils.deserialize(
+      TDigest roundTripped = PercentileTDigestAccumulator.fromBytes(
           ByteBuffer.wrap(function.serializeIntermediateResult(merged).getBytes()));
       assertEquals(roundTripped.size(), numCentroids + 3L);
     }
@@ -213,13 +212,20 @@ public class PercentileSmartTDigestAggregationFunctionTest {
 
   @Test
   public void testFractionalDigestFinalExtractionWithNullHandling() {
-    PercentileSmartTDigestAggregationFunction function = new PercentileSmartTDigestAggregationFunction(
-        List.of(EXPRESSION, ExpressionContext.forLiteral(Literal.doubleValue(50.0))), true);
-    TDigest digest = new PercentileTDigestAccumulator(100.0);
-    digest.add(42.0, 0.5);
-    assertEquals(digest.size(), 0L);
-    assertFalse(digest.isEmpty());
-    assertEquals(function.extractFinalResult(digest), 42.0);
+    for (boolean nullHandlingEnabled : new boolean[]{false, true}) {
+      PercentileSmartTDigestAggregationFunction function = new PercentileSmartTDigestAggregationFunction(
+          List.of(EXPRESSION, ExpressionContext.forLiteral(Literal.doubleValue(50.0))), nullHandlingEnabled);
+      TDigest digest = new PercentileTDigestAccumulator(100.0);
+      assertTrue(digest.isEmpty());
+      Double expectedEmptyResult = nullHandlingEnabled ? null : Double.NEGATIVE_INFINITY;
+      assertEquals(function.extractFinalResult(digest), expectedEmptyResult);
+      assertEquals(function.extractFinalResult(new DoubleArrayList()), expectedEmptyResult);
+      assertEquals(function.extractFinalResult(null), expectedEmptyResult);
+      digest.add(42.0, 0.5);
+      assertEquals(digest.size(), 0L);
+      assertFalse(digest.isEmpty());
+      assertEquals(function.extractFinalResult(digest), 42.0);
+    }
   }
 
   @Test

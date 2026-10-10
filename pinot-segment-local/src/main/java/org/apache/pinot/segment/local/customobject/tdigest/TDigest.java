@@ -16,9 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.customobject;
+package org.apache.pinot.segment.local.customobject.tdigest;
 
-import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
 
@@ -40,12 +39,18 @@ public abstract class TDigest {
   /// Merges an exclusively owned source; implementations may compress that mutable source in place.
   public abstract void add(TDigest other);
 
-  public abstract void add(List<? extends TDigest> others);
+  public void add(List<? extends TDigest> others) {
+    for (TDigest other : others) {
+      add(other);
+    }
+  }
 
   public abstract void compress();
 
   /// Returns the legacy long size view, saturating when the precise mass exceeds its range.
-  public abstract long size();
+  public long size() {
+    return (long) getTotalWeight();
+  }
 
   /// Returns centroid mass without narrowing fractional or large weights. Valid totals must remain finite;
   /// add and merge throw IllegalArgumentException when the summed mass exceeds the finite double range.
@@ -72,30 +77,15 @@ public abstract class TDigest {
 
   public abstract double compression();
 
-  /// Returns bytes needed by asBytes. New fractional endpoint masses that cannot be encoded safely for legacy
-  /// readers are rejected; unchanged retained historical encodings may be passed through byte-exactly.
-  public abstract int byteSize();
+  /// Serializes one independently owned legacy-compatible payload. Implementations own their compression policy.
+  /// Unchanged historical encodings may be retained byte-exactly; fresh unrepresentable boundaries are rejected.
+  public abstract byte[] serialize();
 
-  /// Bounds bytes written by asBytes for the current state; conservative bounds may include verbose expansion.
-  /// Mutable implementations should override this without flushing buffered inputs; the default asks byteSize
-  /// and may perform compression.
+  /// Bounds independently owned serialization without requiring a two-step size/write protocol.
+  /// Mutable implementations can override this to avoid flushing buffered inputs.
   public int maxSerializedByteSize() {
-    return byteSize();
+    return serialize().length;
   }
-
-  /// Returns space for asSmallBytes; degraded legacy state or finite fields that overflow float retain verbose bytes.
-  /// Implementations fail explicitly when compact centroid counts or capacities cannot fit their signed short fields.
-  /// New fractional boundary masses below one or a singleton mass between one and two cannot satisfy legacy unit
-  /// endpoint requirements without changing total mass, and serialization rejects them.
-  public abstract int smallByteSize();
-
-  /// Writes one legacy payload at the current position and advances the position past the complete payload.
-  /// The caller supplies at least maxSerializedByteSize bytes of remaining space.
-  public abstract void asBytes(ByteBuffer buffer);
-
-  /// Writes compact bytes when possible, using verbose bytes for degraded state or finite fields that overflow float.
-  /// Advances the position past the complete payload; the caller supplies at least smallByteSize bytes of space.
-  public abstract void asSmallBytes(ByteBuffer buffer);
 
   public abstract int centroidCount();
 
@@ -106,7 +96,7 @@ public abstract class TDigest {
   /// Returns the mean of an unsupported fractional endpoint inherited from validated legacy bytes, or NaN when
   /// none is known. The lower or upper boundary is selected by `lowerBoundary`. Producers of fresh values retain
   /// this default; mergers propagate the provenance without granting permission to new fractional extrema.
-  public double getHistoricalFractionalBoundaryMean(boolean lowerBoundary) {
+  double getHistoricalFractionalBoundaryMean(boolean lowerBoundary) {
     return Double.NaN;
   }
 

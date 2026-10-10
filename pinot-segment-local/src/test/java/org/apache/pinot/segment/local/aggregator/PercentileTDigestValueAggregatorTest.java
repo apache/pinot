@@ -25,16 +25,16 @@ import java.util.List;
 import java.util.SplittableRandom;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.segment.local.customobject.SerializedTDigest;
-import org.apache.pinot.segment.local.customobject.TDigest;
-import org.apache.pinot.segment.local.customobject.TDigest.Centroid;
+import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
-import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -67,7 +67,7 @@ public class PercentileTDigestValueAggregatorTest {
   public static Object[][] compressionBounds() {
     return new Object[][]{
         {10, 30, 512},
-        {100, 210, 3_392},
+        {100, 1_049, 3_392},
         {1_000, 2_010, 32_192}
     };
   }
@@ -82,6 +82,7 @@ public class PercentileTDigestValueAggregatorTest {
 
     assertEquals(digest.size(), 256L);
     int maxByteSize = aggregator.getMaxAggregatedValueByteSize();
+    assertEquals(maxByteSize, 3_392);
     byte[] serialized = aggregator.serializeAggregatedValue(digest);
     assertTrue(digest.centroidCount() > 0);
     assertTrue(serialized.length <= maxByteSize);
@@ -103,6 +104,32 @@ public class PercentileTDigestValueAggregatorTest {
     byte[] serialized = aggregator.serializeAggregatedValue(result);
     assertTrue(serialized.length > 512, "The larger-compression input must exceed a compression-10 buffer");
     assertTrue(serialized.length <= maxByteSize);
+
+    double[] means = new double[5_000];
+    double[] weights = new double[means.length];
+    Arrays.fill(weights, 2.0);
+    weights[0] = 1.0;
+    weights[weights.length - 1] = 1.0;
+    for (int i = 0; i < 5_000; i++) {
+      means[i] = i + 1.0;
+    }
+    PercentileTDigestValueAggregator sourceAggregator = newAggregator(10_000);
+    TDigest highCompression = sourceAggregator.deserializeAggregatedValue(
+        createVerboseEncoding(means, weights, 10_000.0));
+    sourceAggregator.applyRawValue(highCompression, 2_500.0);
+    byte[] highCompressionBytes = highCompression.serialize();
+    PercentileTDigestValueAggregator lowerCompression = newAggregator(100);
+    TDigest merged = lowerCompression.getInitialAggregatedValue(new Object[0]);
+    lowerCompression.applyRawValue(merged, highCompressionBytes);
+    byte[] rewritten = lowerCompression.serializeAggregatedValue(merged);
+    TDigest restored = lowerCompression.deserializeAggregatedValue(rewritten);
+    assertTrue(restored.hasValidStatistics());
+    assertEquals(restored.getTotalWeight(), 9_999.0);
+    assertEquals(restored.getMin(), 1.0);
+    assertEquals(restored.getMax(), 5_000.0);
+    assertEquals(restored.quantile(0.0), 1.0);
+    assertEquals(restored.quantile(1.0), 5_000.0);
+    assertEquals(restored.quantile(0.198), 990.901, 1.0);
   }
 
   @Test
@@ -135,9 +162,8 @@ public class PercentileTDigestValueAggregatorTest {
     byte[] serialized = aggregator.serializeAggregatedValue(result);
     TDigest clone = aggregator.cloneAggregatedValue(result);
 
-    // The native bound also reserves verbose expansion, while unchanged compact bytes remain byte-exact.
-    assertEquals(maxByteSize, TDigestUtils.VERBOSE_HEADER_SIZE
-        + TDigestUtils.VERBOSE_CENTROID_SIZE * centroidCount);
+    // Unchanged compact bytes remain byte-exact and reserve their original size.
+    assertEquals(maxByteSize, smallEncoding.length);
     assertEquals(serialized, smallEncoding);
     assertTrue(serialized.length <= maxByteSize);
     assertEquals(clone.size(), result.size());
@@ -150,7 +176,7 @@ public class PercentileTDigestValueAggregatorTest {
   public void testAggregatedUpdateDoesNotForceDestinationCompression() {
     PercentileTDigestValueAggregator aggregator = newAggregator(100);
     TDigest destination = aggregator.getInitialAggregatedValue(1.0);
-    TDigest source = TDigestUtils.createMergingDigest(100);
+    TDigest source = PercentileTDigestAccumulator.forLegacyAggregation(100);
     source.add(2.0);
     source.add(3.0);
 
@@ -175,7 +201,7 @@ public class PercentileTDigestValueAggregatorTest {
     TDigest copy = aggregator.cloneAggregatedValue(source);
     TDigest parent = aggregator.getInitialAggregatedValue(0.0);
     aggregator.applyAggregatedValue(parent, source);
-    TDigest queryAccumulator = TDigestUtils.createMergingDigest(100.0);
+    TDigest queryAccumulator = PercentileTDigestAccumulator.forLegacyAggregation(100.0);
     queryAccumulator.add(source);
 
     assertEquals(source.getTotalWeight(), 94.0);
@@ -195,7 +221,7 @@ public class PercentileTDigestValueAggregatorTest {
       double min = values[0];
       double max = values[1];
       ByteBuffer compact = ByteBuffer.allocate(46);
-      compact.putInt(TDigestUtils.SMALL_ENCODING).putDouble(min).putDouble(max).putFloat(100.0F);
+      compact.putInt(TDigestCodec.SMALL_ENCODING).putDouble(min).putDouble(max).putFloat(100.0F);
       compact.putShort((short) 210).putShort((short) 1050).putShort((short) 2);
       compact.putFloat(1.0F).putFloat((float) min).putFloat(1.0F).putFloat((float) max);
       PercentileTDigestValueAggregator aggregator = newAggregator(100);
@@ -205,9 +231,9 @@ public class PercentileTDigestValueAggregatorTest {
       byte[] serialized = aggregator.serializeAggregatedValue(result);
       assertTrue(serialized.length <= registeredBound);
       ByteBuffer verbose = ByteBuffer.wrap(serialized);
-      assertEquals(verbose.getInt(), TDigestUtils.VERBOSE_ENCODING);
+      assertEquals(verbose.getInt(), TDigestCodec.VERBOSE_ENCODING);
       int count = verbose.getInt(28);
-      verbose.position(TDigestUtils.VERBOSE_HEADER_SIZE);
+      verbose.position(TDigestCodec.VERBOSE_HEADER_SIZE);
       int finiteCount = 0;
       for (int i = 0; i < count; i++) {
         verbose.getDouble();
@@ -253,7 +279,7 @@ public class PercentileTDigestValueAggregatorTest {
 
         byte[] serialized = aggregator.serializeAggregatedValue(digest);
         assertTrue(serialized.length <= bound);
-        assertFalse(TDigestUtils.inspectSerialized(ByteBuffer.wrap(serialized)).weightedBoundaries());
+        assertFalse(TDigestCodec.inspectSerialized(ByteBuffer.wrap(serialized)).weightedBoundaries());
         TDigest roundTripped = aggregator.deserializeAggregatedValue(serialized);
         assertEquals(roundTripped.getTotalWeight(), 12.0 + 3.0 * tails.length);
         assertEquals(roundTripped.getMin(), digest.getMin());
@@ -270,7 +296,7 @@ public class PercentileTDigestValueAggregatorTest {
         PercentileTDigestValueAggregator aggregator = newAggregator(100);
         TDigest finite = historical
             ? aggregator.deserializeAggregatedValue(createVerboseEncoding(new double[]{0.0}, new double[]{1.5}))
-            : TDigestUtils.createMergingDigest(100);
+            : PercentileTDigestAccumulator.forLegacyAggregation(100);
         if (!historical) {
           finite.add(0.0, 1.5);
         }
@@ -284,9 +310,9 @@ public class PercentileTDigestValueAggregatorTest {
         assertEquals(centroids.getLast().weight(), 1.0);
         byte[] serialized = aggregator.serializeAggregatedValue(result);
         assertTrue(serialized.length <= bound);
-        assertFalse(TDigestUtils.inspectSerialized(ByteBuffer.wrap(serialized)).weightedBoundaries());
+        assertFalse(TDigestCodec.inspectSerialized(ByteBuffer.wrap(serialized)).weightedBoundaries());
         assertEquals(aggregator.deserializeAggregatedValue(serialized).centroidCount(), centroids.size());
-        assertEquals(TDigestUtils.validateSerialized(serialized), 2.5);
+        assertEquals(TDigestCodec.validateSerialized(serialized), 2.5);
         assertEquals(result.cdf(0.0), positiveTail ? 0.3 : 0.7, 1e-12);
         assertEquals(aggregator.deserializeAggregatedValue(serialized).cdf(0.0), result.cdf(0.0));
       }
@@ -317,6 +343,25 @@ public class PercentileTDigestValueAggregatorTest {
     assertEquals(standardDigest.getMax(), Double.POSITIVE_INFINITY);
     TDigest roundTripped = aggregator.deserializeAggregatedValue(serialized);
     assertInfinityDistribution(roundTripped, expectedSize);
+
+    for (double[] means : new double[][]{
+        {5.0, Double.POSITIVE_INFINITY}, {Double.NEGATIVE_INFINITY, -5.0},
+        {Double.NEGATIVE_INFINITY, 5.0}, {-5.0, Double.POSITIVE_INFINITY},
+        {Double.NEGATIVE_INFINITY, 0.0, Double.POSITIVE_INFINITY}
+    }) {
+      double[] weights = new double[means.length];
+      Arrays.fill(weights, 1.0);
+      byte[] input = createVerboseEncoding(means, weights);
+      TDigest nativeDigest = PercentileTDigestAccumulator.fromBytes(input);
+      TDigest wrapped = aggregator.deserializeAggregatedValue(input);
+      TDigest raw = aggregator.getInitialAggregatedValue(Arrays.stream(means).boxed().toArray());
+      for (double quantile : new double[]{
+          0.0, Math.nextDown(0.5), 0.5, Math.nextUp(0.5), 1.0 / 3.0, 2.0 / 3.0, 1.0
+      }) {
+        assertEquals(wrapped.quantile(quantile), nativeDigest.quantile(quantile));
+        assertEquals(raw.quantile(quantile), nativeDigest.quantile(quantile));
+      }
+    }
   }
 
   @Test
@@ -344,7 +389,7 @@ public class PercentileTDigestValueAggregatorTest {
     means[means.length - 1] = Double.POSITIVE_INFINITY;
     weights[weights.length - 1] = 1.0;
 
-    byte[] compatible = TDigestUtils.makeLegacyCompatible(createVerboseEncoding(means, weights, 20.0));
+    byte[] compatible = TDigestCodec.makeLegacyCompatible(createVerboseEncoding(means, weights, 20.0));
     assertEquals(ByteBuffer.wrap(compatible).getInt(), 1);
     PercentileTDigestValueAggregator aggregator = newAggregator(20);
     TDigest digest = aggregator.deserializeAggregatedValue(compatible);
@@ -384,17 +429,48 @@ public class PercentileTDigestValueAggregatorTest {
   }
 
   @Test
-  public void testCentroidInspectionDoesNotInvalidateCachedSerialization() {
+  public void testCentroidInspectionPreservesSerializationStatistics() {
     PercentileTDigestValueAggregator aggregator = newAggregator(20);
     TDigest digest = aggregator.getInitialAggregatedValue(
         new Object[]{Double.NEGATIVE_INFINITY, 0.0, 1.0, 2.0, Double.POSITIVE_INFINITY});
-    byte[] beforeInspection = aggregator.serializeAggregatedValue(digest);
-
+    byte[] beforeInspection = digest.serialize();
     digest.compress();
     assertTrue(digest.centroidCount() > 0);
     assertCentroidWeight(digest, digest.size());
+    assertEquals(digest.serialize(), beforeInspection);
 
-    assertEquals(aggregator.serializeAggregatedValue(digest), beforeInspection);
+    for (byte[] compact : new byte[][]{
+        createSmallEncoding(new double[]{1.0, 5.0, 9.0}, new double[]{1.0, 1.0, 1.0}),
+        createSmallEncoding(100, 500, 2_500, 500)}) {
+      for (int read = 0; read < 7; read++) {
+        TDigest source = aggregator.deserializeAggregatedValue(compact);
+        double mass = source.getTotalWeight();
+        double min = source.getMin();
+        double max = source.getMax();
+        byte[] returned = source.serialize();
+        Arrays.fill(returned, (byte) 0);
+        switch (read) {
+          case 0 -> source.quantile(0.5);
+          case 1 -> source.cdf(5.0);
+          case 2 -> source.centroids();
+          case 3 -> source.centroidCount();
+          case 4 -> source.compress();
+          case 5 -> aggregator.cloneAggregatedValue(source);
+          case 6 -> aggregator.applyAggregatedValue(aggregator.getInitialAggregatedValue(0.0), source);
+          default -> throw new AssertionError();
+        }
+        assertEquals(source.getTotalWeight(), mass);
+        assertEquals(source.getMin(), min);
+        assertEquals(source.getMax(), max);
+        byte[] serialized = source.serialize();
+        assertEquals(TDigestCodec.validateSerialized(serialized), mass);
+        assertTrue(serialized.length <= source.maxSerializedByteSize());
+        source.add(1_000.0);
+        byte[] updated = source.serialize();
+        assertEquals(TDigestCodec.validateSerialized(updated), mass + 1.0);
+        assertEquals(source.getMax(), 1_000.0);
+      }
+    }
   }
 
   @Test(dataProvider = "serializationOwnership")
@@ -420,8 +496,8 @@ public class PercentileTDigestValueAggregatorTest {
 
   @Test
   public void testCompactOverflowWithGenuineInfinityTailRemainsFinite() {
-    ByteBuffer compact = ByteBuffer.allocate(TDigestUtils.SMALL_HEADER_SIZE + 3 * TDigestUtils.SMALL_CENTROID_SIZE);
-    compact.putInt(TDigestUtils.SMALL_ENCODING).putDouble(Double.NEGATIVE_INFINITY).putDouble(1e39).putFloat(100);
+    ByteBuffer compact = ByteBuffer.allocate(TDigestCodec.SMALL_HEADER_SIZE + 3 * TDigestCodec.SMALL_CENTROID_SIZE);
+    compact.putInt(TDigestCodec.SMALL_ENCODING).putDouble(Double.NEGATIVE_INFINITY).putDouble(1e39).putFloat(100);
     compact.putShort((short) 210).putShort((short) 1050).putShort((short) 3);
     compact.putFloat(1).putFloat(Float.NEGATIVE_INFINITY);
     compact.putFloat(1).putFloat(0);
@@ -440,7 +516,7 @@ public class PercentileTDigestValueAggregatorTest {
 
   @Test
   public void testFractionalCentroidsWithInfiniteTailsPreserveWireMass() {
-    TDigest source = TDigestUtils.deserialize(createVerboseEncoding(
+    TDigest source = PercentileTDigestAccumulator.fromBytes(createVerboseEncoding(
         new double[]{Double.NEGATIVE_INFINITY, 2.0, Double.POSITIVE_INFINITY},
         new double[]{1.0, 0.5, 1.0}));
     PercentileTDigestValueAggregator aggregator = newAggregator(100);
@@ -460,7 +536,7 @@ public class PercentileTDigestValueAggregatorTest {
     int bound = weightedFinite.maxSerializedByteSize();
     byte[] weightedBytes = aggregator.serializeAggregatedValue(weightedFinite);
     assertTrue(weightedBytes.length <= bound);
-    assertFalse(TDigestUtils.inspectSerialized(ByteBuffer.wrap(weightedBytes)).weightedBoundaries());
+    assertFalse(TDigestCodec.inspectSerialized(ByteBuffer.wrap(weightedBytes)).weightedBoundaries());
     assertEquals(aggregator.deserializeAggregatedValue(weightedBytes).getTotalWeight(), 9.5);
 
     TDigest fractional = aggregator.getInitialAggregatedValue(createVerboseEncoding(
@@ -504,7 +580,7 @@ public class PercentileTDigestValueAggregatorTest {
   @Test
   public void testFreshFractionalBoundaryFailsBeforeWritingLegacyBytes() {
     PercentileTDigestValueAggregator aggregator = newAggregator(100);
-    TDigest result = TDigestUtils.createMergingDigest(100);
+    TDigest result = PercentileTDigestAccumulator.forLegacyAggregation(100);
     result.add(0.0, 0.5);
     result.add(2.0, 1.5);
     assertThrows(IllegalArgumentException.class, () -> aggregator.serializeAggregatedValue(result));
@@ -531,7 +607,7 @@ public class PercentileTDigestValueAggregatorTest {
           TDigest result;
           if (sourceKind == 2) {
             result = aggregator.getInitialAggregatedValue(healthyValue);
-            aggregator.applyAggregatedValue(result, TDigestUtils.deserialize(input));
+            aggregator.applyAggregatedValue(result, PercentileTDigestAccumulator.fromBytes(input));
           } else {
             result = aggregator.deserializeAggregatedValue(input);
             result.add(sourceKind == 0 ? infinity : healthyValue);
@@ -540,15 +616,15 @@ public class PercentileTDigestValueAggregatorTest {
           int bound = result.maxSerializedByteSize();
           byte[] serialized = aggregator.serializeAggregatedValue(result);
           assertTrue(serialized.length <= bound);
-          assertEquals(ByteBuffer.wrap(serialized).getInt(), TDigestUtils.VERBOSE_ENCODING);
+          assertEquals(ByteBuffer.wrap(serialized).getInt(), TDigestCodec.VERBOSE_ENCODING);
           for (TDigest view : List.of(result, aggregator.cloneAggregatedValue(result),
-              aggregator.deserializeAggregatedValue(serialized), TDigestUtils.deserialize(serialized))) {
+              aggregator.deserializeAggregatedValue(serialized), PercentileTDigestAccumulator.fromBytes(serialized))) {
             assertTrue(view.hasValidStatistics());
             assertEquals(view.getTotalWeight(), expectedWeight);
             assertEquals(view.getMin(), positiveTail ? 0.0 : infinity);
             assertEquals(view.getMax(), positiveTail ? infinity : 0.0);
             assertTrue(Double.isFinite(view.cdf(healthyValue / 2.0)));
-            assertEquals(TDigestUtils.validateSerialized(TDigestUtils.serialize(view)), expectedWeight);
+            assertEquals(TDigestCodec.validateSerialized(view.serialize()), expectedWeight);
           }
 
           TDigest newFractionalEndpoint = aggregator.cloneAggregatedValue(result);
@@ -614,15 +690,14 @@ public class PercentileTDigestValueAggregatorTest {
     assertEquals(result.quantile(0.5), 42.0);
     TDigest roundTripped = aggregator.deserializeAggregatedValue(aggregator.serializeAggregatedValue(result));
     assertEquals(roundTripped.getTotalWeight(), largeWeight + 3.5);
-    verify(source, never()).byteSize();
-    verify(source, never()).asBytes(any(ByteBuffer.class));
+    verify(source, never()).serialize();
   }
 
   @Test
   public void testDegradedCompactPayloadRejectsInfinityMutationAndRetainsBytes() {
     int centroidCount = 100;
     byte[] compact = createSmallEncoding(10, centroidCount, 500, centroidCount);
-    ByteBuffer.wrap(compact).putFloat(TDigestUtils.SMALL_HEADER_SIZE, -1.0F);
+    ByteBuffer.wrap(compact).putFloat(TDigestCodec.SMALL_HEADER_SIZE, -1.0F);
     PercentileTDigestValueAggregator aggregator = newAggregator(10);
     TDigest digest = aggregator.getInitialAggregatedValue(compact);
     assertThrows(IllegalArgumentException.class, () -> aggregator.applyRawValue(digest, Double.NEGATIVE_INFINITY));
@@ -633,7 +708,7 @@ public class PercentileTDigestValueAggregatorTest {
   public void testInfinityOnlyReceiverRejectsDegradedCompactPayloadWithoutMutation() {
     int centroidCount = 100;
     byte[] compact = createSmallEncoding(10, centroidCount, 500, centroidCount);
-    ByteBuffer.wrap(compact).putFloat(TDigestUtils.SMALL_HEADER_SIZE, -1.0F);
+    ByteBuffer.wrap(compact).putFloat(TDigestCodec.SMALL_HEADER_SIZE, -1.0F);
     PercentileTDigestValueAggregator aggregator = newAggregator(10);
     TDigest result = aggregator.getInitialAggregatedValue(Double.NEGATIVE_INFINITY);
     TDigest source = aggregator.deserializeAggregatedValue(compact);
@@ -657,23 +732,23 @@ public class PercentileTDigestValueAggregatorTest {
       digest.quantile(0.5);
       digest.compress();
       TDigest copy = aggregator.cloneAggregatedValue(digest);
-      assertEquals(TDigestUtils.serialize(digest), original);
+      assertEquals(digest.serialize(), original);
       assertEquals(CustomSerDeUtils.TDIGEST_SER_DE.serialize(digest), original);
       assertEquals(new SerializedTDigest(digest, 50).toString(), BytesUtils.toHexString(original));
-      byte[] returned = TDigestUtils.serialize(digest);
+      byte[] returned = digest.serialize();
       returned[0] = 0;
-      assertEquals(TDigestUtils.serialize(digest), original);
+      assertEquals(digest.serialize(), original);
       assertEquals(aggregator.serializeAggregatedValue(digest), original);
-      assertEquals(TDigestUtils.serialize(copy), original);
+      assertEquals(copy.serialize(), original);
       digest.add(Double.NEGATIVE_INFINITY, 0.5);
       if (digest.getMax() == Double.POSITIVE_INFINITY) {
-        assertEquals(TDigestUtils.validateSerialized(TDigestUtils.serialize(digest)),
-            TDigestUtils.validateSerialized(original) + 0.5);
+        assertEquals(TDigestCodec.validateSerialized(digest.serialize()),
+            TDigestCodec.validateSerialized(original) + 0.5);
       } else {
         // This new fractional infinity endpoint has no historical provenance.
-        assertThrows(IllegalArgumentException.class, () -> TDigestUtils.serialize(digest));
+        assertThrows(IllegalArgumentException.class, () -> digest.serialize());
       }
-      assertEquals(digest.getTotalWeight(), TDigestUtils.validateSerialized(original) + 0.5);
+      assertEquals(digest.getTotalWeight(), TDigestCodec.validateSerialized(original) + 0.5);
     }
 
     TDigest fresh = aggregator.deserializeAggregatedValue(createVerboseEncoding(
@@ -688,9 +763,56 @@ public class PercentileTDigestValueAggregatorTest {
   }
 
   @Test
+  public void testPureHistoricalFractionalInfinityProvenanceSurvivesMergeAndCopy() {
+    for (boolean compact : new boolean[]{false, true}) {
+      for (double infinity : new double[]{Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY}) {
+        double[] means = {infinity};
+        double[] weights = {0.5};
+        byte[] original = compact ? createSmallEncoding(means, weights) : createVerboseEncoding(means, weights);
+        PercentileTDigestValueAggregator aggregator = newAggregator(100);
+        for (boolean historicalFirst : new boolean[]{false, true}) {
+          TDigest historical = aggregator.deserializeAggregatedValue(original);
+          TDigest healthy = aggregator.getInitialAggregatedValue(0.0);
+          TDigest result = aggregator.applyAggregatedValue(historicalFirst ? historical : healthy,
+              historicalFirst ? healthy : historical);
+          assertEquals(TDigestCodec.validateSerialized(result.serialize()), 1.5);
+          assertEquals(TDigestCodec.validateSerialized(aggregator.serializeAggregatedValue(
+              aggregator.cloneAggregatedValue(result))), 1.5);
+          assertEquals(result.cdf(0.0), infinity < 0.0 ? 2.0 / 3.0 : 1.0 / 3.0);
+        }
+        TDigest pureInfinity = aggregator.deserializeAggregatedValue(original);
+        pureInfinity.add(infinity);
+        TDigest copied = aggregator.cloneAggregatedValue(pureInfinity);
+        byte[] serialized = aggregator.serializeAggregatedValue(copied);
+        assertEquals(TDigestCodec.validateSerialized(serialized), 1.5);
+        assertEquals(copied.quantile(0.5), infinity);
+        assertEquals(aggregator.serializeAggregatedValue(pureInfinity), serialized);
+      }
+    }
+  }
+
+  @Test
+  public void testRetainedFractionalInfinityBytesSetExactSizeBound() {
+    for (boolean compact : new boolean[]{false, true}) {
+      for (double infinity : new double[]{Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY}) {
+        double[] means = new double[10];
+        double[] weights = new double[means.length];
+        Arrays.fill(means, infinity);
+        Arrays.fill(weights, 0.5);
+        byte[] original = compact ? createSmallEncoding(means, weights) : createVerboseEncoding(means, weights);
+        TDigest digest = newAggregator(100).deserializeAggregatedValue(original);
+        assertEquals(digest.maxSerializedByteSize(), original.length);
+        byte[] encoded = digest.serialize();
+        assertEquals(encoded, original);
+        assertTrue(encoded.length <= digest.maxSerializedByteSize());
+      }
+    }
+  }
+
+  @Test
   public void testSerializationRegistersPreviouslyUnobservedDigestBound() {
     PercentileTDigestValueAggregator aggregator = newAggregator(10);
-    TDigest digest = TDigestUtils.createMergingDigest(500.0);
+    TDigest digest = PercentileTDigestAccumulator.forLegacyAggregation(500.0);
     for (int i = 0; i < 500; i++) {
       digest.add(i);
     }
@@ -705,7 +827,7 @@ public class PercentileTDigestValueAggregatorTest {
 
   @Test
   public void testGenericInfinityMergeAcceptsWorkingCentroidsAboveDefaultCapacity() {
-    int finiteCount = TDigestUtils.getDefaultCentroidCapacity(100.0) + 20;
+    int finiteCount = TDigestCodec.getDefaultCentroidCapacity(100.0) + 20;
     List<Centroid> centroids = new ArrayList<>(finiteCount + 2);
     centroids.add(new Centroid(Double.NEGATIVE_INFINITY, 1.0));
     for (int i = 0; i < finiteCount; i++) {
@@ -727,12 +849,12 @@ public class PercentileTDigestValueAggregatorTest {
     assertEquals(result.getTotalWeight(), finiteCount + 3.0);
     assertEquals(result.centroids().stream().mapToDouble(Centroid::weight).sum(), finiteCount + 3.0);
     int registeredBound = aggregator.getMaxAggregatedValueByteSize();
+    assertTrue(registeredBound <= 3_392);
     byte[] serialized = aggregator.serializeAggregatedValue(result);
     assertTrue(serialized.length <= registeredBound);
     assertEquals(aggregator.deserializeAggregatedValue(serialized).getTotalWeight(), finiteCount + 3.0);
     verify(source, never()).compress();
-    verify(source, never()).byteSize();
-    verify(source, never()).asBytes(any(ByteBuffer.class));
+    verify(source, never()).serialize();
   }
 
   private static void assertInfinityDistribution(TDigest digest, long expectedSize) {
@@ -760,7 +882,7 @@ public class PercentileTDigestValueAggregatorTest {
 
   private static void assertCentroidWeight(TDigest digest, long expectedWeight) {
     assertEquals(digest.centroids().stream().mapToDouble(Centroid::weight).sum(), (double) expectedWeight);
-    assertEquals(TDigestUtils.validateSerialized(TDigestUtils.serialize(digest)), (double) expectedWeight);
+    assertEquals(TDigestCodec.validateSerialized(digest.serialize()), (double) expectedWeight);
   }
 
   private static void assertHasFiniteCentroid(TDigest digest, double expectedMean) {
@@ -797,9 +919,9 @@ public class PercentileTDigestValueAggregatorTest {
   }
 
   private static byte[] createSmallEncoding(double[] means, double[] weights) {
-    ByteBuffer buffer = ByteBuffer.allocate(TDigestUtils.SMALL_HEADER_SIZE
-        + means.length * TDigestUtils.SMALL_CENTROID_SIZE);
-    buffer.putInt(TDigestUtils.SMALL_ENCODING).putDouble(means[0]).putDouble(means[means.length - 1]).putFloat(100);
+    ByteBuffer buffer = ByteBuffer.allocate(TDigestCodec.SMALL_HEADER_SIZE
+        + means.length * TDigestCodec.SMALL_CENTROID_SIZE);
+    buffer.putInt(TDigestCodec.SMALL_ENCODING).putDouble(means[0]).putDouble(means[means.length - 1]).putFloat(100);
     buffer.putShort((short) 210).putShort((short) 1050).putShort((short) means.length);
     for (int i = 0; i < means.length; i++) {
       buffer.putFloat((float) weights[i]).putFloat((float) means[i]);

@@ -57,8 +57,13 @@ OPTIONAL:
 ## T-digest migration
 
 The Pinot digest implementation removes `com.tdunning:t-digest` while reading legacy verbose and compact BYTES.
-Plugins that used tdunning types must recompile against `org.apache.pinot.segment.local.customobject.TDigest`;
-use `TDigestUtils.createMergingDigest(100)`, `digest.add(value, doubleWeight)`, and `TDigestUtils.serialize(digest)`.
+Plugins that used tdunning types must recompile against `org.apache.pinot.segment.local.customobject.tdigest.TDigest`.
+Create an empty general/Star-tree digest with `PercentileTDigestAccumulator.forLegacyAggregation(100)` or an empty
+SQL reducer with `PercentileTDigestAccumulator.forReduction(100)`. `PercentileTDigestAccumulator.fromBytes(bytes)`
+reads and retains stored input. Use `digest.add(value, doubleWeight)` and `byte[] bytes = digest.serialize()`;
+each serialization returns independently owned bytes. Compact decoding and compatible output selection are automatic.
+`TDigestCodec` handles encoding/validation; `SerializedTDigestInput` can be reused for group fanout. The digest classes,
+including `NonFiniteAwareTDigest` and `SerializedTDigest`, reside in the same `customobject.tdigest` package.
 Centroid mass is available through `Centroid.weight()` and `getTotalWeight()` without integer truncation.
 
 Release note: an identifiable infinity tail from historical tdunning arithmetic remains usable. NaN extrema and
@@ -72,6 +77,14 @@ compression. When healthy input leaves an inherited fractional boundary unrepres
 merged mass in the historical verbose form rather than failing intermediate-result serialization. This retains
 the existing legacy limitation: assertion-enabled t-digest 3.3 can fail when recompressing these fractional forms,
 including during the old Pinot wrapper's initial deserialization. Fresh unsupported boundaries remain rejected.
+
+Operator remediation: an error starting with `Cannot merge or mutate a historically corrupted TDigest` identifies
+a corrupt or ambiguous stored distribution. Mixing such a payload with nonempty input fails the query, merge-rollup
+task, or TDigest star-tree build. Healthy empty inputs remain no-ops. Identify affected stored BYTES with
+`PercentileTDigestAccumulator.fromBytes(bytes).hasValidStatistics()`, rebuild their digests from original measurements or
+reingest affected segments from a known-good source, then rerun rollup or rebuild the star-tree. Retrying the same
+stored bytes cannot repair the distribution. These payloads remain readable individually with NaN statistics and
+their original bytes, including inverted extrema; structural errors such as truncated encodings still fail validation.
 
 Release note: `percentileSmartTDigest` over multi-value columns with null handling enabled now respects each
 non-null row range. Previously, a batch containing null rows replayed all rows for every non-null range,

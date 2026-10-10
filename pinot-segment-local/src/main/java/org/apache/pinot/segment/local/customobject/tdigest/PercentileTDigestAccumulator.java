@@ -16,15 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.customobject;
+package org.apache.pinot.segment.local.customobject.tdigest;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import org.apache.pinot.segment.local.utils.TDigestUtils;
-import org.apache.pinot.segment.local.utils.TDigestUtils.SerializedTDigestMetadata;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec.SerializedTDigestMetadata;
 
 
 
@@ -76,14 +75,11 @@ public final class PercentileTDigestAccumulator extends TDigest {
   private double _historicalFractionalMaxMean = Double.NaN;
   private SerializedTDigestMetadata _pendingSerializedMetadata;
   private boolean _legacyDegraded;
-  private byte[] _serializedBytesForWrite;
   private boolean _hasFractionalWeights;
 
   private int _numRawValues;
   private int _numCentroids;
   private int _numIncomingCentroids;
-  private int _serializedMainCapacity;
-  private int _serializedBufferCapacity;
   private int _mergeCount;
   private boolean _publiclyCompressed;
   private boolean _incomingCentroidsSorted = true;
@@ -106,14 +102,14 @@ public final class PercentileTDigestAccumulator extends TDigest {
 
   private PercentileTDigestAccumulator(double compression, boolean allocateRawBuffer, boolean allocateMergeBuffers,
       boolean useTwoLevelRawCompression) {
-    TDigestUtils.validateCompression(compression);
+    TDigestCodec.validateCompression(compression);
     _useTwoLevelRawCompression = useTwoLevelRawCompression;
     _compression = Math.max(MIN_COMPRESSION, compression);
     _workingCompression = TWO_LEVEL_COMPRESSION_MULTIPLIER * _compression;
     _publicMaxWeightScale = calculateK1MaxWeightScale(_compression);
     _workingMaxWeightScale = calculateK1MaxWeightScale(_workingCompression);
     long roundedCompression = (long) Math.ceil(_compression);
-    _centroidCapacity = TDigestUtils.getDefaultCentroidCapacity(_compression);
+    _centroidCapacity = TDigestCodec.getDefaultCentroidCapacity(_compression);
     _pendingCentroidCapacity = getPendingCentroidCapacity(_centroidCapacity, useTwoLevelRawCompression);
     if (allocateRawBuffer) {
       _rawValues = new double[getInitialRawBufferSize(roundedCompression)];
@@ -132,24 +128,23 @@ public final class PercentileTDigestAccumulator extends TDigest {
     return new PercentileTDigestAccumulator(compression, false, false, true);
   }
 
-  public static PercentileTDigestAccumulator forSerializedTDigest(byte[] bytes) {
-    return new PercentileTDigestAccumulator(readCompression(bytes), false, false);
+  /// Reads and retains one legacy digest, preserving the general aggregation compression policy.
+  public static PercentileTDigestAccumulator fromBytes(byte[] bytes) {
+    return fromBytes(ByteBuffer.wrap(bytes));
   }
 
-  public static PercentileTDigestAccumulator forSerializedTDigest(SerializedTDigestInput input) {
-    return new PercentileTDigestAccumulator(input._metadata.compression(), false, false);
+  /// Reads one payload and advances the buffer past it.
+  public static PercentileTDigestAccumulator fromBytes(ByteBuffer bytes) {
+    SerializedTDigestInput input = new SerializedTDigestInput();
+    input.reset(bytes);
+    return fromBytes(input);
   }
 
-  public static PercentileTDigestAccumulator forSerializedTDigestWithMergeBuffers(byte[] bytes) {
-    return new PercentileTDigestAccumulator(readCompression(bytes), false, true);
-  }
-
-  public static PercentileTDigestAccumulator forSerializedTDigest(ByteBuffer input) {
-    SerializedTDigestInput serialized = new SerializedTDigestInput();
-    serialized.reset(input);
-    PercentileTDigestAccumulator accumulator = forSerializedTDigest(serialized);
-    accumulator.addSerializedTDigest(serialized);
-    return accumulator;
+  /// Retains an already validated input without rescanning its centroid bytes.
+  public static PercentileTDigestAccumulator fromBytes(SerializedTDigestInput input) {
+    PercentileTDigestAccumulator digest = forLegacyAggregation(input.getCompression());
+    digest.addSerializedTDigest(input);
+    return digest;
   }
 
   public static PercentileTDigestAccumulator forReduction(double compression) {
@@ -218,10 +213,23 @@ public final class PercentileTDigestAccumulator extends TDigest {
       normalizeBoundaryCentroids();
       _publiclyCompressed = true;
     } else {
-      for (int i = 0; i < count; i++) {
-        if (weights[i] > 0.0) {
-          bufferIncomingCentroid(means[i], weights[i]);
+      if (sorted && positiveCount == count) {
+        bufferIncomingCentroids(means, weights, count, totalWeight, min, max);
+      } else {
+        // Caller-owned arrays are copied only when filtering or sorting is necessary.
+        double[] sortedMeans = new double[positiveCount];
+        double[] sortedWeights = new double[positiveCount];
+        int index = 0;
+        for (int i = 0; i < count; i++) {
+          if (weights[i] > 0.0) {
+            sortedMeans[index] = means[i];
+            sortedWeights[index++] = weights[i];
+          }
         }
+        if (!sorted) {
+          sortCentroids(sortedMeans, sortedWeights, positiveCount);
+        }
+        bufferIncomingCentroids(sortedMeans, sortedWeights, positiveCount, totalWeight, min, max);
       }
       _min = Math.min(_min, min);
       _max = Math.max(_max, max);
@@ -300,6 +308,9 @@ public final class PercentileTDigestAccumulator extends TDigest {
 
   @Override
   public void add(TDigest other) {
+    if (other.hasValidStatistics() && other.getTotalWeight() == 0.0) {
+      return;
+    }
     requireMutable();
     if (other instanceof PercentileTDigestAccumulator) {
       addAccumulator((PercentileTDigestAccumulator) other);
@@ -308,14 +319,17 @@ public final class PercentileTDigestAccumulator extends TDigest {
     if (!other.hasValidStatistics()) {
       materializePendingSerializedTDigest();
       SerializedTDigestInput input = getSerializedTDigestInput();
-      input.reset(ByteBuffer.wrap(TDigestUtils.serialize(other)), false);
+      input.reset(ByteBuffer.wrap(other.serialize()), false);
       addSerializedTDigest(input);
       return;
     }
-    materializePendingSerializedTDigest();
     double otherWeight = other.getTotalWeight();
-    checkTotalWeight(_totalWeight + _incomingWeight + _numRawValues + otherWeight);
-    for (Centroid centroid : other.centroids()) {
+    checkTotalWeight(getTotalWeight() + otherWeight);
+    Collection<Centroid> centroids = other.centroids();
+    double[] means = new double[centroids.size()];
+    double[] weights = new double[means.length];
+    int count = 0;
+    for (Centroid centroid : centroids) {
       double weight = centroid.weight();
       if (weight == 0.0) {
         continue;
@@ -323,22 +337,12 @@ public final class PercentileTDigestAccumulator extends TDigest {
       if (!(weight > 0.0) || !Double.isFinite(weight) || Double.isNaN(centroid.mean())) {
         throw new IllegalArgumentException("Invalid TDigest centroid");
       }
-      _hasFractionalWeights |= weight != Math.rint(weight);
-      bufferIncomingCentroid(centroid.mean(), weight);
-      _originalFractionalBytes = null;
+      means[count] = centroid.mean();
+      weights[count++] = weight;
     }
-    if (otherWeight != 0.0) {
-      _min = Math.min(_min, other.getMin());
-      _max = Math.max(_max, other.getMax());
-      inheritHistoricalFractionalBoundaries(other);
-    }
-  }
-
-  @Override
-  public void add(List<? extends TDigest> others) {
-    for (TDigest other : others) {
-      add(other);
-    }
+    // Validate all generic centroids before changing the target, then use the same whole-source primitive path.
+    addCentroids(means, weights, count, other.getMin(), other.getMax(), false);
+    inheritHistoricalFractionalBoundaries(other);
   }
 
   private void addAccumulator(PercentileTDigestAccumulator other) {
@@ -380,8 +384,8 @@ public final class PercentileTDigestAccumulator extends TDigest {
     checkTotalWeight(_totalWeight + _incomingWeight + _numRawValues + other._totalWeight);
     _hasFractionalWeights |= other._hasFractionalWeights;
     inheritHistoricalFractionalBoundaries(other._historicalFractionalMinMean, other._historicalFractionalMaxMean);
-    preserveSerializedCapacity(other._serializedMainCapacity, other._serializedBufferCapacity);
-    bufferIncomingCentroids(other._centroidMeans, other._centroidWeights, other._numCentroids);
+    bufferIncomingCentroids(other._centroidMeans, other._centroidWeights, other._numCentroids, other._totalWeight,
+        other._min, other._max);
     if (other._totalWeight > 0.0) {
       _originalFractionalBytes = null;
     }
@@ -481,9 +485,6 @@ public final class PercentileTDigestAccumulator extends TDigest {
     if (input._metadata.totalWeight() == 0.0) {
       return;
     }
-    if (input._metadata.encoding() == TDigestUtils.SMALL_ENCODING) {
-      preserveSerializedCapacity(input._metadata.mainCapacity(), input._metadata.bufferCapacity());
-    }
     if (hasNoInputs()) {
       if (input._metadata.totalWeight() != 0.0) {
         ensureCentroidCapacity(input._numCentroids);
@@ -507,7 +508,8 @@ public final class PercentileTDigestAccumulator extends TDigest {
         return;
       }
     } else {
-      bufferIncomingCentroids(input._means, input._weights, input._numCentroids);
+      bufferIncomingCentroids(input._means, input._weights, input._numCentroids, input._metadata.totalWeight(),
+          input._metadata.min(), input._metadata.max());
     }
     _min = Math.min(_min, input._metadata.min());
     _max = Math.max(_max, input._metadata.max());
@@ -518,25 +520,16 @@ public final class PercentileTDigestAccumulator extends TDigest {
     if (_legacyDegraded) {
       return;
     }
-    if (_pendingSerializedTDigest != null || _numRawValues > 0 || _numIncomingCentroids > 0
-        || !_publiclyCompressed && _numCentroids > 0) {
-      _serializedBytesForWrite = null;
-    }
     materializePendingSerializedTDigest();
     if (_numRawValues > 0 || _numIncomingCentroids > 0) {
-      // MergingDigest 3.3 combines pending values and existing centroids directly at public compression. Flushing at
-      // working compression first would add an extra lossy merge pass and materially increase reducer rank error.
+      // SQL reduction combines pending values and existing centroids directly at public compression, matching
+      // MergingDigest 3.3. Its writer avoids an extra working-compression pass that can increase reducer rank error.
       flush(_compression);
       _publiclyCompressed = true;
     } else if (!_publiclyCompressed && _numCentroids > 0) {
       recompressCentroids(_compression);
       _publiclyCompressed = true;
     }
-  }
-
-  @Override
-  public long size() {
-    return (long) getTotalWeight();
   }
 
   @Override
@@ -759,13 +752,13 @@ public final class PercentileTDigestAccumulator extends TDigest {
     if (_legacyDegraded) {
       byte[] bytes = serialize();
       ByteBuffer encoded = ByteBuffer.wrap(bytes);
-      SerializedTDigestMetadata metadata = TDigestUtils.readSerializedHeader(encoded);
+      SerializedTDigestMetadata metadata = TDigestCodec.readSerializedHeader(encoded);
       encoded.position(metadata.centroidOffset());
       List<Centroid> centroids = new ArrayList<>(metadata.centroidCount());
       for (int i = 0; i < metadata.centroidCount(); i++) {
-        double weight = metadata.centroidSize() == TDigestUtils.VERBOSE_CENTROID_SIZE
+        double weight = metadata.centroidSize() == TDigestCodec.VERBOSE_CENTROID_SIZE
             ? encoded.getDouble() : encoded.getFloat();
-        double mean = metadata.centroidSize() == TDigestUtils.VERBOSE_CENTROID_SIZE
+        double mean = metadata.centroidSize() == TDigestCodec.VERBOSE_CENTROID_SIZE
             ? encoded.getDouble() : encoded.getFloat();
         centroids.add(new Centroid(mean, weight));
       }
@@ -804,24 +797,8 @@ public final class PercentileTDigestAccumulator extends TDigest {
     return _compression;
   }
 
-  /// Returns the length of the [#serialize()] bytes rather than the raw verbose byte size, so generic `TDigest`
-  /// serializers ([#byteSize()] followed by [#asBytes(ByteBuffer)]) emit the mixed-version-compatible encoding.
-  /// Prepared bytes are cached until the next write or mutation, avoiding a second encoding pass for that pattern.
-  /// Emitting raw verbose bytes here could produce a digest with more centroids than an old reader of the same
-  /// compression allocates, which it rejects with [ArrayIndexOutOfBoundsException].
-  @Override
-  public int byteSize() {
-    if (_legacyDegraded || _originalFractionalBytes != null) {
-      return _legacyDegraded ? _pendingSerializedTDigest.length : _originalFractionalBytes.length;
-    }
-    if (_serializedBytesForWrite == null) {
-      _serializedBytesForWrite = serialize();
-    }
-    return _serializedBytesForWrite.length;
-  }
-
-  /// Bounds both compatible encodings and a widened verbose view without flushing. Buffered and fractional inputs
-  /// can reserve more space than their eventual bytes; retained capacities need not fit default compression size.
+  /// Bounds compatible output without flushing. Unchanged historical bytes and pending compact capacities can
+  /// exceed the newly encoded legacy-capacity bound and retain their actual length.
   @Override
   public int maxSerializedByteSize() {
     if (_legacyDegraded) {
@@ -834,65 +811,23 @@ public final class PercentileTDigestAccumulator extends TDigest {
     if (!_hasFractionalWeights) {
       centroidCount = (long) Math.min(centroidCount, Math.ceil(getTotalWeight()));
     }
-    int maximumBytes = getMaxVerboseByteSize(centroidCount);
-    return _pendingSerializedTDigest == null ? maximumBytes : Math.max(maximumBytes, _pendingSerializedTDigest.length);
+    int maximumBytes = TDigestCodec.getMaxLegacyCompatibleByteSize(_compression, centroidCount);
+    return _pendingSerializedTDigest != null && _pendingSerializedMetadata.encoding() == TDigestCodec.SMALL_ENCODING
+        ? Math.max(maximumBytes, _pendingSerializedTDigest.length) : maximumBytes;
   }
 
-  private static int getMaxVerboseByteSize(long centroidCount) {
-    return Math.toIntExact(Math.addExact(TDigestUtils.VERBOSE_HEADER_SIZE,
-        Math.multiplyExact(TDigestUtils.VERBOSE_CENTROID_SIZE, centroidCount)));
-  }
-
-  /// Returns the small-encoding size unless float narrowing loses a field or an inherited fractional endpoint needs
-  /// exact verbose bytes.
-  /// Historical degraded state retains its original encoding and rejects mutation.
-  @Override
-  public int smallByteSize() {
-    if (_legacyDegraded || _originalFractionalBytes != null) {
-      return _legacyDegraded ? _pendingSerializedTDigest.length : _originalFractionalBytes.length;
-    }
-    compress();
-    normalizeBoundaryCentroids();
-    checkFractionalBoundaryEncoding();
-    if (!canUseSmallEncoding()) {
-      return byteSize();
-    }
-    checkCapacityPreservingCentroidCount();
-    return Math.addExact(TDigestUtils.SMALL_HEADER_SIZE,
-        Math.multiplyExact(TDigestUtils.SMALL_CENTROID_SIZE, _numCentroids));
-  }
-
-  /// Writes the [#serialize()] bytes; see [#byteSize()]. Bytes are always written in big-endian order (the t-digest
-  /// wire order) regardless of the destination buffer's byte order, unlike the library's `asBytes`.
-  @Override
-  public void asBytes(ByteBuffer buffer) {
-    byte[] bytes = _serializedBytesForWrite;
-    _serializedBytesForWrite = null;
-    buffer.put(bytes != null ? bytes : serialize());
-  }
-
-  /// Writes the representation described by [#smallByteSize()]; readers must inspect the leading encoding identifier.
-  @Override
-  public void asSmallBytes(ByteBuffer buffer) {
-    if (_legacyDegraded || _originalFractionalBytes != null) {
-      buffer.put(serialize());
-      return;
-    }
-    compress();
-    normalizeBoundaryCentroids();
-    checkFractionalBoundaryEncoding();
-    if (canUseSmallEncoding()) {
-      buffer.put(toCapacityPreservingBytes());
-    } else {
-      asBytes(buffer);
-    }
-  }
-
+  /// Returns the centroid view's count, including repaired endpoints and excluding zero-mass serialized entries.
   @Override
   public int centroidCount() {
     if (_pendingSerializedTDigest != null) {
-      return !_legacyDegraded && _pendingSerializedMetadata.totalWeight() == 0.0
-          ? 0 : _pendingSerializedMetadata.centroidCount();
+      if (_legacyDegraded) {
+        return _pendingSerializedMetadata.centroidCount();
+      }
+      if (!_pendingSerializedMetadata.weightedBoundaries() && !_pendingSerializedMetadata.hasZeroWeightCentroids()
+          && !_pendingSerializedMetadata.unorderedMeans()) {
+        return _pendingSerializedMetadata.centroidCount();
+      }
+      materializePendingSerializedTDigest();
     }
     flush();
     return _numCentroids;
@@ -920,11 +855,12 @@ public final class PercentileTDigestAccumulator extends TDigest {
 
   /// Prepares finite centroid views for inclusion inside a larger serialized digest, repairing weighted boundaries.
   /// The enclosing digest owns the complete endpoint check; fractional finite boundaries can be interior there.
-  public void prepareCentroidsForSerialization() {
+  void prepareCentroidsForSerialization() {
     compress();
     normalizeBoundaryCentroids();
   }
 
+  @Override
   public byte[] serialize() {
     if (_legacyDegraded) {
       return _pendingSerializedTDigest.clone();
@@ -938,17 +874,23 @@ public final class PercentileTDigestAccumulator extends TDigest {
           || !Double.isNaN(_pendingSerializedMetadata.recoveredInfinityMean())) {
         materializePendingSerializedTDigest();
       } else {
-        if (ByteBuffer.wrap(_pendingSerializedTDigest).getInt() == TDigestUtils.VERBOSE_ENCODING) {
-          byte[] serialized = TDigestUtils.makeLegacyCompatible(_pendingSerializedTDigest, _pendingSerializedMetadata);
+        if (ByteBuffer.wrap(_pendingSerializedTDigest).getInt() == TDigestCodec.VERBOSE_ENCODING) {
+          byte[] serialized = TDigestCodec.makeLegacyCompatible(_pendingSerializedTDigest, _pendingSerializedMetadata);
           return serialized == _pendingSerializedTDigest ? serialized.clone() : serialized;
         }
         return _pendingSerializedTDigest.clone();
       }
     }
+    if (_useTwoLevelRawCompression) {
+      // General aggregation retains its legacy working-compression pass. SQL reduction serializes pending
+      // intermediate centroids directly at public compression without this extra lossy flush.
+      flush();
+    }
     compress();
     normalizeBoundaryCentroids();
     checkFractionalBoundaryEncoding();
-    return toLegacyCompatibleVerboseBytes();
+    return TDigestCodec.serializeCompatibleCentroids(_compression, _min, _max, _centroidMeans, _centroidWeights,
+        _numCentroids, hasInheritedFractionalBoundaryEncoding());
   }
 
   private void recompressCentroids(double compression) {
@@ -965,83 +907,9 @@ public final class PercentileTDigestAccumulator extends TDigest {
     }
   }
 
-  private byte[] toLegacyCompatibleVerboseBytes() {
-    ByteBuffer buffer = ByteBuffer.allocate(
-        Math.addExact(TDigestUtils.VERBOSE_HEADER_SIZE,
-            Math.multiplyExact(TDigestUtils.VERBOSE_CENTROID_SIZE, _numCentroids)));
-    buffer.putInt(TDigestUtils.VERBOSE_ENCODING);
-    buffer.putDouble(_min);
-    buffer.putDouble(_max);
-    buffer.putDouble(_compression);
-    buffer.putInt(_numCentroids);
-    double encodedWeight = 0.0;
-    boolean hasNonFiniteMeans = false;
-    boolean fractionalWeights = false;
-    for (int i = 0; i < _numCentroids; i++) {
-      buffer.putDouble(_centroidWeights[i]);
-      buffer.putDouble(_centroidMeans[i]);
-      encodedWeight += _centroidWeights[i];
-      hasNonFiniteMeans |= !Double.isFinite(_centroidMeans[i]);
-      fractionalWeights |= _centroidWeights[i] != Math.rint(_centroidWeights[i]);
-    }
-    checkTotalWeight(encodedWeight);
-    boolean weightedBoundaries = _numCentroids == 1 ? _centroidWeights[0] >= 2.0
-        : _numCentroids > 1 && (_centroidWeights[0] > 1.0 || _centroidWeights[_numCentroids - 1] > 1.0);
-    // Collect exact wire metadata during the write rather than decoding and validating our fresh bytes again.
-    SerializedTDigestMetadata metadata = new SerializedTDigestMetadata(TDigestUtils.VERBOSE_ENCODING, _min, _max,
-        _compression, _numCentroids, Math.max(TDigestUtils.getDefaultCentroidCapacity(_compression),
-        TDigestUtils.getLegacyDefaultCentroidCapacity(_compression)), 0,
-        TDigestUtils.VERBOSE_HEADER_SIZE, TDigestUtils.VERBOSE_CENTROID_SIZE, buffer.capacity(), encodedWeight,
-        hasNonFiniteMeans, false, false, fractionalWeights, weightedBoundaries, false, _compression, Double.NaN);
-    return TDigestUtils.makeLegacyCompatible(buffer.array(), metadata, hasInheritedFractionalBoundaryEncoding());
-  }
-
-  private boolean canUseSmallEncoding() {
-    if (hasInheritedFractionalBoundaryEncoding() || !Float.isFinite((float) _compression)) {
-      return false;
-    }
-    for (int i = 0; i < _numCentroids; i++) {
-      if (!Float.isFinite((float) _centroidWeights[i]) || (float) _centroidWeights[i] == 0.0f
-          || Double.isFinite(_centroidMeans[i]) && !Float.isFinite((float) _centroidMeans[i])) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private byte[] toCapacityPreservingBytes() {
-    checkCapacityPreservingCentroidCount();
-    int mainCapacity = Math.min(Short.MAX_VALUE,
-        Math.max(_centroidCapacity, Math.max(_numCentroids, _serializedMainCapacity)));
-    long defaultBufferCapacity = Math.multiplyExact(TDigestUtils.DEFAULT_MERGE_BUFFER_MULTIPLIER, (long) mainCapacity);
-    int bufferCapacity = Math.toIntExact(Math.min(Short.MAX_VALUE,
-        Math.max(Math.max((long) _serializedBufferCapacity, mainCapacity + 1L), defaultBufferCapacity)));
-    ByteBuffer buffer = ByteBuffer.allocate(
-        TDigestUtils.SMALL_HEADER_SIZE + TDigestUtils.SMALL_CENTROID_SIZE * _numCentroids);
-    buffer.putInt(TDigestUtils.SMALL_ENCODING);
-    buffer.putDouble(_min);
-    buffer.putDouble(_max);
-    buffer.putFloat((float) _compression);
-    buffer.putShort((short) mainCapacity);
-    buffer.putShort((short) bufferCapacity);
-    buffer.putShort((short) _numCentroids);
-    for (int i = 0; i < _numCentroids; i++) {
-      buffer.putFloat((float) _centroidWeights[i]);
-      buffer.putFloat((float) _centroidMeans[i]);
-    }
-    return buffer.array();
-  }
-
-  private void checkCapacityPreservingCentroidCount() {
-    if (_numCentroids > Short.MAX_VALUE) {
-      throw new IllegalStateException("TDigest has too many centroids for capacity-preserving encoding: "
-          + _numCentroids);
-    }
-  }
-
   private void checkFractionalBoundaryEncoding() {
     if (_numCentroids > 0 && !hasInheritedFractionalBoundaryEncoding()) {
-      TDigestUtils.checkLegacyBoundaryWeights(_numCentroids, _centroidWeights[0], _centroidWeights[_numCentroids - 1]);
+      TDigestCodec.checkLegacyBoundaryWeights(_numCentroids, _centroidWeights[0], _centroidWeights[_numCentroids - 1]);
     }
   }
 
@@ -1051,30 +919,30 @@ public final class PercentileTDigestAccumulator extends TDigest {
 
   /// Applies the canonical inherited-endpoint check to a complete digest's sorted centroid view. Enclosing writers
   /// use this after adding their infinity tails; unsupported fresh global endpoints never inherit permission.
-  public boolean hasInheritedFractionalBoundaryEncoding(double[] means, double[] weights, int count) {
+  boolean hasInheritedFractionalBoundaryEncoding(double[] means, double[] weights, int count) {
     if (count < 0 || count > 0 && (count > means.length || count > weights.length)) {
       throw new IllegalArgumentException("Invalid TDigest centroid count: " + count);
     }
     if (count == 0) {
       return false;
     }
-    return TDigestUtils.hasInheritedFractionalBoundaryEncoding(this, count, means[0], weights[0],
+    return TDigestCodec.hasInheritedFractionalBoundaryEncoding(this, count, means[0], weights[0],
         means[count - 1], weights[count - 1]);
   }
 
   @Override
-  public double getHistoricalFractionalBoundaryMean(boolean lowerBoundary) {
+  double getHistoricalFractionalBoundaryMean(boolean lowerBoundary) {
     return lowerBoundary ? _historicalFractionalMinMean : _historicalFractionalMaxMean;
   }
 
   /// Propagates provenance from a validated source without exposing arbitrary endpoint setters.
-  public void inheritHistoricalFractionalBoundaries(TDigest source) {
+  void inheritHistoricalFractionalBoundaries(TDigest source) {
     requireMutable();
     inheritHistoricalFractionalBoundaries(source.getHistoricalFractionalBoundaryMean(true),
         source.getHistoricalFractionalBoundaryMean(false));
   }
 
-  private void inheritHistoricalFractionalBoundaries(double minMean, double maxMean) {
+  void inheritHistoricalFractionalBoundaries(double minMean, double maxMean) {
     if (!Double.isNaN(minMean)) {
       _historicalFractionalMinMean = Double.isNaN(_historicalFractionalMinMean) ? minMean
           : Math.min(_historicalFractionalMinMean, minMean);
@@ -1087,8 +955,8 @@ public final class PercentileTDigestAccumulator extends TDigest {
 
   private void flush() {
     // SQL accumulators merge raw inputs incrementally at configured compression. General digest aggregation keeps
-    // the legacy two-level raw merge, preserving sparse Star-tree query accuracy. Buffered reducer inputs also
-    // retain the two-level merge for its accuracy benefit.
+    // the legacy two-level raw merge, preserving sparse Star-tree query accuracy. Incremental buffer exhaustion or
+    // centroid/statistics reads use working compression for reducer inputs; final serialization bypasses that pass.
     flush(_numIncomingCentroids == 0 && !_useTwoLevelRawCompression
         ? getIncrementalCompression()
         : _workingCompression);
@@ -1227,7 +1095,7 @@ public final class PercentileTDigestAccumulator extends TDigest {
         if (canMerge) {
           _outputWeights[currentIndex] = proposedWeight;
           _outputMeans[currentIndex] =
-              TDigestUtils.weightedMean(_outputMeans[currentIndex], proposedWeight - weight, mean, weight,
+              TDigestCodec.weightedMean(_outputMeans[currentIndex], proposedWeight - weight, mean, weight,
                   proposedWeight, sameSignMeans);
         } else {
           weightSoFar += _outputWeights[currentIndex];
@@ -1264,7 +1132,7 @@ public final class PercentileTDigestAccumulator extends TDigest {
       int newCapacity = _incomingMeans == null
           ? Math.max(capacity, Math.min(_centroidCapacity, _pendingCentroidCapacity))
           : Math.max(capacity, (int) Math.min(_pendingCentroidCapacity,
-              (long) _incomingMeans.length * TDigestUtils.DEFAULT_MERGE_BUFFER_MULTIPLIER));
+              (long) _incomingMeans.length * TDigestCodec.DEFAULT_MERGE_BUFFER_MULTIPLIER));
       _incomingMeans = _incomingMeans == null ? new double[newCapacity] : Arrays.copyOf(_incomingMeans, newCapacity);
       _incomingWeights =
           _incomingWeights == null ? new double[newCapacity] : Arrays.copyOf(_incomingWeights, newCapacity);
@@ -1319,6 +1187,9 @@ public final class PercentileTDigestAccumulator extends TDigest {
 
   private void bufferIncomingCentroid(double mean, double weight) {
     checkTotalWeight(_totalWeight + _incomingWeight + _numRawValues + weight);
+    // The caller will widen global extrema after buffering. Repair materialized endpoints against their own
+    // existing bounds first, so a later merge cannot move old point mass to a newly introduced extreme.
+    normalizeBoundaryCentroids();
     if (_numRawValues + _numIncomingCentroids == getPendingInputLimit()) {
       flush();
     }
@@ -1333,28 +1204,48 @@ public final class PercentileTDigestAccumulator extends TDigest {
     _incomingWeight += weight;
   }
 
-  private void bufferIncomingCentroids(double[] means, double[] weights, int count) {
+  private void bufferIncomingCentroids(double[] means, double[] weights, int count, double totalWeight,
+      double min, double max) {
+    if (count == 0) {
+      return;
+    }
+    checkTotalWeight(_totalWeight + (_incomingWeight + _numRawValues + totalWeight));
+    normalizeBoundaryCentroids();
+    boolean canSplitSource = count <= getPendingInputLimit() && weights[0] == 1.0 && weights[count - 1] == 1.0
+        && means[0] == min && means[count - 1] == max;
+    if (!canSplitSource && count > getPendingInputLimit() - _numRawValues - _numIncomingCentroids) {
+      // Sources without identifiable unit endpoints, or larger than a whole batch, are merged in one pass.
+      flush();
+      if (count > getPendingInputLimit()) {
+        boolean runBackwards = (_mergeCount++ & 1) != 0;
+        mergeSorted(means, weights, count, totalWeight,
+            _useTwoLevelRawCompression ? _workingCompression : getIncrementalCompression(), runBackwards);
+        _min = Math.min(_min, min);
+        _max = Math.max(_max, max);
+        return;
+      }
+    }
     int offset = 0;
     while (offset < count) {
       if (_numRawValues + _numIncomingCentroids == getPendingInputLimit()) {
         flush();
       }
+      // A previous prefix can end inside a weighted source. Repair it using only its consumed bounds before
+      // the next prefix widens those bounds; the source's full extrema are used only at its actual endpoints.
+      normalizeBoundaryCentroids();
       int copied = Math.min(count - offset,
           getPendingInputLimit() - _numRawValues - _numIncomingCentroids);
       int existingCount = _numIncomingCentroids;
       int combinedCount = Math.addExact(existingCount, copied);
+      ensureIncomingCapacity(combinedCount);
       if (existingCount == 0 || !_incomingCentroidsSorted) {
-        ensureIncomingCapacity(combinedCount);
         System.arraycopy(means, offset, _incomingMeans, existingCount, copied);
         System.arraycopy(weights, offset, _incomingWeights, existingCount, copied);
       } else {
-        ensureIncomingCapacity(combinedCount);
         int existingIndex = existingCount - 1;
         int addedIndex = offset + copied - 1;
         int outputIndex = combinedCount - 1;
         while (existingIndex >= 0 && addedIndex >= offset) {
-          // Choose the added centroid on equality while merging backwards so existing equal centroids retain stable
-          // order before the newly added run.
           if (_incomingMeans[existingIndex] > means[addedIndex]) {
             _incomingMeans[outputIndex] = _incomingMeans[existingIndex];
             _incomingWeights[outputIndex--] = _incomingWeights[existingIndex--];
@@ -1372,14 +1263,28 @@ public final class PercentileTDigestAccumulator extends TDigest {
       for (int i = 0; i < copied; i++) {
         _incomingWeight += weights[offset + i];
       }
+      _min = Math.min(_min, offset == 0 ? min : means[offset]);
       offset += copied;
+      _max = Math.max(_max, offset == count ? max : means[offset - 1]);
       _numIncomingCentroids = combinedCount;
     }
   }
 
+  private static void sortCentroids(double[] means, double[] weights, int count) {
+    it.unimi.dsi.fastutil.Arrays.mergeSort(0, count,
+        (first, second) -> Double.compare(means[first], means[second]),
+        (first, second) -> {
+          double mean = means[first];
+          means[first] = means[second];
+          means[second] = mean;
+          double weight = weights[first];
+          weights[first] = weights[second];
+          weights[second] = weight;
+        });
+  }
+
   private void materializePendingSerializedTDigest() {
     if (_pendingSerializedTDigest != null && !_legacyDegraded) {
-      _serializedBytesForWrite = null;
       byte[] bytes = _pendingSerializedTDigest;
       SerializedTDigestMetadata metadata = _pendingSerializedMetadata;
       _pendingSerializedTDigest = null;
@@ -1416,7 +1321,7 @@ public final class PercentileTDigestAccumulator extends TDigest {
   /// The caller owns sorted, numerically validated arrays, their exact extrema, and at least two spare entries.
   /// Returns the new live count; fractional endpoints below one remain unchanged and require the normal provenance
   /// check at the complete writer. This can split a fractional singleton when a surrounding tail provides mass.
-  public static int normalizeSerializedBoundaries(double[] means, double[] weights, int count, double min, double max) {
+  static int normalizeSerializedBoundaries(double[] means, double[] weights, int count, double min, double max) {
     if (count < 0 || Math.addExact(count, 2) > means.length || count + 2 > weights.length) {
       throw new IllegalArgumentException("TDigest boundary repair requires two spare centroid entries");
     }
@@ -1495,7 +1400,7 @@ public final class PercentileTDigestAccumulator extends TDigest {
   }
 
   private static int getPendingCentroidCapacity(int centroidCapacity, boolean legacyAggregation) {
-    long capacity = (long) TDigestUtils.DEFAULT_MERGE_BUFFER_MULTIPLIER * centroidCapacity;
+    long capacity = (long) TDigestCodec.DEFAULT_MERGE_BUFFER_MULTIPLIER * centroidCapacity;
     return legacyAggregation ? (int) Math.min(Integer.MAX_VALUE, capacity)
         : (int) Math.min(MAX_RAW_BUFFER_SIZE, Math.max(MIN_RAW_BUFFER_SIZE, capacity));
   }
@@ -1507,15 +1412,6 @@ public final class PercentileTDigestAccumulator extends TDigest {
       return MAX_RAW_BUFFER_SIZE;
     }
     return Math.max(1, _pendingCentroidCapacity - _numCentroids - 1);
-  }
-
-  private void preserveSerializedCapacity(int mainCapacity, int bufferCapacity) {
-    if (mainCapacity > 0) {
-      _serializedMainCapacity = Math.max(_serializedMainCapacity, mainCapacity);
-    }
-    if (bufferCapacity > 0) {
-      _serializedBufferCapacity = Math.max(_serializedBufferCapacity, bufferCapacity);
-    }
   }
 
   private int getPreferredOutputCapacity(int incomingCount) {
@@ -1540,16 +1436,15 @@ public final class PercentileTDigestAccumulator extends TDigest {
     }
   }
 
-  private void requireMutable() {
+  void requireMutable() {
     if (_legacyDegraded) {
       throw corruptedMutation();
     }
-    _serializedBytesForWrite = null;
   }
 
   private static IllegalArgumentException corruptedMutation() {
     return new IllegalArgumentException("Cannot merge or mutate a historically corrupted TDigest; "
-        + "only its unchanged original bytes can be retained");
+        + "rebuild stored digests from source data before merging");
   }
 
   private static double positiveCompression(double compression) {
@@ -1599,168 +1494,5 @@ public final class PercentileTDigestAccumulator extends TDigest {
     }
     double correction = Math.scalb(scaledCorrection / residualWeight, scaleShift);
     return clamp(mean + correction, min, max);
-  }
-
-  private static double readCompression(byte[] bytes) {
-    return TDigestUtils.readSerializedHeader(ByteBuffer.wrap(bytes)).compression();
-  }
-
-  /// Reusable, invocation-local view of one serialized TDigest for group-by-MV fanout.
-  ///
-  /// [#reset(byte\[\])] validates the header once per input row. The first decode combines numerical validation
-  /// with filling reusable centroid arrays, so all groups for a row merge the same primitive input without sharing
-  /// mutable accumulator state. A pending accumulator requests an immutable byte snapshot, created at most once per
-  /// reset
-  /// and shared by the row's group fanout. The input must remain thread-confined and must not outlive the aggregation
-  /// call that owns it. Pending-only inputs inspect their bytes without allocating centroid arrays; their first
-  /// later materialization reads the already validated values without another numerical validation pass.
-  public static final class SerializedTDigestInput {
-    private byte[] _bytes;
-    private byte[] _retainedBytes;
-    private int _numCentroids;
-    private double[] _means;
-    private double[] _weights;
-    private boolean _decoded;
-
-    private SerializedTDigestMetadata _metadata;
-
-    public void reset(byte[] bytes) {
-      reset(bytes, TDigestUtils.readSerializedHeader(ByteBuffer.wrap(bytes)));
-    }
-
-    /// Owns one snapshot of the encoded digest and advances the source buffer past it.
-    public void reset(ByteBuffer bytes) {
-      reset(bytes, true);
-    }
-
-    /// Reads a source digest, optionally enforcing the historical decoder's declared centroid capacity.
-    public void reset(ByteBuffer bytes, boolean checkCapacity) {
-      SerializedTDigestMetadata metadata = TDigestUtils.readSerializedHeader(bytes, checkCapacity);
-      byte[] snapshot = new byte[metadata.encodedLength()];
-      bytes.get(snapshot);
-      reset(snapshot, metadata);
-      _retainedBytes = snapshot;
-    }
-
-    private void reset(byte[] bytes, SerializedTDigestMetadata metadata) {
-      _metadata = metadata;
-      _bytes = bytes;
-      _retainedBytes = null;
-      _numCentroids = metadata.centroidCount();
-      _decoded = false;
-    }
-
-    public double getCompression() {
-      return _metadata.compression();
-    }
-
-    /// Returns validated metadata without allocating centroid arrays for a digest that will remain pending.
-    public SerializedTDigestMetadata getMetadata() {
-      inspectMetadata();
-      return _metadata;
-    }
-
-    private void inspectMetadata() {
-      if (Double.isNaN(_metadata.totalWeight())) {
-        _metadata = TDigestUtils.inspectSerialized(ByteBuffer.wrap(_bytes), _metadata, null, null);
-      }
-    }
-
-    /// Propagates endpoint provenance from this complete, numerically validated serialized distribution.
-    /// The scan uses encoded counts even when a previous fanout decode has split boundary centroids.
-    public boolean recordHistoricalFractionalBoundaries(PercentileTDigestAccumulator target) {
-      inspectMetadata();
-      if (!_metadata.fractionalWeights() || _metadata.needsLegacyFallback()) {
-        return false;
-      }
-      target.requireMutable();
-      ByteBuffer encoded = ByteBuffer.wrap(_bytes);
-      encoded.position(_metadata.centroidOffset());
-      double firstWeight = 0.0;
-      double lastWeight = 0.0;
-      double firstMean = Double.POSITIVE_INFINITY;
-      double lastMean = Double.NEGATIVE_INFINITY;
-      int positiveCount = 0;
-      for (int i = 0; i < _metadata.centroidCount(); i++) {
-        double weight = _metadata.centroidSize() == TDigestUtils.VERBOSE_CENTROID_SIZE ? encoded.getDouble()
-            : encoded.getFloat();
-        double mean = _metadata.centroidSize() == TDigestUtils.VERBOSE_CENTROID_SIZE ? encoded.getDouble()
-            : encoded.getFloat();
-        if (weight > 0.0) {
-          mean = Double.isNaN(mean) ? _metadata.recoveredInfinityMean() : clamp(mean, _metadata.min(), _metadata.max());
-          if (firstWeight == 0.0 || mean < firstMean) {
-            firstWeight = weight;
-            firstMean = mean;
-          }
-          if (lastWeight == 0.0 || mean >= lastMean) {
-            lastWeight = weight;
-            lastMean = mean;
-          }
-          positiveCount++;
-        }
-      }
-      boolean singleton = positiveCount == 1 && firstWeight != 1.0 && firstWeight < 2.0;
-      boolean firstUnsupported = firstWeight < 1.0 || singleton;
-      boolean lastUnsupported = lastWeight < 1.0 || singleton;
-      target.inheritHistoricalFractionalBoundaries(firstUnsupported ? firstMean : Double.NaN,
-          lastUnsupported ? lastMean : Double.NaN);
-      return firstUnsupported || lastUnsupported;
-    }
-
-    private byte[] retainBytes() {
-      if (_retainedBytes == null) {
-        _retainedBytes = _bytes.clone();
-      }
-      return _retainedBytes;
-    }
-
-    private void decode() {
-      if (_decoded) {
-        return;
-      }
-      int encodedCentroidCount = _numCentroids;
-      ensureCapacity(Math.addExact(encodedCentroidCount, 2));
-      if (Double.isNaN(_metadata.totalWeight())) {
-        _metadata = TDigestUtils.inspectSerialized(ByteBuffer.wrap(_bytes), _metadata, _means, _weights);
-      } else {
-        // Pending state was already inspected before retaining bytes. Its later first read only materializes
-        // those validated centroids; regular merged inputs compute flags and weights in the decode pass above.
-        TDigestUtils.decodeSerializedCentroids(ByteBuffer.wrap(_bytes), _metadata, _means, _weights);
-      }
-      if (!_metadata.needsLegacyFallback()) {
-        if (_metadata.hasZeroWeightCentroids()) {
-          int nonZeroCount = 0;
-          for (int i = 0; i < encodedCentroidCount; i++) {
-            if (_weights[i] != 0.0) {
-              _means[nonZeroCount] = _means[i];
-              _weights[nonZeroCount++] = _weights[i];
-            }
-          }
-          encodedCentroidCount = nonZeroCount;
-        }
-        if (_metadata.unorderedMeans()) {
-          it.unimi.dsi.fastutil.Arrays.mergeSort(0, encodedCentroidCount,
-              (first, second) -> Double.compare(_means[first], _means[second]),
-              (first, second) -> {
-                double mean = _means[first];
-                _means[first] = _means[second];
-                _means[second] = mean;
-                double weight = _weights[first];
-                _weights[first] = _weights[second];
-                _weights[second] = weight;
-              });
-        }
-        _numCentroids = normalizeBoundaries(_means, _weights, encodedCentroidCount, _metadata.min(), _metadata.max());
-      }
-      _decoded = true;
-    }
-
-    private void ensureCapacity(int capacity) {
-      if (capacity > 0 && (_means == null || capacity > _means.length)) {
-        int newCapacity = _means == null ? capacity : Math.max(capacity, Math.multiplyExact(_means.length, 2));
-        _means = new double[newCapacity];
-        _weights = new double[newCapacity];
-      }
-    }
   }
 }

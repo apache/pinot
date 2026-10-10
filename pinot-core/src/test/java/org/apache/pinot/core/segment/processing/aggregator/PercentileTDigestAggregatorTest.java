@@ -22,8 +22,8 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.segment.local.customobject.TDigest;
-import org.apache.pinot.segment.local.utils.TDigestUtils;
+import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -46,11 +46,11 @@ public class PercentileTDigestAggregatorTest {
 
   @Test
   public void testAggregateWithDefaultCompression() {
-    TDigest first = TDigestUtils.createMergingDigest(100);
+    TDigest first = PercentileTDigestAccumulator.forLegacyAggregation(100);
     for (int i = 0; i < 100; i++) {
       first.add(i);
     }
-    TDigest second = TDigestUtils.createMergingDigest(100);
+    TDigest second = PercentileTDigestAccumulator.forLegacyAggregation(100);
     for (int i = 100; i < 200; i++) {
       second.add(i);
     }
@@ -69,11 +69,11 @@ public class PercentileTDigestAggregatorTest {
 
   @Test
   public void testAggregateWithCustomCompression() {
-    TDigest first = TDigestUtils.createMergingDigest(100);
+    TDigest first = PercentileTDigestAccumulator.forLegacyAggregation(100);
     for (int i = 0; i < 50; i++) {
       first.add(i);
     }
-    TDigest second = TDigestUtils.createMergingDigest(100);
+    TDigest second = PercentileTDigestAccumulator.forLegacyAggregation(100);
     for (int i = 50; i < 100; i++) {
       second.add(i);
     }
@@ -95,8 +95,8 @@ public class PercentileTDigestAggregatorTest {
 
   @Test
   public void testAggregateEncodedEmptyDigestUsesConfiguredCompression() {
-    TDigest empty = TDigestUtils.createMergingDigest(20);
-    TDigest values = TDigestUtils.createMergingDigest(100);
+    TDigest empty = PercentileTDigestAccumulator.forLegacyAggregation(20);
+    TDigest values = PercentileTDigestAccumulator.forLegacyAggregation(100);
     for (int i = 0; i < 50; i++) {
       values.add(i);
     }
@@ -164,7 +164,7 @@ public class PercentileTDigestAggregatorTest {
 
   @Test
   public void testAggregateWithFirstEmptyBytes() {
-    TDigest second = TDigestUtils.createMergingDigest(100);
+    TDigest second = PercentileTDigestAccumulator.forLegacyAggregation(100);
     for (int i = 0; i < 50; i++) {
       second.add(i);
     }
@@ -182,7 +182,7 @@ public class PercentileTDigestAggregatorTest {
 
   @Test
   public void testAggregateWithSecondEmptyBytes() {
-    TDigest first = TDigestUtils.createMergingDigest(100);
+    TDigest first = PercentileTDigestAccumulator.forLegacyAggregation(100);
     for (int i = 0; i < 50; i++) {
       first.add(i);
     }

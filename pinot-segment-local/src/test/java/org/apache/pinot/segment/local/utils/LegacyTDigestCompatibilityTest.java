@@ -22,7 +22,9 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.SplittableRandom;
-import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -42,7 +44,7 @@ public class LegacyTDigestCompatibilityTest {
     int count = 0;
     for (double compression : new double[]{10, 20, 100, 500}) {
       for (String state : new String[]{"empty", "singleton", "seeded", "weighted"}) {
-        TDigest digest = TDigestUtils.createMergingDigest(compression);
+        TDigest digest = PercentileTDigestAccumulator.forLegacyAggregation(compression);
         switch (state) {
           case "singleton":
             digest.add(3.25);
@@ -71,7 +73,7 @@ public class LegacyTDigestCompatibilityTest {
       for (int i = 0; i < 51; i++) {
         verbose.putDouble(1).putDouble(offset + 256 * i);
       }
-      TDigest digest = TDigestUtils.deserialize(verbose.array());
+      TDigest digest = PercentileTDigestAccumulator.fromBytes(verbose.array());
       writeVerbose(directory, manifest, "capacity-" + offset, digest);
       count++;
     }
@@ -82,7 +84,7 @@ public class LegacyTDigestCompatibilityTest {
     for (int i = 0; i < 600; i++) {
       compact.putFloat(1).putFloat(i);
     }
-    TDigest digest = TDigestUtils.deserialize(compact.array());
+    TDigest digest = PercentileTDigestAccumulator.fromBytes(compact.array());
     writeVerbose(directory, manifest, "oversized-compact", digest);
     count++;
     // Externally stored verbose headers below ten must be normalized before a 3.2 reader allocates its arrays.
@@ -91,13 +93,13 @@ public class LegacyTDigestCompatibilityTest {
     for (int i = 0; i < 25; i++) {
       lowCompression.putDouble(1).putDouble(i);
     }
-    digest = TDigestUtils.deserialize(lowCompression.array());
+    digest = PercentileTDigestAccumulator.fromBytes(lowCompression.array());
     writeVerbose(directory, manifest, "low-compression-header", digest);
     count++;
     ByteBuffer zeroWeight = ByteBuffer.allocate(32 + 16 * 3);
     zeroWeight.putInt(1).putDouble(0).putDouble(10).putDouble(100).putInt(3);
     zeroWeight.putDouble(1).putDouble(0).putDouble(0).putDouble(5).putDouble(1).putDouble(10);
-    digest = TDigestUtils.deserialize(zeroWeight.array());
+    digest = PercentileTDigestAccumulator.fromBytes(zeroWeight.array());
     writeVerbose(directory, manifest, "zero-weight-centroid", digest);
     count++;
     // Repair adjacent zero-mass NaN means before reducing to the smaller fractional-compression reader capacity.
@@ -112,20 +114,18 @@ public class LegacyTDigestCompatibilityTest {
       means[i + 100] = i;
       weights[i + 100] = 1.0;
     }
-    byte[] repaired = TDigestUtils.makeLegacyCompatible(
-        TDigestUtils.serializeCentroids(100.1, 0.0, 219.0, means, weights, means.length));
+    byte[] repaired = TDigestCodec.makeLegacyCompatible(
+        TDigestCodec.serializeCentroids(100.1, 0.0, 219.0, means, weights, means.length));
     assertEquals(ByteBuffer.wrap(repaired).getInt(28), 211);
-    digest = TDigestUtils.deserialize(repaired);
+    digest = PercentileTDigestAccumulator.fromBytes(repaired);
     write(directory, manifest, "zero-weight-capacity-repair", digest, repaired, quantiles(digest), false);
     count++;
-    // Compact float fields cannot represent this finite mean; the actual small writer must fall back to verbose.
-    digest = TDigestUtils.createMergingDigest(100);
+    // Compact fixture fields cannot represent this finite mean; retain the native verbose serialization.
+    digest = PercentileTDigestAccumulator.forLegacyAggregation(100);
     digest.add(1e100);
     digest.compress();
     double[] hugeExpected = quantiles(digest);
-    ByteBuffer hugeSmall = ByteBuffer.allocate(digest.smallByteSize());
-    digest.asSmallBytes(hugeSmall);
-    write(directory, manifest, "huge-mean-small-fallback", digest, hugeSmall.array(), hugeExpected, true);
+    write(directory, manifest, "huge-mean-small-fallback", digest, compactFixture(digest), hugeExpected, true);
     count++;
     Files.writeString(directory.resolve("manifest.tsv"), manifest);
     assertEquals(count, 39);
@@ -136,13 +136,41 @@ public class LegacyTDigestCompatibilityTest {
       throws Exception {
     digest.compress();
     double[] expected = quantiles(digest);
-    write(directory, manifest, name + "-verbose", digest, TDigestUtils.serialize(digest), expected,
+    write(directory, manifest, name + "-verbose", digest, digest.serialize(), expected,
         compareInitialQuantiles);
     expected = quantiles(digest);
-    ByteBuffer compact = ByteBuffer.allocate(digest.smallByteSize());
-    digest.asSmallBytes(compact);
-    write(directory, manifest, name + "-compact", digest, compact.array(), expected, compareInitialQuantiles);
+    write(directory, manifest, name + "-compact", digest, compactFixture(digest), expected, compareInitialQuantiles);
     return 2;
+  }
+
+  // Legacy input fixtures keep compact decoding coverage without exposing a compact-writing digest API.
+  private static byte[] compactFixture(TDigest digest) {
+    byte[] serialized = digest.serialize();
+    ByteBuffer input = ByteBuffer.wrap(serialized);
+    if (input.getInt() == TDigestCodec.SMALL_ENCODING) {
+      return serialized;
+    }
+    double min = input.getDouble();
+    double max = input.getDouble();
+    double compression = input.getDouble();
+    int count = input.getInt();
+    int mainCapacity = Math.max(TDigestCodec.getDefaultCentroidCapacity(compression), count);
+    long bufferCapacity = 5L * mainCapacity;
+    if ((double) (float) compression != compression || count > Short.MAX_VALUE || bufferCapacity > Short.MAX_VALUE) {
+      return serialized;
+    }
+    ByteBuffer output = ByteBuffer.allocate(30 + 8 * count);
+    output.putInt(TDigestCodec.SMALL_ENCODING).putDouble(min).putDouble(max).putFloat((float) compression);
+    output.putShort((short) mainCapacity).putShort((short) bufferCapacity).putShort((short) count);
+    for (int i = 0; i < count; i++) {
+      float weight = (float) input.getDouble();
+      float mean = (float) input.getDouble();
+      if (!(weight > 0.0f) || !Float.isFinite(weight) || !Float.isFinite(mean)) {
+        return serialized;
+      }
+      output.putFloat(weight).putFloat(mean);
+    }
+    return output.array();
   }
 
   private static double[] quantiles(TDigest digest) {
@@ -158,7 +186,7 @@ public class LegacyTDigestCompatibilityTest {
     digest.compress();
     double[] expected = quantiles(digest);
     // Boundary/capacity repairs and historical 3.2 singleton interpolation can intentionally change quantile values.
-    write(directory, manifest, name, digest, TDigestUtils.serialize(digest), expected, false);
+    write(directory, manifest, name, digest, digest.serialize(), expected, false);
   }
 
   private static void write(Path directory, StringBuilder manifest, String name, TDigest digest, byte[] bytes,

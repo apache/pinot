@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.SplittableRandom;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
-import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;

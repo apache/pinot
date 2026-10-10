@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.queries;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
-import org.apache.pinot.segment.local.customobject.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -62,8 +61,9 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
       _numValues += numMultiValues;
       Double[] values = new Double[numMultiValues];
       TDigest tDigest =
-          TDigestUtils.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
-      TDigest tDigestCustom = TDigestUtils.createMergingDigest(CUSTOM_COMPRESSION);
+          PercentileTDigestAccumulator.forLegacyAggregation(
+              PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      TDigest tDigestCustom = PercentileTDigestAccumulator.forLegacyAggregation(CUSTOM_COMPRESSION);
       for (int j = 0; j < numMultiValues; j++) {
         double value = RANDOM.nextDouble() * VALUE_RANGE;
         values[j] = value;
@@ -72,13 +72,11 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
       }
       row.putValue(DOUBLE_COLUMN, values);
 
-      ByteBuffer byteBuffer = ByteBuffer.allocate(tDigest.byteSize());
-      tDigest.asBytes(byteBuffer);
-      row.putValue(TDIGEST_COLUMN, byteBuffer.array());
+      byte[] digestBytes = tDigest.serialize();
+      row.putValue(TDIGEST_COLUMN, digestBytes);
 
-      ByteBuffer byteBufferCustom = ByteBuffer.allocate(tDigestCustom.byteSize());
-      tDigestCustom.asBytes(byteBufferCustom);
-      row.putValue(TDIGEST_CUSTOM_COMPRESSION_COLUMN, byteBufferCustom.array());
+      byte[] customDigestBytes = tDigestCustom.serialize();
+      row.putValue(TDIGEST_CUSTOM_COMPRESSION_COLUMN, customDigestBytes);
 
       String group = GROUPS[RANDOM.nextInt(GROUPS.length)];
       row.putValue(GROUP_BY_COLUMN, group);

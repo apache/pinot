@@ -32,10 +32,14 @@ TDIGEST_JAR="$TDIGEST_JAR_DIR/t-digest-3.3.jar"
 TDIGEST_REFERENCE="$TDIGEST_ROOT/pinot-core/src/test/resources/data/tdigest-3.3-k1-rank-errors.csv"
 mkdir -p "$TDIGEST_WORK" "$TDIGEST_JAR_DIR"
 if ! git -C "$TDIGEST_ROOT" cat-file -e "$TDIGEST_BASELINE^{commit}" 2>/dev/null; then
-  # CI checks out shallow history. Fetch only the immutable public baseline; leave the worktree and POMs alone.
+  # Keep shallow CI checkouts bounded without making a developer's full clone shallow.
+  TDIGEST_FETCH_ARGS=(--no-tags)
+  if [[ "$(git -C "$TDIGEST_ROOT" rev-parse --is-shallow-repository)" == true ]]; then
+    TDIGEST_FETCH_ARGS+=(--depth=1)
+  fi
   for TDIGEST_ATTEMPT in 1 2 3; do
     if git -C "$TDIGEST_ROOT" -c http.lowSpeedLimit=1 -c http.lowSpeedTime=30 \
-        fetch --no-tags --depth=1 https://github.com/apache/pinot.git "$TDIGEST_BASELINE"; then
+        fetch "${TDIGEST_FETCH_ARGS[@]}" https://github.com/apache/pinot.git "$TDIGEST_BASELINE"; then
       break
     fi
     if [[ "$TDIGEST_ATTEMPT" == 3 ]]; then
