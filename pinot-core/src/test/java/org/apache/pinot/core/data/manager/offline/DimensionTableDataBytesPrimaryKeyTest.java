@@ -202,7 +202,7 @@ public class DimensionTableDataBytesPrimaryKeyTest {
     assertEquals(row.getValue("assetId"), keyValue);
     assertEquals(row.getValue("assetName"), "logo-final-v2.svg");
     assertEquals(row.getValue("contentHash"), contentHashBytes);
-    assertEquals(tableDataManager.lookupValue(key, "assetId"), rawBytes);
+    assertEquals(tableDataManager.lookupValue(key, "assetId"), keyValue);
     assertEquals(tableDataManager.lookupValue(key, "assetName"), "logo-final-v2.svg");
     assertEquals(tableDataManager.lookupValue(key, "contentHash"), contentHashBytes);
     Object[] values = tableDataManager.lookupValues(key, new String[]{"assetId", "assetName", "contentHash"});

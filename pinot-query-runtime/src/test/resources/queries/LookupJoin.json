@@ -271,7 +271,7 @@
         "replicated": true,
         "isDimTable": true,
         "isActualDimTableNeeded": true,
-        "disablePreload": false,
+        "disablePreload": true,
         "primaryKeyColumns": ["bytes_value"]
       }
     }, "queries": [
@@ -298,6 +298,14 @@
         "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.int_value FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.bytes_value in ('a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d','9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d') AND {dim_tbl}.bytes_value = {fact_tbl}.bytes_value",
         "outputs": [
           [4], [2]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Checking left join with comparison operator to test case where predicates can possibly fail on a byte[] expecting a ByteArray",
+        "sql": "SELECT  /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.int_value FROM {fact_tbl} LEFT JOIN {dim_tbl} ON {dim_tbl}.bytes_value = {fact_tbl}.bytes_value AND {dim_tbl}.bytes_value < 'a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d'",
+        "outputs": [
+          [null], [2], [null], [null]
         ],
         "ignoreLiteMode": true
       }
@@ -331,7 +339,7 @@
         "replicated": true,
         "isDimTable": true,
         "isActualDimTableNeeded": true,
-        "disablePreload": true,
+        "disablePreload": false,
         "primaryKeyColumns": ["bytes_value"]
       }
     }, "queries": [
@@ -358,6 +366,14 @@
         "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.int_value FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.bytes_value in ('a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d','9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d') AND {dim_tbl}.bytes_value = {fact_tbl}.bytes_value",
         "outputs": [
           [4], [2]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Checking left join with comparison operator to test case where predicates can possibly fail on a byte[] expecting a ByteArray",
+        "sql": "SELECT  /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.int_value FROM {fact_tbl} LEFT JOIN {dim_tbl} ON {dim_tbl}.bytes_value = {fact_tbl}.bytes_value AND {dim_tbl}.bytes_value < 'a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d'",
+        "outputs": [
+          [null], [2], [null], [null]
         ],
         "ignoreLiteMode": true
       }
