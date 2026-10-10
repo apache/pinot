@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.tdunning.math.stats.MergingDigest;
-import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
+import java.util.List;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.segment.local.customobject.SerializedTDigest;
+import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
+import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.Test;
 
@@ -32,21 +35,43 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/// Tests that the final result of `percentileRawTDigest` stays readable by a plain t-digest
-/// [MergingDigest#fromBytes] reader when the intermediate [PercentileTDigestAccumulator] holds
-/// capacity-preserving state (a digest with more centroids than a freshly allocated
-/// [MergingDigest] of the same compression can hold).
+/// Tests that `percentileRawTDigest` retains the legacy byte format and reader capacity contract.
+/// Capacity-preserving inputs can contain more centroids than a default legacy reader allocates.
 public class PercentileRawTDigestAggregationFunctionTest {
   private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("col");
 
   @Test
-  public void testFinalResultReadableByPlainReaderForCapacityPreservingState() {
+  public void testHistoricalUnknownQuantileOrdering() {
+    TDigest finiteDigest = PercentileTDigestAccumulator.forLegacyAggregation(100.0);
+    finiteDigest.add(0.5);
+    TDigest infinityDigest = new PercentileTDigestValueAggregator(List.of())
+        .getInitialAggregatedValue(Double.POSITIVE_INFINITY);
+    byte[] corruptBytes = TDigestCodec.serializeCentroids(100.0, 0.0, 1.0,
+        new double[]{100.0}, new double[]{1.0}, 1);
+    TDigest unknownDigest = PercentileTDigestAccumulator.fromBytes(corruptBytes);
+    assertTrue(Double.isNaN(unknownDigest.quantile(0.5)));
+
+    SerializedTDigest finite = new SerializedTDigest(finiteDigest, 50.0);
+    SerializedTDigest infinity = new SerializedTDigest(infinityDigest, 50.0);
+    SerializedTDigest unknown = new SerializedTDigest(unknownDigest, 50.0);
+    assertTrue(finite.compareTo(infinity) < 0);
+    assertTrue(infinity.compareTo(unknown) < 0);
+    assertTrue(finite.compareTo(unknown) < 0);
+    for (SerializedTDigest first : List.of(finite, infinity, unknown)) {
+      for (SerializedTDigest second : List.of(finite, infinity, unknown)) {
+        assertEquals(Integer.signum(first.compareTo(second)), -Integer.signum(second.compareTo(first)));
+      }
+    }
+  }
+
+  @Test
+  public void testFinalResultPreservesLegacyCapacityState() {
     int numCentroids = 51;
     double compression = 20.0;
     byte[] small = createSmallUnitCentroidDigest(numCentroids, compression, 60, 100);
 
-    // Sanity: the input itself is readable by a plain t-digest reader.
-    TDigest direct = MergingDigest.fromBytes(ByteBuffer.wrap(small));
+    // Sanity: the supplied legacy input has the expected weight.
+    TDigest direct = PercentileTDigestAccumulator.fromBytes(ByteBuffer.wrap(small));
     assertEquals(direct.size(), numCentroids);
 
     PercentileRawTDigestAggregationFunction function =
@@ -58,11 +83,10 @@ public class PercentileRawTDigestAggregationFunctionTest {
     SerializedTDigest finalResult = function.extractFinalResult(intermediateResult);
     byte[] serialized = BytesUtils.toBytes(finalResult.toString());
     assertLegacyCompatibleShape(serialized, compression);
+    assertEquals(serialized, small, "Untouched legacy small state must retain its original bytes");
 
-    // Client side: a plain t-digest reader must be able to read the emitted bytes without losing
-    // state. Before the fix this threw ArrayIndexOutOfBoundsException because the final result was
-    // re-encoded as a verbose digest with more centroids than the reader allocates.
-    TDigest roundTripped = MergingDigest.fromBytes(ByteBuffer.wrap(serialized));
+    // Before the capacity fix, verbose output exceeded the allocation of a legacy reader.
+    TDigest roundTripped = PercentileTDigestAccumulator.fromBytes(ByteBuffer.wrap(serialized));
     assertUnitCentroidDigest(roundTripped, numCentroids);
 
     // Also cover the materialized (merged) accumulator state, not just the serialized pass-through.
@@ -70,7 +94,7 @@ public class PercentileRawTDigestAggregationFunctionTest {
         new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(small))));
     byte[] mergedSerialized = BytesUtils.toBytes(function.extractFinalResult(merged).toString());
     assertLegacyCompatibleShape(mergedSerialized, compression);
-    TDigest mergedRoundTripped = MergingDigest.fromBytes(ByteBuffer.wrap(mergedSerialized));
+    TDigest mergedRoundTripped = PercentileTDigestAccumulator.fromBytes(ByteBuffer.wrap(mergedSerialized));
     assertEquals(mergedRoundTripped.size(), 2L * numCentroids);
     assertEquals(mergedRoundTripped.quantile(0.5), (numCentroids - 1.0) / 2.0, 1.0);
   }
@@ -78,12 +102,11 @@ public class PercentileRawTDigestAggregationFunctionTest {
   @Test
   public void testFinalResultRoundTripForRegularDigest() {
     double compression = 100.0;
-    TDigest input = TDigest.createMergingDigest(compression);
+    TDigest input = PercentileTDigestAccumulator.forLegacyAggregation(compression);
     for (int i = 0; i < 1000; i++) {
       input.add(i);
     }
-    byte[] bytes = new byte[input.byteSize()];
-    input.asBytes(ByteBuffer.wrap(bytes));
+    byte[] bytes = input.serialize();
 
     PercentileRawTDigestAggregationFunction function =
         new PercentileRawTDigestAggregationFunction(EXPRESSION, 50.0, (int) compression, false);
@@ -92,7 +115,7 @@ public class PercentileRawTDigestAggregationFunctionTest {
 
     SerializedTDigest finalResult = function.extractFinalResult(intermediateResult);
     byte[] serialized = BytesUtils.toBytes(finalResult.toString());
-    TDigest roundTripped = MergingDigest.fromBytes(ByteBuffer.wrap(serialized));
+    TDigest roundTripped = PercentileTDigestAccumulator.fromBytes(ByteBuffer.wrap(serialized));
     assertEquals(roundTripped.size(), 1000);
     assertEquals(roundTripped.quantile(0.5), input.quantile(0.5), 1e-6);
   }
@@ -135,7 +158,7 @@ public class PercentileRawTDigestAggregationFunctionTest {
 
   /// SMALL-encoded digest (encoding 2) with explicit main/buffer capacities, unit-weight centroids
   /// at means 0..numCentroids-1. This is the layout t-digest's `asSmallBytes` produces and
-  /// `MergingDigest.fromBytes` accepts regardless of the default capacity for the compression.
+  /// legacy readers accept using the encoded capacity rather than the default for the compression.
   /// Package-private: shared with [PercentileSmartTDigestAggregationFunctionTest].
   static byte[] createSmallUnitCentroidDigest(int numCentroids, double compression, int mainCapacity,
       int bufferCapacity) {
@@ -155,17 +178,32 @@ public class PercentileRawTDigestAggregationFunctionTest {
     return buffer.array();
   }
 
-  private static void assertLegacyCompatibleShape(byte[] bytes, double compression) {
+  static void assertLegacyCompatibleShape(byte[] bytes, double compression) {
+    // Decode the documented legacy header independently of the production codec. The centroid count must fit
+    // the allocation that a tdunning reader makes before it consumes any centroid payload.
     ByteBuffer buffer = ByteBuffer.wrap(bytes);
     int encoding = buffer.getInt();
+    buffer.position(Integer.BYTES + 2 * Double.BYTES);
+    int centroidCount;
+    int centroidSize;
     if (encoding == 1) {
-      assertEquals(buffer.getDouble(Integer.BYTES + 2 * Double.BYTES), compression);
-      int centroidCount = buffer.getInt(Integer.BYTES + 3 * Double.BYTES);
+      assertEquals(buffer.getDouble(), compression);
+      centroidCount = buffer.getInt();
+      centroidSize = 2 * Double.BYTES;
       assertTrue(centroidCount <= 2 * Math.ceil(compression) + 10,
-          "Verbose encoding exceeds the fresh MergingDigest centroid capacity: " + centroidCount);
+          "Verbose encoding exceeds the legacy reader centroid capacity: " + centroidCount);
     } else {
       assertEquals(encoding, 2, "Unexpected t-digest encoding");
+      assertEquals(buffer.getFloat(), (float) compression);
+      int mainCapacity = buffer.getShort();
+      int bufferCapacity = buffer.getShort();
+      centroidCount = buffer.getShort();
+      centroidSize = 2 * Float.BYTES;
+      assertTrue(mainCapacity >= centroidCount);
+      assertTrue(bufferCapacity >= mainCapacity);
     }
+    assertTrue(centroidCount >= 0);
+    assertEquals(buffer.remaining(), centroidCount * centroidSize);
   }
 
   private static void assertUnitCentroidDigest(TDigest digest, int expectedSize) {

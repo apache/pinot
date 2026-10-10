@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.core.startree.v2;
 
-import com.tdunning.math.stats.TDigest;
 import java.util.List;
 import java.util.Random;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
+import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;
@@ -46,7 +47,7 @@ public class PreAggregatedPercentileTDigestStarTreeV2Test extends BaseStarTreeV2
 
   @Override
   Object getRandomRawValue(Random random) {
-    TDigest tDigest = TDigest.createMergingDigest(COMPRESSION);
+    TDigest tDigest = PercentileTDigestAccumulator.forLegacyAggregation(COMPRESSION);
     tDigest.add(random.nextInt(MAX_VALUE));
     tDigest.add(random.nextInt(MAX_VALUE));
     return ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest);

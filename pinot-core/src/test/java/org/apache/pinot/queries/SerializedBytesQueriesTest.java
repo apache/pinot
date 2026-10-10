@@ -20,8 +20,6 @@ package org.apache.pinot.queries;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
-import com.tdunning.math.stats.MergingDigest;
-import com.tdunning.math.stats.TDigest;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,6 +34,8 @@ import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -186,7 +186,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       _quantileDigests[i] = quantileDigest;
       row.putValue(PERCENTILE_EST_COLUMN, ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest));
 
-      TDigest tDigest = MergingDigest.createDigest(PERCENTILE_TDIGEST_COMPRESSION);
+      TDigest tDigest = PercentileTDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
       for (int value : values) {
         tDigest.add(value);
       }
@@ -276,7 +276,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
 
     // PercentileTDigest
     TDigest tDigest = (TDigest) aggregationResult.get(4);
-    TDigest expectedTDigest = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest expectedTDigest = PercentileTDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
     for (int value : _valuesArray[0]) {
       expectedTDigest.add(value);
     }
@@ -374,8 +374,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     long expectedPercentileEstResult = quantileDigest1.getQuantile(0.5);
 
     // PercentileTDigest
-    TDigest tDigest1 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
-    TDigest tDigest2 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest tDigest1 = PercentileTDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest tDigest2 = PercentileTDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
     for (int value : _valuesArray[0]) {
       tDigest1.add(value);
       tDigest2.add(value);
@@ -472,7 +472,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
 
       // PercentileTDigest
       TDigest tDigest = (TDigest) groupByResult.get(groupId)._record.getValues()[5];
-      TDigest expectedTDigest = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+      TDigest expectedTDigest = PercentileTDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
       for (int value : _valuesArray[groupId]) {
         expectedTDigest.add(value);
       }
@@ -572,8 +572,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       long expectedPercentileEstResult = quantileDigest1.getQuantile(0.5);
 
       // PercentileTDigest
-      TDigest tDigest1 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
-      TDigest tDigest2 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+      TDigest tDigest1 = PercentileTDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
+      TDigest tDigest2 = PercentileTDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
       for (int value : _valuesArray[groupId]) {
         tDigest1.add(value);
         tDigest2.add(value);
@@ -656,7 +656,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     }
 
     // PercentileTDigest
-    TDigest expectedTDigest = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest expectedTDigest = PercentileTDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
     for (int value : _valuesArray[0]) {
       expectedTDigest.add(value);
     }
@@ -783,8 +783,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     long expectedPercentileEstResult = quantileDigest1.getQuantile(0.5);
 
     // PercentileTDigest
-    TDigest tDigest1 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
-    TDigest tDigest2 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest tDigest1 = PercentileTDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest tDigest2 = PercentileTDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
     for (int value : _valuesArray[0]) {
       tDigest1.add(value);
       tDigest2.add(value);

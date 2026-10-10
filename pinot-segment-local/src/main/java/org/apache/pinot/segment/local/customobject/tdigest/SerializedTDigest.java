@@ -16,15 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.customobject;
+package org.apache.pinot.segment.local.customobject.tdigest;
 
-import com.tdunning.math.stats.TDigest;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
 /// Serialized and comparable version of TDigest. Compares TDigest for a specific percentile value.
+/// Uses Double.compare ordering: NaN quantiles from corrupted historical inputs sort after positive infinity.
 public class SerializedTDigest implements Comparable<SerializedTDigest> {
   private final double _percentile;
   private final TDigest _tDigest;
@@ -42,6 +41,6 @@ public class SerializedTDigest implements Comparable<SerializedTDigest> {
 
   @Override
   public String toString() {
-    return BytesUtils.toHexString(CustomSerDeUtils.TDIGEST_SER_DE.serialize(_tDigest));
+    return BytesUtils.toHexString(_tDigest.serialize());
   }
 }

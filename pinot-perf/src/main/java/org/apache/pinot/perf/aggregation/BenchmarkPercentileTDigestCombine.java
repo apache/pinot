@@ -18,11 +18,7 @@
  */
 package org.apache.pinot.perf.aggregation;
 
-import com.tdunning.math.stats.Centroid;
-import com.tdunning.math.stats.MergingDigest;
-import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
-import java.security.CodeSource;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
@@ -34,8 +30,6 @@ import java.util.StringJoiner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -50,6 +44,9 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction.Seri
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -75,12 +72,9 @@ import org.openjdk.jmh.infra.BenchmarkParams;
 /// Run with JMH's GC profiler to report allocation and GC metrics, for example `-prof gc`. Error counters report
 /// absolute error in billionths because all generated distributions are bounded to `[0, 1]`.
 ///
-/// The TDigest dependency version is deliberately a build-level dimension. Compare identical `PAIRWISE` runs from a
-/// 3.2 build and a 3.3 build. Use `_sourceLayout=FIXED_VERBOSE` to hold the serialized centroid shape constant for the
-/// attributable pairwise experiment; the default `NATIVE` mode includes version-specific source compression.
-/// `SINGLETON_LIST` is accepted as a command-line JMH parameter for the 3.3 experiment, but is excluded from the
-/// default matrix and rejected on TDigest 3.2 because that version corrupts non-empty targets in `add(List)`.
-/// `PROMOTED_LOCAL` measures promotion of raw group-by [MergingDigest] results. `ACCUMULATOR_LOCAL` models
+/// Use `_sourceLayout=FIXED_VERBOSE` to hold the serialized centroid shape constant; the default `NATIVE` mode
+/// uses the current accumulator's compression. `PROMOTED_LOCAL` measures the raw group-by result path.
+/// `ACCUMULATOR_LOCAL` models
 /// materialized accumulator results from non-grouped and StarTree segment execution. `ACCUMULATOR_WIRE` keeps
 /// deserialized sources lazy to model broker reduction. Use `_sourceReuse=UNIQUE` for production-shaped runs so
 /// every group and metric has distinct prebuilt source state; the default shared corpus keeps the full matrix small.
@@ -96,7 +90,6 @@ public class BenchmarkPercentileTDigestCombine {
   private static final int QUALITY_SAMPLES = 32;
   private static final long QUALITY_ORDER_SEED = 0x3C6EF372FE94F82BL;
   private static final double ERROR_SCALE = 1_000_000_000.0;
-  private static final Pattern TDIGEST_JAR_VERSION = Pattern.compile("t-digest-(\\d+)\\.(\\d+)(?:\\.[^/]*)?\\.jar");
 
   public enum Distribution {
     UNIFORM,
@@ -185,7 +178,7 @@ public class BenchmarkPercentileTDigestCombine {
 
   @Setup(Level.Trial)
   public void setUpTrial() {
-    rejectUnsafeSingletonListMerge();
+    validateSourceConfiguration();
     buildSourcesAndOracle();
     buildMergeOrder();
     buildQuery();
@@ -278,10 +271,9 @@ public class BenchmarkPercentileTDigestCombine {
     double[] rawValues = new double[_fanIn * VALUES_PER_DIGEST];
     int totalInputCentroids = 0;
     for (int sourceId = 0; sourceId < _fanIn; sourceId++) {
-      ImmutableMergingDigest nativeDigest = null;
+      TDigest nativeDigest = null;
       if (_sourceLayout == SourceLayout.NATIVE) {
-        nativeDigest = new ImmutableMergingDigest(_compression);
-        TDigestBenchmarkUtils.usePinotScaleFunction(nativeDigest);
+        nativeDigest = PercentileTDigestAccumulator.forLegacyAggregation(_compression);
       }
       double[] sourceValues = new double[VALUES_PER_DIGEST];
       SplittableRandom random = new SplittableRandom(0x6A09E667F3BCC909L + sourceId);
@@ -297,7 +289,7 @@ public class BenchmarkPercentileTDigestCombine {
       TDigest digest;
       byte[] fixedBytes = null;
       if (nativeDigest != null) {
-        nativeDigest.freeze();
+        nativeDigest.compress();
         digest = nativeDigest;
       } else {
         Arrays.sort(sourceValues);
@@ -527,11 +519,11 @@ public class BenchmarkPercentileTDigestCombine {
     long centroidWeight = 0L;
     double previousMean = Double.NEGATIVE_INFINITY;
     for (Centroid centroid : digest.centroids()) {
-      if (!Double.isFinite(centroid.mean()) || centroid.count() <= 0 || centroid.mean() + 1e-12 < previousMean) {
+      if (!Double.isFinite(centroid.mean()) || centroid.weight() <= 0 || centroid.mean() + 1e-12 < previousMean) {
         throw new IllegalStateException("Invalid centroid: previousMean=" + previousMean + ", mean=" + centroid.mean()
-            + ", weight=" + centroid.count());
+            + ", weight=" + centroid.weight());
       }
-      centroidWeight += centroid.count();
+      centroidWeight += centroid.weight();
       previousMean = centroid.mean();
     }
     if (centroidWeight != expectedWeight) {
@@ -597,7 +589,7 @@ public class BenchmarkPercentileTDigestCombine {
     return sortedValues[lower] + fraction * (sortedValues[upper] - sortedValues[lower]);
   }
 
-  private void rejectUnsafeSingletonListMerge() {
+  private void validateSourceConfiguration() {
     if (_sourceLayout == SourceLayout.FIXED_VERBOSE
         && (_implementation == Implementation.SINGLETON_LIST || _implementation.isBatching())) {
       throw new IllegalArgumentException("FIXED_VERBOSE sources do not support list or batch merging");
@@ -605,21 +597,6 @@ public class BenchmarkPercentileTDigestCombine {
     if (_sourceReuse == SourceReuse.UNIQUE
         && (_implementation == Implementation.SINGLETON_LIST || _implementation.isBatching())) {
       throw new IllegalArgumentException("UNIQUE sources do not support list or batch merging");
-    }
-    if (_implementation != Implementation.SINGLETON_LIST) {
-      return;
-    }
-    CodeSource codeSource = TDigest.class.getProtectionDomain().getCodeSource();
-    String location = codeSource != null ? codeSource.getLocation().toString() : "";
-    Matcher matcher = TDIGEST_JAR_VERSION.matcher(location);
-    if (!matcher.find()) {
-      throw new IllegalStateException("Cannot determine TDigest version from: " + location);
-    }
-    int major = Integer.parseInt(matcher.group(1));
-    int minor = Integer.parseInt(matcher.group(2));
-    if (major < 3 || (major == 3 && minor < 3)) {
-      throw new IllegalArgumentException(
-          "SINGLETON_LIST is unsafe on TDigest " + major + "." + minor + "; use TDigest 3.3 or newer");
     }
   }
 
@@ -739,9 +716,7 @@ public class BenchmarkPercentileTDigestCombine {
     }
   }
 
-  /// Immutable verbose TDigest input used to keep the exact source centroid layout identical across dependency
-  /// versions. TDigest 3.3 force-compresses a [MergingDigest] when its centroids are read, so a library digest cannot
-  /// represent this control input without changing the state under test.
+  /// Immutable verbose TDigest input used to keep the exact source centroid layout fixed throughout a trial.
   private static final class FixedTDigest extends TDigest {
     private final byte[] _bytes;
     private final double _compression;
@@ -790,7 +765,7 @@ public class BenchmarkPercentileTDigestCombine {
     }
 
     @Override
-    public void add(double value, int weight) {
+    public void add(double value, double weight) {
       throw new UnsupportedOperationException("Fixed TDigest is immutable");
     }
 
@@ -810,6 +785,11 @@ public class BenchmarkPercentileTDigestCombine {
 
     @Override
     public long size() {
+      return _size;
+    }
+
+    @Override
+    public double getTotalWeight() {
       return _size;
     }
 
@@ -839,33 +819,8 @@ public class BenchmarkPercentileTDigestCombine {
     }
 
     @Override
-    public int byteSize() {
-      return _bytes.length;
-    }
-
-    @Override
-    public int smallByteSize() {
-      return toTDigest().smallByteSize();
-    }
-
-    @Override
-    public void asBytes(ByteBuffer buffer) {
-      buffer.put(_bytes);
-    }
-
-    @Override
-    public void asSmallBytes(ByteBuffer buffer) {
-      toTDigest().asSmallBytes(buffer);
-    }
-
-    @Override
-    public TDigest recordAllData() {
-      return toTDigest().recordAllData();
-    }
-
-    @Override
-    public boolean isRecording() {
-      return false;
+    public byte[] serialize() {
+      return _bytes.clone();
     }
 
     @Override
@@ -879,27 +834,7 @@ public class BenchmarkPercentileTDigestCombine {
     }
 
     private TDigest toTDigest() {
-      return MergingDigest.fromBytes(ByteBuffer.wrap(_bytes));
-    }
-  }
-
-  private static final class ImmutableMergingDigest extends MergingDigest {
-    private boolean _frozen;
-
-    private ImmutableMergingDigest(double compression) {
-      super(compression);
-    }
-
-    private void freeze() {
-      super.compress();
-      _frozen = true;
-    }
-
-    @Override
-    public void compress() {
-      if (!_frozen) {
-        super.compress();
-      }
+      return PercentileTDigestAccumulator.fromBytes(ByteBuffer.wrap(_bytes));
     }
   }
 
@@ -968,7 +903,7 @@ public class BenchmarkPercentileTDigestCombine {
       if (pending.isEmpty()) {
         return;
       }
-      TDigest batch = TDigestBenchmarkUtils.usePinotScaleFunction(TDigest.createMergingDigest(_compressionFactor));
+      TDigest batch = PercentileTDigestAccumulator.forLegacyAggregation(_compressionFactor);
       batch.add(pending);
       pending.clear();
       target.add(batch);

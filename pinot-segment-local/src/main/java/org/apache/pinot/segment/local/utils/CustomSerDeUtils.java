@@ -22,7 +22,6 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.primitives.Longs;
-import com.tdunning.math.stats.TDigest;
 import java.io.IOException;
 import java.lang.foreign.MemorySegment;
 import java.nio.ByteBuffer;
@@ -34,6 +33,8 @@ import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.roaringbitmap.RoaringBitmap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -215,17 +216,17 @@ public class CustomSerDeUtils {
 
     @Override
     public byte[] serialize(TDigest tDigest) {
-      return TDigestUtils.serialize(tDigest);
+      return tDigest.serialize();
     }
 
     @Override
     public TDigest deserialize(byte[] bytes) {
-      return TDigestUtils.deserialize(bytes);
+      return PercentileTDigestAccumulator.fromBytes(bytes);
     }
 
     @Override
     public TDigest deserialize(ByteBuffer byteBuffer) {
-      return TDigestUtils.deserialize(byteBuffer);
+      return PercentileTDigestAccumulator.fromBytes(byteBuffer);
     }
   };
 

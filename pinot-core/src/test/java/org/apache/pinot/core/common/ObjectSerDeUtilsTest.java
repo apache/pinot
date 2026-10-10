@@ -20,8 +20,6 @@ package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
-import com.tdunning.math.stats.Centroid;
-import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.Double2LongOpenHashMap;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.floats.Float2LongOpenHashMap;
@@ -66,6 +64,10 @@ import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
+import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigestInput;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -319,7 +321,9 @@ public class ObjectSerDeUtilsTest {
   @Test
   public void testTDigest() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
-      TDigest expected = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      TDigest expected =
+          PercentileTDigestAccumulator.forLegacyAggregation(
+              PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
       int size = RANDOM.nextInt(100) + 1;
       for (int j = 0; j < size; j++) {
         expected.add(RANDOM.nextDouble());
@@ -337,7 +341,7 @@ public class ObjectSerDeUtilsTest {
     List<Double> compressionFactorsToTest = Arrays.asList(10d, 200d, 500d, 1000d, 10000d);
     for (double compressionFactor : compressionFactorsToTest) {
       for (int i = 0; i < NUM_ITERATIONS; i++) {
-        TDigest expected = TDigest.createMergingDigest(compressionFactor);
+        TDigest expected = PercentileTDigestAccumulator.forLegacyAggregation(compressionFactor);
         int size = RANDOM.nextInt(100) + 1;
         for (int j = 0; j < size; j++) {
           expected.add(RANDOM.nextDouble());
@@ -351,6 +355,33 @@ public class ObjectSerDeUtilsTest {
         }
       }
     }
+  }
+
+  @Test
+  public void testTDigestIntermediateReductionStrategy() {
+    TDigest source = PercentileTDigestAccumulator.forLegacyAggregation(100.0);
+    Random random = new Random(42);
+    for (int i = 0; i < 1000; i++) {
+      source.add(random.nextDouble());
+    }
+    byte[] bytes = source.serialize();
+    SerializedTDigestInput input = new SerializedTDigestInput();
+    input.reset(bytes);
+    PercentileTDigestAccumulator expected = PercentileTDigestAccumulator.forReduction(input.getCompression());
+    expected.addSerializedTDigest(input);
+    TDigest fromBytes = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytes);
+    TDigest fromBuffer = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ByteBuffer.wrap(bytes));
+    // Raw values appended to a peer's intermediate must use reducer compression, rather than the stored-sketch policy.
+    for (int i = 0; i < 5000; i++) {
+      double value = random.nextDouble();
+      expected.add(value);
+      fromBytes.add(value);
+      fromBuffer.add(value);
+    }
+    byte[] expectedBytes = expected.serialize();
+    assertEquals(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(fromBytes), expectedBytes);
+    assertEquals(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(fromBuffer), expectedBytes);
+    assertEquals(fromBytes.getTotalWeight(), 6000.0);
   }
 
   @DataProvider(name = "tdigest32Fixtures")
@@ -376,9 +407,9 @@ public class ObjectSerDeUtilsTest {
     double previousMean = Double.NEGATIVE_INFINITY;
     for (Centroid centroid : digest.centroids()) {
       assertTrue(Double.isFinite(centroid.mean()));
-      assertTrue(centroid.count() > 0);
+      assertTrue(centroid.weight() > 0);
       assertTrue(centroid.mean() + 1e-12 >= previousMean);
-      centroidWeight += centroid.count();
+      centroidWeight += centroid.weight();
       previousMean = centroid.mean();
     }
     assertEquals(centroidWeight, expectedSize);

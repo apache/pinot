@@ -25,7 +25,6 @@ import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
-import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.Double2LongMap;
 import it.unimi.dsi.fastutil.doubles.Double2LongOpenHashMap;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
@@ -95,8 +94,10 @@ import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.VarianceTuple;
+import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigestInput;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
-import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.locationtech.jts.geom.Geometry;
@@ -1108,21 +1109,26 @@ public class ObjectSerDeUtils {
     }
   };
 
+  // Type-10 intermediate results use reduction compression; stored sketches use the native legacy fromBytes factory.
   public static final ObjectSerDe<TDigest> TDIGEST_SER_DE = new ObjectSerDe<TDigest>() {
 
     @Override
     public byte[] serialize(TDigest tDigest) {
-      return TDigestUtils.serialize(tDigest);
+      return tDigest.serialize();
     }
 
     @Override
     public TDigest deserialize(byte[] bytes) {
-      return TDigestUtils.deserialize(bytes);
+      return deserialize(ByteBuffer.wrap(bytes));
     }
 
     @Override
     public TDigest deserialize(ByteBuffer byteBuffer) {
-      return TDigestUtils.deserialize(byteBuffer);
+      SerializedTDigestInput input = new SerializedTDigestInput();
+      input.reset(byteBuffer);
+      PercentileTDigestAccumulator accumulator = PercentileTDigestAccumulator.forReduction(input.getCompression());
+      accumulator.addSerializedTDigest(input);
+      return accumulator;
     }
   };
 
