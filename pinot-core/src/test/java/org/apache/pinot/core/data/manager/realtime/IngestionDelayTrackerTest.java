@@ -52,6 +52,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
 public class IngestionDelayTrackerTest {
@@ -459,12 +460,16 @@ public class IngestionDelayTrackerTest {
     partitionsHosted.add(0);
     partitionsHosted.add(1);
 
-    ingestionDelayTracker.updateLatestStreamOffset(partitionsHosted);
-    Assert.assertEquals(ingestionDelayTracker._partitionIdToLatestOffset.size(), 2);
-    Assert.assertEquals(((LongMsgOffset) (ingestionDelayTracker._partitionIdToLatestOffset.get(0))).getOffset(),
-        Integer.MAX_VALUE);
-    Assert.assertEquals(((LongMsgOffset) (ingestionDelayTracker._partitionIdToLatestOffset.get(1))).getOffset(),
-        Integer.MAX_VALUE);
+    try {
+      ingestionDelayTracker.updateLatestStreamOffset(partitionsHosted);
+      assertEquals(ingestionDelayTracker._partitionIdToLatestOffset.size(), 2);
+      assertEquals(((LongMsgOffset) (ingestionDelayTracker._partitionIdToLatestOffset.get(0))).getOffset(),
+          Integer.MAX_VALUE);
+      assertEquals(((LongMsgOffset) (ingestionDelayTracker._partitionIdToLatestOffset.get(1))).getOffset(),
+          Integer.MAX_VALUE);
+    } finally {
+      ingestionDelayTracker.shutdown();
+    }
 
     IngestionConfig ingestionConfig = new IngestionConfig();
     List<Map<String, String>> streamConfigMaps = new ArrayList<>();
@@ -478,17 +483,24 @@ public class IngestionDelayTrackerTest {
         .setIngestionConfig(ingestionConfig)
         .setStreamConfigs(getStreamConfigs())
         .build();
-    when(REALTIME_TABLE_DATA_MANAGER.getCachedTableConfigAndSchema()).thenReturn(Pair.of(tableConfig, null));
-    ingestionDelayTracker = createTracker();
-    partitionsHosted.add(IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(0, 1));
-    ingestionDelayTracker.updateLatestStreamOffset(partitionsHosted);
-    Assert.assertEquals(ingestionDelayTracker._partitionIdToLatestOffset.size(), 3);
-    Assert.assertEquals(((LongMsgOffset) (ingestionDelayTracker._partitionIdToLatestOffset.get(0))).getOffset(),
-        Integer.MAX_VALUE);
-    Assert.assertEquals(((LongMsgOffset) (ingestionDelayTracker._partitionIdToLatestOffset.get(1))).getOffset(),
-        Integer.MAX_VALUE);
-    Assert.assertEquals(((LongMsgOffset) (ingestionDelayTracker._partitionIdToLatestOffset.get(
-        IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(0, 1)))).getOffset(), Integer.MAX_VALUE);
+    // Configure a separate mock before starting the tracker, so scheduled tasks never race with restubbing.
+    RealtimeTableDataManager realtimeTableDataManager = mock(RealtimeTableDataManager.class);
+    when(realtimeTableDataManager.getCachedTableConfigAndSchema()).thenReturn(Pair.of(tableConfig, null));
+    ingestionDelayTracker =
+        new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, realtimeTableDataManager);
+    try {
+      partitionsHosted.add(IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(0, 1));
+      ingestionDelayTracker.updateLatestStreamOffset(partitionsHosted);
+      assertEquals(ingestionDelayTracker._partitionIdToLatestOffset.size(), 3);
+      assertEquals(((LongMsgOffset) (ingestionDelayTracker._partitionIdToLatestOffset.get(0))).getOffset(),
+          Integer.MAX_VALUE);
+      assertEquals(((LongMsgOffset) (ingestionDelayTracker._partitionIdToLatestOffset.get(1))).getOffset(),
+          Integer.MAX_VALUE);
+      assertEquals(((LongMsgOffset) (ingestionDelayTracker._partitionIdToLatestOffset.get(
+          IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(0, 1)))).getOffset(), Integer.MAX_VALUE);
+    } finally {
+      ingestionDelayTracker.shutdown();
+    }
   }
 
   @Test
