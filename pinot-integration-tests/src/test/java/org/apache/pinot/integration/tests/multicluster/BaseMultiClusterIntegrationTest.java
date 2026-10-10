@@ -23,6 +23,8 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.net.ServerSocket;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,6 +35,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
+import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.broker.broker.helix.MultiClusterHelixBrokerStarter;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -126,27 +129,42 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
   /// Starts a broker configured with cluster2 (valid) and an unavailable cluster (invalid ZK).
   private void startBrokerWithUnavailableCluster() throws Exception {
     _brokerWithUnavailableCluster = new ClusterComponents();
-    _brokerWithUnavailableCluster._brokerPort = findAvailablePort(55000);
+    // Keep the port bound while startup waits for the unavailable remote ZooKeeper cluster.
+    try (ServerSocket portReservation = new ServerSocket(0)) {
+      _brokerWithUnavailableCluster._brokerPort = portReservation.getLocalPort();
 
-    PinotConfiguration brokerConfig = new PinotConfiguration();
-    brokerConfig.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, _cluster1._zkUrl);
-    brokerConfig.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, CLUSTER_1_NAME);
-    brokerConfig.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, ControllerTest.LOCAL_HOST);
-    brokerConfig.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, _brokerWithUnavailableCluster._brokerPort);
-    brokerConfig.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
-    brokerConfig.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
-    brokerConfig.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
-    brokerConfig.setProperty(Helix.CONFIG_OF_REMOTE_CLUSTER_NAMES,
-        CLUSTER_2_NAME + "," + UNAVAILABLE_CLUSTER_NAME);
-    brokerConfig.setProperty(String.format(Helix.CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS, CLUSTER_2_NAME),
-        _cluster2._zkUrl);
-    brokerConfig.setProperty(String.format(Helix.CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS, UNAVAILABLE_CLUSTER_NAME),
-        UNAVAILABLE_ZK_ADDRESS);
+      PinotConfiguration brokerConfig = new PinotConfiguration();
+      brokerConfig.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, _cluster1._zkUrl);
+      brokerConfig.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, CLUSTER_1_NAME);
+      brokerConfig.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, ControllerTest.LOCAL_HOST);
+      brokerConfig.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, _brokerWithUnavailableCluster._brokerPort);
+      brokerConfig.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
+      brokerConfig.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
+      brokerConfig.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
+      brokerConfig.setProperty(Helix.CONFIG_OF_REMOTE_CLUSTER_NAMES,
+          CLUSTER_2_NAME + "," + UNAVAILABLE_CLUSTER_NAME);
+      brokerConfig.setProperty(String.format(Helix.CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS, CLUSTER_2_NAME),
+          _cluster2._zkUrl);
+      brokerConfig.setProperty(String.format(Helix.CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS, UNAVAILABLE_CLUSTER_NAME),
+          UNAVAILABLE_ZK_ADDRESS);
 
-    _brokerWithUnavailableCluster._brokerStarter = createBrokerStarter();
-    _brokerWithUnavailableCluster._brokerStarter.init(brokerConfig);
-    _brokerWithUnavailableCluster._brokerStarter.start();
-    LOGGER.info("Started broker with unavailable cluster on port {}", _brokerWithUnavailableCluster._brokerPort);
+      _brokerWithUnavailableCluster._brokerStarter = new MultiClusterHelixBrokerStarter() {
+        @Override
+        protected BrokerAdminApiApplication createBrokerAdminApp() {
+          BrokerAdminApiApplication application = super.createBrokerAdminApp();
+          // Remote ZooKeeper connection attempts finish before the HTTP listener is created.
+          try {
+            portReservation.close();
+          } catch (IOException e) {
+            throw new UncheckedIOException(e);
+          }
+          return application;
+        }
+      };
+      _brokerWithUnavailableCluster._brokerStarter.init(brokerConfig);
+      _brokerWithUnavailableCluster._brokerStarter.start();
+      LOGGER.info("Started broker with unavailable cluster on port {}", _brokerWithUnavailableCluster._brokerPort);
+    }
   }
 
   @Override
