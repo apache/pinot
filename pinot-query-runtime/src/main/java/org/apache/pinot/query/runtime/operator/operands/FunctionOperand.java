@@ -31,12 +31,13 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.spi.annotations.FunctionVolatility;
 import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/*
- * FunctionOperands are generated from {@link RexExpression}s.
- */
+/// Evaluates scalar function calls generated from [RexExpression]s. Immutable calls on literal arguments cache their
+/// result on first use, including null. Like [LiteralOperand], cached results are shared and must not be mutated.
+/// Instances are used by one operator chain and are not thread-safe.
 public class FunctionOperand implements TransformOperand {
   private final ColumnDataType _resultType;
   private final QueryFunctionInvoker _functionInvoker;
@@ -44,6 +45,9 @@ public class FunctionOperand implements TransformOperand {
   private final boolean _needsConversion;
   private final List<TransformOperand> _operands;
   private final Object[] _reusableOperandHolder;
+  private final boolean _cacheable;
+  private boolean _resultCached;
+  private Object _cachedResult;
 
   public FunctionOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
     _resultType = functionCall.getDataType();
@@ -106,6 +110,8 @@ public class FunctionOperand implements TransformOperand {
       _operands.add(TransformOperandFactory.getTransformOperand(operand, dataSchema));
     }
     _reusableOperandHolder = new Object[numOperands];
+    _cacheable = functionInfo.getVolatility() == FunctionVolatility.IMMUTABLE
+        && _operands.stream().allMatch(LiteralOperand.class::isInstance);
   }
 
   @Override
@@ -116,6 +122,9 @@ public class FunctionOperand implements TransformOperand {
   @Nullable
   @Override
   public Object apply(List<Object> row) {
+    if (_resultCached) {
+      return _cachedResult;
+    }
     for (int i = 0; i < _operands.size(); i++) {
       TransformOperand operand = _operands.get(i);
       Object value = operand.apply(row);
@@ -130,7 +139,12 @@ public class FunctionOperand implements TransformOperand {
       }
       result = _functionInvoker.invoke(_reusableOperandHolder);
     }
-    return result != null ? TypeUtils.convert(_functionInvokerResultType.toInternal(result),
+    Object convertedResult = result != null ? TypeUtils.convert(_functionInvokerResultType.toInternal(result),
         _resultType.getStoredType()) : null;
+    if (_cacheable) {
+      _cachedResult = convertedResult;
+      _resultCached = true;
+    }
+    return convertedResult;
   }
 }
