@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
@@ -97,13 +98,16 @@ public final class OrDocIdSet implements BlockDocIdSet {
       // BlockDocIdIterator, directly return the merged BitmapDocIdIterator; otherwise, construct and return an
       // OrDocIdIterator with the merged BitmapDocIdIterator and the remaining BlockDocIdIterators.
 
-      MutableRoaringBitmap docIds = new MutableRoaringBitmap();
-      for (SortedDocIdIterator sortedDocIdIterator : sortedDocIdIterators) {
-        for (Pairs.IntPair docIdRange : sortedDocIdIterator.getDocIdRanges()) {
-          // NOTE: docIdRange has inclusive start and end.
-          docIds.add(docIdRange.getLeft(), docIdRange.getRight() + 1L);
+      List<Pairs.IntPair> docIdRanges;
+      if (numSortedDocIdIterators == 1) {
+        docIdRanges = sortedDocIdIterators.get(0).getDocIdRanges();
+      } else {
+        docIdRanges = new ArrayList<>();
+        for (SortedDocIdIterator sortedDocIdIterator : sortedDocIdIterators) {
+          docIdRanges.addAll(sortedDocIdIterator.getDocIdRanges());
         }
       }
+      MutableRoaringBitmap docIds = RoaringBitmapUtils.fromInclusiveRanges(docIdRanges);
       for (BitmapBasedDocIdIterator bitmapBasedDocIdIterator : bitmapBasedDocIdIterators) {
         docIds.or(bitmapBasedDocIdIterator.getDocIds());
       }
