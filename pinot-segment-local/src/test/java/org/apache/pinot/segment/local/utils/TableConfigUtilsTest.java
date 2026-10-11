@@ -2564,6 +2564,51 @@ public class TableConfigUtilsTest {
     }
   }
 
+  @DataProvider
+  public Object[][] retentionTableTypes() {
+    return new Object[][]{{TableType.OFFLINE}, {TableType.REALTIME}};
+  }
+
+  @Test(dataProvider = "retentionTableTypes")
+  public void testValidateRetentionSize(TableType tableType) {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    TableConfigBuilder builder = new TableConfigBuilder(tableType).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN);
+    if (tableType == TableType.REALTIME) {
+      builder.setStreamConfigs(getStreamConfigs());
+    }
+
+    // Size retention is optional and does not require time retention.
+    TableConfigUtils.validate(builder.build(), schema);
+    for (String retentionSize : List.of("1", "1B", "100G", "1.5gB")) {
+      TableConfigUtils.validate(builder.setRetentionSize(retentionSize).build(), schema);
+    }
+
+    // The two retention policies can be configured together.
+    TableConfigUtils.validate(builder.setRetentionTimeUnit("DAYS").setRetentionTimeValue("7").build(), schema);
+  }
+
+  @Test(dataProvider = "retentionTableTypes")
+  public void testRejectInvalidRetentionSize(TableType tableType) {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    TableConfigBuilder builder = new TableConfigBuilder(tableType).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN);
+    if (tableType == TableType.REALTIME) {
+      builder.setStreamConfigs(getStreamConfigs());
+    }
+
+    for (String retentionSize : List.of("", " ", "0", "0G", "0.5B", "-1", "-1G", "100GBB", "abc")) {
+      TableConfig tableConfig = builder.setRetentionSize(retentionSize).build();
+      IllegalStateException e =
+          expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, schema));
+      assertTrue(e.getMessage().contains("invalid retention size: " + retentionSize), e.getMessage());
+    }
+  }
+
   @Test
   public void testValidateDedupConfig() {
     TableConfig validTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
