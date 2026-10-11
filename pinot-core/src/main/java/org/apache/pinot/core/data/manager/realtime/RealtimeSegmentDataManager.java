@@ -1765,16 +1765,18 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata)
       throws Exception {
-    boolean allowedDuringDownload = _parallelSegmentConsumptionPolicy.isAllowedDuringDownload();
     // A local build that failed or mismatched the committed CRC has already released the semaphore when the policy
     // allows consumption during build, so the next consuming segment can be running during this download as well
     boolean releasedDuringBuild =
         _parallelSegmentConsumptionPolicy.isAllowedDuringBuild() && !_consumerSemaphoreAcquired.get();
-    if ((allowedDuringDownload || releasedDuringBuild) && _partitionUpsertMetadataManager != null
-        && _partitionUpsertMetadataManager.shouldRevertMetadataOnInconsistency(_realtimeSegment)) {
-      // Table config validation rejects this in PROTECTED mode. It still happens when the mode is switched after the
-      // table is created, when the server-level default allows partial upsert consumption during commit, or when a
-      // pauseless table falls back to a download after its local build fails.
+    boolean revertsUpsertMetadata = _partitionUpsertMetadataManager != null
+        && _partitionUpsertMetadataManager.shouldRevertMetadataOnInconsistency(_realtimeSegment);
+    // Hold the semaphore when the replace reverts, so the next consuming segment does not start against a partially
+    // reverted primary key map.
+    boolean allowedDuringDownload =
+        _parallelSegmentConsumptionPolicy.isAllowedDuringDownload() && !revertsUpsertMetadata;
+    if (releasedDuringBuild && revertsUpsertMetadata) {
+      // The build already released the semaphore, so it cannot be held back here.
       _segmentLogger.error("Next consuming segment can run during download while this replace reverts upsert "
           + "metadata. Its snapshot can miss the rows the revert restores. Use DISALLOW_ALWAYS");
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD, 1L);
