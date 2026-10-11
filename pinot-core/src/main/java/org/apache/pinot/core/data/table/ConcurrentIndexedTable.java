@@ -22,6 +22,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.BiFunction;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -44,6 +46,26 @@ public class ConcurrentIndexedTable extends IndexedTable {
       upsertWithOrderBy(key, record);
     } else {
       upsertWithoutOrderBy(key, record);
+    }
+    return true;
+  }
+
+  @Override
+  public boolean upsertSingleAggregationResult(Key key, @Nullable Object result) {
+    assert _aggregationFunctions.length == 1;
+    if (_hasOrderBy) {
+      return super.upsertSingleAggregationResult(key, result);
+    }
+    BiFunction<Key, Record, Record> mergeResult = (k, record) -> record == null
+        ? createSingleAggregationRecord(k, result)
+        : updateSingleAggregationRecord(record, result);
+    if (_noMoreNewRecords.get()) {
+      _lookupMap.computeIfPresent(key, mergeResult);
+    } else {
+      _lookupMap.compute(key, mergeResult);
+      if (_lookupMap.size() >= _resultSize) {
+        _noMoreNewRecords.set(true);
+      }
     }
     return true;
   }

@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -106,6 +107,29 @@ public abstract class IndexedTable extends BaseTable {
     //       AggregationGroupByOrderByOperator.
     Object[] keyValues = Arrays.copyOf(record.getValues(), _numKeyColumns);
     return upsert(new Key(keyValues), record);
+  }
+
+  /// Upserts an already-extracted result into a table with exactly one aggregation function.
+  /// The table may retain the key and result; callers must not modify them after this call.
+  /// A null result follows the aggregation function's existing merge semantics.
+  public boolean upsertSingleAggregationResult(Key key, @Nullable Object result) {
+    assert _aggregationFunctions.length == 1;
+    return upsert(key, createSingleAggregationRecord(key, result));
+  }
+
+  protected Record createSingleAggregationRecord(Key key, @Nullable Object result) {
+    Object[] values = Arrays.copyOf(key.getValues(), _numKeyColumns + 1);
+    values[_numKeyColumns] = result;
+    return new Record(values);
+  }
+
+  protected Record updateSingleAggregationRecord(Record record, @Nullable Object result) {
+    Object[] values = record.getValues();
+    values[_numKeyColumns] = !_hasFinalInput
+        ? AggregationFunctionUtils.merge(_aggregationFunctions[0], values[_numKeyColumns], result)
+        : AggregationFunctionUtils.mergeFinalResult(_aggregationFunctions[0], (Comparable) values[_numKeyColumns],
+            (Comparable) result);
+    return record;
   }
 
   /// Adds a record with new key or updates a record with existing key.
