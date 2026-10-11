@@ -1160,124 +1160,131 @@ public abstract class BaseTableDataManager implements TableDataManager {
     indexLoadingConfig = indexLoadingConfig.copyWithSegmentTier(segmentTier);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
-    _segmentReloadSemaphore.acquire(segmentName, _logger);
+    // Acquire segmentLock first, then _segmentReloadSemaphore second to prevent AB-BA deadlock with
+    // replaceSegmentInternal/doReplaceSegment which acquires them in the same order (Issue #19611).
     Lock segmentLock = getSegmentLock(segmentName);
     segmentLock.lock();
     try {
-      // Re-validate under the segment lock: the caller's map read in reloadSegment(String, boolean, String) is
-      // unlocked, so a concurrent offloadSegment can remove the entry between that read and this lock acquisition.
-      // Without this guard, reload would resurrect a segment the cluster has already dropped.
-      if (_segmentDataManagerMap.get(segmentName) == null) {
-        _logger.warn("Skipping reload for segment: {} — concurrently offloaded after dispatch", segmentName);
-        return;
-      }
-      /*
-      Determines if a segment should be downloaded from deep storage based on:
-      1. A forced download flag.
-      2. The segment status being marked as "DONE" in ZK metadata and a CRC mismatch
-         between ZK metadata and local metadata CRC.
-         - The "DONE" status confirms that the COMMIT_END_METADATA call succeeded
-           and the segment is available in deep storage or with a peer before discarding
-           the local copy.
-
-      Otherwise:
-      - Copy the backup directory back to the original index directory.
-      - Continue loading the segment from the index directory.
-      */
-      boolean crcMatch = hasSameCRC(zkMetadata, localMetadata);
-      boolean shouldDownload = forceDownload
-          || (isSegmentStatusCompleted(zkMetadata) && !crcMatch
-              && _instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad());
-      // For an upsert table with metadata TTL and snapshots enabled, a reload must not blindly re-scan the segment and
-      // re-add every primary key, as that would resurrect keys already expired (metadataTTL) or deleted
-      // (deletedKeysTTL). Instead we rebuild the upsert metadata from the persisted validDocIds snapshot (valid docs
-      // only). The snapshot is docId-position based, so it only maps to the segment being loaded when the content (CRC)
-      // is unchanged. A CRC mismatch with shouldDownload means a different (downloaded) copy will be loaded, so
-      // reusing the local snapshot could silently rebuild upsert state against the wrong docIds: fail closed in that
-      // case. When CRC checking is disabled (instance.check.crc.on.segment.load=false) a CRC-mismatched normal reload
-      // keeps the local segment (shouldDownload is false), so the local snapshot still maps and the reload proceeds.
-      UpsertContext upsertContext = isUpsertEnabled() ? _tableUpsertMetadataManager.getContext() : null;
-      boolean restoreValidDocIdsSnapshot = upsertContext != null && upsertContext.isSnapshotEnabled()
-          && (upsertContext.getMetadataTTL() > 0 || upsertContext.getDeletedKeysTTL() > 0);
-      if (restoreValidDocIdsSnapshot && !crcMatch && shouldDownload) {
-        throw new IllegalStateException(String.format(
-            "Failing reload for segment: %s of upsert table with metadata TTL: %s because the segment CRC has "
-                + "changed from: %s to: %s and the docId-based validDocIds snapshot cannot be guaranteed to map to "
-                + "the reloaded segment. Reload once the local copy matches the deep-store segment, or recreate the "
-                + "snapshot from the new segment.", segmentName, _tableNameWithType, localMetadata.getCrc(),
-            zkMetadata.getCrc()));
-      }
-      if (shouldDownload) {
-        // Create backup directory to handle failure of segment reloading.
-        createBackup(indexDir);
-        // The validDocIds snapshot is a server-local file absent from the deep-store copy. createBackup moved it into
-        // the backup dir; capture that path so it can be copied into the freshly downloaded segment dir below (the
-        // non-download copyTo path already restores it via copyDirectory).
-        File backupValidDocIdsSnapshotFile = restoreValidDocIdsSnapshot ? new File(
-            SegmentDirectoryPaths.findSegmentDirectory(new File(indexDir.getParentFile(),
-                indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX)),
-            V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME) : null;
-        if (forceDownload) {
-          _logger.info("Force downloading segment: {}", segmentName);
-        } else {
-          _logger.info("Downloading segment: {} because its CRC has changed from: {} to: {}", segmentName,
-              localMetadata.getCrc(), zkMetadata.getCrc());
-        }
-        indexDir = downloadSegment(zkMetadata);
-        if (backupValidDocIdsSnapshotFile != null && backupValidDocIdsSnapshotFile.exists()) {
-          FileUtils.copyFile(backupValidDocIdsSnapshotFile, new File(
-              SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
-        }
-      } else {
-        _logger.info("Reloading existing segment: {} on tier: {}", segmentName,
-            TierConfigUtils.normalizeTierName(segmentTier));
-        SegmentDirectory segmentDirectory =
-            initSegmentDirectory(segmentName, zkMetadata.getCrc(), indexLoadingConfig, zkMetadata);
-        // We should first try to reuse existing segment directory
-        if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig)) {
-          _logger.info("Reloading segment: {} using existing segment directory as no reprocessing needed", segmentName);
-          // No reprocessing needed, reuse the same segment
-          ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
-          addSegment(segment, zkMetadata);
+      _segmentReloadSemaphore.acquire(segmentName, _logger);
+      try {
+        // Re-validate under the segment lock: the caller's map read in reloadSegment(String, boolean, String) is
+        // unlocked, so a concurrent offloadSegment can remove the entry between that read and this lock acquisition.
+        // Without this guard, reload would resurrect a segment the cluster has already dropped.
+        if (_segmentDataManagerMap.get(segmentName) == null) {
+          _logger.warn("Skipping reload for segment: {} — concurrently offloaded after dispatch", segmentName);
           return;
         }
-        // Create backup directory to handle failure of segment reloading.
-        createBackup(indexDir);
-        // The indexDir is empty after calling createBackup, as it's renamed to a backup directory.
-        // The SegmentDirectory should initialize accordingly. Like for SegmentLocalFSDirectory, it
-        // doesn't load anything from an empty indexDir, but gets the info to complete the copyTo.
-        try {
-          segmentDirectory.copyTo(indexDir);
-        } finally {
-          segmentDirectory.close();
+        /*
+        Determines if a segment should be downloaded from deep storage based on:
+        1. A forced download flag.
+        2. The segment status being marked as "DONE" in ZK metadata and a CRC mismatch
+           between ZK metadata and local metadata CRC.
+           - The "DONE" status confirms that the COMMIT_END_METADATA call succeeded
+             and the segment is available in deep storage or with a peer before discarding
+             the local copy.
+
+        Otherwise:
+        - Copy the backup directory back to the original index directory.
+        - Continue loading the segment from the index directory.
+        */
+        boolean crcMatch = hasSameCRC(zkMetadata, localMetadata);
+        boolean shouldDownload = forceDownload
+            || (isSegmentStatusCompleted(zkMetadata) && !crcMatch
+                && _instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad());
+        // For an upsert table with metadata TTL and snapshots enabled, a reload must not blindly re-scan
+        // the segment and re-add every primary key, as that would resurrect keys already expired (metadataTTL)
+        // or deleted (deletedKeysTTL). Instead we rebuild the upsert metadata from the persisted validDocIds snapshot
+        // (valid docs only). The snapshot is docId-position based, so it only maps to the segment being loaded when
+        // the content (CRC) is unchanged. A CRC mismatch with shouldDownload means a different (downloaded) copy will
+        // be loaded, so reusing the local snapshot could silently rebuild upsert state against the wrong docIds:
+        // fail closed in that case. When CRC checking is disabled (instance.check.crc.on.segment.load=false) a
+        // CRC-mismatched normal reload keeps the local segment (shouldDownload is false), so the local snapshot still
+        // maps and the reload proceeds.
+        UpsertContext upsertContext = isUpsertEnabled() ? _tableUpsertMetadataManager.getContext() : null;
+        boolean restoreValidDocIdsSnapshot = upsertContext != null && upsertContext.isSnapshotEnabled()
+            && (upsertContext.getMetadataTTL() > 0 || upsertContext.getDeletedKeysTTL() > 0);
+        if (restoreValidDocIdsSnapshot && !crcMatch && shouldDownload) {
+          throw new IllegalStateException(String.format(
+              "Failing reload for segment: %s of upsert table with metadata TTL: %s because the segment CRC has "
+                  + "changed from: %s to: %s and the docId-based validDocIds snapshot cannot be guaranteed to map to "
+                  + "the reloaded segment. Reload once the local copy matches the deep-store segment, or recreate the "
+                  + "snapshot from the new segment.", segmentName, _tableNameWithType, localMetadata.getCrc(),
+              zkMetadata.getCrc()));
         }
-      }
+        if (shouldDownload) {
+          // Create backup directory to handle failure of segment reloading.
+          createBackup(indexDir);
+          // The validDocIds snapshot is a server-local file absent from the deep-store copy. createBackup moved it into
+          // the backup dir; capture that path so it can be copied into the freshly downloaded segment dir below (the
+          // non-download copyTo path already restores it via copyDirectory).
+          File backupValidDocIdsSnapshotFile = restoreValidDocIdsSnapshot ? new File(
+              SegmentDirectoryPaths.findSegmentDirectory(new File(indexDir.getParentFile(),
+                  indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX)),
+              V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME) : null;
+          if (forceDownload) {
+            _logger.info("Force downloading segment: {}", segmentName);
+          } else {
+            _logger.info("Downloading segment: {} because its CRC has changed from: {} to: {}", segmentName,
+                localMetadata.getCrc(), zkMetadata.getCrc());
+          }
+          indexDir = downloadSegment(zkMetadata);
+          if (backupValidDocIdsSnapshotFile != null && backupValidDocIdsSnapshotFile.exists()) {
+            FileUtils.copyFile(backupValidDocIdsSnapshotFile, new File(
+                SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+          }
+        } else {
+          _logger.info("Reloading existing segment: {} on tier: {}", segmentName,
+              TierConfigUtils.normalizeTierName(segmentTier));
+          SegmentDirectory segmentDirectory =
+              initSegmentDirectory(segmentName, zkMetadata.getCrc(), indexLoadingConfig, zkMetadata);
+          // We should first try to reuse existing segment directory
+          if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig)) {
+            _logger.info("Reloading segment: {} using existing segment directory as no reprocessing needed",
+                segmentName);
+            // No reprocessing needed, reuse the same segment
+            ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
+            addSegment(segment, zkMetadata);
+            return;
+          }
+          // Create backup directory to handle failure of segment reloading.
+          createBackup(indexDir);
+          // The indexDir is empty after calling createBackup, as it's renamed to a backup directory.
+          // The SegmentDirectory should initialize accordingly. Like for SegmentLocalFSDirectory, it
+          // doesn't load anything from an empty indexDir, but gets the info to complete the copyTo.
+          try {
+            segmentDirectory.copyTo(indexDir);
+          } finally {
+            segmentDirectory.close();
+          }
+        }
 
-      // Load from indexDir and replace the old segment in memory. What's inside indexDir
-      // may come from SegmentDirectory.copyTo() or the segment downloaded from deep store.
-      indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
-      _logger.info("Loading segment: {} from indexDir: {} to tier: {}", segmentName, indexDir,
-          TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
-      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig,
-          _segmentOperationsThrottlerSet, zkMetadata);
-      addSegment(segment, zkMetadata);
+        // Load from indexDir and replace the old segment in memory. What's inside indexDir
+        // may come from SegmentDirectory.copyTo() or the segment downloaded from deep store.
+        indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
+        _logger.info("Loading segment: {} from indexDir: {} to tier: {}", segmentName, indexDir,
+            TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
+        ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig,
+            _segmentOperationsThrottlerSet, zkMetadata);
+        addSegment(segment, zkMetadata);
 
-      // Remove backup directory to mark the completion of segment reloading.
-      removeBackup(indexDir);
-    } catch (Exception reloadFailureException) {
-      try {
-        LoaderUtils.reloadFailureRecovery(indexDir);
-      } catch (Exception recoveryFailureException) {
-        _logger.error("Failed to recover segment: {} after reload failure", segmentName, recoveryFailureException);
-        ExceptionUtils.suppress(recoveryFailureException, reloadFailureException);
+        // Remove backup directory to mark the completion of segment reloading.
+        removeBackup(indexDir);
+      } catch (Exception reloadFailureException) {
+        try {
+          LoaderUtils.reloadFailureRecovery(indexDir);
+        } catch (Exception recoveryFailureException) {
+          _logger.error("Failed to recover segment: {} after reload failure", segmentName, recoveryFailureException);
+          ExceptionUtils.suppress(recoveryFailureException, reloadFailureException);
+        }
+        addSegmentError(segmentName,
+            new SegmentErrorInfo(System.currentTimeMillis(), "Caught exception while reloading segment",
+                reloadFailureException));
+        throw reloadFailureException;
+      } finally {
+        _segmentReloadSemaphore.release();
       }
-      addSegmentError(segmentName,
-          new SegmentErrorInfo(System.currentTimeMillis(), "Caught exception while reloading segment",
-              reloadFailureException));
-      throw reloadFailureException;
     } finally {
       segmentLock.unlock();
-      _segmentReloadSemaphore.release();
     }
     _logger.info("Reloaded segment: {}", segmentName);
   }

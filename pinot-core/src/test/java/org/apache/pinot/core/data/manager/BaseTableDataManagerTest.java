@@ -36,6 +36,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -86,6 +90,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
@@ -513,6 +518,112 @@ public class BaseTableDataManagerTest {
     segmentMetadata = new SegmentMetadataImpl(indexDir);
     assertEquals(segmentMetadata.getCrc(), zkMetadata.getCrc());
     assertEquals(segmentMetadata.getTotalDocs(), 5);
+  }
+
+  @Test
+  public void testReloadSegmentAcquiresSegmentLockBeforeSemaphore()
+      throws Exception {
+    TestSegmentReloadSemaphore reloadSemaphore = new TestSegmentReloadSemaphore(1);
+    BaseTableDataManager tableDataManager = createTableManager(reloadSemaphore);
+
+    Lock segmentLock = tableDataManager.getSegmentLock(SEGMENT_NAME);
+    segmentLock.lock();
+    ExecutorService executor = Executors.newCachedThreadPool();
+    Thread reloadThread = new Thread(() -> {
+      try {
+        tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), mock(SegmentZKMetadata.class),
+            mock(SegmentMetadata.class), false);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, "test-reload-thread");
+
+    try {
+      reloadThread.start();
+      TestUtils.waitForCondition(aVoid -> ((ReentrantLock) segmentLock).hasQueuedThread(reloadThread), 10, 5000,
+          "Reload thread did not wait on segment lock");
+
+      // Verify lock acquisition ordering:
+      // In refresh (doReplaceSegment), segmentLock is acquired first, then the reload semaphore.
+      // To avoid AB-BA deadlock between refresh and reload on the same segment, reloadSegment must also acquire
+      // segmentLock before acquiring the reload semaphore.
+      // Under unpatched code (the bug), reloadSegment acquires the semaphore before waiting on segmentLock,
+      // exhausting permits (availablePermits == 0) and deadlocking any concurrent refresh.
+      // Under patched code, reloadSegment blocks on segmentLock first, leaving the semaphore available (1 permit).
+      assertEquals(reloadSemaphore.availablePermits(), 1,
+          "Reload thread must not acquire the reload semaphore before acquiring segment lock");
+
+      // Verify that another operation (simulating refresh holding segmentLock) can acquire the semaphore
+      // without deadlocking.
+      Future<Boolean> refreshSemaphoreAcquire = executor.submit(() -> {
+        reloadSemaphore.acquire(SEGMENT_NAME, tableDataManager.getLogger());
+        reloadSemaphore.release();
+        return true;
+      });
+      assertTrue(refreshSemaphoreAcquire.get(2, TimeUnit.SECONDS),
+          "Thread holding segment lock must be able to acquire reload semaphore without deadlocking");
+    } finally {
+      segmentLock.unlock();
+      reloadThread.join(5000);
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testReloadSegmentInterruptedDuringSemaphoreAcquire()
+      throws Exception {
+    TestSegmentReloadSemaphore reloadSemaphore = new TestSegmentReloadSemaphore(1);
+    BaseTableDataManager tableDataManager = createTableManager(reloadSemaphore);
+
+    // Acquire the only permit so that reloadSegment blocks when attempting to acquire the semaphore.
+    reloadSemaphore.acquire("otherSegment", tableDataManager.getLogger());
+    assertEquals(reloadSemaphore.availablePermits(), 0);
+
+    AtomicBoolean caughtInterruptedException = new AtomicBoolean(false);
+    Thread reloadThread = new Thread(() -> {
+      try {
+        tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), mock(SegmentZKMetadata.class),
+            mock(SegmentMetadata.class), false);
+      } catch (InterruptedException e) {
+        caughtInterruptedException.set(true);
+      } catch (Exception e) {
+        if (e.getCause() instanceof InterruptedException) {
+          caughtInterruptedException.set(true);
+        }
+      }
+    }, "test-reload-interrupted-thread");
+
+    try {
+      reloadThread.start();
+      // Wait until reloadThread is blocked waiting to acquire the semaphore.
+      TestUtils.waitForCondition(
+          aVoid -> reloadThread.getState() == Thread.State.WAITING && reloadSemaphore.isAcquireAttempted(), 10, 5000,
+          "Reload thread did not wait on reload semaphore");
+
+      // Interrupt reloadThread while it is waiting in acquire()
+      reloadThread.interrupt();
+      reloadThread.join(5000);
+      assertTrue(caughtInterruptedException.get(), "Reload thread should have caught InterruptedException");
+
+      // Verify exception safety:
+      // 1. segmentLock must NOT be leaked (must be unlocked)
+      Lock segmentLock = tableDataManager.getSegmentLock(SEGMENT_NAME);
+      assertFalse(((ReentrantLock) segmentLock).isLocked(), "Segment lock must be released when interrupted");
+      assertTrue(segmentLock.tryLock(), "Segment lock should be acquirable after thread was interrupted");
+      segmentLock.unlock();
+
+      // 2. No semaphore permit must be leaked: release the permit held by the test, and verify 1 permit remains
+      reloadSemaphore.release();
+      assertEquals(reloadSemaphore.availablePermits(), 1, "Semaphore permit count must remain balanced");
+    } finally {
+      if (reloadThread.isAlive()) {
+        reloadThread.interrupt();
+        reloadThread.join(5000);
+      }
+      if (reloadSemaphore.availablePermits() == 0) {
+        reloadSemaphore.release();
+      }
+    }
   }
 
   @Test
@@ -1376,6 +1487,14 @@ public class BaseTableDataManagerTest {
     return tableDataManager;
   }
 
+  protected BaseTableDataManager createTableManager(SegmentReloadSemaphore segmentReloadSemaphore) {
+    BaseTableDataManager tableDataManager = newTableDataManager();
+    tableDataManager.init(createDefaultInstanceDataManagerConfig(), createHelixManagerMock(), new SegmentLocks(),
+        DEFAULT_TABLE_CONFIG, SCHEMA, segmentReloadSemaphore, Executors.newSingleThreadExecutor(), null, null,
+        SEGMENT_OPERATIONS_THROTTLER, false, mock(ServerReloadJobStatusCache.class));
+    return tableDataManager;
+  }
+
   protected BaseTableDataManager createTableManagerWithAsyncSegmentRefreshEnabled(
       InstanceDataManagerConfig instanceDataManagerConfig) {
     BaseTableDataManager tableDataManager = newTableDataManager();
@@ -1492,5 +1611,37 @@ public class BaseTableDataManagerTest {
     File indexMapFile =
         new File(new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME), V1Constants.INDEX_MAP_FILE_NAME);
     return FileUtils.readFileToString(indexMapFile, StandardCharsets.UTF_8).contains(columnName + ".inverted_index");
+  }
+
+  private static class TestSegmentReloadSemaphore extends SegmentReloadSemaphore {
+    private final AtomicInteger _availablePermits;
+    private final AtomicBoolean _acquireAttempted = new AtomicBoolean(false);
+
+    public TestSegmentReloadSemaphore(int permits) {
+      super(permits);
+      _availablePermits = new AtomicInteger(permits);
+    }
+
+    @Override
+    public void acquire(String segmentName, Logger logger)
+        throws InterruptedException {
+      _acquireAttempted.set(true);
+      super.acquire(segmentName, logger);
+      _availablePermits.decrementAndGet();
+    }
+
+    @Override
+    public void release() {
+      _availablePermits.incrementAndGet();
+      super.release();
+    }
+
+    public int availablePermits() {
+      return _availablePermits.get();
+    }
+
+    public boolean isAcquireAttempted() {
+      return _acquireAttempted.get();
+    }
   }
 }
