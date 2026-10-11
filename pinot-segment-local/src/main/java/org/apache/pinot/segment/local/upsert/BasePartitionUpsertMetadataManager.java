@@ -48,6 +48,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
@@ -729,8 +730,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   /// Determines whether metadata should be reverted when inconsistencies are detected during segment replacement.
-  /// This is only applicable when in PROTECTED mode, the old segment is a mutable segment,
-  /// and the table has inconsistent state configurations.
+  /// This is only applicable when in PROTECTED mode, the old segment is a mutable segment, the table has inconsistent
+  /// state configurations, and the table is not pauseless. A pauseless table consumes while the previous segment is
+  /// still building, and keys taken from a still-mutable predecessor have no recorded previous location to revert to.
   ///
   /// @param oldSegment the old segment being replaced
   /// @return true if metadata revert should be performed on inconsistency
@@ -739,7 +741,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return ConsumingSegmentConsistencyModeListener.getInstance().getConsistencyMode()
         == ConsumingSegmentConsistencyModeListener.Mode.PROTECTED
         && oldSegment instanceof MutableSegment
-        && _context.isTableTypeInconsistentDuringConsumption();
+        && _context.isTableTypeInconsistentDuringConsumption()
+        && !PauselessConsumptionUtils.isPauselessEnabled(_context.getTableConfig());
   }
 
   /// Reverts segment upsert metadata
