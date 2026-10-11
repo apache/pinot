@@ -241,7 +241,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       completedSegments.removeIf(metadata -> lastCompletedSegments.contains(metadata.getSegmentName()));
     } else {
       // A size typo must not remove the entire OFFLINE table, even if its newest segment exceeds the cap alone.
-      completedSegments.stream().max(evictionOrder).ifPresent(completedSegments::remove);
+      completedSegments.stream().max(evictionOrder)
+          .ifPresent(newest -> completedSegments.removeIf(metadata -> metadata == newest));
     }
     completedSegments.sort(evictionOrder);
 
