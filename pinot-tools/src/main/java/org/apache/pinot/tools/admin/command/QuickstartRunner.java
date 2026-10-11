@@ -57,9 +57,12 @@ public class QuickstartRunner {
   public static final int DEFAULT_CONTROLLER_PORT = 9000;
   private static final int DEFAULT_BROKER_PORT = 8000;
   private static final int DEFAULT_BROKER_GRPC_PORT = 8010;
+  private static final int DEFAULT_BROKER_MULTI_STAGE_RUNNER_PORT = 8030;
   private static final int DEFAULT_SERVER_ADMIN_API_PORT = 7500;
   private static final int DEFAULT_SERVER_NETTY_PORT = 7050;
   private static final int DEFAULT_SERVER_GRPC_PORT = 7100;
+  private static final int DEFAULT_SERVER_MULTI_STAGE_SERVER_PORT = 7200;
+  private static final int DEFAULT_SERVER_MULTI_STAGE_RUNNER_PORT = 7300;
   private static final int DEFAULT_MINION_PORT = 6000;
 
   private static final String DEFAULT_ZK_DIR = "PinotZkDir";
@@ -185,6 +188,7 @@ public class QuickstartRunner {
       brokerStarter
           .setPort(DEFAULT_BROKER_PORT + i)
           .setGrpcPort(DEFAULT_BROKER_GRPC_PORT + i)
+          .setBrokerMultiStageRunnerPort(DEFAULT_BROKER_MULTI_STAGE_RUNNER_PORT + i)
           .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME);
 
       Map<String, Object> individualBrokerConfigOverrides = _individualBrokerConfigOverridesFunction.apply(i);
@@ -210,6 +214,8 @@ public class QuickstartRunner {
           .setPort(DEFAULT_SERVER_NETTY_PORT + i)
           .setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
           .setGrpcPort(DEFAULT_SERVER_GRPC_PORT + i)
+          .setMultiStageServerPort(DEFAULT_SERVER_MULTI_STAGE_SERVER_PORT + i)
+          .setMultiStageRunnerPort(DEFAULT_SERVER_MULTI_STAGE_RUNNER_PORT + i)
           .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
           .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath());
