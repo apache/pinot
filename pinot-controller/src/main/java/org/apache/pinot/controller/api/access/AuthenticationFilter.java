@@ -154,9 +154,6 @@ public class AuthenticationFilter implements ContainerRequestFilter {
   /// declares may name the table: otherwise a caller could append `?tableName=<a table it is scoped to>` to a cluster
   /// endpoint and have it authorized as a table-scoped request.
   ///
-  /// Binding a table query parameter is treated as authorizing table scope. That is correct only when the endpoint
-  /// uses the parameter to scope the operation. An optional `tableName` that only filters a nested view (for example
-  /// `GET /tasks/task/{taskName}/debug`) still grants table scope for the whole request.
   @Nullable
   @VisibleForTesting
   static String extractTableName(Method endpointMethod, MultivaluedMap<String, String> pathParameters,
@@ -165,6 +162,18 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     if (authorize != null && authorize.targetType() == TargetType.TABLE) {
       // Same primitive as FineGrainedAuthUtils.validateFineGrainedAuth: path first, then a declared query param.
       return FineGrainedAuthUtils.findRawTargetId(authorize, endpointMethod, pathParameters, queryParameters);
+    }
+    if (authorize != null && authorize.targetType() == TargetType.CLUSTER) {
+      String parameter = authorize.tableScopeParam();
+      if (parameter.isEmpty()) {
+        return null;
+      }
+      String target = pathParameters.getFirst(parameter);
+      if (target != null) {
+        return target;
+      }
+      return FineGrainedAuthUtils.getDeclaredQueryParams(endpointMethod).contains(parameter)
+          ? queryParameters.getFirst(parameter) : null;
     }
     String tableName = extractTableName(pathParameters);
     if (tableName != null) {

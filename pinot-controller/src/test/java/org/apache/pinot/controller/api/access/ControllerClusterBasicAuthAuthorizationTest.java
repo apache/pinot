@@ -245,6 +245,10 @@ public class ControllerClusterBasicAuthAuthorizationTest extends ControllerTest 
         _controllerBaseApiUrl + "/users/" + ADMIN_USER + "?component=CONTROLLER&tableName=" + ALLOWED_TABLE,
         tableAdminHeaders));
 
+    // A table filter only limits subtasks; task-level debug metadata remains cluster-wide.
+    assertGetStatus(_controllerBaseApiUrl + "/tasks/task/missing/debug?tableName=" + ALLOWED_TABLE + "_OFFLINE",
+        tableAdminHeaders, 403);
+
     // The principal keeps the endpoints that genuinely declare a table parameter, cluster action or not.
     assertGetStatus(_controllerBaseApiUrl + "/periodictask/run?taskname=missing&tableName=" + ALLOWED_TABLE,
         tableAdminHeaders, 404);

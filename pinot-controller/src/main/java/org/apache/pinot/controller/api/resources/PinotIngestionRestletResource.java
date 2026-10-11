@@ -131,7 +131,8 @@ public class PinotIngestionRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/ingestFromFile")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.INGEST_FILE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.INGEST_FILE,
+      tableScopeParam = "tableNameWithType")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Ingest a file", notes = "Creates a segment using given file and pushes it to Pinot. "
       + "\n All steps happen on the controller. This API is NOT meant for production environments/large input files. "
@@ -176,7 +177,8 @@ public class PinotIngestionRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/ingestFromURI")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.INGEST_FILE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.INGEST_FILE,
+      tableScopeParam = "tableNameWithType")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Ingest from the given URI", notes =
       "Creates a segment using file at the given URI and pushes it to Pinot. "

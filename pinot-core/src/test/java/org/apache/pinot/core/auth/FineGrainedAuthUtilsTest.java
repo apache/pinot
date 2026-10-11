@@ -28,13 +28,18 @@ import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.mockito.Mockito;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
-
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
+import static org.testng.Assert.fail;
 
 public class FineGrainedAuthUtilsTest {
 
@@ -67,131 +72,131 @@ public class FineGrainedAuthUtilsTest {
   @Test
   public void testValidateFineGrainedAuthIgnoresUndeclaredTableQueryParam()
       throws Exception {
-    FineGrainedAccessControl ac = Mockito.mock(FineGrainedAccessControl.class);
-    Mockito.when(ac.hasAccess(Mockito.any(HttpHeaders.class), Mockito.any(), Mockito.any(), Mockito.any()))
+    FineGrainedAccessControl ac = mock(FineGrainedAccessControl.class);
+    when(ac.hasAccess(any(HttpHeaders.class), any(), any(), any()))
         .thenReturn(true);
 
-    UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
+    UriInfo mockUriInfo = mock(UriInfo.class);
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     queryParams.putSingle("tableName", "callerPicked");
-    Mockito.when(mockUriInfo.getPathParameters()).thenReturn(pathParams);
-    Mockito.when(mockUriInfo.getQueryParameters()).thenReturn(queryParams);
-    Mockito.when(mockUriInfo.getRequestUri()).thenReturn(URI.create("http://localhost/tables"));
-    HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
+    when(mockUriInfo.getPathParameters()).thenReturn(pathParams);
+    when(mockUriInfo.getQueryParameters()).thenReturn(queryParams);
+    when(mockUriInfo.getRequestUri()).thenReturn(URI.create("http://localhost/tables"));
+    HttpHeaders mockHttpHeaders = mock(HttpHeaders.class);
 
     Method unboundTableMethod = TestResource.class.getDeclaredMethod("getTable");
     try {
       FineGrainedAuthUtils.validateFineGrainedAuth(unboundTableMethod, mockUriInfo, mockHttpHeaders, ac);
-      Assert.fail("Expected WebApplicationException");
+      fail("Expected WebApplicationException");
     } catch (WebApplicationException e) {
-      Assert.assertTrue(e.getMessage().contains("Missing required table parameter"));
-      Assert.assertEquals(e.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+      assertTrue(e.getMessage().contains("Missing required table parameter"));
+      assertEquals(e.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
     }
-    Mockito.verify(ac, Mockito.never())
-        .hasAccess(Mockito.any(HttpHeaders.class), Mockito.any(), Mockito.any(), Mockito.any());
+    verify(ac, never())
+        .hasAccess(any(HttpHeaders.class), any(), any(), any());
   }
 
   @Test
   public void testValidateFineGrainedAuthAllowsDeclaredTableQueryParam()
       throws Exception {
-    FineGrainedAccessControl ac = Mockito.mock(FineGrainedAccessControl.class);
-    Mockito.when(ac.hasAccess(Mockito.any(HttpHeaders.class), Mockito.any(), Mockito.any(), Mockito.any()))
+    FineGrainedAccessControl ac = mock(FineGrainedAccessControl.class);
+    when(ac.hasAccess(any(HttpHeaders.class), any(), any(), any()))
         .thenReturn(true);
 
-    UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
+    UriInfo mockUriInfo = mock(UriInfo.class);
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     queryParams.putSingle("tableName", "ownedTable");
-    Mockito.when(mockUriInfo.getPathParameters()).thenReturn(pathParams);
-    Mockito.when(mockUriInfo.getQueryParameters()).thenReturn(queryParams);
-    HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
+    when(mockUriInfo.getPathParameters()).thenReturn(pathParams);
+    when(mockUriInfo.getQueryParameters()).thenReturn(queryParams);
+    HttpHeaders mockHttpHeaders = mock(HttpHeaders.class);
 
     Method declaredTableMethod = TestResource.class.getDeclaredMethod("getTableByQuery", String.class);
     FineGrainedAuthUtils.validateFineGrainedAuth(declaredTableMethod, mockUriInfo, mockHttpHeaders, ac);
-    Mockito.verify(ac).hasAccess(mockHttpHeaders, TargetType.TABLE, "ownedTable", "getTable");
+    verify(ac).hasAccess(mockHttpHeaders, TargetType.TABLE, "ownedTable", "getTable");
   }
 
   @Test
   public void testValidateFineGrainedAuthAllowed() {
-    FineGrainedAccessControl ac = Mockito.mock(FineGrainedAccessControl.class);
-    Mockito.when(ac.hasAccess(Mockito.any(HttpHeaders.class), Mockito.any(), Mockito.any(), Mockito.any()))
+    FineGrainedAccessControl ac = mock(FineGrainedAccessControl.class);
+    when(ac.hasAccess(any(HttpHeaders.class), any(), any(), any()))
         .thenReturn(true);
 
-    UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
-    HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
+    UriInfo mockUriInfo = mock(UriInfo.class);
+    HttpHeaders mockHttpHeaders = mock(HttpHeaders.class);
 
     FineGrainedAuthUtils.validateFineGrainedAuth(getAnnotatedMethod(), mockUriInfo, mockHttpHeaders, ac);
   }
 
   @Test
   public void testValidateFineGrainedAuthDenied() {
-    FineGrainedAccessControl ac = Mockito.mock(FineGrainedAccessControl.class);
-    Mockito.when(ac.hasAccess(Mockito.any(HttpHeaders.class), Mockito.any(), Mockito.any(), Mockito.any()))
+    FineGrainedAccessControl ac = mock(FineGrainedAccessControl.class);
+    when(ac.hasAccess(any(HttpHeaders.class), any(), any(), any()))
         .thenReturn(false);
 
-    UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
-    HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
+    UriInfo mockUriInfo = mock(UriInfo.class);
+    HttpHeaders mockHttpHeaders = mock(HttpHeaders.class);
 
     try {
       FineGrainedAuthUtils.validateFineGrainedAuth(getAnnotatedMethod(), mockUriInfo, mockHttpHeaders, ac);
-      Assert.fail("Expected WebApplicationException");
+      fail("Expected WebApplicationException");
     } catch (WebApplicationException e) {
-      Assert.assertTrue(e.getMessage().contains("Access denied to getCluster in the cluster"));
-      Assert.assertEquals(e.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
+      assertTrue(e.getMessage().contains("Access denied to getCluster in the cluster"));
+      assertEquals(e.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
     }
   }
 
   @Test
   public void testValidateFineGrainedAuthWithNoSuchMethodError() {
-    FineGrainedAccessControl ac = Mockito.mock(FineGrainedAccessControl.class);
-    Mockito.when(ac.hasAccess(Mockito.any(HttpHeaders.class), Mockito.any(), Mockito.any(), Mockito.any()))
+    FineGrainedAccessControl ac = mock(FineGrainedAccessControl.class);
+    when(ac.hasAccess(any(HttpHeaders.class), any(), any(), any()))
         .thenThrow(new NoSuchMethodError("Method not found"));
 
-    UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
-    HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
+    UriInfo mockUriInfo = mock(UriInfo.class);
+    HttpHeaders mockHttpHeaders = mock(HttpHeaders.class);
 
     try {
       FineGrainedAuthUtils.validateFineGrainedAuth(getAnnotatedMethod(), mockUriInfo, mockHttpHeaders, ac);
-      Assert.fail("Expected WebApplicationException");
+      fail("Expected WebApplicationException");
     } catch (WebApplicationException e) {
-      Assert.assertTrue(e.getMessage().contains("Failed to check for access"));
-      Assert.assertEquals(e.getResponse().getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
+      assertTrue(e.getMessage().contains("Failed to check for access"));
+      assertEquals(e.getResponse().getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
     }
   }
 
   @Test
   public void testMissingTableParameterIsBadRequest() {
-    UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
-    Mockito.when(mockUriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
-    Mockito.when(mockUriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
-    Mockito.when(mockUriInfo.getRequestUri()).thenReturn(URI.create("http://localhost/v2/segments"));
+    UriInfo mockUriInfo = mock(UriInfo.class);
+    when(mockUriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(mockUriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(mockUriInfo.getRequestUri()).thenReturn(URI.create("http://localhost/v2/segments"));
 
-    WebApplicationException exception = Assert.expectThrows(WebApplicationException.class,
+    WebApplicationException exception = expectThrows(WebApplicationException.class,
         () -> FineGrainedAuthUtils.validateFineGrainedAuth(getTableAnnotatedMethod(), mockUriInfo,
-            Mockito.mock(HttpHeaders.class), Mockito.mock(FineGrainedAccessControl.class)));
+            mock(HttpHeaders.class), mock(FineGrainedAccessControl.class)));
 
-    Assert.assertEquals(exception.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
-    Assert.assertTrue(exception.getMessage().contains("Missing required table parameter 'tableName'"));
+    assertEquals(exception.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    assertTrue(exception.getMessage().contains("Missing required table parameter 'tableName'"));
   }
 
   @Test
   public void testInvalidTableParameterIsBadRequest() {
-    UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
+    UriInfo mockUriInfo = mock(UriInfo.class);
     MultivaluedHashMap<String, String> queryParameters = new MultivaluedHashMap<>();
     queryParameters.putSingle("tableName", "databaseB.testTable");
-    Mockito.when(mockUriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
-    Mockito.when(mockUriInfo.getQueryParameters()).thenReturn(queryParameters);
-    Mockito.when(mockUriInfo.getRequestUri()).thenReturn(URI.create("http://localhost/v2/segments"));
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
-    Mockito.when(headers.getHeaderString(CommonConstants.DATABASE)).thenReturn("databaseA");
+    when(mockUriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(mockUriInfo.getQueryParameters()).thenReturn(queryParameters);
+    when(mockUriInfo.getRequestUri()).thenReturn(URI.create("http://localhost/v2/segments"));
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(CommonConstants.DATABASE)).thenReturn("databaseA");
 
-    WebApplicationException exception = Assert.expectThrows(WebApplicationException.class,
+    WebApplicationException exception = expectThrows(WebApplicationException.class,
         () -> FineGrainedAuthUtils.validateFineGrainedAuth(getTableAnnotatedMethod(), mockUriInfo, headers,
-            Mockito.mock(FineGrainedAccessControl.class)));
+            mock(FineGrainedAccessControl.class)));
 
-    Assert.assertEquals(exception.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
-    Assert.assertTrue(exception.getMessage().contains("Invalid table parameter 'tableName'"));
+    assertEquals(exception.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    assertTrue(exception.getMessage().contains("Invalid table parameter 'tableName'"));
   }
 
   static class TestResource {

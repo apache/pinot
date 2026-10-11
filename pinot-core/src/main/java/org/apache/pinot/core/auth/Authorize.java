@@ -37,6 +37,11 @@ public @interface Authorize {
   // If the target type is the Pinot cluster, then this field is not required
   String paramName() default "";
 
+  /// Optional path or query parameter that narrows a cluster operation to one table for coarse access control.
+  /// Use only when the entire operation is limited to that table, rather than filtering part of the response.
+  /// Omitting the parameter retains cluster-wide scope. Fine-grained authorization still uses targetType.
+  String tableScopeParam() default "";
+
   // action to validate on the specific resource
   String action();
 }

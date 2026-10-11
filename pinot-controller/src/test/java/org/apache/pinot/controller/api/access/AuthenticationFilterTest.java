@@ -46,6 +46,7 @@ import org.apache.pinot.controller.api.resources.PinotControllerPeriodicTaskRest
 import org.apache.pinot.controller.api.resources.PinotInstanceRestletResource;
 import org.apache.pinot.controller.api.resources.PinotQueryResource;
 import org.apache.pinot.controller.api.resources.PinotTableRestletResource;
+import org.apache.pinot.controller.api.resources.PinotTaskRestletResource;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
@@ -205,10 +206,35 @@ public class AuthenticationFilterTest {
           "undeclared query parameter " + key + " must not resolve a table name");
     }
 
-    // A path parameter is a variable of the endpoint's own @Path template, so it stays authoritative.
+    // A cluster declaration stays authoritative even when its path includes a table filter.
     queryParams.clear();
     pathParams.putSingle("tableName", "A");
-    assertEquals(AuthenticationFilter.extractTableName(clusterMethod, pathParams, queryParams), "A");
+    assertNull(AuthenticationFilter.extractTableName(clusterMethod, pathParams, queryParams));
+  }
+
+  @Test
+  public void testExplicitClusterTableScopeUsesPathAndQueryParameters() throws Exception {
+    Method method = AuthenticationFilterTest.class.getMethod("methodWithClusterAuthorizationAndTableParam",
+        String.class);
+    MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
+    pathParams.putSingle("tableName", "pathTable");
+    queryParams.putSingle("tableName", "queryTable");
+    assertEquals(AuthenticationFilter.extractTableName(method, pathParams, queryParams), "pathTable");
+    pathParams.clear();
+    assertEquals(AuthenticationFilter.extractTableName(method, pathParams, queryParams), "queryTable");
+    queryParams.clear();
+    assertNull(AuthenticationFilter.extractTableName(method, pathParams, queryParams));
+  }
+
+  @Test
+  public void testTaskDebugFilterDoesNotGrantTableScope() {
+    Method method = Arrays.stream(PinotTaskRestletResource.class
+        .getDeclaredMethods()).filter(candidate -> candidate.getName().equals("getTaskDebugInfo"))
+        .findFirst().orElseThrow();
+    MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
+    queryParams.putSingle("tableName", "ownedTable_OFFLINE");
+    assertNull(AuthenticationFilter.extractTableName(method, new MultivaluedHashMap<>(), queryParams));
   }
 
   @Test
@@ -414,16 +440,17 @@ public class AuthenticationFilterTest {
   public void methodWithClusterAuthorization() {
   }
 
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.EXECUTE_TASK)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.EXECUTE_TASK, tableScopeParam = "tableName")
   public void methodWithClusterAuthorizationAndTableParam(@QueryParam("tableName") String tableName) {
   }
 
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.INGEST_FILE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.INGEST_FILE,
+      tableScopeParam = "tableNameWithType")
   public void methodWithClusterAuthorizationAndTypedTableParam(
       @QueryParam("tableNameWithType") String tableNameWithType) {
   }
 
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEMA)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEMA, tableScopeParam = "schemaName")
   public void methodWithClusterAuthorizationAndSchemaParam(@QueryParam("schemaName") String schemaName) {
   }
 

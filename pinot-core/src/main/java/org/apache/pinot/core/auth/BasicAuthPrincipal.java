@@ -70,7 +70,7 @@ public class BasicAuthPrincipal {
     return _token;
   }
 
-  public final boolean hasTable(String tableName) {
+  public boolean hasTable(String tableName) {
     return isTableIncluded(tableName) && isTableNotExcluded(tableName);
   }
 
@@ -85,7 +85,7 @@ public class BasicAuthPrincipal {
   /// cluster access by role would let that principal reach cluster state outside the list. The bootstrapped admin
   /// is bootstrapped with a null `UserConfig#getTables()`, which normalizes to an empty set here, so
   /// `RoleType.ADMIN` without a table list still passes.
-  public final boolean hasUnrestrictedTableAccess() {
+  public boolean hasUnrestrictedTableAccess() {
     return _tables.isEmpty() && _excludeTables.isEmpty();
   }
 
