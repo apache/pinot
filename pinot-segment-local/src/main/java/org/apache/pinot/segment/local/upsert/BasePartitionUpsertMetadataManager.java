@@ -729,8 +729,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   /// Determines whether metadata should be reverted when inconsistencies are detected during segment replacement.
-  /// This is only applicable when in PROTECTED mode, the old segment is a mutable segment,
-  /// and the table has inconsistent state configurations.
+  /// This is only applicable when in PROTECTED mode, the old segment is a mutable segment, the table has inconsistent
+  /// state configurations.
   ///
   /// @param oldSegment the old segment being replaced
   /// @return true if metadata revert should be performed on inconsistency
