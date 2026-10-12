@@ -116,7 +116,9 @@ public class ServerPlanRequestUtils {
     }
 
     List<InstanceRequest> instanceRequests;
-    if (executionContext.getWorkerMetadata().getLogicalTableSegmentsMap() != null) {
+    if (serverContext.shouldSkipLeafQueryExecution()) {
+      instanceRequests = List.of();
+    } else if (executionContext.getWorkerMetadata().getLogicalTableSegmentsMap() != null) {
       instanceRequests = constructLogicalTableServerQueryRequests(executionContext, pinotQuery,
           leafQueryExecutor.getInstanceDataManager());
     } else {
