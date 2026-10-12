@@ -59,6 +59,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   /// Key columns precede the aggregation columns in the record layout.
   private final int _numKeyColumns;
   private final int _numColumns;
+  private final boolean _useSingleAggregationResult;
   // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
   // _futures (try to interrupt the execution if it already started).
   private final CountDownLatch _operatorLatch;
@@ -77,6 +78,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     assert _queryContext.getGroupByExpressions() != null;
     _numKeyColumns = _queryContext.getNumGroupByKeyColumns();
     _numColumns = _numKeyColumns + _numAggregationFunctions;
+    _useSingleAggregationResult = _numAggregationFunctions == 1;
     _operatorLatch = new CountDownLatch(_numTasks);
   }
 
@@ -143,12 +145,17 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
                 QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
                 GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
                 Object[] keys = groupKey._keys;
-                Object[] values = Arrays.copyOf(keys, _numColumns);
                 int groupId = groupKey._groupId;
-                for (int i = 0; i < _numAggregationFunctions; i++) {
-                  values[_numKeyColumns + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+                if (_useSingleAggregationResult) {
+                  Object result = aggregationGroupByResult.getResultForGroupId(0, groupId);
+                  _indexedTable.upsertSingleAggregationResult(new Key(keys), result);
+                } else {
+                  Object[] values = Arrays.copyOf(keys, _numColumns);
+                  for (int i = 0; i < _numAggregationFunctions; i++) {
+                    values[_numKeyColumns + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+                  }
+                  _indexedTable.upsert(new Key(keys), new Record(values));
                 }
-                _indexedTable.upsert(new Key(keys), new Record(values));
               }
             } finally {
               // Release the resources used by the group key generator

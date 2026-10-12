@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -108,14 +109,58 @@ public abstract class IndexedTable extends BaseTable {
     return upsert(new Key(keyValues), record);
   }
 
+  /// Upserts an already-extracted result into a table with exactly one aggregation function.
+  /// The table may retain the key and result; callers must not modify them after this call.
+  /// A null result follows the aggregation function's existing merge semantics.
+  /// Final inputs must be Comparable, as required by the aggregation function's final-result merge.
+  /// Returns true even when new groups are rejected; existing groups can still accept updates.
+  public boolean upsertSingleAggregationResult(Key key, @Nullable Object result) {
+    Preconditions.checkState(_aggregationFunctions.length == 1,
+        "upsertSingleAggregationResult requires exactly one aggregation function");
+    Preconditions.checkArgument(!_hasFinalInput || result == null || result instanceof Comparable,
+        "Final aggregation inputs must be Comparable");
+    if (_hasOrderBy) {
+      return upsert(key, createSingleAggregationRecord(key, result));
+    }
+    upsertWithoutOrderBy(key, null, result);
+    return true;
+  }
+
+  /// Applies the table's unordered admission policy to either an eager record or a single aggregation result.
+  /// A null record selects the single-result input, which may itself be null.
+  protected abstract void upsertWithoutOrderBy(Key key, @Nullable Record record, @Nullable Object result);
+
+  protected Record createSingleAggregationRecord(Key key, @Nullable Object result) {
+    Object[] values = Arrays.copyOf(key.getValues(), _numKeyColumns + 1);
+    values[_numKeyColumns] = result;
+    return new Record(values);
+  }
+
+  private Record updateSingleAggregationRecord(Record record, @Nullable Object result) {
+    Object[] values = record.getValues();
+    values[_numKeyColumns] = mergeValue(0, values[_numKeyColumns], result, _hasFinalInput);
+    return record;
+  }
+
   /// Adds a record with new key or updates a record with existing key.
   protected void addOrUpdateRecord(Key key, Record newRecord) {
-    _lookupMap.compute(key, (k, v) -> v == null ? newRecord : updateRecord(v, newRecord));
+    addOrUpdateRecord(key, newRecord, null);
+  }
+
+  protected void addOrUpdateRecord(Key key, @Nullable Record newRecord, @Nullable Object result) {
+    _lookupMap.compute(key, (k, existing) -> {
+      if (existing == null) {
+        return newRecord != null ? newRecord : createSingleAggregationRecord(k, result);
+      }
+      return newRecord != null ? updateRecord(existing, newRecord) : updateSingleAggregationRecord(existing, result);
+    });
   }
 
   /// Updates a record with existing key. Record with new key will be ignored.
-  protected void updateExistingRecord(Key key, Record newRecord) {
-    _lookupMap.computeIfPresent(key, (k, v) -> updateRecord(v, newRecord));
+  protected void updateExistingRecord(Key key, @Nullable Record newRecord, @Nullable Object result) {
+    // computeIfPresent waits for pending insertions; a containsKey check would discard their updates.
+    _lookupMap.computeIfPresent(key, (k, existing) -> newRecord != null
+        ? updateRecord(existing, newRecord) : updateSingleAggregationRecord(existing, result));
   }
 
   private Record updateRecord(Record existingRecord, Record newRecord) {
@@ -125,16 +170,23 @@ public abstract class IndexedTable extends BaseTable {
     int index = _numKeyColumns;
     if (!_hasFinalInput) {
       for (int i = 0; i < numAggregations; i++, index++) {
-        existingValues[index] =
-            AggregationFunctionUtils.merge(_aggregationFunctions[i], existingValues[index], newValues[index]);
+        existingValues[index] = mergeValue(i, existingValues[index], newValues[index], false);
       }
     } else {
       for (int i = 0; i < numAggregations; i++, index++) {
-        existingValues[index] = AggregationFunctionUtils.mergeFinalResult(_aggregationFunctions[i],
-            (Comparable) existingValues[index], (Comparable) newValues[index]);
+        existingValues[index] = mergeValue(i, existingValues[index], newValues[index], true);
       }
     }
     return existingRecord;
+  }
+
+  @Nullable
+  private Object mergeValue(int functionIndex, @Nullable Object existing, @Nullable Object input,
+      boolean hasFinalInput) {
+    return hasFinalInput
+        ? AggregationFunctionUtils.mergeFinalResult(_aggregationFunctions[functionIndex], (Comparable) existing,
+            (Comparable) input)
+        : AggregationFunctionUtils.merge(_aggregationFunctions[functionIndex], existing, input);
   }
 
   /// Resizes the lookup map based on the trim size.
