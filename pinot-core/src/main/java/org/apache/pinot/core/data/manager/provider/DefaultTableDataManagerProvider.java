@@ -81,7 +81,8 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
     switch (tableConfig.getTableType()) {
       case OFFLINE:
         if (tableConfig.isDimTable()) {
-          tableDataManager = DimensionTableDataManager.createInstanceByTableName(tableConfig.getTableName());
+          tableDataManager = DimensionTableDataManager.createInstanceByTableName(tableConfig.getTableName(),
+              _instanceDataManagerConfig.getInstanceId());
         } else {
           tableDataManager = new OfflineTableDataManager();
         }

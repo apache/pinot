@@ -35,6 +35,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
+import org.apache.pinot.core.data.manager.provider.DefaultTableDataManagerProvider;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
@@ -50,6 +51,7 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -60,6 +62,9 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryExecutionContext.QueryType;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -127,14 +132,8 @@ public class DimensionTableDataManagerTest {
 
   @AfterMethod(alwaysRun = true)
   public void tearDownMethod() {
-    // DimensionTableDataManager is a process-wide singleton keyed by table name (see the static
-    // INSTANCES map in DimensionTableDataManager). Every test method loads the same
-    // dimBaseballTeams_OFFLINE table, so without an explicit teardown the singleton (and its
-    // property-store mock, loaded segments, and reload executor) leaks from one method into the
-    // next. A stale async reload from a prior method could then read a _propertyStore that a
-    // concurrent init() had swapped out, surfacing as an intermittent
-    // "Failed to find schema for table: dimBaseballTeams_OFFLINE". Shutting the singleton down
-    // removes it from INSTANCES so each method starts from a clean, freshly-initialized instance.
+    // Most tests use the legacy unscoped registration for the same table. Release its segments and executor
+    // so later methods do not reuse a manager initialized with an earlier method's property-store mock.
     DimensionTableDataManager tableDataManager =
         DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME);
     if (tableDataManager != null) {
@@ -181,6 +180,12 @@ public class DimensionTableDataManagerTest {
   private DimensionTableDataManager makeTableDataManager(TableConfig tableConfig, Schema schema,
       ZkHelixPropertyStore<ZNRecord> propertyStoreMock)
       throws JsonProcessingException {
+    return makeTableDataManager(tableConfig, schema, propertyStoreMock, null);
+  }
+
+  private DimensionTableDataManager makeTableDataManager(TableConfig tableConfig, Schema schema,
+      ZkHelixPropertyStore<ZNRecord> propertyStoreMock, String instanceId)
+      throws JsonProcessingException {
     HelixManager helixManager = mock(HelixManager.class);
     when(propertyStoreMock.get("/CONFIGS/TABLE/dimBaseballTeams_OFFLINE", null, AccessOption.PERSISTENT)).thenReturn(
         TableConfigSerDeUtils.toZNRecord(tableConfig));
@@ -188,14 +193,86 @@ public class DimensionTableDataManagerTest {
         SchemaSerDeUtils.toZNRecord(schema));
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStoreMock);
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
-    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
-    DimensionTableDataManager tableDataManager =
-        DimensionTableDataManager.createInstanceByTableName(OFFLINE_TABLE_NAME);
-    tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, schema,
-        new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, SEGMENT_OPERATIONS_THROTTLER,
-        false, mock(ServerReloadJobStatusCache.class));
+    when(instanceDataManagerConfig.getInstanceId()).thenReturn(instanceId);
+    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(
+        (instanceId == null ? TEMP_DIR : new File(TEMP_DIR, instanceId)).getAbsolutePath());
+    DimensionTableDataManager tableDataManager;
+    if (instanceId == null) {
+      tableDataManager = DimensionTableDataManager.createInstanceByTableName(OFFLINE_TABLE_NAME);
+      tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, schema,
+          new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, SEGMENT_OPERATIONS_THROTTLER,
+          false, mock(ServerReloadJobStatusCache.class));
+    } else {
+      DefaultTableDataManagerProvider provider = new DefaultTableDataManagerProvider();
+      provider.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), SEGMENT_OPERATIONS_THROTTLER,
+          mock(ServerReloadJobStatusCache.class));
+      tableDataManager = (DimensionTableDataManager) provider.getTableDataManager(tableConfig, schema);
+    }
     tableDataManager.start();
     return tableDataManager;
+  }
+
+  private DimensionTableDataManager getTableDataManagerForQuery(String instanceId) {
+    QueryExecutionContext executionContext = new QueryExecutionContext(QueryType.SSE, 1L, "cid", "workload",
+        System.currentTimeMillis(), Long.MAX_VALUE, Long.MAX_VALUE, "broker", instanceId, "");
+    try (QueryThreadContext ignored = QueryThreadContext.open(executionContext,
+        ThreadAccountantUtils.getNoOpAccountant())) {
+      return DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME);
+    }
+  }
+
+  @Test
+  public void testServerScopedInstances()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setIsDimTable(true).setDimensionTableConfig(new DimensionTableConfig(false, false)).build();
+    Schema schema = getSchema();
+    DimensionTableDataManager first =
+        makeTableDataManager(tableConfig, schema, mock(ZkHelixPropertyStore.class), "server1");
+    DimensionTableDataManager second = null;
+    DimensionTableDataManager legacy = null;
+    DimensionTableDataManager replacement = null;
+    try {
+      second = makeTableDataManager(tableConfig, schema, mock(ZkHelixPropertyStore.class), "server2");
+      assertNotSame(first, second);
+      assertNotEquals(first.getTableDataDir(), second.getTableDataDir());
+      assertSame(getTableDataManagerForQuery("server1"), first);
+      assertSame(getTableDataManagerForQuery("server2"), second);
+      assertNull(DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME));
+
+      PrimaryKey key = new PrimaryKey(new String[]{"SF"});
+      first.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
+          SEGMENT_OPERATIONS_THROTTLER));
+      assertEquals(getTableDataManagerForQuery("server1").lookupValue(key, "teamName"), "San Francisco Giants");
+      assertFalse(getTableDataManagerForQuery("server2").containsKey(key));
+
+      legacy = makeTableDataManager(tableConfig, schema);
+      assertNull(getTableDataManagerForQuery("missingServer"));
+      legacy.shutDown();
+
+      second.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
+          SEGMENT_OPERATIONS_THROTTLER));
+      first.shutDown();
+      assertNull(getTableDataManagerForQuery("server1"));
+      assertSame(getTableDataManagerForQuery("server2"), second);
+      assertEquals(getTableDataManagerForQuery("server2").lookupValue(key, "teamName"), "San Francisco Giants");
+      assertSame(DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME), second);
+
+      replacement = makeTableDataManager(tableConfig, schema, mock(ZkHelixPropertyStore.class), "server1");
+      first.doShutdown();
+      assertSame(getTableDataManagerForQuery("server1"), replacement);
+    } finally {
+      first.shutDown();
+      if (second != null) {
+        second.shutDown();
+      }
+      if (legacy != null) {
+        legacy.shutDown();
+      }
+      if (replacement != null) {
+        replacement.shutDown();
+      }
+    }
   }
 
   @Test
@@ -210,6 +287,7 @@ public class DimensionTableDataManagerTest {
     DimensionTableDataManager returnedManager = DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME);
     assertNotNull(returnedManager, "Manager should find instance");
     assertEquals(tableDataManager, returnedManager, "Manager should return already created instance");
+    assertSame(getTableDataManagerForQuery("singleServer"), tableDataManager);
 
     // assert that segments are released after loading data
     tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),

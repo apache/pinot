@@ -47,6 +47,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /// Dimension Table is a special type of OFFLINE table which is assigned to all servers
@@ -54,13 +55,13 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 /// loads the contents into a HashMap for faster access thus the size should be small
 /// enough to easily fit in memory.
 ///
-/// DimensionTableDataManager uses Registry of Singletons pattern to store one instance per table
-/// which can be accessed via [#getInstanceByTableName] static method.
+/// DimensionTableDataManager stores one instance per table and server, which can be accessed via
+/// [#getInstanceByTableName] using the current query's server instance ID.
 @ThreadSafe
 public class DimensionTableDataManager extends OfflineTableDataManager {
 
-  // Storing singletons per table in a map
-  private static final Map<String, DimensionTableDataManager> INSTANCES = new ConcurrentHashMap<>();
+  // A null instance ID identifies a legacy, unscoped registration.
+  private static final Map<Pair<String, String>, DimensionTableDataManager> INSTANCES = new ConcurrentHashMap<>();
   public static final Hash.Strategy<Object[]> HASH_STRATEGY = new Hash.Strategy<>() {
     @Override
     public int hashCode(Object[] o) {
@@ -73,24 +74,61 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     }
   };
 
+  @Nullable
+  private final String _registryInstanceId;
+
   protected DimensionTableDataManager() {
+    this(null);
+  }
+
+  private DimensionTableDataManager(@Nullable String instanceId) {
+    _registryInstanceId = instanceId;
   }
 
   /// `createInstanceByTableName` should only be used by the
   /// [org.apache.pinot.core.data.manager.provider.TableDataManagerProvider] and the returned instance should
   /// be properly initialized via [#init] method before using.
   public static DimensionTableDataManager createInstanceByTableName(String tableNameWithType) {
-    return INSTANCES.computeIfAbsent(tableNameWithType, k -> new DimensionTableDataManager());
+    return createInstanceByTableName(tableNameWithType, null);
+  }
+
+  /// Creates or retrieves the manager owned by the given server. A null ID preserves legacy unscoped registration.
+  public static DimensionTableDataManager createInstanceByTableName(String tableNameWithType,
+      @Nullable String instanceId) {
+    return INSTANCES.computeIfAbsent(Pair.of(tableNameWithType, instanceId),
+        k -> new DimensionTableDataManager(instanceId));
   }
 
   @VisibleForTesting
   public static DimensionTableDataManager registerDimensionTable(String tableNameWithType,
       DimensionTableDataManager instance) {
-    return INSTANCES.computeIfAbsent(tableNameWithType, k -> instance);
+    return INSTANCES.computeIfAbsent(Pair.of(tableNameWithType, null), k -> instance);
   }
 
+  /// Resolves the current query's server, or the only registered server when no query context is available.
+  /// Legacy unscoped registrations remain usable when the table has no server-scoped registrations.
+  @Nullable
   public static DimensionTableDataManager getInstanceByTableName(String tableNameWithType) {
-    return INSTANCES.get(tableNameWithType);
+    QueryThreadContext threadContext = QueryThreadContext.getIfAvailable();
+    if (threadContext != null) {
+      DimensionTableDataManager instance =
+          INSTANCES.get(Pair.of(tableNameWithType, threadContext.getExecutionContext().getInstanceId()));
+      if (instance != null) {
+        return instance;
+      }
+    }
+    DimensionTableDataManager instance = INSTANCES.get(Pair.of(tableNameWithType, null));
+    for (Map.Entry<Pair<String, String>, DimensionTableDataManager> entry : INSTANCES.entrySet()) {
+      Pair<String, String> key = entry.getKey();
+      if (tableNameWithType.equals(key.getLeft()) && key.getRight() != null) {
+        // Never substitute another server for a missing query owner, or choose among ambiguous owners.
+        if (threadContext != null || instance != null) {
+          return null;
+        }
+        instance = entry.getValue();
+      }
+    }
+    return instance;
   }
 
   private final AtomicReference<DimensionTable> _dimensionTable = new AtomicReference<>();
@@ -171,7 +209,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   protected void doShutdown() {
     releaseAndRemoveAllSegments();
     closeDimensionTable(_dimensionTable.get());
-    INSTANCES.remove(_tableNameWithType);
+    INSTANCES.remove(Pair.of(_tableNameWithType, _registryInstanceId), this);
   }
 
 
