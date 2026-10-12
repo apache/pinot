@@ -199,3 +199,11 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+------------------------------------------------------------------------------------
+This project includes code adapted from t-digest 3.3
+(https://github.com/tdunning/t-digest), licensed under the Apache License,
+Version 2.0. Portions of TDigestAccumulator.java in
+pinot-segment-local/src/main/java/org/apache/pinot/segment/local/customobject/tdigest/
+are derived from com.tdunning.math.stats.MergingDigest, AbstractTDigest and
+ScaleFunction.

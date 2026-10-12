@@ -3,3 +3,7 @@ Copyright 2018-2025 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
+
+This product includes code adapted from t-digest 3.3
+(https://github.com/tdunning/t-digest).
+The code for the t-digest was originally authored by Ted Dunning

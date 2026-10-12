@@ -20,8 +20,6 @@ package org.apache.pinot.queries;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
-import com.tdunning.math.stats.MergingDigest;
-import com.tdunning.math.stats.TDigest;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,6 +34,8 @@ import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -56,6 +56,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 /// Tests for serialized bytes values.
@@ -186,7 +187,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       _quantileDigests[i] = quantileDigest;
       row.putValue(PERCENTILE_EST_COLUMN, ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest));
 
-      TDigest tDigest = MergingDigest.createDigest(PERCENTILE_TDIGEST_COMPRESSION);
+      TDigest tDigest = TDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
       for (int value : values) {
         tDigest.add(value);
       }
@@ -276,7 +277,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
 
     // PercentileTDigest
     TDigest tDigest = (TDigest) aggregationResult.get(4);
-    TDigest expectedTDigest = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest expectedTDigest = TDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
     for (int value : _valuesArray[0]) {
       expectedTDigest.add(value);
     }
@@ -374,8 +375,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     long expectedPercentileEstResult = quantileDigest1.getQuantile(0.5);
 
     // PercentileTDigest
-    TDigest tDigest1 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
-    TDigest tDigest2 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest tDigest1 = TDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest tDigest2 = TDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
     for (int value : _valuesArray[0]) {
       tDigest1.add(value);
       tDigest2.add(value);
@@ -472,7 +473,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
 
       // PercentileTDigest
       TDigest tDigest = (TDigest) groupByResult.get(groupId)._record.getValues()[5];
-      TDigest expectedTDigest = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+      TDigest expectedTDigest = TDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
       for (int value : _valuesArray[groupId]) {
         expectedTDigest.add(value);
       }
@@ -572,8 +573,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       long expectedPercentileEstResult = quantileDigest1.getQuantile(0.5);
 
       // PercentileTDigest
-      TDigest tDigest1 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
-      TDigest tDigest2 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+      TDigest tDigest1 = TDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
+      TDigest tDigest2 = TDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
       for (int value : _valuesArray[groupId]) {
         tDigest1.add(value);
         tDigest2.add(value);
@@ -614,6 +615,22 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       assertEquals((long) row[3], expectedPercentileEstResult);
       assertEquals((Double) row[4], expectedPercentileTDigestResult, PERCENTILE_TDIGEST_DELTA);
       assertEquals((long) row[5], expectedDistinctCountHllPlusResult);
+
+      // Check the original measurements independently of the digest used above as an expected result.
+      // The four identical segment copies preserve these normalized ranks through server/broker reduction.
+      double median = (Double) row[4];
+      int count = 0;
+      int below = 0;
+      int atOrBelow = 0;
+      for (int i = groupId; i < NUM_ROWS; i += NUM_GROUPS) {
+        for (int value : _valuesArray[i]) {
+          count++;
+          below += value < median ? 1 : 0;
+          atOrBelow += value <= median ? 1 : 0;
+        }
+      }
+      assertTrue(below <= count * 0.52 && atOrBelow >= count * 0.48,
+          "Median rank exceeds 2% error for " + GROUPS[groupId] + "; seed: " + RANDOM_SEED);
     }
   }
 
@@ -656,7 +673,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     }
 
     // PercentileTDigest
-    TDigest expectedTDigest = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest expectedTDigest = TDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
     for (int value : _valuesArray[0]) {
       expectedTDigest.add(value);
     }
@@ -783,8 +800,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     long expectedPercentileEstResult = quantileDigest1.getQuantile(0.5);
 
     // PercentileTDigest
-    TDigest tDigest1 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
-    TDigest tDigest2 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest tDigest1 = TDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
+    TDigest tDigest2 = TDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
     for (int value : _valuesArray[0]) {
       tDigest1.add(value);
       tDigest2.add(value);

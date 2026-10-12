@@ -201,6 +201,14 @@
    limitations under the License.
 
 ------------------------------------------------------------------------------------
+This project includes code adapted from t-digest 3.3
+(https://github.com/tdunning/t-digest), licensed under the Apache License,
+Version 2.0. Portions of TDigestAccumulator.java in
+pinot-segment-local/src/main/java/org/apache/pinot/segment/local/customobject/tdigest/
+are derived from com.tdunning.math.stats.MergingDigest, AbstractTDigest and
+ScaleFunction.
+
+------------------------------------------------------------------------------------
 This project bundles some components that are also licensed under the Apache
 License Version 2.0:
 
@@ -280,7 +288,6 @@ com.squareup.wire:wire-runtime-jvm:5.1.0
 com.squareup.wire:wire-schema-jvm:5.1.0
 com.squareup:javapoet:1.13.0
 com.squareup:kotlinpoet-jvm:1.18.1
-com.tdunning:t-digest:3.2
 com.typesafe.scala-logging:scala-logging_2.13:3.9.5
 com.uber:h3:4.4.0
 com.yammer.metrics:metrics-core:2.2.0
