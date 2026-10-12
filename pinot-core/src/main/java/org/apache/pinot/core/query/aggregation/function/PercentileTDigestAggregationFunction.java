@@ -30,6 +30,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
@@ -108,12 +109,12 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
     if (blockValSet.getValueType() == DataType.BYTES) {
       // Serialized TDigest
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      PercentileTDigestAccumulator.SerializedTDigestInput input =
-          new PercentileTDigestAccumulator.SerializedTDigestInput();
+      TDigestAccumulator.SerializedTDigestInput input =
+          new TDigestAccumulator.SerializedTDigestInput();
       foldNotNull(length, blockValSet,
-          (PercentileTDigestAccumulator) aggregationResultHolder.getResult(), (current, from, toExclusive) -> {
+          (TDigestAccumulator) aggregationResultHolder.getResult(), (current, from, toExclusive) -> {
             if (current == null) {
-              current = PercentileTDigestAccumulator.forSerializedTDigestWithMergeBuffers(bytesValues[from]);
+              current = TDigestAccumulator.forSerializedTDigestWithMergeBuffers(bytesValues[from]);
               aggregationResultHolder.setValue(current);
             }
             for (int i = from; i < toExclusive; i++) {
@@ -135,13 +136,13 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
 
   protected void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
     double[] doubleValues = blockValSet.getDoubleValuesSV();
-    PercentileTDigestAccumulator accumulator = getAccumulator(aggregationResultHolder, _compressionFactor);
+    TDigestAccumulator accumulator = getAccumulator(aggregationResultHolder, _compressionFactor);
     forEachNotNull(length, blockValSet, (from, to) -> accumulator.add(doubleValues, from, to));
   }
 
   protected void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
     double[][] valuesArray = blockValSet.getDoubleValuesMV();
-    PercentileTDigestAccumulator accumulator = getAccumulator(aggregationResultHolder, _compressionFactor);
+    TDigestAccumulator accumulator = getAccumulator(aggregationResultHolder, _compressionFactor);
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         double[] values = valuesArray[i];
@@ -157,8 +158,8 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
     if (blockValSet.getValueType() == DataType.BYTES) {
       // Serialized TDigest
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      PercentileTDigestAccumulator.SerializedTDigestInput input =
-          new PercentileTDigestAccumulator.SerializedTDigestInput();
+      TDigestAccumulator.SerializedTDigestInput input =
+          new TDigestAccumulator.SerializedTDigestInput();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
           int groupKey = groupKeyArray[i];
@@ -206,8 +207,8 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
     if (blockValSet.getValueType() == DataType.BYTES) {
       // Serialized TDigest
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      PercentileTDigestAccumulator.SerializedTDigestInput input =
-          new PercentileTDigestAccumulator.SerializedTDigestInput();
+      TDigestAccumulator.SerializedTDigestInput input =
+          new TDigestAccumulator.SerializedTDigestInput();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
           int[] groupKeys = groupKeysArray[i];
@@ -277,12 +278,12 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
     if (intermediateResult2.size() == 0L) {
       return intermediateResult1;
     }
-    if (intermediateResult1 instanceof PercentileTDigestAccumulator) {
+    if (intermediateResult1 instanceof TDigestAccumulator) {
       intermediateResult1.add(intermediateResult2);
       return intermediateResult1;
     }
-    PercentileTDigestAccumulator accumulator =
-        PercentileTDigestAccumulator.forReduction(intermediateResult1.compression());
+    TDigestAccumulator accumulator =
+        TDigestAccumulator.forReduction(intermediateResult1.compression());
     accumulator.add(intermediateResult1);
     accumulator.add(intermediateResult2);
     return accumulator;
@@ -293,7 +294,7 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
   /// Segment merge-and-rollup uses this method because its configured output compression can differ from the
   /// compression stored in either input digest.
   public TDigest mergeWithConfiguredCompression(TDigest intermediateResult1, TDigest intermediateResult2) {
-    PercentileTDigestAccumulator accumulator = PercentileTDigestAccumulator.forReduction(_compressionFactor);
+    TDigestAccumulator accumulator = TDigestAccumulator.forReduction(_compressionFactor);
     accumulator.add(intermediateResult1);
     accumulator.add(intermediateResult2);
     accumulator.compress();
@@ -313,7 +314,7 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
 
   @Override
   public TDigest deserializeIntermediateResult(CustomObject customObject) {
-    return PercentileTDigestAccumulator.forSerializedTDigest(customObject.getBuffer());
+    return TDigestAccumulator.forSerializedTDigest(customObject.getBuffer());
   }
 
   @Override
@@ -360,21 +361,21 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
     return tDigest;
   }
 
-  private static PercentileTDigestAccumulator getAccumulator(AggregationResultHolder aggregationResultHolder,
+  private static TDigestAccumulator getAccumulator(AggregationResultHolder aggregationResultHolder,
       int compressionFactor) {
-    PercentileTDigestAccumulator accumulator = aggregationResultHolder.getResult();
+    TDigestAccumulator accumulator = aggregationResultHolder.getResult();
     if (accumulator == null) {
-      accumulator = new PercentileTDigestAccumulator(compressionFactor);
+      accumulator = new TDigestAccumulator(compressionFactor);
       aggregationResultHolder.setValue(accumulator);
     }
     return accumulator;
   }
 
-  private static PercentileTDigestAccumulator getSerializedAccumulator(GroupByResultHolder groupByResultHolder,
-      int groupKey, PercentileTDigestAccumulator.SerializedTDigestInput input) {
-    PercentileTDigestAccumulator accumulator = groupByResultHolder.getResult(groupKey);
+  private static TDigestAccumulator getSerializedAccumulator(GroupByResultHolder groupByResultHolder,
+      int groupKey, TDigestAccumulator.SerializedTDigestInput input) {
+    TDigestAccumulator accumulator = groupByResultHolder.getResult(groupKey);
     if (accumulator == null) {
-      accumulator = PercentileTDigestAccumulator.forSerializedTDigest(input);
+      accumulator = TDigestAccumulator.forSerializedTDigest(input);
       groupByResultHolder.setValueForKey(groupKey, accumulator);
     }
     return accumulator;
@@ -390,7 +391,7 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
       int compressionFactor) {
     TDigest tDigest = groupByResultHolder.getResult(groupKey);
     if (tDigest == null) {
-      tDigest = new PercentileTDigestAccumulator(compressionFactor);
+      tDigest = new TDigestAccumulator(compressionFactor);
       groupByResultHolder.setValueForKey(groupKey, tDigest);
     }
     return tDigest;
