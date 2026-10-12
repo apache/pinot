@@ -74,6 +74,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -81,6 +82,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -88,6 +90,12 @@ import static org.testng.Assert.assertTrue;
 @SuppressWarnings("unchecked")
 public class InstanceSelectorTest {
   private AutoCloseable _mocks;
+
+  @Test
+  public void testUnknownSelectorConservativelyReportsServerAssignment() {
+    InstanceSelector selector = mock(InstanceSelector.class, CALLS_REAL_METHODS);
+    assertTrue(selector.isServerAssigned("unknownInstance"));
+  }
 
   @Mock
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
@@ -352,6 +360,15 @@ public class InstanceSelectorTest {
         INSTANCE_SELECTOR_CONFIG, enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
     strictReplicaGroupInstanceSelector.init(_tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(),
         INSTANCE_SELECTOR_CONFIG, enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
+
+    // Assignment membership is independent of current serving state. ERROR instances are not serving, but a later
+    // instance-config enablement still has to wait for the tables whose ideal state assigns them segments.
+    for (InstanceSelector selector
+        : List.of(balancedInstanceSelector, replicaGroupInstanceSelector, strictReplicaGroupInstanceSelector)) {
+      assertTrue(selector.isServerAssigned(errorInstance0));
+      assertTrue(selector.isServerAssigned(errorInstance1));
+      assertFalse(selector.isServerAssigned("unassignedInstance"));
+    }
 
     int requestId = 0;
 

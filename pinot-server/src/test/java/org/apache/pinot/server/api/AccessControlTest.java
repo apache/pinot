@@ -119,7 +119,7 @@ public class AccessControlTest {
 
     _adminApiApplication = new AdminApiApplication(serverInstance, basicAuthAccessFactory,
         mock(ServerReloadJobStatusCache.class),
-        serverConf);
+        serverConf, () -> true);
 
     int adminApiApplicationPort = getAvailablePort();
     _adminApiApplication.start(List.of(

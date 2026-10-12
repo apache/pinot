@@ -307,6 +307,12 @@ public class RemoteClusterBrokerRoutingManagerTest extends ControllerTest {
   public void testShutdownDuringDiscovery() throws Exception {
     String testTable = "shutdownTable_OFFLINE";
     createTableInZooKeeper(testTable, TableType.OFFLINE);
+    RemoteClusterBrokerRoutingManager routingManager = new RemoteClusterBrokerRoutingManager(
+        REMOTE_CLUSTER_NAME, _brokerMetrics, _serverRoutingStatsManager, _pinotConfig);
+    routingManager.init(_helixManager);
+    routingManager.processClusterChange(org.apache.helix.HelixConstants.ChangeType.INSTANCE_CONFIG);
+    routingManager.scheduleInstanceConfigRetry();
+    Assert.assertTrue(routingManager.isInstanceConfigRetryScheduled(), "Retry should be pending before shutdown");
 
     ExecutorService executor = Executors.newFixedThreadPool(2);
     CountDownLatch startLatch = new CountDownLatch(1);
@@ -320,8 +326,8 @@ public class RemoteClusterBrokerRoutingManagerTest extends ControllerTest {
       Future<?> discoveryTask = executor.submit(() -> {
         try {
           startLatch.await();
-          _routingManager.processSegmentAssignmentChangeInternal();
-          _routingManager.determineRoutingChangeForTables();
+          routingManager.processSegmentAssignmentChangeInternal();
+          routingManager.determineRoutingChangeForTables();
         } catch (Exception e) {
           discoveryException.set(e);
         } finally {
@@ -333,7 +339,7 @@ public class RemoteClusterBrokerRoutingManagerTest extends ControllerTest {
       Future<?> shutdownTask = executor.submit(() -> {
         try {
           startLatch.await();
-          _routingManager.shutdown();
+          routingManager.shutdown();
         } catch (Exception e) {
           shutdownException.set(e);
         } finally {
@@ -348,8 +354,9 @@ public class RemoteClusterBrokerRoutingManagerTest extends ControllerTest {
         Assert.fail("Shutdown failed", shutdownException.get());
       }
 
-      Assert.assertTrue(_routingManager.isExecutorShutdown(), "Executor should be shutdown");
+      Assert.assertTrue(routingManager.isExecutorShutdown(), "All routing-manager executors should be shutdown");
     } finally {
+      routingManager.shutdown();
       executor.shutdown();
       Assert.assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
     }

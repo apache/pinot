@@ -35,13 +35,15 @@ public class HttpClientConfig {
   private final int _maxConnPerRoute;
   private final boolean _disableDefaultUserAgent;
   private final int _connectionTimeoutMs;
+  private final boolean _followRedirects;
 
   private HttpClientConfig(int maxConnTotal, int maxConnPerRoute, boolean disableDefaultUserAgent,
-      int connectionTimeout) {
+      int connectionTimeout, boolean followRedirects) {
     _maxConnTotal = maxConnTotal;
     _maxConnPerRoute = maxConnPerRoute;
     _disableDefaultUserAgent = disableDefaultUserAgent;
     _connectionTimeoutMs = connectionTimeout;
+    _followRedirects = followRedirects;
   }
 
   public int getMaxConnTotal() {
@@ -58,6 +60,10 @@ public class HttpClientConfig {
 
   public int getConnectionTimeoutMs() {
     return _connectionTimeoutMs;
+  }
+
+  public boolean isFollowRedirects() {
+    return _followRedirects;
   }
 
   /// Creates a [HttpClientConfig.Builder] and initializes it with relevant configs from the provided
@@ -83,7 +89,7 @@ public class HttpClientConfig {
     return builder;
   }
 
-  private static Builder newBuilder() {
+  public static Builder newBuilder() {
     return new Builder();
   }
 
@@ -92,6 +98,7 @@ public class HttpClientConfig {
     private int _maxConnsPerRoute = -1;
     private boolean _disableDefaultUserAgent = false;
     private int _connectionTimeoutMs = -1;
+    private boolean _followRedirects = true;
 
     private Builder() {
     }
@@ -116,8 +123,14 @@ public class HttpClientConfig {
       return this;
     }
 
+    public Builder withFollowRedirects(boolean followRedirects) {
+      _followRedirects = followRedirects;
+      return this;
+    }
+
     public HttpClientConfig build() {
-      return new HttpClientConfig(_maxConns, _maxConnsPerRoute, _disableDefaultUserAgent, _connectionTimeoutMs);
+      return new HttpClientConfig(_maxConns, _maxConnsPerRoute, _disableDefaultUserAgent, _connectionTimeoutMs,
+          _followRedirects);
     }
   }
 }
