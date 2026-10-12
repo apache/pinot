@@ -33,8 +33,6 @@ import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
-import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
-import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.roaringbitmap.RoaringBitmap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -209,24 +207,6 @@ public class CustomSerDeUtils {
       byte[] bytes = new byte[byteBuffer.remaining()];
       byteBuffer.get(bytes);
       return deserialize(bytes);
-    }
-  };
-
-  public static final ObjectSerDe<TDigest> TDIGEST_SER_DE = new ObjectSerDe<TDigest>() {
-
-    @Override
-    public byte[] serialize(TDigest tDigest) {
-      return tDigest.serialize();
-    }
-
-    @Override
-    public TDigest deserialize(byte[] bytes) {
-      return TDigestAccumulator.fromBytes(bytes);
-    }
-
-    @Override
-    public TDigest deserialize(ByteBuffer byteBuffer) {
-      return TDigestAccumulator.fromBytes(byteBuffer);
     }
   };
 

@@ -30,6 +30,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.segment.local.utils.TDigestTestUtils.verbose;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -728,6 +729,47 @@ public class TDigestAccumulatorTest {
   }
 
   @Test
+  public void testBatchNaNRejectionDoesNotMutateBufferedState() throws Exception {
+    for (boolean legacyAggregation : new boolean[]{false, true}) {
+      TDigestAccumulator digest = legacyAggregation
+          ? TDigestAccumulator.forLegacyAggregation(100) : TDigestAccumulator.forReduction(100);
+      digest.add(0);
+      int capacity = ((double[]) field(digest, "_rawValues")).length;
+      SplittableRandom random = new SplittableRandom(42);
+      for (int i = 1; i < capacity - 2; i++) {
+        digest.add(random.nextDouble());
+      }
+      TDigestAccumulator control = digest.copy();
+      byte[] before = digest.serializeSnapshot();
+      double[] rawValues = ((double[]) field(digest, "_rawValues")).clone();
+      int rawCount = (int) field(digest, "_numRawValues");
+      int mergeCount = (int) field(digest, "_mergeCount");
+      double[] batch = new double[32];
+      for (int i = 0; i < batch.length; i++) {
+        batch[i] = random.nextDouble();
+      }
+      batch[batch.length - 1] = Double.NaN;
+      expectThrows(IllegalArgumentException.class, () -> digest.add(batch, 0, batch.length));
+      assertEquals(digest.getTotalWeight(), control.getTotalWeight());
+      assertEquals((int) field(digest, "_numRawValues"), rawCount);
+      assertEquals((int) field(digest, "_mergeCount"), mergeCount);
+      assertEquals((double[]) field(digest, "_rawValues"), rawValues);
+      assertEquals(digest.serializeSnapshot(), before);
+
+      batch[batch.length - 1] = 0.5;
+      digest.add(batch, 0, batch.length);
+      control.add(batch, 0, batch.length);
+      double[] slice = {Double.NaN, -1, 1, Double.NaN};
+      digest.add(slice, 1, 3);
+      control.add(slice, 1, 3);
+      digest.add(slice, 0, 0);
+      digest.add(slice, 3, 2);
+      assertEquals(digest.getTotalWeight(), control.getTotalWeight());
+      assertEquals(digest.serialize(), control.serialize(), "Rejected batches must not retain a partial prefix");
+    }
+  }
+
+  @Test
   public void testHighCompressionRetainsBoundedInputBatches() throws Exception {
     double[] values = new double[100_000];
     for (int i = 0; i < values.length; i++) {
@@ -1159,19 +1201,5 @@ public class TDigestAccumulatorTest {
         TDigestAccumulator.forReduction(TDigestCodec.readCompression(bytes));
     digest.addSerializedTDigest(bytes);
     return digest;
-  }
-
-  private static byte[] verbose(double[] means, double[] weights) {
-    ByteBuffer encoded = ByteBuffer.allocate(32 + 16 * means.length);
-    encoded.putInt(TDigestCodec.VERBOSE_ENCODING);
-    encoded.putDouble(means[0]);
-    encoded.putDouble(means[means.length - 1]);
-    encoded.putDouble(100);
-    encoded.putInt(means.length);
-    for (int i = 0; i < means.length; i++) {
-      encoded.putDouble(weights[i]);
-      encoded.putDouble(means[i]);
-    }
-    return encoded.array();
   }
 }

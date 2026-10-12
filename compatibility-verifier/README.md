@@ -71,6 +71,7 @@ after intentionally changing the seeded corpus; it writes an unverified referenc
 
 Pinot removes `com.tdunning:t-digest` while retaining legacy verbose/compact BYTES and object type 10.
 Plugins using tdunning types must recompile against `org.apache.pinot.segment.local.customobject.tdigest.TDigest`.
+Replace `CustomSerDeUtils.TDIGEST_SER_DE` with `fromBytes(bytes)`/`serialize()` for stored digests.
 Use `TDigestAccumulator.forLegacyAggregation(compression)` for general/Star-tree aggregation,
 `forReduction(compression)` for SQL reducers, or `fromBytes(bytes)` for stored input. Add values with
 `digest.add(value, doubleWeight)`; `serialize()` returns independently owned bytes. `Centroid.weight()` and

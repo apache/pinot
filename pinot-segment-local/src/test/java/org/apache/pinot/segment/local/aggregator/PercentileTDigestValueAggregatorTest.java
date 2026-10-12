@@ -31,7 +31,7 @@ import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
+import org.apache.pinot.segment.local.utils.TDigestTestUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -402,7 +402,7 @@ public class PercentileTDigestValueAggregatorTest {
     long expectedSize = 2L * values.length;
     assertInfinityDistribution(digest, expectedSize);
     byte[] serialized = aggregator.serializeAggregatedValue(digest);
-    TDigest standardDigest = CustomSerDeUtils.TDIGEST_SER_DE.deserialize(serialized);
+    TDigest standardDigest = TDigestAccumulator.fromBytes(serialized);
     assertEquals(standardDigest.size(), expectedSize);
     assertEquals(standardDigest.getMin(), Double.NEGATIVE_INFINITY);
     assertEquals(standardDigest.getMax(), Double.POSITIVE_INFINITY);
@@ -489,7 +489,7 @@ public class PercentileTDigestValueAggregatorTest {
     assertHasFiniteCentroid(digest, 1.0e308);
 
     byte[] serialized = aggregator.serializeAggregatedValue(digest);
-    assertEquals(CustomSerDeUtils.TDIGEST_SER_DE.deserialize(serialized).size(), 2L * finiteWeight + 4L);
+    assertEquals(TDigestAccumulator.fromBytes(serialized).size(), 2L * finiteWeight + 4L);
     assertEquals(aggregator.deserializeAggregatedValue(serialized).size(), 2L * finiteWeight + 4L);
   }
 
@@ -1150,7 +1150,6 @@ public class PercentileTDigestValueAggregatorTest {
       digest.compress();
       TDigest copy = aggregator.cloneAggregatedValue(digest);
       assertEquals(digest.serialize(), original);
-      assertEquals(CustomSerDeUtils.TDIGEST_SER_DE.serialize(digest), original);
       assertEquals(new SerializedTDigest(digest, 50).toString(), BytesUtils.toHexString(original));
       byte[] returned = digest.serialize();
       returned[0] = 0;
@@ -1338,47 +1337,18 @@ public class PercentileTDigestValueAggregatorTest {
 
   private static byte[] createSmallEncoding(int compression, int centroidCapacity, int bufferSize,
       int centroidCount) {
-    ByteBuffer buffer = ByteBuffer.allocate(30 + centroidCount * 2 * Float.BYTES);
-    buffer.putInt(2);
-    buffer.putDouble(0.0);
-    buffer.putDouble(centroidCount - 1.0);
-    buffer.putFloat(compression);
-    buffer.putShort((short) centroidCapacity);
-    buffer.putShort((short) bufferSize);
-    buffer.putShort((short) centroidCount);
-    for (int i = 0; i < centroidCount; i++) {
-      buffer.putFloat(1.0F);
-      buffer.putFloat(i);
-    }
-    return buffer.array();
+    return TDigestTestUtils.unitCentroids(true, centroidCount, compression, centroidCapacity, bufferSize);
   }
 
   private static byte[] createSmallEncoding(double[] means, double[] weights) {
-    ByteBuffer buffer = ByteBuffer.allocate(TDigestCodec.SMALL_HEADER_SIZE
-        + means.length * TDigestCodec.SMALL_CENTROID_SIZE);
-    buffer.putInt(TDigestCodec.SMALL_ENCODING).putDouble(means[0]).putDouble(means[means.length - 1]).putFloat(100);
-    buffer.putShort((short) 210).putShort((short) 1050).putShort((short) means.length);
-    for (int i = 0; i < means.length; i++) {
-      buffer.putFloat((float) weights[i]).putFloat((float) means[i]);
-    }
-    return buffer.array();
+    return TDigestTestUtils.small(means, weights);
   }
 
   private static byte[] createVerboseEncoding(double[] means, double[] weights) {
-    return createVerboseEncoding(means, weights, 100.0);
+    return TDigestTestUtils.verbose(means, weights);
   }
 
   private static byte[] createVerboseEncoding(double[] means, double[] weights, double compression) {
-    ByteBuffer buffer = ByteBuffer.allocate(32 + means.length * 2 * Double.BYTES);
-    buffer.putInt(1);
-    buffer.putDouble(means[0]);
-    buffer.putDouble(means[means.length - 1]);
-    buffer.putDouble(compression);
-    buffer.putInt(means.length);
-    for (int i = 0; i < means.length; i++) {
-      buffer.putDouble(weights[i]);
-      buffer.putDouble(means[i]);
-    }
-    return buffer.array();
+    return TDigestTestUtils.verbose(means, weights, compression);
   }
 }

@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec;
+import org.apache.pinot.segment.local.utils.TDigestTestUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.Test;
 
@@ -145,17 +146,7 @@ public class PercentileRawTDigestAggregationFunctionTest {
   /// Verbose-encoded digest (encoding 1) with unit-weight centroids at means 0..numCentroids-1. Package-private:
   /// shared with [PercentileTDigestAggregationFunctionTest] and [PercentileSmartTDigestAggregationFunctionTest].
   static byte[] createVerboseUnitCentroidDigest(int numCentroids, double compression) {
-    ByteBuffer buffer = ByteBuffer.allocate(4 * Integer.BYTES + 2 * Double.BYTES + 2 * Double.BYTES * numCentroids);
-    buffer.putInt(1);
-    buffer.putDouble(0.0);
-    buffer.putDouble(numCentroids - 1.0);
-    buffer.putDouble(compression);
-    buffer.putInt(numCentroids);
-    for (int i = 0; i < numCentroids; i++) {
-      buffer.putDouble(1.0);
-      buffer.putDouble(i);
-    }
-    return buffer.array();
+    return TDigestTestUtils.unitCentroids(false, numCentroids, compression, 0, 0);
   }
 
   /// SMALL-encoded digest (encoding 2) with explicit main/buffer capacities, unit-weight centroids
@@ -164,20 +155,7 @@ public class PercentileRawTDigestAggregationFunctionTest {
   /// Package-private: shared with [PercentileSmartTDigestAggregationFunctionTest].
   static byte[] createSmallUnitCentroidDigest(int numCentroids, double compression, int mainCapacity,
       int bufferCapacity) {
-    ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES + 2 * Double.BYTES + Float.BYTES + 3 * Short.BYTES
-        + 2 * Float.BYTES * numCentroids);
-    buffer.putInt(2);
-    buffer.putDouble(0.0);
-    buffer.putDouble(numCentroids - 1.0);
-    buffer.putFloat((float) compression);
-    buffer.putShort((short) mainCapacity);
-    buffer.putShort((short) bufferCapacity);
-    buffer.putShort((short) numCentroids);
-    for (int i = 0; i < numCentroids; i++) {
-      buffer.putFloat(1.0f);
-      buffer.putFloat(i);
-    }
-    return buffer.array();
+    return TDigestTestUtils.unitCentroids(true, numCentroids, compression, mainCapacity, bufferCapacity);
   }
 
   static void assertLegacyCompatibleShape(byte[] bytes, double compression) {

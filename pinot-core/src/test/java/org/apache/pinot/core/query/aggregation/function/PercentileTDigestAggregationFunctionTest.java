@@ -272,31 +272,12 @@ public class PercentileTDigestAggregationFunctionTest {
 
   @Test
   public void testLegacyWeightedBoundariesUseTheirSourceExtrema() {
-    ByteBuffer legacy = ByteBuffer.allocate(64);
-    legacy.putInt(1);
-    legacy.putDouble(0.0);
-    legacy.putDouble(10.0);
-    legacy.putDouble(20.0);
-    legacy.putInt(2);
-    legacy.putDouble(2.0);
-    legacy.putDouble(1.0);
-    legacy.putDouble(1.0);
-    legacy.putDouble(10.0);
-
-    ByteBuffer shifted = ByteBuffer.allocate(64);
-    shifted.putInt(1);
-    shifted.putDouble(-100.0);
-    shifted.putDouble(100.0);
-    shifted.putDouble(20.0);
-    shifted.putInt(2);
-    shifted.putDouble(1.0);
-    shifted.putDouble(-100.0);
-    shifted.putDouble(1.0);
-    shifted.putDouble(100.0);
+    byte[] legacy = TDigestTestUtils.verbose(20.0, 0.0, 10.0, new double[]{1.0, 10.0}, new double[]{2.0, 1.0});
+    byte[] shifted = TDigestTestUtils.verbose(new double[]{-100.0, 100.0}, new double[]{1.0, 1.0}, 20.0);
 
     TDigestAccumulator actual = TDigestAccumulator.forReduction(20.0);
-    actual.addSerializedTDigest(legacy.array());
-    actual.addSerializedTDigest(shifted.array());
+    actual.addSerializedTDigest(legacy);
+    actual.addSerializedTDigest(shifted);
     TDigestAccumulator expected = new TDigestAccumulator(20);
     expected.add(new double[]{0.0, 2.0, 10.0, -100.0, 100.0}, 0, 5);
 
@@ -977,16 +958,9 @@ public class PercentileTDigestAggregationFunctionTest {
     double min = 8.0e307;
     double mean = 1.0e308;
     double max = 1.2e308;
-    ByteBuffer verbose = ByteBuffer.allocate(32 + 2 * Double.BYTES);
-    verbose.putInt(1);
-    verbose.putDouble(min);
-    verbose.putDouble(max);
-    verbose.putDouble(100.0);
-    verbose.putInt(1);
-    verbose.putDouble(3.0);
-    verbose.putDouble(mean);
+    byte[] verbose = TDigestTestUtils.verbose(100.0, min, max, new double[]{mean}, new double[]{3.0});
 
-    TDigest result = aggregateSerialized(new byte[][]{verbose.array()}, null, false);
+    TDigest result = aggregateSerialized(new byte[][]{verbose}, null, false);
     assertEquals(result.centroids().size(), 1);
     assertEquals(result.quantile(0.5), mean);
     result.serialize();
@@ -1192,12 +1166,10 @@ public class PercentileTDigestAggregationFunctionTest {
   public void testFractionalMassIsNotEmptyDuringAggregationMergeOrFinalExtraction() {
     PercentileTDigestAggregationFunction function =
         new PercentileTDigestAggregationFunction(EXPRESSION, 50.0, true);
-    ByteBuffer fractionalBytes = ByteBuffer.allocate(48);
-    fractionalBytes.putInt(1).putDouble(42.0).putDouble(42.0).putDouble(100.0).putInt(1)
-        .putDouble(0.5).putDouble(42.0);
+    byte[] fractionalBytes = TDigestTestUtils.verbose(new double[]{42.0}, new double[]{0.5});
     AggregationResultHolder holder = function.createAggregationResultHolder();
     function.aggregate(1, holder, Map.of(EXPRESSION,
-        bytesBlockValSet(new byte[][]{fractionalBytes.array()}, null)));
+        bytesBlockValSet(new byte[][]{fractionalBytes}, null)));
     TDigest fractional = function.extractAggregationResult(holder);
     assertEquals(fractional.size(), 0L);
     assertFalse(fractional.isEmpty());
@@ -1205,7 +1177,7 @@ public class PercentileTDigestAggregationFunctionTest {
     assertNull(function.extractFinalResult(TDigestAccumulator.forLegacyAggregation(100.0)));
 
     for (boolean fractionalFirst : new boolean[]{true, false}) {
-      TDigest half = TDigestAccumulator.fromBytes(fractionalBytes.array());
+      TDigest half = TDigestAccumulator.fromBytes(fractionalBytes);
       TDigest singleton = TDigestAccumulator.forLegacyAggregation(100.0);
       singleton.add(42.0);
       TDigest merged = fractionalFirst ? function.merge(half, singleton) : function.merge(singleton, half);
@@ -1219,8 +1191,8 @@ public class PercentileTDigestAggregationFunctionTest {
       TDigest healthy = TDigestAccumulator.forLegacyAggregation(100.0);
       healthy.add(43.0);
       byte[] healthyBytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(healthy);
-      byte[][] inputs = fractionalFirst ? new byte[][]{fractionalBytes.array(), healthyBytes}
-          : new byte[][]{healthyBytes, fractionalBytes.array()};
+      byte[][] inputs = fractionalFirst ? new byte[][]{fractionalBytes, healthyBytes}
+          : new byte[][]{healthyBytes, fractionalBytes};
       TDigest leaf = aggregateSerialized(inputs, null, false);
       GroupByResultHolder groups = function.createGroupByResultHolder(1, 1);
       function.aggregateGroupBySV(2, new int[]{0, 0}, groups, Map.of(EXPRESSION, bytesBlockValSet(inputs, null)));

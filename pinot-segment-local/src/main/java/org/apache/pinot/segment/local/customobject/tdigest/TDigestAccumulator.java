@@ -304,20 +304,18 @@ public final class TDigestAccumulator extends TDigest {
       return;
     }
     requireMutable();
+    for (int i = from; i < toExclusive; i++) {
+      if (Double.isNaN(values[i])) {
+        throw new IllegalArgumentException("Cannot add NaN to t-digest");
+      }
+    }
     prepareForMutation();
     while (from < toExclusive) {
       ensureRawBuffer();
       flushIfBuffersFull(true);
       int numValues = Math.min(toExclusive - from, Math.min(_rawValues.length - _numRawValues,
           getPendingInputLimit() - _numRawValues - _numIncomingCentroids));
-      int rawOffset = _numRawValues;
-      for (int i = 0; i < numValues; i++) {
-        double value = values[from + i];
-        if (Double.isNaN(value)) {
-          throw new IllegalArgumentException("Cannot add NaN to t-digest");
-        }
-        _rawValues[rawOffset + i] = value;
-      }
+      System.arraycopy(values, from, _rawValues, _numRawValues, numValues);
       _originalFractionalBytes = null;
       from += numValues;
       _numRawValues += numValues;
