@@ -104,8 +104,6 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     assertEquals(mergedRoundTripped.quantile(0.5), (numCentroids - 1.0) / 2.0, 1.0);
   }
 
-  /// Materialized historical compact state must also serialize into legacy-compatible bytes
-  /// through the generic serde, with its owned serialization length matching the generic result.
   @Test
   public void testMaterializedCapacityPreservingStateSerializesLegacyCompatible() {
     int numCentroids = 51;

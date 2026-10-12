@@ -22,15 +22,10 @@ import java.nio.ByteBuffer;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec.SerializedTDigestMetadata;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec.SerializedTDigestState;
 
-/// Reusable, invocation-local view of one serialized TDigest for group-by-MV fanout.
-///
-/// [#reset(byte\[\])] validates the header once per input row. The first decode combines numerical validation
-/// with filling reusable centroid arrays, so all groups for a row merge the same primitive input without sharing
-/// mutable accumulator state. A pending accumulator requests an immutable byte snapshot, created at most once per
-/// reset
-/// and shared by the row's group fanout. The input must remain thread-confined and must not outlive the aggregation
-/// call that owns it. Pending-only inputs inspect their bytes without allocating centroid arrays; their first
-/// later materialization reads the already validated values without another numerical validation pass.
+/// Invocation-local view of one serialized TDigest, reused across group-by-MV fanout.
+/// Validates each row once and decodes into reusable arrays only when needed. Pending accumulators share one
+/// immutable byte snapshot per reset, without sharing mutable digest state.
+/// Thread-confined; must not outlive its owning aggregation call.
 public final class SerializedTDigestInput {
   byte[] _bytes;
   byte[] _retainedBytes;

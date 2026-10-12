@@ -18,7 +18,6 @@
 # under the License.
 #
 
-# Reuse or generate LegacyTDigestCompatibilityTest fixtures. Legacy jars are test-tool artifacts, not Pinot dependencies.
 set -euo pipefail
 # Match the unit-test workflow's Maven Central retry and connection settings, including standalone runs.
 export MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 \
@@ -43,7 +42,6 @@ javac -cp "$TDIGEST_PINOT_CLASSPATH" -d "$TDIGEST_WORK" \
 for TDIGEST_VERSION in 3.2 3.3; do
   TDIGEST_JAR="$TDIGEST_WORK/t-digest-$TDIGEST_VERSION.jar"
   if [[ ! -s "$TDIGEST_JAR" ]]; then
-    # Resolution uses the workflow-cached Maven repository; retain each immutable copy for subsequent runs.
     "$TDIGEST_ROOT/mvnw" -f "$TDIGEST_ROOT/pom.xml" -N -B -ntp \
       org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy \
       "-Dartifact=com.tdunning:t-digest:$TDIGEST_VERSION:jar" "-DoutputDirectory=$TDIGEST_WORK"

@@ -36,8 +36,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/// Tests that `percentileRawTDigest` retains the legacy byte format and reader capacity contract.
-/// Capacity-preserving inputs can contain more centroids than a default legacy reader allocates.
+/// Tests the legacy byte format and reader capacity contract of `percentileRawTDigest`.
 public class PercentileRawTDigestAggregationFunctionTest {
   private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("col");
 
@@ -74,7 +73,6 @@ public class PercentileRawTDigestAggregationFunctionTest {
     double compression = 20.0;
     byte[] small = createSmallUnitCentroidDigest(numCentroids, compression, 60, 100);
 
-    // Sanity: the supplied legacy input has the expected weight.
     TDigest direct = TDigestAccumulator.fromBytes(ByteBuffer.wrap(small));
     assertEquals(direct.size(), numCentroids);
 

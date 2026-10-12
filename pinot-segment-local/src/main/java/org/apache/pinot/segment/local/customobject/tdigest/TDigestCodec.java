@@ -25,29 +25,11 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 
-/// Compatibility helpers for the serialized t-digest format shared by t-digest 3.2 and 3.3.
-///
-/// Version 3.3 requires the first and last centroid to have unit weight whenever a digest is recompressed. Version
-/// 3.2 did not maintain that invariant, so an otherwise valid 3.2 digest can fail an assertion after being read by
-/// 3.3. Pure reads retain the legacy weighted boundary centroids. Adjacent equal means use Pinot's point-mass
-/// interpolation, so quantile/CDF values can change on unchanged bytes, including intervals next to a plateau.
-/// Mutation and serialization repair their boundaries only when unit endpoints can preserve their total weight and
-/// first moment; otherwise unchanged historical bytes remain readable and mutation fails explicitly.
-/// Serialization uses the compact form when 3.3's larger low-compression centroid buffer would not fit in a 3.2
-/// default buffer and every centroid is exactly representable in that format. Otherwise, it merges the nearest
-/// interior centroids until the verbose representation fits the 3.2 capacity. This keeps intermediate values readable
-/// in both directions during a rolling upgrade without silently narrowing double-precision values to floats.
-///
-/// Pinot owns the in-memory K1 implementation and retains these legacy bytes for stored columns and mixed-version
-/// intermediate results. Decoding checks lengths and numerical state before allocating centroid arrays.
-/// NaN means at an identifiable infinite tail are restored to that infinite bound without changing their weights.
-/// Other poisoned states remain byte-readable with NaN statistics because their distribution cannot be recovered.
-/// They retain their original bytes; attempting to mutate them or mix them with another distribution fails explicitly.
-/// Opaque poisoned payloads retain their original centroids even if an old reader's default array cannot hold them;
-/// these historical exceptions remain readable by Pinot, but are not guaranteed to survive a reverse upgrade.
-/// Historical fractional boundary masses below one, and singleton masses between one and two, retain their original
-/// bytes. Fresh serialization rejects these boundaries: t-digest 3.3's unit-endpoint assertion cannot be satisfied
-/// without changing their mass. Fractional interior weights remain supported.
+/// Reads and writes the legacy t-digest 3.2/3.3 formats, validating lengths before allocating centroid arrays.
+/// Fresh output respects both readers' capacities without narrowing doubles. Historical fractional endpoints and
+/// opaque corrupted payloads retain their original limitations; byte preservation does not ensure reverse upgrades.
+/// Endpoint repair, capacity fallback and point-mass interpolation can change quantiles on historical data.
+/// This utility has no shared mutable state; callers must exclusively own input buffers and parser state.
 public final class TDigestCodec {
   public static final int VERBOSE_ENCODING = 1;
   public static final int SMALL_ENCODING = 2;
@@ -146,11 +128,9 @@ public final class TDigestCodec {
     }
   }
 
-  /// Allows only unsupported endpoint means inherited from a validated legacy source. This is shared by native,
-  /// enclosing and generic writers; new fractional global extrema do not receive the historical exception.
-  /// Exact equality is intentional: endpoint repair preserves these means, and admitting nearby means would grant
-  /// the exception to fresh extrema. Fresh fractional input at or beyond a recorded endpoint permanently excludes
-  /// that endpoint, even if its historical mass was merged away or the new weight equals the historical weight.
+  /// Allows unsupported endpoints only at exact means inherited from validated legacy bytes. A tolerance could
+  /// grant the exception to fresh extrema. Fresh fractional input at or beyond an endpoint permanently excludes it,
+  /// even if its historical mass was merged away or the new weight equals the historical weight.
   static boolean hasInheritedFractionalBoundaryEncoding(TDigest source, int count, double firstMean,
       double firstWeight, double lastMean, double lastWeight) {
     if (count <= 0 || !source.hasValidStatistics() || !(firstWeight > 0.0) || !(lastWeight > 0.0)
@@ -193,9 +173,7 @@ public final class TDigestCodec {
     return makeLegacyCompatible(verboseBytes, inspectSerialized(ByteBuffer.wrap(verboseBytes), false));
   }
 
-  /// Serializes an unchanged, independently retained payload using metadata validated at ingestion.
-  ///
-  /// The metadata must describe these exact bytes. This avoids another centroid validation walk for lazy digests.
+  /// Uses metadata validated for these exact retained bytes, avoiding another centroid validation walk.
   public static byte[] makeLegacyCompatible(byte[] verboseBytes, SerializedTDigestMetadata metadata) {
     return makeLegacyCompatible(verboseBytes, metadata, false);
   }

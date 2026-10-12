@@ -22,10 +22,8 @@ import java.util.Collection;
 import java.util.List;
 
 /// Mutable percentile digest base for Pinot aggregation and legacy t-digest byte encodings.
-/// Implementations are not thread-safe; callers must serialize access to each aggregation state.
-/// Historical corrupted payloads may be retained unchanged, but cannot be mutated or mixed with healthy state.
-/// Fractional mass is preserved; t-digest 3.3 can reject endpoint weights below one or singleton masses between
-/// one and two during recompression because its endpoint invariant requires unit weights.
+/// Implementations require external synchronization. Historical corrupted payloads can be retained unchanged,
+/// but cannot be mutated or mixed with healthy state.
 public abstract class TDigest {
   public abstract void add(double value);
 
@@ -33,10 +31,9 @@ public abstract class TDigest {
     add(value, (double) weight);
   }
 
-  /// Adds positive finite mass, rejecting a valid distribution's total that would overflow double.
-  /// Fractional interior mass is supported. Serialization rejects fresh endpoint mass below one, or a singleton
-  /// mass between one and two, because legacy readers require unit endpoints. For example, `add(5, 0.5)` is
-  /// accepted but cannot be serialized alone; subsequent input can make that mass interior or representable.
+  /// Adds positive finite mass; rejects total-weight overflow. Fractional interior mass is supported, but
+  /// serialization rejects fresh endpoint mass below one or singleton mass between one and two: legacy readers
+  /// require unit endpoints. Thus `add(5, 0.5)` is accepted but cannot be serialized alone.
   public abstract void add(double value, double weight);
 
   /// Merges an exclusively owned source; implementations may compress that mutable source in place.
@@ -55,10 +52,8 @@ public abstract class TDigest {
     return (long) getTotalWeight();
   }
 
-  /// Returns centroid mass without narrowing fractional or large weights. Valid totals must remain finite;
-  /// add and merge throw IllegalArgumentException when the summed mass exceeds the finite double range.
-  /// An invalid historical payload may report its original negative or non-finite total; it cannot contribute
-  /// to another digest.
+  /// Returns mass without narrowing fractional or large weights. Add/merge reject overflow of a valid total.
+  /// Invalid historical payloads may report their original negative or non-finite total, but cannot be merged.
   public abstract double getTotalWeight();
 
   /// Returns false when historical numerical corruption leaves the distribution unknown.
@@ -100,9 +95,8 @@ public abstract class TDigest {
 
   public abstract double getMax();
 
-  /// Returns the mean of an unsupported fractional endpoint inherited from validated legacy bytes, or NaN when
-  /// none is known. The lower or upper boundary is selected by `lowerBoundary`. Producers of fresh values retain
-  /// this default; mergers propagate the provenance without granting permission to new fractional extrema.
+  /// Returns the inherited unsupported fractional endpoint mean, or NaN. Mergers propagate this provenance
+  /// from validated legacy bytes without granting permission to new fractional extrema.
   double getHistoricalFractionalBoundaryMean(boolean lowerBoundary) {
     return Double.NaN;
   }

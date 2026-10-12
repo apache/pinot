@@ -28,14 +28,10 @@ import java.util.List;
 import java.util.SplittableRandom;
 
 
-/// Runs only against one legacy jar in a separate JVM; Pinot classes are deliberately absent from its classpath.
-/// Fractional endpoint masses below one and singleton masses between one and two are excluded: legacy 3.3 cannot
-/// recompress them without changing mass. Those preserved-byte limitations are tested by Pinot's unit tests.
-/// Initial value parity covers ordinary continuous/empty/singleton inputs and huge-mean fallback. Weighted endpoint
-/// or capacity repair can change interpolation, and 3.2 has older singleton rules; those fixtures retain structural,
-/// mass, extrema, and monotonicity checks rather than widening the numerical tolerance.
-/// Degraded fixtures characterize oversized and sub-10-header decoding in both legacy readers; preserving opaque
-/// bytes does not guarantee reverse-upgrade compatibility.
+/// Runs against one legacy jar in an isolated JVM. Unit tests cover fractional endpoints the old readers cannot
+/// recompress without changing mass. Weighted-boundary/capacity repair and 3.2 singleton rules can change quantiles;
+/// those fixtures check structure, mass, extrema and monotonicity rather than relaxing numerical tolerances.
+/// Degraded fixtures characterize legacy reader limits; opaque byte preservation does not ensure reverse upgrades.
 public final class LegacyReader {
   private static final double[] QUANTILES = {0, 0.25, 0.5, 0.75, 0.99, 1};
 

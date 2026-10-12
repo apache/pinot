@@ -74,8 +74,7 @@ import org.openjdk.jmh.infra.BenchmarkParams;
 ///
 /// Use `_sourceLayout=FIXED_VERBOSE` to hold the serialized centroid shape constant; the default `NATIVE` mode
 /// uses the current accumulator's compression. `PROMOTED_LOCAL` measures the raw group-by result path.
-/// `ACCUMULATOR_LOCAL` models
-/// materialized accumulator results from non-grouped and StarTree segment execution. `ACCUMULATOR_WIRE` keeps
+/// `ACCUMULATOR_LOCAL` models materialized results from non-grouped and StarTree execution. `ACCUMULATOR_WIRE` keeps
 /// deserialized sources lazy to model broker reduction. Use `_sourceReuse=UNIQUE` for production-shaped runs so
 /// every group and metric has distinct prebuilt source state; the default shared corpus keeps the full matrix small.
 @BenchmarkMode(Mode.AverageTime)

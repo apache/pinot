@@ -53,23 +53,11 @@ import org.slf4j.LoggerFactory;
 
 
 /// Accumulates raw values and serialized TDigests into primitive centroids using Pinot's K1 weight-limit rule.
-///
-/// Raw values are sorted in small batches; serialized centroids retain their existing sorted order. Both are
-/// linearly merged with accumulated centroids. K1 preserves Pinot's existing middle-quantile behavior, and the
-/// legacy verbose and small encodings preserve stored data and mixed-version wire compatibility.
-///
-/// Serialized state keeps its first digest pending and allocates centroid buffers only when another input must be
-/// merged or the digest is queried. Raw-value buffers remain unallocated until a raw value is added.
-///
-/// Historical corrupted payloads remain opaque and byte-exact, with NaN statistics. Their reported historical mass
-/// may be invalid; they cannot be mutated or mixed with another distribution. Such an operation fails before
-/// changing aggregate mass, because neither invented statistics nor synthetic NaN bytes are safe for old readers.
-/// Unchanged historical fractional boundaries retain their original bytes, including when configured compression
-/// differs. After a merge, inherited fractional endpoints retain precise verbose weights and finite statistics when
-/// unit endpoints cannot preserve their mass. These keep the historical t-digest 3.3 assertion-enabled reader and
-/// recompression limitation. Newly introduced unsupported fractional endpoints are rejected.
-///
-/// Instances are externally serialized per aggregation or group key and are not safe for concurrent mutation.
+/// Raw batches are sorted and linearly merged with sorted centroids. The first serialized input stays pending;
+/// centroid and raw-value buffers are allocated only when needed.
+/// Historical corruption remains opaque and cannot be mutated. Inherited fractional endpoints retain their
+/// legacy limitations; newly introduced unsupported endpoints are rejected (see [TDigestCodec]).
+/// Instances require external synchronization per aggregation or group key.
 public final class TDigestAccumulator extends TDigest {
   private static final Logger LOGGER = LoggerFactory.getLogger(TDigestAccumulator.class);
   private static final RateLimiter LEGACY_DEGRADED_LOG_RATE_LIMITER = RateLimiter.create(1.0 / 60.0);
