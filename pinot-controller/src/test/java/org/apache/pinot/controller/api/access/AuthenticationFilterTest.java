@@ -312,9 +312,10 @@ public class AuthenticationFilterTest {
   /// Guards the assumption stated on [org.apache.pinot.core.auth.FineGrainedAuthUtils#getDeclaredQueryParams]: a
   /// table target's parameter must be bound as a `@PathParam` or a method-level `@QueryParam`. An endpoint binding it
   /// via `@BeanParam` or field injection would resolve no table and hard-fail with 400 for every caller, admin
-  /// included.
+  /// included. Cluster endpoints opting into table scope must also bind their `tableScopeParam`, otherwise a typo
+  /// would silently retain cluster-wide scope and deny table-scoped callers.
   @Test
-  public void testTableAuthorizeParamsAreBoundOnTheMethod()
+  public void testAuthorizeTableParamsAreBoundOnTheMethod()
       throws Exception {
     List<Class<?>> resourceClasses = controllerResourceClasses();
     assertTrue(resourceClasses.size() > 20, "expected to discover the controller resource classes, found "
@@ -323,16 +324,24 @@ public class AuthenticationFilterTest {
     for (Class<?> resourceClass : resourceClasses) {
       for (Method method : resourceClass.getDeclaredMethods()) {
         Authorize authorize = method.getAnnotation(Authorize.class);
-        if (authorize == null || authorize.targetType() != TargetType.TABLE) {
+        if (authorize == null) {
           continue;
         }
-        if (!bindsParameter(method, authorize.paramName())) {
-          violations.add(resourceClass.getSimpleName() + "#" + method.getName() + " declares paramName '"
-              + authorize.paramName() + "'");
+        String parameterName;
+        if (authorize.targetType() == TargetType.TABLE) {
+          parameterName = authorize.paramName();
+        } else if (authorize.targetType() == TargetType.CLUSTER && !authorize.tableScopeParam().isEmpty()) {
+          parameterName = authorize.tableScopeParam();
+        } else {
+          continue;
+        }
+        if (!bindsParameter(method, parameterName)) {
+          violations.add(resourceClass.getSimpleName() + "#" + method.getName() + " declares table parameter '"
+              + parameterName + "'");
         }
       }
     }
-    assertTrue(violations.isEmpty(), "@Authorize(TABLE) paramName must be bound as @PathParam or @QueryParam: "
+    assertTrue(violations.isEmpty(), "@Authorize table parameters must be bound as @PathParam or @QueryParam: "
         + violations);
   }
 

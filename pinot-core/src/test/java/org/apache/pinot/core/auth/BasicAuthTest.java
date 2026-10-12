@@ -20,6 +20,7 @@ package org.apache.pinot.core.auth;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -80,6 +81,21 @@ public class BasicAuthTest {
     assertEquals(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
         ImmutableSet.of("read"), Map.of("myTable", List.of("cityID > 100")))
         .getRLSFilters("myTable"), Optional.of(List.of("cityID > 100")));
+  }
+
+  @Test
+  public void testBasicAuthPrincipalWithNullTableEntry() {
+    Set<String> tables = new HashSet<>(Set.of("myTable"));
+    tables.add(null);
+    BasicAuthPrincipal included = new BasicAuthPrincipal("name", "token", tables, Set.of(), Set.of("read"));
+    assertTrue(included.hasTable("myTable"));
+    assertFalse(included.hasTable("otherTable"));
+    assertFalse(included.hasUnrestrictedTableAccess());
+
+    BasicAuthPrincipal excluded = new BasicAuthPrincipal("name", "token", Set.of(), tables, Set.of("read"));
+    assertFalse(excluded.hasTable("myTable"));
+    assertTrue(excluded.hasTable("otherTable"));
+    assertFalse(excluded.hasUnrestrictedTableAccess());
   }
 
   @Test
