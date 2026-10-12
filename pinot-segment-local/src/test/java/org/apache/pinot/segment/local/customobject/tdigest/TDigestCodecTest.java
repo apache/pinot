@@ -18,12 +18,18 @@
  */
 package org.apache.pinot.segment.local.customobject.tdigest;
 
+import java.io.InputStream;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.SplittableRandom;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec.SerializedTDigestMetadata;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.spy;
@@ -31,6 +37,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
@@ -40,6 +47,87 @@ public class TDigestCodecTest {
   private static final int VERBOSE_ENCODING = 1;
   private static final int SMALL_ENCODING = 2;
   private static final int VERBOSE_HEADER_SIZE = 32;
+  private static final double[] LEGACY_QUANTILES = {0, 0.25, 0.5, 0.75, 0.99, 1};
+
+  @DataProvider
+  public Object[][] legacyReleaseFixtures() throws Exception {
+    List<Object[]> fixtures = new ArrayList<>();
+    for (String version : List.of("3.2", "3.3")) {
+      try (InputStream input = getClass().getResourceAsStream("/tdigest/legacy-" + version + ".tsv")) {
+        assertNotNull(input, "Missing t-digest " + version + " fixtures");
+        List<String> rows = new String(input.readAllBytes(), StandardCharsets.UTF_8).lines()
+            .filter(line -> !line.isBlank() && !line.startsWith("#")).toList();
+        assertEquals(rows.size(), version.equals("3.2") ? 69 : 57, "Incomplete t-digest " + version + " fixtures");
+        for (String row : rows) {
+          String[] fields = row.split("\t");
+          fixtures.add(new Object[]{version + " " + fields[0], fields});
+        }
+      }
+    }
+    return fixtures.toArray(Object[][]::new);
+  }
+
+  @Test(dataProvider = "legacyReleaseFixtures")
+  public void testFrozenLegacyReleaseBytes(String fixture, String[] fields) {
+    assertTrue(fields.length > 13, fixture);
+    byte[] bytes = Base64.getDecoder().decode(fields[fields.length - 1]);
+    SerializedTDigestMetadata metadata = TDigestCodec.inspectSerialized(ByteBuffer.wrap(bytes));
+    int count = metadata.centroidCount();
+    assertEquals(count, fields.length - 13, fixture);
+    double[] means = new double[count];
+    double[] weights = new double[count];
+    TDigestCodec.decodeSerializedCentroids(ByteBuffer.wrap(bytes), metadata, means, weights);
+    double roundingBound = 0;
+    for (int i = 0; i < count; i++) {
+      String[] centroid = fields[12 + i].split(":");
+      double legacyMean = Double.parseDouble(centroid[0]);
+      // Compact endpoints can cross header extrema; legacy Centroid construction adds multiply/divide roundoff.
+      double expectedMean = Math.max(metadata.min(), Math.min(legacyMean, metadata.max()));
+      assertEquals(means[i], expectedMean, 8 * Math.ulp(expectedMean), fixture + " centroid " + i);
+      assertEquals(weights[i], Double.parseDouble(centroid[1]), fixture + " centroid weight " + i);
+      if (metadata.encoding() == SMALL_ENCODING) {
+        roundingBound = Math.max(roundingBound, 2.0 * Math.ulp((float) legacyMean));
+      }
+    }
+    double mass = Double.parseDouble(fields[1]);
+    double min = Double.parseDouble(fields[2]);
+    double max = Double.parseDouble(fields[3]);
+    double compression = Double.parseDouble(fields[4]);
+    TDigest digest = TDigestAccumulator.fromBytes(bytes);
+    assertLegacyStatistics(digest, mass, min, max, compression, fixture);
+    if (Boolean.parseBoolean(fields[5])) {
+      for (int i = 0; i < LEGACY_QUANTILES.length; i++) {
+        double expected = Double.parseDouble(fields[6 + i]);
+        assertEquals(digest.quantile(LEGACY_QUANTILES[i]), expected,
+            Math.max(roundingBound, 8 * Math.ulp(expected)), fixture + " quantile " + LEGACY_QUANTILES[i]);
+      }
+    }
+    TDigestAccumulator merged = TDigestAccumulator.forReduction(compression);
+    merged.add(1);
+    merged.add(digest);
+    merged.addSerializedTDigest(bytes);
+    assertLegacyStatistics(TDigestAccumulator.fromBytes(merged.serialize()), 2 * mass + 1,
+        Math.min(min, 1), Math.max(max, 1), compression, fixture + " merged");
+    digest.add(1);
+    assertLegacyStatistics(TDigestAccumulator.fromBytes(digest.serialize()), mass + 1,
+        Math.min(min, 1), Math.max(max, 1), compression, fixture + " updated");
+  }
+
+  private static void assertLegacyStatistics(TDigest digest, double mass, double min, double max,
+      double compression, String fixture) {
+    assertTrue(digest.hasValidStatistics(), fixture);
+    assertEquals(digest.getTotalWeight(), mass, fixture + " mass");
+    assertEquals(digest.getMin(), min, fixture + " minimum");
+    assertEquals(digest.getMax(), max, fixture + " maximum");
+    assertEquals(digest.compression(), compression, fixture + " compression");
+    double previous = Double.NEGATIVE_INFINITY;
+    for (double quantile : LEGACY_QUANTILES) {
+      double value = digest.quantile(quantile);
+      assertTrue(Double.isFinite(value) && value >= previous && value >= min && value <= max,
+          fixture + " bounded monotone quantile " + quantile);
+      previous = value;
+    }
+  }
 
   @Test
   public void testPinotDigestRetainsQuantileAccuracyAcrossLegacyBytes() {

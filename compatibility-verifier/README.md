@@ -133,10 +133,8 @@ Byte retention does not guarantee downgrade safety. Retained corrupt or unrepair
 exceed old readers' header-based capacity, even when statistics are valid (compression 100.5 with 212 centroids
 exceeds 3.3's capacity of 211). Rebuild affected digests before downgrading or exposing them to old readers.
 
-### Verification
+### Regression coverage
 
-Run `compatibility-verifier/tdigest-compatibility/run.sh` for genuine 3.2/3.3 reads and writes, including the
-historical limitations above, and the frozen accuracy oracle described earlier. It reuses fixtures or runs
-`LegacyTDigestCompatibilityTest` to generate them; missing fixtures remain fatal. Legacy jars are isolated from
-the Pinot reader and are test-tool artifacts only. Uncached runs require network access. The oracle's
-reference-environment and update rules above apply.
+`TDigestCodecTest` reads frozen verbose/compact bytes and expectations produced by t-digest 3.2/3.3, then checks
+native decoding, mutation, merging and serialization. These offline fixtures need no legacy JAR or generator at
+runtime. The frozen accuracy oracle above remains part of the regular percentile aggregation tests.
