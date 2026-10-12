@@ -62,6 +62,7 @@ public class QueryServer {
   private final ChannelHandler _instanceRequestHandler;
   private ServerSocketChannel _channel;
   private final ConcurrentHashMap<SocketChannel, Boolean> _allChannels = new ConcurrentHashMap<>();
+  private volatile boolean _shuttingDown;
 
 
   /// Create an unsecured server instance
@@ -137,6 +138,10 @@ public class QueryServer {
             protected void initChannel(SocketChannel ch) {
               _allChannels.put(ch, true);
               ch.closeFuture().addListener(f -> _allChannels.remove(ch));
+              if (_shuttingDown) {
+                ch.close();
+                return;
+              }
 
               ch.pipeline()
                   .addLast(ChannelHandlerFactory.getDirectOOMHandler(null, null, null, _allChannels, _channel));
@@ -160,8 +165,13 @@ public class QueryServer {
   }
 
   public void shutDown() {
+    _shuttingDown = true;
     try {
       _channel.close().sync();
+      // Close accepted connections explicitly, including registrations racing with listener shutdown.
+      for (SocketChannel channel : _allChannels.keySet()) {
+        channel.close();
+      }
     } catch (Exception e) {
       throw new RuntimeException(e);
     } finally {
