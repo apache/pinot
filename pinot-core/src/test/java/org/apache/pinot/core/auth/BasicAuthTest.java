@@ -20,57 +20,82 @@ package org.apache.pinot.core.auth;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 public class BasicAuthTest {
 
   @Test
   public void testBasicAuthPrincipal() {
-    Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
+    assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
         ImmutableSet.of("READ"))
         .hasTable("myTable"));
-    Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable", "myTable1"),
+    assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable", "myTable1"),
         Set.of(), ImmutableSet.of("Read"))
         .hasTable("myTable1"));
-    Assert.assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
+    assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
         ImmutableSet.of("read"))
         .hasTable("myTable1"));
-    Assert.assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable", "myTable1"),
+    assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable", "myTable1"),
         Set.of(), ImmutableSet.of("read"))
         .hasTable("myTable2"));
-    Assert.assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), ImmutableSet.of("myTable"),
+    assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), ImmutableSet.of("myTable"),
         ImmutableSet.of("read"))
         .hasTable("myTable"));
-    Assert.assertFalse(new BasicAuthPrincipal("name", "token", Set.of(), ImmutableSet.of("myTable"),
+    assertFalse(new BasicAuthPrincipal("name", "token", Set.of(), ImmutableSet.of("myTable"),
         ImmutableSet.of("read"))
         .hasTable("myTable"));
-    Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), ImmutableSet.of("myTable1"),
+    assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), ImmutableSet.of("myTable1"),
         ImmutableSet.of("read"))
         .hasTable("myTable"));
+    assertTrue(new BasicAuthPrincipal("name", "token", Set.of(), Set.of(), Set.of("read"))
+        .hasUnrestrictedTableAccess());
+    assertFalse(new BasicAuthPrincipal("name", "token", Set.of("myTable"), Set.of(), Set.of("read"))
+        .hasUnrestrictedTableAccess());
+    assertFalse(new BasicAuthPrincipal("name", "token", Set.of(), Set.of("myTable"), Set.of("read"))
+        .hasUnrestrictedTableAccess());
 
-    Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
+    assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
         ImmutableSet.of("READ"))
         .hasPermission("read"));
-    Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
+    assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
         ImmutableSet.of("Read"))
         .hasPermission("READ"));
-    Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
+    assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
         ImmutableSet.of("read"))
         .hasPermission("Read"));
-    Assert.assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
+    assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
         ImmutableSet.of("read"))
         .hasPermission("write"));
 
-    Assert.assertEquals(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
+    assertEquals(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
         ImmutableSet.of("read"), Map.of("myTable", List.of("cityID > 100")))
         .getRLSFilters("myTable"), Optional.of(List.of("cityID > 100")));
+  }
+
+  @Test
+  public void testBasicAuthPrincipalWithNullTableEntry() {
+    Set<String> tables = new HashSet<>(Set.of("myTable"));
+    tables.add(null);
+    BasicAuthPrincipal included = new BasicAuthPrincipal("name", "token", tables, Set.of(), Set.of("read"));
+    assertTrue(included.hasTable("myTable"));
+    assertFalse(included.hasTable("otherTable"));
+    assertFalse(included.hasUnrestrictedTableAccess());
+
+    BasicAuthPrincipal excluded = new BasicAuthPrincipal("name", "token", Set.of(), tables, Set.of("read"));
+    assertFalse(excluded.hasTable("myTable"));
+    assertTrue(excluded.hasTable("otherTable"));
+    assertFalse(excluded.hasUnrestrictedTableAccess());
   }
 
   @Test
@@ -90,54 +115,54 @@ public class BasicAuthTest {
     List<BasicAuthPrincipal> principals = BasicAuthPrincipalUtils
         .extractBasicAuthPrincipals(configuration, "principals");
 
-    Assert.assertEquals(principals.size(), 2);
+    assertEquals(principals.size(), 2);
 
     // Verify admin principal (should have no table restrictions)
     BasicAuthPrincipal adminPrincipal = principals.stream()
         .filter(p -> p.getName().equals("admin"))
         .findFirst()
         .orElse(null);
-    Assert.assertNotNull(adminPrincipal);
-    Assert.assertEquals(adminPrincipal.getName(), "admin");
+    assertNotNull(adminPrincipal);
+    assertEquals(adminPrincipal.getName(), "admin");
 
     // Verify user principal
     BasicAuthPrincipal userPrincipal = principals.stream()
         .filter(p -> p.getName().equals("user"))
         .findFirst()
         .orElse(null);
-    Assert.assertNotNull(userPrincipal);
-    Assert.assertEquals(userPrincipal.getName(), "user");
+    assertNotNull(userPrincipal);
+    assertEquals(userPrincipal.getName(), "user");
 
     Set<String> expectedTables = ImmutableSet.of("lessImportantStuff", "lesserImportantStuff", "leastImportantStuff");
     expectedTables.forEach(tableName -> {
-      Assert.assertTrue(userPrincipal.hasTable(tableName));
+      assertTrue(userPrincipal.hasTable(tableName));
     });
 
     Set<String> expectedExcludeTables = ImmutableSet.of("excludedTable");
     expectedExcludeTables.forEach(tableName -> {
-      Assert.assertFalse(userPrincipal.hasTable(tableName));
+      assertFalse(userPrincipal.hasTable(tableName));
     });
 
     Set<String> expectedPermissions = ImmutableSet.of("read", "write");
     expectedPermissions.forEach(permission -> {
-      Assert.assertTrue(userPrincipal.hasPermission(permission));
+      assertTrue(userPrincipal.hasPermission(permission));
     });
 
     // Verify RLS filters
 
     List<String> lessImportantStuffFilters = userPrincipal.getRLSFilters("lessImportantStuff").get();
-    Assert.assertNotNull(lessImportantStuffFilters);
-    Assert.assertEquals(lessImportantStuffFilters.size(), 2);
-    Assert.assertTrue(lessImportantStuffFilters.contains("cityID > 100"));
-    Assert.assertTrue(lessImportantStuffFilters.contains("status = 'active'"));
+    assertNotNull(lessImportantStuffFilters);
+    assertEquals(lessImportantStuffFilters.size(), 2);
+    assertTrue(lessImportantStuffFilters.contains("cityID > 100"));
+    assertTrue(lessImportantStuffFilters.contains("status = 'active'"));
 
     List<String> lesserImportantStuffFilters = userPrincipal.getRLSFilters("lesserImportantStuff").get();
-    Assert.assertNotNull(lesserImportantStuffFilters);
-    Assert.assertEquals(lesserImportantStuffFilters.size(), 1);
-    Assert.assertTrue(lesserImportantStuffFilters.contains("region = 'US'"));
+    assertNotNull(lesserImportantStuffFilters);
+    assertEquals(lesserImportantStuffFilters.size(), 1);
+    assertTrue(lesserImportantStuffFilters.contains("region = 'US'"));
 
     // Verify no RLS filters for leastImportantStuff (not configured)
-    Assert.assertTrue(userPrincipal.getRLSFilters("leastImportantStuff").isEmpty());
+    assertTrue(userPrincipal.getRLSFilters("leastImportantStuff").isEmpty());
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "must provide "
