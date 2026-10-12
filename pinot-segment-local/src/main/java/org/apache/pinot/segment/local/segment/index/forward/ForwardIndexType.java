@@ -335,11 +335,26 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     return builder.build();
   }
 
+  /// The compression type used for a raw column whose table config does not name one.
+  ///
+  /// Metrics stay uncompressed: they are usually small fixed-width values where compression costs more
+  /// than it saves. Everything else uses [ForwardIndexConfig#getDefaultCompressionType()], which is LZ4
+  /// unless `pinot.forward.index.default.compression.codec` says otherwise. That config is applied at
+  /// startup by components that read cluster config, so segments built outside the cluster -- standalone,
+  /// Spark or Hadoop batch ingestion -- keep LZ4.
+  ///
+  /// This also decides the codec for a column listed in the legacy `noDictionaryConfig`, whose per-column
+  /// codec value is discarded: only its key set is read, here and in `DictionaryIndexType`. Such a column
+  /// used to land on a hardcoded LZ4 and now follows the configured default.
+  ///
+  /// This is a default, not a table config value, so changing it does not rewrite existing segments:
+  /// `ForwardIndexHandler` deliberately ignores it when deciding whether a reload must rewrite a forward
+  /// index.
   public static ChunkCompressionType getDefaultCompressionType(FieldSpec.FieldType fieldType) {
     if (fieldType == FieldSpec.FieldType.METRIC) {
       return ChunkCompressionType.PASS_THROUGH;
     } else {
-      return ChunkCompressionType.LZ4;
+      return ForwardIndexConfig.getDefaultCompressionType();
     }
   }
 

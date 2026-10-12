@@ -434,7 +434,7 @@ public class OpenStructColumnSplitterTest {
 
     IllegalStateException exception = expectThrows(IllegalStateException.class, splitter::seal);
     assertEquals(exception.getMessage(), "OPEN_STRUCT column 'metrics': codecSpec is not supported for key 'clicks'; "
-        + "materialized keys always use a dictionary-encoded or LZ4 raw forward index");
+        + "the splitter fixes materialized keys to a dictionary-encoded or LZ4 raw forward index");
   }
 
   private static FieldConfig rawCodecSpecFieldConfig(String name) {
