@@ -136,7 +136,7 @@ public abstract class IndexedTable extends BaseTable {
     return new Record(values);
   }
 
-  protected Record updateSingleAggregationRecord(Record record, @Nullable Object result) {
+  private Record updateSingleAggregationRecord(Record record, @Nullable Object result) {
     Object[] values = record.getValues();
     values[_numKeyColumns] = mergeValue(0, values[_numKeyColumns], result, _hasFinalInput);
     return record;
@@ -158,6 +158,7 @@ public abstract class IndexedTable extends BaseTable {
 
   /// Updates a record with existing key. Record with new key will be ignored.
   protected void updateExistingRecord(Key key, @Nullable Record newRecord, @Nullable Object result) {
+    // computeIfPresent waits for pending insertions; a containsKey check would discard their updates.
     _lookupMap.computeIfPresent(key, (k, existing) -> newRecord != null
         ? updateRecord(existing, newRecord) : updateSingleAggregationRecord(existing, result));
   }
@@ -179,6 +180,7 @@ public abstract class IndexedTable extends BaseTable {
     return existingRecord;
   }
 
+  @Nullable
   private Object mergeValue(int functionIndex, @Nullable Object existing, @Nullable Object input,
       boolean hasFinalInput) {
     return hasFinalInput

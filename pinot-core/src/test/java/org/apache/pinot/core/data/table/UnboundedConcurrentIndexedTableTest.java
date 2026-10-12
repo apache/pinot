@@ -43,6 +43,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -272,12 +273,8 @@ public class UnboundedConcurrentIndexedTableTest {
         upsert(table, new Record(new Object[]{"hot", 1d, 1L}), scalarInput);
       });
       assertTrue(updateReady.await(10, TimeUnit.SECONDS), "Update writer did not become ready");
-      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-      while (!update.isDone() && updateThread.get().getState() != Thread.State.BLOCKED
-          && System.nanoTime() < deadline) {
-        Thread.onSpinWait();
-      }
-      assertTrue(update.isDone() || updateThread.get().getState() == Thread.State.BLOCKED,
+      TestUtils.waitForCondition(ignored -> update.isDone() || updateThread.get().getState() == Thread.State.BLOCKED,
+          10, 10_000,
           "Update must complete or wait for the pending insertion before it is released");
       releaseInsertion.countDown();
       insertion.get(10, TimeUnit.SECONDS);
