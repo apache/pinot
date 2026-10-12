@@ -36,6 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -225,6 +226,67 @@ public class UnboundedConcurrentIndexedTableTest {
     } finally {
       start.countDown();
       executor.shutdownNow();
+    }
+  }
+
+  @Test(dataProvider = "scalarInputs", timeOut = 30_000)
+  public void testPendingInsertionUpdateAfterGroupLimit(boolean scalarInput)
+      throws InterruptedException, ExecutionException, TimeoutException {
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    CountDownLatch insertionStarted = new CountDownLatch(1);
+    CountDownLatch releaseInsertion = new CountDownLatch(1);
+    CountDownLatch updateReady = new CountDownLatch(1);
+    AtomicReference<Thread> updateThread = new AtomicReference<>();
+    Key hotKey = new Key(new Object[]{"hot", 1d});
+    Key otherKey = new Key(new Object[]{"other-key", 1d});
+    int hotHash = hotKey.hashCode();
+    int otherHash = otherKey.hashCode();
+    // Different low spread-hash bits put the keys in separate buckets at every map capacity above one.
+    assertTrue(((hotHash ^ (hotHash >>> 16)) & 1) != ((otherHash ^ (otherHash >>> 16)) & 1));
+    try {
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+          "SELECT COUNT(*) FROM testTable GROUP BY tv_id, weights");
+      IndexedTable table = new UnboundedConcurrentIndexedTable(newDataSchema(), false, queryContext, 1, 64, executor) {
+        @Override
+        protected Record createSingleAggregationRecord(Key key, Object result) {
+          if (key.equals(hotKey)) {
+            insertionStarted.countDown();
+            try {
+              assertTrue(releaseInsertion.await(10, TimeUnit.SECONDS), "Pending insertion was not released");
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              throw new IllegalStateException(e);
+            }
+          }
+          return super.createSingleAggregationRecord(key, result);
+        }
+      };
+      Future<?> insertion = executor.submit(() -> table.upsertSingleAggregationResult(hotKey, 1L));
+      assertTrue(insertionStarted.await(10, TimeUnit.SECONDS), "Insertion did not reach the map computation");
+      Future<?> otherInsertion = executor.submit(() -> table.upsertSingleAggregationResult(otherKey, 1L));
+      otherInsertion.get(10, TimeUnit.SECONDS);
+      assertEquals(table.size(), 1);
+      Future<?> update = executor.submit(() -> {
+        updateThread.set(Thread.currentThread());
+        updateReady.countDown();
+        upsert(table, new Record(new Object[]{"hot", 1d, 1L}), scalarInput);
+      });
+      assertTrue(updateReady.await(10, TimeUnit.SECONDS), "Update writer did not become ready");
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+      while (!update.isDone() && updateThread.get().getState() != Thread.State.BLOCKED
+          && System.nanoTime() < deadline) {
+        Thread.onSpinWait();
+      }
+      assertTrue(update.isDone() || updateThread.get().getState() == Thread.State.BLOCKED,
+          "Update must complete or wait for the pending insertion before it is released");
+      releaseInsertion.countDown();
+      insertion.get(10, TimeUnit.SECONDS);
+      update.get(10, TimeUnit.SECONDS);
+      assertEquals(finishAndCount(table, false), Map.of(hotKey, 2L, otherKey, 1L));
+    } finally {
+      releaseInsertion.countDown();
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Writers did not terminate");
     }
   }
 

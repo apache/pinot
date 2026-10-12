@@ -158,10 +158,8 @@ public abstract class IndexedTable extends BaseTable {
 
   /// Updates a record with existing key. Record with new key will be ignored.
   protected void updateExistingRecord(Key key, @Nullable Record newRecord, @Nullable Object result) {
-    if (_lookupMap.containsKey(key)) {
-      _lookupMap.computeIfPresent(key, (k, existing) -> newRecord != null
-          ? updateRecord(existing, newRecord) : updateSingleAggregationRecord(existing, result));
-    }
+    _lookupMap.computeIfPresent(key, (k, existing) -> newRecord != null
+        ? updateRecord(existing, newRecord) : updateSingleAggregationRecord(existing, result));
   }
 
   private Record updateRecord(Record existingRecord, Record newRecord) {
