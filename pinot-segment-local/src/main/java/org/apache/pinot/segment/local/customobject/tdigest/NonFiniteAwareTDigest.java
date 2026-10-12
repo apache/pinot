@@ -54,7 +54,7 @@ public final class NonFiniteAwareTDigest extends TDigest {
   public NonFiniteAwareTDigest copy() {
     NonFiniteAwareTDigest copy =
         new NonFiniteAwareTDigest(_finiteDigest.copy(), _negativeInfinityWeight, _positiveInfinityWeight);
-    copy._originalBytes = _originalBytes == null ? null : _originalBytes.clone();
+    copy._originalBytes = _originalBytes;
     copy._unrepresentableInfinityTail = _unrepresentableInfinityTail;
     copy._pendingHistoricalBoundaryRepair = _pendingHistoricalBoundaryRepair;
     copy._historicalMin = _historicalMin;
@@ -196,7 +196,7 @@ public final class NonFiniteAwareTDigest extends TDigest {
         _finiteDigest = wrapped._finiteDigest.copy();
         _negativeInfinityWeight = wrapped._negativeInfinityWeight;
         _positiveInfinityWeight = wrapped._positiveInfinityWeight;
-        _originalBytes = wrapped._originalBytes.clone();
+        _originalBytes = wrapped._originalBytes;
         _unrepresentableInfinityTail = true;
         _pendingHistoricalBoundaryRepair = wrapped._pendingHistoricalBoundaryRepair;
         _historicalMin = wrapped._historicalMin;

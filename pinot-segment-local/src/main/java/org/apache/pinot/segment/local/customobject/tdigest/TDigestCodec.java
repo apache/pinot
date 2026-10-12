@@ -559,19 +559,6 @@ public final class TDigestCodec {
     }
   }
 
-  /// Validates centroids in one pass and optionally decodes their means and weights into reusable arrays.
-  ///
-  /// The header must describe this exact input, and each supplied array must hold all encoded centroids. Endpoint
-  /// rounding inherited from compact re-encoding or old merge arithmetic is restored to the double header bounds.
-  public static SerializedTDigestMetadata inspectSerialized(ByteBuffer input, SerializedTDigestMetadata header,
-      double[] means, double[] weights) {
-    SerializedTDigestState state = new SerializedTDigestState();
-    state.reset(input);
-    state.copyFrom(header);
-    inspectSerialized(state, means, weights);
-    return state.snapshot();
-  }
-
   static void inspectSerialized(SerializedTDigestState state, double[] means, double[] weights) {
     state._position = state._centroidOffset;
     int centroidCount = state._centroidCount;

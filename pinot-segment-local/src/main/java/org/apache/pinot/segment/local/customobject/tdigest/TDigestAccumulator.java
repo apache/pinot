@@ -170,10 +170,15 @@ public final class TDigestAccumulator extends TDigest {
 
   /// Snapshots buffered inputs and centroid state without materializing or compressing the source. Mutable buffers
   /// are copied; immutable retained bytes and metadata are shared. Merge and sort scratch buffers remain lazy.
+  /// Raw capacity is retained so future flush timing is unchanged.
   TDigestAccumulator copy() {
+    return copy(_rawValues != null ? _rawValues.length : 0);
+  }
+
+  private TDigestAccumulator copy(int rawBufferSize) {
     TDigestAccumulator copy =
         new TDigestAccumulator(_compression, false, false, _useTwoLevelRawCompression);
-    copy._rawValues = _rawValues != null ? _rawValues.clone() : null;
+    copy._rawValues = rawBufferSize > 0 ? Arrays.copyOf(_rawValues, rawBufferSize) : null;
     copy._centroidMeans = _numCentroids > 0 ? Arrays.copyOf(_centroidMeans, _numCentroids) : null;
     copy._centroidWeights = _numCentroids > 0 ? Arrays.copyOf(_centroidWeights, _numCentroids) : null;
     copy._incomingMeans = _numIncomingCentroids > 0 ? Arrays.copyOf(_incomingMeans, _numIncomingCentroids) : null;
@@ -291,8 +296,6 @@ public final class TDigestAccumulator extends TDigest {
         }
         bufferIncomingCentroids(sortedMeans, sortedWeights, positiveCount, totalWeight, min, max);
       }
-      _min = Math.min(_min, min);
-      _max = Math.max(_max, max);
     }
   }
 
@@ -447,11 +450,6 @@ public final class TDigestAccumulator extends TDigest {
       addSerializedTDigest(input);
       return;
     }
-    if (other._legacyDegraded) {
-      addSerializedTDigest(other.serialize());
-      return;
-    }
-
     // MergingDigest compressed merge sources in place. Aggregation owns these mutable inputs exclusively.
     other.compress();
     other.prepareForMutation();
@@ -464,8 +462,6 @@ public final class TDigestAccumulator extends TDigest {
     if (other._totalWeight > 0.0) {
       _originalFractionalBytes = null;
     }
-    _min = Math.min(_min, other._min);
-    _max = Math.max(_max, other._max);
   }
 
   public void addSerializedTDigest(byte[] bytes) {
@@ -641,13 +637,13 @@ public final class TDigestAccumulator extends TDigest {
 
   /// Bounds serialized output centroids from buffered inputs, including up to two boundary splits before a merge
   /// and two more before writing, without flushing or using the potentially huge input mass.
-  public long getCentroidCountUpperBound() {
+  long getCentroidCountUpperBound() {
     return _pendingSerializedTDigest != null ? (long) _pendingSerializedMetadata.centroidCount() + 4L
         : (long) _numCentroids + _numRawValues + _numIncomingCentroids + 4L;
   }
 
   /// Whether unchanged historical fractional boundaries still require their original byte representation.
-  public boolean hasOriginalFractionalPayload() {
+  boolean hasOriginalFractionalPayload() {
     return _originalFractionalBytes != null;
   }
 
@@ -902,7 +898,7 @@ public final class TDigestAccumulator extends TDigest {
 
   /// Copies a valid distribution's primitive centroid arrays after flushing buffered inputs. This does not apply
   /// public compression or serialize a finite sub-distribution; callers can include surrounding infinity mass.
-  public void copyCentroids(double[] means, double[] weights, int offset) {
+  void copyCentroids(double[] means, double[] weights, int offset) {
     if (_legacyDegraded) {
       throw corruptedMutation();
     }
@@ -992,7 +988,7 @@ public final class TDigestAccumulator extends TDigest {
         || _centroidWeights[0] == 1.0 && _centroidWeights[_numCentroids - 1] == 1.0)) {
       return serialize();
     }
-    return copy().serialize();
+    return copy(_numRawValues).serialize();
   }
 
   @Override

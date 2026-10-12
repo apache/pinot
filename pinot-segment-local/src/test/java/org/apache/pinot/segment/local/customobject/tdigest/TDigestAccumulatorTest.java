@@ -966,11 +966,15 @@ public class TDigestAccumulatorTest {
           ? TDigestAccumulator.forLegacyAggregation(100) : TDigestAccumulator.forReduction(100);
       TDigestAccumulator control = legacyAggregation
           ? TDigestAccumulator.forLegacyAggregation(100) : TDigestAccumulator.forReduction(100);
+      TDigestAccumulator continuingCopy = null;
       SplittableRandom random = new SplittableRandom(7);
       for (int i = 0; i < 2000; i++) {
         double value = random.nextDouble(1000);
         source.add(value);
         control.add(value);
+        if (continuingCopy != null) {
+          continuingCopy.add(value);
+        }
         if (i == 999) {
           source.add(10, 3.5);
           control.add(10, 3.5);
@@ -983,9 +987,11 @@ public class TDigestAccumulatorTest {
           copy.add(-100, 10);
           copy.serialize();
           assertEquals(source.getTotalWeight(), control.getTotalWeight());
+          continuingCopy = source.copy();
         }
       }
       assertEquals(source.serialize(), control.serialize());
+      assertEquals(continuingCopy.serialize(), control.serialize(), "Copies must preserve future flush timing");
       assertEquals(source.quantile(0.86), control.quantile(0.86));
     }
   }

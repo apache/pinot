@@ -108,39 +108,6 @@ public abstract class TDigest {
   }
 
   /// Immutable centroid value preserving fractional and large mass.
-  public static final class Centroid {
-    private final double _mean;
-    private final double _weight;
-
-    public Centroid(double mean, double weight) {
-      _mean = mean;
-      _weight = weight;
-    }
-
-    public double mean() {
-      return _mean;
-    }
-
-    public double weight() {
-      return _weight;
-    }
-
-    @Override
-    public boolean equals(Object other) {
-      if (this == other) {
-        return true;
-      }
-      if (!(other instanceof Centroid)) {
-        return false;
-      }
-      Centroid centroid = (Centroid) other;
-      return Double.doubleToLongBits(_mean) == Double.doubleToLongBits(centroid._mean)
-          && Double.doubleToLongBits(_weight) == Double.doubleToLongBits(centroid._weight);
-    }
-
-    @Override
-    public int hashCode() {
-      return 31 * Double.hashCode(_mean) + Double.hashCode(_weight);
-    }
+  public record Centroid(double mean, double weight) {
   }
 }
