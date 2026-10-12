@@ -21,6 +21,7 @@ package org.apache.pinot.common.request.context;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.apache.pinot.common.request.Literal;
@@ -274,10 +275,72 @@ public class LiteralContextTest {
         {DataType.LONG, new long[]{1L, 2L}, new long[]{1L, 2L}, new long[]{1L, 3L}},
         {DataType.FLOAT, new float[]{1.0f, 2.0f}, new float[]{1.0f, 2.0f}, new float[]{1.0f, 3.0f}},
         {DataType.DOUBLE, new double[]{1.0, 2.0}, new double[]{1.0, 2.0}, new double[]{1.0, 3.0}},
+        {DataType.BIG_DECIMAL, new BigDecimal[]{new BigDecimal("1.23"), new BigDecimal("4.56")},
+            new BigDecimal[]{new BigDecimal("1.23"), new BigDecimal("4.56")},
+            new BigDecimal[]{new BigDecimal("1.23"), new BigDecimal("7.89")}},
+        {DataType.BOOLEAN, new boolean[]{true, false}, new boolean[]{true, false}, new boolean[]{true, true}},
+        {DataType.BOOLEAN, new Boolean[]{true, false}, new Boolean[]{true, false}, new Boolean[]{true, true}},
+        {DataType.TIMESTAMP, new Timestamp[]{new Timestamp(1000L), new Timestamp(2000L)},
+            new Timestamp[]{new Timestamp(1000L), new Timestamp(2000L)},
+            new Timestamp[]{new Timestamp(1000L), new Timestamp(3000L)}},
         {DataType.STRING, new String[]{"one", "two"}, new String[]{"one", "two"}, new String[]{"one", "three"}},
         {DataType.BYTES, new byte[]{1, 2}, new byte[]{1, 2}, new byte[]{1, 3}},
-        {DataType.BYTES, new byte[][]{{1}, {2}}, new byte[][]{{1}, {2}}, new byte[][]{{1}, {3}}}
+        {DataType.BYTES, new byte[][]{{1}, {2}}, new byte[][]{{1}, {2}}, new byte[][]{{1}, {3}}},
+        {DataType.UUID, new UUID[]{UUID.fromString("550e8400-e29b-41d4-a716-446655440000"),
+            UUID.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8")},
+            new UUID[]{UUID.fromString("550e8400-e29b-41d4-a716-446655440000"),
+                UUID.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8")},
+            new UUID[]{UUID.fromString("550e8400-e29b-41d4-a716-446655440000"),
+                UUID.fromString("00000000-0000-0000-0000-000000000000")}}
     };
+  }
+
+  @Test
+  public void testBigDecimalArrayLiteral() {
+    BigDecimal[] values = new BigDecimal[]{new BigDecimal("123.45"), new BigDecimal("678.90")};
+    LiteralContext literalContext = new LiteralContext(DataType.BIG_DECIMAL, values);
+    assertFalse(literalContext.isSingleValue());
+    assertEquals(literalContext.getType(), DataType.BIG_DECIMAL);
+    assertEquals(literalContext.getValue(), values);
+    assertEquals(literalContext.toString(), "'[123.45, 678.90]'");
+  }
+
+  @Test
+  public void testBooleanArrayLiteral() {
+    LiteralContext primitiveContext = new LiteralContext(DataType.BOOLEAN, new boolean[]{true, false});
+    assertFalse(primitiveContext.isSingleValue());
+    assertEquals(primitiveContext.getType(), DataType.BOOLEAN);
+    assertEquals(primitiveContext.getValue(), new boolean[]{true, false});
+    assertEquals(primitiveContext.toString(), "'[true, false]'");
+
+    LiteralContext boxedContext = new LiteralContext(DataType.BOOLEAN, new Boolean[]{true, false});
+    assertFalse(boxedContext.isSingleValue());
+    assertEquals(boxedContext.getType(), DataType.BOOLEAN);
+    assertEquals(boxedContext.getValue(), new Boolean[]{true, false});
+    assertEquals(boxedContext.toString(), "'[true, false]'");
+  }
+
+  @Test
+  public void testTimestampLiteral() {
+    Timestamp timestamp = new Timestamp(123456789L);
+    LiteralContext literalContext = new LiteralContext(DataType.TIMESTAMP, timestamp);
+    assertTrue(literalContext.isSingleValue());
+    assertEquals(literalContext.getType(), DataType.TIMESTAMP);
+    assertEquals(literalContext.getLongValue(), 123456789L);
+    assertEquals(literalContext.getStringValue(), timestamp.toString());
+    assertThrows(literalContext::getBytesValue);
+    assertFalse(literalContext.isNull());
+    assertEquals(literalContext.toString(), "'" + timestamp + "'");
+  }
+
+  @Test
+  public void testTimestampArrayLiteral() {
+    Timestamp[] values = new Timestamp[]{new Timestamp(1000L), new Timestamp(2000L)};
+    LiteralContext literalContext = new LiteralContext(DataType.TIMESTAMP, values);
+    assertFalse(literalContext.isSingleValue());
+    assertEquals(literalContext.getType(), DataType.TIMESTAMP);
+    assertEquals(literalContext.getValue(), values);
+    assertEquals(literalContext.toString(), "'" + Arrays.toString(values) + "'");
   }
 
   @Test
@@ -285,7 +348,20 @@ public class LiteralContextTest {
     UUID uuid = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
     LiteralContext literalContext = new LiteralContext(DataType.UUID, uuid);
 
+    assertTrue(literalContext.isSingleValue());
+    assertEquals(literalContext.getType(), DataType.UUID);
     assertEquals(literalContext.getStringValue(), uuid.toString());
     assertEquals(literalContext.getBytesValue(), UuidUtils.toBytes(uuid));
+  }
+
+  @Test
+  public void testUuidArrayLiteral() {
+    UUID[] values = new UUID[]{UUID.fromString("550e8400-e29b-41d4-a716-446655440000"),
+        UUID.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8")};
+    LiteralContext literalContext = new LiteralContext(DataType.UUID, values);
+    assertFalse(literalContext.isSingleValue());
+    assertEquals(literalContext.getType(), DataType.UUID);
+    assertEquals(literalContext.getValue(), values);
+    assertEquals(literalContext.toString(), "'" + Arrays.toString(values) + "'");
   }
 }

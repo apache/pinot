@@ -315,7 +315,8 @@ public class TransformFunctionFactory {
         String functionName = canonicalize(function.getFunctionName());
 
         // Check if the function is ArrayValueConstructor transform function
-        if (functionName.equalsIgnoreCase(ArrayLiteralTransformFunction.FUNCTION_NAME)) {
+        if (functionName.equalsIgnoreCase(ArrayLiteralTransformFunction.FUNCTION_NAME)
+            || functionName.equalsIgnoreCase("array")) {
           return queryContext.getOrComputeSharedValue(ArrayLiteralTransformFunction.class,
               expression.getFunction().getArguments(), ArrayLiteralTransformFunction::new);
         }

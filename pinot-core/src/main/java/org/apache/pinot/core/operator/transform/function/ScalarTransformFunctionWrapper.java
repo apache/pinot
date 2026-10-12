@@ -374,6 +374,60 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     return _stringValuesMV;
   }
 
+  @Override
+  public BigDecimal[][] transformToBigDecimalValuesMV(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.BIG_DECIMAL) {
+      return super.transformToBigDecimalValuesMV(valueBlock);
+    }
+    int length = valueBlock.getNumDocs();
+    initBigDecimalValuesMV(length);
+    getNonLiteralValues(valueBlock);
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      _bigDecimalValuesMV[i] =
+          value != null ? (BigDecimal[]) _resultType.toInternal(value) : NullValuePlaceHolder.BIG_DECIMAL_ARRAY;
+    }
+    return _bigDecimalValuesMV;
+  }
+
+  @Override
+  public byte[][][] transformToBytesValuesMV(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.BYTES) {
+      return super.transformToBytesValuesMV(valueBlock);
+    }
+    int length = valueBlock.getNumDocs();
+    initBytesValuesMV(length);
+    getNonLiteralValues(valueBlock);
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      if (value == null) {
+        _bytesValuesMV[i] = NullValuePlaceHolder.BYTES_ARRAY;
+        continue;
+      }
+      Object internalValue = _resultType.toInternal(value);
+      if (internalValue == null) {
+        _bytesValuesMV[i] = NullValuePlaceHolder.BYTES_ARRAY;
+      } else if (internalValue instanceof ByteArray[]) {
+        ByteArray[] byteArrays = (ByteArray[]) internalValue;
+        int numElements = byteArrays.length;
+        byte[][] bytes = new byte[numElements][];
+        for (int k = 0; k < numElements; k++) {
+          bytes[k] = byteArrays[k] != null ? byteArrays[k].getBytes() : NullValuePlaceHolder.BYTES;
+        }
+        _bytesValuesMV[i] = bytes;
+      } else {
+        _bytesValuesMV[i] = (byte[][]) internalValue;
+      }
+    }
+    return _bytesValuesMV;
+  }
+
   /// Helper method to fetch values for the non-literal transform functions based on the parameter types.
   private void getNonLiteralValues(ValueBlock valueBlock) {
     PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
@@ -485,6 +539,22 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case BYTES_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToBytesValuesMV(valueBlock);
           break;
+        case UUID_ARRAY: {
+          byte[][][] bytesValuesMV = transformFunction.transformToBytesValuesMV(valueBlock);
+          int numRows = bytesValuesMV.length;
+          UUID[][] uuidValuesMV = new UUID[numRows][];
+          for (int j = 0; j < numRows; j++) {
+            byte[][] bytesValues = bytesValuesMV[j];
+            int numValues = bytesValues.length;
+            UUID[] uuidValues = new UUID[numValues];
+            for (int k = 0; k < numValues; k++) {
+              uuidValues[k] = UuidUtils.toUUID(bytesValues[k]);
+            }
+            uuidValuesMV[j] = uuidValues;
+          }
+          _nonLiteralValues[i] = uuidValuesMV;
+          break;
+        }
         default:
           throw new IllegalStateException("Unsupported parameter type: " + parameterType);
       }
