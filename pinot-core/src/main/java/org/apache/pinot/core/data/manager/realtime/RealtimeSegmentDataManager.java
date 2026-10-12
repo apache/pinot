@@ -1207,7 +1207,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @Nullable
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit)
       throws SegmentBuildFailureException {
-    if (_parallelSegmentConsumptionPolicy.isAllowedDuringBuild()) {
+    // Not released when the replace rewrites upsert or dedup metadata: a build that fails or mismatches the
+    // committed CRC falls back to a download, which cannot hold back a semaphore already given away.
+    if (_parallelSegmentConsumptionPolicy.isAllowedDuringBuild() && !holdsConsumerSemaphoreForMetadata()) {
       closeStreamConsumerAndReleaseSemaphore();
     }
     // Do not allow building segment when table data manager is already shut down
@@ -1769,22 +1771,43 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // allows consumption during build, so the next consuming segment can be running during this download as well
     boolean releasedDuringBuild =
         _parallelSegmentConsumptionPolicy.isAllowedDuringBuild() && !_consumerSemaphoreAcquired.get();
-    boolean revertsUpsertMetadata = _partitionUpsertMetadataManager != null
-        && _partitionUpsertMetadataManager.shouldRevertMetadataOnInconsistency(_realtimeSegment);
-    // Hold the semaphore when the replace reverts, so the next consuming segment does not start against a partially
-    // reverted primary key map.
+    // Hold the semaphore when the replace rewrites the key map, so the next consuming segment does not start against
+    // a partially reverted one, and does not replay rows against keys this replace is about to remove.
+    boolean holdsConsumerSemaphore = holdsConsumerSemaphoreForMetadata();
     boolean allowedDuringDownload =
-        _parallelSegmentConsumptionPolicy.isAllowedDuringDownload() && !revertsUpsertMetadata;
-    if (releasedDuringBuild && revertsUpsertMetadata) {
-      // The build already released the semaphore, so it cannot be held back here.
-      _segmentLogger.error("Next consuming segment can run during download while this replace reverts upsert "
-          + "metadata. Its snapshot can miss the rows the revert restores. Use DISALLOW_ALWAYS");
-      _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD, 1L);
+        _parallelSegmentConsumptionPolicy.isAllowedDuringDownload() && !holdsConsumerSemaphore;
+    if (releasedDuringBuild && holdsConsumerSemaphore) {
+      // The build holds the semaphore for these tables, so reaching this means it was released on another path.
+      _segmentLogger.error("Next consuming segment can run during download while this replace rewrites upsert or "
+          + "dedup metadata. Its rows can be dropped against keys this replace removes. Use DISALLOW_ALWAYS");
+      if (revertsUpsertMetadata()) {
+        _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD, 1L);
+      }
     }
     if (allowedDuringDownload) {
       closeStreamConsumerAndReleaseSemaphore();
     }
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
+  }
+
+  /// Whether replacing this segment rewrites the key map its consuming rows wrote, so the next consuming segment
+  /// must not start until the replace is done. Such tables keep the consumer semaphore across both the build and the
+  /// download, which is what DISALLOW_ALWAYS does.
+  ///
+  /// Upsert: the replace reverts the metadata the consuming rows wrote, and the next segment would start against a
+  /// partially reverted primary key map. Dedup: a replica that consumed past the committed end offset downloads the
+  /// committed copy, and offloading the mutable segment removes the keys those extra rows added; a next consuming
+  /// segment running in between replays the rows, finds the keys still pointing at the mutable segment and drops
+  /// them as duplicates, so they land in neither segment. Dedup is not keyed on allowDedupConsumptionDuringCommit:
+  /// that one is deprecated and only read when no parallelSegmentConsumptionPolicy is set, so an explicit
+  /// ALLOW_ALWAYS would skip the hold it needs.
+  private boolean holdsConsumerSemaphoreForMetadata() {
+    return revertsUpsertMetadata() || _partitionDedupMetadataManager != null;
+  }
+
+  private boolean revertsUpsertMetadata() {
+    return _partitionUpsertMetadataManager != null
+        && _partitionUpsertMetadataManager.shouldRevertMetadataOnInconsistency(_realtimeSegment);
   }
 
   protected long now() {
