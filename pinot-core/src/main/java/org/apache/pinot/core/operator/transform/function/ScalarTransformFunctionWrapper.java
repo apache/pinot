@@ -148,7 +148,8 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       } else {
         _nonLiteralIndices[_numNonLiteralArguments] = i;
         _nonLiteralFunctions[_numNonLiteralArguments] = transformFunction;
-        _nonLiteralTypes[_numNonLiteralArguments] = parameterTypes[i] != PinotDataType.OBJECT ? parameterTypes[i]
+        _nonLiteralTypes[_numNonLiteralArguments] = parameterTypes[i] != PinotDataType.OBJECT
+            ? parameterTypes[i]
             : getObjectArgumentType(transformFunction.getResultMetadata());
         _numNonLiteralArguments++;
       }
