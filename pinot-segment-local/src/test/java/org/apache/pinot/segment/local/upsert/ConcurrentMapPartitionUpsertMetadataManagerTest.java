@@ -2692,6 +2692,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ConsumingSegmentConsistencyModeListener consistencyModeListener =
         ConsumingSegmentConsistencyModeListener.getInstance();
     try {
+      // Set the mode explicitly rather than relying on the default, which this test is not about.
+      consistencyModeListener.setMode(ConsumingSegmentConsistencyModeListener.Mode.RESTRICTED);
       assertFalse(upsertMetadataManager.shouldRevertMetadataOnInconsistency(mutableSegment));
       consistencyModeListener.setMode(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED);
       assertTrue(upsertMetadataManager.shouldRevertMetadataOnInconsistency(mutableSegment));
