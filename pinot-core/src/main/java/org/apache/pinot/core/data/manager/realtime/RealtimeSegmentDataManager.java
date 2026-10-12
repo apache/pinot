@@ -1790,17 +1790,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
   }
 
-  /// Whether replacing this segment rewrites the key map its consuming rows wrote, so the next consuming segment
-  /// must not start until the replace is done. Such tables keep the consumer semaphore across both the build and the
-  /// download, which is what DISALLOW_ALWAYS does.
-  ///
-  /// Upsert: the replace reverts the metadata the consuming rows wrote, and the next segment would start against a
-  /// partially reverted primary key map. Dedup: a replica that consumed past the committed end offset downloads the
-  /// committed copy, and offloading the mutable segment removes the keys those extra rows added; a next consuming
-  /// segment running in between replays the rows, finds the keys still pointing at the mutable segment and drops
-  /// them as duplicates, so they land in neither segment. Dedup is not keyed on allowDedupConsumptionDuringCommit:
-  /// that one is deprecated and only read when no parallelSegmentConsumptionPolicy is set, so an explicit
-  /// ALLOW_ALWAYS would skip the hold it needs.
+  /// Whether replacing this segment rewrites the key map, which the next consuming segment must not run against.
+  /// These tables hold the semaphore across both the build and the download, the way DISALLOW_ALWAYS does.
+  /// Upsert reverts the keys the consuming rows wrote; dedup removes them when the mutable segment is offloaded,
+  /// and a replay in between is dropped as a duplicate against a key that is about to disappear.
   private boolean holdsConsumerSemaphoreForMetadata() {
     return revertsUpsertMetadata() || _partitionDedupMetadataManager != null;
   }
