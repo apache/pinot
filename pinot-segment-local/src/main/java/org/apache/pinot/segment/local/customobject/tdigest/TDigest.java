@@ -85,6 +85,9 @@ public abstract class TDigest {
   /// Unchanged historical encodings may be retained byte-exactly; fresh unrepresentable boundaries are rejected.
   public abstract byte[] serialize();
 
+  /// Finalizes an independently owned result without changing a live aggregation that may receive more inputs.
+  protected abstract byte[] serializeSnapshot();
+
   /// Bounds independently owned serialization without requiring a two-step size/write protocol.
   /// Mutable implementations can override this to avoid flushing buffered inputs.
   public int maxSerializedByteSize() {

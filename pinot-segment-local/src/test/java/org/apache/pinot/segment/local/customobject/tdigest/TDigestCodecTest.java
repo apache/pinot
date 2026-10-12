@@ -56,6 +56,29 @@ public class TDigestCodecTest {
   }
 
   @Test
+  public void testEncodedQuantileMatchesDecodedHistoricalDistribution() {
+    double[][] means = {{0, 10, 10, 20, 30}, {0, 10, 20}, {0, 20, 10, 30}, {0, 10, 30},
+        {0, Double.NaN, 30}, {0, 10, Double.NaN}, {Double.NEGATIVE_INFINITY, 10, Double.POSITIVE_INFINITY},
+        {-Double.MAX_VALUE, 0, Double.MAX_VALUE}, {-0.0, 0.0, 1}, {5}, {5}, {0, 10, 30}};
+    double[][] weights = {{1, 3, 5, 2, 1}, {0.5, 4, 0.5}, {0.5, 2, 3, 1}, {1, 0, 1},
+        {1, 4, 1}, {1, 4, 1}, {1, 4, 1}, {1, 4, 1}, {1, 4, 1}, {1.5}, {0}, {1, Double.MAX_VALUE, 1}};
+    for (int encoding : new int[]{VERBOSE_ENCODING, SMALL_ENCODING}) {
+      for (int i = 0; i < means.length; i++) {
+        double min = means[i][0];
+        double max = i == 5 ? Double.POSITIVE_INFINITY : means[i][means[i].length - 1];
+        byte[] bytes = legacyBytes(encoding, 100, min, max, means[i], weights[i]);
+        byte[] original = bytes.clone();
+        TDigest decoded = TDigestAccumulator.fromBytes(bytes);
+        for (double quantile : new double[]{0, 0.001, 0.1, 0.25, 0.5, 0.75, 0.9, 0.999, 1}) {
+          assertEquals(TDigestCodec.quantile(bytes, quantile), decoded.quantile(quantile),
+              "Encoding " + encoding + ", distribution " + i + ", quantile " + quantile);
+        }
+        assertEquals(bytes, original);
+      }
+    }
+  }
+
+  @Test
   public void testBufferedRawQuantilesRetainLegacyTwoLevelCompression() {
     SplittableRandom random = new SplittableRandom(10);
     double[] values = new double[94];

@@ -46,6 +46,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec.SerializedTDigestMetadata;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec.SerializedTDigestState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -747,8 +748,9 @@ public final class TDigestAccumulator extends TDigest {
         }
         double width = _centroidMeans[i + 1] - _centroidMeans[i];
         if (width > 0.0) {
-          double leftExcludedWeight = getPointMassHalfWeight(i);
-          double rightExcludedWeight = getPointMassHalfWeight(i + 1);
+          double leftExcludedWeight = getPointMassHalfWeight(_centroidMeans, _centroidWeights, null, _numCentroids, i);
+          double rightExcludedWeight =
+              getPointMassHalfWeight(_centroidMeans, _centroidWeights, null, _numCentroids, i + 1);
           double halfWeight = (_centroidWeights[i] + _centroidWeights[i + 1]) / 2.0;
           double interpolatedWeight = halfWeight - leftExcludedWeight - rightExcludedWeight;
           double base = weightSoFar + _centroidWeights[i] / 2.0 + leftExcludedWeight;
@@ -774,76 +776,91 @@ public final class TDigestAccumulator extends TDigest {
     }
     materializePendingSerializedTDigest();
     flush();
-    if (_numCentroids == 0) {
+    return quantile(quantile, _numCentroids, _totalWeight, _min, _max, _centroidMeans, _centroidWeights, null);
+  }
+
+  /// Interpolates the same distribution from primitive centroids or validated encoded centroids, without a copy.
+  static double quantile(double quantile, int count, double totalWeight, double min, double max, double[] means,
+      double[] weights, SerializedTDigestState encoded) {
+    if (count == 0) {
       return Double.NaN;
     }
-    if (_numCentroids == 1) {
-      return _centroidMeans[0];
+    if (count == 1) {
+      return mean(means, encoded, 0);
     }
     if (quantile == 0.0) {
-      return _min;
+      return min;
     }
     if (quantile == 1.0) {
-      return _max;
+      return max;
     }
 
-    double index = quantile * _totalWeight;
-    double firstWeight = _centroidWeights[0];
+    double index = quantile * totalWeight;
+    double firstWeight = weight(weights, encoded, 0);
     if (firstWeight < 1.0 && index < firstWeight / 2.0) {
-      return weightedAverage(_min, firstWeight / 2.0 - index, _centroidMeans[0], index);
+      return weightedAverage(min, firstWeight / 2.0 - index, mean(means, encoded, 0), index);
     }
     if (firstWeight >= 1.0 && index < 1.0) {
-      return _min;
+      return min;
     }
-    if (_centroidWeights[0] > 1.0 && index < _centroidWeights[0] / 2.0) {
-      return _min + (index - 1.0) / (_centroidWeights[0] / 2.0 - 1.0) * (_centroidMeans[0] - _min);
+    if (weight(weights, encoded, 0) > 1.0 && index < weight(weights, encoded, 0) / 2.0) {
+      return min + (index - 1.0) / (weight(weights, encoded, 0) / 2.0 - 1.0) * (mean(means, encoded, 0) - min);
     }
-    int lastIndex = _numCentroids - 1;
-    double lastWeight = _centroidWeights[lastIndex];
-    if (lastWeight < 1.0 && index >= _totalWeight - lastWeight / 2.0) {
-      return weightedAverage(_centroidMeans[lastIndex], _totalWeight - index, _max,
-          index - (_totalWeight - lastWeight / 2.0));
+    int lastIndex = count - 1;
+    double lastWeight = weight(weights, encoded, lastIndex);
+    if (lastWeight < 1.0 && index >= totalWeight - lastWeight / 2.0) {
+      return weightedAverage(mean(means, encoded, lastIndex), totalWeight - index, max,
+          index - (totalWeight - lastWeight / 2.0));
     }
-    if (lastWeight >= 1.0 && index > _totalWeight - 1.0) {
-      return _max;
+    if (lastWeight >= 1.0 && index > totalWeight - 1.0) {
+      return max;
     }
-    if (_centroidWeights[lastIndex] > 1.0
-        && _totalWeight - index <= _centroidWeights[lastIndex] / 2.0) {
-      return _max - (_totalWeight - index - 1.0) / (_centroidWeights[lastIndex] / 2.0 - 1.0)
-          * (_max - _centroidMeans[lastIndex]);
+    if (weight(weights, encoded, lastIndex) > 1.0
+        && totalWeight - index <= weight(weights, encoded, lastIndex) / 2.0) {
+      return max - (totalWeight - index - 1.0) / (weight(weights, encoded, lastIndex) / 2.0 - 1.0)
+          * (max - mean(means, encoded, lastIndex));
     }
 
-    double weightSoFar = _centroidWeights[0] / 2.0;
+    double weightSoFar = weight(weights, encoded, 0) / 2.0;
     for (int i = 0; i < lastIndex; i++) {
-      double halfWeight = (_centroidWeights[i] + _centroidWeights[i + 1]) / 2.0;
+      double halfWeight = (weight(weights, encoded, i) + weight(weights, encoded, i + 1)) / 2.0;
       if (weightSoFar + halfWeight > index) {
-        double leftExcludedWeight = getPointMassHalfWeight(i);
+        double leftExcludedWeight = getPointMassHalfWeight(means, weights, encoded, count, i);
         if (index - weightSoFar < leftExcludedWeight) {
-          return _centroidMeans[i];
+          return mean(means, encoded, i);
         }
-        double rightExcludedWeight = getPointMassHalfWeight(i + 1);
+        double rightExcludedWeight = getPointMassHalfWeight(means, weights, encoded, count, i + 1);
         if (weightSoFar + halfWeight - index <= rightExcludedWeight) {
-          return _centroidMeans[i + 1];
+          return mean(means, encoded, i + 1);
         }
         double leftWeight = index - weightSoFar - leftExcludedWeight;
         double rightWeight = weightSoFar + halfWeight - index - rightExcludedWeight;
-        return weightedAverage(_centroidMeans[i], rightWeight, _centroidMeans[i + 1], leftWeight);
+        return weightedAverage(mean(means, encoded, i), rightWeight, mean(means, encoded, i + 1), leftWeight);
       }
       weightSoFar += halfWeight;
     }
     // Rounded cumulative weights can leave a small gap before the directly computed last centroid center.
-    double weightToMax = Math.max(0.0, index - (_totalWeight - lastWeight / 2.0));
+    double weightToMax = Math.max(0.0, index - (totalWeight - lastWeight / 2.0));
     double weightFromLastCentroid = lastWeight / 2.0 - weightToMax;
-    return weightedAverage(_centroidMeans[lastIndex], weightFromLastCentroid, _max, weightToMax);
+    return weightedAverage(mean(means, encoded, lastIndex), weightFromLastCentroid, max, weightToMax);
   }
 
-  private double getPointMassHalfWeight(int index) {
+  private static double getPointMassHalfWeight(double[] means, double[] weights, SerializedTDigestState encoded,
+      int count, int index) {
     // Adjacent equal means establish a repeated-value plateau. Keep its complete mass out of interpolation at
     // either edge; an isolated weighted centroid still represents an unknown distribution around its mean.
-    double mean = _centroidMeans[index];
-    boolean pointMass = _centroidWeights[index] == 1.0 || index > 0 && _centroidMeans[index - 1] == mean
-        || index + 1 < _numCentroids && _centroidMeans[index + 1] == mean;
-    return pointMass ? _centroidWeights[index] / 2.0 : 0.0;
+    double mean = mean(means, encoded, index);
+    boolean pointMass = weight(weights, encoded, index) == 1.0 || index > 0 && mean(means, encoded, index - 1) == mean
+        || index + 1 < count && mean(means, encoded, index + 1) == mean;
+    return pointMass ? weight(weights, encoded, index) / 2.0 : 0.0;
+  }
+
+  private static double mean(double[] means, SerializedTDigestState encoded, int index) {
+    return encoded == null ? means[index] : encoded.mean(index);
+  }
+
+  private static double weight(double[] weights, SerializedTDigestState encoded, int index) {
+    return encoded == null ? weights[index] : encoded.weight(index);
   }
 
   private static double weightedAverage(double firstValue, double firstWeight, double secondValue,
@@ -974,6 +991,20 @@ public final class TDigestAccumulator extends TDigest {
     }
     flush();
     return _max;
+  }
+
+  @Override
+  protected byte[] serializeSnapshot() {
+    if (_legacyDegraded || _originalFractionalBytes != null || _originalBoundaryBytes != null
+        || _pendingSerializedTDigest != null && _pendingSerializedMetadata.isCanonicalPayload()) {
+      return serialize();
+    }
+    if (_pendingSerializedTDigest == null && _numRawValues == 0 && _numIncomingCentroids == 0
+        && _publiclyCompressed && (_numCentroids == 0 || _deferBoundaryNormalization
+        || _centroidWeights[0] == 1.0 && _centroidWeights[_numCentroids - 1] == 1.0)) {
+      return serialize();
+    }
+    return copy().serialize();
   }
 
   @Override

@@ -31,9 +31,9 @@ public class SerializedTDigest implements Comparable<SerializedTDigest> {
 
   public SerializedTDigest(TDigest tDigest, double percentile) {
     _percentile = percentile / 100.0;
-    // Finalize once before obtaining the sort key; serialization also owns historical byte-retention policy.
-    _serializedBytes = tDigest.serialize();
-    _quantile = TDigestAccumulator.fromBytes(_serializedBytes).quantile(_percentile);
+    // Finalize a snapshot: trim survivors continue aggregating, and the key must match the emitted encoding.
+    _serializedBytes = tDigest.serializeSnapshot();
+    _quantile = TDigestCodec.quantile(_serializedBytes, _percentile);
   }
 
   @Override

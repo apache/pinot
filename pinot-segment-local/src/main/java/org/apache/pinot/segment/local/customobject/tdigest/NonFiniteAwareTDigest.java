@@ -627,6 +627,17 @@ public final class NonFiniteAwareTDigest extends TDigest {
   }
 
   @Override
+  protected byte[] serializeSnapshot() {
+    if (_originalBytes != null) {
+      return _originalBytes.clone();
+    }
+    if (!_pendingHistoricalBoundaryRepair && _negativeInfinityWeight == 0.0 && _positiveInfinityWeight == 0.0) {
+      return _finiteDigest.serializeSnapshot();
+    }
+    return copy().serialize();
+  }
+
+  @Override
   public byte[] serialize() {
     if (_originalBytes != null) {
       return _originalBytes.clone();

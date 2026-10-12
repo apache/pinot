@@ -413,6 +413,17 @@ public final class TDigestCodec {
           _historicalFractionalMinMean, _historicalFractionalMaxMean);
     }
 
+    double weight(int index) {
+      _position = _centroidOffset + index * _centroidSize;
+      return _centroidSize == VERBOSE_CENTROID_SIZE ? readDouble() : readFloat();
+    }
+
+    double mean(int index) {
+      _position = _centroidOffset + index * _centroidSize + _centroidSize / 2;
+      double mean = _centroidSize == VERBOSE_CENTROID_SIZE ? readDouble() : readFloat();
+      return Double.isNaN(mean) ? _recoveredInfinityMean : Math.max(_min, Math.min(mean, _max));
+    }
+
     private int readPosition(int length) {
       if (length > _limit - _position) {
         throw new BufferUnderflowException();
@@ -443,6 +454,32 @@ public final class TDigestCodec {
       int position = readPosition(Float.BYTES);
       return _bytes != null ? Float.intBitsToFloat((int) INT_VIEW.get(_bytes, position)) : _buffer.getFloat(position);
     }
+  }
+
+  /// Reads a finalized payload's quantile without cloning bytes or constructing a mutable digest.
+  static double quantile(byte[] bytes, double quantile) {
+    if (Double.isNaN(quantile) || quantile < 0.0 || quantile > 1.0) {
+      throw new IllegalArgumentException("q should be in [0,1], got " + quantile);
+    }
+    SerializedTDigestState state = new SerializedTDigestState();
+    state.reset(bytes);
+    readSerializedHeader(state, true);
+    if (Double.isNaN(state._totalWeight)) {
+      inspectSerialized(state, null, null);
+    }
+    if (state._needsLegacyFallback || state._totalWeight == 0.0) {
+      return Double.NaN;
+    }
+    if (state._unorderedMeans || state._hasZeroWeightCentroids) {
+      // Rare retained historical payloads need the reader's filtering and stable sort, but no recompression.
+      SerializedTDigestInput input = new SerializedTDigestInput();
+      input.reset(bytes, state.snapshot());
+      input.decode();
+      return TDigestAccumulator.quantile(quantile, input._numCentroids, state._totalWeight, state._min, state._max,
+          input._means, input._weights, null);
+    }
+    return TDigestAccumulator.quantile(quantile, state._centroidCount, state._totalWeight, state._min, state._max,
+        null, null, state);
   }
 
   /// Inspects one payload without mutating `input`, scanning the centroid values once.

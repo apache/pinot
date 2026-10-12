@@ -22,6 +22,7 @@ import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import java.util.SplittableRandom;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -832,10 +833,45 @@ public class TDigestAccumulatorTest {
     assertEquals(comparison, Double.compare(decoded.quantile(0.5), nearby.quantile(0.5)));
     assertEquals(result.compareTo(other), comparison);
     assertEquals(result.toString(), rendered);
-    assertEquals(digest.quantile(0.5), publicMedian);
+    assertEquals(digest.quantile(0.5), workingMedian, "Extracting a trim key must not compress the survivor");
     digest.add(2);
     assertEquals(result.compareTo(other), comparison);
     assertEquals(result.toString(), rendered);
+  }
+
+  @Test
+  public void testRepeatedRawResultExtractionDoesNotChangeContinuingAggregation() {
+    for (boolean wrapped : new boolean[]{false, true}) {
+      TDigest control = wrapped
+          ? NonFiniteAwareTDigest.forLegacyAggregation(100) : TDigestAccumulator.forReduction(100);
+      TDigest trimmed = wrapped
+          ? NonFiniteAwareTDigest.forLegacyAggregation(100) : TDigestAccumulator.forReduction(100);
+      if (wrapped) {
+        control.add(Double.NEGATIVE_INFINITY);
+        control.add(Double.POSITIVE_INFINITY);
+        trimmed.add(Double.NEGATIVE_INFINITY);
+        trimmed.add(Double.POSITIVE_INFINITY);
+      }
+      Random random = new Random(7);
+      for (int shard = 0; shard < 32; shard++) {
+        TDigestAccumulator partial = TDigestAccumulator.forReduction(100);
+        for (int i = 0; i < 2_000; i++) {
+          partial.add(StrictMath.pow(random.nextDouble(), 8));
+        }
+        byte[] bytes = partial.serialize();
+        control.add(fromBytes(bytes));
+        trimmed.add(fromBytes(bytes));
+        if (shard % 4 == 3 && shard < 31) {
+          SerializedTDigest result = new SerializedTDigest(trimmed, 75);
+          String rendered = result.toString();
+          TDigestAccumulator reference = TDigestAccumulator.forReduction(100);
+          reference.add(fromBytes(BytesUtils.toBytes(rendered)).quantile(0.75));
+          assertEquals(result.compareTo(new SerializedTDigest(reference, 75)), 0);
+          assertEquals(new SerializedTDigest(trimmed, 75).toString(), rendered);
+        }
+      }
+      assertEquals(trimmed.serialize(), control.serialize(), "Trimming must preserve the continuing merge trajectory");
+    }
   }
 
   @Test
