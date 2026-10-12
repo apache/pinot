@@ -573,7 +573,7 @@ public class TableRebalancerTest {
     }
     Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap = new HashMap<>();
     return TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap,
-        minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
+        minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap, null);
   }
 
   @Test
@@ -1303,6 +1303,68 @@ public class TableRebalancerTest {
         RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
         DEFAULT_DATA_LOSS_RISK_ASSESSOR);
     assertEquals(nextAssignment, targetAssignment);
+  }
+
+  /// In low disk mode a server that is in both the current and the target assignment can be in the drop phase for
+  /// some segments while being in the add phase for others, which makes it hold both sets at once. Verify that the
+  /// adds to such a server are deferred until it has dropped everything the target assignment does not place on it.
+  @Test
+  public void testAssignmentWithLowDiskModeDefersAddsToServersWithPendingDrops() {
+    // 6 segments with replication 2 over host1/host2/host3, moving to host2/host3/host4. host2 and host3 are in both
+    // the current and the target assignment, so they both offload and onload segments.
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    currentAssignment.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(List.of("host1", "host2"), ONLINE));
+    currentAssignment.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(List.of("host3", "host1"), ONLINE));
+    currentAssignment.put("segment3", SegmentAssignmentUtils.getInstanceStateMap(List.of("host2", "host3"), ONLINE));
+    currentAssignment.put("segment4", SegmentAssignmentUtils.getInstanceStateMap(List.of("host1", "host2"), ONLINE));
+    currentAssignment.put("segment5", SegmentAssignmentUtils.getInstanceStateMap(List.of("host3", "host1"), ONLINE));
+    currentAssignment.put("segment6", SegmentAssignmentUtils.getInstanceStateMap(List.of("host2", "host3"), ONLINE));
+
+    Map<String, Map<String, String>> targetAssignment = new TreeMap<>();
+    targetAssignment.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(List.of("host2", "host3"), ONLINE));
+    targetAssignment.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(List.of("host4", "host2"), ONLINE));
+    targetAssignment.put("segment3", SegmentAssignmentUtils.getInstanceStateMap(List.of("host3", "host4"), ONLINE));
+    targetAssignment.put("segment4", SegmentAssignmentUtils.getInstanceStateMap(List.of("host2", "host3"), ONLINE));
+    targetAssignment.put("segment5", SegmentAssignmentUtils.getInstanceStateMap(List.of("host4", "host2"), ONLINE));
+    targetAssignment.put("segment6", SegmentAssignmentUtils.getInstanceStateMap(List.of("host3", "host4"), ONLINE));
+
+    // Every host hosts 4 segments to begin with, and host2 and host3 also host 4 in the target assignment
+    assertEquals(getNumSegmentsHosted(currentAssignment), Map.of("host1", 4, "host2", 4, "host3", 4));
+    assertEquals(getNumSegmentsHosted(targetAssignment), Map.of("host2", 4, "host3", 4, "host4", 4));
+
+    // With no per-segment sizes available every segment counts as one byte. host1, host2 and host3 are all already
+    // at the disk they started the rebalance with, so none of them may take on a segment until they have dropped one,
+    // while host4 is empty and can take on its full target.
+    TableRebalancer.StepDiskBudget stepBudget =
+        TableRebalancer.DiskUsageBudget.create(currentAssignment, null).forStep(currentAssignment, targetAssignment);
+    assertEquals(stepBudget.getRemainingBytes(), Map.of("host1", 0L, "host2", 0L, "host3", 0L, "host4", 4L));
+
+    Map<String, Map<String, String>> nextAssignment = currentAssignment;
+    int maxNumSegmentsHostedByHost3 = 4;
+    for (int step = 1; step <= 10 && !nextAssignment.equals(targetAssignment); step++) {
+      nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 1, false, true,
+          RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
+          DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+      Map<String, Integer> numSegmentsHosted = getNumSegmentsHosted(nextAssignment);
+      maxNumSegmentsHostedByHost3 = Math.max(maxNumSegmentsHostedByHost3, numSegmentsHosted.getOrDefault("host3", 0));
+      if (step == 2) {
+        assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(List.of("host2")));
+        assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(List.of("host2")));
+      }
+    }
+    assertEquals(nextAssignment, targetAssignment);
+    // host3 starts and ends with 4 segments, so it must never host more than 4 at any point of the rebalance
+    assertEquals(maxNumSegmentsHostedByHost3, 4);
+  }
+
+  private static Map<String, Integer> getNumSegmentsHosted(Map<String, Map<String, String>> assignment) {
+    Map<String, Integer> numSegmentsHosted = new TreeMap<>();
+    for (Map<String, String> instanceStateMap : assignment.values()) {
+      for (String instance : instanceStateMap.keySet()) {
+        numSegmentsHosted.merge(instance, 1, Integer::sum);
+      }
+    }
+    return numSegmentsHosted;
   }
 
   @Test
