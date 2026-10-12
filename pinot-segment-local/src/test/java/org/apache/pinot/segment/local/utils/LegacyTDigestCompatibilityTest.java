@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.google.common.util.concurrent.RateLimiter;
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,6 +27,7 @@ import java.util.SplittableRandom;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -120,7 +123,8 @@ public class LegacyTDigestCompatibilityTest {
     digest.add(1e100);
     digest.compress();
     double[] hugeExpected = quantiles(digest);
-    write(directory, manifest, "huge-mean-small-fallback", digest, compactFixture(digest), hugeExpected, true);
+    write(directory, manifest, "huge-mean-small-fallback", digest, TDigestTestUtils.compactFixture(digest),
+        hugeExpected, true);
     // Opaque degraded state retains its bytes even when neither old reader can fit its centroid count.
     ByteBuffer degraded = ByteBuffer.allocate(32 + 16 * 300);
     degraded.putInt(1).putDouble(0).putDouble(299).putDouble(100).putInt(300);
@@ -134,6 +138,9 @@ public class LegacyTDigestCompatibilityTest {
     assertEquals(preserved, degraded.array());
     write(directory, manifest, "degraded-over-capacity", digest, preserved, quantiles(digest), false);
     Files.writeString(directory.resolve("manifest.tsv"), manifest);
+    Files.writeString(directory.resolve("pinot-reader-classpath.txt"), String.join(File.pathSeparator,
+        Path.of(LoggerFactory.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toString(),
+        Path.of(RateLimiter.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toString()));
   }
 
   private static void export(Path directory, StringBuilder manifest, String name, TDigest digest,
@@ -144,37 +151,8 @@ public class LegacyTDigestCompatibilityTest {
     write(directory, manifest, name + "-verbose", digest, digest.serialize(), expected,
         compareInitialQuantiles);
     expected = quantiles(digest);
-    write(directory, manifest, name + "-compact", digest, compactFixture(digest), expected, compareInitialQuantiles);
-  }
-
-  // Legacy input fixtures keep compact decoding coverage without exposing a compact-writing digest API.
-  private static byte[] compactFixture(TDigest digest) {
-    byte[] serialized = digest.serialize();
-    ByteBuffer input = ByteBuffer.wrap(serialized);
-    if (input.getInt() == TDigestCodec.SMALL_ENCODING) {
-      return serialized;
-    }
-    double min = input.getDouble();
-    double max = input.getDouble();
-    double compression = input.getDouble();
-    int count = input.getInt();
-    int mainCapacity = Math.max(TDigestCodec.getDefaultCentroidCapacity(compression), count);
-    long bufferCapacity = 5L * mainCapacity;
-    if ((double) (float) compression != compression || count > Short.MAX_VALUE || bufferCapacity > Short.MAX_VALUE) {
-      return serialized;
-    }
-    ByteBuffer output = ByteBuffer.allocate(30 + 8 * count);
-    output.putInt(TDigestCodec.SMALL_ENCODING).putDouble(min).putDouble(max).putFloat((float) compression);
-    output.putShort((short) mainCapacity).putShort((short) bufferCapacity).putShort((short) count);
-    for (int i = 0; i < count; i++) {
-      float weight = (float) input.getDouble();
-      float mean = (float) input.getDouble();
-      if (!(weight > 0.0f) || !Float.isFinite(weight) || !Float.isFinite(mean)) {
-        return serialized;
-      }
-      output.putFloat(weight).putFloat(mean);
-    }
-    return output.array();
+    write(directory, manifest, name + "-compact", digest, TDigestTestUtils.compactFixture(digest), expected,
+        compareInitialQuantiles);
   }
 
   private static double[] quantiles(TDigest digest) {

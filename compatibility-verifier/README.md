@@ -129,6 +129,11 @@ Operator remediation: an error starting with `Cannot merge or mutate a historica
 a corrupt or ambiguous stored distribution. Mixing such a payload with nonempty input fails the query, merge-rollup
 task, or TDigest star-tree build, even when all other inputs are healthy. A single corrupt row in one segment can
 therefore fail a query spanning many segments; there is no automatic per-row quarantine or NaN fallback during merges.
+This replaces the approximate values older readers could return for negative weights, NaN means or far-out-of-range
+means; there is no configuration to restore that lenient behavior. A rate-limited WARN from
+`TDigestAccumulator` reports when an input first becomes degraded, with encoding and size metadata and
+rebuild guidance. It does not contain stored values or segment identity; use the query's segment context to locate
+affected data.
 Healthy empty inputs remain no-ops. Identify affected stored BYTES with
 `TDigestAccumulator.fromBytes(bytes).hasValidStatistics()`, rebuild their digests from original measurements or
 reingest affected segments from a known-good source, then rerun rollup or rebuild the star-tree. Retrying the same
@@ -166,9 +171,13 @@ This improves accuracy near large repeated-value populations, but can change qua
 including intervals adjacent to a plateau, even when evaluating the same stored centroid bytes. Legacy byte encodings
 remain compatible; quantile/CDF values need not be bit-identical to tdunning's interpolation.
 
-After the affected tests generate fixtures, run `compatibility-verifier/tdigest-compatibility/run.sh` to exercise
+Run `compatibility-verifier/tdigest-compatibility/run.sh` to exercise
 the real 3.2 and 3.3 readers and verify Pinot reads verbose/compact bytes written by those libraries. The script
-also runs `compatibility-verifier/tdigest-compatibility/generate-rank-errors.sh` to verify the independent 3.3
+reuses generated fixtures or explicitly runs `LegacyTDigestCompatibilityTest` if its manifest or isolated reader
+classpath is missing. Generation failures remain fatal. The Pinot reader includes only Pinot classes and the
+SLF4J/Guava runtime jars used by its diagnostics, and rejects any classpath containing tdunning classes. Legacy jars
+remain isolated test-tool artifacts resolved through the cached Maven repository; uncached runs need Maven Central.
+The script also runs `compatibility-verifier/tdigest-compatibility/generate-rank-errors.sh` to verify the independent 3.3
 accuracy oracle.
 
 The oracle pins Pinot's `f818bae6d75a91228eb3aac95c921bca4aeb2128` utility and t-digest 3.3. Its reference CI

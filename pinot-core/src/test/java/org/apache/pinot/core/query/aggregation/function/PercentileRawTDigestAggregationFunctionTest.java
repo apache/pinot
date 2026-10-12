@@ -141,7 +141,7 @@ public class PercentileRawTDigestAggregationFunctionTest {
   }
 
   /// Verbose-encoded digest (encoding 1) with unit-weight centroids at means 0..numCentroids-1. Package-private:
-  /// shared with [PercentileSmartTDigestAggregationFunctionTest].
+  /// shared with [PercentileTDigestAggregationFunctionTest] and [PercentileSmartTDigestAggregationFunctionTest].
   static byte[] createVerboseUnitCentroidDigest(int numCentroids, double compression) {
     ByteBuffer buffer = ByteBuffer.allocate(4 * Integer.BYTES + 2 * Double.BYTES + 2 * Double.BYTES * numCentroids);
     buffer.putInt(1);

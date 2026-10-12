@@ -50,6 +50,7 @@ import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigestInpu
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec;
+import org.apache.pinot.segment.local.utils.TDigestTestUtils;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
@@ -497,7 +498,7 @@ public class PercentileTDigestAggregationFunctionTest {
     TDigest empty = TDigestAccumulator.forLegacyAggregation(20.0);
     TDigest one = TDigestAccumulator.forLegacyAggregation(100.0);
     one.add(1.0);
-    byte[] smallBytes = compactFixture(one);
+    byte[] smallBytes = TDigestTestUtils.compactFixture(one);
     TDigest two = TDigestAccumulator.forLegacyAggregation(100.0);
     two.add(2.0);
     byte[][] values = {
@@ -866,7 +867,7 @@ public class PercentileTDigestAggregationFunctionTest {
   @Test
   public void testLowCompressionVerboseCapacityAddedIn33() {
     int numCentroids = 51;
-    byte[] verbose = createVerboseUnitCentroidDigest(numCentroids, 20.0);
+    byte[] verbose = PercentileRawTDigestAggregationFunctionTest.createVerboseUnitCentroidDigest(numCentroids, 20.0);
 
     TDigest deserialized = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(verbose);
     Assert.assertEquals(deserialized.size(), numCentroids);
@@ -880,7 +881,8 @@ public class PercentileTDigestAggregationFunctionTest {
     for (Object[] testCase : new Object[][]{{42.125, 95}, {100.1, 212}}) {
       double compression = (double) testCase[0];
       int numCentroids = (int) testCase[1];
-      byte[] verbose = createVerboseUnitCentroidDigest(numCentroids, compression);
+      byte[] verbose =
+          PercentileRawTDigestAggregationFunctionTest.createVerboseUnitCentroidDigest(numCentroids, compression);
 
       TDigest result = aggregateSerialized(new byte[][]{verbose}, null, false);
       Assert.assertEquals(result.size(), numCentroids);
@@ -900,7 +902,7 @@ public class PercentileTDigestAggregationFunctionTest {
   @Test
   public void testPendingLowCompressionDigestSerializesWithLegacyCompatibleCapacity() {
     int numCentroids = 51;
-    byte[] verbose = createVerboseUnitCentroidDigest(numCentroids, 20.0);
+    byte[] verbose = PercentileRawTDigestAggregationFunctionTest.createVerboseUnitCentroidDigest(numCentroids, 20.0);
     TDigestAccumulator accumulator =
         TDigestAccumulator.forReduction(TDigestCodec.readCompression(verbose));
     accumulator.addSerializedTDigest(verbose);
@@ -1357,7 +1359,7 @@ public class PercentileTDigestAggregationFunctionTest {
         digest.add(serializedValue(digestIndex, valueIndex, numDigests, valuesPerDigest));
       }
       if (useSmallEncoding.test(digestIndex)) {
-        serializedDigests[digestIndex] = compactFixture(digest);
+        serializedDigests[digestIndex] = TDigestTestUtils.compactFixture(digest);
       } else {
         serializedDigests[digestIndex] = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(digest);
       }
@@ -1365,53 +1367,8 @@ public class PercentileTDigestAggregationFunctionTest {
     return serializedDigests;
   }
 
-  // Legacy input fixtures keep compact decoding coverage without exposing a compact-writing digest API.
-  private static byte[] compactFixture(TDigest digest) {
-    byte[] serialized = digest.serialize();
-    ByteBuffer input = ByteBuffer.wrap(serialized);
-    if (input.getInt() == TDigestCodec.SMALL_ENCODING) {
-      return serialized;
-    }
-    double min = input.getDouble();
-    double max = input.getDouble();
-    double compression = input.getDouble();
-    int count = input.getInt();
-    int mainCapacity = Math.max(TDigestCodec.getDefaultCentroidCapacity(compression), count);
-    long bufferCapacity = 5L * mainCapacity;
-    if ((double) (float) compression != compression || count > Short.MAX_VALUE || bufferCapacity > Short.MAX_VALUE) {
-      return serialized;
-    }
-    ByteBuffer output = ByteBuffer.allocate(30 + 8 * count);
-    output.putInt(TDigestCodec.SMALL_ENCODING).putDouble(min).putDouble(max).putFloat((float) compression);
-    output.putShort((short) mainCapacity).putShort((short) bufferCapacity).putShort((short) count);
-    for (int i = 0; i < count; i++) {
-      float weight = (float) input.getDouble();
-      float mean = (float) input.getDouble();
-      if (!(weight > 0.0f) || !Float.isFinite(weight) || !Float.isFinite(mean)) {
-        return serialized;
-      }
-      output.putFloat(weight).putFloat(mean);
-    }
-    return output.array();
-  }
-
-  private static byte[] createVerboseUnitCentroidDigest(int numCentroids, double compression) {
-    ByteBuffer verbose = ByteBuffer.allocate(4 * Integer.BYTES + 2 * Double.BYTES
-        + 2 * Double.BYTES * numCentroids);
-    verbose.putInt(1);
-    verbose.putDouble(0.0);
-    verbose.putDouble(numCentroids - 1.0);
-    verbose.putDouble(compression);
-    verbose.putInt(numCentroids);
-    for (int i = 0; i < numCentroids; i++) {
-      verbose.putDouble(1.0);
-      verbose.putDouble(i);
-    }
-    return verbose.array();
-  }
-
   private static void assertPendingSerializedDigestOwnsInputBytes(boolean reusableInput) {
-    byte[] bytes = createVerboseUnitCentroidDigest(3, 20.0);
+    byte[] bytes = PercentileRawTDigestAggregationFunctionTest.createVerboseUnitCentroidDigest(3, 20.0);
     byte[] expected = bytes.clone();
     TDigestAccumulator accumulator;
     if (reusableInput) {

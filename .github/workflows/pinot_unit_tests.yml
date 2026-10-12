@@ -170,7 +170,8 @@ jobs:
         run: |
           .github/workflows/scripts/pr-tests/.pinot_tests_unit.sh
       - name: Verify legacy t-digest compatibility
-        # Set 2 must run LegacyTDigestCompatibilityTest; missing fixtures must fail this gate.
+        # Reuse set 2's fixtures, or explicitly run their exporter if test filtering omitted it.
+        # Missing fixtures after generation must still fail this gate.
         # The script resolves real 3.2/3.3 test jars; offline CI must cache both the repository and Maven wrapper.
         if: ${{ matrix.testset == 2 }}
         timeout-minutes: 5

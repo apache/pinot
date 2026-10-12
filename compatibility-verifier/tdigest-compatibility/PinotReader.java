@@ -40,6 +40,9 @@ public final class PinotReader {
     if (!PinotReader.class.desiredAssertionStatus()) {
       throw new IllegalStateException("The legacy compatibility gate requires -ea");
     }
+    if (PinotReader.class.getClassLoader().getResource("com/tdunning/math/stats/TDigest.class") != null) {
+      throw new IllegalStateException("The Pinot reader classpath must not include tdunning");
+    }
     Path directory = Path.of(args[0]);
     List<String> manifest = Files.readAllLines(directory.resolve("manifest.tsv"));
     assert !manifest.isEmpty() : "Missing legacy writer fixtures";

@@ -18,7 +18,7 @@
 # under the License.
 #
 
-# Run after LegacyTDigestCompatibilityTest. Legacy jars are test-tool artifacts, not Pinot dependencies.
+# Reuse or generate LegacyTDigestCompatibilityTest fixtures. Legacy jars are test-tool artifacts, not Pinot dependencies.
 set -euo pipefail
 # Match the unit-test workflow's Maven Central retry and connection settings, including standalone runs.
 export MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 \
@@ -26,13 +26,19 @@ export MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.wagon.httpconnectionManager.ttlSecond
 TDIGEST_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TDIGEST_FIXTURES="$TDIGEST_ROOT/pinot-segment-local/target/tdigest-compat-fixtures"
 TDIGEST_WORK="$TDIGEST_ROOT/pinot-segment-local/target/tdigest-legacy-reader"
-if [[ ! -s "$TDIGEST_FIXTURES/manifest.tsv" ]]; then
-  printf 'Missing or empty t-digest fixture manifest: %s. Run LegacyTDigestCompatibilityTest first.\n' \
-    "$TDIGEST_FIXTURES/manifest.tsv" >&2
+TDIGEST_RUNTIME_CLASSPATH="$TDIGEST_FIXTURES/pinot-reader-classpath.txt"
+if [[ ! -s "$TDIGEST_FIXTURES/manifest.tsv" || ! -s "$TDIGEST_RUNTIME_CLASSPATH" ]]; then
+  # Explicit selection keeps the gate independent of unit-test shard filters and quarantine lists.
+  "$TDIGEST_ROOT/mvnw" -f "$TDIGEST_ROOT/pom.xml" -B -ntp -pl pinot-segment-local -am \
+    -Dtest=LegacyTDigestCompatibilityTest -Dsurefire.failIfNoSpecifiedTests=false -DskipTests=false test
+fi
+if [[ ! -s "$TDIGEST_FIXTURES/manifest.tsv" || ! -s "$TDIGEST_RUNTIME_CLASSPATH" ]]; then
+  printf 'LegacyTDigestCompatibilityTest did not generate the required fixtures in %s.\n' "$TDIGEST_FIXTURES" >&2
   exit 1
 fi
+TDIGEST_PINOT_CLASSPATH="$TDIGEST_ROOT/pinot-segment-local/target/classes:$(cat "$TDIGEST_RUNTIME_CLASSPATH")"
 mkdir -p "$TDIGEST_WORK"
-javac -cp "$TDIGEST_ROOT/pinot-segment-local/target/classes" -d "$TDIGEST_WORK" \
+javac -cp "$TDIGEST_PINOT_CLASSPATH" -d "$TDIGEST_WORK" \
   "$TDIGEST_ROOT/compatibility-verifier/tdigest-compatibility/PinotReader.java"
 for TDIGEST_VERSION in 3.2 3.3; do
   TDIGEST_JAR="$TDIGEST_WORK/t-digest-$TDIGEST_VERSION.jar"
@@ -46,7 +52,7 @@ for TDIGEST_VERSION in 3.2 3.3; do
     "$TDIGEST_ROOT/compatibility-verifier/tdigest-compatibility/LegacyReader.java"
   java -ea:LegacyReader -Xmx128m -cp "$TDIGEST_WORK:$TDIGEST_JAR" LegacyReader "$TDIGEST_FIXTURES" "$TDIGEST_VERSION"
   # The Pinot JVM contains no tdunning classes; it consumes bytes and expectations from the legacy JVM.
-  java -ea -Xmx128m -cp "$TDIGEST_WORK:$TDIGEST_ROOT/pinot-segment-local/target/classes" \
+  java -ea -Xmx128m -cp "$TDIGEST_WORK:$TDIGEST_PINOT_CLASSPATH" \
     PinotReader "$TDIGEST_FIXTURES/legacy-$TDIGEST_VERSION" "$TDIGEST_VERSION"
 done
 # Keep the checked-in accuracy oracle executable and independent from the current Pinot implementation.

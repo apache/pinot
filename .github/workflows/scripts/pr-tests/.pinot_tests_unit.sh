@@ -66,8 +66,7 @@ fi
 if [ "$RUN_TEST_SET" == "1" ]; then
   # pinot-segment-local's tests run in set #2 to balance pinot-core's longer test time in this
   # shard against set #2's longer build. It remains built in set #1 as a pinot-core dependency.
-  # LegacyTDigestCompatibilityTest must remain included: the workflow requires its fixtures in set #2.
-  # Moving these tests to another shard requires updating the workflow's legacy t-digest gate condition.
+  # The legacy t-digest gate reuses set #2's fixtures, or runs their exporter if filtering omitted it.
   # No -am on this command, so only the listed modules test.
   mvn test ${FORK_OPTS} \
       -pl 'pinot-spi' \

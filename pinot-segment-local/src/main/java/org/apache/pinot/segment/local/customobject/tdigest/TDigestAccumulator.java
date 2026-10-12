@@ -39,12 +39,15 @@
  */
 package org.apache.pinot.segment.local.customobject.tdigest;
 
+import com.google.common.util.concurrent.RateLimiter;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec.SerializedTDigestMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 
@@ -67,6 +70,8 @@ import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec.Serializ
 ///
 /// Instances are externally serialized per aggregation or group key and are not safe for concurrent mutation.
 public final class TDigestAccumulator extends TDigest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TDigestAccumulator.class);
+  private static final RateLimiter LEGACY_DEGRADED_LOG_RATE_LIMITER = RateLimiter.create(1.0 / 60.0);
   private static final int MIN_RAW_BUFFER_SIZE = 256;
   private static final int MAX_RAW_BUFFER_SIZE = 10_000;
   private static final int TWO_LEVEL_COMPRESSION_MULTIPLIER = 2;
@@ -535,7 +540,7 @@ public final class TDigestAccumulator extends TDigest {
         _originalFractionalBytes = _pendingSerializedTDigest;
       }
       if (input._metadata._needsLegacyFallback) {
-        _legacyDegraded = true;
+        markLegacyDegraded();
       }
       return false;
     }
@@ -545,7 +550,7 @@ public final class TDigestAccumulator extends TDigest {
       if (hasNoInputs()) {
         _pendingSerializedTDigest = input.retainBytes();
         _pendingSerializedMetadata = input.getMetadata();
-        _legacyDegraded = true;
+        markLegacyDegraded();
         return false;
       }
       throw corruptedMutation();
@@ -561,6 +566,19 @@ public final class TDigestAccumulator extends TDigest {
     }
     _hasFractionalWeights |= input._metadata._fractionalWeights;
     return true;
+  }
+
+  private void markLegacyDegraded() {
+    _legacyDegraded = true;
+    if (LOGGER.isWarnEnabled() && LEGACY_DEGRADED_LOG_RATE_LIMITER.tryAcquire()) {
+      LOGGER.warn("Preserving corrupt historical t-digest bytes (encoding={}, bytes={}, compression={}, centroids={}, "
+              + "totalWeight={}): percentile/CDF results are NaN and mutation or non-empty merges will fail. "
+              + "Inspect the affected t-digest columns and rebuild or re-ingest their segments from original values. "
+              + "Warnings are rate limited across accumulators.",
+          _pendingSerializedMetadata.encoding(), _pendingSerializedTDigest.length,
+          _pendingSerializedMetadata.compression(), _pendingSerializedMetadata.centroidCount(),
+          _pendingSerializedMetadata.totalWeight());
+    }
   }
 
   private boolean hasNoInputs() {
